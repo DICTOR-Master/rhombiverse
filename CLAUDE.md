@@ -149,8 +149,10 @@ gaps between the old and new radius get filled. **Visually confirmed,
 2026-08-11** — user confirmed growth compounds correctly up through 10
 shells on the same structure.
 
-**Phase 3 (local persistence) is implemented, NOT yet visually
-verified.** `persistence.js` gained `saveToLocalStorage`/
+**Phase 3 (local persistence) is implemented and visually confirmed,
+2026-08-11** — user confirmed persistence-across-refresh, Export/Import
+round-tripping, and New World's reset all work. `persistence.js` gained
+`saveToLocalStorage`/
 `loadFromLocalStorage` (JSON in/out of `localStorage`, wrapped in
 try/catch since a quota-exceeded failure shouldn't break building —
 real risk given `MAX_CELLS=20000`-scale worlds, not hypothetical),
@@ -169,11 +171,7 @@ re-renders and re-saves; three new buttons in `index.html`'s `#controls`
 overlay — **New World** (confirm-gated, since it's destructive; clears
 storage and reloads the static seed), **Export JSON** (downloads the
 current world), **Import JSON** (file picker, replaces the world,
-alerts on invalid JSON rather than silently failing). **Not yet
-verified** — after hard-refreshing, build something, refresh the page
-again, and confirm the build persists (Phase 3's actual success check);
-also try Export then Import to confirm round-tripping works, and New
-World to confirm it resets after confirmation.
+alerts on invalid JSON rather than silently failing).
 
 **To continue implementation**, Phase 4 (deploy publicly: GitHub
 Pages/Vercel, still single-player) is next — see `RHOMBIVERSE_PLAN.md`

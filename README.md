@@ -29,13 +29,9 @@ from Phase 5.5 — Shift+click a cell to fill N shells outward around it
 Shift+click on the same structure grows it further (confirmed working up
 through 10 shells).
 
-**Phase 3** (local persistence) is implemented — builds now survive a
-page refresh via `localStorage`, plus New World / Export JSON / Import
-JSON buttons — but **not yet visually confirmed**. After hard-refreshing:
-build something, reload the page, and check it's still there; try Export
-then Import to round-trip a world; try New World to confirm it resets
-after the confirmation prompt. See `CLAUDE.md`'s Current Status for
-implementation detail.
+**Phase 3** (local persistence) is implemented and visually confirmed —
+builds survive a page refresh via `localStorage`, and New World / Export
+JSON / Import JSON all work.
 
 Phase 4 (deploy publicly) is next — see `RHOMBIVERSE_PLAN.md` section 4
 for the full phased build order. `docs/RHOMBIVERSE_COMPLIANCE.md`'s
