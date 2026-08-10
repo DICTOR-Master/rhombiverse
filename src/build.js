@@ -1,14 +1,14 @@
 // Placement/removal: raycast to find which of the 12 faces of a clicked
 // RD was hit, click to add the corresponding neighbor cell, right-click
 // to remove the clicked cell. RHOMBIVERSE_PLAN.md section 4, Phase 2.
-// Shift+click instead fills N shells outward from the clicked cell (the
-// Phase 5.5 "shell fill" / fill-sphere shortcut, see lattice.js's
-// cellsInShells), built early at the user's request.
+// Shift+click instead fills N shells outward from a center (the Phase 5.5
+// "shell fill" / fill-sphere shortcut, see lattice.js's cellsInShells),
+// built early at the user's request.
 //
 // Touch (tap / long-press) is not implemented yet -- mouse only for now,
 // documented here as a known gap rather than a half-working touch handler.
 import * as THREE from 'three';
-import { NEIGHBOR_OFFSETS, isValidCell, cellsInShells } from './lattice.js';
+import { NEIGHBOR_OFFSETS, isValidCell, cellsInShells, cellKey, parseCellKey } from './lattice.js';
 
 // Unit-normalized neighbor directions, precomputed once. Every RD
 // instance shares the same (unrotated) orientation -- see lattice.js --
@@ -59,9 +59,23 @@ export function createBuildController({ renderer, camera, mesh, cellAt, world, o
 
     if (event.shiftKey) {
       const n = getShellCount();
-      for (const c of cellsInShells(cell.x, cell.y, cell.z, n)) {
+      // If the clicked cell already belongs to a shell-filled structure
+      // (it was itself placed by, or is the original center of, an
+      // earlier fill), grow THAT structure's true center outward instead
+      // of starting a new one where you happened to click -- otherwise a
+      // second shift+click on an outer shell builds an unrelated
+      // same-sized cluster next door rather than a bigger sphere.
+      const centerKey = cell.shellCenter || cellKey(cell.x, cell.y, cell.z);
+      const [ccx, ccy, ccz] = parseCellKey(centerKey);
+
+      if (!cell.shellCenter) {
+        const { x, y, z, ...data } = cell;
+        world.addCell(x, y, z, { ...data, shellCenter: centerKey });
+      }
+
+      for (const c of cellsInShells(ccx, ccy, ccz, n)) {
         if (!world.has(c.x, c.y, c.z)) {
-          world.addCell(c.x, c.y, c.z, { material: 'base', shell: c.shell });
+          world.addCell(c.x, c.y, c.z, { material: 'base', shell: c.shell, shellCenter: centerKey });
         }
       }
       onChange();

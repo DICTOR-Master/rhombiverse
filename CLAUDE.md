@@ -128,6 +128,29 @@ same-colored neighbor cells appear, and that increasing the shell-count
 input and Shift+clicking again adds a second, differently-tinted ring
 outward.
 
+**Real bug found and fixed, 2026-08-11: a second Shift+click built a new,
+unrelated cluster instead of growing the first one.** User confirmed
+shell-fill worked and tinted correctly on the first click, but clicking
+again (with a bigger N, expecting the sphere to grow) instead built
+another same-sized group next door. Root cause: every Shift+click treated
+whatever cell was clicked as a brand-new center, with no memory of which
+structure it belonged to. Fixed by tagging every shell-filled cell
+(including the original center, retroactively, on first fill) with a
+`shellCenter` field — the stringified coordinate of its structure's true
+origin. A later Shift+click checks the clicked cell for an existing
+`shellCenter`: if present, it re-runs `cellsInShells` from that stored
+center (not the clicked cell), so growth compounds around the same
+origin; new cells inherit the same `shellCenter` so the chain continues
+correctly on a third, fourth, etc. click. If absent (an untagged plain
+cell), the clicked cell becomes a new center, same as before — so
+Shift+clicking an unrelated cell still starts a separate structure, which
+is correct. Already-placed cells are never re-added or reshuffled, only
+gaps between the old and new radius get filled. **Not yet visually
+verified** — after hard-refreshing, Shift+click a cell, then increase the
+shell-count input and Shift+click the SAME structure again (center or any
+outer cell) and confirm it grows one coherent, larger sphere rather than
+spawning a second cluster.
+
 **To continue implementation**, Phase 3 (local persistence: `localStorage`
 save/load, JSON export/import) is next — see `RHOMBIVERSE_PLAN.md`
 section 4.

@@ -31,10 +31,13 @@ stale `InstancedMesh` bounding-sphere cache) were both found via real
 browser checks and fixed. A **shell fill tool** (Phase 5.5's fill-sphere
 tool, pulled forward early) was also added: Shift+click a cell to fill N
 shells outward around it (set N in the on-page number input), tinted by
-shell distance so each ring is visually distinguishable. **None of this
-round is yet re-confirmed — hard-refresh and check you can ring all 12
-faces of a cell, and that Shift+click fills and tints shells** before
-trusting it as resolved; see `CLAUDE.md`'s Current Status for root
+shell distance so each ring is visually distinguishable, and a second
+Shift+click on the same structure now grows it further instead of
+starting an unrelated cluster next door (also a real, user-caught bug).
+**This latest fix is not yet re-confirmed — hard-refresh, Shift+click a
+cell, raise the shell count, and Shift+click that same structure again to
+confirm it grows one bigger sphere** before trusting it as resolved; see
+`CLAUDE.md`'s Current Status for root
 causes. Phase 3
 (local persistence) is next —
 see `RHOMBIVERSE_PLAN.md` section 4 for the full phased build order.
