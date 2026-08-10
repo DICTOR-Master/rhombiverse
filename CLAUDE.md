@@ -41,17 +41,17 @@ renders it via `InstancedMesh` for every cell in the loaded world, and
 orbits it with `OrbitControls`. `build.js`/`persistence.js` remain stubs
 (Phases 2/3).
 
-**Not yet verified in a real browser.** No Node, browser binary, or
-screenshot tool exists in this environment, and the Claude in Chrome
-extension isn't connected in this session. Verified instead: every CDN
-import-map path resolves (curl 200, including confirming the exact
-`ConvexGeometry`/`OrbitControls` export names match what's imported),
+**Visually verified, 2026-08-11.** No Node, browser binary, or screenshot
+tool exists in this environment, and the Claude in Chrome extension isn't
+connected in this session, so verification happened out-of-band: the user
+opened the served page in a real browser from a separate machine/terminal
+and confirmed the RD renders and orbits correctly. Prior to that, this
+session had only confirmed every CDN import-map path resolves (curl 200,
+including the exact `ConvexGeometry`/`OrbitControls` export names),
 `python3 -m http.server` serves every file with correct content, and
-`starter-world.json` parses as valid, schema-matching JSON. **Load
-`http://localhost:8000` after `python3 -m http.server` in a real browser
-and confirm the RD actually renders and orbits before trusting this is
-visually correct** — the math and wiring are verified, the pixels are
-not.
+`starter-world.json` parses as valid, schema-matching JSON — that was
+wiring/math verification, not visual, and is why the actual browser check
+mattered before trusting this phase as done.
 
 **To continue implementation**, Phase 2 (build tool: face-picking raycast,
 click to add/remove cells) is next — see `RHOMBIVERSE_PLAN.md` section 4.
