@@ -20,11 +20,14 @@ See `RHOMBIVERSE_PLAN.md` section 6 for the full vision statement, and
 
 ## What this is (right now)
 
-Phase 1 (renderer + lattice math, no interactivity) is implemented and
-visually confirmed: a single rhombic dodecahedron renders at the FCC
-origin and the camera orbits it with mouse drag. Phase 2 (build tool:
-click to place/remove cells) is next — see `RHOMBIVERSE_PLAN.md` section 4
-for the full phased build order.
+Phase 1 (renderer + lattice math) is implemented and visually confirmed:
+a single rhombic dodecahedron renders at the FCC origin and the camera
+orbits it with mouse drag. Phase 2 (build tool) is implemented but **not
+yet checked in a real browser** — left-click a face to add the
+neighboring cell, right-click a cell to remove it (mouse only; touch
+tap/long-press isn't implemented yet). See `CLAUDE.md`'s Current Status
+before trusting Phase 2 as working. Phase 3 (local persistence) is next —
+see `RHOMBIVERSE_PLAN.md` section 4 for the full phased build order.
 
 ## Structure
 

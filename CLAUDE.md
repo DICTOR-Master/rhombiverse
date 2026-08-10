@@ -38,23 +38,43 @@ all six built `~/rhombispheres/` levels), not re-derived from scratch.
 needs triangles for rendering, not `build_polyhedron`'s merged N-gon
 faces, which are a physics-layer concern this project doesn't have yet),
 renders it via `InstancedMesh` for every cell in the loaded world, and
-orbits it with `OrbitControls`. `build.js`/`persistence.js` remain stubs
-(Phases 2/3).
+orbits it with `OrbitControls`. `persistence.js` remains a stub (Phase 3).
 
-**Visually verified, 2026-08-11.** No Node, browser binary, or screenshot
-tool exists in this environment, and the Claude in Chrome extension isn't
-connected in this session, so verification happened out-of-band: the user
-opened the served page in a real browser from a separate machine/terminal
-and confirmed the RD renders and orbits correctly. Prior to that, this
-session had only confirmed every CDN import-map path resolves (curl 200,
-including the exact `ConvexGeometry`/`OrbitControls` export names),
-`python3 -m http.server` serves every file with correct content, and
-`starter-world.json` parses as valid, schema-matching JSON — that was
-wiring/math verification, not visual, and is why the actual browser check
-mattered before trusting this phase as done.
+**Phase 1 visually verified, 2026-08-11** — no Node/browser/screenshot
+tooling in this environment, so the user confirmed rendering/orbiting in
+a real browser from a separate machine/terminal.
 
-**To continue implementation**, Phase 2 (build tool: face-picking raycast,
-click to add/remove cells) is next — see `RHOMBIVERSE_PLAN.md` section 4.
+**Phase 2 (build tool) is implemented, NOT yet visually verified.**
+`src/build.js` raycasts against the `InstancedMesh`; left-click on a face
+adds the corresponding neighbor cell (matching the hit's flat face normal
+against the 12 `NEIGHBOR_OFFSETS` directions — every RD face's outward
+normal points exactly along its neighbor direction, since the RD is the
+FCC lattice's own Voronoi cell, so no per-instance transform is needed),
+right-click removes the clicked cell. `src/worldstate.js` gained
+`createWorldStore` (an in-memory `Map`-backed store with
+`has`/`addCell`/`removeCell`/`entries`) to back this — Phase 3 will add
+persistence on top, not replace this store. `render.js` now allocates the
+`InstancedMesh` at a fixed capacity (`MAX_CELLS = 4096`) and re-syncs
+`mesh.count`/instance matrices on every world-state change via
+`rebuildInstances`. `OrbitControls`' right-mouse-button pan is disabled
+(`controls.mouseButtons.RIGHT = null`) so right-click is unambiguous for
+removal — confirmed safe by reading `OrbitControls`' own source (an
+unrecognized `mouseButtons` value falls through to a no-op, doesn't
+error). **Touch (tap / long-press) is explicitly not implemented** —
+mouse only, documented as a known gap in `build.js` rather than a
+half-working touch handler.
+
+**What's verified vs. not, for Phase 2:** confirmed via source inspection
+and static serving (CDN paths, bracket-balance, HTTP 200s on every file)
+in this session, same as Phase 1 originally was — but unlike Phase 1,
+**no one has yet opened this in a real browser and actually clicked to
+build/right-clicked to remove a cell.** Do that before trusting Phase 2's
+success check ("player can build outward face-by-face from the seed cell
+using only mouse/touch") as met.
+
+**To continue implementation**, Phase 3 (local persistence: `localStorage`
+save/load, JSON export/import) is next — see `RHOMBIVERSE_PLAN.md`
+section 4.
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.
