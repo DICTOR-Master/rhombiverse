@@ -10,9 +10,13 @@
 // actual distances (measured: shell 6 ranges 6.0-8.485 world units,
 // wider than the ~1.15-unit average spacing BETWEEN shells) -- that
 // spread is exactly why a shell-filled sphere looks faceted rather than
-// round, and reselecting by distance is what actually fixes it. All
-// three built early at the user's request, ahead of their originally
-// planned phases.
+// round, and reselecting by distance is what actually fixes it.
+// Ctrl+Shift+click excavates: removes an EXISTING structure's interior
+// down to the "hollow from" shell, since the hollow-fill option above
+// only skips filling the interior on a NEW fill -- it can't retroactively
+// hollow out something already built solid, which needed its own
+// operation. All four built early at the user's request, ahead of their
+// originally planned phases.
 //
 // Touch (tap / long-press) is not implemented yet -- mouse only for now,
 // documented here as a known gap rather than a half-working touch handler.
@@ -105,6 +109,20 @@ function roundStructure(world, centerKey) {
   }
 }
 
+// Removes an existing structure's cells with shell < minShell, carving
+// out its interior. The center cell itself is never touched (it has no
+// `shell` field, so it never matches the filter below).
+function excavateStructure(world, centerKey, minShell) {
+  const structure = world
+    .entries()
+    .filter((c) => c.shellCenter === centerKey && c.shell !== undefined);
+  for (const c of structure) {
+    if (c.shell < minShell) {
+      world.removeCell(c.x, c.y, c.z);
+    }
+  }
+}
+
 // renderer/camera/mesh: the Phase 1 render.js scene objects to raycast
 // against. cellAt(instanceId): looks up the {x,y,z,...} cell for a hit
 // instance. world: the worldstate.js store (has/addCell/removeCell).
@@ -140,7 +158,17 @@ export function createBuildController({
     const cell = cellAt(hit.instanceId);
     if (!cell) return;
 
-    if (event.ctrlKey || event.metaKey) {
+    const hasCtrl = event.ctrlKey || event.metaKey;
+
+    if (hasCtrl && event.shiftKey) {
+      if (cell.shellCenter) {
+        excavateStructure(world, cell.shellCenter, getMinShell());
+        onChange();
+      }
+      return;
+    }
+
+    if (hasCtrl) {
       if (cell.shellCenter) {
         roundStructure(world, cell.shellCenter);
         onChange();

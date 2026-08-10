@@ -213,13 +213,25 @@ still ahead of Phase 5.5's own planned scope:
   reverting to `base`. `0.75` is a tunable heuristic, not derived —
   consistent with how other numeric constants are handled throughout the
   specs (e.g. the gravity spec's shell-tolerance and cooldown values).
+- **Excavate tool, 2026-08-11, NOT yet visually verified.** User asked
+  how to hollow out something already built solid — the hollow-fill
+  option above only skips filling the interior on a *new* fill, it can't
+  retroactively carve out an existing structure. **Ctrl+Shift+click** an
+  existing structure to `excavateStructure` (`build.js`): removes every
+  cell with `shell` below the current "Hollow from shell" UI value,
+  leaving the center and everything at or above that shell intact.
+  Modifier dispatch order in `onClick` matters: Ctrl+Shift is checked
+  *before* plain Ctrl (round) and plain Shift (fill), otherwise
+  Ctrl+Shift+click would fall through to one of those instead.
 
 **Not yet visually verified** — after hard-refreshing: pick a
 non-default material and confirm new cells render tinted; set
 "Hollow from shell" above 1 and Shift+click to confirm the interior stays
 empty; build a shell-filled sphere and Ctrl+click it to confirm the
 boundary visibly smooths (fewer sharp points) without emptying a hollow
-interior if one exists.
+interior if one exists; solid-fill a sphere, set "Hollow from shell", and
+Ctrl+Shift+click it to confirm the interior below that shell empties out
+while the outer shells and center remain.
 
 **To continue implementation**, Phase 4 (deploy publicly: GitHub
 Pages/Vercel, still single-player) is next — see `RHOMBIVERSE_PLAN.md`

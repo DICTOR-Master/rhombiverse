@@ -33,7 +33,7 @@ through 10 shells).
 builds survive a page refresh via `localStorage`, and New World / Export
 JSON / Import JSON all work.
 
-**Three more planetoid tools** (pulled forward ahead of Phase 5.5, not
+**Four more planetoid tools** (pulled forward ahead of Phase 5.5, not
 yet visually confirmed):
 - **Material picker** — a dropdown selects which material new cells use
   (Base Rhomb, Garnet, Ferrostone, Glassite, Star-Glassite,
@@ -45,6 +45,9 @@ yet visually confirmed):
   single shell spans a wide range of true distances from center); round
   reselects the boundary by actual Euclidean distance instead, trimming
   the far points and filling the gaps that leaves.
+- **Excavate** — Ctrl+Shift+click an already-built structure to hollow it
+  out down to "Hollow from shell", for retrofitting something you already
+  built solid (hollow-shell fill above only applies to new fills).
 
 Phase 4 (deploy publicly) is next — see `RHOMBIVERSE_PLAN.md` section 4
 for the full phased build order. `docs/RHOMBIVERSE_COMPLIANCE.md`'s
