@@ -64,13 +64,23 @@ error). **Touch (tap / long-press) is explicitly not implemented** —
 mouse only, documented as a known gap in `build.js` rather than a
 half-working touch handler.
 
-**What's verified vs. not, for Phase 2:** confirmed via source inspection
-and static serving (CDN paths, bracket-balance, HTTP 200s on every file)
-in this session, same as Phase 1 originally was — but unlike Phase 1,
-**no one has yet opened this in a real browser and actually clicked to
-build/right-clicked to remove a cell.** Do that before trusting Phase 2's
-success check ("player can build outward face-by-face from the seed cell
-using only mouse/touch") as met.
+**Real bug found and fixed, 2026-08-11: RD size was 2x too large for the
+lattice spacing, causing built cells to visibly overlap.** The user
+confirmed click-to-remove worked in a real browser, but newly-built
+neighbor cells overlapped their neighbors instead of tiling flush. Root
+cause: `rdRawVerts` ported `geometry.py`'s raw `CUBE_VERTS`(±1)/
+`OCTA_VERTS`(±2) constants directly, but those are scaled for
+rhombicroid's own `WORLD_SCALE=8.0` flight arena, not for tiling against
+this lattice's unit `NEIGHBOR_OFFSETS` (e.g. `(1,1,0)`, magnitude √2).
+Solved by treating the RD as literally what it is — this FCC lattice's
+own Voronoi cell — and solving where 3 adjacent perpendicular-bisector
+planes of the neighbor offsets meet (e.g. `x+y=1, x+z=1, y+z=1` →
+`(0.5,0.5,0.5)`): correct cube-vertex magnitude is `0.5*s`, octa-vertex
+`1.0*s`, i.e. exactly **half** of geometry.py's raw values, though the
+cube:octa 2:1 *ratio* itself (the shape) was already correct. Fixed in
+`lattice.js`'s `rdRawVerts`. **Not yet re-confirmed visually after this
+fix** — hard-refresh and confirm cells now tile flush with no gap or
+overlap before trusting this as resolved.
 
 **To continue implementation**, Phase 3 (local persistence: `localStorage`
 save/load, JSON export/import) is next — see `RHOMBIVERSE_PLAN.md`

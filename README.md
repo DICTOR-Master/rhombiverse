@@ -22,11 +22,14 @@ See `RHOMBIVERSE_PLAN.md` section 6 for the full vision statement, and
 
 Phase 1 (renderer + lattice math) is implemented and visually confirmed:
 a single rhombic dodecahedron renders at the FCC origin and the camera
-orbits it with mouse drag. Phase 2 (build tool) is implemented but **not
-yet checked in a real browser** — left-click a face to add the
-neighboring cell, right-click a cell to remove it (mouse only; touch
-tap/long-press isn't implemented yet). See `CLAUDE.md`'s Current Status
-before trusting Phase 2 as working. Phase 3 (local persistence) is next —
+orbits it with mouse drag. Phase 2 (build tool) is implemented —
+left-click a face to add the neighboring cell, right-click a cell to
+remove it (mouse only; touch tap/long-press isn't implemented yet). A
+real overlap bug (RD size was 2x too large for the lattice spacing) was
+found via a real browser check and just fixed — **not yet re-confirmed,
+hard-refresh and check cells tile flush** before trusting this as
+resolved; see `CLAUDE.md`'s Current Status for the root cause. Phase 3
+(local persistence) is next —
 see `RHOMBIVERSE_PLAN.md` section 4 for the full phased build order.
 
 ## Structure

@@ -18,12 +18,22 @@ export const OCTA_VERTS = [
 ];
 
 // A single RD's 14 raw vertices, scaled by `s`. The cube/octa 2:1 radius
-// ratio is what makes this RD tile face-to-face against a neighbor placed
-// at any offset in NEIGHBOR_OFFSETS below, at the same scale `s`.
+// ratio (ported from geometry.py) is what makes this RD's *shape* correct;
+// the absolute size below is NOT geometry.py's own raw scale (that repo's
+// CUBE_VERTS=1/OCTA_VERTS=2 is tuned for its own WORLD_SCALE, unrelated to
+// this lattice's unit spacing). The RD is this FCC lattice's own Voronoi
+// cell: solving where 3 adjacent perpendicular-bisector planes of
+// NEIGHBOR_OFFSETS meet (e.g. x+y=1, x+z=1, y+z=1) gives cube-type
+// vertices at magnitude 0.5 and octa-type at magnitude 1.0 for unit
+// spacing -- i.e. exactly HALF of geometry.py's raw constants -- which is
+// what tiles adjacent cells face-to-face with no gap or overlap at
+// cellToWorld's own coord*s spacing. Confirmed 2026-08-11 after a real
+// overlap bug from using geometry.py's un-halved scale directly.
 export function rdRawVerts(s = 1) {
+  const half = s * 0.5;
   return [
-    ...CUBE_VERTS.map(([x, y, z]) => [x * s, y * s, z * s]),
-    ...OCTA_VERTS.map(([x, y, z]) => [x * 2 * s, y * 2 * s, z * 2 * s]),
+    ...CUBE_VERTS.map(([x, y, z]) => [x * half, y * half, z * half]),
+    ...OCTA_VERTS.map(([x, y, z]) => [x * 2 * half, y * 2 * half, z * 2 * half]),
   ];
 }
 
