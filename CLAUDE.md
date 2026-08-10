@@ -25,18 +25,39 @@ don't cross-reference code or specs between the two repos.
 
 ## Current status (as of 2026-08-11)
 
-**Scaffold only. No functional code exists yet.** `index.html` and the five
-`src/*.js` files are stubs (a single header comment each, pointing at the
-plan section that defines them) — this is deliberately left for a future
-session to implement, starting with Phase 1. `data/starter-world.json`
-contains real, schema-valid data (a single seed cell at the FCC origin) and
-is ready to be loaded once `render.js`/`worldstate.js` exist.
+**Phase 1 (renderer + lattice math, no interactivity) is implemented.**
+`src/lattice.js` has the FCC coordinate math (`isValidCell`, 12
+`NEIGHBOR_OFFSETS`, `cellKey`/`parseCellKey`, `cellToWorld`) and the RD raw
+vertex set — ported directly from `~/rhombicroid/geometry.py`'s
+`CUBE_VERTS + OCTA_VERTS*2` formula (the same one already proven across
+all six built `~/rhombispheres/` levels), not re-derived from scratch.
+`src/worldstate.js` loads and flattens `data/starter-world.json`.
+`src/render.js` builds one RD's triangulated geometry via Three.js's
+`ConvexGeometry` (the JS equivalent of the `scipy.ConvexHull` step
+`build_polyhedron` uses in the Python sibling projects — Phase 1 only
+needs triangles for rendering, not `build_polyhedron`'s merged N-gon
+faces, which are a physics-layer concern this project doesn't have yet),
+renders it via `InstancedMesh` for every cell in the loaded world, and
+orbits it with `OrbitControls`. `build.js`/`persistence.js` remain stubs
+(Phases 2/3).
 
-**To start real implementation**, use the "First Claude Code Prompt" in
-`RHOMBIVERSE_PLAN.md` section 5 (Phase 1: renderer + lattice math only, no
-interactivity). Each subsequent phase and spec addendum ends with its own
-copy-paste-ready Claude Code prompt — use those rather than improvising
-scope, they're calibrated to build on exactly what the prior phase produced.
+**Not yet verified in a real browser.** No Node, browser binary, or
+screenshot tool exists in this environment, and the Claude in Chrome
+extension isn't connected in this session. Verified instead: every CDN
+import-map path resolves (curl 200, including confirming the exact
+`ConvexGeometry`/`OrbitControls` export names match what's imported),
+`python3 -m http.server` serves every file with correct content, and
+`starter-world.json` parses as valid, schema-matching JSON. **Load
+`http://localhost:8000` after `python3 -m http.server` in a real browser
+and confirm the RD actually renders and orbits before trusting this is
+visually correct** — the math and wiring are verified, the pixels are
+not.
+
+**To continue implementation**, Phase 2 (build tool: face-picking raycast,
+click to add/remove cells) is next — see `RHOMBIVERSE_PLAN.md` section 4.
+Each subsequent phase and spec addendum ends with its own copy-paste-ready
+Claude Code prompt — use those rather than improvising scope, they're
+calibrated to build on exactly what the prior phase produced.
 
 ## Read this before touching anything
 

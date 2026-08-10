@@ -20,10 +20,13 @@ See `RHOMBIVERSE_PLAN.md` section 6 for the full vision statement, and
 
 ## What this is (right now)
 
-This repo is currently a **scaffold**, not a working build. Phase 1
-(renderer + lattice math, no interactivity) has not been implemented yet —
-see `RHOMBIVERSE_PLAN.md` section 4 for the full phased build order and
-section 5 for the exact prompt to start Phase 1.
+Phase 1 (renderer + lattice math, no interactivity) is implemented: a
+single rhombic dodecahedron renders at the FCC origin and the camera
+orbits it with mouse drag. It has not yet been confirmed in a real
+browser in this environment (see `CLAUDE.md`'s Current Status section) —
+open `index.html` via a local server and check before trusting it.
+Phase 2 (build tool: click to place/remove cells) is next — see
+`RHOMBIVERSE_PLAN.md` section 4 for the full phased build order.
 
 ## Structure
 
