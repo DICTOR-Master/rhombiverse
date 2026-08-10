@@ -82,9 +82,43 @@ cube:octa 2:1 *ratio* itself (the shape) was already correct. Fixed in
 fix** — hard-refresh and confirm cells now tile flush with no gap or
 overlap before trusting this as resolved.
 
+**Second real bug found and fixed, 2026-08-11: only cells near the very
+first click could ever be built.** Confirmed after the tiling fix above:
+tiling itself was correct, but the user could not place all 12 neighbors
+around one seed cell — most clicks silently did nothing. Root cause,
+found by reading three.js's own `InstancedMesh.raycast()` source directly
+rather than guessing: it pre-checks the ray against `this.boundingSphere`
+before testing any instance, but only computes that sphere **lazily,
+once** (`if (this.boundingSphere === null) this.computeBoundingSphere()`)
+— it is never auto-invalidated when `mesh.count` grows or instances move.
+The first-ever raycast call froze a tiny sphere around whatever few cells
+existed at that moment; every later click outside that stale sphere was
+dropped before per-instance testing ever ran, regardless of `mesh.count`.
+Fixed by calling `mesh.computeBoundingSphere()` at the end of every
+`rebuildInstances()` call in `render.js`, so the cached sphere always
+reflects the current instance set. **Not yet re-confirmed visually** —
+after hard-refreshing, try ringing all 12 faces of the seed cell with
+neighbor cells before trusting this as resolved.
+
+**Shell/skin feature — requested by the user 2026-08-11, NOT YET
+SPEC'D OR IMPLEMENTED.** User wants a "shell" covering all built cells
+rather than every individual RD's own facets rendering separately — the
+literal ask ("cover all units with a skin") is underspecified: could mean
+(a) a surface-only render mode that hides interior/shared faces between
+adjacent built cells (a "greedy meshing"-style optimization + visual
+smoothing), (b) a distinct visual material/texture applied over the whole
+structure regardless of per-cell material, or (c) something else. This is
+new scope beyond Phase 2 (`RHOMBIVERSE_PLAN.md` doesn't mention it) and
+should get its own short spec addendum (with a concrete definition and
+success check, per this project's own established convention — see
+`docs/RHOMBIVERSE_SPEC_*.md` for the pattern) before implementation,
+rather than being improvised. Ask the user for their actual referent
+before building anything here.
+
 **To continue implementation**, Phase 3 (local persistence: `localStorage`
 save/load, JSON export/import) is next — see `RHOMBIVERSE_PLAN.md`
-section 4.
+section 4. The shell/skin feature above is a separate, not-yet-scoped
+track.
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.

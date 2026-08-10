@@ -25,10 +25,12 @@ a single rhombic dodecahedron renders at the FCC origin and the camera
 orbits it with mouse drag. Phase 2 (build tool) is implemented —
 left-click a face to add the neighboring cell, right-click a cell to
 remove it (mouse only; touch tap/long-press isn't implemented yet). A
-real overlap bug (RD size was 2x too large for the lattice spacing) was
-found via a real browser check and just fixed — **not yet re-confirmed,
-hard-refresh and check cells tile flush** before trusting this as
-resolved; see `CLAUDE.md`'s Current Status for the root cause. Phase 3
+real overlap bug (RD size was 2x too large for the lattice spacing) and a
+second bug (only cells near the very first click could ever be built, a
+stale `InstancedMesh` bounding-sphere cache) were both found via real
+browser checks and fixed — **not yet re-confirmed, hard-refresh and check
+you can ring all 12 faces of a cell** before trusting this as resolved;
+see `CLAUDE.md`'s Current Status for both root causes. Phase 3
 (local persistence) is next —
 see `RHOMBIVERSE_PLAN.md` section 4 for the full phased build order.
 

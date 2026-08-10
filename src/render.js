@@ -70,6 +70,16 @@ function rebuildInstances(mesh, world) {
   });
   mesh.count = cellOrder.length;
   mesh.instanceMatrix.needsUpdate = true;
+  // InstancedMesh.raycast() only computes its bounding-sphere pre-check
+  // lazily, ONCE, then caches it forever (three.js's own source: `if
+  // (this.boundingSphere === null) this.computeBoundingSphere()`). It is
+  // never auto-invalidated when `count` grows or instances move, so
+  // without forcing a recompute here, any click outside whatever sphere
+  // happened to be cached on the first-ever raycast is silently dropped
+  // before per-instance testing even runs -- the exact cause of a real
+  // bug where only cells near the very first click's bounding sphere
+  // could ever be built.
+  mesh.computeBoundingSphere();
 }
 
 async function init() {
