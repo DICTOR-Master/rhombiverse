@@ -100,25 +100,37 @@ reflects the current instance set. **Not yet re-confirmed visually** —
 after hard-refreshing, try ringing all 12 faces of the seed cell with
 neighbor cells before trusting this as resolved.
 
-**Shell/skin feature — requested by the user 2026-08-11, NOT YET
-SPEC'D OR IMPLEMENTED.** User wants a "shell" covering all built cells
-rather than every individual RD's own facets rendering separately — the
-literal ask ("cover all units with a skin") is underspecified: could mean
-(a) a surface-only render mode that hides interior/shared faces between
-adjacent built cells (a "greedy meshing"-style optimization + visual
-smoothing), (b) a distinct visual material/texture applied over the whole
-structure regardless of per-cell material, or (c) something else. This is
-new scope beyond Phase 2 (`RHOMBIVERSE_PLAN.md` doesn't mention it) and
-should get its own short spec addendum (with a concrete definition and
-success check, per this project's own established convention — see
-`docs/RHOMBIVERSE_SPEC_*.md` for the pattern) before implementation,
-rather than being improvised. Ask the user for their actual referent
-before building anything here.
+**Shell fill tool — implemented 2026-08-11, early/out-of-sequence at the
+user's request.** Clarified: not a rendering/skin feature at all — the
+user wants a shortcut to build near-spherical planetoid shapes using the
+lattice's own shell structure ("wrap one cell with 12 and so on
+outwards"). This is exactly Phase 5.5's "fill sphere" tool from
+`RHOMBIVERSE_PLAN.md`, pulled forward. `lattice.js`'s `cellsInShells(cx,
+cy, cz, maxShell)` does a BFS outward through `NEIGHBOR_OFFSETS`,
+returning every cell in shells 1..maxShell as `{x, y, z, shell}` —
+verified against `shellCount(n) = 10n²+2`
+(`docs/RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md` section 3) before shipping
+since no Node/browser was available to run it directly: BFS shell sizes
+matched the formula exactly through n=6. **Shift+click** an existing cell
+(instead of a plain click) fills that many shells around it via
+`build.js`; a small on-page number input (`#shell-count` in `index.html`)
+sets the shell count. Each filled cell stores its `shell` number in
+world-state, and `render.js` uses it to tint instances by shell distance
+via `InstancedMesh.setColorAt` (confirmed via three.js source that
+`USE_INSTANCING_COLOR` activates automatically once any `setColorAt` call
+exists — no `material.vertexColors` flag needed). Cells without a `shell`
+(plain single-clicks, the original seed) render untinted (white
+multiplier = no change to the base material color). `MAX_CELLS` was
+raised from 4096 to 20000 to leave headroom for shell-fills (cumulative
+cells through shell 8 alone is ~2057). **Not yet visually verified** —
+after hard-refreshing, Shift+click the seed cell and confirm 12
+same-colored neighbor cells appear, and that increasing the shell-count
+input and Shift+clicking again adds a second, differently-tinted ring
+outward.
 
 **To continue implementation**, Phase 3 (local persistence: `localStorage`
 save/load, JSON export/import) is next — see `RHOMBIVERSE_PLAN.md`
-section 4. The shell/skin feature above is a separate, not-yet-scoped
-track.
+section 4.
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.

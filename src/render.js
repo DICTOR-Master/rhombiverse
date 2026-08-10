@@ -10,10 +10,10 @@ import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController } from './build.js';
 
 const SCALE = 1;
-// Fixed InstancedMesh capacity. Generous for hand-building in Phase 2;
-// revisit if a "fill sphere" tool (RHOMBIVERSE_PLAN.md Phase 5.5) or real
-// player counts ever approach it.
-const MAX_CELLS = 4096;
+// Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
+// ~2057 (see lattice.js's shellCount); 20000 leaves headroom for several
+// shell-fills plus hand-building. Revisit for real player counts.
+const MAX_CELLS = 20000;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05050a);
@@ -55,6 +55,22 @@ function buildRDGeometry(scale = 1) {
   return geometry;
 }
 
+// Tint for a cell by its shell-fill distance (lattice.js's
+// cellsInShells), so shells placed by the shift+click fill tool are
+// visually distinguishable outward. Cells with no `shell` (plain single
+// clicks, or the original seed) get white -- an identity multiplier
+// against the material's own base color, i.e. no visible tint change.
+// Hue cycles per shell (0.15 turns/shell) rather than a fixed palette, so
+// it stays distinct for any shell count the UI allows.
+const _shellColorCache = new Map();
+function shellColor(shell) {
+  if (!shell) return new THREE.Color(1, 1, 1);
+  if (!_shellColorCache.has(shell)) {
+    _shellColorCache.set(shell, new THREE.Color().setHSL((shell * 0.15) % 1, 0.65, 0.55));
+  }
+  return _shellColorCache.get(shell);
+}
+
 // instanceId -> {x, y, z, ...cellData}, refreshed on every rebuild. Read
 // by build.js's raycast controller to turn a clicked instance back into
 // lattice coordinates.
@@ -67,9 +83,11 @@ function rebuildInstances(mesh, world) {
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
     m.makeTranslation(wx, wy, wz);
     mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, shellColor(cell.shell));
   });
   mesh.count = cellOrder.length;
   mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   // InstancedMesh.raycast() only computes its bounding-sphere pre-check
   // lazily, ONCE, then caches it forever (three.js's own source: `if
   // (this.boundingSphere === null) this.computeBoundingSphere()`). It is
@@ -99,6 +117,8 @@ async function init() {
 
   rebuildInstances(mesh, world);
 
+  const shellCountInput = document.getElementById('shell-count');
+
   createBuildController({
     renderer,
     camera,
@@ -106,6 +126,7 @@ async function init() {
     cellAt: (instanceId) => cellOrder[instanceId],
     world,
     onChange: () => rebuildInstances(mesh, world),
+    getShellCount: () => Math.max(1, Number(shellCountInput.value) || 1),
   });
 }
 

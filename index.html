@@ -7,6 +7,19 @@
   <style>
     html, body { margin: 0; height: 100%; background: #05050a; overflow: hidden; }
     canvas { display: block; }
+    #controls {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      color: #ddd;
+      font: 13px/1.4 system-ui, sans-serif;
+      background: rgba(0, 0, 0, 0.45);
+      padding: 8px 12px;
+      border-radius: 6px;
+      user-select: none;
+    }
+    #controls input { width: 3em; }
+    #controls .hint { opacity: 0.7; margin-top: 4px; }
   </style>
   <!--
     No bundler/build step by design (Grounded Simplicity, RHOMBIVERSE_PRINCIPLES.md
@@ -24,6 +37,13 @@
 </head>
 <body>
   <div id="app"></div>
+  <div id="controls">
+    <label>Shell fill radius: <input id="shell-count" type="number" min="1" max="10" value="3" /></label>
+    <div class="hint">
+      Click a face: add one cell. Shift+click a cell: fill that many
+      shells outward. Right-click: remove.
+    </div>
+  </div>
   <script type="module" src="./src/render.js"></script>
 </body>
 </html>

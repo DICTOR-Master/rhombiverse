@@ -28,9 +28,14 @@ remove it (mouse only; touch tap/long-press isn't implemented yet). A
 real overlap bug (RD size was 2x too large for the lattice spacing) and a
 second bug (only cells near the very first click could ever be built, a
 stale `InstancedMesh` bounding-sphere cache) were both found via real
-browser checks and fixed — **not yet re-confirmed, hard-refresh and check
-you can ring all 12 faces of a cell** before trusting this as resolved;
-see `CLAUDE.md`'s Current Status for both root causes. Phase 3
+browser checks and fixed. A **shell fill tool** (Phase 5.5's fill-sphere
+tool, pulled forward early) was also added: Shift+click a cell to fill N
+shells outward around it (set N in the on-page number input), tinted by
+shell distance so each ring is visually distinguishable. **None of this
+round is yet re-confirmed — hard-refresh and check you can ring all 12
+faces of a cell, and that Shift+click fills and tints shells** before
+trusting it as resolved; see `CLAUDE.md`'s Current Status for root
+causes. Phase 3
 (local persistence) is next —
 see `RHOMBIVERSE_PLAN.md` section 4 for the full phased build order.
 

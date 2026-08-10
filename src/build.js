@@ -1,11 +1,14 @@
 // Placement/removal: raycast to find which of the 12 faces of a clicked
 // RD was hit, click to add the corresponding neighbor cell, right-click
 // to remove the clicked cell. RHOMBIVERSE_PLAN.md section 4, Phase 2.
+// Shift+click instead fills N shells outward from the clicked cell (the
+// Phase 5.5 "shell fill" / fill-sphere shortcut, see lattice.js's
+// cellsInShells), built early at the user's request.
 //
 // Touch (tap / long-press) is not implemented yet -- mouse only for now,
 // documented here as a known gap rather than a half-working touch handler.
 import * as THREE from 'three';
-import { NEIGHBOR_OFFSETS, isValidCell } from './lattice.js';
+import { NEIGHBOR_OFFSETS, isValidCell, cellsInShells } from './lattice.js';
 
 // Unit-normalized neighbor directions, precomputed once. Every RD
 // instance shares the same (unrotated) orientation -- see lattice.js --
@@ -34,7 +37,8 @@ function matchNeighborOffset(faceNormal) {
 // against. cellAt(instanceId): looks up the {x,y,z,...} cell for a hit
 // instance. world: the worldstate.js store (has/addCell/removeCell).
 // onChange: called after any mutation so the caller can re-sync the mesh.
-export function createBuildController({ renderer, camera, mesh, cellAt, world, onChange }) {
+// getShellCount(): reads the current shell-fill N from the UI.
+export function createBuildController({ renderer, camera, mesh, cellAt, world, onChange, getShellCount }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
@@ -52,6 +56,18 @@ export function createBuildController({ renderer, camera, mesh, cellAt, world, o
     if (!hit || hit.instanceId === undefined) return;
     const cell = cellAt(hit.instanceId);
     if (!cell) return;
+
+    if (event.shiftKey) {
+      const n = getShellCount();
+      for (const c of cellsInShells(cell.x, cell.y, cell.z, n)) {
+        if (!world.has(c.x, c.y, c.z)) {
+          world.addCell(c.x, c.y, c.z, { material: 'base', shell: c.shell });
+        }
+      }
+      onChange();
+      return;
+    }
+
     const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
     const nx = cell.x + dx;
     const ny = cell.y + dy;

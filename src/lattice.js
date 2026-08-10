@@ -69,3 +69,48 @@ export function parseCellKey(key) {
 export function cellToWorld(x, y, z, s = 1) {
   return [x * s, y * s, z * s];
 }
+
+// Number of cells in shell n (counting outward from a center point, n =
+// 1, 2, 3...) -- RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md section 3. Not a
+// new formula: the standard FCC coordination-shell count for this
+// 12-neighbor lattice. Used here to sanity-check cellsInShells below.
+export function shellCount(n) {
+  return 10 * n * n + 2;
+}
+
+// BFS outward through NEIGHBOR_OFFSETS from a center cell, returning
+// every cell in shells 1..maxShell (exclusive of the center itself) as
+// {x, y, z, shell} records. This is the "shell fill" shortcut tool --
+// Phase 5.5's fill-sphere tool from RHOMBIVERSE_PLAN.md ("radius input
+// -> auto-fills all valid lattice cells within that radius of a chosen
+// center"), built early/out-of-sequence at the user's request
+// (2026-08-11) to approximate spherical planetoid shapes while Phase 2's
+// build tool is still the only interaction available. Verified against
+// shellCount(n) above (BFS shell sizes match 10n^2+2 exactly through
+// n=6) before shipping, since no browser/Node was available in the
+// session that wrote this to run it directly. Each result's `shell`
+// field lets the renderer tint cells by shell distance so the outward
+// layers are visually distinguishable.
+export function cellsInShells(cx, cy, cz, maxShell) {
+  const visited = new Set([cellKey(cx, cy, cz)]);
+  let frontier = [[cx, cy, cz]];
+  const result = [];
+  for (let shell = 1; shell <= maxShell; shell++) {
+    const next = [];
+    for (const [x, y, z] of frontier) {
+      for (const [dx, dy, dz] of NEIGHBOR_OFFSETS) {
+        const nx = x + dx;
+        const ny = y + dy;
+        const nz = z + dz;
+        const k = cellKey(nx, ny, nz);
+        if (!visited.has(k)) {
+          visited.add(k);
+          next.push([nx, ny, nz]);
+          result.push({ x: nx, y: ny, z: nz, shell });
+        }
+      }
+    }
+    frontier = next;
+  }
+  return result;
+}
