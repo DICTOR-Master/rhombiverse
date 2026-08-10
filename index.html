@@ -20,8 +20,8 @@
     }
     #controls input[type="number"] { width: 3em; }
     #controls select { font: inherit; }
-    #controls .row { margin-top: 4px; }
-    #controls .hint { opacity: 0.7; margin: 4px 0; }
+    #controls .row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+    #controls .hint { opacity: 0.7; margin: 6px 0 0; max-width: 26em; }
     #controls .buttons { display: flex; gap: 6px; margin-top: 6px; }
     #controls button, #controls .file-btn {
       font: inherit;
@@ -33,6 +33,7 @@
       cursor: pointer;
     }
     #controls button:hover, #controls .file-btn:hover { background: rgba(255, 255, 255, 0.2); }
+    #controls button.mode-btn.active { background: rgba(120, 190, 255, 0.35); border-color: #7cf; }
   </style>
   <!--
     No bundler/build step by design (Grounded Simplicity, RHOMBIVERSE_PRINCIPLES.md
@@ -52,6 +53,12 @@
   <div id="app"></div>
   <div id="controls">
     <div class="row">
+      <button class="mode-btn active" data-mode="build" type="button">Build</button>
+      <button class="mode-btn" data-mode="fill" type="button">Fill</button>
+      <button class="mode-btn" data-mode="round" type="button">Round</button>
+      <button class="mode-btn" data-mode="excavate" type="button">Excavate</button>
+    </div>
+    <div class="row">
       <label>Material:
         <select id="material-select">
           <option value="base">Base Rhomb</option>
@@ -69,11 +76,27 @@
       <label>Shell fill radius: <input id="shell-count" type="number" min="1" max="10" value="3" /></label>
       <label>Hollow from shell: <input id="hollow-from" type="number" min="1" max="10" value="1" /></label>
     </div>
+    <div class="row">
+      <label><input id="section-enable" type="checkbox" /> Section view</label>
+      <select id="section-axis">
+        <option value="x">X</option>
+        <option value="y">Y</option>
+        <option value="z">Z</option>
+      </select>
+      <input id="section-pos" type="range" min="-20" max="20" step="0.5" value="0" />
+      <label><input id="section-flip" type="checkbox" /> Flip</label>
+    </div>
+    <div class="row">
+      <label>Onion skin shells:
+        <input id="onion-min" type="number" min="0" value="0" /> to
+        <input id="onion-max" type="number" min="0" value="999" />
+      </label>
+    </div>
     <div class="hint">
-      Click a face: add one cell. Shift+click a cell: fill shells
-      (hollow-from..radius) outward. Ctrl+click a filled cell: round its
-      surface. Ctrl+Shift+click: excavate the interior below "hollow
-      from". Right-click: remove.
+      Click acts per the selected mode above (Build adds one cell; Fill/
+      Round/Excavate use the shell inputs and only apply to shell-tagged
+      structures). Right-click always removes the clicked cell, in every
+      mode.
     </div>
     <div class="buttons">
       <button id="new-world" type="button">New World</button>

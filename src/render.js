@@ -38,7 +38,35 @@ camera.position.set(6, 5, 8);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
+renderer.localClippingEnabled = true; // required once, globally, for any clippingPlanes to take effect
 document.getElementById('app').appendChild(renderer.domElement);
+
+// Section view: a single cutaway clipping plane through the whole scene
+// (RHOMBIVERSE_PLAN.md doesn't cover this -- added at the user's request
+// so the shell system, previously invisible from outside a solid
+// structure, can actually be seen and understood). Disabled by default
+// (empty clippingPlanes array); #section-enable populates
+// material.clippingPlanes with this same Plane object, so mutating its
+// normal/constant here is picked up automatically next frame with no
+// separate "apply" step.
+const sectionPlane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
+function updateSectionPlane() {
+  const axis = document.getElementById('section-axis').value;
+  const flip = document.getElementById('section-flip').checked;
+  const pos = Number(document.getElementById('section-pos').value) || 0;
+  // The plane's own position (a point on it) is always `pos` along the
+  // chosen axis, regardless of flip -- only the normal direction (which
+  // side gets kept vs. clipped) should change when flipping, not where
+  // the plane physically sits.
+  const axisVec = new THREE.Vector3(
+    axis === 'x' ? 1 : 0,
+    axis === 'y' ? 1 : 0,
+    axis === 'z' ? 1 : 0
+  );
+  const pointOnPlane = axisVec.clone().multiplyScalar(pos);
+  const normal = flip ? axisVec.clone().negate() : axisVec.clone();
+  sectionPlane.setFromNormalAndCoplanarPoint(normal, pointOnPlane);
+}
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -110,13 +138,26 @@ function instanceColorFor(cell) {
   return base.clone().lerp(shellTint(cell.shell), 0.35);
 }
 
+// Onion-skin filter: cells without a `shell` (plain single-clicks, the
+// original seed) are always shown regardless of range, since they aren't
+// part of any shell system -- only shell-tagged cells get hidden/shown
+// by this. View-only: never mutates world data, only which cells become
+// InstancedMesh instances this rebuild (so hidden cells are also
+// correctly un-clickable, not just invisible).
+function visibleCells(world) {
+  const min = Number(document.getElementById('onion-min').value) || 0;
+  const max = Number(document.getElementById('onion-max').value) || Infinity;
+  return world.entries().filter((c) => c.shell === undefined || (c.shell >= min && c.shell <= max));
+}
+
 // instanceId -> {x, y, z, ...cellData}, refreshed on every rebuild. Read
 // by build.js's raycast controller to turn a clicked instance back into
-// lattice coordinates.
+// lattice coordinates. Only currently-visible (onion-skin filtered)
+// cells get an entry -- clicking a hidden cell should not be possible.
 let cellOrder = [];
 
 function rebuildInstances(mesh, world) {
-  cellOrder = world.entries();
+  cellOrder = visibleCells(world);
   const m = new THREE.Matrix4();
   cellOrder.forEach((cell, i) => {
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
@@ -167,11 +208,51 @@ async function init() {
     saveToLocalStorage(world.toJSON());
   }
 
+  // View-only re-render (onion-skin range, section view) -- never
+  // persists, since nothing in the actual world data changed, only what's
+  // currently visible.
+  function rerender() {
+    rebuildInstances(mesh, world);
+  }
+
+  // Section view (clipping plane): #section-enable toggles whether
+  // material.clippingPlanes contains sectionPlane at all; the other
+  // three controls just mutate that same Plane object in place, picked
+  // up automatically by the next rendered frame (no rebuild needed --
+  // clipping is a GPU-side spatial test, unlike onion-skin's per-cell
+  // JS filter above).
+  function updateSectionEnabled() {
+    const enabled = document.getElementById('section-enable').checked;
+    material.clippingPlanes = enabled ? [sectionPlane] : [];
+  }
+  updateSectionPlane();
+  updateSectionEnabled();
+  document.getElementById('section-enable').addEventListener('change', updateSectionEnabled);
+  for (const id of ['section-axis', 'section-flip', 'section-pos']) {
+    document.getElementById(id).addEventListener('input', updateSectionPlane);
+  }
+
+  document.getElementById('onion-min').addEventListener('input', rerender);
+  document.getElementById('onion-max').addEventListener('input', rerender);
+
   const shellCountInput = document.getElementById('shell-count');
   const hollowFromInput = document.getElementById('hollow-from');
   const materialSelect = document.getElementById('material-select');
 
   const getShellCount = () => Math.max(1, Number(shellCountInput.value) || 1);
+
+  // Mode selector: exactly one #mode-btn is "active" at a time; a plain
+  // click does whatever that mode does (build.js). Replaced an earlier
+  // modifier-key scheme (Shift/Ctrl/Ctrl+Shift+click) that became
+  // unmanageable -- see build.js's header comment for the full reasoning.
+  let currentMode = 'build';
+  const modeButtons = document.querySelectorAll('.mode-btn');
+  modeButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      currentMode = btn.dataset.mode;
+      modeButtons.forEach((b) => b.classList.toggle('active', b === btn));
+    });
+  });
 
   createBuildController({
     renderer,
@@ -180,6 +261,7 @@ async function init() {
     cellAt: (instanceId) => cellOrder[instanceId],
     world,
     onChange,
+    getMode: () => currentMode,
     getShellCount,
     getMinShell: () => Math.min(Math.max(1, Number(hollowFromInput.value) || 1), getShellCount()),
     getMaterial: () => materialSelect.value,

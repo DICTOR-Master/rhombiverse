@@ -213,25 +213,68 @@ still ahead of Phase 5.5's own planned scope:
   reverting to `base`. `0.75` is a tunable heuristic, not derived —
   consistent with how other numeric constants are handled throughout the
   specs (e.g. the gravity spec's shell-tolerance and cooldown values).
-- **Excavate tool, 2026-08-11, NOT yet visually verified.** User asked
-  how to hollow out something already built solid — the hollow-fill
-  option above only skips filling the interior on a *new* fill, it can't
-  retroactively carve out an existing structure. **Ctrl+Shift+click** an
-  existing structure to `excavateStructure` (`build.js`): removes every
-  cell with `shell` below the current "Hollow from shell" UI value,
-  leaving the center and everything at or above that shell intact.
-  Modifier dispatch order in `onClick` matters: Ctrl+Shift is checked
-  *before* plain Ctrl (round) and plain Shift (fill), otherwise
-  Ctrl+Shift+click would fall through to one of those instead.
+- **Excavate tool.** `excavateStructure` (`build.js`) removes every cell
+  in an existing structure with `shell` below the current "Hollow from
+  shell" UI value, leaving the center and everything at or above that
+  shell intact — for hollowing out something already built solid (the
+  hollow-fill option above only skips filling the interior on a *new*
+  fill, it can't retroactively carve an existing one).
 
-**Not yet visually verified** — after hard-refreshing: pick a
-non-default material and confirm new cells render tinted; set
-"Hollow from shell" above 1 and Shift+click to confirm the interior stays
-empty; build a shell-filled sphere and Ctrl+click it to confirm the
-boundary visibly smooths (fewer sharp points) without emptying a hollow
-interior if one exists; solid-fill a sphere, set "Hollow from shell", and
-Ctrl+Shift+click it to confirm the interior below that shell empties out
-while the outer shells and center remain.
+**Interaction model replaced with an explicit mode selector, 2026-08-11
+— superseding everything above about Shift/Ctrl/Ctrl+Shift+click.** User
+feedback, verbatim reasoning worth preserving: five behaviors triggered
+by modifier-key combinations on one "click" gesture — including two
+pairs of literal opposites (fill vs. excavate, add vs. remove) one
+keystroke apart — became unmanageable; user couldn't tell what was
+broken vs. just hard to keep straight ("seemingly all can't separate to
+understand what is wrong"). Replaced with **four mode buttons**
+(`.mode-btn[data-mode]` in `index.html`: Build/Fill/Round/Excavate,
+exactly one `.active` at a time) — a plain click now does whatever the
+selected mode does, dispatched in `build.js`'s `onClick` via `getMode()`
+returning `'build'|'fill'|'round'|'excavate'`, no modifier keys anywhere.
+**Right-click stays a universal remove in every mode** — deliberately
+NOT folded into the mode system, per direct instruction, since it's the
+single most common corrective action and shouldn't require a mode
+switch. The underlying algorithms (`cellsInShells`, `roundStructure`,
+`excavateStructure`) are unchanged; only how they're triggered changed.
+
+**Section view + onion-skin shells, 2026-08-11, NOT yet visually
+verified.** Added because the shell system was invisible from outside a
+solid structure — impossible to verify what fill/round/excavate actually
+did, likely a real contributor to the interaction-model confusion above.
+Two independent, composable filters:
+- **Section view** (`#section-enable` + `#section-axis`/`#section-pos`/
+  `#section-flip checkbox`): a single `THREE.Plane` cutaway, GPU-side via
+  `material.clippingPlanes` (`renderer.localClippingEnabled = true` is
+  required once, globally, for any clipping to take effect — easy to
+  silently no-op without it). `updateSectionPlane()` in `render.js`
+  rebuilds the plane via `setFromNormalAndCoplanarPoint` on every
+  input change — the plane's *position* (a point on it, always
+  `axisVec * pos`) and its *normal direction* (flips which side is kept
+  vs. clipped) are computed separately and must stay that way: an early
+  version incorrectly folded the flip into the position calculation too,
+  which would have shifted the plane's location depending on flip state
+  instead of just which side it clips. No rebuild needed when this
+  changes — clipping is a per-fragment GPU test, picked up automatically
+  next frame.
+- **Onion-skin shells** (`#onion-min`/`#onion-max`): a per-cell JS filter
+  in `visibleCells()` (`render.js`) — cells with no `shell` (plain
+  clicks, the seed) always show regardless of range; shell-tagged cells
+  outside `[min, max]` are excluded from `rebuildInstances`' instance
+  set entirely, so they're both invisible AND unclickable, not just
+  hidden. View-only: never touches `world` data, so `round`/`excavate`
+  (which read `world.entries()` directly, not the filtered `cellOrder`)
+  still see and operate on the true full structure regardless of what's
+  currently visible on screen.
+
+**Not yet visually verified** — after hard-refreshing: click each mode
+button and confirm a plain click does the right thing per mode (Build
+adds one cell; Fill/Round/Excavate act on shell-tagged structures using
+the shell inputs); confirm right-click still removes regardless of which
+mode is active; enable Section view and drag the position slider to
+confirm a visible cutaway through the structure; narrow the onion-skin
+range on a shell-filled sphere and confirm only that shell band renders
+(and that clicking elsewhere on the hidden structure does nothing).
 
 **To continue implementation**, Phase 4 (deploy publicly: GitHub
 Pages/Vercel, still single-player) is next — see `RHOMBIVERSE_PLAN.md`

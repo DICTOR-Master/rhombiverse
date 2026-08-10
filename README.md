@@ -33,21 +33,33 @@ through 10 shells).
 builds survive a page refresh via `localStorage`, and New World / Export
 JSON / Import JSON all work.
 
-**Four more planetoid tools** (pulled forward ahead of Phase 5.5, not
-yet visually confirmed):
-- **Material picker** — a dropdown selects which material new cells use
-  (Base Rhomb, Garnet, Ferrostone, Glassite, Star-Glassite,
-  Blackstar-Glassite, Ice 9.9, Water), each with its own tint.
-- **Hollow-shell fill** — set "Hollow from shell" above 1 to fill only an
-  outer band of shells, leaving the interior empty.
-- **Round/sculpt** — Ctrl+click (Cmd on Mac) a shell-filled cell to
-  smooth its outer boundary. Shell-based fills are naturally faceted (a
-  single shell spans a wide range of true distances from center); round
-  reselects the boundary by actual Euclidean distance instead, trimming
-  the far points and filling the gaps that leaves.
-- **Excavate** — Ctrl+Shift+click an already-built structure to hollow it
-  out down to "Hollow from shell", for retrofitting something you already
-  built solid (hollow-shell fill above only applies to new fills).
+**Planetoid tools** (pulled forward ahead of Phase 5.5, not yet visually
+confirmed as a whole). Pick a **mode** with the Build / Fill / Round /
+Excavate buttons — a plain click then does whatever that mode does. This
+replaced an earlier Shift/Ctrl/Ctrl+Shift+click modifier scheme that grew
+unmanageable; **right-click still always removes the clicked cell, in
+every mode.**
+- **Build** — click a face to add the neighboring cell (default mode).
+- **Fill** — click a cell to fill shells ("hollow from"–"radius") outward
+  around it, approximating a sphere. A second Fill click on the same
+  structure grows it further rather than starting a new one.
+- **Round** — click a shell-tagged cell to smooth its outer boundary.
+  Shell-based fills are naturally faceted (a single shell spans a wide
+  range of true distances from center); round reselects the boundary by
+  actual Euclidean distance instead, trimming the far points and filling
+  the gaps that leaves.
+- **Excavate** — click an already-built structure to hollow it out down
+  to "Hollow from shell", for retrofitting something you built solid
+  (Fill's hollow option only applies to new fills).
+
+A **material picker** selects which material new cells use (Base Rhomb,
+Garnet, Ferrostone, Glassite, Star-Glassite, Blackstar-Glassite, Ice 9.9,
+Water), each with its own tint — cosmetic only for now.
+
+To actually see the shell system: a **section view** (cutaway clipping
+plane, pick an axis/position/flip) and **onion-skin shells** (show only
+shells min–max) can be combined to look inside a structure instead of
+just its solid exterior.
 
 Phase 4 (deploy publicly) is next — see `RHOMBIVERSE_PLAN.md` section 4
 for the full phased build order. `docs/RHOMBIVERSE_COMPLIANCE.md`'s

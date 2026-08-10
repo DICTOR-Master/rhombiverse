@@ -1,22 +1,22 @@
-// Placement/removal: raycast to find which of the 12 faces of a clicked
-// RD was hit, click to add the corresponding neighbor cell, right-click
-// to remove the clicked cell. RHOMBIVERSE_PLAN.md section 4, Phase 2.
-// Shift+click instead fills shells minShell..maxShell outward from a
-// center (the Phase 5.5 "shell fill" / fill-sphere shortcut, see
-// lattice.js's cellsInShells -- minShell > 1 gives a hollow-shell build).
-// Ctrl+click (Cmd on Mac) "rounds" the clicked structure: reselects its
-// outer boundary by true Euclidean distance from center instead of raw
-// shell membership, since a single BFS shell spans a wide range of
-// actual distances (measured: shell 6 ranges 6.0-8.485 world units,
-// wider than the ~1.15-unit average spacing BETWEEN shells) -- that
-// spread is exactly why a shell-filled sphere looks faceted rather than
-// round, and reselecting by distance is what actually fixes it.
-// Ctrl+Shift+click excavates: removes an EXISTING structure's interior
-// down to the "hollow from" shell, since the hollow-fill option above
-// only skips filling the interior on a NEW fill -- it can't retroactively
-// hollow out something already built solid, which needed its own
-// operation. All four built early at the user's request, ahead of their
-// originally planned phases.
+// Raycasts to find which of the 12 faces of a clicked RD was hit, then
+// acts according to the currently selected build MODE (an explicit
+// #mode-* button in index.html, read via getMode() -- see render.js).
+// RHOMBIVERSE_PLAN.md section 4, Phase 2's original click-to-add is now
+// the "build" mode; three more modes (fill, round, excavate) were added
+// early, ahead of their originally planned phases, at the user's
+// request. Right-click always removes the clicked cell, in every mode --
+// kept as a single universal, unambiguous gesture rather than folded
+// into the mode system, per direct instruction (2026-08-11).
+//
+// This replaced an earlier modifier-key scheme (Shift+click / Ctrl+click
+// / Ctrl+Shift+click for fill/round/excavate) that grew unmanageable:
+// five behaviors on one "click" gesture, distinguished only by which
+// modifiers you remembered to hold, including two pairs of literal
+// opposites (fill vs. excavate, add vs. remove) one keystroke apart, with
+// no visual indication of what a click would currently do. An explicit
+// mode selector is the standard fix for this (how most voxel/CAD editors
+// handle multiple click tools) -- exactly one mode active at a time,
+// visually shown, plain click does whatever that mode does.
 //
 // Touch (tap / long-press) is not implemented yet -- mouse only for now,
 // documented here as a known gap rather than a half-working touch handler.
@@ -127,8 +127,9 @@ function excavateStructure(world, centerKey, minShell) {
 // against. cellAt(instanceId): looks up the {x,y,z,...} cell for a hit
 // instance. world: the worldstate.js store (has/addCell/removeCell).
 // onChange: called after any mutation so the caller can re-sync the mesh.
-// getShellCount()/getMinShell(): read the shell-fill range from the UI.
-// getMaterial(): reads the selected material to place.
+// getMode(): reads the active build mode ('build'|'fill'|'round'|
+// 'excavate') from the UI. getShellCount()/getMinShell(): read the
+// fill/excavate shell range. getMaterial(): reads the selected material.
 export function createBuildController({
   renderer,
   camera,
@@ -136,6 +137,7 @@ export function createBuildController({
   cellAt,
   world,
   onChange,
+  getMode,
   getShellCount,
   getMinShell,
   getMaterial,
@@ -158,9 +160,9 @@ export function createBuildController({
     const cell = cellAt(hit.instanceId);
     if (!cell) return;
 
-    const hasCtrl = event.ctrlKey || event.metaKey;
+    const mode = getMode();
 
-    if (hasCtrl && event.shiftKey) {
+    if (mode === 'excavate') {
       if (cell.shellCenter) {
         excavateStructure(world, cell.shellCenter, getMinShell());
         onChange();
@@ -168,7 +170,7 @@ export function createBuildController({
       return;
     }
 
-    if (hasCtrl) {
+    if (mode === 'round') {
       if (cell.shellCenter) {
         roundStructure(world, cell.shellCenter);
         onChange();
@@ -176,7 +178,7 @@ export function createBuildController({
       return;
     }
 
-    if (event.shiftKey) {
+    if (mode === 'fill') {
       const maxShell = getShellCount();
       const minShell = Math.min(getMinShell(), maxShell);
       const material = getMaterial();
@@ -184,7 +186,7 @@ export function createBuildController({
       // (it was itself placed by, or is the original center of, an
       // earlier fill), grow THAT structure's true center outward instead
       // of starting a new one where you happened to click -- otherwise a
-      // second shift+click on an outer shell builds an unrelated
+      // second fill-mode click on an outer shell builds an unrelated
       // same-sized cluster next door rather than a bigger sphere.
       const centerKey = cell.shellCenter || cellKey(cell.x, cell.y, cell.z);
       const [ccx, ccy, ccz] = parseCellKey(centerKey);
@@ -203,6 +205,7 @@ export function createBuildController({
       return;
     }
 
+    // mode === 'build' (default)
     const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
     const nx = cell.x + dx;
     const ny = cell.y + dy;
