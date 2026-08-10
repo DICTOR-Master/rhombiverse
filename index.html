@@ -19,6 +19,8 @@
       user-select: none;
     }
     #controls input[type="number"] { width: 3em; }
+    #controls select { font: inherit; }
+    #controls .row { margin-top: 4px; }
     #controls .hint { opacity: 0.7; margin: 4px 0; }
     #controls .buttons { display: flex; gap: 6px; margin-top: 6px; }
     #controls button, #controls .file-btn {
@@ -49,10 +51,28 @@
 <body>
   <div id="app"></div>
   <div id="controls">
-    <label>Shell fill radius: <input id="shell-count" type="number" min="1" max="10" value="3" /></label>
+    <div class="row">
+      <label>Material:
+        <select id="material-select">
+          <option value="base">Base Rhomb</option>
+          <option value="garnet">Garnet</option>
+          <option value="ferrostone">Ferrostone</option>
+          <option value="glassite">Glassite</option>
+          <option value="star-glassite">Star-Glassite</option>
+          <option value="blackstar-glassite">Blackstar-Glassite</option>
+          <option value="ice99">Ice 9.9</option>
+          <option value="water">Water</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label>Shell fill radius: <input id="shell-count" type="number" min="1" max="10" value="3" /></label>
+      <label>Hollow from shell: <input id="hollow-from" type="number" min="1" max="10" value="1" /></label>
+    </div>
     <div class="hint">
-      Click a face: add one cell. Shift+click a cell: fill that many
-      shells outward. Right-click: remove.
+      Click a face: add one cell. Shift+click a cell: fill shells
+      (hollow-from..radius) outward. Ctrl+click a filled cell: round its
+      surface. Right-click: remove.
     </div>
     <div class="buttons">
       <button id="new-world" type="button">New World</button>

@@ -33,6 +33,19 @@ through 10 shells).
 builds survive a page refresh via `localStorage`, and New World / Export
 JSON / Import JSON all work.
 
+**Three more planetoid tools** (pulled forward ahead of Phase 5.5, not
+yet visually confirmed):
+- **Material picker** — a dropdown selects which material new cells use
+  (Base Rhomb, Garnet, Ferrostone, Glassite, Star-Glassite,
+  Blackstar-Glassite, Ice 9.9, Water), each with its own tint.
+- **Hollow-shell fill** — set "Hollow from shell" above 1 to fill only an
+  outer band of shells, leaving the interior empty.
+- **Round/sculpt** — Ctrl+click (Cmd on Mac) a shell-filled cell to
+  smooth its outer boundary. Shell-based fills are naturally faceted (a
+  single shell spans a wide range of true distances from center); round
+  reselects the boundary by actual Euclidean distance instead, trimming
+  the far points and filling the gaps that leaves.
+
 Phase 4 (deploy publicly) is next — see `RHOMBIVERSE_PLAN.md` section 4
 for the full phased build order. `docs/RHOMBIVERSE_COMPLIANCE.md`'s
 "Required before Phase 4" items (LICENSE, ToS, Privacy Policy,

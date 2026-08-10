@@ -79,19 +79,22 @@ export function shellCount(n) {
 }
 
 // BFS outward through NEIGHBOR_OFFSETS from a center cell, returning
-// every cell in shells 1..maxShell (exclusive of the center itself) as
-// {x, y, z, shell} records. This is the "shell fill" shortcut tool --
-// Phase 5.5's fill-sphere tool from RHOMBIVERSE_PLAN.md ("radius input
-// -> auto-fills all valid lattice cells within that radius of a chosen
-// center"), built early/out-of-sequence at the user's request
-// (2026-08-11) to approximate spherical planetoid shapes while Phase 2's
-// build tool is still the only interaction available. Verified against
-// shellCount(n) above (BFS shell sizes match 10n^2+2 exactly through
-// n=6) before shipping, since no browser/Node was available in the
-// session that wrote this to run it directly. Each result's `shell`
-// field lets the renderer tint cells by shell distance so the outward
-// layers are visually distinguishable.
-export function cellsInShells(cx, cy, cz, maxShell) {
+// every cell in shells minShell..maxShell (exclusive of the center
+// itself unless minShell is 0) as {x, y, z, shell} records. This is the
+// "shell fill" shortcut tool -- Phase 5.5's fill-sphere tool from
+// RHOMBIVERSE_PLAN.md ("radius input -> auto-fills all valid lattice
+// cells within that radius of a chosen center"), built early/
+// out-of-sequence at the user's request (2026-08-11) to approximate
+// spherical planetoid shapes while Phase 2's build tool is still the
+// only interaction available. Verified against shellCount(n) above (BFS
+// shell sizes match 10n^2+2 exactly through n=6) before shipping, since
+// no browser/Node was available in the session that wrote this to run it
+// directly. Each result's `shell` field lets the renderer tint cells by
+// shell distance so the outward layers are visually distinguishable.
+// `minShell` (default 1 = solid fill from the center) lets a caller skip
+// the innermost shells for a hollow-shell build -- still traverses them
+// for BFS correctness, just doesn't record them in the result.
+export function cellsInShells(cx, cy, cz, maxShell, minShell = 1) {
   const visited = new Set([cellKey(cx, cy, cz)]);
   let frontier = [[cx, cy, cz]];
   const result = [];
@@ -106,7 +109,7 @@ export function cellsInShells(cx, cy, cz, maxShell) {
         if (!visited.has(k)) {
           visited.add(k);
           next.push([nx, ny, nz]);
-          result.push({ x: nx, y: ny, z: nz, shell });
+          if (shell >= minShell) result.push({ x: nx, y: ny, z: nz, shell });
         }
       }
     }

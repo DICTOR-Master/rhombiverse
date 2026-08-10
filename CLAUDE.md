@@ -173,6 +173,54 @@ storage and reloads the static seed), **Export JSON** (downloads the
 current world), **Import JSON** (file picker, replaces the world,
 alerts on invalid JSON rather than silently failing).
 
+**Three more planetoid tools added, 2026-08-11, at the user's request —
+NOT yet visually verified.** All build on the shell-fill tool above,
+still ahead of Phase 5.5's own planned scope:
+
+- **Material picker.** A `#material-select` dropdown in `index.html`
+  (values: `base`, `garnet`, `ferrostone`, `glassite`, `star-glassite`,
+  `blackstar-glassite`, `ice99`, `water` — the exact strings used in the
+  specs' own JSON examples) replaces the hardcoded `material: 'base'` in
+  both the single-click add and shell-fill paths in `build.js`. Cosmetic
+  only for now — `render.js`'s `MATERIAL_COLORS` gives each a base tint,
+  applied via `setColorAt` (shared `InstancedMesh` material color is now
+  white, an identity multiplier, so per-instance color shows through
+  unmodified). No material has functional behavior yet (gravity/
+  hydrosphere are Phase 5.5+). Shell tint (existing) now blends 35% into
+  the material color rather than replacing it, so both are visible at
+  once.
+- **Hollow-shell fill.** `cellsInShells` (`lattice.js`) gained a
+  `minShell` parameter (default 1 = old solid-fill behavior). A new
+  `#hollow-from` input lets Shift+click fill only shells
+  `hollow-from..radius`, leaving the interior empty — a crust instead of
+  a solid ball.
+- **Round/sculpt tool.** Ctrl+click (Cmd on Mac) a shell-tagged cell to
+  "round" that structure. Real insight behind why this is needed, checked
+  numerically before implementing (not assumed): a single BFS shell spans
+  a wide range of true Euclidean distances from center — shell 6 ranges
+  6.0 to 8.485 world units, wider than the ~1.15-unit average spacing
+  *between* shells — so a shell-filled sphere's boundary is genuinely
+  faceted, not just visually rough. `roundStructure` (`build.js`)
+  reselects the outer boundary by true distance instead of shell number:
+  computes the outer shell's average distance from center as a target
+  radius, trims any cell beyond `target + 0.75` (cuts the "points"), and
+  fills any gap within `target ± 0.75` using `cellsInShells(..., maxShell
+  + 1)` as the candidate pool (extended by one shell since shells overlap
+  in raw distance — shell 5's max, 7.071, already exceeds shell 6's min,
+  6.0). Never touches cells well inside the target radius, so a
+  hollow-shell structure's interior survives a round pass untouched. Gap
+  fills reuse the outer shell's own majority material rather than
+  reverting to `base`. `0.75` is a tunable heuristic, not derived —
+  consistent with how other numeric constants are handled throughout the
+  specs (e.g. the gravity spec's shell-tolerance and cooldown values).
+
+**Not yet visually verified** — after hard-refreshing: pick a
+non-default material and confirm new cells render tinted; set
+"Hollow from shell" above 1 and Shift+click to confirm the interior stays
+empty; build a shell-filled sphere and Ctrl+click it to confirm the
+boundary visibly smooths (fewer sharp points) without emptying a hollow
+interior if one exists.
+
 **To continue implementation**, Phase 4 (deploy publicly: GitHub
 Pages/Vercel, still single-player) is next — see `RHOMBIVERSE_PLAN.md`
 section 4. Before that phase ships, `docs/RHOMBIVERSE_COMPLIANCE.md`'s

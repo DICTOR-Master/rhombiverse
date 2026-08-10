@@ -64,20 +64,50 @@ function buildRDGeometry(scale = 1) {
   return geometry;
 }
 
+// Base color per material (RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md's
+// Glassite family, RHOMBIVERSE_SPEC_ASTEROIDS.md's Garnet/Ferrostone,
+// RHOMBIVERSE_SPEC_WATER_ICE.md's Water/Ice 9.9). The shared
+// InstancedMesh material's own .color is left white (see init()) so
+// these show through unmodified via setColorAt -- cosmetic only for now,
+// no material has functional behavior yet (gravity/hydrosphere land in
+// Phase 5.5).
+const MATERIAL_COLORS = {
+  base: 0x8899aa,
+  garnet: 0x8b2e2e,
+  ferrostone: 0x5a5a5a,
+  glassite: 0xbfe3f0,
+  'star-glassite': 0xdff3ff,
+  'blackstar-glassite': 0x1a1a22,
+  ice99: 0xd8f0ff,
+  water: 0x2e6f9e,
+};
+
+function materialColor(material) {
+  return new THREE.Color(MATERIAL_COLORS[material] ?? MATERIAL_COLORS.base);
+}
+
 // Tint for a cell by its shell-fill distance (lattice.js's
 // cellsInShells), so shells placed by the shift+click fill tool are
 // visually distinguishable outward. Cells with no `shell` (plain single
-// clicks, or the original seed) get white -- an identity multiplier
-// against the material's own base color, i.e. no visible tint change.
-// Hue cycles per shell (0.15 turns/shell) rather than a fixed palette, so
-// it stays distinct for any shell count the UI allows.
+// clicks, or the original seed) get white -- an identity multiplier, no
+// tint. Hue cycles per shell (0.15 turns/shell) rather than a fixed
+// palette, so it stays distinct for any shell count the UI allows.
 const _shellColorCache = new Map();
-function shellColor(shell) {
+function shellTint(shell) {
   if (!shell) return new THREE.Color(1, 1, 1);
   if (!_shellColorCache.has(shell)) {
     _shellColorCache.set(shell, new THREE.Color().setHSL((shell * 0.15) % 1, 0.65, 0.55));
   }
   return _shellColorCache.get(shell);
+}
+
+// Final per-instance color: the cell's material color, lightly blended
+// (35%) toward its shell tint so shell rings stay visible without
+// obscuring which material a cell actually is.
+function instanceColorFor(cell) {
+  const base = materialColor(cell.material);
+  if (!cell.shell) return base;
+  return base.clone().lerp(shellTint(cell.shell), 0.35);
 }
 
 // instanceId -> {x, y, z, ...cellData}, refreshed on every rebuild. Read
@@ -92,7 +122,7 @@ function rebuildInstances(mesh, world) {
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
     m.makeTranslation(wx, wy, wz);
     mesh.setMatrixAt(i, m);
-    mesh.setColorAt(i, shellColor(cell.shell));
+    mesh.setColorAt(i, instanceColorFor(cell));
   });
   mesh.count = cellOrder.length;
   mesh.instanceMatrix.needsUpdate = true;
@@ -116,8 +146,12 @@ async function init() {
   const world = createWorldStore(worldJSON);
 
   const geometry = buildRDGeometry(SCALE);
+  // White base color: actual per-cell color comes entirely from
+  // setColorAt (instanceColorFor) via the multiplicative USE_INSTANCING_
+  // COLOR shader path, so white here is an identity multiplier that lets
+  // the per-instance color show through unmodified.
   const material = new THREE.MeshStandardMaterial({
-    color: 0x8899aa,
+    color: 0xffffff,
     metalness: 0.15,
     roughness: 0.55,
     flatShading: true,
@@ -134,6 +168,10 @@ async function init() {
   }
 
   const shellCountInput = document.getElementById('shell-count');
+  const hollowFromInput = document.getElementById('hollow-from');
+  const materialSelect = document.getElementById('material-select');
+
+  const getShellCount = () => Math.max(1, Number(shellCountInput.value) || 1);
 
   createBuildController({
     renderer,
@@ -142,7 +180,9 @@ async function init() {
     cellAt: (instanceId) => cellOrder[instanceId],
     world,
     onChange,
-    getShellCount: () => Math.max(1, Number(shellCountInput.value) || 1),
+    getShellCount,
+    getMinShell: () => Math.min(Math.max(1, Number(hollowFromInput.value) || 1), getShellCount()),
+    getMaterial: () => materialSelect.value,
   });
 
   document.getElementById('new-world').addEventListener('click', async () => {
