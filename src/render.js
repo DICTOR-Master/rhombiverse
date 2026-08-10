@@ -2,12 +2,21 @@
 // Phase 1 (RHOMBIVERSE_PLAN.md section 4): renderer + lattice math, camera
 // orbit. Phase 2: wires build.js's click-to-add/remove controller onto
 // the same InstancedMesh, re-syncing it after every world-state change.
+// Phase 3: every change also saves to localStorage, and wires the New
+// World / Export / Import buttons.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld } from './lattice.js';
 import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController } from './build.js';
+import {
+  saveToLocalStorage,
+  loadFromLocalStorage,
+  clearLocalStorage,
+  exportWorldFile,
+  importWorldFile,
+} from './persistence.js';
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -101,7 +110,9 @@ function rebuildInstances(mesh, world) {
 }
 
 async function init() {
-  const worldJSON = await loadWorld('./data/starter-world.json');
+  // A saved build takes priority over the static seed -- that's the
+  // whole point of Phase 3 (refreshing preserves the build).
+  const worldJSON = loadFromLocalStorage() ?? (await loadWorld('./data/starter-world.json'));
   const world = createWorldStore(worldJSON);
 
   const geometry = buildRDGeometry(SCALE);
@@ -117,6 +128,11 @@ async function init() {
 
   rebuildInstances(mesh, world);
 
+  function onChange() {
+    rebuildInstances(mesh, world);
+    saveToLocalStorage(world.toJSON());
+  }
+
   const shellCountInput = document.getElementById('shell-count');
 
   createBuildController({
@@ -125,8 +141,36 @@ async function init() {
     mesh,
     cellAt: (instanceId) => cellOrder[instanceId],
     world,
-    onChange: () => rebuildInstances(mesh, world),
+    onChange,
     getShellCount: () => Math.max(1, Number(shellCountInput.value) || 1),
+  });
+
+  document.getElementById('new-world').addEventListener('click', async () => {
+    if (!confirm('Start a new world? This clears your current build.')) return;
+    clearLocalStorage();
+    const fresh = await loadWorld('./data/starter-world.json');
+    world.replaceAll(fresh);
+    onChange();
+  });
+
+  document.getElementById('export-json').addEventListener('click', () => {
+    exportWorldFile(world.toJSON());
+  });
+
+  const importInput = document.getElementById('import-json');
+  importInput.addEventListener('change', async () => {
+    const file = importInput.files[0];
+    if (!file) return;
+    try {
+      const parsed = await importWorldFile(file);
+      world.replaceAll(parsed);
+      onChange();
+    } catch (err) {
+      alert('That file is not valid Rhombiverse world JSON.');
+      console.warn('Rhombiverse: import failed', err);
+    } finally {
+      importInput.value = '';
+    }
   });
 }
 

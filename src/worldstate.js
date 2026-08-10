@@ -1,7 +1,7 @@
 // Load/save/serialize the world-state JSON (schema: RHOMBIVERSE_PLAN.md
-// section 3), and an in-memory mutable store over it for Phase 2's
-// add/remove-cell build tool. Persisting mutations to storage lands in
-// Phase 3 (persistence.js) -- this module only tracks state in memory.
+// section 3), and an in-memory mutable store over it. Actually persisting
+// to storage (localStorage) lives in persistence.js -- this module only
+// tracks state in memory and knows how to turn it back into JSON.
 import { cellKey, parseCellKey } from './lattice.js';
 
 export async function loadWorld(url) {
@@ -14,8 +14,15 @@ export async function loadWorld(url) {
 
 // Wraps a loaded world JSON's `cells` map in a Map keyed the same way
 // ("x,y,z"), with add/remove/has by coordinate and a stable-order
-// entries() list for rendering.
+// entries() list for rendering. The store is a single long-lived object
+// (render.js holds one reference for the whole session) -- replaceAll
+// mutates it in place rather than requiring callers to swap to a new
+// store, so existing closures (build.js's controller, etc.) keep working
+// after a "New World" reset or a JSON import.
 export function createWorldStore(worldJSON) {
+  let worldName = worldJSON.worldName;
+  let version = worldJSON.version;
+  let meta = { ...worldJSON.meta };
   const cells = new Map(Object.entries(worldJSON.cells));
 
   return {
@@ -33,6 +40,26 @@ export function createWorldStore(worldJSON) {
         const [x, y, z] = parseCellKey(key);
         return { x, y, z, ...data };
       });
+    },
+    // Serializes back to the full RHOMBIVERSE_PLAN.md section 3 shape,
+    // for persistence.js to save/export.
+    toJSON() {
+      return {
+        worldName,
+        version,
+        cells: Object.fromEntries(cells),
+        meta: { ...meta, lastModified: new Date().toISOString() },
+      };
+    },
+    // Replaces the entire world in place (New World reset, JSON import).
+    replaceAll(newWorldJSON) {
+      worldName = newWorldJSON.worldName;
+      version = newWorldJSON.version;
+      meta = { ...newWorldJSON.meta };
+      cells.clear();
+      for (const [key, data] of Object.entries(newWorldJSON.cells)) {
+        cells.set(key, data);
+      }
     },
   };
 }

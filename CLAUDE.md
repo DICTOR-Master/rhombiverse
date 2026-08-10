@@ -145,15 +145,41 @@ correctly on a third, fourth, etc. click. If absent (an untagged plain
 cell), the clicked cell becomes a new center, same as before — so
 Shift+clicking an unrelated cell still starts a separate structure, which
 is correct. Already-placed cells are never re-added or reshuffled, only
-gaps between the old and new radius get filled. **Not yet visually
-verified** — after hard-refreshing, Shift+click a cell, then increase the
-shell-count input and Shift+click the SAME structure again (center or any
-outer cell) and confirm it grows one coherent, larger sphere rather than
-spawning a second cluster.
+gaps between the old and new radius get filled. **Visually confirmed,
+2026-08-11** — user confirmed growth compounds correctly up through 10
+shells on the same structure.
 
-**To continue implementation**, Phase 3 (local persistence: `localStorage`
-save/load, JSON export/import) is next — see `RHOMBIVERSE_PLAN.md`
-section 4.
+**Phase 3 (local persistence) is implemented, NOT yet visually
+verified.** `persistence.js` gained `saveToLocalStorage`/
+`loadFromLocalStorage` (JSON in/out of `localStorage`, wrapped in
+try/catch since a quota-exceeded failure shouldn't break building —
+real risk given `MAX_CELLS=20000`-scale worlds, not hypothetical),
+`clearLocalStorage`, `exportWorldFile` (Blob + synthetic anchor download,
+no library), and `importWorldFile` (reads a `File`, resolves to parsed
+JSON, throws on invalid JSON for the caller to handle as a user-facing
+error rather than a crash). `worldstate.js`'s `createWorldStore` gained
+`toJSON()` (serializes back to the full section-3 shape, refreshing
+`meta.lastModified`) and `replaceAll(newWorldJSON)` — mutates the
+**same** store object in place rather than requiring a new one, so
+`build.js`'s already-wired closures keep working after a reset/import
+without any re-wiring. `render.js`: `init()` now loads from
+`localStorage` first, falling back to `starter-world.json` only if
+nothing is saved yet; every `onChange` (add/remove/shell-fill) both
+re-renders and re-saves; three new buttons in `index.html`'s `#controls`
+overlay — **New World** (confirm-gated, since it's destructive; clears
+storage and reloads the static seed), **Export JSON** (downloads the
+current world), **Import JSON** (file picker, replaces the world,
+alerts on invalid JSON rather than silently failing). **Not yet
+verified** — after hard-refreshing, build something, refresh the page
+again, and confirm the build persists (Phase 3's actual success check);
+also try Export then Import to confirm round-tripping works, and New
+World to confirm it resets after confirmation.
+
+**To continue implementation**, Phase 4 (deploy publicly: GitHub
+Pages/Vercel, still single-player) is next — see `RHOMBIVERSE_PLAN.md`
+section 4. Before that phase ships, `docs/RHOMBIVERSE_COMPLIANCE.md`'s
+"Required before Phase 4" checklist (LICENSE, ToS, Privacy Policy,
+SECURITY.md, XSS audit) needs doing — not yet started.
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.

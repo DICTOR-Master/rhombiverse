@@ -18,8 +18,19 @@
       border-radius: 6px;
       user-select: none;
     }
-    #controls input { width: 3em; }
-    #controls .hint { opacity: 0.7; margin-top: 4px; }
+    #controls input[type="number"] { width: 3em; }
+    #controls .hint { opacity: 0.7; margin: 4px 0; }
+    #controls .buttons { display: flex; gap: 6px; margin-top: 6px; }
+    #controls button, #controls .file-btn {
+      font: inherit;
+      color: inherit;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    #controls button:hover, #controls .file-btn:hover { background: rgba(255, 255, 255, 0.2); }
   </style>
   <!--
     No bundler/build step by design (Grounded Simplicity, RHOMBIVERSE_PRINCIPLES.md
@@ -42,6 +53,14 @@
     <div class="hint">
       Click a face: add one cell. Shift+click a cell: fill that many
       shells outward. Right-click: remove.
+    </div>
+    <div class="buttons">
+      <button id="new-world" type="button">New World</button>
+      <button id="export-json" type="button">Export JSON</button>
+      <label class="file-btn">
+        Import JSON
+        <input id="import-json" type="file" accept="application/json" hidden />
+      </label>
     </div>
   </div>
   <script type="module" src="./src/render.js"></script>

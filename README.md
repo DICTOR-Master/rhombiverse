@@ -20,27 +20,27 @@ See `RHOMBIVERSE_PLAN.md` section 6 for the full vision statement, and
 
 ## What this is (right now)
 
-Phase 1 (renderer + lattice math) is implemented and visually confirmed:
-a single rhombic dodecahedron renders at the FCC origin and the camera
-orbits it with mouse drag. Phase 2 (build tool) is implemented —
-left-click a face to add the neighboring cell, right-click a cell to
-remove it (mouse only; touch tap/long-press isn't implemented yet). A
-real overlap bug (RD size was 2x too large for the lattice spacing) and a
-second bug (only cells near the very first click could ever be built, a
-stale `InstancedMesh` bounding-sphere cache) were both found via real
-browser checks and fixed. A **shell fill tool** (Phase 5.5's fill-sphere
-tool, pulled forward early) was also added: Shift+click a cell to fill N
-shells outward around it (set N in the on-page number input), tinted by
-shell distance so each ring is visually distinguishable, and a second
-Shift+click on the same structure now grows it further instead of
-starting an unrelated cluster next door (also a real, user-caught bug).
-**This latest fix is not yet re-confirmed — hard-refresh, Shift+click a
-cell, raise the shell count, and Shift+click that same structure again to
-confirm it grows one bigger sphere** before trusting it as resolved; see
-`CLAUDE.md`'s Current Status for root
-causes. Phase 3
-(local persistence) is next —
-see `RHOMBIVERSE_PLAN.md` section 4 for the full phased build order.
+**Phase 1** (renderer + lattice math) and **Phase 2** (build tool:
+left-click a face to add the neighboring cell, right-click to remove;
+mouse only, touch isn't implemented yet) are both implemented and
+visually confirmed, including a **shell fill tool** pulled forward early
+from Phase 5.5 — Shift+click a cell to fill N shells outward around it
+(set N in the on-page input), tinted by distance, and a second
+Shift+click on the same structure grows it further (confirmed working up
+through 10 shells).
+
+**Phase 3** (local persistence) is implemented — builds now survive a
+page refresh via `localStorage`, plus New World / Export JSON / Import
+JSON buttons — but **not yet visually confirmed**. After hard-refreshing:
+build something, reload the page, and check it's still there; try Export
+then Import to round-trip a world; try New World to confirm it resets
+after the confirmation prompt. See `CLAUDE.md`'s Current Status for
+implementation detail.
+
+Phase 4 (deploy publicly) is next — see `RHOMBIVERSE_PLAN.md` section 4
+for the full phased build order. `docs/RHOMBIVERSE_COMPLIANCE.md`'s
+"Required before Phase 4" items (LICENSE, ToS, Privacy Policy,
+SECURITY.md, XSS audit) haven't been started yet.
 
 ## Structure
 
