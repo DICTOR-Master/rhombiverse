@@ -1,0 +1,11 @@
+{
+  "worldName": "Rhombiverse",
+  "version": 1,
+  "cells": {
+    "0,0,0": { "material": "base", "region": "core", "status": "approved", "authorId": "system" }
+  },
+  "meta": {
+    "createdAt": "2026-08-11T00:00:00Z",
+    "lastModified": "2026-08-11T00:00:00Z"
+  }
+}
