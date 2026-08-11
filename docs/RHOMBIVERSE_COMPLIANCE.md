@@ -8,14 +8,11 @@ Each item below is tagged with **when it's required by**, mapped to the phases i
 
 ## Required before Phase 4 (public playable link)
 
-- [ ] **License file** (`LICENSE`) — choose before first public exposure:
-  - MIT / Apache-2.0 → permissive, easiest for others to build on.
-  - GPL-family → derivatives must stay open-source.
-  - Decision affects who can fork/commercialize later — treat as near-irreversible once adopted.
-- [ ] **Terms of Service** — even minimal, required once strangers can use the app and their data/content is stored.
-- [ ] **Privacy Policy** — required if any data is collected (even just localStorage-only usage counts or future accounts).
-- [ ] **SECURITY.md** — private vulnerability reporting channel (e.g. an email or GitHub private security advisory), standard open-source norm before wide exposure.
-- [ ] **Input sanitization audit** — any user-submitted text (world names, usernames, future chat) must be sanitized before being rendered back into the DOM (XSS prevention). Do this before Phase 4, not after.
+- [ ] **License file** (`LICENSE`) — deliberately deferred (2026-08-11): repo stays private/unlicensed for now, per direct instruction. Revisit before flipping the GitHub repo to public — decision affects who can fork/commercialize later, treat as near-irreversible once adopted.
+- [x] **Terms of Service** — `TERMS.md` added 2026-08-11 (minimal, matches current no-account/no-backend scope; flagged for real legal review once Phase 5+ adds accounts/shared worlds).
+- [x] **Privacy Policy** — `PRIVACY.md` added 2026-08-11 (no server-side collection at this stage; localStorage/export-JSON only).
+- [x] **SECURITY.md** — added 2026-08-11, reporting contact + GitHub private advisory link, scope note for the current static/no-backend stage.
+- [x] **Input sanitization audit** — done 2026-08-11: no user-submitted text (world name, imported JSON, material strings) is ever passed to `innerHTML`/`outerHTML`/`insertAdjacentHTML`/`document.write`. The three `innerHTML` uses in `src/render.js` (ring-list placeholder/empty states) are static literals, not interpolated data. All dynamic text (shell labels, counts) goes through `.textContent`, which auto-escapes. Imported JSON is parsed via `JSON.parse` only (no `eval`), and `worldName` is currently never rendered into the DOM at all. `MATERIAL_COLORS[material] ?? MATERIAL_COLORS.base` is a safe plain-object lookup with fallback — no dynamic property write, no code execution path. **No fixes were needed; nothing found.** Re-run this audit if user-facing text (chat, usernames) is added in a later phase.
 
 ## Required before Phase 5 (shared/multiplayer backend)
 
