@@ -34,6 +34,57 @@
     }
     #controls button:hover, #controls .file-btn:hover { background: rgba(255, 255, 255, 0.2); }
     #controls button.mode-btn.active { background: rgba(120, 190, 255, 0.35); border-color: #7cf; }
+
+    #shells-panel {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      width: 220px;
+      color: #ddd;
+      font: 13px/1.4 system-ui, sans-serif;
+      background: rgba(0, 0, 0, 0.45);
+      padding: 8px 12px;
+      border-radius: 6px;
+      user-select: none;
+    }
+    #undo-btn {
+      display: block;
+      width: 100%;
+      font: bold 14px system-ui, sans-serif;
+      color: #fff;
+      background: #b45309;
+      border: 1px solid #f59e0b;
+      border-radius: 4px;
+      padding: 8px;
+      cursor: pointer;
+    }
+    #undo-btn:hover:not(:disabled) { background: #d97706; }
+    #undo-btn:disabled { opacity: 0.35; cursor: default; }
+    #shells-panel h3 { margin: 10px 0 4px; font-size: 13px; opacity: 0.85; }
+    #ring-list { max-height: 460px; overflow-y: auto; }
+    #ring-list svg { display: block; margin: 4px auto 8px; }
+    #ring-list svg circle[stroke] { transition: filter 0.1s; }
+    #ring-list svg circle[stroke]:hover { filter: brightness(1.35); }
+    #ring-list .ring-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 3px 0;
+    }
+    #ring-list .ring-remove {
+      font: bold 13px monospace;
+      color: #fff;
+      background: rgba(220, 60, 60, 0.55);
+      border: 1px solid rgba(255, 120, 120, 0.6);
+      border-radius: 4px;
+      width: 20px;
+      height: 20px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    #ring-list .ring-remove:hover { background: rgba(220, 60, 60, 0.85); }
+    #ring-list .placeholder { opacity: 0.6; }
   </style>
   <!--
     No bundler/build step by design (Grounded Simplicity, RHOMBIVERSE_PRINCIPLES.md
@@ -58,7 +109,7 @@
       <button class="mode-btn" data-mode="round" type="button">Round</button>
       <button class="mode-btn" data-mode="excavate" type="button">Excavate</button>
     </div>
-    <div class="row">
+    <div id="material-row" class="row">
       <label>Material:
         <select id="material-select">
           <option value="base">Base Rhomb</option>
@@ -72,12 +123,18 @@
         </select>
       </label>
     </div>
-    <div class="row">
+    <div id="shell-radius-row" class="row">
       <label>Shell fill radius: <input id="shell-count" type="number" min="1" max="15" value="3" /></label>
+    </div>
+    <div id="hollow-from-row" class="row">
       <label>Hollow from shell: <input id="hollow-from" type="number" min="1" max="15" value="1" /></label>
     </div>
+    <div id="mode-hint" class="hint"></div>
+    <hr style="border-color: rgba(255,255,255,0.15); margin: 8px 0;" />
     <div class="row">
       <label><input id="section-enable" type="checkbox" /> Section view</label>
+    </div>
+    <div id="section-controls-row" class="row" style="display: none">
       <select id="section-axis">
         <option value="x">X</option>
         <option value="y">Y</option>
@@ -86,17 +143,8 @@
       <input id="section-pos" type="range" min="-20" max="20" step="0.5" value="0" />
       <label><input id="section-flip" type="checkbox" /> Flip</label>
     </div>
-    <div class="row">
-      <label>Onion skin shells:
-        <input id="onion-min" type="number" min="0" max="15" value="0" /> to
-        <input id="onion-max" type="number" min="0" max="15" value="15" />
-      </label>
-    </div>
     <div class="hint">
-      Click acts per the selected mode above (Build adds one cell; Fill/
-      Round/Excavate use the shell inputs and only apply to shell-tagged
-      structures). Right-click always removes the clicked cell, in every
-      mode.
+      Right-click always removes the clicked cell, in every mode.
     </div>
     <div class="buttons">
       <button id="new-world" type="button">New World</button>
@@ -106,6 +154,11 @@
         <input id="import-json" type="file" accept="application/json" hidden />
       </label>
     </div>
+  </div>
+  <div id="shells-panel">
+    <button id="undo-btn" type="button" disabled>Undo</button>
+    <h3>Shells (click a built cell)</h3>
+    <div id="ring-list"><div class="placeholder">Click a built structure to see its shells.</div></div>
   </div>
   <script type="module" src="./src/render.js"></script>
 </body>

@@ -298,6 +298,114 @@ just unbuildable-from-scratch in this session. Onion-max's default value
 also changed from the arbitrary `999` placeholder to `15`, matching the
 real ceiling rather than an arbitrary "big enough" number.
 
+**Real testing infrastructure established, 2026-08-11 — use this before
+guessing at future bugs.** User reported "Fill mode only removes cells,"
+reproducible even in a fresh private-browsing window. Static code
+reading found nothing (correctly — see below). Rather than keep
+guessing, downloaded a portable Node.js binary (no root available;
+`nodejs.org` release tarball extracted to a scratch dir, no `apt`/`npm`
+install needed) and `npm install three@0.185.1` in a scratch project,
+then imported the REAL `lattice.js`/`worldstate.js`/`build.js` (via
+absolute paths) against the real npm `three` package — `Raycaster`,
+`InstancedMesh.raycast()`, `ConvexGeometry` etc. are pure CPU-side math
+with no WebGL/DOM dependency, so this exercises real ray-triangle
+intersection, not a mock. A real `EventTarget` (Node global) stands in
+for `renderer.domElement`; `new Event('click')` with `clientX`/`clientY`
+assigned as plain properties stands in for a browser click; the seed
+cell's world position is projected through the real camera matrices to
+find the correct screen coordinate to click, rather than guessing pixel
+values. **Result: Fill mode was, and is, 100% correct** — a simulated
+fill-mode click on the seed produced exactly 147 cells (1 + 12 + 42 +
+92, matching shells 1–3 exactly), fully tagged. The reported bug was
+never reproduced through the actual code path; root cause (if any)
+remains external to `lattice.js`/`worldstate.js`/`build.js`'s mode
+dispatch. **This harness is reusable** — when a future bug report can't
+be resolved by reading code, reach for direct execution before
+theorizing further; it found a real gap (see the `onCellClicked` fix
+below) that static reading had missed, in the same session that also
+proved the reported bug wasn't there.
+
+To reconstruct the harness: portable Node was extracted to a scratch
+dir (not this repo); a scratch npm project has `three@0.185.1` in
+`node_modules`; **the real `src/*.js` files need `node_modules`
+findable via Node's own resolution from their location** (`import * as
+THREE from 'three'` in `build.js` resolves relative to `build.js`, not
+the test script) — a symlink `~/rhombiverse/node_modules ->
+<scratch>/node_modules` makes that work, and must be removed again
+after testing (it's `.gitignore`d, but isn't part of this repo's actual
+structure — the project is deliberately build-tool-free, see "No build
+step" below). Two established test patterns:
+`test-fill.mjs`-style (full raycast + real click dispatch, for anything
+touching `matchNeighborOffset`/mode dispatch) and
+`test-modeui.mjs`/`test-undo.mjs`-style (mock DOM elements + a verbatim
+copy of the specific render.js logic under test, for pure DOM-wiring
+logic that doesn't need real geometry).
+
+**UI complexity feedback led to a real redesign, 2026-08-11 — several
+rounds, each grounded in something concrete, not vibes:**
+1. First complaint ("too complicated appearance all options seem
+   available at same time") → contextual mode UI: `updateModeUI()`
+   shows/hides `#material-row`/`#shell-radius-row`/`#hollow-from-row`
+   per active mode, and `#mode-hint` states in plain language what a
+   click currently does (see `MODE_HINTS`). Verified via
+   `test-modeui.mjs` mock-DOM test before shipping: all four modes show
+   exactly the intended rows.
+2. Direct request ("onion ring model as a standard view... select rings
+   to remove... undo button clearly visible") → **removed** the
+   onion-skin `#onion-min`/`#onion-max` view-only filter entirely
+   (superseded, not kept alongside — two ways to look at the same shell
+   concept would be exactly the redundancy being complained about) and
+   replaced it with a live **ring-list panel** (`#shells-panel`,
+   deliberately on the opposite side of the screen from `#controls` —
+   spatial separation of "how to build" vs. "what you've built /
+   undo", not just visual grouping within one growing box).
+3. Follow-up request (concentric-circle diagram) → `renderRingDiagram()`
+   draws a bullseye SVG: largest shell painted first, each smaller shell
+   painted on top covering the larger one's center, leaving only its own
+   ring-shaped band visible and clickable — the standard technique for
+   real donut/ring click targets without arc/annulus path math. Colored
+   via the same hue formula as `shellTint()` in the 3D view (`shellHue()`
+   below it), so a shell reads as the same color everywhere. Kept
+   **alongside**, not instead of, the text list with `×` buttons — a
+   thin ring is easy to mis-click, so the list is the precise fallback,
+   not a redundant duplicate.
+
+**Undo, implemented as a full-world-JSON snapshot stack, not a
+diff/command log** — simpler to reason about correctly than tracking
+per-operation inverses, and every mutating path (Build/Fill/Round/
+Excavate/ring-remove/New World/Import) already produces a full
+`world.toJSON()`, so one mechanism covers all of them for free, with no
+per-operation-type undo logic needed. `lastSnapshot` always holds the
+state as of the end of the *previous* `onChange`, i.e. exactly the state
+right before whatever mutation the *current* `onChange` is reporting —
+this is what lets a single hook in `onChange` capture correct "before"
+snapshots without instrumenting every individual
+`world.addCell`/`removeCell` call site in `build.js`. Undo itself calls
+`rebuildInstances`/`saveToLocalStorage` directly rather than going
+through `onChange()`, deliberately — going through `onChange()` would
+push a new snapshot for the undo action itself, effectively making undo
+un-undo-able in a confusing way. Capped at 20 states (`MAX_UNDO`).
+Verified end-to-end via `test-undo.mjs` against the real modules: fill →
+undo → back to 1 cell; redo the fill → remove one ring → undo → ring
+restored → undo again → back to 1 cell → undo on an empty stack is a
+safe no-op. **That test caught a real gap**: `onCellClicked` fires with
+the clicked cell's PRE-mutation state, so on the very first fill that
+creates a brand-new structure, the original cell had no `shellCenter`
+yet at the moment `onCellClicked` was invoked — the ring panel wouldn't
+have focused on a just-built structure without a second click. Fixed by
+having the `fill` branch in `build.js` re-invoke `onCellClicked` a
+second time with the now-definitive `centerKey` after the fill
+completes.
+
+**Not yet visually verified in a real browser** (everything above was
+verified via the Node harness, not a live page) — after hard-refreshing:
+confirm each mode's contextual controls show/hide correctly; Fill a
+structure and confirm the ring panel on the right immediately shows its
+shells (no second click needed) with a live bullseye diagram; click a
+ring (either the diagram or the × in the list) and confirm just that
+shell disappears from the 3D view; click Undo and confirm it comes back;
+confirm the Undo button's label shows a count and disables at zero.
+
 **To continue implementation**, Phase 4 (deploy publicly: GitHub
 Pages/Vercel, still single-player) is next — see `RHOMBIVERSE_PLAN.md`
 section 4. Before that phase ships, `docs/RHOMBIVERSE_COMPLIANCE.md`'s

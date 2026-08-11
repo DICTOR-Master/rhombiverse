@@ -123,6 +123,20 @@ function excavateStructure(world, centerKey, minShell) {
   }
 }
 
+// Removes every cell at exactly one shell number for a structure -- the
+// "select a ring to remove" panel in render.js calls this directly (not
+// via a canvas click), one ring at a time. Exported since render.js's
+// ring-list UI needs it, unlike round/excavateStructure which are only
+// ever reached through onClick's mode dispatch below.
+export function removeShell(world, centerKey, shellNumber) {
+  const structure = world
+    .entries()
+    .filter((c) => c.shellCenter === centerKey && c.shell === shellNumber);
+  for (const c of structure) {
+    world.removeCell(c.x, c.y, c.z);
+  }
+}
+
 // renderer/camera/mesh: the Phase 1 render.js scene objects to raycast
 // against. cellAt(instanceId): looks up the {x,y,z,...} cell for a hit
 // instance. world: the worldstate.js store (has/addCell/removeCell).
@@ -130,6 +144,9 @@ function excavateStructure(world, centerKey, minShell) {
 // getMode(): reads the active build mode ('build'|'fill'|'round'|
 // 'excavate') from the UI. getShellCount()/getMinShell(): read the
 // fill/excavate shell range. getMaterial(): reads the selected material.
+// onCellClicked(cell): called with every successfully-hit cell,
+// regardless of mode -- render.js uses this to track which structure's
+// shells the ring-list panel should currently show.
 export function createBuildController({
   renderer,
   camera,
@@ -141,6 +158,7 @@ export function createBuildController({
   getShellCount,
   getMinShell,
   getMaterial,
+  onCellClicked,
 }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -159,6 +177,8 @@ export function createBuildController({
     if (!hit || hit.instanceId === undefined) return;
     const cell = cellAt(hit.instanceId);
     if (!cell) return;
+
+    if (onCellClicked) onCellClicked(cell);
 
     const mode = getMode();
 
@@ -201,6 +221,13 @@ export function createBuildController({
           world.addCell(c.x, c.y, c.z, { material, shell: c.shell, shellCenter: centerKey });
         }
       }
+      // Re-report focus with the now-definitive centerKey: on a fill that
+      // just created a brand-new structure (cell had no shellCenter yet
+      // when onCellClicked fired above, before this mutation), the
+      // earlier call reported no focus at all -- caught by a real
+      // integration test, not assumed. Without this, the ring panel
+      // wouldn't show the shells you just built until a second click.
+      if (onCellClicked) onCellClicked({ shellCenter: centerKey });
       onChange();
       return;
     }

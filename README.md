@@ -20,52 +20,39 @@ See `RHOMBIVERSE_PLAN.md` section 6 for the full vision statement, and
 
 ## What this is (right now)
 
-**Phase 1** (renderer + lattice math) and **Phase 2** (build tool:
-left-click a face to add the neighboring cell, right-click to remove;
-mouse only, touch isn't implemented yet) are both implemented and
-visually confirmed, including a **shell fill tool** pulled forward early
-from Phase 5.5 — Shift+click a cell to fill N shells outward around it
-(set N in the on-page input), tinted by distance, and a second
-Shift+click on the same structure grows it further (confirmed working up
-through 10 shells).
+**Phase 1** (renderer + lattice math), **Phase 2** (build/remove), and
+**Phase 3** (local persistence — builds survive a refresh; New World /
+Export JSON / Import JSON) are all implemented and visually confirmed.
 
-**Phase 3** (local persistence) is implemented and visually confirmed —
-builds survive a page refresh via `localStorage`, and New World / Export
-JSON / Import JSON all work.
-
-**Planetoid tools** (pulled forward ahead of Phase 5.5, not yet visually
-confirmed as a whole). Pick a **mode** with the Build / Fill / Round /
-Excavate buttons — a plain click then does whatever that mode does. This
-replaced an earlier Shift/Ctrl/Ctrl+Shift+click modifier scheme that grew
-unmanageable; **right-click still always removes the clicked cell, in
-every mode.**
+**Planetoid tools**, pulled forward ahead of Phase 5.5. Pick a **mode**
+with the Build / Fill / Round / Excavate buttons on the left — a plain
+click then does whatever that mode does, and only the controls relevant
+to that mode are shown. **Right-click always removes the clicked cell,
+in every mode.**
 - **Build** — click a face to add the neighboring cell (default mode).
 - **Fill** — click a cell to fill shells ("hollow from"–"radius") outward
   around it, approximating a sphere. A second Fill click on the same
   structure grows it further rather than starting a new one.
 - **Round** — click a shell-tagged cell to smooth its outer boundary.
-  Shell-based fills are naturally faceted (a single shell spans a wide
-  range of true distances from center); round reselects the boundary by
-  actual Euclidean distance instead, trimming the far points and filling
-  the gaps that leaves.
+  Shell-based fills are naturally faceted; round reselects the boundary
+  by actual distance from center instead, trimming the far points and
+  filling the gaps that leaves.
 - **Excavate** — click an already-built structure to hollow it out down
-  to "Hollow from shell", for retrofitting something you built solid
-  (Fill's hollow option only applies to new fills).
+  to "Hollow from shell", for retrofitting something you built solid.
 
 A **material picker** selects which material new cells use (Base Rhomb,
 Garnet, Ferrostone, Glassite, Star-Glassite, Blackstar-Glassite, Ice 9.9,
-Water), each with its own tint — cosmetic only for now.
+Water), each with its own tint — cosmetic only for now. A **section
+view** (cutaway clipping plane, pick an axis/position/flip) lets you see
+inside a structure instead of just its solid exterior.
 
-To actually see the shell system: a **section view** (cutaway clipping
-plane, pick an axis/position/flip) and **onion-skin shells** (show only
-shells min–max) can be combined to look inside a structure instead of
-just its solid exterior.
-
-All shell-number inputs (Fill radius, Hollow from, Onion min/max) share
-the same real cap of 15 — a genuine fix, not just cosmetic: they used to
-have inconsistent, unenforced limits (one field would silently accept a
-value like 100, which would have tried to fill far past what the app can
-actually render).
+On the right, a **shells panel** always shows the last-clicked
+structure's shells as a live bullseye diagram (colored to match the 3D
+view) plus a precise list with a remove button per shell — click a ring,
+either in the diagram or the list, to delete it. A prominent **Undo**
+button at the top covers every mutating action (Build/Fill/Round/
+Excavate/ring removal/New World/Import), not just ring removal, up to
+20 steps back.
 
 Phase 4 (deploy publicly) is next — see `RHOMBIVERSE_PLAN.md` section 4
 for the full phased build order. `docs/RHOMBIVERSE_COMPLIANCE.md`'s
