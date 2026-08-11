@@ -12,6 +12,7 @@ import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController, removeShell, recolorShell } from './build.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
 import { applyHydrosphere } from './hydrosphere.js';
+import { applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } from './blackhole.js';
 import { createPlayerController } from './player.js';
 import {
   saveToLocalStorage,
@@ -110,10 +111,13 @@ function updateGravityInfo() {
   }
   const status = nearest.active ? 'active' : 'out of range (build closer to the core, or add more BSG)';
   const hydro = nearest.hydrosphereActive ? ' · hydrosphere+atmosphere active' : '';
+  const blackHole = nearest.isBlackHole
+    ? ` · BLACK HOLE — ledger ${nearest.consumedMatter} · generated ${nearest.generatedCellCount} cells through shell ${nearest.generatedThroughShell}`
+    : '';
   el.textContent =
     `Nearest planetoid: gravity ${status} · radius ${nearest.gravityRadius.toFixed(1)}u · ` +
     `${nearest.bsgCount} BSG cell${nearest.bsgCount === 1 ? '' : 's'} · ` +
-    `recommended core: ${nearest.coreShellRecommendation} shell${nearest.coreShellRecommendation === 1 ? '' : 's'}${hydro}`;
+    `recommended core: ${nearest.coreShellRecommendation} shell${nearest.coreShellRecommendation === 1 ? '' : 's'}${hydro}${blackHole}`;
 }
 
 function enterWalk() {
@@ -207,10 +211,17 @@ function shellTint(shell) {
   return _shellColorCache.get(shell);
 }
 
+// Distinct tint for black-hole-generated buffer cells (RHOMBIVERSE_SPEC_
+// BLACKHOLE.md section 2) -- players need to be able to tell "auto-
+// generated containment space" apart from their own build at a glance,
+// not just via the underlying data flag.
+const GENERATED_TINT = new THREE.Color(0x2a0a30);
+
 // Final per-instance color: the cell's material color, lightly blended
 // (35%) toward its shell tint so shell rings stay visible without
 // obscuring which material a cell actually is.
 function instanceColorFor(cell) {
+  if (cell.generatedByBlackHole) return GENERATED_TINT;
   const base = materialColor(cell.material);
   if (!cell.shell) return base;
   return base.clone().lerp(shellTint(cell.shell), 0.35);
@@ -267,9 +278,12 @@ async function init() {
   scene.add(mesh);
 
   applyHydrosphere(world);
+  applyBlackHoleConsumption(world);
+  applyAsymptoticGeneration(world);
   rebuildInstances(mesh, world);
 
   planetoids = computePlanetoids(world);
+  planetoids = annotateBlackHoles(planetoids, world);
   player = createPlayerController({
     camera,
     domElement: renderer.domElement,
@@ -415,8 +429,11 @@ async function init() {
 
   function onChange() {
     applyHydrosphere(world);
+    applyBlackHoleConsumption(world);
+    applyAsymptoticGeneration(world);
     rebuildInstances(mesh, world);
     planetoids = computePlanetoids(world);
+    planetoids = annotateBlackHoles(planetoids, world);
     updateGravityInfo();
     const afterJSON = world.toJSON();
     const afterStr = JSON.stringify(afterJSON);

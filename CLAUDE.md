@@ -518,10 +518,107 @@ the whole run (only benign WebGL driver performance warnings). Real
 screenshots taken at each step confirm the render itself (not just DOM
 state) is correct.
 
-**To continue implementation**, Phase 5 (Shared World, optional realtime
-sync) or the specs Phase 5.5 unlocked (black hole, star system,
-supernova, water/ice — see Build order below) are next, or Phase 5.8
-(Trust Zones/Moderation) if working toward a real public deploy — ask
+**Water & Ice 9.9 (planetoid hydrosphere) done, commit `ce528da`,
+2026-08-11.** `docs/RHOMBIVERSE_SPEC_WATER_ICE.md`. Water needed no new
+code — already an ordinary, freely-placeable material. New
+`src/hydrosphere.js`: for every connected cluster (reuses `gravity.js`'s
+`findClusters`, now exported) containing at least one BSG cell, any Ice
+9.9 cell **anywhere in that same cluster** — not just cells directly
+touching the core — liquifies into permeated water (`applyHydrosphere`,
+called every `render.js` `onChange`/`init`, mutates world in place,
+idempotent). `gravity.js`'s `computePlanetoids` gained
+`hydrosphereActive`/`atmosphereActive` on each planetoid record (both
+flip together, reading the `hydrospherePermeated` flag already stamped
+by the time it runs). Deliberately does not touch the black hole's
+containment framework at all, per the spec's own section 3. Verified
+with a real Playwright run: BSG + adjacent Ice 9.9 converts to permeated
+water, visible in the render (distinct blue tint) and in the
+`#gravity-info` hint, zero console errors.
+
+**Black Hole (Asymptotic Containment) done, 2026-08-11 — scoped for
+single-player, direct instruction.** `docs/
+RHOMBIVERSE_SPEC_BLACKHOLE.md`. The spec's own section 4 says its
+cross-player consent model "depends on the Phase 5.8 trust-zone/region-
+ownership system existing first" — this repo has no accounts and no
+Phase 5.8 yet, so per direct instruction the real physics/economics are
+built in full now, while the ownership/consent layer is deliberately NOT
+faked. New `src/blackhole.js`: **a black hole is not a new material or
+object type** — mirrors Star System's own framing — a BSG cluster
+becomes one once `BLACK_HOLE_BSG_THRESHOLD` (20, first-guess/tunable)
+BSG cells are reached, reusing `gravity.js`'s new `bsgClusterStats`
+helper (factored out of `computePlanetoids` so both modules share the
+exact same center/radius math, not two derivations of it). **Consumption**
+(`applyBlackHoleConsumption`): any foreign, non-buffer cell within
+`EVENT_HORIZON_FRACTION` (0.15) of `gravityRadius` is absorbed —
+removed from the world, credited to a matter ledger stored on a sticky
+"core" BSG cell (nearest to centerOfMass the first time the threshold is
+crossed, then kept stable across recomputes so accumulated ledger state
+survives the cluster growing). **Generation**
+(`applyAsymptoticGeneration`): backfills empty lattice cells between the
+core and the nearest *foreign* structure (a structure chain-connected to
+the black hole's own cluster is correctly excluded from "foreign" —
+confirmed the hard way, see below) with `generatedByBlackHole` buffer
+cells (distinct dark render tint), gated by four independent, all
+independently-verified limits: (1) `shellCumulativeCost(n)` (cumulative
+`shellCount` through shell n) must be affordable from the ledger, scaled
+up by (2) adaptive damping — `1 + recentConsumptionCount *
+DAMPING_FACTOR` over a `DAMPING_WINDOW_MS` (10s) window, so rapid recent
+consumption makes further growth costlier, not easier; (3) generation
+never reaches or passes the nearest foreign structure's own BFS shell;
+(4) generation never exceeds real Euclidean `gravityRadius`, and (5)
+never exceeds `MAX_GENERATED_CELLS` (2000, the spec's own "computability
+caveat" cap). **Consent/ownership, deliberately NOT built as fake
+multiplayer:** in a single-player world the black hole's creator already
+owns 100% of the world, so the spec's own creator-exception clause
+already covers everything with zero extra code. What got real, narrow
+meaning instead: a per-cell `destructible: false` opt-out (checked by
+consumption) lets a player protect specific cells of their *own* build
+from their *own* black hole — forward-compatible with the eventual
+cross-player meaning without inventing account/region state that doesn't
+exist yet.
+
+**Real bug caught only by execution, not code review, while testing
+this:** an early version of the generation test built a "foreign
+approaching structure" as a chain of built cells reaching out from the
+core — but `findClusters` groups by *built adjacency*, not material, so
+that chain silently merged into the black hole's own cluster and was
+then correctly excluded by `clusterKeys` from ever counting as "foreign,"
+making generation look broken (0 cells) when the code was actually
+working exactly as designed and the test setup was wrong. Root-caused by
+building a genuinely *disconnected* foreign cell instead (a gap, no
+connecting chain) — confirms `applyAsymptoticGeneration`'s "foreign
+means not part of this cluster" logic is correct, but is also a real
+trap worth remembering: **anything chain-built onto a black hole's own
+structure becomes part of it**, including for future mechanics that need
+to reason about "what's near a black hole but not owned by it." Verified
+via real execution throughout, not static reading: since this module has
+no DOM/Three.js dependency, tests drove it with dynamic `import()`
+straight from a running `http.server` inside a headless Chromium page
+(no Node needed) — confirmed threshold detection, in-range consumption
+crediting the ledger while an out-of-event-horizon structure stays
+untouched, generation correctly halting with an insufficient ledger,
+generation correctly stopping exactly one shell short of a nearby
+foreign structure with an abundant ledger, generation correctly capped
+by `gravityRadius` and by `MAX_GENERATED_CELLS` when nothing nearby
+limits it first, and adaptive damping producing measurably less
+generation (541 cells / shell 5 vs. 35 cells / shell 2) from the
+*identical* ledger balance when 20 recent consumption events are present
+vs. none. Also reran the Phase 5.5 walk-mode and Water/Ice regression
+tests afterward to confirm the new pipeline calls (`applyHydrosphere` →
+`applyBlackHoleConsumption` → `applyAsymptoticGeneration` →
+`rebuildInstances` → `computePlanetoids` → `annotateBlackHoles`, wired
+into both `init()` and `onChange()` in `render.js`) didn't regress
+ordinary (non-black-hole) play — both passed unchanged, zero console
+errors.
+
+**To continue implementation**, Star System Anchor (`docs/
+RHOMBIVERSE_SPEC_STAR_SYSTEM.md`) is next — it hard-depends on Water/Ice
+9.9's hydrogen/oxygen mechanic (done above), not on Black Hole, despite
+the spec docs listing black hole first; Supernova depends on both Star
+System and Black Hole (reuses this file's containment pattern for its
+remnant) and comes after. Phase 5 (Shared World, optional realtime
+sync) or Phase 5.8 (Trust Zones/Moderation) — the real prerequisite for
+Black Hole/Supernova's cross-player consent model — are also open, ask
 which, don't assume. Crystal-growth mode (Phase 5.5's other bullet,
 cells auto-growing over time) was intentionally left unbuilt; the plan
 marks it optional/tied to Phase 6 timing. Actual public deploy (Phase 4's
@@ -610,10 +707,16 @@ once deployed). Phase 5+ and the spec addenda layer on progressively:
 5.5. **Planetoid Building + Radial Gravity** — DONE, commit `30cd1c8` (2026-08-11,
      see status above), except crystal-growth (intentionally deferred to
      Phase 6 timing). `docs/RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md`.
-     Also unlocks the black hole (`SPEC_BLACKHOLE.md`), star system
-     (`SPEC_STAR_SYSTEM.md`), supernova (`SPEC_SUPERNOVA.md`), and
-     water/ice (`SPEC_WATER_ICE.md`) addenda, each building on the last —
-     none of these four started yet.
+     Also unlocks four addenda, whose REAL dependency order is not the
+     order the docs list them in: **Water/Ice → Black Hole → Star System
+     → Supernova** (Star System hard-depends on Water/Ice's hydrogen/
+     oxygen; Supernova depends on both Star System and Black Hole).
+     - Water/Ice (`SPEC_WATER_ICE.md`) — DONE, commit `ce528da` (2026-08-11).
+     - Black Hole (`SPEC_BLACKHOLE.md`) — DONE except the Phase 5.8-
+       dependent cross-player consent model, deliberately scoped for
+       single-player per direct instruction (see status above).
+     - Star System (`SPEC_STAR_SYSTEM.md`) — not started.
+     - Supernova (`SPEC_SUPERNOVA.md`) — not started, blocked on Star System.
 5.8. **Trust Zones / Moderation** — region moderation states + review
      pipeline. `docs/RHOMBIVERSE_SPEC_REGIONS.md` (ownership claims) and
      the asteroid/trade specs assume this exists — implement before those

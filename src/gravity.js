@@ -61,6 +61,31 @@ export function findClusters(world) {
   return clusters;
 }
 
+// Shared per-cluster BSG math -- the single-point center-of-mass and
+// gravity-radius formula, factored out so other spec modules that need
+// the same "is this cluster gravitationally coherent, and how far does
+// it reach" answer (blackhole.js's threshold/radius checks) reuse the
+// exact same numbers computePlanetoids uses, rather than re-deriving
+// them. Returns null for a cluster with no BSG cell at all (inert).
+export function bsgClusterStats(cluster) {
+  const bsgCells = cluster.filter((c) => c.material === BSG_MATERIAL);
+  if (bsgCells.length === 0) return null;
+
+  const sum = bsgCells.reduce(
+    (acc, c) => {
+      const [wx, wy, wz] = cellToWorld(c.x, c.y, c.z);
+      acc.x += wx;
+      acc.y += wy;
+      acc.z += wz;
+      return acc;
+    },
+    { x: 0, y: 0, z: 0 }
+  );
+  const center = [sum.x / bsgCells.length, sum.y / bsgCells.length, sum.z / bsgCells.length];
+  const gravityRadius = BASE_GRAVITY_RADIUS + (bsgCells.length - 1) * RADIUS_PER_BSG;
+  return { bsgCells, center, gravityRadius };
+}
+
 // For every cluster containing at least one Blackstar-Glassite cell,
 // computes its single-point gravity source, gravity radius, and a soft
 // core-shell-size UI hint (section 3's shellCount(n), used here via the
@@ -75,31 +100,14 @@ export function computePlanetoids(world) {
   let nextId = 1;
 
   for (const cluster of clusters) {
-    const bsgCells = cluster.filter((c) => c.material === BSG_MATERIAL);
-    if (bsgCells.length === 0) continue;
-
-    const sum = bsgCells.reduce(
-      (acc, c) => {
-        const [wx, wy, wz] = cellToWorld(c.x, c.y, c.z);
-        acc.x += wx;
-        acc.y += wy;
-        acc.z += wz;
-        return acc;
-      },
-      { x: 0, y: 0, z: 0 }
-    );
-    const center = {
-      x: sum.x / bsgCells.length,
-      y: sum.y / bsgCells.length,
-      z: sum.z / bsgCells.length,
-    };
-
-    const gravityRadius = BASE_GRAVITY_RADIUS + (bsgCells.length - 1) * RADIUS_PER_BSG;
+    const stats = bsgClusterStats(cluster);
+    if (!stats) continue;
+    const { bsgCells, center, gravityRadius } = stats;
 
     let surfaceRadius = 0;
     for (const c of cluster) {
       const [wx, wy, wz] = cellToWorld(c.x, c.y, c.z);
-      const d = Math.hypot(wx - center.x, wy - center.y, wz - center.z);
+      const d = Math.hypot(wx - center[0], wy - center[1], wz - center[2]);
       if (d > surfaceRadius) surfaceRadius = d;
     }
 
@@ -115,7 +123,7 @@ export function computePlanetoids(world) {
     const hydrosphereActive = cluster.some((c) => c.hydrospherePermeated);
 
     planetoids[`planetoid_${nextId++}`] = {
-      centerOfMass: [center.x, center.y, center.z],
+      centerOfMass: center,
       gravityRadius,
       surfaceRadius,
       coreShellRecommendation,
