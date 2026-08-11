@@ -32,7 +32,7 @@ const CORE_FRACTION = 1 / 3; // recommended core radius as a fraction of a
 // 12-direction adjacency as everything else in this lattice (build.js's
 // neighbor matching, lattice.js's cellsInShells): two cells are in the
 // same cluster iff connected through a chain of built neighbors.
-function findClusters(world) {
+export function findClusters(world) {
   const cells = world.entries();
   const byKey = new Map(cells.map((c) => [cellKey(c.x, c.y, c.z), c]));
   const visited = new Set();
@@ -106,6 +106,14 @@ export function computePlanetoids(world) {
     const effectiveShells = Math.max(1, Math.round(surfaceRadius / AVG_SHELL_SPACING));
     const coreShellRecommendation = Math.max(1, Math.round(effectiveShells * CORE_FRACTION));
 
+    // Both flip together (RHOMBIVERSE_SPEC_WATER_ICE.md section 4:
+    // "permeation establishes both at once") -- reads the
+    // hydrospherePermeated flag hydrosphere.js's applyHydrosphere already
+    // stamped on this cluster's cells by the time this runs (render.js
+    // calls applyHydrosphere before computePlanetoids on every change), so
+    // no separate clustering pass or ice99 lookup is needed here.
+    const hydrosphereActive = cluster.some((c) => c.hydrospherePermeated);
+
     planetoids[`planetoid_${nextId++}`] = {
       centerOfMass: [center.x, center.y, center.z],
       gravityRadius,
@@ -113,6 +121,8 @@ export function computePlanetoids(world) {
       coreShellRecommendation,
       bsgCount: bsgCells.length,
       cellCount: cluster.length,
+      hydrosphereActive,
+      atmosphereActive: hydrosphereActive,
     };
   }
   return planetoids;

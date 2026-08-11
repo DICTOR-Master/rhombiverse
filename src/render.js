@@ -11,6 +11,7 @@ import { rdRawVerts, cellToWorld } from './lattice.js';
 import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController, removeShell, recolorShell } from './build.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
+import { applyHydrosphere } from './hydrosphere.js';
 import { createPlayerController } from './player.js';
 import {
   saveToLocalStorage,
@@ -108,10 +109,11 @@ function updateGravityInfo() {
     return;
   }
   const status = nearest.active ? 'active' : 'out of range (build closer to the core, or add more BSG)';
+  const hydro = nearest.hydrosphereActive ? ' · hydrosphere+atmosphere active' : '';
   el.textContent =
     `Nearest planetoid: gravity ${status} · radius ${nearest.gravityRadius.toFixed(1)}u · ` +
     `${nearest.bsgCount} BSG cell${nearest.bsgCount === 1 ? '' : 's'} · ` +
-    `recommended core: ${nearest.coreShellRecommendation} shell${nearest.coreShellRecommendation === 1 ? '' : 's'}`;
+    `recommended core: ${nearest.coreShellRecommendation} shell${nearest.coreShellRecommendation === 1 ? '' : 's'}${hydro}`;
 }
 
 function enterWalk() {
@@ -264,6 +266,7 @@ async function init() {
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(mesh);
 
+  applyHydrosphere(world);
   rebuildInstances(mesh, world);
 
   planetoids = computePlanetoids(world);
@@ -411,6 +414,7 @@ async function init() {
   }
 
   function onChange() {
+    applyHydrosphere(world);
     rebuildInstances(mesh, world);
     planetoids = computePlanetoids(world);
     updateGravityInfo();
