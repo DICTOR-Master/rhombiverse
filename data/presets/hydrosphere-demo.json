@@ -1,0 +1,25 @@
+{
+  "worldName": "Hydrosphere Demo",
+  "version": 1,
+  "cells": {
+    "0,0,0": {
+      "material": "base"
+    },
+    "1,1,0": {
+      "material": "blackstar-glassite"
+    },
+    "1,-1,0": {
+      "material": "blackstar-glassite"
+    },
+    "-1,1,0": {
+      "material": "blackstar-glassite"
+    },
+    "2,2,0": {
+      "material": "ice99"
+    }
+  },
+  "meta": {
+    "lastModified": "2026-08-11T19:41:53.480Z",
+    "preset": true
+  }
+}

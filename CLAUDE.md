@@ -650,11 +650,35 @@ fuel types being present (and inert without either), frost-line
 placement correctly blocked inside / allowed outside / never restricting
 rocky materials — all real execution, zero console errors. Reran the
 Water/Ice, Walk Mode, and Black Hole regression tests afterward with no
-breakage. **Not yet verified via an actual raycast click in the
-browser** (only the underlying `canPlaceMaterial` function and its
-wiring were confirmed directly) — the code path is a straightforward
-threaded parameter, low risk, but worth a real click-through if a bug
-report ever points at frost-line placement specifically.
+breakage.
+
+**Frost line reconfirmed via an actual raycast click, 2026-08-12** (the
+isolated-function verification above was real but not sufficient on its
+own — a genuine UI click exercises the raycast/face-matching/mode-dispatch
+path in `build.js` that the isolated test never touched). First attempt
+tried chaining individual Build-mode clicks outward face-by-face,
+computed via the exact camera projection `render.js` uses (position
+`(6,5,8)`, `lookAt(0,0,0)`, real `THREE.Vector3.project()`) — this
+surfaced two real click-targeting lessons worth keeping: (1) two adjacent
+Voronoi cells share a face exactly at the midpoint between their
+centers, not at the neighbor's own center — aiming a click at the full
+neighbor position often overshoots the mesh into empty space and hits
+nothing; (2) as the structure grows, a fixed camera position walks
+distant click targets off-canvas onto the UI overlay (confirmed directly
+by probing screen projections — a point at world `(4.5,4.5,0)` landed on
+the Undo button, not the canvas) or gets occluded by nearer geometry
+along the same ray once the scene is dense enough. Sidestepped both by
+using Fill mode's own per-candidate-cell `canPlaceMaterial` check instead
+of chained Build clicks: one real click on the seed (Blackstar-Glassite,
+shell 1 → a 12-BSG-cell star) followed by one real click with Ice 9.9
+selected and shell-count 4 (shells 2–4, since shell 1 is already
+occupied) exercises the frost line across a wide distance range in a
+single interaction. Result: all 108 placed Ice 9.9 cells sit at distance
+≥4.69 against a 4.62 frost line — zero exceptions — and the ring panel
+confirms shells 2–3 were never built at all (not attempted-and-rejected,
+genuinely skipped), visually a hollow gap between the BSG core and the
+outer ice shell in the actual render. This is now confirmed via real
+end-to-end interaction, not just the underlying function.
 
 **Supernova Threshold done, 2026-08-11 — all four Phase 5.5 addenda now
 complete.** `docs/RHOMBIVERSE_SPEC_SUPERNOVA.md`. New `src/supernova.js`,

@@ -173,6 +173,21 @@
         <input id="import-json" type="file" accept="application/json" hidden />
       </label>
     </div>
+    <div class="row">
+      <label>Load preset:
+        <select id="preset-select">
+          <option value="">-- choose a pre-built structure --</option>
+          <option value="minimal-star">Minimal Star (fusion-ready)</option>
+          <option value="black-hole-core">Black Hole Core</option>
+          <option value="hydrosphere-demo">Hydrosphere Demo</option>
+        </select>
+      </label>
+      <button id="load-preset" type="button">Load</button>
+    </div>
+    <div class="hint">
+      Presets replace your current world with a ready-built structure --
+      exact BSG/shell counts, no manual clicking needed.
+    </div>
   </div>
   <div id="shells-panel">
     <button id="undo-btn" type="button" disabled>Undo</button>

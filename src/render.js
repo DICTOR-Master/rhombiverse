@@ -592,6 +592,26 @@ async function init() {
       importInput.value = '';
     }
   });
+
+  // Presets: ready-built structures (data/presets/*.json) loaded the
+  // same way New World does -- a full world.replaceAll(), confirm-gated
+  // since it's destructive. Exists because precise face-by-face clicking
+  // to hand-build something like a 20-BSG-cell black hole is genuinely
+  // fragile (real face targeting needs the shared-face midpoint between
+  // two cell centers, not either center itself, and a fixed camera plus
+  // a growing structure can walk distant click targets off-canvas or into
+  // occlusion -- both hit for real while verifying the frost line this
+  // session) -- these presets are generated via the actual lattice math
+  // (NEIGHBOR_OFFSETS-driven, not hand-derived coordinates) so they're
+  // guaranteed valid, and double as reliable fixtures for future tests.
+  document.getElementById('load-preset').addEventListener('click', async () => {
+    const key = document.getElementById('preset-select').value;
+    if (!key) return;
+    if (!confirm('Load this preset? This clears your current build.')) return;
+    const preset = await loadWorld(`./data/presets/${key}.json`);
+    world.replaceAll(preset);
+    onChange();
+  });
 }
 
 function onResize() {
