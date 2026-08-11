@@ -34,16 +34,22 @@ export function luminosity(planetoid) {
   return (planetoid.bsgCount - STAR_BSG_THRESHOLD + 1) * LUMINOSITY_PER_BSG;
 }
 
-function defaultLedger() {
-  return { hydrogenConsumed: 0, carbonConsumed: 0, activeTicks: 0 };
+// Exported: supernova.js reads/extends this same shape (accumulated
+// mass, detonation state) rather than inventing a second ledger, per
+// that spec's own "extends the existing... ledger pattern" instruction.
+export function defaultLedger() {
+  return { hydrogenConsumed: 0, carbonConsumed: 0, activeTicks: 0, recentFusionTimes: [], detonated: false };
 }
 
 // Sticky core-cell selection, same pattern as blackhole.js's pickCoreCell
 // -- kept independent (not shared) since a cluster's black-hole core cell
 // and star core cell are conceptually different ledgers that could, in
 // principle, both live on cells of the same cluster without colliding
-// (different field names: starLedger vs blackHoleLedger).
-function pickCoreCell(cluster, center) {
+// (different field names: starLedger vs blackHoleLedger). Exported: a
+// star's own core cell is also where supernova.js's detonation state
+// lives, per that spec's own instruction to extend this same ledger
+// rather than invent a second one.
+export function pickCoreCell(cluster, center) {
   const existing = cluster.find((c) => c.material === BSG_MATERIAL && c.starLedger);
   if (existing) return existing;
   let best = null;
@@ -81,7 +87,7 @@ function pickCoreCell(cluster, center) {
 // for that same cluster (gravity.js sets both from the same flag), so
 // section 2's "Oxygen released... feeding the existing atmosphere
 // mechanic" is satisfied structurally, not by a second flag.
-export function applyStarFusion(world) {
+export function applyStarFusion(world, now = Date.now()) {
   const clusters = findClusters(world);
   for (const cluster of clusters) {
     const stats = bsgClusterStats(cluster);
@@ -94,13 +100,20 @@ export function applyStarFusion(world) {
     const coreCell = pickCoreCell(cluster, stats.center);
     if (!coreCell) continue;
     const ledger = coreCell.starLedger ?? defaultLedger();
+    // A detonated star (RHOMBIVERSE_SPEC_SUPERNOVA.md) is spent -- "a
+    // single, bounded detonation, not a runaway process" -- so fusion
+    // stops accumulating further mass once that's happened, rather than
+    // silently re-arming for a second detonation.
+    if (ledger.detonated) continue;
     const { x, y, z, ...data } = coreCell;
     world.addCell(x, y, z, {
       ...data,
       starLedger: {
+        ...ledger,
         hydrogenConsumed: ledger.hydrogenConsumed + 1,
         carbonConsumed: ledger.carbonConsumed + 1,
         activeTicks: ledger.activeTicks + 1,
+        recentFusionTimes: [...ledger.recentFusionTimes, now].filter((t) => now - t <= 10000),
       },
     });
   }
@@ -166,6 +179,8 @@ export function annotateStars(planetoids, world) {
       fusionActive,
       hydrogenConsumed: ledger.hydrogenConsumed,
       carbonConsumed: ledger.carbonConsumed,
+      accumulatedMass: ledger.hydrogenConsumed + ledger.carbonConsumed,
+      detonated: ledger.detonated,
       frostLineDistance: frostLineDistance(planetoid),
     };
   }

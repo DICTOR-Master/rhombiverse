@@ -656,12 +656,56 @@ wiring were confirmed directly) — the code path is a straightforward
 threaded parameter, low risk, but worth a real click-through if a bug
 report ever points at frost-line placement specifically.
 
-**To continue implementation**, Supernova (`docs/
-RHOMBIVERSE_SPEC_SUPERNOVA.md`) is next — depends on both Star System
-(done above) and Black Hole (done above, reused for the remnant). Phase 5
-(Shared World, optional realtime sync) or Phase 5.8 (Trust Zones/
-Moderation) — the real prerequisite for Black Hole/Supernova's
-cross-player consent model — are also open, ask
+**Supernova Threshold done, 2026-08-11 — all four Phase 5.5 addenda now
+complete.** `docs/RHOMBIVERSE_SPEC_SUPERNOVA.md`. New `src/supernova.js`,
+deliberately thin per the spec's own header ("reuses the containment
+pattern from Black Hole directly... no new safety mechanism is invented
+here"). **Accumulated mass reuses `starsystem.js`'s own ledger
+directly** (`hydrogenConsumed + carbonConsumed`), not a second ledger —
+literal reading of the spec's "extends the existing... ledger pattern...
+same shape, not a new field type." `SUPERNOVA_CRITICAL_MASS` (30,
+first-guess) is the Chandrasekhar-equivalent limit; adaptive damping
+scales the *effective* threshold up with recent fusion activity (same
+shape as `blackhole.js`'s own damping — reused, not reinvented, per this
+spec's explicit instruction) rather than shrinking increments, so
+detonation is a real, reachable, deterministic event rather than an
+eternally-receding asymptote. **Detonation is single-shot**:
+`applyStarFusion` stops accumulating mass once `starLedger.detonated` is
+set, and `applyDetonationCheck` itself checks that flag first — confirmed
+idempotent by calling it twice in the same test with no double-effect.
+Effects: bounded blast radius (reuses `gravityRadius`, same "same radius
+mechanic" convention as Black Hole), the same single-player-scoped
+`destructible: false` consent check as Black Hole (confirmed a
+protected cell survives untouched), and matter redistribution — consumed
+foreign cells are matched 1:1 with new `supernovaScattered` cells placed
+just beyond the blast radius, never simple deletion. **The remnant needed
+genuinely zero new code**: `detonate()` never touches the star's own BSG
+core cells (only foreign ones within radius), so if that core's own
+`bsgCount` already meets `blackhole.js`'s `BLACK_HOLE_BSG_THRESHOLD`, the
+*already-running* `applyBlackHoleConsumption`/`applyAsymptoticGeneration`
+passes simply start treating it as a black hole on the very next
+`onChange` — confirmed directly (`isBlackHole: true, isBlackHoleRemnant:
+true` after detonating a 20-BSG-cell star), literally satisfying "do not
+build a separate remnant mechanic" by not writing one. Verified via the
+same direct-module-execution technique as the other three specs: below-
+threshold (no detonation), above-threshold (detonation, consumption,
+scatter, protected-cell survival, idempotent re-check), heavily-damped
+(same raw mass, no detonation because of recent activity), and the
+extreme-mass remnant case — one test run's "foreign" cell ended up
+accidentally cluster-connected the same way Black Hole's generation test
+did earlier in this session (worth remembering as a recurring test-design
+trap, not a code bug: anything built adjacent to a BSG structure becomes
+part of its cluster, foreign or not) — didn't invalidate the run's actual
+point (the remnant reuse), so left as-is rather than re-engineering
+further. Reran the full regression suite (Water/Ice, Walk Mode, both
+Black Hole tests, Star System) afterward — all six passed clean, zero
+console errors throughout this whole session's testing.
+
+**To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
+Black Hole, Star System, Supernova) are done. Phase 5 (Shared World,
+optional realtime sync) or Phase 5.8 (Trust Zones/Moderation) — the real
+prerequisite for Black Hole/Supernova's cross-player consent model — are
+open next, ask
 which, don't assume. Crystal-growth mode (Phase 5.5's other bullet,
 cells auto-growing over time) was intentionally left unbuilt; the plan
 marks it optional/tied to Phase 6 timing. Actual public deploy (Phase 4's
@@ -759,7 +803,7 @@ once deployed). Phase 5+ and the spec addenda layer on progressively:
        dependent cross-player consent model, deliberately scoped for
        single-player per direct instruction (see status above).
      - Star System (`SPEC_STAR_SYSTEM.md`) — DONE (2026-08-11, see status above).
-     - Supernova (`SPEC_SUPERNOVA.md`) — not started.
+     - Supernova (`SPEC_SUPERNOVA.md`) — DONE (2026-08-11, see status above). All four addenda complete.
 5.8. **Trust Zones / Moderation** — region moderation states + review
      pipeline. `docs/RHOMBIVERSE_SPEC_REGIONS.md` (ownership claims) and
      the asteroid/trade specs assume this exists — implement before those

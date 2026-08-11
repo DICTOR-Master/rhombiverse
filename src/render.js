@@ -14,6 +14,7 @@ import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
 import { applyHydrosphere } from './hydrosphere.js';
 import { applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } from './blackhole.js';
 import { applyStarFusion, annotateStars, canPlaceMaterial as canPlaceForStars } from './starsystem.js';
+import { applyDetonationCheck, annotateSupernovae } from './supernova.js';
 import { createPlayerController } from './player.js';
 import {
   saveToLocalStorage,
@@ -116,7 +117,8 @@ function updateGravityInfo() {
     ? ` · BLACK HOLE — ledger ${nearest.consumedMatter} · generated ${nearest.generatedCellCount} cells through shell ${nearest.generatedThroughShell}`
     : '';
   const star = nearest.isStar
-    ? ` · STAR — luminosity ${nearest.luminosity.toFixed(1)} · fusion ${nearest.fusionActive ? 'active' : 'idle (needs hydrosphere + Ferrostone)'} · frost line ${nearest.frostLineDistance.toFixed(1)}u`
+    ? ` · STAR — luminosity ${nearest.luminosity.toFixed(1)} · fusion ${nearest.fusionActive ? 'active' : 'idle (needs hydrosphere + Ferrostone)'} · frost line ${nearest.frostLineDistance.toFixed(1)}u` +
+      (nearest.detonated ? ` · DETONATED${nearest.isBlackHoleRemnant ? ' (black hole remnant)' : ''}` : ` · mass ${nearest.accumulatedMass}/${nearest.supernovaCriticalMass}`)
     : '';
   el.textContent =
     `Nearest planetoid: gravity ${status} · radius ${nearest.gravityRadius.toFixed(1)}u · ` +
@@ -285,11 +287,13 @@ async function init() {
   applyBlackHoleConsumption(world);
   applyAsymptoticGeneration(world);
   applyStarFusion(world);
+  applyDetonationCheck(world);
   rebuildInstances(mesh, world);
 
   planetoids = computePlanetoids(world);
   planetoids = annotateBlackHoles(planetoids, world);
   planetoids = annotateStars(planetoids, world);
+  planetoids = annotateSupernovae(planetoids);
   player = createPlayerController({
     camera,
     domElement: renderer.domElement,
@@ -438,10 +442,12 @@ async function init() {
     applyBlackHoleConsumption(world);
     applyAsymptoticGeneration(world);
     applyStarFusion(world);
+    applyDetonationCheck(world);
     rebuildInstances(mesh, world);
     planetoids = computePlanetoids(world);
     planetoids = annotateBlackHoles(planetoids, world);
     planetoids = annotateStars(planetoids, world);
+    planetoids = annotateSupernovae(planetoids);
     updateGravityInfo();
     const afterJSON = world.toJSON();
     const afterStr = JSON.stringify(afterJSON);
