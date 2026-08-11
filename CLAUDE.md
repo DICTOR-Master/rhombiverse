@@ -428,11 +428,106 @@ confirm only that ring's color changes in the 3D view with no cells
 added or removed; confirm the material dropdown stays visible while in
 Round or Excavate mode.
 
-**To continue implementation**, Phase 4 (deploy publicly: GitHub
-Pages/Vercel, still single-player) is next — see `RHOMBIVERSE_PLAN.md`
-section 4. Before that phase ships, `docs/RHOMBIVERSE_COMPLIANCE.md`'s
-"Required before Phase 4" checklist (LICENSE, ToS, Privacy Policy,
-SECURITY.md, XSS audit) needs doing — not yet started.
+**Phase 4 (compliance docs) done, commit `84f65fd`, 2026-08-11.**
+`docs/RHOMBIVERSE_COMPLIANCE.md`'s "Required before Phase 4" checklist is
+done except LICENSE (`TERMS.md`/`PRIVACY.md`/`SECURITY.md` added, XSS
+audit completed with no fixes needed). **LICENSE deliberately deferred
+and actual public deploy (GitHub Pages/Vercel) explicitly held off** —
+direct instruction: repo stays unlicensed/private and undeployed until
+the user asks again ("the game is not near any level of sophistication to
+actually play yet"). Don't deploy publicly without asking first, even
+though the compliance checklist itself is otherwise clear.
+
+**Phase 5.5 (Planetoid Building + Radial Gravity) done, commit
+`30cd1c8`, 2026-08-11 — built out of sequence, ahead of Phase 4's own
+deploy step, and picked up mid-flight as uncommitted work-in-progress
+rather than scaffolded fresh in this session** (the shell-fill/hollow/
+round/excavate tools above were already pulled forward earlier; this
+finishes the other Phase 5.5 bullet, "Radial gravity," per
+`RHOMBIVERSE_PLAN.md` section 4 and
+`docs/RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md`). New `src/gravity.js`:
+flood-fills built cells into connected clusters via the same
+`NEIGHBOR_OFFSETS` adjacency as everything else, and for every cluster
+containing at least one Blackstar-Glassite cell computes a single-point
+gravity source (center = average world position of its BSG cells),
+gravity radius (`BASE_GRAVITY_RADIUS + (bsgCount-1) * RADIUS_PER_BSG`,
+first-guess constants, not yet playtested — same "flag it, don't
+silently invent tuning math" convention as `roundStructure`'s `0.75`
+above), and a soft core-cavity-size UI hint via `shellCount(n)`. Deliberately
+scoped to the spec's own section 4.1 (single-point/single-cluster source)
+— section 4.2's multi-deposit weighted centroid and section 4.3's
+recentering shockwave are both explicitly deferred, matching
+`RHOMBIVERSE_PRINCIPLES.md` section 0's own worked example of Grounded
+Simplicity. New `src/player.js`: a first-person walk controller,
+deliberately NOT three/addons' `PointerLockControls` since that hardcodes
+world-Y as "up" in its internal Euler math, which breaks once gravity's
+"up" is a radial direction instead — builds camera orientation from
+yaw/pitch plus whatever `up` `gravity.js` reports for the current
+position each frame, so walking on a curved surface re-levels correctly;
+falls back to a no-clip flycam (no momentum, direct WASD + Space/Shift
+up-down) when no gravity is active, matching the spec's "inert cells ...
+treat as normal flat-gravity or zero-gravity space." Known first-pass
+limitation, left as-is on purpose: no roll blending between two different
+planetoids' gravity fields in one session (up snaps instantly at the
+boundary) — a single-planetoid session is the realistic first-playtest
+case. Wired into `render.js`: an **Enter Walk Mode** button toggles
+`controls.enabled` vs. the walk controller, requests/releases pointer
+lock, and a `pointerlockchange` listener catches the browser exiting lock
+on its own (Esc, tab switch) so Walk Mode's UI state can't get out of
+sync with the actual lock state. `getMode()` returns `null` while
+walking so Build/Fill/Round/Excavate can't fire mid-walk. A live
+`#gravity-info` hint reports the nearest planetoid and whether its
+gravity is in range, reading `controls.target` in Build mode and the
+live player position while walking. `worldstate.js`'s `addCell` also
+stamps `gravitySource`/`gravityWeight` on BSG cells per the spec's
+section 5 schema — **not load-bearing**, `gravity.js` treats `material`
+as ground truth so worlds imported without these fields still work;
+they exist for schema-compliance/future tooling only.
+
+**Verified with a real headless-browser run, 2026-08-11 — a genuinely
+new testing capability for this repo, worth using again.** The existing
+"Real testing infrastructure" section above (portable Node + real `three`
+package) proves CPU-side math only, explicitly *without* WebGL/DOM — it
+can't exercise actual rendering, pointer lock, or real click/keyboard
+dispatch against a live page. This environment also has no system
+Chromium and no passwordless `sudo` (interactive auth required), so
+installing a system browser wasn't an option either. Instead: a throwaway
+Python venv (in the session scratchpad, not this repo) with `pip install
+playwright` + `playwright install chromium` — no sudo needed, downloads
+its own Chromium build to `~/.cache/ms-playwright` (that cache **does**
+persist across sessions since it's under `$HOME`; only the venv itself
+is ephemeral, so a future cold session can `python3 -m venv` + `pip
+install playwright` fresh and skip the ~200MB browser download if that
+cache is still present). Served the repo via `python3 -m http.server`,
+then drove a real page load with Playwright: selected Blackstar-Glassite,
+clicked a face to place a BSG cell, confirmed `#gravity-info` went from
+"No planetoid yet" to "gravity active · radius 2.2u · 1 BSG cell",
+clicked **Enter Walk Mode**, confirmed `document.pointerLockElement` was
+genuinely non-null (real lock, not just a UI flag flip), sent WASD +
+mouse-move input, then proved the exit path two ways: a CDP-synthetic
+Escape keydown did **not** release the lock (a known Chromium/CDP
+limitation — the browser's native "Escape exits pointer lock" shortcut is
+tied to genuine trusted input and doesn't fire from automation; this is
+not an app bug and real physical Escape presses do trigger it), so
+`document.exitPointerLock()` was called directly to simulate what a real
+Escape does at the browser-chrome level — confirmed `render.js`'s
+`pointerlockchange` listener correctly caught that and called
+`exitWalk()`, reverting the button text, hiding the walk hint, and
+restoring `OrbitControls`. Zero console errors or page exceptions across
+the whole run (only benign WebGL driver performance warnings). Real
+screenshots taken at each step confirm the render itself (not just DOM
+state) is correct.
+
+**To continue implementation**, Phase 5 (Shared World, optional realtime
+sync) or the specs Phase 5.5 unlocked (black hole, star system,
+supernova, water/ice — see Build order below) are next, or Phase 5.8
+(Trust Zones/Moderation) if working toward a real public deploy — ask
+which, don't assume. Crystal-growth mode (Phase 5.5's other bullet,
+cells auto-growing over time) was intentionally left unbuilt; the plan
+marks it optional/tied to Phase 6 timing. Actual public deploy (Phase 4's
+GH Pages/Vercel step) is still explicitly held off per the instruction
+above — don't do it without asking again, even though the mechanics have
+moved well past Phase 4 in scope.
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.
@@ -512,10 +607,13 @@ once deployed). Phase 5+ and the spec addenda layer on progressively:
    (LICENSE, ToS, Privacy Policy, SECURITY.md, XSS audit) must be done
    before this phase ships, not after.*
 5. **Shared World** (optional) — swap persistence backend to realtime sync.
-5.5. **Planetoid Building + Radial Gravity** — `docs/RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md`.
+5.5. **Planetoid Building + Radial Gravity** — DONE, commit `30cd1c8` (2026-08-11,
+     see status above), except crystal-growth (intentionally deferred to
+     Phase 6 timing). `docs/RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md`.
      Also unlocks the black hole (`SPEC_BLACKHOLE.md`), star system
      (`SPEC_STAR_SYSTEM.md`), supernova (`SPEC_SUPERNOVA.md`), and
-     water/ice (`SPEC_WATER_ICE.md`) addenda, each building on the last.
+     water/ice (`SPEC_WATER_ICE.md`) addenda, each building on the last —
+     none of these four started yet.
 5.8. **Trust Zones / Moderation** — region moderation states + review
      pipeline. `docs/RHOMBIVERSE_SPEC_REGIONS.md` (ownership claims) and
      the asteroid/trade specs assume this exists — implement before those
