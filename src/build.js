@@ -29,6 +29,7 @@ import {
   parseCellKey,
   cellToWorld,
 } from './lattice.js';
+import { generatePlanetoid } from './planetoidgen.js';
 
 // Unit-normalized neighbor directions, precomputed once. Every RD
 // instance shares the same (unrotated) orientation -- see lattice.js --
@@ -182,6 +183,7 @@ export function createBuildController({
   getShellCount,
   getMinShell,
   getMaterial,
+  getGeneratorType,
   onCellClicked,
   // RHOMBIVERSE_SPEC_STAR_SYSTEM.md section 3's frost line: optional,
   // defaults to "always allowed" so callers that don't care about star
@@ -225,6 +227,13 @@ export function createBuildController({
         roundStructure(world, cell.shellCenter);
         onChange();
       }
+      return;
+    }
+
+    if (mode === 'generate') {
+      generatePlanetoid(world, getGeneratorType(), cell.x, cell.y, cell.z, getShellCount(), canPlaceMaterial);
+      if (onCellClicked) onCellClicked({ shellCenter: cellKey(cell.x, cell.y, cell.z) });
+      onChange();
       return;
     }
 

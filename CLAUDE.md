@@ -756,6 +756,49 @@ these same JSON files directly instead of hand-building cells in test
 code or clicking through the UI, sidestepping the face-targeting
 fragility documented above entirely.
 
+**Formula-driven planetoid generator added, 2026-08-12 — direct
+instruction, a new idea from the user (not a spec-derived feature), built
+directly without a spec doc first per their own explicit call.** Distinct
+from the static presets above: instead of fixed pre-built JSON snapshots,
+this is a fifth build mode (**Generate**) that constructs a full,
+correctly-graduated body of a chosen real-world-inspired type at
+whatever radius you click, in one click. New `src/planetoidgen.js`:
+`PLANETOID_RECIPES` (`rocky`, `ice-moon`, `gas-giant`), each a
+`materialForShell(shell, totalShells)` function picking a material by
+which fractional band the shell falls into — as simple a formula as
+reasonably possible, per the user's own stated goal. Every recipe stamps
+exactly one Blackstar-Glassite cell at the generated center: gravity in
+this game is entirely BSG-tied (not new lore, a hard constraint of the
+existing gravity mechanic), so a generated body needs one to be
+walkable/coherent at all. Rocky planetoid grades Ferrostone (core) →
+Garnet (mantle) → Base Rhomb (crust), mirroring real planetary
+differentiation. Ice moon grades Ferrostone (core) → Ice 9.9 (icy
+shell) — the outer shell auto-permeates into water via the *already-
+existing* `hydrosphere.js` the moment it's generated, confirmed directly
+(`hydrosphereActive: true` immediately after one click), a genuine
+payoff of reusing existing mechanics rather than a new one. Gas giant
+reuses Glassite ("translucent... no gravity function," per the gravity
+spec's own material table) as a large outer envelope rather than
+inventing a new low-density material or `state` field — same "reuse
+before inventing" move as Star System's Ferrostone-as-carbon-catalyst.
+`generatePlanetoid` reuses `cellsInShells` directly (the same
+`shellCount(n) = 10n²+2` substrate as everything else), respects the
+Star System frost line via the same `canPlaceMaterial` callback Fill
+mode and `recolorShell` already take, and skips cells that already exist
+rather than overwriting real player-built matter. Wired as a genuine
+fifth mode button (`build.js`'s `onClick` dispatch, `index.html`'s
+`#generator-row` type dropdown shown contextually like the other modes'
+inputs, reusing the existing "Shell fill radius" input for total size).
+Verified via three real clicks in a fresh browser (one per body type):
+material-by-shell breakdown matched the intended bands exactly at
+`totalShells=6` (rocky: shells 1–2/3–4/5–6 → ferrostone/garnet/base; ice
+moon: shells 1–3 ferrostone, 4–6 water — permeation confirmed; gas
+giant: shell 1 ferrostone, 2–6 glassite), shell cell-counts matched
+`shellCount(n)` exactly (12/42/92/162/252/362), zero console errors.
+Reran the full nine-test regression suite afterward (Water/Ice, Walk
+Mode, both Black Hole tests, Star System, Supernova, the presets UI, and
+the frost-line fill test) — all passed clean.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova) are done. Phase 5 (Shared World,
 optional realtime sync) or Phase 5.8 (Trust Zones/Moderation) — the real

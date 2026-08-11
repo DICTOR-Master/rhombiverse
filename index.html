@@ -119,6 +119,7 @@
       <button class="mode-btn" data-mode="fill" type="button">Fill</button>
       <button class="mode-btn" data-mode="round" type="button">Round</button>
       <button class="mode-btn" data-mode="excavate" type="button">Excavate</button>
+      <button class="mode-btn" data-mode="generate" type="button">Generate</button>
     </div>
     <div class="row">
       <button id="walk-toggle" type="button">Enter Walk Mode</button>
@@ -139,6 +140,15 @@
           <option value="blackstar-glassite">Blackstar-Glassite</option>
           <option value="ice99">Ice 9.9</option>
           <option value="water">Water</option>
+        </select>
+      </label>
+    </div>
+    <div id="generator-row" class="row" style="display: none;">
+      <label>Body type:
+        <select id="generator-type-select">
+          <option value="rocky">Rocky Planetoid</option>
+          <option value="ice-moon">Ice Moon</option>
+          <option value="gas-giant">Gas Giant</option>
         </select>
       </label>
     </div>

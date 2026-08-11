@@ -520,12 +520,15 @@ async function init() {
     fill: 'Click a cell to fill shells (hollow from–radius) outward around it, approximating a sphere. A second click on the same structure grows it further.',
     round: 'Click a shell-tagged cell to smooth its outer boundary by true distance from center.',
     excavate: 'Click a shell-tagged structure to hollow out its interior below "Hollow from shell".',
+    generate: 'Click a cell to generate a full body of the chosen type there (radius = Shell fill radius), formula-built in one click instead of hand-placing every cell.',
   };
   function updateModeUI() {
-    const showRadius = currentMode === 'fill';
+    const showRadius = currentMode === 'fill' || currentMode === 'generate';
     const showHollowFrom = currentMode === 'fill' || currentMode === 'excavate';
+    const showGenerator = currentMode === 'generate';
     document.getElementById('shell-radius-row').style.display = showRadius ? '' : 'none';
     document.getElementById('hollow-from-row').style.display = showHollowFrom ? '' : 'none';
+    document.getElementById('generator-row').style.display = showGenerator ? '' : 'none';
     document.getElementById('mode-hint').textContent = MODE_HINTS[currentMode];
   }
 
@@ -558,6 +561,7 @@ async function init() {
     getShellCount,
     getMinShell: () => Math.min(Math.max(1, Number(hollowFromInput.value) || 1), getShellCount()),
     getMaterial: () => materialSelect.value,
+    getGeneratorType: () => document.getElementById('generator-type-select').value,
     canPlaceMaterial,
     onCellClicked: (cell) => {
       focusedCenterKey = cell.shellCenter || null;
