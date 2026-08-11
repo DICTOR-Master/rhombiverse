@@ -69,9 +69,20 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
+      gap: 6px;
       padding: 3px 0;
     }
+    #ring-list .ring-item span { flex: 1; }
+    #ring-list .ring-recolor {
+      font: 11px system-ui, sans-serif;
+      color: #fff;
+      background: rgba(60, 130, 220, 0.55);
+      border: 1px solid rgba(120, 170, 255, 0.6);
+      border-radius: 4px;
+      padding: 2px 6px;
+      cursor: pointer;
+    }
+    #ring-list .ring-recolor:hover { background: rgba(60, 130, 220, 0.85); }
     #ring-list .ring-remove {
       font: bold 13px monospace;
       color: #fff;

@@ -137,6 +137,25 @@ export function removeShell(world, centerKey, shellNumber) {
   }
 }
 
+// Changes every cell at exactly one shell number to a different material
+// IN PLACE -- no geometry change, so unlike a remove-then-refill via
+// Fill mode this never requires clicking a specific cell in the 3D view
+// (there's nothing left to click once a ring is removed) and can't
+// accidentally change which cells exist. Added because "remove a ring
+// and fill it in with a different material" turned out to really mean
+// "recolor this ring," and coordinating Fill mode's exact shell-range
+// inputs plus finding a valid cell to click was the actual source of
+// difficulty, not a missing remove/fill feature.
+export function recolorShell(world, centerKey, shellNumber, material) {
+  const structure = world
+    .entries()
+    .filter((c) => c.shellCenter === centerKey && c.shell === shellNumber);
+  for (const c of structure) {
+    const { x, y, z, ...data } = c;
+    world.addCell(x, y, z, { ...data, material });
+  }
+}
+
 // renderer/camera/mesh: the Phase 1 render.js scene objects to raycast
 // against. cellAt(instanceId): looks up the {x,y,z,...} cell for a hit
 // instance. world: the worldstate.js store (has/addCell/removeCell).

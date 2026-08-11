@@ -52,7 +52,11 @@ view) plus a precise list with a remove button per shell — click a ring,
 either in the diagram or the list, to delete it. A prominent **Undo**
 button at the top covers every mutating action (Build/Fill/Round/
 Excavate/ring removal/New World/Import), not just ring removal, up to
-20 steps back.
+20 steps back. Each ring row also has a **Recolor** button — sets that
+ring's material in place to whatever's selected in the material
+dropdown, no geometry change, so it works even after other cells around
+it have been removed (unlike trying to refill a gap via Fill mode,
+which needs an existing cell to click on).
 
 Phase 4 (deploy publicly) is next — see `RHOMBIVERSE_PLAN.md` section 4
 for the full phased build order. `docs/RHOMBIVERSE_COMPLIANCE.md`'s

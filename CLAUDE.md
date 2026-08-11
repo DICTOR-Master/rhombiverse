@@ -397,14 +397,36 @@ having the `fill` branch in `build.js` re-invoke `onCellClicked` a
 second time with the now-definitive `centerKey` after the fill
 completes.
 
-**Not yet visually verified in a real browser** (everything above was
-verified via the Node harness, not a live page) — after hard-refreshing:
-confirm each mode's contextual controls show/hide correctly; Fill a
-structure and confirm the ring panel on the right immediately shows its
-shells (no second click needed) with a live bullseye diagram; click a
-ring (either the diagram or the × in the list) and confirm just that
-shell disappears from the 3D view; click Undo and confirm it comes back;
-confirm the Undo button's label shows a count and disables at zero.
+**Visually confirmed, 2026-08-11: ring panel appearance and diagram.**
+User liked the ring panel's look. But reported real friction trying to
+"remove a ring and fill it in with a different material" via the two
+panels together. Root cause, on investigation: once a ring is removed
+there's nothing left in the 3D view to click, so refilling it via Fill
+mode required exactly matching shell-radius/hollow-from to the removed
+shell number AND finding a still-existing cell of the same structure to
+click on -- awkward by construction, not a bug. What the user actually
+wanted was simpler than remove-then-refill: changing a ring's material
+in place. Added `recolorShell(world, centerKey, shellNumber, material)`
+(`build.js`) -- pure material overwrite via `world.addCell` with the
+existing `shell`/`shellCenter` preserved, no geometry change, so it
+can't touch cell count or trigger the "nothing to click" problem at all.
+Wired as a **Recolor** button on every ring-list row (`render.js`),
+using whichever material is currently selected in `#material-select`.
+Verified against the real modules via `test-recolor.mjs`: recolors
+exactly the target shell, leaves other shells' materials and every
+shell's `shell`/`shellCenter` tags untouched, changes no cell count.
+
+**`#material-row` is no longer mode-gated** — it used to hide in
+Round/Excavate (`updateModeUI()`), but Recolor needs it regardless of
+active mode; hiding it there would have forced a mode switch just to
+see the dropdown before recoloring. Now always visible.
+
+**Not yet visually verified in a real browser for this round** (Recolor
++ always-visible material row) — after hard-refreshing: build a shell,
+change the material dropdown, click Recolor on one ring in the list, and
+confirm only that ring's color changes in the 3D view with no cells
+added or removed; confirm the material dropdown stays visible while in
+Round or Excavate mode.
 
 **To continue implementation**, Phase 4 (deploy publicly: GitHub
 Pages/Vercel, still single-player) is next — see `RHOMBIVERSE_PLAN.md`

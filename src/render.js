@@ -9,7 +9,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld } from './lattice.js';
 import { loadWorld, createWorldStore } from './worldstate.js';
-import { createBuildController, removeShell } from './build.js';
+import { createBuildController, removeShell, recolorShell } from './build.js';
 import {
   saveToLocalStorage,
   loadFromLocalStorage,
@@ -310,6 +310,15 @@ async function init() {
       row.className = 'ring-item';
       const label = document.createElement('span');
       label.textContent = `Shell ${shell} · ${counts.get(shell)} cells`;
+      const recolorBtn = document.createElement('button');
+      recolorBtn.type = 'button';
+      recolorBtn.className = 'ring-recolor';
+      recolorBtn.textContent = 'Recolor';
+      recolorBtn.title = 'Set this shell to the selected material';
+      recolorBtn.addEventListener('click', () => {
+        recolorShell(world, focusedCenterKey, shell, materialSelect.value);
+        onChange();
+      });
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'ring-remove';
@@ -320,6 +329,7 @@ async function init() {
         onChange();
       });
       row.appendChild(label);
+      row.appendChild(recolorBtn);
       row.appendChild(removeBtn);
       container.appendChild(row);
     }
@@ -384,11 +394,15 @@ async function init() {
   // Contextual UI, added because "all options seem available at same
   // time" was a real, separate complaint even after the fill logic
   // itself was verified correct by direct execution: each mode only
-  // shows the inputs it actually reads (Fill uses both shell inputs and
-  // material; Excavate uses only "hollow from"; Round and Build use
-  // neither shell input), and the hint line states in plain language
-  // exactly what a click currently does -- so it's possible to tell
-  // whether something worked without needing devtools.
+  // shows the shell inputs it actually reads (Fill uses both; Excavate
+  // uses only "hollow from"; Round and Build use neither), and the hint
+  // line states in plain language exactly what a click currently does --
+  // so it's possible to tell whether something worked without needing
+  // devtools. Material stays visible in every mode, unlike the shell
+  // inputs: it's read by Build/Fill for what to place, AND by the ring
+  // panel's Recolor button regardless of which mode is active, so hiding
+  // it in Round/Excavate would make recoloring require a mode switch
+  // just to see the dropdown.
   const MODE_HINTS = {
     build: 'Click a face to add one cell using the selected material.',
     fill: 'Click a cell to fill shells (hollow from–radius) outward around it, approximating a sphere. A second click on the same structure grows it further.',
@@ -396,10 +410,8 @@ async function init() {
     excavate: 'Click a shell-tagged structure to hollow out its interior below "Hollow from shell".',
   };
   function updateModeUI() {
-    const showMaterial = currentMode === 'build' || currentMode === 'fill';
     const showRadius = currentMode === 'fill';
     const showHollowFrom = currentMode === 'fill' || currentMode === 'excavate';
-    document.getElementById('material-row').style.display = showMaterial ? '' : 'none';
     document.getElementById('shell-radius-row').style.display = showRadius ? '' : 'none';
     document.getElementById('hollow-from-row').style.display = showHollowFrom ? '' : 'none';
     document.getElementById('mode-hint').textContent = MODE_HINTS[currentMode];
