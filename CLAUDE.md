@@ -725,6 +725,37 @@ further. Reran the full regression suite (Water/Ice, Walk Mode, both
 Black Hole tests, Star System) afterward — all six passed clean, zero
 console errors throughout this whole session's testing.
 
+**Structure presets added, 2026-08-12 — direct instruction, prompted by
+real friction hit while verifying the frost line above.** Hand-clicking
+a precise multi-cell structure (e.g. a 20-BSG-cell black hole) face by
+face turned out to be genuinely fragile — see the frost-line entry above
+for the two concrete lessons (shared-face midpoints vs. neighbor
+centers; a fixed camera plus a growing structure walking click targets
+off-canvas or into occlusion). New `data/presets/*.json`: `minimal-star`
+(shell-1 BSG core, 12 cells, plus one adjacent Ice 9.9 and one Ferrostone
+cell so fusion is active immediately on load), `black-hole-core` (shell-1
+BSG + 8 more from shell 2 = exactly `BLACK_HOLE_BSG_THRESHOLD`), and
+`hydrosphere-demo` (a small 3-BSG sub-star cluster with adjacent Ice 9.9,
+isolating Water/Ice's permeation from star/fusion behavior). **Generated
+via the real in-browser lattice math** (`NEIGHBOR_OFFSETS`-driven, via
+the same dynamic-`import()`-in-headless-Chromium technique used for
+testing all session, not hand-derived coordinates — the exact class of
+error that caused the friction these exist to fix). A new **Load preset**
+dropdown + button in `index.html`'s controls panel (confirm-gated, same
+destructive-action pattern as **New World**) calls `world.replaceAll()`
+in `render.js`. Verified two ways: the underlying JSON was checked
+through the full `apply*`/`annotate*` pipeline directly (module-level,
+confirming e.g. `black-hole-core` is already `isBlackHole: true` on
+load, and correctly auto-consumes its own leftover `base`-material seed
+cell within the event horizon — a real, intentional consequence of the
+Black Hole mechanic, not a preset bug), and then the actual **Load**
+button was clicked for all three presets in a fresh browser session,
+confirming the real UI path produces identical results. Zero console
+errors. **Also serve as reusable test fixtures** — future tests can load
+these same JSON files directly instead of hand-building cells in test
+code or clicking through the UI, sidestepping the face-targeting
+fragility documented above entirely.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova) are done. Phase 5 (Shared World,
 optional realtime sync) or Phase 5.8 (Trust Zones/Moderation) — the real
