@@ -61,6 +61,12 @@ plane, pick an axis/position/flip) and **onion-skin shells** (show only
 shells min–max) can be combined to look inside a structure instead of
 just its solid exterior.
 
+All shell-number inputs (Fill radius, Hollow from, Onion min/max) share
+the same real cap of 15 — a genuine fix, not just cosmetic: they used to
+have inconsistent, unenforced limits (one field would silently accept a
+value like 100, which would have tried to fill far past what the app can
+actually render).
+
 Phase 4 (deploy publicly) is next — see `RHOMBIVERSE_PLAN.md` section 4
 for the full phased build order. `docs/RHOMBIVERSE_COMPLIANCE.md`'s
 "Required before Phase 4" items (LICENSE, ToS, Privacy Policy,

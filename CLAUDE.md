@@ -276,6 +276,28 @@ confirm a visible cutaway through the structure; narrow the onion-skin
 range on a shell-filled sphere and confirm only that shell band renders
 (and that clicking elsewhere on the hidden structure does nothing).
 
+**Real bug fixed, 2026-08-11: shell-number inputs had inconsistent,
+purely cosmetic caps.** User noticed shells went up to 100 on one input
+but only 10 on another. Root cause was worse than a display
+inconsistency: `#shell-count`/`#hollow-from` had `max="10"` in HTML,
+`#onion-min`/`#onion-max` had no `max` at all (999 default value) — and
+none of the four were actually *enforced* in JS. An HTML `max` on a
+number input is purely a validation hint; typing past it does nothing.
+`getShellCount()` had no upper clamp at all, so a typed value like `100`
+would genuinely attempt to fill through shell 100 (~200k+ cells) against
+a 20000-cell `MAX_CELLS` budget. Fixed by adding `MAX_SHELL = 15`
+(`render.js`) — cumulative cells through shell 15 is 12431, leaving real
+headroom under `MAX_CELLS` — and real-clamping `getShellCount()` to it
+(`getMinShell()` was already bounded transitively via `Math.min(...,
+getShellCount())`). **Onion-min/max are deliberately NOT clamped in JS**
+despite getting the same `max="15"` HTML hint for visual consistency —
+they're a safe display filter, not a cell generator, and clamping them
+would make shells from an Import JSON world (potentially built before
+`MAX_SHELL` existed, or hand-edited) permanently unviewable rather than
+just unbuildable-from-scratch in this session. Onion-max's default value
+also changed from the arbitrary `999` placeholder to `15`, matching the
+real ceiling rather than an arbitrary "big enough" number.
+
 **To continue implementation**, Phase 4 (deploy publicly: GitHub
 Pages/Vercel, still single-player) is next — see `RHOMBIVERSE_PLAN.md`
 section 4. Before that phase ships, `docs/RHOMBIVERSE_COMPLIANCE.md`'s

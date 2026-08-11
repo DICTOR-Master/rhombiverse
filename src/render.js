@@ -23,6 +23,16 @@ const SCALE = 1;
 // ~2057 (see lattice.js's shellCount); 20000 leaves headroom for several
 // shell-fills plus hand-building. Revisit for real player counts.
 const MAX_CELLS = 20000;
+// Real, enforced cap on any shell-number UI input (shell-count,
+// hollow-from, onion-min, onion-max) -- cumulative cells through shell
+// 15 is 12431 (1 + sum of shellCount(n) for n=1..15), leaving real
+// headroom under MAX_CELLS for hand-built cells or a second structure.
+// Previously the four inputs had inconsistent, PURELY COSMETIC max=
+// HTML attributes (10 on two, none at all on the other two) that didn't
+// actually stop anyone from typing past them -- a real bug (shell-count
+// had nothing stopping a request for shell 100, ~200k+ cells, far past
+// MAX_CELLS) as well as a confusing inconsistency, caught by the user.
+const MAX_SHELL = 15;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05050a);
@@ -144,6 +154,13 @@ function instanceColorFor(cell) {
 // by this. View-only: never mutates world data, only which cells become
 // InstancedMesh instances this rebuild (so hidden cells are also
 // correctly un-clickable, not just invisible).
+//
+// Deliberately NOT clamped to MAX_SHELL, unlike getShellCount() below --
+// this is a safe display filter, not a cell generator, and an Import
+// JSON world built in a session before MAX_SHELL existed (or hand-edited
+// JSON) could legitimately contain shells above it; clamping here would
+// make those shells permanently unviewable rather than just unbuildable
+// from scratch in THIS session.
 function visibleCells(world) {
   const min = Number(document.getElementById('onion-min').value) || 0;
   const max = Number(document.getElementById('onion-max').value) || Infinity;
@@ -239,7 +256,7 @@ async function init() {
   const hollowFromInput = document.getElementById('hollow-from');
   const materialSelect = document.getElementById('material-select');
 
-  const getShellCount = () => Math.max(1, Number(shellCountInput.value) || 1);
+  const getShellCount = () => Math.min(Math.max(1, Number(shellCountInput.value) || 1), MAX_SHELL);
 
   // Mode selector: exactly one #mode-btn is "active" at a time; a plain
   // click does whatever that mode does (build.js). Replaced an earlier
