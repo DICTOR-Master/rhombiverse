@@ -197,9 +197,10 @@ export function createBuildController({
     const cell = cellAt(hit.instanceId);
     if (!cell) return;
 
-    if (onCellClicked) onCellClicked(cell);
-
     const mode = getMode();
+    if (!mode) return; // e.g. Walk mode active -- editing is disabled while walking
+
+    if (onCellClicked) onCellClicked(cell);
 
     if (mode === 'excavate') {
       if (cell.shellCenter) {
@@ -263,6 +264,7 @@ export function createBuildController({
 
   function onContextMenu(event) {
     event.preventDefault();
+    if (!getMode()) return; // e.g. Walk mode active -- editing is disabled while walking
     const hit = pick(event);
     if (!hit || hit.instanceId === undefined) return;
     const cell = cellAt(hit.instanceId);

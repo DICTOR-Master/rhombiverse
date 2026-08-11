@@ -10,6 +10,8 @@ import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld } from './lattice.js';
 import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController, removeShell, recolorShell } from './build.js';
+import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
+import { createPlayerController } from './player.js';
 import {
   saveToLocalStorage,
   loadFromLocalStorage,
@@ -82,6 +84,71 @@ controls.enableDamping = true;
 controls.target.set(0, 0, 0);
 // Right-click is reserved for block removal (build.js), not camera pan.
 controls.mouseButtons.RIGHT = null;
+
+// Walk mode (RHOMBIVERSE_PLAN.md Phase 5.5) state, module-level since
+// both init() (which creates `player` once the world is loaded) and
+// animate() (the top-level render loop) need it. `planetoids` is derived
+// from world-state and recomputed in onChange() -- see gravity.js.
+let walking = false;
+let player = null;
+let planetoids = {};
+
+// Shown near the mode controls regardless of Build/Walk mode -- useful
+// even when nothing is active yet ("no gravity source"), so it doubles as
+// a hint for how to create one. Reads `controls.target` in Build mode (a
+// reasonable proxy for "what you're looking at") and the live player
+// position while walking.
+function updateGravityInfo() {
+  const el = document.getElementById('gravity-info');
+  if (!el) return;
+  const refPos = walking && player ? player.getPosition() : controls.target;
+  const nearest = nearestPlanetoid(refPos, planetoids);
+  if (!nearest) {
+    el.textContent = 'No planetoid yet — place a Blackstar-Glassite cell to create a gravity source.';
+    return;
+  }
+  const status = nearest.active ? 'active' : 'out of range (build closer to the core, or add more BSG)';
+  el.textContent =
+    `Nearest planetoid: gravity ${status} · radius ${nearest.gravityRadius.toFixed(1)}u · ` +
+    `${nearest.bsgCount} BSG cell${nearest.bsgCount === 1 ? '' : 's'} · ` +
+    `recommended core: ${nearest.coreShellRecommendation} shell${nearest.coreShellRecommendation === 1 ? '' : 's'}`;
+}
+
+function enterWalk() {
+  if (!player || walking) return;
+  walking = true;
+  controls.enabled = false;
+  document.getElementById('walk-toggle').textContent = 'Exit Walk Mode (Esc)';
+  document.getElementById('walk-hint').style.display = '';
+  player.reset(camera.position);
+  player.setEnabled(true);
+  player.requestLock();
+  updateGravityInfo();
+}
+
+function exitWalk() {
+  if (!walking) return;
+  walking = false;
+  if (player) player.setEnabled(false);
+  controls.enabled = true;
+  camera.up.set(0, 1, 0);
+  document.getElementById('walk-toggle').textContent = 'Enter Walk Mode';
+  document.getElementById('walk-hint').style.display = 'none';
+  updateGravityInfo();
+}
+
+document.getElementById('walk-toggle').addEventListener('click', () => {
+  if (walking) exitWalk();
+  else enterWalk();
+});
+
+// Browsers exit pointer lock on their own (Esc, tab switch, etc.) without
+// going through exitWalk() -- this catches that so Walk mode's own state
+// (controls.enabled, the toggle button label) never gets out of sync with
+// the actual lock state.
+document.addEventListener('pointerlockchange', () => {
+  if (walking && document.pointerLockElement !== renderer.domElement) exitWalk();
+});
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 const sun = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -198,6 +265,14 @@ async function init() {
   scene.add(mesh);
 
   rebuildInstances(mesh, world);
+
+  planetoids = computePlanetoids(world);
+  player = createPlayerController({
+    camera,
+    domElement: renderer.domElement,
+    getGravity: (pos) => gravityAt(pos, planetoids),
+  });
+  updateGravityInfo();
 
   // Undo: a full-world-JSON snapshot stack, not a diff/command log --
   // simpler to reason about correctly than tracking per-operation
@@ -337,6 +412,8 @@ async function init() {
 
   function onChange() {
     rebuildInstances(mesh, world);
+    planetoids = computePlanetoids(world);
+    updateGravityInfo();
     const afterJSON = world.toJSON();
     const afterStr = JSON.stringify(afterJSON);
     if (afterStr !== lastSnapshot) {
@@ -344,7 +421,7 @@ async function init() {
       if (undoStack.length > MAX_UNDO) undoStack.shift();
     }
     lastSnapshot = afterStr;
-    saveToLocalStorage(afterJSON);
+    saveToLocalStorage({ ...afterJSON, planetoids });
     updateUndoButton();
     renderRingList();
   }
@@ -435,7 +512,7 @@ async function init() {
     cellAt: (instanceId) => cellOrder[instanceId],
     world,
     onChange,
-    getMode: () => currentMode,
+    getMode: () => (walking ? null : currentMode),
     getShellCount,
     getMinShell: () => Math.min(Math.max(1, Number(hollowFromInput.value) || 1), getShellCount()),
     getMaterial: () => materialSelect.value,
@@ -454,7 +531,7 @@ async function init() {
   });
 
   document.getElementById('export-json').addEventListener('click', () => {
-    exportWorldFile(world.toJSON());
+    exportWorldFile({ ...world.toJSON(), planetoids });
   });
 
   const importInput = document.getElementById('import-json');
@@ -481,9 +558,19 @@ function onResize() {
 }
 window.addEventListener('resize', onResize);
 
+let lastFrameTime = performance.now();
 function animate() {
   requestAnimationFrame(animate);
-  controls.update();
+  const now = performance.now();
+  const dt = Math.min(0.1, (now - lastFrameTime) / 1000); // clamp avoids a huge step after a tab is backgrounded
+  lastFrameTime = now;
+
+  if (walking && player) {
+    player.update(dt);
+    updateGravityInfo(); // player position changes every frame, unlike Build mode's onChange-driven updates
+  } else {
+    controls.update();
+  }
   renderer.render(scene, camera);
 }
 

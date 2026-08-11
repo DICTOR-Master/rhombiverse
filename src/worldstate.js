@@ -29,8 +29,20 @@ export function createWorldStore(worldJSON) {
     has(x, y, z) {
       return cells.has(cellKey(x, y, z));
     },
+    // Stamps gravitySource/gravityWeight per the schema in
+    // RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md section 5, for any cell whose
+    // material is Blackstar-Glassite (and strips them otherwise, e.g. on
+    // recolor away from it). These fields are NOT load-bearing --
+    // gravity.js treats `material` as ground truth so worlds imported
+    // from an older export (without these fields) still work correctly --
+    // they exist for schema-compliance / future external tooling only.
     addCell(x, y, z, data) {
-      cells.set(cellKey(x, y, z), data);
+      const { gravitySource, gravityWeight, ...rest } = data;
+      const stamped =
+        data.material === 'blackstar-glassite'
+          ? { ...rest, gravitySource: true, gravityWeight: gravityWeight ?? 1.0 }
+          : rest;
+      cells.set(cellKey(x, y, z), stamped);
     },
     removeCell(x, y, z) {
       cells.delete(cellKey(x, y, z));
