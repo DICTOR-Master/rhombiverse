@@ -611,14 +611,57 @@ into both `init()` and `onChange()` in `render.js`) didn't regress
 ordinary (non-black-hole) play — both passed unchanged, zero console
 errors.
 
-**To continue implementation**, Star System Anchor (`docs/
-RHOMBIVERSE_SPEC_STAR_SYSTEM.md`) is next — it hard-depends on Water/Ice
-9.9's hydrogen/oxygen mechanic (done above), not on Black Hole, despite
-the spec docs listing black hole first; Supernova depends on both Star
-System and Black Hole (reuses this file's containment pattern for its
-remnant) and comes after. Phase 5 (Shared World, optional realtime
-sync) or Phase 5.8 (Trust Zones/Moderation) — the real prerequisite for
-Black Hole/Supernova's cross-player consent model — are also open, ask
+**Star System Anchor done, 2026-08-11.** `docs/
+RHOMBIVERSE_SPEC_STAR_SYSTEM.md`. New `src/starsystem.js`: same "not a
+new material" framing as Black Hole — a BSG cluster becomes a star past
+`STAR_BSG_THRESHOLD` (8, deliberately lower than Black Hole's 20, so a
+star is a reachable mid-game milestone rather than requiring
+endgame-scale accretion), independent of black-hole status (a cluster
+could in principle cross both thresholds; the spec doesn't say they're
+exclusive). `luminosity` scales linearly with BSG count above threshold.
+**Fusion** (`applyStarFusion`): active whenever the cluster contains
+*both* a `hydrospherePermeated` cell (hydrogen, from Water/Ice's own
+mechanic — section 2's "Ice 9.9... splits into fusion fuel plus a
+byproduct") and a Ferrostone cell (the reused carbon-catalyst material —
+implementation's own choice, per the spec's explicit permission to reuse
+rather than mint a new material). **Deliberately does not physically
+delete the fuel cells each tick** — Ice 9.9's hydrosphere is a standing
+network per its own spec, not a one-shot consumable, so presence (not
+depletion) is the gate; a ledger (`hydrogenConsumed`/`carbonConsumed`)
+still accumulates in the same shape the spec asks for, just not backed
+by deleting player-built matter, which would be a surprising/destructive
+side effect nothing in the spec actually asks for. **Oxygen byproduct
+needed zero new code**: fusion's hydrogen source already requires
+`hydrospherePermeated`, which already implies `hydrosphereActive`/
+`atmosphereActive` are already true for that cluster via `gravity.js` —
+satisfied structurally, not by a second flag. **Frost line**
+(`canPlaceMaterial`, `frostLineDistance` = 0.6 × a star's `gravityRadius`,
+first-guess): the one real build-time constraint this spec adds — Ice
+9.9 cannot be placed within a star's frost line, checked before every
+placement path that can introduce material (`build.js`'s build mode,
+fill mode, and `recolorShell`, all three now take an optional
+`canPlaceMaterial` callback, defaulting to always-allowed so existing
+callers/tests are unaffected). Rocky materials are never restricted by
+the frost line (only Ice 9.9 is), matching the spec's actual wording.
+No orbital motion implemented, per the spec's own explicit deferral.
+Verified via the same direct-module-execution technique as Black Hole:
+threshold detection, luminosity formula, fusion correctly gated on both
+fuel types being present (and inert without either), frost-line
+placement correctly blocked inside / allowed outside / never restricting
+rocky materials — all real execution, zero console errors. Reran the
+Water/Ice, Walk Mode, and Black Hole regression tests afterward with no
+breakage. **Not yet verified via an actual raycast click in the
+browser** (only the underlying `canPlaceMaterial` function and its
+wiring were confirmed directly) — the code path is a straightforward
+threaded parameter, low risk, but worth a real click-through if a bug
+report ever points at frost-line placement specifically.
+
+**To continue implementation**, Supernova (`docs/
+RHOMBIVERSE_SPEC_SUPERNOVA.md`) is next — depends on both Star System
+(done above) and Black Hole (done above, reused for the remnant). Phase 5
+(Shared World, optional realtime sync) or Phase 5.8 (Trust Zones/
+Moderation) — the real prerequisite for Black Hole/Supernova's
+cross-player consent model — are also open, ask
 which, don't assume. Crystal-growth mode (Phase 5.5's other bullet,
 cells auto-growing over time) was intentionally left unbuilt; the plan
 marks it optional/tied to Phase 6 timing. Actual public deploy (Phase 4's
@@ -715,8 +758,8 @@ once deployed). Phase 5+ and the spec addenda layer on progressively:
      - Black Hole (`SPEC_BLACKHOLE.md`) — DONE except the Phase 5.8-
        dependent cross-player consent model, deliberately scoped for
        single-player per direct instruction (see status above).
-     - Star System (`SPEC_STAR_SYSTEM.md`) — not started.
-     - Supernova (`SPEC_SUPERNOVA.md`) — not started, blocked on Star System.
+     - Star System (`SPEC_STAR_SYSTEM.md`) — DONE (2026-08-11, see status above).
+     - Supernova (`SPEC_SUPERNOVA.md`) — not started.
 5.8. **Trust Zones / Moderation** — region moderation states + review
      pipeline. `docs/RHOMBIVERSE_SPEC_REGIONS.md` (ownership claims) and
      the asteroid/trade specs assume this exists — implement before those

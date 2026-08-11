@@ -13,6 +13,7 @@ import { createBuildController, removeShell, recolorShell } from './build.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
 import { applyHydrosphere } from './hydrosphere.js';
 import { applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } from './blackhole.js';
+import { applyStarFusion, annotateStars, canPlaceMaterial as canPlaceForStars } from './starsystem.js';
 import { createPlayerController } from './player.js';
 import {
   saveToLocalStorage,
@@ -114,10 +115,13 @@ function updateGravityInfo() {
   const blackHole = nearest.isBlackHole
     ? ` · BLACK HOLE — ledger ${nearest.consumedMatter} · generated ${nearest.generatedCellCount} cells through shell ${nearest.generatedThroughShell}`
     : '';
+  const star = nearest.isStar
+    ? ` · STAR — luminosity ${nearest.luminosity.toFixed(1)} · fusion ${nearest.fusionActive ? 'active' : 'idle (needs hydrosphere + Ferrostone)'} · frost line ${nearest.frostLineDistance.toFixed(1)}u`
+    : '';
   el.textContent =
     `Nearest planetoid: gravity ${status} · radius ${nearest.gravityRadius.toFixed(1)}u · ` +
     `${nearest.bsgCount} BSG cell${nearest.bsgCount === 1 ? '' : 's'} · ` +
-    `recommended core: ${nearest.coreShellRecommendation} shell${nearest.coreShellRecommendation === 1 ? '' : 's'}${hydro}${blackHole}`;
+    `recommended core: ${nearest.coreShellRecommendation} shell${nearest.coreShellRecommendation === 1 ? '' : 's'}${hydro}${blackHole}${star}`;
 }
 
 function enterWalk() {
@@ -280,10 +284,12 @@ async function init() {
   applyHydrosphere(world);
   applyBlackHoleConsumption(world);
   applyAsymptoticGeneration(world);
+  applyStarFusion(world);
   rebuildInstances(mesh, world);
 
   planetoids = computePlanetoids(world);
   planetoids = annotateBlackHoles(planetoids, world);
+  planetoids = annotateStars(planetoids, world);
   player = createPlayerController({
     camera,
     domElement: renderer.domElement,
@@ -408,7 +414,7 @@ async function init() {
       recolorBtn.textContent = 'Recolor';
       recolorBtn.title = 'Set this shell to the selected material';
       recolorBtn.addEventListener('click', () => {
-        recolorShell(world, focusedCenterKey, shell, materialSelect.value);
+        recolorShell(world, focusedCenterKey, shell, materialSelect.value, canPlaceMaterial);
         onChange();
       });
       const removeBtn = document.createElement('button');
@@ -431,9 +437,11 @@ async function init() {
     applyHydrosphere(world);
     applyBlackHoleConsumption(world);
     applyAsymptoticGeneration(world);
+    applyStarFusion(world);
     rebuildInstances(mesh, world);
     planetoids = computePlanetoids(world);
     planetoids = annotateBlackHoles(planetoids, world);
+    planetoids = annotateStars(planetoids, world);
     updateGravityInfo();
     const afterJSON = world.toJSON();
     const afterStr = JSON.stringify(afterJSON);
@@ -526,6 +534,13 @@ async function init() {
   });
   updateModeUI();
 
+  // Frost line (RHOMBIVERSE_SPEC_STAR_SYSTEM.md section 3): reads the
+  // live `planetoids` closure variable at call time (not a stale
+  // snapshot), so it always reflects whatever stars exist as of the most
+  // recent onChange.
+  const canPlaceMaterial = (material, x, y, z) =>
+    canPlaceForStars(material, x, y, z, Object.values(planetoids).filter((p) => p.isStar));
+
   createBuildController({
     renderer,
     camera,
@@ -537,6 +552,7 @@ async function init() {
     getShellCount,
     getMinShell: () => Math.min(Math.max(1, Number(hollowFromInput.value) || 1), getShellCount()),
     getMaterial: () => materialSelect.value,
+    canPlaceMaterial,
     onCellClicked: (cell) => {
       focusedCenterKey = cell.shellCenter || null;
       renderRingList();

@@ -146,11 +146,16 @@ export function removeShell(world, centerKey, shellNumber) {
 // "recolor this ring," and coordinating Fill mode's exact shell-range
 // inputs plus finding a valid cell to click was the actual source of
 // difficulty, not a missing remove/fill feature.
-export function recolorShell(world, centerKey, shellNumber, material) {
+// canPlaceMaterial: same frost-line check build.js's build/fill modes use
+// (RHOMBIVERSE_SPEC_STAR_SYSTEM.md section 3) -- cells that fail it are
+// simply left at their current material (a partial recolor), same
+// "skip, don't block the whole action" behavior fill mode already has.
+export function recolorShell(world, centerKey, shellNumber, material, canPlaceMaterial = () => true) {
   const structure = world
     .entries()
     .filter((c) => c.shellCenter === centerKey && c.shell === shellNumber);
   for (const c of structure) {
+    if (!canPlaceMaterial(material, c.x, c.y, c.z)) continue;
     const { x, y, z, ...data } = c;
     world.addCell(x, y, z, { ...data, material });
   }
@@ -178,6 +183,11 @@ export function createBuildController({
   getMinShell,
   getMaterial,
   onCellClicked,
+  // RHOMBIVERSE_SPEC_STAR_SYSTEM.md section 3's frost line: optional,
+  // defaults to "always allowed" so callers that don't care about star
+  // placement rules (tests, future non-star worlds) don't need to pass
+  // one. render.js supplies the real check.
+  canPlaceMaterial = () => true,
 }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -237,7 +247,7 @@ export function createBuildController({
       }
 
       for (const c of cellsInShells(ccx, ccy, ccz, maxShell, minShell)) {
-        if (!world.has(c.x, c.y, c.z)) {
+        if (!world.has(c.x, c.y, c.z) && canPlaceMaterial(material, c.x, c.y, c.z)) {
           world.addCell(c.x, c.y, c.z, { material, shell: c.shell, shellCenter: centerKey });
         }
       }
@@ -257,8 +267,10 @@ export function createBuildController({
     const nx = cell.x + dx;
     const ny = cell.y + dy;
     const nz = cell.z + dz;
+    const material = getMaterial();
     if (!isValidCell(nx, ny, nz) || world.has(nx, ny, nz)) return;
-    world.addCell(nx, ny, nz, { material: getMaterial() });
+    if (!canPlaceMaterial(material, nx, ny, nz)) return;
+    world.addCell(nx, ny, nz, { material });
     onChange();
   }
 
