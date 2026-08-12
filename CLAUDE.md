@@ -418,12 +418,28 @@ Round or Excavate mode.
 **Phase 4 (compliance docs) done, commit `84f65fd`, 2026-08-11.**
 `docs/RHOMBIVERSE_COMPLIANCE.md`'s "Required before Phase 4" checklist is
 done except LICENSE (`TERMS.md`/`PRIVACY.md`/`SECURITY.md` added, XSS
-audit completed with no fixes needed). **LICENSE deliberately deferred
-and actual public deploy (GitHub Pages/Vercel) explicitly held off** —
-direct instruction: repo stays unlicensed/private and undeployed until
-the user asks again ("the game is not near any level of sophistication to
-actually play yet"). Don't deploy publicly without asking first, even
-though the compliance checklist itself is otherwise clear.
+audit completed with no fixes needed). LICENSE and public deploy were
+initially deferred by direct instruction ("the game is not near any
+level of sophistication to actually play yet") — see the 2026-08-12
+entry below for both being completed once the user asked again.
+
+**Public deploy done, 2026-08-12 — direct instruction, superseding the
+Phase 4 deferral above.** MIT `LICENSE` added (copyright DICTOR-Master).
+Deployed via Vercel, linked directly to the GitHub repo (`DICTOR-Master/
+rhombiverse`, still private — Vercel deploying from a private repo
+doesn't require making it public, unlike GitHub Pages, which was the
+deciding factor in choosing Vercel over Pages). No build step needed —
+matches this project's own "no build step, by design" principle exactly;
+Vercel serves `index.html` straight from the repo root, no
+`package.json`/build command involved. **Live at
+https://rhombiverse.vercel.app** — verified twice: a raw `curl` (200,
+correct HTML) and a real headless-browser load (real screenshot showing
+the actual rendered scene — seed cell, full controls panel — zero
+console errors), not just a reachability check. First deployment on a
+brand-new Vercel project is automatically assigned straight to
+production (not something achievable by using a "safer" preview-only
+command) — worth knowing before assuming a plain `vercel deploy` is ever
+non-live for a project's very first deploy.
 
 **Phase 5.5 (Planetoid Building + Radial Gravity) done, commit
 `30cd1c8`, 2026-08-11 — built out of sequence, ahead of Phase 4's own
@@ -1351,14 +1367,17 @@ Black Hole, Star System, Supernova), Phase 5 (Shared World),
 `RHOMBIVERSE_SPEC_LOOPHOLES.md` (all five items resolved) are all done.
 Phase 5.8 (Trust Zones/Moderation) is still only partially done (see its
 own status above) — the only named gap left anywhere in this repo's
-scope, besides the explicitly-deferred crystal-growth mode and public
-deploy below. Ask before assuming what's next.
+scope, besides the explicitly-deferred crystal-growth mode. Ask before
+assuming what's next.
 Crystal-growth mode (Phase 5.5's other bullet,
 cells auto-growing over time) was intentionally left unbuilt; the plan
-marks it optional/tied to Phase 6 timing. Actual public deploy (Phase 4's
-GH Pages/Vercel step) is still explicitly held off per the instruction
-above — don't do it without asking again, even though the mechanics have
-moved well past Phase 4 in scope.
+marks it optional/tied to Phase 6 timing. Public deploy is DONE (see the
+2026-08-12 entry above, live at https://rhombiverse.vercel.app) — the
+repo itself stays private (Vercel deploys from it without requiring
+public visibility), but the built site is genuinely live and public now;
+factor that into any future security/compliance judgment calls (e.g. the
+XSS audit already done in Phase 4 is no longer a hypothetical-future
+concern).
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.
