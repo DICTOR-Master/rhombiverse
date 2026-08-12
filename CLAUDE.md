@@ -325,21 +325,8 @@ theorizing further; it found a real gap (see the `onCellClicked` fix
 below) that static reading had missed, in the same session that also
 proved the reported bug wasn't there.
 
-To reconstruct the harness: portable Node was extracted to a scratch
-dir (not this repo); a scratch npm project has `three@0.185.1` in
-`node_modules`; **the real `src/*.js` files need `node_modules`
-findable via Node's own resolution from their location** (`import * as
-THREE from 'three'` in `build.js` resolves relative to `build.js`, not
-the test script) — a symlink `~/rhombiverse/node_modules ->
-<scratch>/node_modules` makes that work, and must be removed again
-after testing (it's `.gitignore`d, but isn't part of this repo's actual
-structure — the project is deliberately build-tool-free, see "No build
-step" below). Two established test patterns:
-`test-fill.mjs`-style (full raycast + real click dispatch, for anything
-touching `matchNeighborOffset`/mode dispatch) and
-`test-modeui.mjs`/`test-undo.mjs`-style (mock DOM elements + a verbatim
-copy of the specific render.js logic under test, for pure DOM-wiring
-logic that doesn't need real geometry).
+To reconstruct the harness, use the `browser-test-harness` skill
+(`.claude/skills/browser-test-harness/SKILL.md`) — Harness 1 there.
 
 **UI complexity feedback led to a real redesign, 2026-08-11 — several
 rounds, each grounded in something concrete, not vibes:**
@@ -489,17 +476,10 @@ new testing capability for this repo, worth using again.** The existing
 "Real testing infrastructure" section above (portable Node + real `three`
 package) proves CPU-side math only, explicitly *without* WebGL/DOM — it
 can't exercise actual rendering, pointer lock, or real click/keyboard
-dispatch against a live page. This environment also has no system
-Chromium and no passwordless `sudo` (interactive auth required), so
-installing a system browser wasn't an option either. Instead: a throwaway
-Python venv (in the session scratchpad, not this repo) with `pip install
-playwright` + `playwright install chromium` — no sudo needed, downloads
-its own Chromium build to `~/.cache/ms-playwright` (that cache **does**
-persist across sessions since it's under `$HOME`; only the venv itself
-is ephemeral, so a future cold session can `python3 -m venv` + `pip
-install playwright` fresh and skip the ~200MB browser download if that
-cache is still present). Served the repo via `python3 -m http.server`,
-then drove a real page load with Playwright: selected Blackstar-Glassite,
+dispatch against a live page. Reconstructed via the `browser-test-harness`
+skill (`.claude/skills/browser-test-harness/SKILL.md`, Harness 2 —
+portable Python venv + Playwright + cached Chromium, no sudo/system
+browser needed). Drove a real page load: selected Blackstar-Glassite,
 clicked a face to place a BSG cell, confirmed `#gravity-info` went from
 "No planetoid yet" to "gravity active · radius 2.2u · 1 BSG cell",
 clicked **Enter Walk Mode**, confirmed `document.pointerLockElement` was
