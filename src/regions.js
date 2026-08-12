@@ -57,6 +57,26 @@ function claimedCellKeys(claims) {
   return set;
 }
 
+// RHOMBIVERSE_SPEC_LOOPHOLES.md section 4: pre-seeded content (asteroid
+// belts) must be non-allocatable, regardless of shell index. Reads
+// world.entries() directly rather than importing asteroids.js -- every
+// asteroid cell is already tagged with asteroidNodeId (the same pattern
+// claimId/shellCenter use), so this needs no coupling between the two
+// modules; it just treats "already occupied by pre-seeded content" as
+// another flavor of "already spoken for", same as an existing claim.
+// The spec also names a "star system anchor" to reserve, but this
+// implementation has no such thing -- Star System (starsystem.js) is a
+// threshold crossed by a player's OWN BSG cluster wherever they choose
+// to build it, not fixed pre-seeded content at a known coordinate, so
+// there is nothing fixed to reserve for it; only the belts apply here.
+function reservedAsteroidCellKeys(world) {
+  const set = new Set();
+  for (const c of world.entries()) {
+    if (c.asteroidNodeId) set.add(cellKey(c.x, c.y, c.z));
+  }
+  return set;
+}
+
 // Finds the first free claim-sized footprint, searching candidate CENTERS
 // outward from world center in true 3D shell order (section 2: "filled
 // each shell before moving to the next... first-come claims are placed
@@ -64,16 +84,25 @@ function claimedCellKeys(claims) {
 // (shell 0) is tried first, since cellsInShells only ever returns shells
 // 1+. Isolation (section 6): only ever reads existing claims to check for
 // overlap, never resizes/moves/touches one -- granting a claim is a
-// strictly additive operation.
+// strictly additive operation. Also skips any candidate overlapping
+// reserved pre-seeded content (see reservedAsteroidCellKeys above) --
+// section 4's fix, "continuing to the next available cell in shell order
+// rather than overlapping it" is exactly what this loop already does,
+// now with reserved cells added to what counts as "not free".
 function findFreeSlot(world, sizeShells) {
   const claimed = claimedCellKeys(world.getClaims());
+  const reserved = reservedAsteroidCellKeys(world);
   const candidateCenters = [
     { x: 0, y: 0, z: 0, shell: 0 },
     ...cellsInShells(0, 0, 0, MAX_CLAIM_SEARCH_SHELL),
   ];
   for (const center of candidateCenters) {
     const footprint = footprintOf(center.x, center.y, center.z, sizeShells);
-    if (footprint.every(({ x, y, z }) => !claimed.has(cellKey(x, y, z)))) return center;
+    const free = footprint.every(({ x, y, z }) => {
+      const key = cellKey(x, y, z);
+      return !claimed.has(key) && !reserved.has(key);
+    });
+    if (free) return center;
   }
   return null;
 }

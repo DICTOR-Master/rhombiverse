@@ -1320,16 +1320,39 @@ regrowth queue emptied. This is the precise gap the local-only version
 had (the original miner disconnecting before their own timer fired) --
 now any connected client can complete anyone's pending regrowth.
 
+**`RHOMBIVERSE_SPEC_LOOPHOLES.md` section 4 (claim/belt collision guard)
+built, 2026-08-12 — the last open loophole, all five now resolved (two
+applied, two found already-closed by existing design, this one built).**
+`regions.js`'s `findFreeSlot` gained `reservedAsteroidCellKeys(world)`:
+reads `world.entries()` directly rather than importing `asteroids.js` --
+every asteroid cell is already tagged with `asteroidNodeId` (same
+pattern as `claimId`/`shellCenter`), so "already occupied by pre-seeded
+content" needed no coupling between the two modules, just another
+flavor of "already spoken for," alongside the existing claims check. The
+spec also names a "star system anchor" to reserve, but this
+implementation has none -- Star System is a threshold crossed by a
+player's OWN BSG cluster wherever THEY choose to build it, not fixed
+pre-seeded content at a known coordinate, so there's nothing fixed to
+reserve for it; only the belts apply here, stated plainly rather than
+pretending otherwise. **Verified via direct module execution**: real
+asteroid belts sit 80+ units out, genuinely beyond `regions.js`'s own
+`MAX_CLAIM_SEARCH_SHELL=40` search range, so the collision can't occur
+in normal play with real belts -- to prove the guard itself works
+rather than just that it's unreachable, a synthetic asteroid-tagged
+cell was placed at world center (0,0,0), exactly where a claim would
+otherwise land first. Confirmed the claim correctly diverted to
+`(3, 3, 0)`, shell 3 -- the nearest position whose own 2-shell footprint
+(bounding radius ~2.8 units) clears the reserved cell (real distance
+~4.24 units) -- rather than overlapping it. Zero console errors.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World),
-`RHOMBIVERSE_SPEC_REGIONS.md` (data layer, allocation, hazard-mechanic
-wiring, and cross-session Supabase sync), and `RHOMBIVERSE_SPEC_ASTEROIDS.md`
-(acquisition + population-scaled spawning + discoverability UI +
-Supabase-synced regrowth) are all done -- asteroids has no more named
-gaps left in this repo's own scope. `RHOMBIVERSE_SPEC_LOOPHOLES.md`
-section 4 (claim/belt collision guard) is unblocked but still not built.
+`RHOMBIVERSE_SPEC_REGIONS.md`, `RHOMBIVERSE_SPEC_ASTEROIDS.md`, and
+`RHOMBIVERSE_SPEC_LOOPHOLES.md` (all five items resolved) are all done.
 Phase 5.8 (Trust Zones/Moderation) is still only partially done (see its
-own status above) — ask before assuming what's next.
+own status above) — the only named gap left anywhere in this repo's
+scope, besides the explicitly-deferred crystal-growth mode and public
+deploy below. Ask before assuming what's next.
 Crystal-growth mode (Phase 5.5's other bullet,
 cells auto-growing over time) was intentionally left unbuilt; the plan
 marks it optional/tied to Phase 6 timing. Actual public deploy (Phase 4's
