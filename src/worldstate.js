@@ -36,6 +36,12 @@ export function createWorldStore(worldJSON, hooks = {}) {
   let version = worldJSON.version;
   let meta = { ...worldJSON.meta };
   const cells = new Map(Object.entries(worldJSON.cells));
+  // RHOMBIVERSE_SPEC_REGIONS.md's `claims` registry -- the first addendum
+  // to need a genuinely new TOP-LEVEL world-state key rather than just
+  // new per-cell fields (every prior addendum -- shell/shellCenter,
+  // gravitySource, blackHoleLedger, starLedger -- fit entirely inside
+  // existing cells). `?? {}` so JSON from before this existed still loads.
+  let claims = { ...(worldJSON.claims ?? {}) };
 
   return {
     has(x, y, z) {
@@ -80,6 +86,21 @@ export function createWorldStore(worldJSON, hooks = {}) {
         return { x, y, z, ...data };
       });
     },
+    // Read-only view of the claims registry -- regions.js's allocation
+    // algorithm and claimIdAt() both read this to know what's already
+    // granted. Returns a shallow copy so callers can't mutate it directly
+    // (must go through addClaim, same defensive shape as entries()).
+    getClaims() {
+      return { ...claims };
+    },
+    // Grants a new claim or updates an existing one (id is the caller's
+    // choice, not auto-generated here -- regions.js owns id generation).
+    // No hooks.onAdd-style sync notification yet: claims are a Phase 5.8
+    // concept still being scoped, deliberately not yet wired into
+    // sync.js's push/realtime pipeline (see CLAUDE.md's regions status).
+    addClaim(claimId, claimData) {
+      claims = { ...claims, [claimId]: claimData };
+    },
     // Serializes back to the full RHOMBIVERSE_PLAN.md section 3 shape,
     // for persistence.js to save/export.
     toJSON() {
@@ -87,6 +108,7 @@ export function createWorldStore(worldJSON, hooks = {}) {
         worldName,
         version,
         cells: Object.fromEntries(cells),
+        claims,
         meta: { ...meta, lastModified: new Date().toISOString() },
       };
     },
@@ -95,6 +117,7 @@ export function createWorldStore(worldJSON, hooks = {}) {
       worldName = newWorldJSON.worldName;
       version = newWorldJSON.version;
       meta = { ...newWorldJSON.meta };
+      claims = { ...(newWorldJSON.claims ?? {}) };
       cells.clear();
       for (const [key, data] of Object.entries(newWorldJSON.cells)) {
         cells.set(key, data);
