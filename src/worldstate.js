@@ -53,6 +53,10 @@ export function createWorldStore(worldJSON, hooks = {}) {
   // like claims -- see asteroids.js's own header for the full reasoning).
   let inventory = { ...(worldJSON.playerInventory ?? {}) };
   let regrowthQueue = { ...(worldJSON.asteroidRegrowth ?? {}) };
+  // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 5's own top-level schema
+  // key -- atomic barter proposals, resolved (or left pending/cancelled)
+  // by trade.js. `?? {}` so JSON from before this existed still loads.
+  let pendingTrades = { ...(worldJSON.pendingTrades ?? {}) };
 
   return {
     has(x, y, z) {
@@ -122,18 +126,73 @@ export function createWorldStore(worldJSON, hooks = {}) {
     addClaim(claimId, claimData) {
       claims = { ...claims, [claimId]: claimData };
     },
-    // RHOMBIVERSE_SPEC_ASTEROIDS.md section 3/6: adds `amount` of
-    // `material` to `ownerId`'s inventory. Local-only for this first pass
-    // (see CLAUDE.md's asteroids status) -- not yet synced to Supabase.
+    // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 5: each material entry
+    // is `{quantity, lastUsedAt}`, not a bare number -- lastUsedAt drives
+    // trade.js's decay clock. Local-only for this first pass (see
+    // CLAUDE.md's status) -- not yet synced to Supabase.
     getInventory() {
       return { ...inventory };
     },
-    creditInventory(ownerId, material, amount = 1) {
+    // Crediting (mining, or receiving via a completed trade) deliberately
+    // does NOT reset lastUsedAt for a material the player already holds
+    // -- only spending does (spendInventory below). This is exactly
+    // RHOMBIVERSE_SPEC_LOOPHOLES.md section 1's own fix, satisfied by
+    // construction rather than a special case: "trade receipt never
+    // resets decay on its own... its decay clock continues from whenever
+    // it was originally mined." A material the player has genuinely
+    // never held before has no prior timestamp to preserve, so it starts
+    // its own clock at `now` -- the only sensible baseline, not a
+    // loophole (there's no existing decay state being reset away).
+    creditInventory(ownerId, material, amount = 1, now = Date.now()) {
       const current = inventory[ownerId] ?? {};
+      const existing = current[material];
+      const nextEntry = existing
+        ? { quantity: existing.quantity + amount, lastUsedAt: existing.lastUsedAt }
+        : { quantity: amount, lastUsedAt: now };
+      inventory = { ...inventory, [ownerId]: { ...current, [material]: nextEntry } };
+    },
+    // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 4: "using/spending
+    // material resets its decay clock for the amount used" -- the one
+    // real "use" event this implementation has is completing a trade
+    // (see trade.js's own header for why building doesn't consume
+    // inventory yet). Returns false without mutating anything if the
+    // holder doesn't have enough -- callers must check this before
+    // treating a spend as having happened, same "no partial-state risk"
+    // guarantee trade resolution itself needs (section 6).
+    spendInventory(ownerId, material, amount, now = Date.now()) {
+      const current = inventory[ownerId] ?? {};
+      const existing = current[material];
+      if (!existing || existing.quantity < amount) return false;
       inventory = {
         ...inventory,
-        [ownerId]: { ...current, [material]: (current[material] ?? 0) + amount },
+        [ownerId]: { ...current, [material]: { quantity: existing.quantity - amount, lastUsedAt: now } },
       };
+      return true;
+    },
+    // Direct setter for trade.js's decay pass, which computes the exact
+    // resulting {quantity, lastUsedAt} itself (decay is neither a credit
+    // nor a spend in the player-action sense -- see applyInventoryDecay).
+    setInventoryEntry(ownerId, material, entry) {
+      const current = inventory[ownerId] ?? {};
+      inventory = { ...inventory, [ownerId]: { ...current, [material]: entry } };
+    },
+    // Pending barter proposals -- trade.js owns id generation and
+    // resolution logic; this is just storage, same division of
+    // responsibility as claims (regions.js) and the regrowth queue
+    // (asteroids.js). hooks.onTradeSet/onTradeClear mirror the same
+    // optional-hook pattern as onRegrowthSet/onRegrowthClear, for a
+    // future Supabase sync pass.
+    getPendingTrades() {
+      return { ...pendingTrades };
+    },
+    setPendingTrade(tradeId, tradeData) {
+      pendingTrades = { ...pendingTrades, [tradeId]: tradeData };
+      hooks.onTradeSet?.(tradeId, tradeData);
+    },
+    removePendingTrade(tradeId) {
+      const { [tradeId]: _removed, ...rest } = pendingTrades;
+      pendingTrades = rest;
+      hooks.onTradeClear?.(tradeId);
     },
     // Pending asteroid regrowth entries, keyed by "x,y,z" -- see
     // asteroids.js's mineAsteroidCell/applyAsteroidRegeneration.
@@ -165,6 +224,7 @@ export function createWorldStore(worldJSON, hooks = {}) {
         claims,
         playerInventory: inventory,
         asteroidRegrowth: regrowthQueue,
+        pendingTrades,
         meta: { ...meta, lastModified: new Date().toISOString() },
       };
     },
@@ -176,6 +236,7 @@ export function createWorldStore(worldJSON, hooks = {}) {
       claims = { ...(newWorldJSON.claims ?? {}) };
       inventory = { ...(newWorldJSON.playerInventory ?? {}) };
       regrowthQueue = { ...(newWorldJSON.asteroidRegrowth ?? {}) };
+      pendingTrades = { ...(newWorldJSON.pendingTrades ?? {}) };
       cells.clear();
       for (const [key, data] of Object.entries(newWorldJSON.cells)) {
         cells.set(key, data);

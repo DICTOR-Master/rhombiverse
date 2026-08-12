@@ -41,6 +41,7 @@ import {
   applyPopulationScaledSpawning,
   listBelts,
 } from './asteroids.js';
+import { applyInventoryDecay } from './trade.js';
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -431,6 +432,7 @@ async function init() {
   seedAsteroidBelts(world);
   applyAsteroidRegeneration(world);
   applyPopulationScaledSpawning(world);
+  applyInventoryDecay(world);
   applyHydrosphere(world);
   applyBlackHoleConsumption(world);
   applyAsymptoticGeneration(world);
@@ -618,13 +620,16 @@ async function init() {
       return;
     }
     const mine = world.getInventory()[myUserId] ?? {};
-    const parts = Object.entries(mine).map(([material, count]) => `${material} ×${count}`);
+    // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 5: entries are
+    // {quantity, lastUsedAt} objects now, not bare numbers.
+    const parts = Object.entries(mine).map(([material, entry]) => `${material} ×${entry.quantity}`);
     el.textContent = parts.length > 0 ? `Inventory: ${parts.join(', ')}.` : 'Inventory: empty.';
   }
 
   function onChange() {
     applyAsteroidRegeneration(world);
     applyPopulationScaledSpawning(world);
+    applyInventoryDecay(world);
     applyHydrosphere(world);
     applyBlackHoleConsumption(world);
     applyAsymptoticGeneration(world);
@@ -1127,6 +1132,13 @@ async function init() {
     const before = world.entries().length;
     applyAsteroidRegeneration(world);
     applyPopulationScaledSpawning(world);
+    // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 4: decay never changes
+    // cell count (it only touches playerInventory), so it can't be
+    // gated behind the same before/after cell-count check above -- but
+    // the inventory hint still needs to reflect it as it happens, not
+    // only after the player's next unrelated edit.
+    applyInventoryDecay(world);
+    updateInventoryHint();
     if (world.entries().length === before) return;
     rebuildInstances(mesh, world, currentMode === 'report');
     if (!sharedWorldActive) saveToLocalStorage(world.toJSON());

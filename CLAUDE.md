@@ -1361,12 +1361,59 @@ otherwise land first. Confirmed the claim correctly diverted to
 (bounding radius ~2.8 units) clears the reserved cell (real distance
 ~4.24 units) -- rather than overlapping it. Zero console errors.
 
+**`RHOMBIVERSE_SPEC_TRADE_INVENTORY.md` started, 2026-08-12 — data layer
+first (decay + full trade logic), matching regions.js's own "start lean"
+precedent, not wired to Supabase sync or a UI yet.** `worldstate.js`'s
+`playerInventory` entries changed shape from a bare number to
+`{quantity, lastUsedAt}` per the spec's own section 5 schema (only
+`asteroids.js`'s existing `creditInventory` call site was affected, and
+its signature stayed backward-compatible via a defaulted `now` param).
+New `src/trade.js`: `applyInventoryDecay` (flat per-material free
+thresholds, roughly scaled to `RHOMBIVERSE_SPEC_ASTEROIDS.md`'s own
+yield rarity; decays quantity above threshold in discrete ticks matching
+`asteroids.js`'s own regrowth-cooldown SHAPE exactly, per the spec's
+explicit "do not invent a new decay formula" instruction — same 30s tick
+value, intentionally, not coincidentally) and the full barter engine
+(`proposeTrade`/`confirmTrade`/`cancelTrade`, atomic resolution only once
+both parties confirm, re-verifying both offers are still affordable at
+resolution time since inventory can drift between proposal and
+confirmation). **"Using material" has exactly one real meaning in this
+implementation: completing a trade that spends it** — building remains
+completely free/inventory-independent, per the still-standing deferral
+in `RHOMBIVERSE_SPEC_ASTEROIDS.md`'s own Claude Code prompt, which
+nothing in this spec's own prompt reverses. `RHOMBIVERSE_SPEC_LOOPHOLES.md`
+section 1 ("trade receipt never resets decay on its own") is satisfied
+by construction, not a special case: `creditInventory` only stamps a
+fresh clock for a material the receiver has genuinely never held before;
+an existing stockpile's own clock is always preserved through a trade.
+**Verified via direct module execution**, including catching two flawed
+test assertions before trusting the result: decay correctly floors at
+the free threshold and never touches below-threshold stock; the full
+propose → single-confirm (no effect yet) → both-confirm → atomic swap
+sequence produces exactly the right quantities on both sides; a spent
+stack's clock resets to a genuine fresh timestamp (the first test
+compared against a stale frozen value instead of the real resolution-time
+`Date.now()`, caught and re-verified correctly); the actual Loopholes
+scenario — a receiver who ALREADY holds stale stock receiving more via
+trade — correctly leaves their existing clock untouched (the first test
+checked first-time acquisition instead, which correctly does get a fresh
+baseline since there's no existing decay state to protect, not a
+violation of anything); cancelling a trade leaves both inventories
+untouched; proposing with insufficient funds throws and creates no
+pending trade. Zero console errors throughout. **Deliberately not done
+this pass**: no Supabase sync for `playerInventory`/`pendingTrades`, and
+no UI at all (propose/confirm/inventory display) — both natural next
+slices, matching how regions.js's own data-layer-first start later
+gained sync and UI across separate follow-up passes.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World),
 `RHOMBIVERSE_SPEC_REGIONS.md`, `RHOMBIVERSE_SPEC_ASTEROIDS.md`, and
 `RHOMBIVERSE_SPEC_LOOPHOLES.md` (all five items resolved) are all done.
-Phase 5.8 (Trust Zones/Moderation) is still only partially done (see its
-own status above) — the only named gap left anywhere in this repo's
+`RHOMBIVERSE_SPEC_TRADE_INVENTORY.md` has its decay + trade-logic data
+layer (see status above) but no sync or UI yet. Phase 5.8 (Trust
+Zones/Moderation) is still only partially done (see its own status
+above) — the only named gaps left anywhere in this repo's
 scope, besides the explicitly-deferred crystal-growth mode. Ask before
 assuming what's next.
 Crystal-growth mode (Phase 5.5's other bullet,
