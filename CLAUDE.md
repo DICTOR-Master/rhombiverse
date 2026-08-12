@@ -441,6 +441,30 @@ production (not something achievable by using a "safer" preview-only
 command) — worth knowing before assuming a plain `vercel deploy` is ever
 non-live for a project's very first deploy.
 
+**Real gotcha hit right after, 2026-08-12: every deploy AFTER the first
+one got silently stuck at `readyState: BLOCKED`, never reaching the
+production alias, with no error surfaced by the CLI's own progress
+output (it just hangs at "Building…" forever).** Chased two wrong
+theories first (Vercel account/email mismatch, then Deployment
+Protection/SSO) before querying the deployment object directly via the
+Management API (`GET /v13/deployments/:id`), which is what actually
+revealed the real, documented reason:
+`readyStateReason: "The Deployment was blocked because there was no git
+user associated with the commit."` — the commit author on every commit
+this whole session, `DICTO <dicto@dicto.jp>` (this sandbox's local git
+config, unrelated to the user's real GitHub/Vercel accounts), isn't a
+recognized collaborator identity, so Vercel refuses to auto-promote any
+deploy sourced from it — except a project's very first-ever deployment,
+which gets a one-time exception (explaining why that one alone worked).
+Fixed by setting `git config user.email` (this repo only, not global) to
+the user's real address and committing again -- **past commits' authors
+are immutable, so this only takes effect starting with the next new
+commit, not retroactively**. If a future deploy mysteriously re-blocks
+after this, check `GET /v13/deployments/:id`'s `readyStateReason` FIRST,
+directly, rather than guessing from the CLI's own silence -- both wrong
+theories chased here were plausible-sounding but a five-second API call
+would have settled it immediately.
+
 **Phase 5.5 (Planetoid Building + Radial Gravity) done, commit
 `30cd1c8`, 2026-08-11 — built out of sequence, ahead of Phase 4's own
 deploy step, and picked up mid-flight as uncommitted work-in-progress
