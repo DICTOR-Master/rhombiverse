@@ -9,7 +9,7 @@
 // (0,0,0) in true 3D shell order via the same NEIGHBOR_OFFSETS/
 // shellCount(n)=10n^2+2 structure used everywhere else in this project --
 // not re-derived, reused directly from lattice.js.
-import { cellKey, cellsInShells } from './lattice.js';
+import { cellKey, cellsInShells, cellToWorld } from './lattice.js';
 
 // "A claim is a 2-shell cluster" -- the spec's own example size, adopted
 // as-is (implementation-tunable per the spec, not fixed by it; picking
@@ -115,13 +115,32 @@ export function allocateClaim(world, ownerId, sizeShells = CLAIM_SIZE_SHELLS) {
   return claimId;
 }
 
+// Real Euclidean distance (world units) from a claim's own center out to
+// the farthest cell in its footprint -- the exact bounding radius, not an
+// estimated formula, reusing the same footprint geometry findFreeSlot
+// already computes elsewhere in this file. render.js uses this to draw a
+// wireframe sphere per claim so territory is visible even where nothing
+// has been built yet (a claim reserves space; it doesn't require every
+// cell in it to physically exist -- see claimIdAt below).
+export function claimBoundingRadius(claim) {
+  const [cx, cy, cz] = claim.center;
+  const [ccx, ccy, ccz] = cellToWorld(cx, cy, cz);
+  let maxDist = 0;
+  for (const c of footprintOf(cx, cy, cz, parseClaimSizeShells(claim.size))) {
+    const [wx, wy, wz] = cellToWorld(c.x, c.y, c.z);
+    const d = Math.hypot(wx - ccx, wy - ccy, wz - ccz);
+    if (d > maxDist) maxDist = d;
+  }
+  return maxDist;
+}
+
 // Which claim (if any) owns a given lattice coordinate -- computed
 // geometrically against the claims registry rather than requiring a
 // per-cell claimId to already be stamped, so ownership of not-yet-built
 // space inside a claim is still well-defined (a claim reserves an area,
-// it doesn't need every cell in it pre-materialized). NOT yet wired into
-// build.js/blackhole.js/supernova.js -- see CLAUDE.md's regions status
-// for what's still deliberately deferred.
+// it doesn't need every cell in it pre-materialized). Wired into
+// worldstate.js's addCell (auto-stamps claimId) and blackhole.js/
+// supernova.js's isClaimProtected below.
 export function claimIdAt(claims, x, y, z) {
   const key = cellKey(x, y, z);
   for (const [id, claim] of Object.entries(claims)) {

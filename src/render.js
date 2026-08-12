@@ -31,7 +31,7 @@ import {
   pushClaim,
   subscribeToSharedWorld,
 } from './sync.js';
-import { computeClaim } from './regions.js';
+import { computeClaim, claimBoundingRadius } from './regions.js';
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -343,6 +343,18 @@ async function init() {
   const mesh = new THREE.InstancedMesh(geometry, material, MAX_CELLS);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(mesh);
+
+  // RHOMBIVERSE_SPEC_REGIONS.md territory visualization: one wireframe
+  // sphere per claim, sized to its real bounding radius (claimBoundingRadius
+  // -- exact geometry, not an estimate) rather than tinting individual
+  // cells, since most of a claim's footprint is typically unbuilt space
+  // with no cell to tint at all. A plain THREE.Group so the whole set can
+  // be cleared and rebuilt in one call (refreshClaims below) without
+  // tracking individual mesh references.
+  const claimGroup = new THREE.Group();
+  scene.add(claimGroup);
+  const CLAIM_COLOR_MINE = 0x4ade80; // green -- this session's own claims
+  const CLAIM_COLOR_OTHER = 0xf59e0b; // amber -- everyone else's
 
   applyHydrosphere(world);
   applyBlackHoleConsumption(world);
@@ -672,6 +684,7 @@ async function init() {
   // already-placed cells, so there's nothing to re-render.
   function applyRemoteClaim(claimId, claimData) {
     world.addClaim(claimId, claimData);
+    refreshClaims();
   }
 
   const sharedWorldToggle = document.getElementById('shared-world-toggle');
@@ -680,6 +693,60 @@ async function init() {
   const loadPresetBtn = document.getElementById('load-preset');
   const claimLandBtn = document.getElementById('claim-land-btn');
   const claimHint = document.getElementById('claim-hint');
+  const claimsListEl = document.getElementById('claims-list');
+
+  // Rebuilds both the wireframe-sphere territory visuals AND the text
+  // list from world.getClaims() -- called after every point claims
+  // actually change (a local grant, a remote claim arriving, entering/
+  // leaving Shared World), not on every onChange(), since claims change
+  // far less often than cells do. Clearing and rebuilding the whole
+  // group each time is simpler than diffing for the handful of claims
+  // this project has ever been tested with -- revisit if that stops
+  // being true.
+  function refreshClaims() {
+    while (claimGroup.children.length > 0) {
+      const child = claimGroup.children[0];
+      claimGroup.remove(child);
+      child.geometry.dispose();
+      child.material.dispose();
+    }
+    const claims = world.getClaims();
+    const ids = Object.keys(claims);
+
+    for (const id of ids) {
+      const claim = claims[id];
+      const radius = claimBoundingRadius(claim);
+      const [wx, wy, wz] = cellToWorld(...claim.center, SCALE);
+      const sphereGeom = new THREE.SphereGeometry(radius, 16, 12);
+      const mine = claim.ownerId === myUserId;
+      const sphereMat = new THREE.MeshBasicMaterial({
+        color: mine ? CLAIM_COLOR_MINE : CLAIM_COLOR_OTHER,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.5,
+      });
+      const sphere = new THREE.Mesh(sphereGeom, sphereMat);
+      sphere.position.set(wx, wy, wz);
+      claimGroup.add(sphere);
+    }
+
+    if (!claimsListEl) return;
+    claimsListEl.innerHTML = '';
+    if (ids.length === 0) {
+      claimsListEl.innerHTML = '<div class="placeholder">No claims granted yet.</div>';
+      return;
+    }
+    for (const id of ids) {
+      const claim = claims[id];
+      const mine = claim.ownerId === myUserId;
+      const row = document.createElement('div');
+      row.className = 'claim-item';
+      row.textContent =
+        `${mine ? '★ ' : ''}${id} — shell ${claim.shellIndex} — ` +
+        `${mine ? 'you' : claim.ownerId.slice(0, 8)}`;
+      claimsListEl.appendChild(row);
+    }
+  }
 
   // RHOMBIVERSE_SPEC_REGIONS.md, minimal UI trigger: grants this session's
   // player one fixed-size claim in the first free slot found outward from
@@ -699,6 +766,7 @@ async function init() {
       const { claimId, claimData } = computeClaim(world, myUserId);
       await pushClaim(claimId, claimData);
       world.addClaim(claimId, claimData);
+      refreshClaims();
       claimHint.textContent =
         `Claimed ${claimId}: center [${claimData.center.join(', ')}], ` +
         `shell ${claimData.shellIndex}, size ${claimData.size}.`;
@@ -752,6 +820,7 @@ async function init() {
       // first render of the shared world.
       sharedWorldActive = true;
       onChange();
+      refreshClaims();
       unsubscribeShared = subscribeToSharedWorld({
         onRemoteUpsert: applyRemoteUpsert,
         onRemoteDelete: applyRemoteDelete,
@@ -783,6 +852,7 @@ async function init() {
     setLocalResetControlsEnabled(true);
     setClaimLandEnabled(false);
     myUserId = null;
+    refreshClaims();
     sharedWorldToggle.textContent = 'Enable Shared World';
     sharedWorldHint.textContent = 'Shared World: off.';
   }

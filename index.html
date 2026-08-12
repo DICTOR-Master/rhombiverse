@@ -96,6 +96,9 @@
     }
     #ring-list .ring-remove:hover { background: rgba(220, 60, 60, 0.85); }
     #ring-list .placeholder { opacity: 0.6; }
+    #claims-list { max-height: 140px; overflow-y: auto; margin-top: 4px; }
+    #claims-list .placeholder { opacity: 0.6; }
+    #claims-list .claim-item { padding: 2px 0; font-size: 12px; }
   </style>
   <!--
     No bundler/build step by design (Grounded Simplicity, RHOMBIVERSE_PRINCIPLES.md
@@ -193,6 +196,7 @@
       <button id="claim-land-btn" type="button" disabled>Claim Land</button>
     </div>
     <div id="claim-hint" class="hint"></div>
+    <div id="claims-list"><div class="placeholder">No claims granted yet.</div></div>
     <div class="row">
       <label>Load preset:
         <select id="preset-select">

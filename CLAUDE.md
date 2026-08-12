@@ -1025,11 +1025,34 @@ sessions — not two tabs sharing one identity)**: Player A claimed world
 center; Player B, connecting separately, received A's claim via realtime
 and correctly computed a non-overlapping slot at shell 5 — confirmed
 against the DB directly afterward (two rows, two genuinely distinct
-`owner_id`s). Zero console/page errors in either session. **Still
-deferred, explicitly**: no claims list/boundary-visualization UI beyond
-the one-line hint after clicking Claim Land, and `destructible` can only
-ever be set at grant time (`false`, hard-coded) since there's no UPDATE
-path — an owner can't yet toggle it after the fact.
+`owner_id`s). Zero console/page errors in either session.
+
+**Claims list + territory visualization added, 2026-08-12 — same session,
+closing the "no UI beyond the hint" gap from the pass above.**
+`regions.js` gained `claimBoundingRadius(claim)`: the EXACT real
+Euclidean distance from a claim's center to the farthest cell in its own
+footprint (reusing the same footprint geometry `findFreeSlot` already
+computes, not an estimated formula) — needed because most of a claim's
+area is typically unbuilt space with no cell to tint, so a wireframe
+sphere sized to this radius is the visualization, not per-cell coloring.
+`render.js`'s `refreshClaims()` rebuilds a `THREE.Group` of these spheres
+(green = this session's own claims, amber = everyone else's) plus a text
+list (`#claims-list`, "★" marking your own) from `world.getClaims()` on
+every point claims actually change — a local grant, a remote claim
+arriving via realtime, or entering/leaving Shared World — not on every
+cell-level `onChange()`, since claims change far less often than cells.
+Verified live (not just statically, since this touches the actual scene
+graph): loaded Shared World (empty claims list, correct empty state),
+clicked Claim Land, confirmed the list showed `★ claim_0_0_0 — shell 0 —
+you` and a screenshot showed a real green wireframe sphere centered
+exactly on the claimed seed cell, then disabled Shared World and
+confirmed the list reset to empty — zero console errors throughout.
+**Still deferred, explicitly**: `destructible` can only ever be set at
+grant time (`false`, hard-coded) since `public.claims` has no UPDATE RLS
+policy — an owner can't yet toggle it after the fact; that would need a
+real, deliberately-scoped RLS policy (e.g. "owner can update destructible
+only, never center/size"), not just flipping RLS open, so it's left as a
+named follow-up rather than done here.
 
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World), and
