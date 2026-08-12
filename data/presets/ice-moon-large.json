@@ -1,0 +1,5547 @@
+{
+  "worldName": "Ice Moon (Large)",
+  "version": 1,
+  "cells": {
+    "0,0,0": {
+      "material": "blackstar-glassite",
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,1,0": {
+      "material": "ferrostone",
+      "shell": 1,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-1,0": {
+      "material": "ferrostone",
+      "shell": 1,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,1,0": {
+      "material": "ferrostone",
+      "shell": 1,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-1,0": {
+      "material": "ferrostone",
+      "shell": 1,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,0,1": {
+      "material": "ferrostone",
+      "shell": 1,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,0,-1": {
+      "material": "ferrostone",
+      "shell": 1,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,0,1": {
+      "material": "ferrostone",
+      "shell": 1,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,0,-1": {
+      "material": "ferrostone",
+      "shell": 1,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,1,1": {
+      "material": "ferrostone",
+      "shell": 1,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,1,-1": {
+      "material": "ferrostone",
+      "shell": 1,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-1,1": {
+      "material": "ferrostone",
+      "shell": 1,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-1,-1": {
+      "material": "ferrostone",
+      "shell": 1,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,2,0": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,0,0": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,2,0": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,1,1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,1,-1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,2,1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,2,-1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-2,0": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-2,0": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-1,1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-1,-1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-2,1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-2,-1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,2,0": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,0,0": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,1,1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,1,-1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,2,1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,2,-1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-2,0": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-1,1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-1,-1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-2,1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-2,-1": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,0,2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,0,2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,1,2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-1,2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,0,-2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,0,-2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,1,-2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-1,-2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,0,2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,1,2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-1,2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,0,-2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,1,-2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-1,-2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,2,2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,2,-2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-2,2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-2,-2": {
+      "material": "ferrostone",
+      "shell": 2,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,3,0": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,1,0": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,3,0": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,2,1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,2,-1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,3,1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,3,-1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-1,0": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,0,1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,0,-1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,3,0": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,3,1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,3,-1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,1,2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,2,2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,1,-2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,2,-2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,3,2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,3,-2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-3,0": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-3,0": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-2,1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-2,-1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-3,1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-3,-1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-3,0": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-3,1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-3,-1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-1,2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-2,2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-1,-2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-2,-2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-3,2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-3,-2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,3,0": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,1,0": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,2,1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,2,-1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,3,1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,3,-1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-1,0": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,0,1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,0,-1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,1,2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,2,2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,1,-2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,2,-2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,3,2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,3,-2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-3,0": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-2,1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-2,-1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-3,1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-3,-1": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-1,2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-2,2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-1,-2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-2,-2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-3,2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-3,-2": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,0,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,0,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,1,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-1,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,0,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,1,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-1,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,2,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-2,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,0,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,0,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,1,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-1,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,0,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,1,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-1,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,2,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-2,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,0,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,1,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-1,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,2,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-2,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,0,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,1,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-1,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,2,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-2,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,3,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,3,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-3,3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-3,-3": {
+      "material": "ferrostone",
+      "shell": 3,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,4,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,2,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,4,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,3,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,3,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,4,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,4,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,0,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,1,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,1,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,4,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,4,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,4,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,2,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,3,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,2,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,3,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,4,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,4,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-2,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-1,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-1,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,0,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,0,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,4,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,4,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,4,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,4,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,4,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,1,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,2,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,3,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,1,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,2,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,3,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,4,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,4,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-4,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-4,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-3,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-3,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-4,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-4,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-4,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-4,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-4,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-2,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-3,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-2,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-3,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-4,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-4,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-4,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-4,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-4,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-4,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-4,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-1,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-2,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-3,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-1,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-2,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-3,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-4,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-4,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,4,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,2,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,3,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,3,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,4,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,4,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,0,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,1,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,1,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,2,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,3,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,2,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,3,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,4,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,4,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-2,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-1,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-1,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,0,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,0,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,1,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,2,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,3,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,1,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,2,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,3,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,4,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,4,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-4,0": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-3,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-3,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-4,1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-4,-1": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-2,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-3,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-2,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-3,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-4,2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-4,-2": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-1,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-2,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-3,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-1,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-2,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-3,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-4,3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-4,-3": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,0,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,0,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,1,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-1,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,0,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,1,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-1,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,2,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-2,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,0,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,1,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-1,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,2,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-2,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,3,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-3,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,0,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,0,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,1,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-1,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,0,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,1,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-1,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,2,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-2,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,0,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,1,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-1,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,2,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-2,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,3,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-3,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,0,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,1,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-1,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,2,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-2,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,3,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-3,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,0,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,1,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-1,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,2,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-2,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,3,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-3,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,4,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,4,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-4,4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-4,-4": {
+      "material": "ice99",
+      "shell": 4,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,5,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,3,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,5,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,4,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,4,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,5,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,5,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,1,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,2,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,2,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,5,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,5,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,5,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,3,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,4,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,3,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,4,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,5,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,5,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-1,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,0,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,0,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,1,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,1,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,5,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,5,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,5,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,5,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,5,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,2,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,3,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,4,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,2,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,3,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,4,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,5,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,5,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-3,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-2,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-2,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-1,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-1,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,0,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,0,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,5,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,5,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,5,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,5,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,5,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,5,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,5,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,1,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,2,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,3,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,4,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,1,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,2,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,3,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,4,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,5,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,5,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-5,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-5,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-4,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-4,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-5,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-5,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-5,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-5,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-5,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-3,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-4,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-3,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-4,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-5,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-5,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-5,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-5,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-5,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-5,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-5,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-2,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-3,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-4,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-2,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-3,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-4,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-5,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-5,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-5,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-5,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-5,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-5,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-5,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-5,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-5,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-1,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-2,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-3,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-4,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-1,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-2,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-3,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-4,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-5,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-5,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,5,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,3,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,4,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,4,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,5,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,5,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,1,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,2,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,2,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,3,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,4,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,3,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,4,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,5,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,5,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-1,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,0,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,0,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,1,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,1,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,2,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,3,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,4,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,2,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,3,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,4,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,5,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,5,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-3,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-2,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-2,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-1,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-1,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,0,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,0,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,1,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,2,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,3,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,4,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,1,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,2,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,3,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,4,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,5,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,5,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-5,0": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-4,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-4,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-5,1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-5,-1": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-3,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-4,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-3,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-4,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-5,2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-5,-2": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-2,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-3,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-4,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-2,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-3,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-4,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-5,3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-5,-3": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-1,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-2,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-3,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-4,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-1,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-2,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-3,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-4,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-5,4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-5,-4": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,0,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,0,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,1,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-1,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,0,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,1,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-1,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,2,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-2,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,0,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,1,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-1,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,2,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-2,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,3,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-3,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,0,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,1,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-1,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,2,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-2,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,3,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-3,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,4,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-4,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,0,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,0,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,1,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-1,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,0,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,1,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-1,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,2,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-2,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,0,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,1,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-1,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,2,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-2,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,3,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-3,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,0,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,1,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-1,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,2,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-2,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,3,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-3,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,4,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-4,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,0,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,1,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-1,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,2,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-2,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,3,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-3,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,4,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-4,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,0,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,1,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-1,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,2,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-2,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,3,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-3,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,4,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-4,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,5,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,5,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-5,5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-5,-5": {
+      "material": "ice99",
+      "shell": 5,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,4,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,5,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,5,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,6,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,6,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,2,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,3,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,3,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,6,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,6,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,4,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,5,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,4,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,5,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,6,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,6,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,0,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,1,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,1,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,2,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,2,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,6,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,6,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,6,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,6,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,3,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,4,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,5,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,3,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,4,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,5,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,6,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,6,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-2,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-1,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-1,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,0,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,0,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,1,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,1,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,6,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,6,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,6,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,6,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,6,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,6,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,2,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,3,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,4,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,5,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,2,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,3,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,4,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,5,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,6,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,6,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-4,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-3,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-3,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-2,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-2,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-1,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-1,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,0,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,0,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,6,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,6,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,6,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,6,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,6,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,6,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,6,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,6,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,1,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,2,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,3,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,4,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,5,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,1,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,2,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,3,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,4,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,5,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,6,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,6,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-5,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-5,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-6,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-6,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-6,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-6,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-4,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-5,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-4,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-5,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-6,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-6,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-6,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-6,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-6,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-6,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-3,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-4,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-5,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-3,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-4,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-5,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-6,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-6,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-6,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-6,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-6,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-6,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-6,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-6,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-2,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-3,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-4,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-5,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-2,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-3,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-4,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-5,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-6,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-6,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-6,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-6,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-6,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-6,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-6,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-6,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-6,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-6,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-1,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-2,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-3,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-4,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-5,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,-1,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-2,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-3,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-4,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-5,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-6,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-6,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,4,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,5,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,5,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,6,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,6,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,2,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,3,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,3,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,4,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,5,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,4,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,5,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,6,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,6,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,0,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,1,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,1,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,2,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,2,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,3,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,4,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,5,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,3,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,4,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,5,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,6,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,6,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-2,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-1,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-1,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,0,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,0,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,1,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,1,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,2,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,3,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,4,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,5,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,2,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,3,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,4,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,5,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,6,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,6,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-4,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-3,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-3,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-2,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-2,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-1,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-1,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,0,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,0,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,1,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,2,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,3,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,4,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,5,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,1,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,2,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,3,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,4,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,5,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,6,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,6,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-6,0": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-5,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-5,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-6,1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-6,-1": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-4,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-5,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-4,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-5,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-6,2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-6,-2": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-3,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-4,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-5,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-3,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-4,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-5,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-6,3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-6,-3": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-2,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-3,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-4,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-5,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-2,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-3,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-4,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-5,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-6,4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-6,-4": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-1,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-2,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-3,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-4,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-5,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,-1,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-2,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-3,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-4,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-5,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-6,5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-6,-5": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,0,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,0,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,1,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-1,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,0,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,1,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-1,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,2,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-2,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,0,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,1,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-1,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,2,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-2,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,3,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-3,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,0,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,1,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-1,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,2,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-2,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,3,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-3,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,4,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-4,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,0,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,1,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-1,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,2,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-2,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,3,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-3,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,4,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-4,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,5,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-5,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "6,0,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,0,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,1,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "5,-1,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,0,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,1,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-1,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,2,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "4,-2,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,0,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,1,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-1,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,2,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-2,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,3,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "3,-3,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,0,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,1,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-1,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,2,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-2,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,3,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-3,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,4,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "2,-4,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,0,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,1,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-1,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,2,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-2,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,3,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-3,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,4,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-4,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,5,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "1,-5,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,0,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,1,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-1,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,2,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-2,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,3,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-3,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,4,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-4,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,5,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-5,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-6,0,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,1,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-5,-1,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,2,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-4,-2,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,3,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-3,-3,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,4,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-2,-4,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,5,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "-1,-5,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,6,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,6,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-6,6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    },
+    "0,-6,-6": {
+      "material": "ice99",
+      "shell": 6,
+      "shellCenter": "0,0,0",
+      "generatorType": "ice-moon"
+    }
+  },
+  "meta": {
+    "lastModified": "2026-08-12T14:27:33.832Z",
+    "preset": true
+  }
+}
