@@ -33,7 +33,7 @@ import {
   subscribeToSharedWorld,
 } from './sync.js';
 import { computeClaim, claimBoundingRadius } from './regions.js';
-import { seedAsteroidBelts, applyAsteroidRegeneration } from './asteroids.js';
+import { seedAsteroidBelts, applyAsteroidRegeneration, listBelts } from './asteroids.js';
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -179,6 +179,29 @@ function updateGravityInfo() {
     `recommended core: ${nearest.coreShellRecommendation} shell${nearest.coreShellRecommendation === 1 ? '' : 's'}${hydro}${blackHole}${star}`;
 }
 
+// RHOMBIVERSE_SPEC_ASTEROIDS.md UI: belts sit 80+ units from the default
+// camera framing -- without this, a player has no way to discover or
+// reach them at all short of reading source. listBelts() is a pure
+// function of fixed constants (no world dependency), so this can be
+// module-level like updateGravityInfo, needing no world-state access.
+function updateBeltHint() {
+  const el = document.getElementById('belt-hint');
+  if (!el) return;
+  const refPos = walking && player ? player.getPosition() : controls.target;
+  let nearest = null;
+  let nearestDist = Infinity;
+  for (const belt of listBelts()) {
+    const [bx, by, bz] = belt.center;
+    const d = Math.hypot(refPos.x - bx, refPos.y - by, refPos.z - bz);
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearest = belt;
+    }
+  }
+  if (!nearest) return;
+  el.textContent = `Nearest belt: ${nearest.id} · ${nearestDist.toFixed(0)}u away.`;
+}
+
 function enterWalk() {
   if (!player || walking) return;
   walking = true;
@@ -189,6 +212,7 @@ function enterWalk() {
   player.setEnabled(true);
   player.requestLock();
   updateGravityInfo();
+  updateBeltHint();
 }
 
 function exitWalk() {
@@ -200,6 +224,7 @@ function exitWalk() {
   document.getElementById('walk-toggle').textContent = 'Enter Walk Mode';
   document.getElementById('walk-hint').style.display = 'none';
   updateGravityInfo();
+  updateBeltHint();
 }
 
 document.getElementById('walk-toggle').addEventListener('click', () => {
@@ -393,7 +418,31 @@ async function init() {
     getGravity: (pos) => gravityAt(pos, planetoids, currentClaims),
   });
   updateGravityInfo();
+  updateBeltHint();
   updateInventoryHint();
+
+  // RHOMBIVERSE_SPEC_ASTEROIDS.md UI: belts are otherwise undiscoverable
+  // (80+ units from the default camera framing, no minimap) -- one
+  // button per belt reframes the camera exactly like the initial
+  // camera.position.set(6,5,8)/controls.target.set(0,0,0) setup, just
+  // offset to the belt's own center instead of world origin. Exits Walk
+  // Mode first if active, since camera.position there is driven by
+  // player.js every frame and would immediately override this.
+  const beltNavRow = document.getElementById('belt-nav-row');
+  for (const belt of listBelts()) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = `Go to ${belt.id.replace('_', ' ')}`;
+    btn.addEventListener('click', () => {
+      if (walking) exitWalk();
+      const [bx, by, bz] = belt.center;
+      camera.position.set(bx + 6, by + 5, bz + 8);
+      controls.target.set(bx, by, bz);
+      updateGravityInfo();
+      updateBeltHint();
+    });
+    beltNavRow.appendChild(btn);
+  }
 
   // Undo: a full-world-JSON snapshot stack, not a diff/command log --
   // simpler to reason about correctly than tracking per-operation
@@ -556,6 +605,7 @@ async function init() {
     planetoids = annotateStars(planetoids, world);
     planetoids = annotateSupernovae(planetoids);
     updateGravityInfo();
+    updateBeltHint();
     updateInventoryHint();
     const afterJSON = world.toJSON();
     const afterStr = JSON.stringify(afterJSON);
@@ -1038,7 +1088,9 @@ function animate() {
 
   if (walking && player) {
     player.update(dt);
-    updateGravityInfo(); // player position changes every frame, unlike Build mode's onChange-driven updates
+    // player position changes every frame, unlike Build mode's onChange-driven updates
+    updateGravityInfo();
+    updateBeltHint();
   } else {
     controls.update();
   }

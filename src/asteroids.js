@@ -30,6 +30,14 @@ const BELTS = [
   { id: 'belt_2', center: [-80, -80, 0], nodeOffsets: [[0, 0, 0], [8, -8, 0], [-8, 8, 0]] },
 ];
 
+// Read-only belt locations for UI -- render.js's "Go to Belt" controls
+// need these to be discoverable/reachable at all (belts sit 80+ units
+// from the default camera framing, impractical to find by orbiting
+// blind). Exposes only id/center, not the internal nodeOffsets shape.
+export function listBelts() {
+  return BELTS.map((b) => ({ id: b.id, center: b.center }));
+}
+
 // Section 3's yield table, as relative weights -- first-guess/tunable
 // like every other numeric constant in this project, not derived.
 // Blackstar-Glassite is intentionally rare here; it remains freely

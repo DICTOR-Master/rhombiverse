@@ -1170,6 +1170,36 @@ bootstrap case. `RHOMBIVERSE_SPEC_LOOPHOLES.md` section 4 (reserve
 pre-seeded content before claim allocation runs) is still NOT built —
 newly unblocked now that asteroids exist, but not done in this pass.
 
+**Asteroid discoverability UI added, 2026-08-12 — closes the exact
+"impractical to reach" testing gap noted in the pass above.** The
+asteroids first pass had zero way to find or reach the belts short of
+reading source (80+ units from the default camera framing, no minimap) —
+confirmed as a real usability gap, not just a testing inconvenience, once
+named explicitly. `asteroids.js` exports `listBelts()` (id + center only,
+not the internal node-offset shape). `render.js`: one **"Go to belt N"**
+button per belt (built from `listBelts()`, so a future third belt needs
+no UI code), reframing the camera exactly like the initial
+`camera.position.set(6,5,8)`/`controls.target.set(0,0,0)` setup, just
+offset to the belt's own center — exits Walk Mode first if active, since
+`player.js` drives `camera.position` every frame there and would
+otherwise immediately override the move. A new `updateBeltHint()`
+(module-level, same pattern as `updateGravityInfo`, since `listBelts()`
+needs no world-state access) reports the nearest belt and its distance,
+refreshed everywhere gravity info already is.
+
+**Verified live, and for the first time via an actual 3D raycast click,
+not direct module execution**: clicked "Go to belt 1", confirmed the hint
+went from "113u away" to "0u away" and a screenshot showed a real cluster
+of asteroid cells now in view; right-clicked at canvas center and
+confirmed via a before/after screenshot comparison that a real cell
+genuinely vanished (plus `Undo (1)` appearing) — the exact mining path
+the earlier asteroids pass could only verify through dynamic import
+because the belts were unreachable by camera. Zero console errors
+throughout. Inventory correctly stayed at "connect to Shared World to
+mine" in this local-only run, matching the existing, intentional design
+(mining works mechanically without a session identity; only inventory
+bookkeeping needs one).
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World), and
 `RHOMBIVERSE_SPEC_REGIONS.md` (data layer, allocation, hazard-mechanic
