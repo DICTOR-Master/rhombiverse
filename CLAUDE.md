@@ -1200,15 +1200,53 @@ mine" in this local-only run, matching the existing, intentional design
 (mining works mechanically without a session identity; only inventory
 bookkeeping needs one).
 
+**Population-scaled spawning (section 5) added, 2026-08-12 — the last
+named gap in `RHOMBIVERSE_SPEC_ASTEROIDS.md`'s own scope, closing it
+except for the two items noted below.** `asteroids.js`:
+`target_total_capacity = base_capacity + f(active_users)` per the spec's
+own formula, literally. `BASE_NODES_PER_BELT = 3` (matches the two
+belts' existing hardcoded nodes — the permanent floor). "Active user" —
+per `RHOMBIVERSE_SPEC_LOOPHOLES.md` section 2's own explicit guidance
+("a sanity-checked activity signal... not raw concurrent-connection
+count") — means a distinct `authorId` that touched a cell within
+`ACTIVITY_WINDOW_MS` (1 hour), NOT a live presence/connection count
+(this repo tracks no presence at all). `sync.js` gained `updatedAtMs`
+(merged from Supabase's `updated_at` column, both in `loadSharedWorld()`
+and the realtime handlers) specifically to make this recency check
+possible client-side. `f(activeUsers) = min(MAX_EXTRA_NODES_PER_BELT=6,
+activeUsers * NODES_PER_ACTIVE_USER=2)` — bounded per the spec's own
+explicit "sane upper capacity ceiling" requirement (18 nodes total
+ceiling, 2 belts × 9). Extra node positions beyond the original 3
+hand-placed ones are generated systematically (`extraNodeOffsets`,
+reusing `cellsInShells`'s own "expand outward from a center" pattern at
+a coarser granularity — node SLOTS spaced `NODE_SPACING=20` apart, not
+individual cells) rather than hand-listed, so the ceiling can grow
+without hand-authoring more coordinates. `applyPopulationScaledSpawning`
+is purely additive by construction — the loop only ever adds nodes
+below the current target; when target falls (population decline) it
+simply does fewer iterations, never touching nodes already seeded at a
+higher population — this IS section 5's "contracts by slowing new
+growth, not by removing what's already there" guarantee, not a separate
+check enforcing it. **Verified live via direct module execution against
+real world-store mutations** (not simulated): 0 active users → target
+stays at base, true no-op; 3 fabricated distinct recent authors →
+target correctly became 9/belt, spawning exactly 18 total nodes (234
+cells); 10 authors → target stayed capped at 9 (ceiling genuinely
+enforced, not just documented); simulating the activity window expiring
+→ target dropped back to 3, and a further spawning pass touched zero of
+the 18 already-seeded nodes. Zero console errors.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
-Black Hole, Star System, Supernova), Phase 5 (Shared World), and
+Black Hole, Star System, Supernova), Phase 5 (Shared World),
 `RHOMBIVERSE_SPEC_REGIONS.md` (data layer, allocation, hazard-mechanic
-wiring, and cross-session Supabase sync) are all done.
-`RHOMBIVERSE_SPEC_ASTEROIDS.md` has its acquisition-only first pass (see
-status above) but no population-scaled spawning, no Supabase-synced
-regrowth, and no claim/belt collision guard yet. Phase 5.8 (Trust
-Zones/Moderation) is still only partially done (see its own status above)
-— ask before assuming what's next.
+wiring, and cross-session Supabase sync), and `RHOMBIVERSE_SPEC_ASTEROIDS.md`
+(acquisition + population-scaled spawning + discoverability UI) are all
+done. Two asteroids items remain, both already named above: the
+regrowth queue is still local-only (not synced to Supabase), and
+`RHOMBIVERSE_SPEC_LOOPHOLES.md` section 4 (claim/belt collision guard)
+is unblocked but not built. Phase 5.8 (Trust Zones/Moderation) is still
+only partially done (see its own status above) — ask before assuming
+what's next.
 Crystal-growth mode (Phase 5.5's other bullet,
 cells auto-growing over time) was intentionally left unbuilt; the plan
 marks it optional/tied to Phase 6 timing. Actual public deploy (Phase 4's

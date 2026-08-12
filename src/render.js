@@ -33,7 +33,12 @@ import {
   subscribeToSharedWorld,
 } from './sync.js';
 import { computeClaim, claimBoundingRadius } from './regions.js';
-import { seedAsteroidBelts, applyAsteroidRegeneration, listBelts } from './asteroids.js';
+import {
+  seedAsteroidBelts,
+  applyAsteroidRegeneration,
+  applyPopulationScaledSpawning,
+  listBelts,
+} from './asteroids.js';
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -401,6 +406,7 @@ async function init() {
 
   seedAsteroidBelts(world);
   applyAsteroidRegeneration(world);
+  applyPopulationScaledSpawning(world);
   applyHydrosphere(world);
   applyBlackHoleConsumption(world);
   applyAsymptoticGeneration(world);
@@ -594,6 +600,7 @@ async function init() {
 
   function onChange() {
     applyAsteroidRegeneration(world);
+    applyPopulationScaledSpawning(world);
     applyHydrosphere(world);
     applyBlackHoleConsumption(world);
     applyAsymptoticGeneration(world);
@@ -1066,6 +1073,7 @@ async function init() {
   setInterval(() => {
     const before = world.entries().length;
     applyAsteroidRegeneration(world);
+    applyPopulationScaledSpawning(world);
     if (world.entries().length === before) return;
     rebuildInstances(mesh, world, currentMode === 'report');
     if (!sharedWorldActive) saveToLocalStorage(world.toJSON());

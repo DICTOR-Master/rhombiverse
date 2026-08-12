@@ -61,7 +61,7 @@ export async function loadClaims() {
 // straight to createWorldStore() or world.replaceAll() with no format
 // translation.
 export async function loadSharedWorld() {
-  const { data, error } = await supabase.from('cells').select('x,y,z,data,author_id');
+  const { data, error } = await supabase.from('cells').select('x,y,z,data,author_id,updated_at');
   if (error) throw error;
   const cells = {};
   for (const row of data) {
@@ -71,8 +71,16 @@ export async function loadSharedWorld() {
     // consume another player's cell" purely by reading world.entries() --
     // no separate ownership lookup needed. row.author_id is the DB's own
     // auth.uid()-stamped column (schema.sql), authoritative regardless of
-    // what a client ever sent.
-    cells[cellKey(row.x, row.y, row.z)] = { ...row.data, authorId: row.author_id };
+    // what a client ever sent. updatedAtMs (epoch ms, easier to compare
+    // than re-parsing an ISO string) drives asteroids.js's population-
+    // scaled spawning (RHOMBIVERSE_SPEC_ASTEROIDS.md section 5) -- "active"
+    // there means authored/touched something recently, not raw connection
+    // count, per RHOMBIVERSE_SPEC_LOOPHOLES.md section 2's own guidance.
+    cells[cellKey(row.x, row.y, row.z)] = {
+      ...row.data,
+      authorId: row.author_id,
+      updatedAtMs: new Date(row.updated_at).getTime(),
+    };
   }
   const claims = await loadClaims();
   const now = new Date().toISOString();
@@ -165,12 +173,12 @@ export function subscribeToSharedWorld({ onRemoteUpsert, onRemoteDelete, onRemot
   const channel = supabase
     .channel('world-sync')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cells' }, (payload) => {
-      const { x, y, z, data, author_id } = payload.new;
-      onRemoteUpsert(x, y, z, { ...data, authorId: author_id });
+      const { x, y, z, data, author_id, updated_at } = payload.new;
+      onRemoteUpsert(x, y, z, { ...data, authorId: author_id, updatedAtMs: new Date(updated_at).getTime() });
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cells' }, (payload) => {
-      const { x, y, z, data, author_id } = payload.new;
-      onRemoteUpsert(x, y, z, { ...data, authorId: author_id });
+      const { x, y, z, data, author_id, updated_at } = payload.new;
+      onRemoteUpsert(x, y, z, { ...data, authorId: author_id, updatedAtMs: new Date(updated_at).getTime() });
     })
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cells' }, (payload) => {
       // Needs schema.sql's `replica identity full` -- without it, a

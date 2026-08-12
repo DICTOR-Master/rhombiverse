@@ -1,9 +1,8 @@
 // Asteroid Belts (Resource Mining) -- RHOMBIVERSE_SPEC_ASTEROIDS.md.
-// First pass, scoped to acquisition only per the spec's own Claude Code
-// prompt ("do not implement crafting/conversion... this pass covers
+// Scoped to acquisition only per the spec's own Claude Code prompt
+// ("do not implement crafting/conversion... this pass covers
 // acquisition only"): world seeding, mining -> inventory, per-cell
-// regeneration. Population-scaled spawning (section 5) is deliberately
-// deferred -- see CLAUDE.md's asteroids status for why.
+// regeneration, and population-scaled spawning (section 5).
 //
 // Deviates from the spec's own section 6 JSON shape in one place, on
 // purpose: no separate `asteroidBelts` registry storing belt/node
@@ -73,6 +72,21 @@ function weightedMaterial() {
   return YIELD_WEIGHTS[0][0];
 }
 
+// Places one node's cells into world.cells at beltCenter+offset, tagged
+// with id. Never overwrites a cell that's already there for any reason.
+// Shared by both initial seeding and population-scaled spawning below.
+function seedNode(world, beltCenter, offset, id) {
+  const ncx = beltCenter[0] + offset[0];
+  const ncy = beltCenter[1] + offset[1];
+  const ncz = beltCenter[2] + offset[2];
+  if (!isValidCell(ncx, ncy, ncz)) return;
+  const footprint = [{ x: ncx, y: ncy, z: ncz }, ...cellsInShells(ncx, ncy, ncz, NODE_SHELL_RADIUS)];
+  for (const { x, y, z } of footprint) {
+    if (world.has(x, y, z)) continue;
+    world.addCell(x, y, z, { material: weightedMaterial(), asteroidNodeId: id });
+  }
+}
+
 // Places the two starting belts' cells directly into world.cells, tagged
 // with asteroidNodeId. Idempotent: only seeds if NO asteroid cells exist
 // yet anywhere (checked once, cheaply, via world.entries()) -- safe to
@@ -85,20 +99,87 @@ export function seedAsteroidBelts(world) {
 
   for (const belt of BELTS) {
     belt.nodeOffsets.forEach((offset, i) => {
-      const ncx = belt.center[0] + offset[0];
-      const ncy = belt.center[1] + offset[1];
-      const ncz = belt.center[2] + offset[2];
-      if (!isValidCell(ncx, ncy, ncz)) return;
-      const id = `${belt.id}_node_${i}`;
-      const footprint = [
-        { x: ncx, y: ncy, z: ncz },
-        ...cellsInShells(ncx, ncy, ncz, NODE_SHELL_RADIUS),
-      ];
-      for (const { x, y, z } of footprint) {
-        if (world.has(x, y, z)) continue;
-        world.addCell(x, y, z, { material: weightedMaterial(), asteroidNodeId: id });
-      }
+      seedNode(world, belt.center, offset, `${belt.id}_node_${i}`);
     });
+  }
+}
+
+// Section 5: population-scaled spawning, Adaptive Damping
+// (RHOMBIVERSE_PRINCIPLES.md section 2) applied to resource supply.
+// target_total_capacity = base_capacity + f(active_users), f() bounded
+// per the spec's own explicit requirement. BASE_NODES_PER_BELT matches
+// BELTS' own hardcoded nodeOffsets length above -- those 6 nodes (2
+// belts x 3) are the permanent floor, always present regardless of
+// population.
+const BASE_NODES_PER_BELT = 3;
+const NODES_PER_ACTIVE_USER = 2; // f()'s slope -- first-guess/tunable, not derived
+const MAX_EXTRA_NODES_PER_BELT = 6; // f()'s bound -- the spec's own explicit "sane upper capacity ceiling" requirement; total ceiling = (3+6)*2 belts = 18 nodes
+// "Active" = authored/touched a cell within this window -- per
+// RHOMBIVERSE_SPEC_LOOPHOLES.md section 2's own explicit guidance ("a
+// sanity-checked activity signal... not raw concurrent-connection
+// count, which is trivially inflated"), not a live presence/connection
+// count (this repo has no presence tracking at all). 1 hour, first-
+// guess/tunable like every other timing constant here.
+const ACTIVITY_WINDOW_MS = 60 * 60 * 1000;
+// Node centers beyond the original hand-placed 3 are generated
+// systematically rather than hand-listed, reusing the SAME
+// cellsInShells "expand outward from a center" pattern used everywhere
+// else in this project -- just applied at a coarser granularity (node
+// SLOTS, not individual cells). NODE_SPACING (even, so scaled
+// coordinates always keep valid lattice parity regardless of the
+// original cell's own parity) keeps generated node centers well
+// separated -- each node's own real footprint radius is under 3 units.
+const NODE_SPACING = 20;
+function extraNodeOffsets(count) {
+  const offsets = [];
+  let shell = 1;
+  while (offsets.length < count) {
+    for (const c of cellsInShells(0, 0, 0, shell, shell)) {
+      offsets.push([c.x * NODE_SPACING, c.y * NODE_SPACING, c.z * NODE_SPACING]);
+      if (offsets.length >= count) break;
+    }
+    shell++;
+  }
+  return offsets;
+}
+
+function activeUserCount(world, now) {
+  const cutoff = now - ACTIVITY_WINDOW_MS;
+  const active = new Set();
+  for (const c of world.entries()) {
+    if (c.authorId && c.updatedAtMs && c.updatedAtMs >= cutoff) active.add(c.authorId);
+  }
+  return active.size;
+}
+
+// Read-only, for UI/tests -- current target node count per belt given
+// present activity. Local-only play has no authorId/updatedAtMs
+// anywhere, so activeUserCount is always 0 there and this always
+// returns BASE_NODES_PER_BELT -- population scaling is inherently a
+// Shared World concept, correctly a no-op for solo play.
+export function targetNodesPerBelt(world, now = Date.now()) {
+  const extra = Math.min(MAX_EXTRA_NODES_PER_BELT, activeUserCount(world, now) * NODES_PER_ACTIVE_USER);
+  return BASE_NODES_PER_BELT + extra;
+}
+
+// Grows each belt toward its current target node count. Purely additive
+// -- only ever ADDS nodes when target rises above what already exists;
+// when target falls (population decline), the loop below simply stops
+// early and does nothing further, never removing/touching nodes already
+// seeded at a higher population. Matches section 5's explicit guarantee
+// ("supply contracts by slowing new growth, not by removing what's
+// already there") exactly, by construction, not by a separate check.
+export function applyPopulationScaledSpawning(world, now = Date.now()) {
+  const target = targetNodesPerBelt(world, now);
+  if (target <= BASE_NODES_PER_BELT) return;
+  const existingIds = new Set(world.entries().map((c) => c.asteroidNodeId).filter(Boolean));
+  const offsets = extraNodeOffsets(MAX_EXTRA_NODES_PER_BELT);
+  for (const belt of BELTS) {
+    for (let i = BASE_NODES_PER_BELT; i < target; i++) {
+      const id = `${belt.id}_node_${i}`;
+      if (existingIds.has(id)) continue;
+      seedNode(world, belt.center, offsets[i - BASE_NODES_PER_BELT], id);
+    }
   }
 }
 
