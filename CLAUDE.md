@@ -1406,6 +1406,30 @@ no UI at all (propose/confirm/inventory display) — both natural next
 slices, matching how regions.js's own data-layer-first start later
 gained sync and UI across separate follow-up passes.
 
+**New large "Rocky Planetoid" preset added, 2026-08-12 — user feedback
+on the live, now-public deploy: the existing three presets (15–21 cells
+each) read as "a few stuck together rhombis," not spheres.** Not a bug
+— confirmed live, screenshotted, and root-caused: those presets were
+deliberately built as minimal FUNCTIONAL fixtures (e.g. `black-hole-core`
+is exactly `BLACK_HOLE_BSG_THRESHOLD`, 20 BSG cells, nothing more), and
+rhombic dodecahedra are angular, not curved -- a small cluster genuinely
+can't read as round regardless of any code fix; only a large-enough
+shell count starts approximating a sphere's silhouette. `data/presets/
+rocky-planetoid.json` (923 cells: 1 BSG core + shells 1–6) fixes the gap
+directly rather than by tuning anything -- generated via the REAL
+`generatePlanetoid` (`planetoidgen.js`, the same function **Generate**
+mode already calls live) at `totalShells=6`, the exact same generation
+path already verified correct when Generate mode itself shipped, not a
+hand-rolled/re-derived structure. Added as a new `#preset-select` option.
+**Verified live**: loaded it, confirmed material counts exactly matched
+the rocky recipe's own bands (1 BSG / 54 ferrostone / 254 garnet / 614
+base -- shells 1–2/3–4/5–6 respectively), and a real screenshot (properly
+zoomed out -- OrbitControls' zoom direction on this project is positive
+`deltaY` = zoom OUT, easy to get backwards, caught by looking at the
+first attempt's screenshot rather than assuming) shows a genuinely round,
+recognizably planet-shaped silhouette, not a small blocky clump. Zero
+console errors.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World),
 `RHOMBIVERSE_SPEC_REGIONS.md`, `RHOMBIVERSE_SPEC_ASTEROIDS.md`, and
