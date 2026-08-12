@@ -74,11 +74,11 @@ Defines how mined materials move from acquisition to use: transport (none needed
 
 ## 7. Success Checks
 
-- [ ] Mined materials are immediately usable from inventory anywhere in the world — no transport mechanic exists.
-- [ ] Two players can propose, confirm, and complete a direct barter trade; the exchange is atomic (all-or-nothing).
-- [ ] Inventory quantity above the flat free threshold decays gradually if unused.
-- [ ] Spending/using material resets its decay clock for the amount used.
-- [ ] Decay never affects another player's inventory or any world structure — fully scoped to the individual holder.
+- [x] Mined materials are immediately usable from inventory anywhere in the world — no transport mechanic exists. Verified 2026-08-13 via a real two-session Shared World test: mining (right-click on an asteroid cell) credits inventory through `mine_asteroid_cell`, a server-authoritative RPC (unlike cells/claims, inventory is a currency-like resource — never directly writable by a client, only through this validated function or the trade-resolution trigger below).
+- [x] Two players can propose, confirm, and complete a direct barter trade; the exchange is atomic (all-or-nothing). Verified 2026-08-13 two ways: direct SQL against a simulated auth context (garnet-for-ferrostone, exact correct quantities on both sides, plus an insufficient-funds-at-resolution case that cancels with zero partial effect), and a full real-browser two-session run through the actual UI (propose → realtime delivery → confirm → confirm → atomic resolve → both sides' panels update, including the same-material edge case, which double-checks the resolution trigger doesn't double-count when a swap touches the same inventory row twice in one transaction).
+- [x] Inventory quantity above the flat free threshold decays gradually if unused. Server-side via a `pg_cron` job every 5 minutes (`apply_inventory_decay`, same shape as `trade.js`'s own local-only version — reused, not reinvented). Verified via direct SQL: floors exactly at the threshold, decays the correct amount for elapsed time.
+- [x] Spending/using material resets its decay clock for the amount used. Same behavior server-side as the local implementation (`resolve_trade_if_ready` sets `last_used_at = now()` only on the spending side, never the receiving side, matching `RHOMBIVERSE_SPEC_LOOPHOLES.md` section 1).
+- [x] Decay never affects another player's inventory or any world structure — fully scoped to the individual holder. True by construction: `apply_inventory_decay` only ever updates the row it's iterating.
 
 ---
 

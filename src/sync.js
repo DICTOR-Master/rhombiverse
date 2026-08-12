@@ -76,12 +76,56 @@ export async function loadRegrowthQueue() {
   return queue;
 }
 
-// Fetches every row from public.cells, public.claims, and
-// public.asteroid_regrowth, returning all three in the same
-// {worldName, version, cells, claims, asteroidRegrowth, meta} shape
-// worldstate.js/persistence.js already use, so callers can pass it
-// straight to createWorldStore() or world.replaceAll() with no format
-// translation.
+// RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 5: fetches every row from
+// public.player_inventory into the {ownerId: {material: {quantity,
+// lastUsedAt}}} shape worldstate.js's inventory registry already uses.
+// Stockpiles are world-visible by design (schema.sql's own comment on
+// player_inventory_select_all) -- this pulls EVERY player's holdings,
+// not just the caller's, doubling as the data source for trade-partner
+// discovery in render.js's UI.
+export async function loadInventory() {
+  const { data, error } = await supabase.from('player_inventory').select('owner_id,material,quantity,last_used_at');
+  if (error) throw error;
+  const inventory = {};
+  for (const row of data) {
+    inventory[row.owner_id] = {
+      ...inventory[row.owner_id],
+      [row.material]: { quantity: Number(row.quantity), lastUsedAt: new Date(row.last_used_at).getTime() },
+    };
+  }
+  return inventory;
+}
+
+function tradeFromRow(row) {
+  return {
+    playerA: row.player_a,
+    offerA: row.offer_a,
+    playerB: row.player_b,
+    offerB: row.offer_b,
+    confirmedA: row.confirmed_a,
+    confirmedB: row.confirmed_b,
+  };
+}
+
+// pending_trades_select_participant RLS means this only ever returns
+// trades the calling session is actually a party to -- no separate
+// filtering needed here, unlike inventory/cells/claims which are
+// world-visible.
+export async function loadPendingTrades() {
+  const { data, error } = await supabase.from('pending_trades').select('*');
+  if (error) throw error;
+  const trades = {};
+  for (const row of data) trades[row.id] = tradeFromRow(row);
+  return trades;
+}
+
+// Fetches every row from public.cells, public.claims,
+// public.asteroid_regrowth, public.player_inventory, and
+// public.pending_trades, returning all five in the same
+// {worldName, version, cells, claims, asteroidRegrowth, playerInventory,
+// pendingTrades, meta} shape worldstate.js/persistence.js already use,
+// so callers can pass it straight to createWorldStore() or
+// world.replaceAll() with no format translation.
 export async function loadSharedWorld() {
   const { data, error } = await supabase.from('cells').select('x,y,z,data,author_id,updated_at');
   if (error) throw error;
@@ -106,6 +150,8 @@ export async function loadSharedWorld() {
   }
   const claims = await loadClaims();
   const asteroidRegrowth = await loadRegrowthQueue();
+  const playerInventory = await loadInventory();
+  const pendingTrades = await loadPendingTrades();
   const now = new Date().toISOString();
   return {
     worldName: 'Rhombiverse (Shared)',
@@ -113,6 +159,8 @@ export async function loadSharedWorld() {
     cells,
     claims,
     asteroidRegrowth,
+    playerInventory,
+    pendingTrades,
     meta: { createdAt: now, lastModified: now },
   };
 }
@@ -232,6 +280,73 @@ export async function pushRegrowthClear(x, y, z) {
   if (error) console.warn('Rhombiverse sync: regrowth clear failed', x, y, z, error);
 }
 
+// RHOMBIVERSE_SPEC_ASTEROIDS.md mining, made server-authoritative for
+// Shared World (unlike a cell placement, an inventory credit is a
+// currency-like resource -- a naive "trust whatever material/amount the
+// client sends" upsert would trivially break the barter economy). Calls
+// schema.sql's mine_asteroid_cell RPC, which re-reads the real cell
+// server-side (never trusts a client-supplied material) before deleting
+// it, queuing regrowth, and crediting exactly 1 of the SERVER-verified
+// material -- all in one atomic transaction. Deliberately non-optimistic
+// unlike every other cell removal in this app: the cell only disappears
+// locally once the resulting realtime DELETE echoes back (applyRemoteDelete
+// in render.js), not on click -- a real-but-small UX tradeoff for
+// correctness on the one thing here that's actually a currency. Swallows
+// errors like pushCellUpsert/pushCellDelete (a race against another
+// player mining the same rock, or a rate-limit hit, both surface via
+// syncErrorHandler rather than throwing).
+export async function mineAsteroidCellRemote(x, y, z) {
+  const { data, error } = await supabase.rpc('mine_asteroid_cell', { mx: x, my: y, mz: z });
+  if (error) {
+    console.warn('Rhombiverse sync: remote mining failed', x, y, z, error);
+    syncErrorHandler?.(error);
+    return null;
+  }
+  return data;
+}
+
+// RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 3, proposer's side: the
+// caller is always player_a (pending_trades_insert_as_proposer RLS
+// requires it), specifying both offers up front -- matches trade.js's
+// own proposeTrade signature/semantics exactly, just server-backed.
+// Throws (does not swallow) -- render.js's UI needs to know a proposal
+// genuinely failed (e.g. the partner ID doesn't exist, or a stale
+// duplicate trade id) rather than silently doing nothing.
+export async function pushTradePropose(tradeId, playerA, offerA, playerB, offerB) {
+  const { error } = await supabase.from('pending_trades').insert({
+    id: tradeId,
+    player_a: playerA,
+    offer_a: offerA,
+    player_b: playerB,
+    offer_b: offerB,
+  });
+  if (error) throw error;
+}
+
+// Flips exactly one side's confirmation -- schema.sql's
+// pending_trades_enforce_confirm_only trigger is the real guarantee
+// that a caller can only ever move their OWN side (this just picks the
+// right column to send; RLS/the trigger would reject a wrong one
+// regardless). If this is the second confirmation, schema.sql's
+// pending_trades_resolve trigger fires the atomic swap server-side
+// before this call even returns -- the resulting inventory/trade-row
+// changes arrive back via realtime, not from this function's own
+// return value.
+export async function pushTradeConfirm(tradeId, isPlayerA) {
+  const column = isPlayerA ? 'confirmed_a' : 'confirmed_b';
+  const { error } = await supabase.from('pending_trades').update({ [column]: true }).eq('id', tradeId);
+  if (error) throw error;
+}
+
+// Either party can cancel/reject a still-pending trade (RLS: either
+// participant). A no-op if it already resolved or was already cancelled
+// -- matches pushRegrowthClear's own "deleting an already-gone row is a
+// silent no-op" reasoning.
+export async function pushTradeCancel(tradeId) {
+  const { error } = await supabase.from('pending_trades').delete().eq('id', tradeId);
+  if (error) console.warn('Rhombiverse sync: trade cancel failed', tradeId, error);
+}
+
 // Subscribes to realtime INSERT/UPDATE/DELETE on public.cells (enabled
 // via schema.sql's `alter publication supabase_realtime add table
 // public.cells`), INSERT/UPDATE on public.claims (no DELETE there --
@@ -251,6 +366,9 @@ export function subscribeToSharedWorld({
   onRemoteClaim,
   onRemoteRegrowthSet,
   onRemoteRegrowthClear,
+  onRemoteInventory,
+  onRemoteTrade,
+  onRemoteTradeClear,
 }) {
   const channel = supabase
     .channel('world-sync')
@@ -290,6 +408,43 @@ export function subscribeToSharedWorld({
       // own DELETE handler above.
       const row = payload.old;
       onRemoteRegrowthClear(cellKey(row.x, row.y, row.z));
+    })
+    // player_inventory: INSERT/UPDATE only -- a row's quantity can hit 0
+    // (fully spent) but this schema never deletes a row, only zeroes it,
+    // so no DELETE handler is needed here. Every quantity change this
+    // session cares about (mining credits, trade resolution, periodic
+    // decay) flows through this same channel regardless of cause.
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'player_inventory' }, (payload) => {
+      if (!onRemoteInventory) return;
+      const row = payload.new;
+      onRemoteInventory(row.owner_id, row.material, { quantity: Number(row.quantity), lastUsedAt: new Date(row.last_used_at).getTime() });
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'player_inventory' }, (payload) => {
+      if (!onRemoteInventory) return;
+      const row = payload.new;
+      onRemoteInventory(row.owner_id, row.material, { quantity: Number(row.quantity), lastUsedAt: new Date(row.last_used_at).getTime() });
+    })
+    // pending_trades: pending_trades_select_participant RLS means this
+    // session only ever receives INSERT/UPDATE for trades it's actually
+    // a party to. DELETE covers both cancellation AND the resolution
+    // trigger's own cleanup (schema.sql's resolve_trade_if_ready deletes
+    // the row once both sides confirm) -- the client can't tell those
+    // two apart from the DELETE event alone, but doesn't need to: either
+    // way the trade is simply gone, and the resulting inventory change
+    // (if any) arrives separately via the player_inventory channel above.
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pending_trades' }, (payload) => {
+      if (!onRemoteTrade) return;
+      onRemoteTrade(payload.new.id, tradeFromRow(payload.new));
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pending_trades' }, (payload) => {
+      if (!onRemoteTrade) return;
+      onRemoteTrade(payload.new.id, tradeFromRow(payload.new));
+    })
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'pending_trades' }, (payload) => {
+      if (!onRemoteTradeClear) return;
+      // Needs replica identity full (schema.sql), same reason as cells'
+      // own DELETE handler.
+      onRemoteTradeClear(payload.old.id);
     })
     .subscribe();
 

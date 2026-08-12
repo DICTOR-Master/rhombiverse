@@ -1454,16 +1454,138 @@ first attempt's screenshot rather than assuming) shows a genuinely round,
 recognizably planet-shaped silhouette, not a small blocky clump. Zero
 console errors.
 
+**Entry welcome overlay + wireframe RD branding, 2026-08-13.** New
+`src/welcome.js`: a first-run modal (localStorage-flagged, checkbox-
+gated "don't show again," reopenable via a persistent "i" button) with
+a plain-language description, a how-to-play list, and an
+under-construction disclaimer made a running motif per direct request
+(page title, Open Graph/Twitter meta, a construction-tape badge, and a
+small persistent on-screen tag during play — not just a paragraph).
+Logo (both `favicon.svg` and the in-card SVG) is the project's own
+voxel shape, not generic art: real `rdRawVerts` coordinates rotated to
+a non-axis-aligned angle so no vertex overlaps another. **Real bug
+caught and fixed**: the favicon's own descriptive comment used this
+project's usual `--` dash style, which is invalid inside an XML
+comment and silently broke standalone `.svg` rendering — confirmed via
+a direct Playwright load before/after. `TERMS.md`/`PRIVACY.md` updated
+same day to actually describe Shared World and land claims (they'd
+drifted stale since Phase 5 shipped, still saying "no accounts, no
+backend"), plus a "note on cooperation" section framing Shared World as
+an open commons, per direct request.
+
+**Repo opened to public/AI contribution, 2026-08-13, direct
+instruction ("I want humans and AI to be able to visit make
+improvements and have impact").** Full git-history secrets audit first
+(clean — no `.env`/service-role keys ever committed, only the
+already-documented public Supabase publishable key) before anything
+irreversible. Added `CONTRIBUTING.md` (explicitly welcomes disclosed
+AI-assisted PRs on equal footing with human ones — accurate, since this
+repo has genuinely been built that way from the start) and the standard
+Contributor Covenant `CODE_OF_CONDUCT.md`. Confirmed with the user, then
+flipped the GitHub repo private→public via `gh repo edit`. GitHub
+Discussions enabled with light structured Forms on Ideas/Q&A
+(`.github/DISCUSSION_TEMPLATE/*.yml`) and a pinned welcome post — aimed
+at encouraging participation while discouraging drive-by/low-effort
+posts, per direct request, not gatekeeping it.
+
+**Shared World security hardening pass, 2026-08-13** — prompted by
+going public: the Supabase publishable key + full schema are now
+visible to anyone. Closed `RHOMBIVERSE_COMPLIANCE.md`'s two remaining
+"required before Phase 5" gaps for real: **rate limiting**
+(`schema.sql`'s `cells_rate_limit` trigger, a token bucket sized to
+never punish one legitimate huge Fill/Generate click while still
+bounding scripted abuse — Adaptive Damping, reused not reinvented) and
+**backups** (a daily `pg_cron` snapshot into `world_snapshots`, honestly
+scoped as protection against realistic failure modes, not off-platform
+disaster recovery). Both verified live via direct SQL against a
+simulated `auth.uid()` context (token math, rejection, refill; snapshot
+correctness). Found and fixed real issues along the way while already
+in the schema: a mutable-search-path advisory on the pre-existing
+claims trigger, `check_rate_limit()` exposed as a public RPC endpoint,
+and investigated (not just assumed) pg_cron's default anon-execute
+grant on `cron.schedule` — confirmed via a real curl against the
+publishable key that PostgREST 404s there (only routes to `public`
+schema), so left as a documented non-issue rather than chased further.
+`render.js`/`sync.js` gained a debounced `#sync-warning` on-screen
+notice so a rejected write is visible instead of silently desyncing —
+verified via a real mocked-rejection browser test.
+
+**`RHOMBIVERSE_SPEC_TRADE_INVENTORY.md` finished — Supabase sync + UI,
+2026-08-13**, closing the one gap left in its own status (data layer
+existed, no sync/UI). Real trust-model distinction from every other
+synced table: a cell is basically cosmetic, but inventory is a
+currency-like resource — a client that could freely upsert its own
+quantity would trivially break the barter economy. So unlike cells
+(client computes, server authenticates+stores), inventory writes are
+NEVER directly grantable; new `public.player_inventory` has a
+world-visible SELECT policy (doubles as trade-partner discovery, no
+chat/DM system exists) but no insert/update policy for any player role
+at all. The only two ways it can change: `mine_asteroid_cell()`, a
+SECURITY DEFINER RPC that re-reads the real cell server-side (never
+trusts a client-supplied material) before deleting it, queuing
+regrowth, and crediting exactly 1 of the verified material — replacing
+the old client-driven delete+credit for the Shared World case
+specifically (local-only play keeps `asteroids.js`'s own
+`mineAsteroidCell`, untouched); and new `public.pending_trades` +
+its `resolve_trade_if_ready` trigger, which fires the atomic swap the
+instant both `confirmed_a`/`confirmed_b` land, re-verifying both sides
+can still afford their own offer at that exact moment (inventory may
+have moved since proposal) and dropping the trade with zero partial
+effect if not — a `pending_trades_enforce_confirm_only` trigger (same
+immutable-except-one-column pattern as claims) ensures a caller can
+only ever flip their OWN confirmation. Decay is also server-side now
+(a `pg_cron` job every 5 minutes, same formula shape as `trade.js`'s
+own local version, reused not reinvented) since a client can no longer
+write its own decayed value; `render.js`'s `onChange()` now skips the
+local decay pass entirely while Shared World is active, to avoid the
+display drifting out of sync with the server between realtime updates.
+UI: a compact single-material-each-side trade form (not a full
+multi-item basket — the spec's own "no marketplace/listings" scope
+limit made this the right amount of simplicity) plus a live pending-
+trades list with Confirm/Cancel, both only shown while connected (local
+single-player has no second identity to trade with, so there's nothing
+meaningful to show).
+
+**Real bug caught only by an actual two-browser-session UI test, not
+the direct-SQL verification that came first**: `#propose-trade-btn`
+(and everything below it in a now-much-longer control panel) was
+genuinely unreachable — `#controls` had `position:fixed` with no
+`max-height`/`overflow-y`, and `body` has `overflow:hidden` for the 3D
+canvas, so once the panel's content grew past the viewport height there
+was no way to scroll to it in a REAL browser, not just a test
+artifact. Fixed by giving `#controls` its own `overflow-y:auto` up to
+the viewport height. This was a latent, pre-existing gap the earlier,
+shorter panel never happened to trigger — worth remembering that a
+UI-growing feature can surface a layout bug unrelated to its own logic.
+
+**Verified end-to-end via two genuinely independent browser sessions**
+(separate localStorage/anon auth, matching the established convention
+from the claims work): Player A mined a real asteroid cell via a real
+right-click (credited via the RPC, confirmed in `#inventory-hint`),
+Player B mined a different one; A's trade-partner list correctly showed
+B (and vice versa) via the public inventory data; A proposed a real
+trade through the actual form; B saw it appear via realtime and
+confirmed through the real Confirm button; A confirmed theirs, which
+triggered server-side resolution; both sides' pending-trades lists
+correctly emptied and inventory reflected the swap (including a
+same-material edge case — both players happened to mine `base` — which
+also proved the resolution trigger doesn't double-count when a swap
+touches the same inventory row twice in one transaction, confirmed
+exactly correct via direct SQL afterward). Zero console errors across
+both sessions throughout. All test identities' cells/inventory/rate-
+limit rows cleaned from the live shared database after verification,
+same discipline as every other live-DB test this session.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World),
-`RHOMBIVERSE_SPEC_REGIONS.md`, `RHOMBIVERSE_SPEC_ASTEROIDS.md`, and
-`RHOMBIVERSE_SPEC_LOOPHOLES.md` (all five items resolved) are all done.
-`RHOMBIVERSE_SPEC_TRADE_INVENTORY.md` has its decay + trade-logic data
-layer (see status above) but no sync or UI yet. Phase 5.8 (Trust
-Zones/Moderation) is still only partially done (see its own status
-above) — the only named gaps left anywhere in this repo's
-scope, besides the explicitly-deferred crystal-growth mode. Ask before
-assuming what's next.
+`RHOMBIVERSE_SPEC_REGIONS.md`, `RHOMBIVERSE_SPEC_ASTEROIDS.md`,
+`RHOMBIVERSE_SPEC_LOOPHOLES.md`, and `RHOMBIVERSE_SPEC_TRADE_INVENTORY.md`
+are all done now. Phase 5.8 (Trust Zones/Moderation) is still only
+partially done (see its own status above) — the only named gap left
+anywhere in this repo's scope, besides the explicitly-deferred
+crystal-growth mode. The repo is public
+(`github.com/DICTOR-Master/rhombiverse`) with Discussions enabled. Ask
+before assuming what's next.
 Crystal-growth mode (Phase 5.5's other bullet,
 cells auto-growing over time) was intentionally left unbuilt; the plan
 marks it optional/tied to Phase 6 timing. Public deploy is DONE (see the

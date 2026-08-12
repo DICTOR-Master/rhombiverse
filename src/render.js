@@ -34,6 +34,10 @@ import {
   pushRegrowthClear,
   subscribeToSharedWorld,
   setSyncErrorHandler,
+  mineAsteroidCellRemote,
+  pushTradePropose,
+  pushTradeConfirm,
+  pushTradeCancel,
 } from './sync.js';
 import { computeClaim, claimBoundingRadius } from './regions.js';
 import {
@@ -42,6 +46,13 @@ import {
   applyPopulationScaledSpawning,
   listBelts,
 } from './asteroids.js';
+// proposeTrade/confirmTrade/cancelTrade (trade.js's own local-only
+// implementations) are deliberately NOT used from here -- trading
+// fundamentally needs two distinct real player identities, which local
+// single-player mode has no concept of (myUserId is null there); the
+// trade panel below only ever shows while Shared World is connected,
+// where every trade action goes through sync.js's server-backed
+// pushTradePropose/Confirm/Cancel instead.
 import { applyInventoryDecay } from './trade.js';
 
 const SCALE = 1;
@@ -72,9 +83,12 @@ let syncWarningTimer = null;
 function showSyncWarning(error) {
   const el = document.getElementById('sync-warning');
   if (!el) return;
-  const message = /budget exceeded/i.test(error?.message ?? '')
+  const errorMessage = error?.message ?? '';
+  const message = /budget exceeded/i.test(errorMessage)
     ? "You're building faster than Shared World allows right now -- some changes may not have saved. It refills over time; slow down a bit."
-    : "Some changes aren't reaching Shared World (connection issue) -- they may not be saved for other players.";
+    : /asteroid cell at that position/i.test(errorMessage)
+      ? "That rock is already gone -- someone else may have mined it first."
+      : "Some changes aren't reaching Shared World (connection issue) -- they may not be saved for other players.";
   el.textContent = `⚠ ${message}`;
   el.style.display = 'block';
   clearTimeout(syncWarningTimer);
@@ -478,6 +492,7 @@ async function init() {
   updateGravityInfo();
   updateBeltHint();
   updateInventoryHint();
+  renderTradePanel();
 
   // RHOMBIVERSE_SPEC_ASTEROIDS.md UI: belts are otherwise undiscoverable
   // (80+ units from the default camera framing, no minimap) -- one
@@ -655,7 +670,14 @@ async function init() {
   function onChange() {
     applyAsteroidRegeneration(world);
     applyPopulationScaledSpawning(world);
-    applyInventoryDecay(world);
+    // Shared World: inventory is server-authoritative now (schema.sql's
+    // apply_inventory_decay runs on its own pg_cron schedule) -- running
+    // this local pass too would silently drift the display out of sync
+    // with the real server value between realtime updates, and
+    // setInventoryEntry here has no push hook to correct the server
+    // anyway. Local-only play has no server, so this stays the only
+    // decay mechanism there, unchanged.
+    if (!sharedWorldActive) applyInventoryDecay(world);
     applyHydrosphere(world);
     applyBlackHoleConsumption(world);
     applyAsymptoticGeneration(world);
@@ -796,6 +818,9 @@ async function init() {
     getGeneratorType: () => document.getElementById('generator-type-select').value,
     canPlaceMaterial,
     getOwnerId: () => myUserId,
+    mineRemote: (x, y, z) => {
+      if (sharedWorldActive) mineAsteroidCellRemote(x, y, z);
+    },
     onCellClicked: (cell) => {
       focusedCenterKey = cell.shellCenter || null;
       renderRingList();
@@ -853,6 +878,33 @@ async function init() {
     applyingRemote = true;
     world.removeRegrowthEntry(key);
     applyingRemote = false;
+  }
+
+  // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md: inventory has no local push-hook
+  // (worldstate.js's setInventoryEntry is a plain setter -- Shared World
+  // inventory changes only ever originate server-side, via
+  // mine_asteroid_cell or the trade-resolution trigger, never a direct
+  // client write), so no applyingRemote guard is needed, same reasoning
+  // as claims. No onChange() either -- inventory has no 3D representation;
+  // just re-renders the panel.
+  function applyRemoteInventory(ownerId, material, entry) {
+    world.setInventoryEntry(ownerId, material, entry);
+    updateInventoryHint();
+    renderTradePanel();
+  }
+
+  // Same no-guard reasoning as inventory above -- a pending trade only
+  // ever changes via this session's own pushTradePropose/Confirm/Cancel
+  // calls (which never touch world.setPendingTrade directly, see
+  // proposeTradeUI/confirmTradeUI/cancelTradeUI below) or another
+  // client's realtime echo, never a local write that could feedback-loop.
+  function applyRemoteTrade(tradeId, tradeData) {
+    world.setPendingTrade(tradeId, tradeData);
+    renderTradePanel();
+  }
+  function applyRemoteTradeClear(tradeId) {
+    world.removePendingTrade(tradeId);
+    renderTradePanel();
   }
 
   const sharedWorldToggle = document.getElementById('shared-world-toggle');
@@ -957,6 +1009,163 @@ async function init() {
     }
   }
 
+  // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 3: direct barter only,
+  // no marketplace/listings (the spec's own explicit scope limit) -- one
+  // material each side, kept deliberately simple rather than a
+  // multi-material offer basket. With no chat/DM system anywhere in this
+  // app, a trade partner has to be identified by pasting their raw
+  // player ID; the "known traders" list below (derived from the
+  // already-public player_inventory data, not a new lookup) exists
+  // purely so that isn't the ONLY way -- click a row to fill the input.
+  const TRADE_MATERIALS = [
+    ['base', 'Base Rhomb'],
+    ['garnet', 'Garnet'],
+    ['ferrostone', 'Ferrostone'],
+    ['glassite', 'Glassite'],
+    ['star-glassite', 'Star-Glassite'],
+    ['blackstar-glassite', 'Blackstar-Glassite'],
+  ];
+
+  function shortId(id) {
+    return id.slice(0, 8);
+  }
+
+  function formatOffer(offer) {
+    return Object.entries(offer)
+      .map(([material, amount]) => `${amount} ${material}`)
+      .join(', ');
+  }
+
+  function renderTradePanel() {
+    const panel = document.getElementById('trade-panel');
+    if (!panel) return;
+    if (!sharedWorldActive || !myUserId) {
+      panel.style.display = 'none';
+      return;
+    }
+    panel.style.display = '';
+
+    const inventory = world.getInventory();
+    const partnerListEl = document.getElementById('trade-partner-list');
+    const partnerIds = Object.keys(inventory).filter((id) => id !== myUserId && Object.keys(inventory[id]).length > 0);
+    partnerListEl.innerHTML = '';
+    if (partnerIds.length === 0) {
+      partnerListEl.innerHTML = '<div class="placeholder">No other traders with inventory yet.</div>';
+    } else {
+      for (const id of partnerIds) {
+        const row = document.createElement('div');
+        row.className = 'trade-partner-item';
+        row.textContent = `${shortId(id)} — ${formatOffer(
+          Object.fromEntries(Object.entries(inventory[id]).map(([m, e]) => [m, e.quantity]))
+        )}`;
+        row.title = 'Click to fill in as trade partner';
+        row.addEventListener('click', () => {
+          document.getElementById('trade-partner-input').value = id;
+        });
+        partnerListEl.appendChild(row);
+      }
+    }
+
+    const tradesListEl = document.getElementById('pending-trades-list');
+    const trades = world.getPendingTrades();
+    const tradeIds = Object.keys(trades);
+    tradesListEl.innerHTML = '';
+    if (tradeIds.length === 0) {
+      tradesListEl.innerHTML = '<div class="placeholder">No pending trades.</div>';
+      return;
+    }
+    for (const id of tradeIds) {
+      const trade = trades[id];
+      const isA = trade.playerA === myUserId;
+      const isB = trade.playerB === myUserId;
+      if (!isA && !isB) continue; // shouldn't happen (RLS already scopes this), defensive only
+      const myConfirmed = isA ? trade.confirmedA : trade.confirmedB;
+      const partnerId = isA ? trade.playerB : trade.playerA;
+
+      const row = document.createElement('div');
+      row.className = 'ring-item';
+      const label = document.createElement('span');
+      label.textContent = `${formatOffer(trade.offerA)} ⇄ ${formatOffer(trade.offerB)} — with ${shortId(partnerId)}`;
+      row.appendChild(label);
+
+      if (!myConfirmed) {
+        const confirmBtn = document.createElement('button');
+        confirmBtn.className = 'ring-recolor';
+        confirmBtn.textContent = 'Confirm';
+        confirmBtn.addEventListener('click', async () => {
+          confirmBtn.disabled = true;
+          try {
+            await pushTradeConfirm(id, isA);
+          } catch (err) {
+            console.warn('Rhombiverse: confirm trade failed', err);
+            confirmBtn.disabled = false;
+          }
+        });
+        row.appendChild(confirmBtn);
+      } else {
+        const waiting = document.createElement('span');
+        waiting.className = 'placeholder';
+        waiting.textContent = 'waiting for them';
+        row.appendChild(waiting);
+      }
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'ring-remove';
+      cancelBtn.textContent = '×';
+      cancelBtn.title = 'Cancel this trade';
+      cancelBtn.addEventListener('click', () => pushTradeCancel(id));
+      row.appendChild(cancelBtn);
+
+      tradesListEl.appendChild(row);
+    }
+  }
+
+  const tradeOfferSelect = document.getElementById('trade-offer-material');
+  const tradeWantSelect = document.getElementById('trade-want-material');
+  for (const select of [tradeOfferSelect, tradeWantSelect]) {
+    if (!select) continue;
+    for (const [value, label] of TRADE_MATERIALS) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      select.appendChild(option);
+    }
+  }
+
+  document.getElementById('propose-trade-btn')?.addEventListener('click', async () => {
+    const hint = document.getElementById('trade-propose-hint');
+    if (!sharedWorldActive || !myUserId) return;
+    const partnerId = document.getElementById('trade-partner-input').value.trim();
+    const offerMaterial = tradeOfferSelect.value;
+    const offerQty = Math.floor(Number(document.getElementById('trade-offer-qty').value));
+    const wantMaterial = tradeWantSelect.value;
+    const wantQty = Math.floor(Number(document.getElementById('trade-want-qty').value));
+
+    if (!partnerId || partnerId === myUserId) {
+      hint.textContent = 'Enter a trade partner\'s ID (not your own).';
+      return;
+    }
+    if (!Number.isFinite(offerQty) || offerQty <= 0 || !Number.isFinite(wantQty) || wantQty <= 0) {
+      hint.textContent = 'Quantities must be positive whole numbers.';
+      return;
+    }
+    const held = world.getInventory()[myUserId]?.[offerMaterial]?.quantity ?? 0;
+    if (held < offerQty) {
+      hint.textContent = `You only have ${held} ${offerMaterial}.`;
+      return;
+    }
+
+    const tradeId = `trade_${shortId(myUserId)}_${Date.now()}`;
+    hint.textContent = 'Proposing…';
+    try {
+      await pushTradePropose(tradeId, myUserId, { [offerMaterial]: offerQty }, partnerId, { [wantMaterial]: wantQty });
+      hint.textContent = 'Trade proposed — waiting for confirmation.';
+    } catch (err) {
+      console.warn('Rhombiverse: propose trade failed', err);
+      hint.textContent = 'Failed to propose trade (see console) — check the partner ID is valid.';
+    }
+  });
+
   // RHOMBIVERSE_SPEC_REGIONS.md, minimal UI trigger: grants this session's
   // player one fixed-size claim in the first free slot found outward from
   // world center. Only meaningful while Shared World is active (ownership
@@ -1060,7 +1269,11 @@ async function init() {
         onRemoteClaim: applyRemoteClaim,
         onRemoteRegrowthSet: applyRemoteRegrowthSet,
         onRemoteRegrowthClear: applyRemoteRegrowthClear,
+        onRemoteInventory: applyRemoteInventory,
+        onRemoteTrade: applyRemoteTrade,
+        onRemoteTradeClear: applyRemoteTradeClear,
       });
+      renderTradePanel();
       setLocalResetControlsEnabled(false);
       setClaimLandEnabled(true);
       sharedWorldToggle.textContent = 'Disable Shared World';
@@ -1088,6 +1301,7 @@ async function init() {
     setClaimLandEnabled(false);
     myUserId = null;
     refreshClaims();
+    renderTradePanel();
     sharedWorldToggle.textContent = 'Enable Shared World';
     sharedWorldHint.textContent = 'Shared World: off.';
   }

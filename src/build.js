@@ -197,6 +197,12 @@ export function createBuildController({
   // crediting does) don't need to supply one. render.js passes the
   // session's real Supabase user id when connected.
   getOwnerId = () => null,
+  // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md: optional, defaults to null so
+  // local-only play (and tests) don't need to supply one -- when set,
+  // Shared World asteroid mining routes through this instead of the
+  // local mineAsteroidCell, since inventory credit there has to be
+  // server-authoritative (see sync.js's mineAsteroidCellRemote).
+  mineRemote = null,
 }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -316,6 +322,17 @@ export function createBuildController({
     // existing block-delete action" -- right-click already removed any
     // cell; an asteroid-tagged one now also credits inventory and
     // registers regrowth instead of just vanishing.
+    if (cell.asteroidNodeId && mineRemote) {
+      // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md: Shared World routes through
+      // the server-authoritative RPC instead of a local removeCell +
+      // creditInventory -- deliberately NOT optimistic here, unlike
+      // every other removal in this function. The cell only disappears
+      // once the server confirms via realtime (render.js's
+      // applyRemoteDelete), which also means no onChange() call here;
+      // nothing has actually changed locally yet.
+      mineRemote(cell.x, cell.y, cell.z);
+      return;
+    }
     if (cell.asteroidNodeId) {
       mineAsteroidCell(world, cell, getOwnerId());
     } else {

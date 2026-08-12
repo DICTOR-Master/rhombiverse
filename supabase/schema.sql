@@ -366,3 +366,296 @@ revoke all on function cron.schedule(text, text) from public, anon, authenticate
 revoke all on function cron.schedule(text, text, text) from public, anon, authenticated;
 revoke all on function cron.unschedule(text) from public, anon, authenticated;
 revoke all on function cron.unschedule(bigint) from public, anon, authenticated;
+
+-- RHOMBIVERSE_SPEC_TRADE_INVENTORY.md, wired to Supabase, 2026-08-13.
+-- src/trade.js already has the full local-only data model and
+-- resolution logic (decay, propose/confirm/cancel) -- this section
+-- makes it real for Shared World, which needs a different trust model
+-- than cells/claims: a cell is basically cosmetic (a "wrong" cell just
+-- makes a weirder world), but inventory is a currency-like resource --
+-- a client that could freely upsert its own quantity would trivially
+-- break the whole barter economy. So unlike cells (client computes,
+-- server just authenticates+stores), inventory writes are NEVER
+-- directly grantable to players -- every change happens through a
+-- SECURITY DEFINER function that validates the real, server-known state
+-- first. This mirrors this project's own established pattern (claims'
+-- immutability trigger, the rate limiter) rather than inventing a new
+-- trust model.
+create table public.player_inventory (
+  owner_id uuid not null,
+  material text not null,
+  quantity numeric not null default 0,
+  last_used_at timestamptz not null default now(),
+  primary key (owner_id, material)
+);
+
+alter table public.player_inventory enable row level security;
+alter table public.player_inventory replica identity full;
+
+-- Stockpiles are world-visible on purpose -- matches this project's
+-- existing "open commons" posture for cells/claims (TERMS.md's own
+-- framing), and doubles as trade-partner discovery: with no chat/DM
+-- system in this app, seeing who holds what is the only practical way
+-- to find someone worth proposing a trade to.
+create policy "player_inventory_select_all" on public.player_inventory
+  for select using (true);
+
+-- Deliberately NO insert/update/delete policy for anon/authenticated --
+-- every write goes through mine_asteroid_cell() or the trade-resolution
+-- trigger below, both SECURITY DEFINER, both bypassing RLS
+-- intentionally after doing their own real validation.
+
+-- RHOMBIVERSE_SPEC_ASTEROIDS.md section 3 + section 4, made
+-- server-authoritative: the ONLY way Shared World inventory can grow is
+-- through this function, which re-reads the real cell server-side
+-- (never trusts a client-supplied material/amount) before crediting.
+-- Bundles the deletion + regrowth-queue registration + credit into one
+-- atomic call, replacing the previous three separate client-driven
+-- steps for the shared-world case specifically -- local single-player
+-- play keeps using asteroids.js's own mineAsteroidCell unchanged, this
+-- is additive.
+create or replace function public.mine_asteroid_cell(mx integer, my integer, mz integer)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  cell_data jsonb;
+  mat text;
+  cur_qty numeric;
+begin
+  if uid is null then
+    raise exception 'Mining requires an authenticated session';
+  end if;
+
+  select data into cell_data from public.cells where x = mx and y = my and z = mz for update;
+  if cell_data is null or cell_data->>'asteroidNodeId' is null then
+    raise exception 'No asteroid cell at that position';
+  end if;
+  mat := cell_data->>'material';
+
+  delete from public.cells where x = mx and y = my and z = mz;
+
+  insert into public.asteroid_regrowth (x, y, z, node_id, material, mined_at)
+  values (mx, my, mz, cell_data->>'asteroidNodeId', mat, now())
+  on conflict (x, y, z) do update
+    set node_id = excluded.node_id, material = excluded.material, mined_at = excluded.mined_at;
+
+  select quantity into cur_qty from public.player_inventory where owner_id = uid and material = mat for update;
+  if cur_qty is null then
+    insert into public.player_inventory (owner_id, material, quantity, last_used_at) values (uid, mat, 1, now());
+  else
+    update public.player_inventory set quantity = cur_qty + 1 where owner_id = uid and material = mat;
+  end if;
+
+  return jsonb_build_object('material', mat);
+end;
+$$;
+
+revoke all on function public.mine_asteroid_cell(integer, integer, integer) from public, anon;
+grant execute on function public.mine_asteroid_cell(integer, integer, integer) to authenticated;
+
+-- RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 5: pendingTrades. Unlike
+-- cells/claims/inventory, a specific negotiation is private between its
+-- two participants, not world-visible -- your stockpile is public, but
+-- an in-progress offer isn't broadcast to everyone.
+create table public.pending_trades (
+  id text primary key,
+  player_a uuid not null,
+  offer_a jsonb not null,
+  player_b uuid not null,
+  offer_b jsonb not null,
+  confirmed_a boolean not null default false,
+  confirmed_b boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table public.pending_trades enable row level security;
+alter table public.pending_trades replica identity full;
+
+create policy "pending_trades_select_participant" on public.pending_trades
+  for select using (auth.uid() = player_a or auth.uid() = player_b);
+
+-- Matches trade.js's proposeTrade: the caller is always player_a (the
+-- proposer specifies both sides' offers up front; player_b just
+-- confirms or lets it sit/cancels).
+create policy "pending_trades_insert_as_proposer" on public.pending_trades
+  for insert with check (auth.uid() = player_a);
+
+create policy "pending_trades_update_participant" on public.pending_trades
+  for update using (auth.uid() = player_a or auth.uid() = player_b)
+  with check (auth.uid() = player_a or auth.uid() = player_b);
+
+-- Either party can cancel/reject -- matches trade.js's own cancelTrade,
+-- which has no permission check at all in its local-only form (fine
+-- there; here the RLS itself IS the permission check).
+create policy "pending_trades_delete_participant" on public.pending_trades
+  for delete using (auth.uid() = player_a or auth.uid() = player_b);
+
+-- Restricts an UPDATE to exactly one thing: the calling party may only
+-- flip THEIR OWN confirmed_* column, never the trade terms and never
+-- the other party's confirmation. Same immutable-except-one-field
+-- pattern as claims_enforce_immutable_geometry, applied to this table's
+-- own shape.
+create or replace function public.pending_trades_enforce_confirm_only()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.id is distinct from old.id
+     or new.player_a is distinct from old.player_a
+     or new.offer_a is distinct from old.offer_a
+     or new.player_b is distinct from old.player_b
+     or new.offer_b is distinct from old.offer_b
+     or new.created_at is distinct from old.created_at
+  then
+    raise exception 'pending trade terms are immutable once proposed (RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 3)';
+  end if;
+  if auth.uid() = old.player_a and new.confirmed_b is distinct from old.confirmed_b then
+    raise exception 'only player B may confirm player B''s side';
+  end if;
+  if auth.uid() = old.player_b and new.confirmed_a is distinct from old.confirmed_a then
+    raise exception 'only player A may confirm player A''s side';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger pending_trades_confirm_only
+  before update on public.pending_trades
+  for each row execute function public.pending_trades_enforce_confirm_only();
+
+-- The actual atomic swap (RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 3:
+-- "either the full exchange completes or nothing happens... prevents
+-- scams by construction"). Fires once both confirmations land; re-
+-- verifies BOTH sides can still afford their own offer at THIS exact
+-- moment (inventory may have moved since proposal -- spent elsewhere,
+-- or decayed), same re-check trade.js's own resolveTrade already does
+-- locally. An unaffordable trade is dropped silently (deleted, no
+-- partial effect) rather than erroring -- matches section 6's "a
+-- failed/cancelled trade leaves both players' inventories exactly as
+-- they were."
+create or replace function public.resolve_trade_if_ready()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  mat text;
+  amt numeric;
+  held numeric;
+begin
+  if not (new.confirmed_a and new.confirmed_b) then
+    return new;
+  end if;
+
+  for mat, amt in select key, value::numeric from jsonb_each_text(new.offer_a) loop
+    select quantity into held from public.player_inventory where owner_id = new.player_a and material = mat;
+    if held is null or held < amt then
+      delete from public.pending_trades where id = new.id;
+      return null;
+    end if;
+  end loop;
+  for mat, amt in select key, value::numeric from jsonb_each_text(new.offer_b) loop
+    select quantity into held from public.player_inventory where owner_id = new.player_b and material = mat;
+    if held is null or held < amt then
+      delete from public.pending_trades where id = new.id;
+      return null;
+    end if;
+  end loop;
+
+  for mat, amt in select key, value::numeric from jsonb_each_text(new.offer_a) loop
+    update public.player_inventory set quantity = quantity - amt, last_used_at = now()
+      where owner_id = new.player_a and material = mat;
+    insert into public.player_inventory (owner_id, material, quantity, last_used_at)
+      values (new.player_b, mat, amt, now())
+      on conflict (owner_id, material) do update set quantity = public.player_inventory.quantity + amt;
+  end loop;
+  for mat, amt in select key, value::numeric from jsonb_each_text(new.offer_b) loop
+    update public.player_inventory set quantity = quantity - amt, last_used_at = now()
+      where owner_id = new.player_b and material = mat;
+    insert into public.player_inventory (owner_id, material, quantity, last_used_at)
+      values (new.player_a, mat, amt, now())
+      on conflict (owner_id, material) do update set quantity = public.player_inventory.quantity + amt;
+  end loop;
+
+  delete from public.pending_trades where id = new.id;
+  return null;
+end;
+$$;
+
+create trigger pending_trades_resolve
+  after update on public.pending_trades
+  for each row execute function public.resolve_trade_if_ready();
+
+alter publication supabase_realtime add table public.player_inventory;
+alter publication supabase_realtime add table public.pending_trades;
+
+-- Same fix as check_rate_limit()/claims_enforce_immutable_geometry
+-- before: these are trigger functions (Postgres refuses a direct
+-- non-trigger call), but Supabase's default API exposure lists every
+-- public-schema function as a callable RPC target regardless of intent.
+-- mine_asteroid_cell's own EXECUTE grant to authenticated is
+-- intentional (that IS the public entry point, already designed to
+-- validate everything server-side) and is left alone.
+revoke all on function public.pending_trades_enforce_confirm_only() from public, anon, authenticated;
+revoke all on function public.resolve_trade_if_ready() from public, anon, authenticated;
+
+-- Section 4 decay, made real for Shared World: same shape as trade.js's
+-- own applyInventoryDecay (flat free threshold per material, gentle
+-- linear decay above it, reused not reinvented), run periodically via
+-- pg_cron rather than client-side, since inventory is now server-
+-- authoritative -- a client can no longer just write its own decayed
+-- value. Every 5 minutes rather than trade.js's 30-second client tick:
+-- the client-side version ran on every local onChange (cheap, frequent,
+-- no real cost); a cron job has a real fixed cost per run regardless of
+-- whether anything decays, so a coarser interval is the right trade for
+-- a hobby-scale project -- still frequent enough that decay reads as
+-- "gradual," per the spec's own framing, not "instant" or
+-- "unnoticeable."
+create or replace function public.apply_inventory_decay()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  free_thresholds jsonb := '{"base":30,"garnet":20,"ferrostone":15,"glassite":8,"star-glassite":5,"blackstar-glassite":2}'::jsonb;
+  default_threshold numeric := 10;
+  decay_tick_seconds numeric := 30;
+  decay_amount_per_tick numeric := 1;
+  row_rec record;
+  threshold numeric;
+  elapsed_ticks numeric;
+  max_decayable numeric;
+  decay_amount numeric;
+  ticks_applied numeric;
+begin
+  for row_rec in select * from public.player_inventory loop
+    threshold := coalesce((free_thresholds->>row_rec.material)::numeric, default_threshold);
+    if row_rec.quantity <= threshold then
+      continue;
+    end if;
+    elapsed_ticks := floor(extract(epoch from (now() - row_rec.last_used_at)) / decay_tick_seconds);
+    if elapsed_ticks <= 0 then
+      continue;
+    end if;
+    max_decayable := row_rec.quantity - threshold;
+    decay_amount := least(max_decayable, elapsed_ticks * decay_amount_per_tick);
+    ticks_applied := ceil(decay_amount / decay_amount_per_tick);
+    update public.player_inventory
+      set quantity = row_rec.quantity - decay_amount,
+          last_used_at = row_rec.last_used_at + make_interval(secs => ticks_applied * decay_tick_seconds)
+      where owner_id = row_rec.owner_id and material = row_rec.material;
+  end loop;
+end;
+$$;
+
+revoke all on function public.apply_inventory_decay() from public, anon, authenticated;
+
+select cron.schedule('inventory-decay', '*/5 * * * *', $$select public.apply_inventory_decay()$$);
