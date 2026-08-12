@@ -33,6 +33,7 @@ import {
   subscribeToSharedWorld,
 } from './sync.js';
 import { computeClaim, claimBoundingRadius } from './regions.js';
+import { seedAsteroidBelts, applyAsteroidRegeneration } from './asteroids.js';
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -373,6 +374,8 @@ async function init() {
   const CLAIM_COLOR_MINE = 0x4ade80; // green -- this session's own claims
   const CLAIM_COLOR_OTHER = 0xf59e0b; // amber -- everyone else's
 
+  seedAsteroidBelts(world);
+  applyAsteroidRegeneration(world);
   applyHydrosphere(world);
   applyBlackHoleConsumption(world);
   applyAsymptoticGeneration(world);
@@ -390,6 +393,7 @@ async function init() {
     getGravity: (pos) => gravityAt(pos, planetoids, currentClaims),
   });
   updateGravityInfo();
+  updateInventoryHint();
 
   // Undo: a full-world-JSON snapshot stack, not a diff/command log --
   // simpler to reason about correctly than tracking per-operation
@@ -527,7 +531,20 @@ async function init() {
     }
   }
 
+  function updateInventoryHint() {
+    const el = document.getElementById('inventory-hint');
+    if (!el) return;
+    if (!myUserId) {
+      el.textContent = 'Inventory: connect to Shared World to mine and track materials.';
+      return;
+    }
+    const mine = world.getInventory()[myUserId] ?? {};
+    const parts = Object.entries(mine).map(([material, count]) => `${material} ×${count}`);
+    el.textContent = parts.length > 0 ? `Inventory: ${parts.join(', ')}.` : 'Inventory: empty.';
+  }
+
   function onChange() {
+    applyAsteroidRegeneration(world);
     applyHydrosphere(world);
     applyBlackHoleConsumption(world);
     applyAsymptoticGeneration(world);
@@ -539,6 +556,7 @@ async function init() {
     planetoids = annotateStars(planetoids, world);
     planetoids = annotateSupernovae(planetoids);
     updateGravityInfo();
+    updateInventoryHint();
     const afterJSON = world.toJSON();
     const afterStr = JSON.stringify(afterJSON);
     if (afterStr !== lastSnapshot) {
@@ -665,6 +683,7 @@ async function init() {
     getMaterial: () => materialSelect.value,
     getGeneratorType: () => document.getElementById('generator-type-select').value,
     canPlaceMaterial,
+    getOwnerId: () => myUserId,
     onCellClicked: (cell) => {
       focusedCenterKey = cell.shellCenter || null;
       renderRingList();
@@ -880,6 +899,16 @@ async function init() {
       myUserId = session.user.id;
       const shared = await loadSharedWorld();
       world.replaceAll(shared);
+      // Idempotent (checks for existing asteroid-tagged cells first) --
+      // safe even if a previous session already seeded this shared world.
+      // A rare race exists if two sessions connect to a truly fresh
+      // (never-seeded) Shared World simultaneously -- both could seed
+      // independently, upserting the same positions with possibly
+      // different random materials. Not catastrophic (same idempotent
+      // upsert mechanism as any other concurrent cell write), just
+      // slightly wasteful; not worth distributed-locking machinery for a
+      // one-time bootstrap case. See CLAUDE.md's asteroids status.
+      seedAsteroidBelts(world);
       // Set BEFORE onChange() so its localStorage guard and the undo
       // button's disabled state already reflect shared mode for this
       // first render of the shared world.
@@ -974,6 +1003,23 @@ async function init() {
     world.replaceAll(preset);
     onChange();
   });
+
+  // RHOMBIVERSE_SPEC_ASTEROIDS.md section 4: a mined cell should regrow
+  // as real time passes, not only on the player's next edit -- a periodic
+  // tick covers idle time between mutations. Deliberately does NOT go
+  // through onChange() (which would push a phantom undo-stack entry and
+  // re-save on every tick even when nothing regrew) -- only rebuilds
+  // instances and persists when applyAsteroidRegeneration actually
+  // changed the cell count. Regrown cells still sync to Shared World
+  // normally, since world.addCell (called inside applyAsteroidRegeneration)
+  // fires the same onAdd hook as any other cell placement.
+  setInterval(() => {
+    const before = world.entries().length;
+    applyAsteroidRegeneration(world);
+    if (world.entries().length === before) return;
+    rebuildInstances(mesh, world, currentMode === 'report');
+    if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
+  }, 5000);
 }
 
 function onResize() {

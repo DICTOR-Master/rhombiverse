@@ -43,6 +43,16 @@ export function createWorldStore(worldJSON, hooks = {}) {
   // gravitySource, blackHoleLedger, starLedger -- fit entirely inside
   // existing cells). `?? {}` so JSON from before this existed still loads.
   let claims = { ...(worldJSON.claims ?? {}) };
+  // RHOMBIVERSE_SPEC_ASTEROIDS.md: playerInventory is the spec's own
+  // top-level schema key (section 6), keyed by ownerId then material.
+  // asteroidRegrowth is NOT in the spec's own schema -- it's this
+  // implementation's bookkeeping for section 4's per-cell regrowth timer
+  // (asteroids.js keeps mined-cell material/nodeId/timestamp here rather
+  // than embedding it in a separate asteroidBelts registry, since node
+  // geometry itself is fully deterministic/hardcoded, not player-granted
+  // like claims -- see asteroids.js's own header for the full reasoning).
+  let inventory = { ...(worldJSON.playerInventory ?? {}) };
+  let regrowthQueue = { ...(worldJSON.asteroidRegrowth ?? {}) };
 
   return {
     has(x, y, z) {
@@ -107,11 +117,35 @@ export function createWorldStore(worldJSON, hooks = {}) {
     },
     // Grants a new claim or updates an existing one (id is the caller's
     // choice, not auto-generated here -- regions.js owns id generation).
-    // No hooks.onAdd-style sync notification yet: claims are a Phase 5.8
-    // concept still being scoped, deliberately not yet wired into
-    // sync.js's push/realtime pipeline (see CLAUDE.md's regions status).
+    // Synced to Supabase like everything else -- see render.js's
+    // enableSharedWorld/applyRemoteClaim and sync.js's pushClaim.
     addClaim(claimId, claimData) {
       claims = { ...claims, [claimId]: claimData };
+    },
+    // RHOMBIVERSE_SPEC_ASTEROIDS.md section 3/6: adds `amount` of
+    // `material` to `ownerId`'s inventory. Local-only for this first pass
+    // (see CLAUDE.md's asteroids status) -- not yet synced to Supabase.
+    getInventory() {
+      return { ...inventory };
+    },
+    creditInventory(ownerId, material, amount = 1) {
+      const current = inventory[ownerId] ?? {};
+      inventory = {
+        ...inventory,
+        [ownerId]: { ...current, [material]: (current[material] ?? 0) + amount },
+      };
+    },
+    // Pending asteroid regrowth entries, keyed by "x,y,z" -- see
+    // asteroids.js's mineAsteroidCell/applyAsteroidRegeneration.
+    getRegrowthQueue() {
+      return { ...regrowthQueue };
+    },
+    setRegrowthEntry(key, entry) {
+      regrowthQueue = { ...regrowthQueue, [key]: entry };
+    },
+    removeRegrowthEntry(key) {
+      const { [key]: _removed, ...rest } = regrowthQueue;
+      regrowthQueue = rest;
     },
     // Serializes back to the full RHOMBIVERSE_PLAN.md section 3 shape,
     // for persistence.js to save/export.
@@ -121,6 +155,8 @@ export function createWorldStore(worldJSON, hooks = {}) {
         version,
         cells: Object.fromEntries(cells),
         claims,
+        playerInventory: inventory,
+        asteroidRegrowth: regrowthQueue,
         meta: { ...meta, lastModified: new Date().toISOString() },
       };
     },
@@ -130,6 +166,8 @@ export function createWorldStore(worldJSON, hooks = {}) {
       version = newWorldJSON.version;
       meta = { ...newWorldJSON.meta };
       claims = { ...(newWorldJSON.claims ?? {}) };
+      inventory = { ...(newWorldJSON.playerInventory ?? {}) };
+      regrowthQueue = { ...(newWorldJSON.asteroidRegrowth ?? {}) };
       cells.clear();
       for (const [key, data] of Object.entries(newWorldJSON.cells)) {
         cells.set(key, data);

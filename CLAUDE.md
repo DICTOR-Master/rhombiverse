@@ -1125,10 +1125,78 @@ position with zero claims defined still returns gravity, and a position
 just outside the claim but within gravity range still gets pulled. Zero
 console errors throughout.
 
+**`RHOMBIVERSE_SPEC_ASTEROIDS.md` started, 2026-08-12 — first pass, scoped
+exactly to the spec's own "acquisition only" instruction (no crafting/
+conversion, no planetoid-building consumption of inventory).** New
+`src/asteroids.js`. Two starting belts (`belt_1`/`belt_2`, three nodes
+each, 13 cells/node via `cellsInShells` radius 1 — "reuse the shellCount
+structure" per section 2), placed at `[80,80,0]`/`[-80,-80,0]` —
+deliberately well outside `regions.js`'s own claim-search range (real
+distance under ~50 units) so belts and claims can never collide in this
+pass. **One deliberate schema deviation from section 6**: no separate
+`asteroidBelts` registry storing belt/node structure — belt/node geometry
+is fully deterministic (fixed constants, not player-granted like claims),
+so it's plain module constants + a seeding function; an asteroid cell's
+own `asteroidNodeId` field (living in the normal `world.cells` map, same
+pattern as `shellCenter`/`claimId`) is enough to identify its node.
+`playerInventory` and a new `asteroidRegrowth` queue (this
+implementation's own bookkeeping for section 4, not in the spec's literal
+schema) ARE real top-level world-state, per `worldstate.js`. Mining
+extends the *existing* universal right-click delete (`build.js`'s
+`onContextMenu`): an asteroid-tagged cell now also credits
+`playerInventory` (only when a real session identity exists — local-only
+play still lets mining/regrowth work mechanically, just without inventory
+bookkeeping) and registers a regrowth-queue entry instead of just
+vanishing. Regrowth (`applyAsteroidRegeneration`) runs on every
+`onChange()` AND on a standalone 5s `setInterval` (deliberately NOT
+routed through `onChange()` — would push a phantom undo-stack entry and
+re-save every tick even when nothing regrew) so a mined cell comes back
+after real time passes, not only on the player's next edit. Yield
+weights (section 3) are a first-guess table; **Blackstar-Glassite's
+"asteroid-exclusive" wording is interpreted as yield-only, not a build-
+time placement restriction** — read fully literally it would contradict
+every gravity/black-hole/star-system mechanic already built and tested
+this session, which all depend on BSG being freely placeable via the
+material dropdown.
+
+**Verified via real execution**, though not via a literal in-3D raycast
+click on an asteroid cell — the belts sit 80+ units from the default
+camera, impractical to reach without dedicated camera-navigation code
+this pass didn't need to write. Instead: confirmed the REAL `init()`
+pipeline seeded 78 cells across 6 nodes into the REAL live world (read
+back from `localStorage` after forcing a save via an unrelated click —
+first attempt checked `localStorage` immediately after page load and
+found nothing, which turned out to be correct, pre-existing behavior
+unrelated to asteroids: nothing is saved until the first `onChange()`,
+not right after initial seeding); exercised `mineAsteroidCell`/
+`applyAsteroidRegeneration` directly via dynamic import against a live
+in-browser store — mining removed the cell and credited inventory
+correctly, and simulating an elapsed cooldown correctly regrew it with
+the original material and node id preserved. Zero console errors
+throughout.
+
+**Known limitations, explicit, not silently left out**: population-
+scaled spawning (section 5) is entirely deferred — capacity is fixed at
+the two starting belts regardless of active user count. The regrowth
+queue is LOCAL/per-session state, not synced to Supabase — if the player
+who mined a cell disconnects before its cooldown elapses, that specific
+regrowth won't fire from anyone else's client (the cell's removal syncs
+globally via the existing cells realtime channel, but the pending-regrow
+timer tracking it does not). A rare simultaneous-first-connection race
+exists for Shared World seeding (two sessions both seeding a truly fresh
+world at once) — same class of narrow, accepted race as regions.js's own
+claim-allocation, not worth distributed-locking machinery for a one-time
+bootstrap case. `RHOMBIVERSE_SPEC_LOOPHOLES.md` section 4 (reserve
+pre-seeded content before claim allocation runs) is still NOT built —
+newly unblocked now that asteroids exist, but not done in this pass.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World), and
 `RHOMBIVERSE_SPEC_REGIONS.md` (data layer, allocation, hazard-mechanic
-wiring, and cross-session Supabase sync) are all done. Phase 5.8 (Trust
+wiring, and cross-session Supabase sync) are all done.
+`RHOMBIVERSE_SPEC_ASTEROIDS.md` has its acquisition-only first pass (see
+status above) but no population-scaled spawning, no Supabase-synced
+regrowth, and no claim/belt collision guard yet. Phase 5.8 (Trust
 Zones/Moderation) is still only partially done (see its own status above)
 — ask before assuming what's next.
 Crystal-growth mode (Phase 5.5's other bullet,

@@ -30,6 +30,7 @@ import {
   cellToWorld,
 } from './lattice.js';
 import { generatePlanetoid } from './planetoidgen.js';
+import { mineAsteroidCell } from './asteroids.js';
 
 // Unit-normalized neighbor directions, precomputed once. Every RD
 // instance shares the same (unrotated) orientation -- see lattice.js --
@@ -190,6 +191,12 @@ export function createBuildController({
   // placement rules (tests, future non-star worlds) don't need to pass
   // one. render.js supplies the real check.
   canPlaceMaterial = () => true,
+  // RHOMBIVERSE_SPEC_ASTEROIDS.md: optional, defaults to no real identity
+  // so callers that don't care about mining (tests, non-shared play still
+  // works -- mining itself doesn't require Shared World, only inventory
+  // crediting does) don't need to supply one. render.js passes the
+  // session's real Supabase user id when connected.
+  getOwnerId = () => null,
 }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -305,7 +312,15 @@ export function createBuildController({
     if (!hit || hit.instanceId === undefined) return;
     const cell = cellAt(hit.instanceId);
     if (!cell) return;
-    world.removeCell(cell.x, cell.y, cell.z);
+    // RHOMBIVERSE_SPEC_ASTEROIDS.md section 3: "extends Phase 2's
+    // existing block-delete action" -- right-click already removed any
+    // cell; an asteroid-tagged one now also credits inventory and
+    // registers regrowth instead of just vanishing.
+    if (cell.asteroidNodeId) {
+      mineAsteroidCell(world, cell, getOwnerId());
+    } else {
+      world.removeCell(cell.x, cell.y, cell.z);
+    }
     onChange();
   }
 
