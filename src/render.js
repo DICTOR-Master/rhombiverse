@@ -28,9 +28,10 @@ import {
   loadSharedWorld,
   pushCellUpsert,
   pushCellDelete,
+  pushClaim,
   subscribeToSharedWorld,
 } from './sync.js';
-import { allocateClaim } from './regions.js';
+import { computeClaim } from './regions.js';
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -662,6 +663,17 @@ async function init() {
     applyingRemote = false;
   }
 
+  // Claims have no local push-hook to suppress (unlike cells' addCell/
+  // removeCell -- see worldstate.js), so no applyingRemote guard is
+  // needed here: applying an incoming claim can never itself trigger
+  // another push. No onChange() either -- claims have no visual
+  // representation yet (no boundary rendering in this pass), and per
+  // Isolation a newly-announced claim never retroactively touches
+  // already-placed cells, so there's nothing to re-render.
+  function applyRemoteClaim(claimId, claimData) {
+    world.addClaim(claimId, claimData);
+  }
+
   const sharedWorldToggle = document.getElementById('shared-world-toggle');
   const sharedWorldHint = document.getElementById('shared-world-hint');
   const newWorldBtn = document.getElementById('new-world');
@@ -674,17 +686,27 @@ async function init() {
   // world center. Only meaningful while Shared World is active (ownership
   // needs a real per-player identity, and claims are pointless to protect
   // in a world only you can ever see) -- claimLandBtn is enabled/disabled
-  // alongside the other Shared-World-only controls.
-  claimLandBtn.addEventListener('click', () => {
+  // alongside the other Shared-World-only controls. Pushes to Supabase
+  // BEFORE applying locally (unlike cell edits, which apply optimistically
+  // then push) -- computeClaim is pure/non-mutating specifically so this
+  // ordering is possible, since a genuine concurrent-grant race on the
+  // same free slot needs to be caught by the server (the claims table's
+  // own primary key) before this client treats the claim as real.
+  claimLandBtn.addEventListener('click', async () => {
     if (!sharedWorldActive || !myUserId) return;
+    claimLandBtn.disabled = true;
     try {
-      const claimId = allocateClaim(world, myUserId);
-      const claim = world.getClaims()[claimId];
+      const { claimId, claimData } = computeClaim(world, myUserId);
+      await pushClaim(claimId, claimData);
+      world.addClaim(claimId, claimData);
       claimHint.textContent =
-        `Claimed ${claimId}: center [${claim.center.join(', ')}], ` +
-        `shell ${claim.shellIndex}, size ${claim.size}.`;
+        `Claimed ${claimId}: center [${claimData.center.join(', ')}], ` +
+        `shell ${claimData.shellIndex}, size ${claimData.size}.`;
     } catch (err) {
       claimHint.textContent = `Claim failed: ${err.message}`;
+      console.warn('Rhombiverse: claim failed', err);
+    } finally {
+      claimLandBtn.disabled = !sharedWorldActive;
     }
   });
 
@@ -733,6 +755,7 @@ async function init() {
       unsubscribeShared = subscribeToSharedWorld({
         onRemoteUpsert: applyRemoteUpsert,
         onRemoteDelete: applyRemoteDelete,
+        onRemoteClaim: applyRemoteClaim,
       });
       setLocalResetControlsEnabled(false);
       setClaimLandEnabled(true);

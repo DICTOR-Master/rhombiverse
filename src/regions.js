@@ -65,35 +65,54 @@ function claimedCellKeys(claims) {
 // 1+. Isolation (section 6): only ever reads existing claims to check for
 // overlap, never resizes/moves/touches one -- granting a claim is a
 // strictly additive operation.
-export function allocateClaim(world, ownerId, sizeShells = CLAIM_SIZE_SHELLS) {
-  const claims = world.getClaims();
-  const claimed = claimedCellKeys(claims);
+function findFreeSlot(world, sizeShells) {
+  const claimed = claimedCellKeys(world.getClaims());
   const candidateCenters = [
     { x: 0, y: 0, z: 0, shell: 0 },
     ...cellsInShells(0, 0, 0, MAX_CLAIM_SEARCH_SHELL),
   ];
-
   for (const center of candidateCenters) {
     const footprint = footprintOf(center.x, center.y, center.z, sizeShells);
-    const free = footprint.every(({ x, y, z }) => !claimed.has(cellKey(x, y, z)));
-    if (!free) continue;
-
-    const claimId = `claim_${Object.keys(claims).length + 1}`;
-    const claimData = {
-      ownerId,
-      shellIndex: center.shell,
-      center: [center.x, center.y, center.z],
-      size: `${sizeShells}-shell`,
-      destructible: false,
-      grantedAt: new Date().toISOString(),
-    };
-    world.addClaim(claimId, claimData);
-    return claimId;
+    if (footprint.every(({ x, y, z }) => !claimed.has(cellKey(x, y, z)))) return center;
   }
+  return null;
+}
 
-  throw new Error(
-    `No free claim slot found within ${MAX_CLAIM_SEARCH_SHELL} shells of world center`
-  );
+// Pure compute step, no mutation -- lets a caller that needs to persist
+// the claim SOMEWHERE ELSE FIRST (sync.js's pushClaim, which must
+// succeed against the shared table before the claim is treated as real
+// -- see render.js's Claim Land handler) do so before ever touching the
+// local store, rather than optimistically applying a claim locally that
+// might then fail to sync (e.g. a genuine concurrent-grant race on the
+// same free slot, caught server-side by the claims table's own primary
+// key -- see supabase/schema.sql).
+export function computeClaim(world, ownerId, sizeShells = CLAIM_SIZE_SHELLS) {
+  const center = findFreeSlot(world, sizeShells);
+  if (!center) {
+    throw new Error(`No free claim slot found within ${MAX_CLAIM_SEARCH_SHELL} shells of world center`);
+  }
+  // The claim's own center coordinate makes a naturally unique,
+  // deterministic id -- no counter/race needed, since a candidate is
+  // only ever chosen once confirmed free of every existing claim.
+  const claimId = `claim_${center.x}_${center.y}_${center.z}`;
+  const claimData = {
+    ownerId,
+    shellIndex: center.shell,
+    center: [center.x, center.y, center.z],
+    size: `${sizeShells}-shell`,
+    destructible: false,
+    grantedAt: new Date().toISOString(),
+  };
+  return { claimId, claimData };
+}
+
+// Convenience wrapper for local-only (non-shared, e.g. single-player or
+// tests) use: computes AND immediately applies to the local store in one
+// call, since there's no separate shared backend to race against.
+export function allocateClaim(world, ownerId, sizeShells = CLAIM_SIZE_SHELLS) {
+  const { claimId, claimData } = computeClaim(world, ownerId, sizeShells);
+  world.addClaim(claimId, claimData);
+  return claimId;
 }
 
 // Which claim (if any) owns a given lattice coordinate -- computed

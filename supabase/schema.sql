@@ -55,3 +55,41 @@ create policy "cells_delete_own" on public.cells
   for delete using (author_id = auth.uid());
 
 alter publication supabase_realtime add table public.cells;
+
+-- RHOMBIVERSE_SPEC_REGIONS.md: ownership claims, synced across sessions.
+-- INSERT-only by design -- no update/delete RLS policy at all, which
+-- hard-enforces section 2's "no claim is ever resized, moved, or shrunk
+-- after being granted" at the database level, not just in application
+-- code. `id` is the claim's own center coordinate ("claim_x_y_z"),
+-- computed client-side by regions.js's allocateClaim -- deterministic
+-- and collision-free by construction (a candidate center is only ever
+-- chosen once its own footprint is confirmed free of every existing
+-- claim), and doubles as the primary key so a genuine concurrent-grant
+-- race (two sessions computing the same free slot before either has
+-- synced) fails loudly via a unique-constraint violation rather than
+-- silently double-granting the same land.
+create table public.claims (
+  id text primary key,
+  owner_id uuid not null default auth.uid(),
+  shell_index integer not null,
+  center_x integer not null,
+  center_y integer not null,
+  center_z integer not null,
+  size text not null,
+  destructible boolean not null default false,
+  granted_at timestamptz not null default now()
+);
+
+alter table public.claims enable row level security;
+
+-- Everyone needs to see everyone's claims -- blackhole.js/supernova.js's
+-- isClaimProtected() check has to work regardless of who's black hole is
+-- evaluating it.
+create policy "claims_select_all" on public.claims
+  for select using (true);
+
+-- You can only ever grant a claim as yourself.
+create policy "claims_insert_own" on public.claims
+  for insert with check (owner_id = auth.uid());
+
+alter publication supabase_realtime add table public.claims;

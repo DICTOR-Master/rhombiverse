@@ -996,21 +996,47 @@ one's real Euclidean footprint is only ~2.8 units). Verified after the
 fix with the same real run: `claim_1` granted at world center (shell 0)
 as expected, a second call correctly skipped every overlapping candidate
 through shell 4 and landed `claim_2` at shell 5 — matching the spacing
-the design predicted — zero console/page errors throughout. **Still
-deferred, explicitly**: claims are not yet pushed to Supabase (no
-`claims` table/sync — a claim granted in one browser session is invisible
-to any other session connected to the same Shared World, so the
-ownership guarantee is currently local-only; the unconditional authorId
-cross-player guard from the earlier Shared World work is unaffected by
-this and still holds regardless), and there's no claims list/visualization
-UI beyond the one-line hint after clicking Claim Land.
+the design predicted — zero console/page errors throughout.
+
+**Claims synced to Supabase, 2026-08-12 — same session, picked up
+immediately after the user said to keep going.** New `public.claims`
+table (`supabase/schema.sql`, applied as migration `phase58_claims_table`):
+**INSERT-only, no update/delete RLS policy at all** — the database itself
+now hard-enforces section 2's "no claim is ever resized, moved, or
+shrunk," not just application code. `id` is the claim's own center
+coordinate (`claim_x_y_z`) rather than a counter — deterministic,
+collision-free by construction, and doubles as the primary key so a
+genuine concurrent-grant race (two sessions computing the same free slot
+before either has synced) fails loudly server-side instead of silently
+double-granting land. `regions.js`'s `allocateClaim` was split into a
+pure `computeClaim` (no mutation) plus a thin local-only wrapper, so
+render.js's Claim Land handler can push to Supabase FIRST and only apply
+the claim to the local store once that succeeds — unlike cell edits
+(which apply optimistically, then push), a claim needs the server's
+verdict before being treated as real. `sync.js` gained `loadClaims()`
+(merged into `loadSharedWorld()`'s return value, so `world.replaceAll()`
+picks up claims with zero extra plumbing) and `pushClaim()`; realtime
+subscription extended with claims' own INSERT event (`onRemoteClaim`),
+applied via a plain `world.addClaim()` with no `applyingRemote` guard
+needed — claims have no local push-hook to feedback-loop against, unlike
+cells' addCell/removeCell. **Verified with two genuinely independent
+browser CONTEXTS (separate localStorage, separate anonymous auth
+sessions — not two tabs sharing one identity)**: Player A claimed world
+center; Player B, connecting separately, received A's claim via realtime
+and correctly computed a non-overlapping slot at shell 5 — confirmed
+against the DB directly afterward (two rows, two genuinely distinct
+`owner_id`s). Zero console/page errors in either session. **Still
+deferred, explicitly**: no claims list/boundary-visualization UI beyond
+the one-line hint after clicking Claim Land, and `destructible` can only
+ever be set at grant time (`false`, hard-coded) since there's no UPDATE
+path — an owner can't yet toggle it after the fact.
 
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
-Black Hole, Star System, Supernova) and Phase 5 (Shared World) are done.
-Phase 5.8 (Trust Zones/Moderation) is partially done, and
-`RHOMBIVERSE_SPEC_REGIONS.md` is functionally wired end-to-end but still
-local-only (no `claims` Supabase sync yet, see status above) — ask before
-assuming which of these to pick up next.
+Black Hole, Star System, Supernova), Phase 5 (Shared World), and
+`RHOMBIVERSE_SPEC_REGIONS.md` (data layer, allocation, hazard-mechanic
+wiring, and cross-session Supabase sync) are all done. Phase 5.8 (Trust
+Zones/Moderation) is still only partially done (see its own status above)
+— ask before assuming what's next.
 Crystal-growth mode (Phase 5.5's other bullet,
 cells auto-growing over time) was intentionally left unbuilt; the plan
 marks it optional/tied to Phase 6 timing. Actual public deploy (Phase 4's

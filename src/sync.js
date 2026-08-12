@@ -31,10 +31,35 @@ export async function ensureAnonymousSession() {
   return data.session;
 }
 
-// Fetches every row from public.cells and returns it in the same
-// {worldName, version, cells, meta} shape worldstate.js/persistence.js
-// already use, so callers can pass it straight to createWorldStore() or
-// world.replaceAll() with no format translation.
+// Row <-> in-memory claim shape, shared by loadClaims and the realtime
+// claims handler below so the mapping only lives in one place.
+function claimFromRow(row) {
+  return {
+    ownerId: row.owner_id,
+    shellIndex: row.shell_index,
+    center: [row.center_x, row.center_y, row.center_z],
+    size: row.size,
+    destructible: row.destructible,
+    grantedAt: row.granted_at,
+  };
+}
+
+// Fetches every row from public.claims (RHOMBIVERSE_SPEC_REGIONS.md) into
+// the same {claim_x_y_z: {...}} shape worldstate.js's claims registry
+// already uses.
+export async function loadClaims() {
+  const { data, error } = await supabase.from('claims').select('*');
+  if (error) throw error;
+  const claims = {};
+  for (const row of data) claims[row.id] = claimFromRow(row);
+  return claims;
+}
+
+// Fetches every row from public.cells and public.claims, returning both
+// in the same {worldName, version, cells, claims, meta} shape
+// worldstate.js/persistence.js already use, so callers can pass it
+// straight to createWorldStore() or world.replaceAll() with no format
+// translation.
 export async function loadSharedWorld() {
   const { data, error } = await supabase.from('cells').select('x,y,z,data,author_id');
   if (error) throw error;
@@ -49,11 +74,13 @@ export async function loadSharedWorld() {
     // what a client ever sent.
     cells[cellKey(row.x, row.y, row.z)] = { ...row.data, authorId: row.author_id };
   }
+  const claims = await loadClaims();
   const now = new Date().toISOString();
   return {
     worldName: 'Rhombiverse (Shared)',
     version: 1,
     cells,
+    claims,
     meta: { createdAt: now, lastModified: now },
   };
 }
@@ -83,17 +110,44 @@ export async function pushCellDelete(x, y, z) {
   if (error) console.warn('Rhombiverse sync: delete failed', x, y, z, error);
 }
 
+// Grants a claim server-side (RHOMBIVERSE_SPEC_REGIONS.md). Claims are
+// INSERT-only -- see supabase/schema.sql's own comment: no update/delete
+// RLS policy exists at all, so this is the only claims write this file
+// will ever offer, by design (section 2's "never resized/moved/shrunk").
+// owner_id/granted_at come from DB column defaults (auth.uid()/now()),
+// deliberately omitted from the payload for the same reason
+// pushCellUpsert omits author_id -- the server, not the client, is the
+// source of truth for who actually made the request. Throws (does not
+// swallow) on failure, unlike pushCellUpsert/pushCellDelete -- a caller
+// needs to know a claim attempt genuinely failed (e.g. a concurrent-grant
+// race losing to the table's own primary key) before treating it as
+// real, since render.js applies a claim locally only after this succeeds.
+export async function pushClaim(claimId, claimData) {
+  const [cx, cy, cz] = claimData.center;
+  const { error } = await supabase.from('claims').insert({
+    id: claimId,
+    shell_index: claimData.shellIndex,
+    center_x: cx,
+    center_y: cy,
+    center_z: cz,
+    size: claimData.size,
+    destructible: claimData.destructible,
+  });
+  if (error) throw error;
+}
+
 // Subscribes to realtime INSERT/UPDATE/DELETE on public.cells (enabled
 // via schema.sql's `alter publication supabase_realtime add table
-// public.cells`). Postgres changes broadcast to every subscriber
-// including the client that made the write, so onRemoteUpsert/
-// onRemoteDelete WILL fire for this session's own pushCellUpsert/
-// pushCellDelete calls too -- callers must be idempotent against that,
-// which worldstate.js's addCell/removeCell already are (Map set/delete).
-// Returns an unsubscribe function.
-export function subscribeToSharedWorld({ onRemoteUpsert, onRemoteDelete }) {
+// public.cells`), plus INSERT on public.claims (claims never update or
+// delete, so that's the only event type there is to hear). Postgres
+// changes broadcast to every subscriber including the client that made
+// the write, so onRemoteUpsert/onRemoteDelete/onRemoteClaim WILL fire for
+// this session's own pushes too -- callers must be idempotent against
+// that, which worldstate.js's addCell/removeCell/addClaim already are
+// (Map set/delete). Returns an unsubscribe function.
+export function subscribeToSharedWorld({ onRemoteUpsert, onRemoteDelete, onRemoteClaim }) {
   const channel = supabase
-    .channel('cells-sync')
+    .channel('world-sync')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cells' }, (payload) => {
       const { x, y, z, data, author_id } = payload.new;
       onRemoteUpsert(x, y, z, { ...data, authorId: author_id });
@@ -110,6 +164,10 @@ export function subscribeToSharedWorld({ onRemoteUpsert, onRemoteDelete }) {
       // reason this is guaranteed to be populated.
       const { x, y, z } = payload.old;
       onRemoteDelete(x, y, z);
+    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'claims' }, (payload) => {
+      if (!onRemoteClaim) return;
+      onRemoteClaim(payload.new.id, claimFromRow(payload.new));
     })
     .subscribe();
 
