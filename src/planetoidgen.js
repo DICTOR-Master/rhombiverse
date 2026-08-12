@@ -62,18 +62,47 @@ export const PLANETOID_RECIPES = {
       [1, 'glassite'], // large translucent "atmosphere" envelope
     ]),
   },
+  'ice-giant': {
+    label: 'Ice Giant',
+    // Distinct from both ice-moon (ice reaches the surface, no
+    // atmosphere) and gas-giant (no ice layer at all): real ice giants
+    // (Uranus, Neptune) are a small rocky/metallic core wrapped in a
+    // deep water/ammonia/methane "ices" mantle, topped with a
+    // comparatively thin H/He/CH4 atmosphere -- the defining
+    // three-layer structure that separates them from gas giants.
+    materialForShell: fractionalRecipe([
+      [1 / 5, 'ferrostone'], // small rocky/metallic core
+      [4 / 5, 'ice99'], // deep icy mantle -- auto-permeates via hydrosphere.js
+      [1, 'glassite'], // thin translucent outer atmosphere
+    ]),
+  },
 };
 
 // Builds a full body in one call: the given center becomes the
 // Blackstar-Glassite gravity core (overwriting whatever was there --
 // "generate a planetoid here" means this location becomes the new
 // anchor, a deliberate replacement like New World, not an incremental
-// grow), and every shell out to totalShells fills per the recipe's
-// per-shell material. Skips cells that already exist (never overwrites
-// other real player-built matter) and respects canPlaceMaterial (the
-// Star System frost line) exactly like Fill mode does -- restricted
-// candidates are simply skipped, not blocked as a whole action.
-export function generatePlanetoid(world, type, centerX, centerY, centerZ, totalShells, canPlaceMaterial = () => true) {
+// grow). Skips cells that already exist (never overwrites other real
+// player-built matter) and respects canPlaceMaterial (the Star System
+// frost line) exactly like Fill mode does -- restricted candidates are
+// simply skipped, not blocked as a whole action.
+//
+// Selects cells by TRUE Euclidean distance from center (<= radius),
+// not raw BFS shell membership -- a BFS "shell" in this 12-neighbor
+// lattice is a rhombic-dodecahedron-shaped level set of the graph
+// metric (this project's own voxel shape, expressed at planetoid
+// scale), not a sphere: build.js's roundStructure already documents
+// shell N's real distances ranging from N up to N*sqrt(2), which is
+// exactly why a raw shell-fill body reads as faceted/pointed rather
+// than round. cellsInShells(..., radius) is still the right candidate
+// pool -- shell N's minimum real distance is exactly N, so no cell
+// within Euclidean `radius` can ever sit at a BFS shell greater than
+// `radius` -- but membership is now decided by real distance, giving a
+// genuinely round body instead of a shell-shaped one needing a
+// separate Round pass afterward. `shell` (BFS integer) is still stamped
+// per cell for compatibility with everything else that groups by it
+// (gravity core-cavity sizing, the ring panel, Round/Excavate).
+export function generatePlanetoid(world, type, centerX, centerY, centerZ, radius, canPlaceMaterial = () => true) {
   const recipe = PLANETOID_RECIPES[type];
   if (!recipe) return;
   const centerKey = cellKey(centerX, centerY, centerZ);
@@ -84,9 +113,11 @@ export function generatePlanetoid(world, type, centerX, centerY, centerZ, totalS
     generatorType: type,
   });
 
-  for (const cell of cellsInShells(centerX, centerY, centerZ, totalShells)) {
+  for (const cell of cellsInShells(centerX, centerY, centerZ, radius)) {
     if (world.has(cell.x, cell.y, cell.z)) continue;
-    const material = recipe.materialForShell(cell.shell, totalShells);
+    const dist = Math.hypot(cell.x - centerX, cell.y - centerY, cell.z - centerZ);
+    if (dist > radius) continue;
+    const material = recipe.materialForShell(dist, radius);
     if (!canPlaceMaterial(material, cell.x, cell.y, cell.z)) continue;
     world.addCell(cell.x, cell.y, cell.z, {
       material,
