@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-45 -45 90 90" width="64" height="64">
+  <!--
+    Wireframe rhombic dodecahedron: this project's own voxel shape, not
+    generic art. Edge/vertex coordinates computed directly from
+    lattice.js's real rdRawVerts (8 cube verts at radius 0.5, 6 octa
+    verts at radius 1.0, the same 2:1 ratio the actual game geometry
+    uses), rotated to a non-axis-aligned angle and orthographically
+    projected so no vertex overlaps another on screen. See
+    src/welcome.js for the same coordinates reused as the in-app logo.
+  -->
+  <rect x="-45" y="-45" width="90" height="90" rx="16" fill="#05050a" />
+  <g stroke="#7cf" stroke-width="2.4" stroke-linecap="round" fill="none">
+    <path d="M -29.48 20.83 L -33.10 -9.69" />
+    <path d="M -29.48 20.83 L 0.00 38.94" />
+    <path d="M -29.48 20.83 L -25.86 12.40" />
+    <path d="M -3.62 8.43 L -33.10 -9.69" />
+    <path d="M -3.62 8.43 L 0.00 38.94" />
+    <path d="M -3.62 8.43 L 25.86 -12.40" />
+    <path d="M -29.48 -18.12 L -33.10 -9.69" />
+    <path d="M -29.48 -18.12 L 0.00 -38.94" />
+    <path d="M -29.48 -18.12 L -25.86 12.40" />
+    <path d="M -3.62 -30.51 L -33.10 -9.69" />
+    <path d="M -3.62 -30.51 L 0.00 -38.94" />
+    <path d="M -3.62 -30.51 L 25.86 -12.40" />
+    <path d="M 3.62 30.51 L 33.10 9.69" />
+    <path d="M 3.62 30.51 L 0.00 38.94" />
+    <path d="M 3.62 30.51 L -25.86 12.40" />
+    <path d="M 29.48 18.12 L 33.10 9.69" />
+    <path d="M 29.48 18.12 L 0.00 38.94" />
+    <path d="M 29.48 18.12 L 25.86 -12.40" />
+    <path d="M 3.62 -8.43 L 33.10 9.69" />
+    <path d="M 3.62 -8.43 L 0.00 -38.94" />
+    <path d="M 3.62 -8.43 L -25.86 12.40" />
+    <path d="M 29.48 -20.83 L 33.10 9.69" />
+    <path d="M 29.48 -20.83 L 0.00 -38.94" />
+    <path d="M 29.48 -20.83 L 25.86 -12.40" />
+  </g>
+  <g fill="#bde6ff">
+    <circle cx="-29.48" cy="20.83" r="3.4" />
+    <circle cx="-3.62" cy="8.43" r="3.4" />
+    <circle cx="-29.48" cy="-18.12" r="3.4" />
+    <circle cx="-3.62" cy="-30.51" r="3.4" />
+    <circle cx="3.62" cy="30.51" r="3.4" />
+    <circle cx="29.48" cy="18.12" r="3.4" />
+    <circle cx="3.62" cy="-8.43" r="3.4" />
+    <circle cx="29.48" cy="-20.83" r="3.4" />
+  </g>
+  <g fill="#7cf">
+    <circle cx="33.10" cy="9.69" r="4.4" />
+    <circle cx="-33.10" cy="-9.69" r="4.4" />
+    <circle cx="0.00" cy="-38.94" r="4.4" />
+    <circle cx="0.00" cy="38.94" r="4.4" />
+    <circle cx="25.86" cy="-12.40" r="4.4" />
+    <circle cx="-25.86" cy="12.40" r="4.4" />
+  </g>
+</svg>
