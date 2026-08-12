@@ -255,7 +255,13 @@ const GENERATED_TINT = new THREE.Color(0x2a0a30);
 // Final per-instance color: the cell's material color, lightly blended
 // (35%) toward its shell tint so shell rings stay visible without
 // obscuring which material a cell actually is.
+const FLAGGED_TINT = new THREE.Color(0xff2020);
+
 function instanceColorFor(cell) {
+  // Only ever reached in Report mode (visibleCells excludes flagged/
+  // removed cells everywhere else), so a bright warning tint here is
+  // unambiguous -- it's ONLY shown to someone actively reviewing reports.
+  if (cell.status === 'flagged' || cell.status === 'removed') return FLAGGED_TINT;
   if (cell.generatedByBlackHole) return GENERATED_TINT;
   const base = materialColor(cell.material);
   if (!cell.shell) return base;
@@ -267,8 +273,23 @@ function instanceColorFor(cell) {
 // lattice coordinates.
 let cellOrder = [];
 
-function rebuildInstances(mesh, world) {
-  cellOrder = world.entries();
+// Phase 5.8: flagged/removed cells are quarantined from the default view
+// -- excluded from the instance set entirely (invisible AND unclickable,
+// same technique the old onion-skin shell filter used) rather than
+// deleted, so derived mechanics (hydrosphere/black hole/etc., which read
+// world.entries() directly, not this filtered list) still see and act on
+// the true full world regardless of what's currently visible. Report
+// mode is the one exception: it needs to see (and click, to toggle back)
+// already-flagged cells to be usable at all, so it opts back into showing
+// them, distinctly tinted -- see instanceColorFor's flagged-in-Report-mode
+// branch below.
+function visibleCells(world, inReportMode) {
+  if (inReportMode) return world.entries();
+  return world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
+}
+
+function rebuildInstances(mesh, world, inReportMode = false) {
+  cellOrder = visibleCells(world, inReportMode);
   const m = new THREE.Matrix4();
   cellOrder.forEach((cell, i) => {
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
@@ -296,6 +317,11 @@ async function init() {
   // whole point of Phase 3 (refreshing preserves the build).
   const worldJSON = loadFromLocalStorage() ?? (await loadWorld('./data/starter-world.json'));
   const world = createWorldStore(worldJSON, { onAdd: handleLocalAdd, onRemove: handleLocalRemove });
+  // Declared this early so the very first rebuildInstances() call below
+  // (before the mode-button UI further down even exists) can safely
+  // reference it -- report mode can't be active yet at that point, but
+  // the reference itself must not be in currentMode's temporal dead zone.
+  let currentMode = 'build';
 
   const geometry = buildRDGeometry(SCALE);
   // White base color: actual per-cell color comes entirely from
@@ -472,7 +498,7 @@ async function init() {
     applyAsymptoticGeneration(world);
     applyStarFusion(world);
     applyDetonationCheck(world);
-    rebuildInstances(mesh, world);
+    rebuildInstances(mesh, world, currentMode === 'report');
     planetoids = computePlanetoids(world);
     planetoids = annotateBlackHoles(planetoids, world);
     planetoids = annotateStars(planetoids, world);
@@ -503,7 +529,7 @@ async function init() {
     const prev = undoStack.pop();
     world.replaceAll(JSON.parse(prev));
     lastSnapshot = prev;
-    rebuildInstances(mesh, world);
+    rebuildInstances(mesh, world, currentMode === 'report');
     saveToLocalStorage(world.toJSON());
     updateUndoButton();
     renderRingList();
@@ -558,6 +584,7 @@ async function init() {
     round: 'Click a shell-tagged cell to smooth its outer boundary by true distance from center.',
     excavate: 'Click a shell-tagged structure to hollow out its interior below "Hollow from shell".',
     generate: 'Click a cell to generate a full body of the chosen type there (radius = Shell fill radius), formula-built in one click instead of hand-placing every cell.',
+    report: 'Shows flagged/removed cells (normally hidden) in red. Click one to flag it, click a flagged one to approve it back.',
   };
   function updateModeUI() {
     const showRadius = currentMode === 'fill' || currentMode === 'generate';
@@ -569,13 +596,16 @@ async function init() {
     document.getElementById('mode-hint').textContent = MODE_HINTS[currentMode];
   }
 
-  let currentMode = 'build';
   const modeButtons = document.querySelectorAll('.mode-btn');
   modeButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       currentMode = btn.dataset.mode;
       modeButtons.forEach((b) => b.classList.toggle('active', b === btn));
       updateModeUI();
+      // Entering/leaving Report mode changes which cells are visible
+      // (visibleCells) -- re-sync immediately rather than waiting for the
+      // next unrelated onChange.
+      rebuildInstances(mesh, world, currentMode === 'report');
     });
   });
   updateModeUI();

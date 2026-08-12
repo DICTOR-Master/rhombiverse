@@ -911,9 +911,51 @@ client, sequential edits) but not proven safe under real concurrent
 multi-player load either. No presence/multi-cursor UI — you can't see
 who else is connected or where they're building.
 
+**Phase 5.8 (Trust Zones/Moderation) started, 2026-08-12 — deliberately
+partial, scope chosen and stated up front rather than attempting the
+plan's full bullet list.** `RHOMBIVERSE_PLAN.md`'s Phase 5.8 section lists
+several sub-items; two don't actually apply to this app yet and were
+skipped rather than faked: an "automated profanity/content filter" has
+nothing to scan (no free-text UGC exists anywhere — material is a fixed
+dropdown enum, no chat, no naming), and a "human review queue" needs an
+account/role system this repo doesn't have. What WAS built, matching the
+plan's own two concrete success checks: `worldstate.js`'s `addCell`
+defaults `region: 'open'`/`status: 'pending'` on any cell missing them
+(existing cells re-added via `...data` spreads — recolor, hydrosphere,
+black hole/star mechanics — already carry their real values, so this only
+ever stamps genuinely brand-new cells; curated content in
+`data/starter-world.json`/`data/presets/*.json` sets `'core'`/`'approved'`
+explicitly in its own JSON and bypasses this via `replaceAll()`
+untouched). A sixth mode button, **Report**, toggles a clicked cell
+between `'flagged'` and `'approved'` — doubling as both the report AND
+the undo-a-report action since no separate reviewer role exists to make a
+one-way flag safe. `render.js`'s `visibleCells()` excludes
+`'flagged'`/`'removed'` cells from the default view entirely (invisible
+AND unclickable, same technique the old onion-skin filter used) —
+quarantined, not deleted, per the plan's own framing; Report mode itself
+is the one exception, showing them with a distinct red tint so they can
+actually be found and un-flagged. Derived mechanics (hydrosphere/black
+hole/etc.) read `world.entries()` directly, not this filtered view, so a
+flagged cell still fully participates in gravity/consumption/fusion —
+correct, since flagging is about visibility, not existence. The plan's
+"rollback via JSON snapshots" bullet needed zero new code — Export JSON
+(Phase 3) already provides exactly that mechanism. **Not yet live-tested
+in a real browser** (reasoning/static-checked only, including catching
+and fixing a real temporal-dead-zone bug — `currentMode` was referenced
+before its own declaration — during review) — this pass was scoped
+tighter and verified lighter than earlier sessions' work, per direct
+instruction to start rationing effort/tokens on this project. **Not yet
+built, left for a real follow-up**: the full `core`/`reviewed`/`open`
+three-tier reachability gate (region field is stamped but not yet
+enforced — only the flagged/removed binary is), the age/mode client
+selector the plan calls for, and `RHOMBIVERSE_SPEC_REGIONS.md`'s
+ownership-claims system (a related but distinct concept from this
+moderation `region` — see that spec's own section 1 naming note).
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova) and Phase 5 (Shared World) are done.
-Phase 5.8 (Trust Zones/Moderation) — the real
+Phase 5.8 (Trust Zones/Moderation) is now partially done (see status
+above) — the remaining piece is the real
 prerequisite for Black Hole/Supernova's cross-player consent model, and
 now the real one to ask about before assuming it's next — is open.
 Crystal-growth mode (Phase 5.5's other bullet,

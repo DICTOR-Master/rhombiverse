@@ -230,6 +230,21 @@ export function createBuildController({
       return;
     }
 
+    if (mode === 'report') {
+      // Phase 5.8's "Report" action, minimally scoped: toggles a cell
+      // between 'flagged' and 'approved' status. No separate review-
+      // queue/role system exists yet (no accounts), so this doubles as
+      // both the report AND the un-report/approve action rather than a
+      // one-way flag with no way back -- render.js's visibility filter
+      // hides 'flagged'/'removed' cells from the default view without
+      // deleting them (quarantine, not delete, per the plan).
+      const newStatus = cell.status === 'flagged' ? 'approved' : 'flagged';
+      const { x, y, z, ...data } = cell;
+      world.addCell(x, y, z, { ...data, status: newStatus });
+      onChange();
+      return;
+    }
+
     if (mode === 'generate') {
       generatePlanetoid(world, getGeneratorType(), cell.x, cell.y, cell.z, getShellCount(), canPlaceMaterial);
       if (onCellClicked) onCellClicked({ shellCenter: cellKey(cell.x, cell.y, cell.z) });

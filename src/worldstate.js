@@ -50,10 +50,23 @@ export function createWorldStore(worldJSON, hooks = {}) {
     // they exist for schema-compliance / future external tooling only.
     addCell(x, y, z, data) {
       const { gravitySource, gravityWeight, ...rest } = data;
-      const stamped =
+      let stamped =
         data.material === 'blackstar-glassite'
           ? { ...rest, gravitySource: true, gravityWeight: gravityWeight ?? 1.0 }
           : rest;
+      // Phase 5.8 moderation fields (RHOMBIVERSE_PLAN.md section 3 / Phase
+      // 5.8): schema-ready on every cell, defaulted only when genuinely
+      // absent -- an existing cell's own data (spread in via ...data by
+      // every caller that re-adds a cell, e.g. recolor, hydrosphere,
+      // black hole/star mechanics) already carries its real values here,
+      // so this only ever stamps brand-new cells. `region` defaults to
+      // 'open'/`status` to 'pending' per the plan's own "new builds
+      // default to open/pending until reviewed" -- curated content
+      // (data/starter-world.json, data/presets/*.json) sets 'core'/
+      // 'approved' explicitly in its own JSON and bypasses this entirely
+      // via replaceAll(), so it's never touched here.
+      if (stamped.region === undefined) stamped = { ...stamped, region: 'open' };
+      if (stamped.status === undefined) stamped = { ...stamped, status: 'pending' };
       cells.set(cellKey(x, y, z), stamped);
       hooks.onAdd?.(x, y, z, stamped);
     },
