@@ -33,6 +33,7 @@ import {
   pushRegrowthSet,
   pushRegrowthClear,
   subscribeToSharedWorld,
+  setSyncErrorHandler,
 } from './sync.js';
 import { computeClaim, claimBoundingRadius } from './regions.js';
 import {
@@ -57,6 +58,31 @@ const MAX_CELLS = 20000;
 // a request for shell 100, ~200k+ cells, far past MAX_CELLS) as well as
 // a confusing inconsistency, caught by the user.
 const MAX_SHELL = 15;
+
+// pushCellUpsert/pushCellDelete (sync.js) previously only console.warn'd
+// on failure -- fine for transient network blips, but it meant a real
+// rejection (e.g. schema.sql's cells_rate_limit trigger, added
+// 2026-08-13) would silently desync a player's view from the shared
+// world with zero visible feedback. This surfaces it without being
+// disruptive: one line, auto-hides, and re-triggering while already
+// visible just resets the hide timer rather than stacking/spamming --
+// a legitimate large Fill/Generate burst that trips the rate limit
+// could otherwise fire this dozens of times in a row.
+let syncWarningTimer = null;
+function showSyncWarning(error) {
+  const el = document.getElementById('sync-warning');
+  if (!el) return;
+  const message = /budget exceeded/i.test(error?.message ?? '')
+    ? "You're building faster than Shared World allows right now -- some changes may not have saved. It refills over time; slow down a bit."
+    : "Some changes aren't reaching Shared World (connection issue) -- they may not be saved for other players.";
+  el.textContent = `⚠ ${message}`;
+  el.style.display = 'block';
+  clearTimeout(syncWarningTimer);
+  syncWarningTimer = setTimeout(() => {
+    el.style.display = 'none';
+  }, 6000);
+}
+setSyncErrorHandler(showSyncWarning);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05050a);

@@ -240,6 +240,23 @@
       user-select: none;
     }
     #construction-tag:hover { opacity: 1; }
+    #sync-warning {
+      display: none;
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 950;
+      max-width: 90vw;
+      color: #1a1400;
+      background: #f59e0b;
+      border: 1px solid #1a1400;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font: 12px system-ui, sans-serif;
+      text-align: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+    }
   </style>
   <!--
     No bundler/build step by design (Grounded Simplicity, RHOMBIVERSE_PRINCIPLES.md
@@ -258,6 +275,7 @@
 </head>
 <body>
   <div id="app"></div>
+  <div id="sync-warning"></div>
   <div id="controls">
     <div class="row">
       <button class="mode-btn active" data-mode="build" type="button">Build</button>

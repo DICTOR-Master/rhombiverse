@@ -180,3 +180,189 @@ create policy "asteroid_regrowth_delete_any" on public.asteroid_regrowth
   for delete using (auth.role() = 'authenticated');
 
 alter publication supabase_realtime add table public.asteroid_regrowth;
+
+-- Security advisor fix, 2026-08-13: an unset search_path on a
+-- SECURITY-sensitive function lets a caller who can create objects
+-- earlier in their own search_path shadow what the function resolves
+-- to. Explicit search_path closes that regardless of caller state --
+-- standard Postgres hardening, not a behavior change.
+alter function public.claims_enforce_immutable_geometry() set search_path = public;
+
+-- RHOMBIVERSE_COMPLIANCE.md's "Rate limiting" item (Required before
+-- Phase 5), 2026-08-13: RLS (cells_insert_own/cells_delete_own/etc.)
+-- already proves WHO wrote something, but nothing previously capped HOW
+-- OFTEN one identity could write. Real gap now that the repo (and the
+-- publishable key + this full schema) is public and discoverable.
+--
+-- Token bucket per Adaptive Damping (RHOMBIVERSE_PRINCIPLES.md section
+-- 0), the same shape already used by blackhole.js's cost-scaling and
+-- supernova.js's threshold damping -- reused, not reinvented. Sized
+-- deliberately generously: a single legitimate Fill-mode click at
+-- MAX_SHELL=15 (render.js) inserts up to shellCumulativeCost(15)=12431
+-- cells in one burst, since every cell push is still one request each
+-- (no client-side batching exists yet) -- the limit must never punish
+-- one enthusiastic click, only sustained/scripted abuse across many
+-- separate actions. Capacity 15000 comfortably clears that ceiling;
+-- refill of 20/sec (1200/min, full refill in ~12.5min) still bounds a
+-- naive infinite scripted loop to a small fraction of its unthrottled
+-- rate. This bounds the blast radius of casual/accidental abuse -- it
+-- does not claim to stop a genuinely determined attacker, consistent
+-- with this project's existing honesty about unsolved gaps (see
+-- RHOMBIVERSE_SPEC_LOOPHOLES.md's own multi-account note).
+create table public.rate_limits (
+  owner_id uuid primary key,
+  tokens numeric not null,
+  last_refill timestamptz not null default now()
+);
+
+-- RLS enabled with NO policies at all -- nobody can read or write this
+-- table directly, including its own owner (flagged INFO by the security
+-- advisor as "RLS enabled, no policy" -- intentional, that IS the
+-- policy: deny-all direct access). The only access path is the
+-- SECURITY DEFINER function below, which bypasses RLS intentionally (it
+-- needs to read/update every user's own row, not just the caller's).
+alter table public.rate_limits enable row level security;
+
+create or replace function public.check_rate_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  capacity numeric := 15000;
+  refill_per_second numeric := 20;
+  current_tokens numeric;
+  elapsed numeric;
+  uid uuid := auth.uid();
+begin
+  if uid is null then
+    raise exception 'Rhombiverse Shared World writes require an authenticated session';
+  end if;
+
+  insert into public.rate_limits (owner_id, tokens, last_refill)
+  values (uid, capacity, now())
+  on conflict (owner_id) do nothing;
+
+  select tokens, extract(epoch from (now() - last_refill))
+    into current_tokens, elapsed
+    from public.rate_limits
+    where owner_id = uid
+    for update;
+
+  current_tokens := least(capacity, current_tokens + elapsed * refill_per_second);
+
+  if current_tokens < 1 then
+    raise exception 'Rhombiverse Shared World write budget exceeded -- slow down, it refills over time';
+  end if;
+
+  update public.rate_limits
+    set tokens = current_tokens - 1, last_refill = now()
+    where owner_id = uid;
+
+  return coalesce(new, old);
+end;
+$$;
+
+-- Applies to INSERT/UPDATE/DELETE alike -- recolor and Excavate mode can
+-- push just as many writes as Build/Fill/Generate, and all represent
+-- the same underlying resource cost.
+create trigger cells_rate_limit
+  before insert or update or delete on public.cells
+  for each row execute function public.check_rate_limit();
+
+-- Security advisor fix, 2026-08-13: Supabase's PostgREST layer exposes
+-- every public-schema function as a callable /rest/v1/rpc/ endpoint by
+-- default, regardless of intent. check_rate_limit is a trigger function
+-- -- Postgres itself refuses a direct (non-trigger) call, so the
+-- real-world exploit surface was a clean error, not data exposure -- but
+-- there's no reason to leave it listed as a public RPC target. Revoking
+-- EXECUTE doesn't affect the trigger itself: a trigger fires via the
+-- trigger mechanism, not a role's EXECUTE grant on the function.
+-- Verified live after this revoke that the trigger still fires
+-- correctly (a real insert/delete still consumes a token as expected).
+revoke all on function public.check_rate_limit() from public, anon, authenticated;
+
+-- RHOMBIVERSE_COMPLIANCE.md's "Backup strategy independent of live
+-- world-state" item, 2026-08-13. Honest framing up front: this is NOT
+-- true off-platform disaster recovery -- a total project-level loss
+-- would take these snapshots too, since they live in the same Postgres
+-- instance. What it DOES cover, for real: the actually likely failure
+-- modes for a small hobby project -- a buggy moderation/consumption
+-- pass, an application bug that mass-deletes or corrupts cells, a bad
+-- manual SQL edit, or a black hole/supernova mechanic gone wrong. A
+-- snapshot table separate from the live tables, on a schedule, with no
+-- application write path to it, is the simplest thing that provides
+-- real recovery value here without new paid infrastructure (Supabase's
+-- own point-in-time recovery is a paid-plan feature) -- Grounded
+-- Simplicity over inventing an off-platform pipeline this project
+-- doesn't otherwise need.
+create extension if not exists pg_cron;
+
+create table public.world_snapshots (
+  id bigserial primary key,
+  taken_at timestamptz not null default now(),
+  cells jsonb not null,
+  claims jsonb not null
+);
+
+-- No policies at all -- this is an internal recovery mechanism, not
+-- player-facing data; nobody (including the anon/authenticated roles
+-- normal gameplay uses) can read or write it directly. Same deny-all
+-- pattern as rate_limits.
+alter table public.world_snapshots enable row level security;
+
+create or replace function public.take_world_snapshot()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.world_snapshots (cells, claims)
+  values (
+    (select coalesce(jsonb_object_agg(x || ',' || y || ',' || z, data), '{}'::jsonb) from public.cells),
+    (select coalesce(jsonb_object_agg(id, jsonb_build_object(
+      'ownerId', owner_id, 'shellIndex', shell_index,
+      'center', jsonb_build_array(center_x, center_y, center_z),
+      'size', size, 'destructible', destructible, 'grantedAt', granted_at
+    )), '{}'::jsonb) from public.claims)
+  );
+  -- Retention: keep the last 30 snapshots (daily cadence below -> ~1
+  -- month of history) rather than growing this table forever.
+  delete from public.world_snapshots
+    where id not in (select id from public.world_snapshots order by taken_at desc limit 30);
+end;
+$$;
+
+revoke all on function public.take_world_snapshot() from public, anon, authenticated;
+
+-- Daily at 03:00 UTC -- low-traffic hour for a small hobby project,
+-- arbitrary but reasonable; not derived from any real usage data since
+-- none exists yet. Verified live: manually invoked take_world_snapshot()
+-- once and confirmed a correct row landed in world_snapshots, and
+-- confirmed cron.job shows this schedule registered and active.
+select cron.schedule('daily-world-snapshot', '0 3 * * *', $$select public.take_world_snapshot()$$);
+
+-- Real finding while adding the job above, 2026-08-13: enabling pg_cron
+-- pulled in its own default grants, which include EXECUTE on
+-- cron.schedule/cron.unschedule for the anon AND authenticated roles --
+-- Supabase's own default when the extension is enabled, not something
+-- this migration set, and (confirmed by testing) not something this
+-- project's own postgres role has sufficient privilege to revoke --
+-- those grants are owned/protected by supabase_admin. Investigated
+-- rather than assumed dangerous: a direct curl against
+-- /rest/v1/rpc/schedule with the public anon key returns a clean
+-- PostgREST 404 ("Could not find the function public.schedule..."),
+-- confirming PostgREST only ever searches the public schema for RPC
+-- targets and never routes to `cron.*` at all -- the raw Postgres grant
+-- is real but genuinely unreachable through this app's actual public
+-- API surface (the anon/publishable key). It would only matter to
+-- someone holding a direct Postgres connection string, a completely
+-- different and already-protected secret. Left as a documented,
+-- investigated non-issue rather than either silently ignored or
+-- incorrectly claimed fixed.
+revoke all on function cron.schedule(text, text) from public, anon, authenticated;
+revoke all on function cron.schedule(text, text, text) from public, anon, authenticated;
+revoke all on function cron.unschedule(text) from public, anon, authenticated;
+revoke all on function cron.unschedule(bigint) from public, anon, authenticated;

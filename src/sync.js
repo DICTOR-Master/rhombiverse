@@ -125,11 +125,27 @@ export async function loadSharedWorld() {
 // cells_update_any_authenticated policy) supabase-js's upsert only SETs
 // the columns actually passed, so the original author_id is left alone
 // instead of being overwritten by whoever happened to trigger the update.
+// Optional hook render.js registers to surface a sync failure to the
+// player -- e.g. schema.sql's cells_rate_limit trigger rejecting a
+// write. pushCellUpsert/pushCellDelete otherwise fail silently (see
+// their own comments below), which is normally fine but means a rate
+// limit hit -- or any real sync problem -- would previously vanish into
+// the console with the player none the wiser their build stopped
+// reaching the shared world. render.js debounces this itself; this
+// module just reports every failure, unfiltered.
+let syncErrorHandler = null;
+export function setSyncErrorHandler(fn) {
+  syncErrorHandler = fn;
+}
+
 export async function pushCellUpsert(x, y, z, data) {
   const { error } = await supabase
     .from('cells')
     .upsert({ x, y, z, data, updated_at: new Date().toISOString() });
-  if (error) console.warn('Rhombiverse sync: upsert failed', x, y, z, error);
+  if (error) {
+    console.warn('Rhombiverse sync: upsert failed', x, y, z, error);
+    syncErrorHandler?.(error);
+  }
 }
 
 // A delete against a cell this session didn't author is silently
@@ -139,7 +155,10 @@ export async function pushCellUpsert(x, y, z, data) {
 // own comment), so no special-casing is needed here for that case.
 export async function pushCellDelete(x, y, z) {
   const { error } = await supabase.from('cells').delete().match({ x, y, z });
-  if (error) console.warn('Rhombiverse sync: delete failed', x, y, z, error);
+  if (error) {
+    console.warn('Rhombiverse sync: delete failed', x, y, z, error);
+    syncErrorHandler?.(error);
+  }
 }
 
 // Grants a claim server-side (RHOMBIVERSE_SPEC_REGIONS.md). Geometry
