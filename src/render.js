@@ -106,6 +106,12 @@ controls.mouseButtons.RIGHT = null;
 let walking = false;
 let player = null;
 let planetoids = {};
+// Mirrors world.getClaims(), same module-level pattern as planetoids
+// above -- gravityAt() (RHOMBIVERSE_SPEC_LOOPHOLES.md section 5) and
+// updateGravityInfo() both need it but live outside init()'s scope where
+// `world` itself is declared, so it's kept in sync via refreshClaims()
+// (inside init()) instead of read from world directly.
+let currentClaims = {};
 
 // Shared World (Phase 5) state. sharedWorldActive gates both directions
 // of sync: whether local mutations get pushed (handleLocalAdd/Remove,
@@ -147,7 +153,17 @@ function updateGravityInfo() {
     el.textContent = 'No planetoid yet — place a Blackstar-Glassite cell to create a gravity source.';
     return;
   }
-  const status = nearest.active ? 'active' : 'out of range (build closer to the core, or add more BSG)';
+  // Distinguishes "gravity active" from "gravity WOULD be active, but
+  // you're standing in a protected claim" -- gravityAt is the real
+  // physics function (RHOMBIVERSE_SPEC_LOOPHOLES.md section 5), so the
+  // hint reads the same source of truth player.js actually acts on
+  // rather than showing "active" for a pull that isn't really happening.
+  const reallyActive = !!gravityAt(refPos, planetoids, currentClaims);
+  const status = !nearest.active
+    ? 'out of range (build closer to the core, or add more BSG)'
+    : reallyActive
+      ? 'active'
+      : 'blocked — you\'re in a protected claim';
   const hydro = nearest.hydrosphereActive ? ' · hydrosphere+atmosphere active' : '';
   const blackHole = nearest.isBlackHole
     ? ` · BLACK HOLE — ledger ${nearest.consumedMatter} · generated ${nearest.generatedCellCount} cells through shell ${nearest.generatedThroughShell}`
@@ -371,7 +387,7 @@ async function init() {
   player = createPlayerController({
     camera,
     domElement: renderer.domElement,
-    getGravity: (pos) => gravityAt(pos, planetoids),
+    getGravity: (pos) => gravityAt(pos, planetoids, currentClaims),
   });
   updateGravityInfo();
 
@@ -712,7 +728,18 @@ async function init() {
       child.material.dispose();
     }
     const claims = world.getClaims();
+    currentClaims = claims;
     const ids = Object.keys(claims);
+
+    // One claim per player (RHOMBIVERSE_SPEC_LOOPHOLES.md section 2) --
+    // disable the button once this session already owns one, rather than
+    // letting them click it again just to see the "already have a claim"
+    // error every time. Only touches the button while Shared World is
+    // actually active; setClaimLandEnabled(false) on disconnect already
+    // covers the other case.
+    if (sharedWorldActive) {
+      claimLandBtn.disabled = ids.some((id) => claims[id].ownerId === myUserId);
+    }
 
     for (const id of ids) {
       const claim = claims[id];
@@ -805,7 +832,14 @@ async function init() {
       claimHint.textContent = `Claim failed: ${err.message}`;
       console.warn('Rhombiverse: claim failed', err);
     } finally {
-      claimLandBtn.disabled = !sharedWorldActive;
+      // NOT unconditionally re-enabled here -- a real bug caught live:
+      // this used to always flip back to `!sharedWorldActive` (i.e.
+      // enabled), immediately undoing refreshClaims()'s own "you already
+      // own a claim, disable the button" state set moments earlier in the
+      // try block above. Re-derive the same ownership check instead of
+      // fighting refreshClaims for the last word.
+      claimLandBtn.disabled =
+        !sharedWorldActive || Object.values(world.getClaims()).some((c) => c.ownerId === myUserId);
     }
   });
 

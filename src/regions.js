@@ -87,6 +87,16 @@ function findFreeSlot(world, sizeShells) {
 // same free slot, caught server-side by the claims table's own primary
 // key -- see supabase/schema.sql).
 export function computeClaim(world, ownerId, sizeShells = CLAIM_SIZE_SHELLS) {
+  // RHOMBIVERSE_SPEC_LOOPHOLES.md section 2: "one claim per verified
+  // account." This is a fast, friendly pre-check against the LOCAL
+  // (possibly slightly stale) claims view -- the real guarantee is
+  // public.claims's own UNIQUE(owner_id) constraint (supabase/schema.sql),
+  // which a claim attempt still has to clear regardless of what this
+  // check sees.
+  const alreadyOwns = Object.values(world.getClaims()).some((c) => c.ownerId === ownerId);
+  if (alreadyOwns) {
+    throw new Error('You already have a claim — one claim per player.');
+  }
   const center = findFreeSlot(world, sizeShells);
   if (!center) {
     throw new Error(`No free claim slot found within ${MAX_CLAIM_SEARCH_SHELL} shells of world center`);

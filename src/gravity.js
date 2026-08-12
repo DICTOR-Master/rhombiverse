@@ -11,6 +11,7 @@
 // Isolation/Adaptive Damping (RHOMBIVERSE_PRINCIPLES.md sections 1-2)
 // don't yet apply; revisit when the shockwave follow-up lands.
 import { NEIGHBOR_OFFSETS, cellKey, parseCellKey, cellToWorld } from './lattice.js';
+import { isClaimProtected } from './regions.js';
 
 export const BSG_MATERIAL = 'blackstar-glassite';
 
@@ -160,7 +161,26 @@ export function nearestPlanetoid(position, planetoids) {
 // "treat as normal flat-gravity or zero-gravity space" for inert cells;
 // this project's space setting makes zero-gravity the natural default
 // (see player.js).
-export function gravityAt(position, planetoids) {
+//
+// claims (optional, defaults to none): RHOMBIVERSE_SPEC_LOOPHOLES.md
+// section 5's entity-pull consent gap -- block destruction inside a
+// protected (destructible: false) claim was already blocked
+// (blackhole.js/supernova.js's isClaimProtected checks), but nothing
+// stopped a hazard's GRAVITY from still pulling a player's own avatar
+// while standing inside one, which is a distinct unwanted effect. Reuses
+// the exact same isClaimProtected check regions.js already provides for
+// cells, applied here to the entity's own position (rounded to its
+// nearest lattice cell, since claims are defined in cell space, not
+// continuous world space -- an entity standing exactly between cells
+// simply won't match any claim footprint, which is a safe, conservative
+// fallback since this only ever withholds a protection benefit, never
+// grants an exploit).
+export function gravityAt(position, planetoids, claims = {}) {
   const nearest = nearestPlanetoid(position, planetoids);
-  return nearest && nearest.active ? nearest : null;
+  if (!nearest || !nearest.active) return null;
+  const cx = Math.round(position.x);
+  const cy = Math.round(position.y);
+  const cz = Math.round(position.z);
+  if (isClaimProtected(claims, cx, cy, cz)) return null;
+  return nearest;
 }

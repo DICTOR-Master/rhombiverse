@@ -128,3 +128,10 @@ $$;
 create trigger claims_immutable_geometry
   before update on public.claims
   for each row execute function public.claims_enforce_immutable_geometry();
+
+-- RHOMBIVERSE_SPEC_LOOPHOLES.md section 2: "one claim per verified
+-- account." A UNIQUE constraint is the real, server-side enforcement --
+-- regions.js's client-side pre-check (computeClaim) is a fast, friendly
+-- error path, not the actual guarantee; a modified/malicious client
+-- skipping that check still hits this constraint on INSERT.
+alter table public.claims add constraint claims_one_per_owner unique (owner_id);

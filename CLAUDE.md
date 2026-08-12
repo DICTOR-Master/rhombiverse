@@ -1072,6 +1072,59 @@ server truth. Verified live end-to-end: toggled off then back on,
 confirmed both the checkbox state and the DB row's actual `destructible`
 column matched at every step, zero console errors.
 
+**`RHOMBIVERSE_SPEC_LOOPHOLES.md`, two of five fixes applied, 2026-08-12
+— the other three checked and found genuinely blocked or already
+satisfied, not silently skipped.** Read the whole spec first: #1 (decay-
+reset gaming) and #4 (claim allocation overlapping pre-seeded content)
+are both hard-blocked on `SPEC_TRADE_INVENTORY.md`/`SPEC_ASTEROIDS.md`
+existing, neither of which does yet. #3 (supernova/black hole matter
+farming) is already closed by the existing design, not by new code: a
+star can only ever detonate once (`starLedger.detonated`), and
+`detonate()`'s scatter loop is a strict 1:1 match against consumed
+foreign mass (`if (placed >= scatterCount) break`) — no path to net-
+positive farming exists to patch. Applied the two that were both
+unblocked and genuinely missing:
+- **#2 (one claim per account, the claims half only — the asteroid-spawn-
+  scaling half is still blocked on Asteroids not existing).** `public.
+  claims` gained a real `UNIQUE(owner_id)` constraint — verified directly
+  against the DB (a second INSERT for the same owner genuinely fails)
+  before touching any app code, same discipline as the destructible-
+  toggle trigger above. `regions.js`'s `computeClaim` gained a matching
+  client-side pre-check for a fast, friendly error — the constraint is
+  the real guarantee, the pre-check is just better UX. `render.js`'s
+  Claim Land button now disables itself once the session already owns a
+  claim, via the same `refreshClaims()` that already tracks this.
+- **#5 (gravity-pull vs. destruction consent gap).** `gravity.js`'s
+  `gravityAt(position, planetoids, claims)` gained a third param: reuses
+  `isClaimProtected` (already proven correct for block-destruction) on
+  the ENTITY's own position instead of a candidate cell — a player
+  standing inside a protected claim is never gravitationally pulled,
+  regardless of proximity to the hazard, closing a distinct consent gap
+  from block-destruction (which was already closed). `render.js` threads
+  a new module-level `currentClaims` (same cross-scope pattern as the
+  existing `planetoids` variable, needed since `gravityAt` is called from
+  both `init()`-scoped and module-level `animate()`/`updateGravityInfo()`
+  code) through to both `player.js`'s real physics and the gravity-info
+  hint text, which now distinguishes "active" from "blocked — you're in a
+  protected claim" instead of showing a status that doesn't match what
+  physically happens.
+**Real bug caught only by live testing, not the implementation itself**:
+Claim Land's own `finally` block unconditionally reset
+`claimLandBtn.disabled = !sharedWorldActive` (i.e. re-enabled it)
+regardless of outcome, silently undoing `refreshClaims()`'s "you already
+own a claim, stay disabled" state set moments earlier in the SAME click
+handler's try block — every successful claim looked fine but immediately
+made the button clickable again. Fixed by re-deriving the same ownership
+check in `finally` instead of a blind reset. Verified live end-to-end
+after the fix: real UI click correctly grants one claim then disables the
+button; forcing the button back on and clicking again gets rejected by
+the real `computeClaim` guard with the exact error text; `gravityAt`
+exercised directly via dynamic import in a live page (not simulated) —
+a position inside a protected claim returns no gravity, the same
+position with zero claims defined still returns gravity, and a position
+just outside the claim but within gravity range still gets pulled. Zero
+console errors throughout.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World), and
 `RHOMBIVERSE_SPEC_REGIONS.md` (data layer, allocation, hazard-mechanic
