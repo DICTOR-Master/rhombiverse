@@ -98,7 +98,21 @@
     #ring-list .placeholder { opacity: 0.6; }
     #claims-list { max-height: 140px; overflow-y: auto; margin-top: 4px; }
     #claims-list .placeholder { opacity: 0.6; }
-    #claims-list .claim-item { padding: 2px 0; font-size: 12px; }
+    #claims-list .claim-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 2px 0;
+      font-size: 12px;
+    }
+    #claims-list .claim-destructible-toggle {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
   </style>
   <!--
     No bundler/build step by design (Grounded Simplicity, RHOMBIVERSE_PRINCIPLES.md

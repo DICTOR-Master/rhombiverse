@@ -29,6 +29,7 @@ import {
   pushCellUpsert,
   pushCellDelete,
   pushClaim,
+  pushClaimDestructible,
   subscribeToSharedWorld,
 } from './sync.js';
 import { computeClaim, claimBoundingRadius } from './regions.js';
@@ -741,9 +742,39 @@ async function init() {
       const mine = claim.ownerId === myUserId;
       const row = document.createElement('div');
       row.className = 'claim-item';
-      row.textContent =
+      const label = document.createElement('span');
+      label.textContent =
         `${mine ? '★ ' : ''}${id} — shell ${claim.shellIndex} — ` +
         `${mine ? 'you' : claim.ownerId.slice(0, 8)}`;
+      row.appendChild(label);
+      // Only your own claims get the toggle -- RLS would silently reject
+      // an attempt on anyone else's anyway (claims_update_own), so there's
+      // no point offering a control that can only ever fail.
+      if (mine) {
+        const toggle = document.createElement('label');
+        toggle.className = 'claim-destructible-toggle';
+        toggle.title = 'Protect this claim from black hole/supernova consumption';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = claim.destructible === false;
+        checkbox.addEventListener('change', async () => {
+          checkbox.disabled = true;
+          try {
+            const newValue = checkbox.checked ? false : true;
+            await pushClaimDestructible(id, newValue);
+            world.addClaim(id, { ...claim, destructible: newValue });
+            refreshClaims();
+          } catch (err) {
+            checkbox.checked = !checkbox.checked; // revert on failure
+            console.warn('Rhombiverse: destructible toggle failed', err);
+          } finally {
+            checkbox.disabled = false;
+          }
+        });
+        toggle.appendChild(checkbox);
+        toggle.appendChild(document.createTextNode('Protected'));
+        row.appendChild(toggle);
+      }
       claimsListEl.appendChild(row);
     }
   }

@@ -1047,12 +1047,30 @@ clicked Claim Land, confirmed the list showed `★ claim_0_0_0 — shell 0 —
 you` and a screenshot showed a real green wireframe sphere centered
 exactly on the claimed seed cell, then disabled Shared World and
 confirmed the list reset to empty — zero console errors throughout.
-**Still deferred, explicitly**: `destructible` can only ever be set at
-grant time (`false`, hard-coded) since `public.claims` has no UPDATE RLS
-policy — an owner can't yet toggle it after the fact; that would need a
-real, deliberately-scoped RLS policy (e.g. "owner can update destructible
-only, never center/size"), not just flipping RLS open, so it's left as a
-named follow-up rather than done here.
+**`destructible` toggle after grant added, 2026-08-12 — same session,
+closing the exact gap named above, per direct instruction.** Built
+exactly as flagged: a real, narrowly-scoped RLS policy, not RLS flipped
+open. `claims_update_own` allows UPDATE only from the row's own owner;
+since a plain RLS `WITH CHECK` only ever sees the NEW row (can't compare
+against OLD to block specific columns), a `BEFORE UPDATE` trigger
+(`claims_enforce_immutable_geometry`) does the actual enforcement —
+raises if `id`/`owner_id`/`shell_index`/`center_*`/`size`/`granted_at`
+differ from OLD, `destructible` is the only column exempted. Verified
+directly against the database BEFORE wiring any app code around it (this
+is a hard safety guarantee, worth confirming in isolation first): a raw
+`UPDATE ... SET destructible = true` succeeded, a raw `UPDATE ... SET
+center_x = 99` on the same row failed with the trigger's own exception.
+`sync.js` gained `pushClaimDestructible()` and an UPDATE handler on the
+claims realtime subscription (reusing the same `onRemoteClaim` callback
+as INSERT, since `world.addClaim`'s overwrite-by-key semantics already
+handle both correctly with no extra logic). `render.js`'s claims list
+gained a "Protected" checkbox, shown only on the player's own claims
+(RLS would just silently reject an attempt on anyone else's, so there's
+no point offering a control that can only fail) — reverts optimistic
+local state on a failed push rather than leaving the UI lying about
+server truth. Verified live end-to-end: toggled off then back on,
+confirmed both the checkbox state and the DB row's actual `destructible`
+column matched at every step, zero console errors.
 
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World), and

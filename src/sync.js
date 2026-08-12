@@ -110,18 +110,19 @@ export async function pushCellDelete(x, y, z) {
   if (error) console.warn('Rhombiverse sync: delete failed', x, y, z, error);
 }
 
-// Grants a claim server-side (RHOMBIVERSE_SPEC_REGIONS.md). Claims are
-// INSERT-only -- see supabase/schema.sql's own comment: no update/delete
-// RLS policy exists at all, so this is the only claims write this file
-// will ever offer, by design (section 2's "never resized/moved/shrunk").
-// owner_id/granted_at come from DB column defaults (auth.uid()/now()),
-// deliberately omitted from the payload for the same reason
-// pushCellUpsert omits author_id -- the server, not the client, is the
-// source of truth for who actually made the request. Throws (does not
-// swallow) on failure, unlike pushCellUpsert/pushCellDelete -- a caller
-// needs to know a claim attempt genuinely failed (e.g. a concurrent-grant
-// race losing to the table's own primary key) before treating it as
-// real, since render.js applies a claim locally only after this succeeds.
+// Grants a claim server-side (RHOMBIVERSE_SPEC_REGIONS.md). Geometry
+// (center/size/shellIndex) is permanent once granted -- enforced by a
+// real BEFORE UPDATE trigger server-side (supabase/schema.sql's
+// claims_enforce_immutable_geometry), not just by this file only ever
+// offering an insert here. owner_id/granted_at come from DB column
+// defaults (auth.uid()/now()), deliberately omitted from the payload for
+// the same reason pushCellUpsert omits author_id -- the server, not the
+// client, is the source of truth for who actually made the request.
+// Throws (does not swallow) on failure, unlike pushCellUpsert/
+// pushCellDelete -- a caller needs to know a claim attempt genuinely
+// failed (e.g. a concurrent-grant race losing to the table's own primary
+// key) before treating it as real, since render.js applies a claim
+// locally only after this succeeds.
 export async function pushClaim(claimId, claimData) {
   const [cx, cy, cz] = claimData.center;
   const { error } = await supabase.from('claims').insert({
@@ -136,10 +137,25 @@ export async function pushClaim(claimId, claimData) {
   if (error) throw error;
 }
 
+// Toggles destructible on an EXISTING claim -- the one column the
+// claims_update_own RLS policy + claims_immutable_geometry trigger
+// together allow the owner to change post-grant; any attempt to touch
+// geometry through this same path would be rejected server-side, not
+// just discouraged client-side. RLS's own `owner_id = auth.uid()` check
+// means this silently affects zero rows if called against a claim this
+// session doesn't own -- callers (render.js) should only ever offer the
+// toggle on the player's own claims in the first place, but the server
+// is the real backstop regardless.
+export async function pushClaimDestructible(claimId, destructible) {
+  const { error } = await supabase.from('claims').update({ destructible }).eq('id', claimId);
+  if (error) throw error;
+}
+
 // Subscribes to realtime INSERT/UPDATE/DELETE on public.cells (enabled
 // via schema.sql's `alter publication supabase_realtime add table
-// public.cells`), plus INSERT on public.claims (claims never update or
-// delete, so that's the only event type there is to hear). Postgres
+// public.cells`), plus INSERT/UPDATE on public.claims (no DELETE there --
+// claims are never removed, only ever granted or destructible-toggled).
+// Postgres
 // changes broadcast to every subscriber including the client that made
 // the write, so onRemoteUpsert/onRemoteDelete/onRemoteClaim WILL fire for
 // this session's own pushes too -- callers must be idempotent against
@@ -166,6 +182,10 @@ export function subscribeToSharedWorld({ onRemoteUpsert, onRemoteDelete, onRemot
       onRemoteDelete(x, y, z);
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'claims' }, (payload) => {
+      if (!onRemoteClaim) return;
+      onRemoteClaim(payload.new.id, claimFromRow(payload.new));
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'claims' }, (payload) => {
       if (!onRemoteClaim) return;
       onRemoteClaim(payload.new.id, claimFromRow(payload.new));
     })

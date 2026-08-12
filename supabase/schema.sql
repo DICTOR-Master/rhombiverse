@@ -93,3 +93,38 @@ create policy "claims_insert_own" on public.claims
   for insert with check (owner_id = auth.uid());
 
 alter publication supabase_realtime add table public.claims;
+
+-- Lets a claim's owner toggle `destructible` after grant, without
+-- reopening geometry to change. Plain RLS (USING/WITH CHECK) only ever
+-- sees the NEW row, so it can't by itself compare against OLD to block
+-- specific column changes -- a BEFORE UPDATE trigger is the correct,
+-- standard Postgres way to enforce "only this column may change," and
+-- matches this table's existing philosophy (INSERT-only was already
+-- chosen specifically to hard-enforce immutability at the DB level, not
+-- just in application code -- see the table's own comment above).
+create policy "claims_update_own" on public.claims
+  for update using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+create or replace function public.claims_enforce_immutable_geometry()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.id is distinct from old.id
+     or new.owner_id is distinct from old.owner_id
+     or new.shell_index is distinct from old.shell_index
+     or new.center_x is distinct from old.center_x
+     or new.center_y is distinct from old.center_y
+     or new.center_z is distinct from old.center_z
+     or new.size is distinct from old.size
+     or new.granted_at is distinct from old.granted_at
+  then
+    raise exception 'claims are immutable except destructible (RHOMBIVERSE_SPEC_REGIONS.md section 2)';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger claims_immutable_geometry
+  before update on public.claims
+  for each row execute function public.claims_enforce_immutable_geometry();
