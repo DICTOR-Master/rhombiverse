@@ -8,35 +8,40 @@ Each item below is tagged with **when it's required by**, mapped to the phases i
 
 ## Required before Phase 4 (public playable link)
 
-- [ ] **License file** (`LICENSE`) — deliberately deferred (2026-08-11): repo stays private/unlicensed for now, per direct instruction. Revisit before flipping the GitHub repo to public — decision affects who can fork/commercialize later, treat as near-irreversible once adopted.
-- [x] **Terms of Service** — `TERMS.md` added 2026-08-11 (minimal, matches current no-account/no-backend scope; flagged for real legal review once Phase 5+ adds accounts/shared worlds).
-- [x] **Privacy Policy** — `PRIVACY.md` added 2026-08-11 (no server-side collection at this stage; localStorage/export-JSON only).
-- [x] **SECURITY.md** — added 2026-08-11, reporting contact + GitHub private advisory link, scope note for the current static/no-backend stage.
+- [x] **License file** (`LICENSE`) — deliberately deferred 2026-08-11, added 2026-08-12 (MIT, direct instruction) once the public deploy actually happened.
+- [x] **Terms of Service** — `TERMS.md` added 2026-08-11; updated 2026-08-13 to cover Shared World (opt-in, what placing content there actually means, land claims) now that Phase 5 is live — no longer just the original no-account/no-backend scope. Still flagged for real legal review before this project takes on real accounts, payments, or a larger user base.
+- [x] **Privacy Policy** — `PRIVACY.md` added 2026-08-11; updated 2026-08-13 to disclose Shared World's anonymous per-browser identity and Supabase as a third-party processor. Still honest that Shared World has no self-service deletion tooling yet (see its own "Data deletion" section) rather than overclaiming.
+- [x] **SECURITY.md** — added 2026-08-11, reporting contact + GitHub private advisory link. Its own "Scope" note still describes the original static/no-backend stage — worth a pass to mention the Supabase backend now that it exists, not blocking.
 - [x] **Input sanitization audit** — done 2026-08-11: no user-submitted text (world name, imported JSON, material strings) is ever passed to `innerHTML`/`outerHTML`/`insertAdjacentHTML`/`document.write`. The three `innerHTML` uses in `src/render.js` (ring-list placeholder/empty states) are static literals, not interpolated data. All dynamic text (shell labels, counts) goes through `.textContent`, which auto-escapes. Imported JSON is parsed via `JSON.parse` only (no `eval`), and `worldName` is currently never rendered into the DOM at all. `MATERIAL_COLORS[material] ?? MATERIAL_COLORS.base` is a safe plain-object lookup with fallback — no dynamic property write, no code execution path. **No fixes were needed; nothing found.** Re-run this audit if user-facing text (chat, usernames) is added in a later phase.
 
 ## Required before Phase 5 (shared/multiplayer backend)
 
-- [ ] **Backend write authentication** — no unauthenticated or unlimited writes to the shared world-state once a real backend exists.
-- [ ] **Rate limiting** — cap builds/placements per user/time window to prevent griefing or lattice-spam.
-- [ ] **Backup strategy independent of live world-state** — the Phase 5.8 snapshot/rollback system doubles as moderation tooling AND disaster recovery, but confirm backups are stored somewhere separate from the live DB.
-- [ ] **GDPR considerations** (if EU users possible) — right to data export and deletion; consent flow for any analytics.
-- [ ] **CCPA considerations** (if California users possible) — similar deletion/disclosure rights.
+Phase 5 (Shared World) shipped 2026-08-12 — this section is no longer forward-looking, it's the actual current backend.
+
+- [x] **Backend write authentication** — done via Supabase RLS (`supabase/schema.sql`): every write policy keys off `auth.uid()` (anonymous sign-in, no unauthenticated writes possible), not just app-level checks. `cells_insert_own`/`claims_insert_own` restrict authorship; `cells_delete_own` (plus the additive `cells_delete_asteroid` policy) restricts deletion.
+- [ ] **Rate limiting** — still genuinely open; RLS proves *who* wrote something but doesn't cap *how often*. Real gap now that the repo (and the publishable key + schema it ships) is public and discoverable — being worked on directly.
+- [ ] **Backup strategy independent of live world-state** — still open; being investigated directly (what Supabase's own plan actually provides vs. what needs to be added).
+- [ ] **GDPR considerations** (if EU users possible) — still open; `PRIVACY.md` at least discloses what's collected and is honest that shared-world deletion is manual/best-effort for now, but a real consent flow / self-service export-and-delete doesn't exist. Needs real legal review before this matters at any real scale.
+- [ ] **CCPA considerations** (if California users possible) — same gap as GDPR above.
 
 ## Required before/alongside Phase 5.8 (Trust Zones / Moderation)
 
-- [ ] **Written community guidelines** — human-readable standard for what gets promoted `pending → reviewed/core` vs `flagged/removed`. The ring system is mechanism; this is the judgment layer humans apply.
-- [ ] **DMCA takedown process, documented** — required for safe-harbor protection once UGC exists publicly; even a simple documented process (who receives reports, how content is pulled) matters legally.
-- [ ] **User-content ownership clause in ToS** — state whether players own what they build and what license they grant you to host/display/moderate it.
-- [ ] **COPPA review** (US) — if minors may realistically use the app, this is a real legal obligation around data collection from under-13 users, not satisfied by "family-friendly" design alone. Get real legal review here if audience will include children.
-- [ ] **Moderator scaling plan** — identify at least a backup reviewer; a single-moderator bottleneck is a common failure point for small UGC open-source projects.
-- [ ] **Player-to-player abuse handling** — separate from content moderation; needed once usernames/chat/presence exist.
+- [ ] **Written community guidelines** — still open for the actual in-game moderation judgment layer (what gets promoted `pending → reviewed/core` vs `flagged/removed`); the ring system is mechanism, this is the judgment humans apply on top of it. Distinct from the *community-space* guidelines added 2026-08-13 (the Discussions welcome post + `CODE_OF_CONDUCT.md`), which cover conduct in GitHub Issues/PRs/Discussions, not in-world content review.
+- [ ] **DMCA takedown process, documented** — still open, and now genuinely relevant rather than forward-looking: the repo is public (2026-08-13) and Shared World is live UGC. Worth prioritizing.
+- [x] **User-content ownership clause in ToS** — `TERMS.md`'s "Shared World and your content" section (added 2026-08-13) states what placing content in Shared World means: visible to and buildable-near by other players, may outlive your session, and the license you grant Rhombiverse to store/transmit/display it.
+- [ ] **COPPA review** (US) — still open, real legal review needed if the audience may include children. `PRIVACY.md`'s "Children's privacy" section is honest about collecting no PII even via Shared World's anonymous identity, but that's not a substitute for real review.
+- [ ] **Moderator scaling plan** — still open (single maintainer).
+- [ ] **Player-to-player abuse handling** — `CODE_OF_CONDUCT.md` (2026-08-13) now covers this for GitHub-side spaces (Issues/PRs/Discussions, which do have usernames). In-world player-to-player abuse handling (no chat/presence system exists yet) is still not applicable/not built.
 
 ## Required before/alongside going public as an open-source repo
 
-- [ ] **CONTRIBUTING.md** — how outside contributors submit changes, coding conventions, PR process.
-- [ ] **CODE_OF_CONDUCT.md** — standard for contributor behavior (many projects adopt the Contributor Covenant as-is).
-- [ ] **CLA decision** — only needed if you want to retain rights to relicense later (e.g. dual open-source/commercial). Skip entirely if you want the simplest possible open project — this is optional, not required.
-- [ ] **.env / secrets audit** — confirm no API keys or credentials are anywhere in git history before flipping repo visibility to public (check history, not just current files — a past commit with a leaked key remains exposed even after removal).
+Done, and the repo actually went public 2026-08-13.
+
+- [x] **CONTRIBUTING.md** — added 2026-08-13. Explicitly welcomes AI-assisted/AI-generated PRs on equal footing with human ones (this repo has genuinely been built collaboratively with an AI coding agent from the start), asks for disclosure and real evidence of testing.
+- [x] **CODE_OF_CONDUCT.md** — added 2026-08-13, the standard Contributor Covenant v2.1 adopted as-is, per this doc's own suggestion below.
+- [x] **CLA decision** — skipped, per this doc's own explicit guidance that it's optional and unnecessary for the simplest open setup.
+- [x] **.env / secrets audit** — done 2026-08-13 across full git history before flipping visibility: no `.env` files ever committed, no service-role/private keys, only the already-documented, intentionally-public Supabase publishable key (security is RLS, not key secrecy).
+- [x] **GitHub Discussions enabled** — 2026-08-13, with light structured templates (`.github/DISCUSSION_TEMPLATE/`) on the Ideas/Q&A categories to nudge toward specificity, and a pinned welcome post explaining category purposes and the same "open commons, good faith over enforcement" framing as `TERMS.md`. Not originally a checklist item here, but the same category of "open-source readiness" work.
 
 ## Ongoing / lower urgency (worth designing for early, not blocking)
 
