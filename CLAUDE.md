@@ -1236,6 +1236,70 @@ enforced, not just documented); simulating the activity window expiring
 → target dropped back to 3, and a further spawning pass touched zero of
 the 18 already-seeded nodes. Zero console errors.
 
+**Two real cross-player bugs found and fixed, 2026-08-12, while starting
+to build Supabase sync for the regrowth queue** (that work itself wasn't
+finished this pass -- see below). Neither was found by review; both
+surfaced only from a genuine two-browser-session live test, the same
+technique already established this session for claims.
+
+1. **Asteroid cells were undeletable by anyone except whoever happened
+   to seed them.** `public.cells`'s existing `cells_delete_own` RLS
+   policy requires `author_id = auth.uid()`; since `pushCellUpsert`
+   omits `author_id` (relying on the column default at INSERT time),
+   whichever session's `seedAsteroidBelts` call ran first became the
+   permanent, sole `author_id` for all 78 seeded cells. Every other
+   player's right-click "mine" would optimistically vanish the cell in
+   their OWN view while the actual server-side DELETE silently failed
+   (RLS violations on DELETE just affect zero rows, no error surfaced) --
+   asteroid mining has never actually worked cross-player until now.
+   Fixed with an additional, purely permissive RLS policy,
+   `cells_delete_asteroid` (`using (data->>'asteroidNodeId' is not
+   null)`) -- Postgres OR's multiple permissive policies for the same
+   command together, so this is strictly additive: your own cells
+   (existing policy) OR any asteroid-tagged cell (this one). Verified
+   with a real two-session test: Session A seeded 78 cells (confirmed via
+   direct SQL, single author, before B ever connected -- eliminating
+   timing as a factor); Session B navigated to the belt and right-clicked
+   a real cell; A's count dropped to 77 in the database, confirming a
+   genuine cross-player DELETE succeeded for the first time.
+2. **Asteroid belts were purely local/cosmetic in Shared World the whole
+   time -- never actually reaching Supabase at all.** In
+   `enableSharedWorld()`, `seedAsteroidBelts(world)` was called BEFORE
+   `sharedWorldActive = true` was set. Every `world.addCell` call during
+   seeding fires the `onAdd` hook into `handleLocalAdd`, which itself
+   checks `if (sharedWorldActive && ...)` before pushing -- since that
+   flag was still false during the entire seeding loop, none of the 78
+   `pushCellUpsert` calls ever fired. The belts rendered correctly and
+   looked completely normal in every single-session test this whole
+   session (including the earlier "confirmed 78 cells across 6 nodes"
+   verification, which read from `localStorage`, not Supabase) -- this
+   is exactly why a second, genuinely independent session was needed to
+   catch it; nothing about single-session testing could have. Fixed by
+   moving `sharedWorldActive = true` before `seedAsteroidBelts(world)`.
+   Verified the same way: after the fix, a solo session's seeding
+   produced exactly 78 rows server-side (confirmed via direct SQL),
+   where it had produced zero before.
+
+**Bonus, unplanned confirmation from the same test session**: the
+"second author" that appeared partway through this investigation looked
+at first like a THIRD bug (a reseeding race) -- traced it down to
+`loadSharedWorld()` returning the correct, complete row set every time
+it was checked directly, which ruled that out. It turned out to be
+`applyPopulationScaledSpawning` correctly firing for real: once a second
+session (B) connected, A counted as one recent active author, so
+`target = 3 + min(6, 1*2) = 5` nodes/belt -- exactly 2 extra nodes × 2
+belts × 13 cells = 52, matching what was observed exactly. A genuine,
+unplanned live confirmation of section 5 working correctly beyond the
+synthetic direct-module test from the pass before this one.
+
+**Still not done this pass**: the regrowth queue itself remains
+local-only, not synced to Supabase (the original goal of this pass,
+superseded by the two bugs above once they were found) -- if the player
+who mined a cell disconnects before its cooldown elapses, that specific
+regrowth still won't fire from anyone else's client.
+`RHOMBIVERSE_SPEC_LOOPHOLES.md` section 4 (claim/belt collision guard)
+also remains unbuilt.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World),
 `RHOMBIVERSE_SPEC_REGIONS.md` (data layer, allocation, hazard-mechanic

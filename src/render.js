@@ -956,6 +956,17 @@ async function init() {
       myUserId = session.user.id;
       const shared = await loadSharedWorld();
       world.replaceAll(shared);
+      // Set BEFORE seedAsteroidBelts (and onChange()) -- a real bug
+      // caught only by a live two-session test, not by review: this used
+      // to be set AFTER seeding, so every seeded cell's world.addCell
+      // call fired its onAdd hook while sharedWorldActive was still
+      // false, meaning handleLocalAdd's own `if (sharedWorldActive...)`
+      // guard skipped pushCellUpsert entirely -- asteroid belts have been
+      // purely local/cosmetic in Shared World this whole time, never
+      // actually reaching Supabase. Also still needed for onChange()'s
+      // own localStorage guard and the undo button's disabled state to
+      // already reflect shared mode for this first render.
+      sharedWorldActive = true;
       // Idempotent (checks for existing asteroid-tagged cells first) --
       // safe even if a previous session already seeded this shared world.
       // A rare race exists if two sessions connect to a truly fresh
@@ -966,10 +977,6 @@ async function init() {
       // slightly wasteful; not worth distributed-locking machinery for a
       // one-time bootstrap case. See CLAUDE.md's asteroids status.
       seedAsteroidBelts(world);
-      // Set BEFORE onChange() so its localStorage guard and the undo
-      // button's disabled state already reflect shared mode for this
-      // first render of the shared world.
-      sharedWorldActive = true;
       onChange();
       refreshClaims();
       unsubscribeShared = subscribeToSharedWorld({

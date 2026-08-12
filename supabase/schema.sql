@@ -135,3 +135,16 @@ create trigger claims_immutable_geometry
 -- error path, not the actual guarantee; a modified/malicious client
 -- skipping that check still hits this constraint on INSERT.
 alter table public.claims add constraint claims_one_per_owner unique (owner_id);
+
+-- Real bug found via a live two-session test, 2026-08-12: asteroid cells
+-- (data->>'asteroidNodeId' is not null) got author_id stamped to
+-- whichever session happened to run seedAsteroidBelts first, and the
+-- existing cells_delete_own policy (author_id = auth.uid()) then meant
+-- only that ONE seeding session could ever mine them -- every other
+-- player's right-click silently failed server-side. Mining is meant to
+-- be universal, not owner-gated. Postgres OR's multiple permissive
+-- policies for the same command together, so this is purely additive:
+-- your own cells (existing policy) OR any asteroid-tagged cell (this
+-- one), either allows deletion.
+create policy "cells_delete_asteroid" on public.cells
+  for delete using (data->>'asteroidNodeId' is not null);
