@@ -19,7 +19,19 @@ export async function loadWorld(url) {
 // mutates it in place rather than requiring callers to swap to a new
 // store, so existing closures (build.js's controller, etc.) keep working
 // after a "New World" reset or a JSON import.
-export function createWorldStore(worldJSON) {
+// hooks.onAdd(x,y,z,data)/onRemove(x,y,z), both optional, fire at the end
+// of every addCell/removeCell call -- every mutation path in the app
+// (build.js's click handlers, recolorShell/removeShell, and every
+// apply*() derived-mechanic module) goes through these two methods, so
+// this is the single point sync.js (Phase 5) needs to hook to push local
+// changes to the shared backend, without worldstate.js knowing anything
+// about Supabase/realtime itself. Deliberately NOT called by replaceAll
+// -- a bulk local-view swap (Undo, New World, Import, Load preset) is a
+// personal reset, not a real edit, and must never bulk-push/delete
+// against a shared world (render.js additionally disables those controls
+// entirely while Shared World sync is active, since replaceAll bypassing
+// these hooks means they'd otherwise silently desync the shared view).
+export function createWorldStore(worldJSON, hooks = {}) {
   let worldName = worldJSON.worldName;
   let version = worldJSON.version;
   let meta = { ...worldJSON.meta };
@@ -43,9 +55,11 @@ export function createWorldStore(worldJSON) {
           ? { ...rest, gravitySource: true, gravityWeight: gravityWeight ?? 1.0 }
           : rest;
       cells.set(cellKey(x, y, z), stamped);
+      hooks.onAdd?.(x, y, z, stamped);
     },
     removeCell(x, y, z) {
       cells.delete(cellKey(x, y, z));
+      hooks.onRemove?.(x, y, z);
     },
     entries() {
       return Array.from(cells.entries()).map(([key, data]) => {

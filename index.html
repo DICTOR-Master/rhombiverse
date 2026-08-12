@@ -106,7 +106,8 @@
     {
       "imports": {
         "three": "https://unpkg.com/three@0.185.1/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.185.1/examples/jsm/"
+        "three/addons/": "https://unpkg.com/three@0.185.1/examples/jsm/",
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
       }
     }
   </script>
@@ -183,6 +184,10 @@
         <input id="import-json" type="file" accept="application/json" hidden />
       </label>
     </div>
+    <div class="row">
+      <button id="shared-world-toggle" type="button">Enable Shared World</button>
+    </div>
+    <div id="shared-world-hint" class="hint">Shared World: off.</div>
     <div class="row">
       <label>Load preset:
         <select id="preset-select">

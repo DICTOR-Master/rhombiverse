@@ -80,6 +80,11 @@ function detonate(world, cluster, stats, coreCell, ledger) {
   for (const cell of world.entries()) {
     if (clusterKeys.has(cellKey(cell.x, cell.y, cell.z))) continue; // never touches the star's own structure -- see remnant note above
     if (cell.destructible === false) continue;
+    // Same absolute cross-player guard as blackhole.js's own consumption
+    // loop (2026-08-12, direct instruction) -- a foreign cell authored by
+    // a different player than this star's own core creator is never
+    // touched by detonation, unconditionally.
+    if (cell.authorId && cell.authorId !== coreCell.authorId) continue;
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z);
     if (Math.hypot(wx - center[0], wy - center[1], wz - center[2]) > gravityRadius) continue;
 

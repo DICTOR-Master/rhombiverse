@@ -6,26 +6,24 @@
 // BSG mass crosses BLACK_HOLE_BSG_THRESHOLD; below that, it is an
 // ordinary planetoid (gravity.js) and none of this file's logic applies.
 //
-// SCOPED FOR SINGLE-PLAYER (2026-08-11, direct instruction). The spec's
-// section 4 cross-player consent model says explicitly "this depends on
-// the Phase 5.8 trust-zone/region-ownership system existing first -- do
-// not invent a separate ownership model here," and this repo has no
-// accounts and no Phase 5.8 regions/claims yet -- see CLAUDE.md's
-// "Current status." The real physics/economics below (asymptotic space
-// generation, matter ledger, shellCount cost scaling, bounded radius,
-// adaptive damping) are implemented in full, per direct instruction to
-// build those now rather than wait on Phase 5.8. What's stubbed is
-// narrower than "the whole consent system": in a single-player world the
-// black hole's creator IS the sole owner of every cell that exists, so
-// the spec's own creator-exception clause ("a black hole's creator may
-// always affect their own claimed region") already covers 100% of this
-// world with zero extra code -- there is no "another player's region"
-// for a `destructible` flag to protect yet. What the flag DOES get real,
-// non-fake meaning for today: a per-cell escape hatch so a player can
-// protect specific cells of their OWN build from their OWN black hole
-// (`destructible: false`, hand-set via Export/Import JSON) -- forward-
-// compatible with the eventual cross-player meaning without inventing
-// fake multiplayer state now.
+// SCOPED FOR SINGLE-PLAYER (2026-08-11, direct instruction), UPDATED
+// 2026-08-12 once Shared World (Phase 5) made cross-player consumption a
+// LIVE possibility rather than a hypothetical. The spec's section 4 full
+// consent/region-ownership model still depends on Phase 5.8, not built
+// here -- but per direct instruction ("not possible at all for one
+// player's black hole to swallow another's built work"), an absolute,
+// unconditional guard was added below: any foreign cell with a real
+// `authorId` (stamped by sync.js from Supabase's own auth.uid()-backed
+// `author_id` column) that doesn't match this black hole's own core
+// creator is skipped, full stop -- not an opt-in via `destructible`, no
+// exceptions. This is narrower than Phase 5.8's eventual region/claim
+// system (no shared-ownership regions, no explicit consent grants
+// between specific players) but it is a hard floor: cross-player
+// consumption is categorically impossible regardless of what Phase 5.8
+// eventually adds on top. `destructible: false` remains the finer-
+// grained, OPT-IN escape hatch for protecting specific cells of your OWN
+// build from your OWN black hole (unaffected by the authorId guard,
+// which only ever concerns OTHER players' cells).
 import { shellCount, cellKey, cellToWorld, cellsInShells } from './lattice.js';
 import { BSG_MATERIAL, findClusters, bsgClusterStats } from './gravity.js';
 
@@ -119,6 +117,14 @@ export function applyBlackHoleConsumption(world, now = Date.now()) {
       if (cell.material === BSG_MATERIAL) continue;
       if (cell.generatedByBlackHole) continue;
       if (cell.destructible === false) continue;
+      // Absolute cross-player guard, per direct instruction (2026-08-12):
+      // a foreign cell with a real authorId that differs from this black
+      // hole's own core creator is NEVER consumable, full stop -- not an
+      // opt-in via destructible, unconditional. A cell with no authorId
+      // (local-only play, the static seed, presets, anything that never
+      // went through sync.js) has nothing to protect it FROM here, same
+      // as before this check existed -- fully backward compatible.
+      if (cell.authorId && cell.authorId !== coreCell.authorId) continue;
       const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z);
       const d = Math.hypot(wx - center[0], wy - center[1], wz - center[2]);
       if (d > eventHorizon) continue;

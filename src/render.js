@@ -23,6 +23,13 @@ import {
   exportWorldFile,
   importWorldFile,
 } from './persistence.js';
+import {
+  ensureAnonymousSession,
+  loadSharedWorld,
+  pushCellUpsert,
+  pushCellDelete,
+  subscribeToSharedWorld,
+} from './sync.js';
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -96,6 +103,28 @@ controls.mouseButtons.RIGHT = null;
 let walking = false;
 let player = null;
 let planetoids = {};
+
+// Shared World (Phase 5) state. sharedWorldActive gates both directions
+// of sync: whether local mutations get pushed (handleLocalAdd/Remove,
+// wired into createWorldStore's hooks below) and whether onChange()/the
+// Undo button are allowed to overwrite localStorage (see their own
+// guards) -- while connected, localStorage must stay frozen at whatever
+// the player's private build was, or switching back would silently lose
+// it. applyingRemote suppresses handleLocalAdd/Remove specifically while
+// a just-received remote change is being written into the local store
+// (applyRemoteUpsert/applyRemoteDelete in init()), which would otherwise
+// immediately re-push what was just received and feedback-loop with
+// every other connected client doing the same.
+let sharedWorldActive = false;
+let applyingRemote = false;
+let unsubscribeShared = null;
+
+function handleLocalAdd(x, y, z, data) {
+  if (sharedWorldActive && !applyingRemote) pushCellUpsert(x, y, z, data);
+}
+function handleLocalRemove(x, y, z) {
+  if (sharedWorldActive && !applyingRemote) pushCellDelete(x, y, z);
+}
 
 // Shown near the mode controls regardless of Build/Walk mode -- useful
 // even when nothing is active yet ("no gravity source"), so it doubles as
@@ -266,7 +295,7 @@ async function init() {
   // A saved build takes priority over the static seed -- that's the
   // whole point of Phase 3 (refreshing preserves the build).
   const worldJSON = loadFromLocalStorage() ?? (await loadWorld('./data/starter-world.json'));
-  const world = createWorldStore(worldJSON);
+  const world = createWorldStore(worldJSON, { onAdd: handleLocalAdd, onRemove: handleLocalRemove });
 
   const geometry = buildRDGeometry(SCALE);
   // White base color: actual per-cell color comes entirely from
@@ -317,7 +346,7 @@ async function init() {
 
   function updateUndoButton() {
     const btn = document.getElementById('undo-btn');
-    btn.disabled = undoStack.length === 0;
+    btn.disabled = sharedWorldActive || undoStack.length === 0;
     btn.textContent = undoStack.length > 0 ? `Undo (${undoStack.length})` : 'Undo';
   }
 
@@ -456,13 +485,21 @@ async function init() {
       if (undoStack.length > MAX_UNDO) undoStack.shift();
     }
     lastSnapshot = afterStr;
-    saveToLocalStorage({ ...afterJSON, planetoids });
+    // Frozen while Shared World is active -- otherwise the shared view
+    // (loaded via world.replaceAll(), not the player's own build) would
+    // overwrite their real local save on the very next onChange().
+    if (!sharedWorldActive) saveToLocalStorage({ ...afterJSON, planetoids });
     updateUndoButton();
     renderRingList();
   }
 
+  // Undo reverts the LOCAL view only, via replaceAll -- like New World/
+  // Import/Load preset, it bypasses the addCell/removeCell hooks that
+  // drive sync.js's pushes, so it can't un-push a change already synced
+  // to the shared table. Disabled outright while Shared World is active
+  // (see updateUndoButton) rather than left to silently desync.
   document.getElementById('undo-btn').addEventListener('click', () => {
-    if (undoStack.length === 0) return;
+    if (sharedWorldActive || undoStack.length === 0) return;
     const prev = undoStack.pop();
     world.replaceAll(JSON.parse(prev));
     lastSnapshot = prev;
@@ -567,6 +604,101 @@ async function init() {
       focusedCenterKey = cell.shellCenter || null;
       renderRingList();
     },
+  });
+
+  // Shared World (Phase 5): applyRemoteUpsert/Delete write an incoming
+  // realtime change into the LOCAL store via the same world.addCell/
+  // removeCell every other code path uses (so derived mechanics --
+  // hydrosphere, black hole, star fusion -- recompute correctly against
+  // it too, since onChange() re-runs the full apply* pipeline), guarded
+  // by applyingRemote so handleLocalAdd/Remove (registered on the store
+  // above) don't immediately push the very change that was just received
+  // back to Supabase.
+  function applyRemoteUpsert(x, y, z, data) {
+    applyingRemote = true;
+    world.addCell(x, y, z, data);
+    onChange();
+    applyingRemote = false;
+  }
+  function applyRemoteDelete(x, y, z) {
+    applyingRemote = true;
+    world.removeCell(x, y, z);
+    onChange();
+    applyingRemote = false;
+  }
+
+  const sharedWorldToggle = document.getElementById('shared-world-toggle');
+  const sharedWorldHint = document.getElementById('shared-world-hint');
+  const newWorldBtn = document.getElementById('new-world');
+  const loadPresetBtn = document.getElementById('load-preset');
+
+  // New World / Import / Load preset all mutate via world.replaceAll(),
+  // which deliberately bypasses the addCell/removeCell sync hooks (see
+  // worldstate.js) -- a personal local-view reset must never bulk-push
+  // or bulk-delete against the shared table. Rather than let that
+  // silently desync the view from the shared world, these three controls
+  // are simply disabled for the duration of the Shared World session.
+  function setLocalResetControlsEnabled(enabled) {
+    newWorldBtn.disabled = !enabled;
+    importInput.disabled = !enabled;
+    loadPresetBtn.disabled = !enabled;
+  }
+
+  async function enableSharedWorld() {
+    if (sharedWorldActive) return;
+    if (
+      !confirm(
+        'Switch to the shared world? This replaces your current view with the live shared build. ' +
+          'Your local save is untouched and returns automatically when you disable Shared World.'
+      )
+    ) {
+      return;
+    }
+    sharedWorldToggle.disabled = true;
+    sharedWorldHint.textContent = 'Shared World: connecting…';
+    try {
+      await ensureAnonymousSession();
+      const shared = await loadSharedWorld();
+      world.replaceAll(shared);
+      // Set BEFORE onChange() so its localStorage guard and the undo
+      // button's disabled state already reflect shared mode for this
+      // first render of the shared world.
+      sharedWorldActive = true;
+      onChange();
+      unsubscribeShared = subscribeToSharedWorld({
+        onRemoteUpsert: applyRemoteUpsert,
+        onRemoteDelete: applyRemoteDelete,
+      });
+      setLocalResetControlsEnabled(false);
+      sharedWorldToggle.textContent = 'Disable Shared World';
+      sharedWorldHint.textContent = 'Shared World: live — building here syncs to everyone in realtime.';
+    } catch (err) {
+      sharedWorldActive = false;
+      sharedWorldHint.textContent = 'Shared World: failed to connect (see console).';
+      console.warn('Rhombiverse: failed to enable Shared World', err);
+    } finally {
+      sharedWorldToggle.disabled = false;
+    }
+  }
+
+  async function disableSharedWorld() {
+    if (!sharedWorldActive) return;
+    sharedWorldActive = false;
+    if (unsubscribeShared) {
+      unsubscribeShared();
+      unsubscribeShared = null;
+    }
+    const local = loadFromLocalStorage() ?? (await loadWorld('./data/starter-world.json'));
+    world.replaceAll(local);
+    onChange();
+    setLocalResetControlsEnabled(true);
+    sharedWorldToggle.textContent = 'Enable Shared World';
+    sharedWorldHint.textContent = 'Shared World: off.';
+  }
+
+  sharedWorldToggle.addEventListener('click', () => {
+    if (sharedWorldActive) disableSharedWorld();
+    else enableSharedWorld();
   });
 
   document.getElementById('new-world').addEventListener('click', async () => {

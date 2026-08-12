@@ -799,12 +799,124 @@ Reran the full nine-test regression suite afterward (Water/Ice, Walk
 Mode, both Black Hole tests, Star System, Supernova, the presets UI, and
 the frost-line fill test) — all passed clean.
 
+**Phase 5 (Shared World, optional realtime sync) done, 2026-08-12 —
+picked up mid-flight from an uncommitted `supabase/schema.sql` that
+predated this session's own memory (a `public.cells` table, one row per
+lattice cell keyed by `(x,y,z)`, RLS policies already written to match
+Black Hole/Supernova's existing "your own cells only" consent rules,
+referencing a not-yet-written `src/sync.js`).** Backing project: Supabase
+`zuvlqvvxifuzumqeyuir`, connected via its MCP server this session
+(authenticated via OAuth, then Anonymous Sign-Ins enabled via the
+Management API since the dashboard's own Save button was unresponsive —
+`external_anonymous_users_enabled: true`). Applied the drafted schema as
+migration `phase5_shared_world_cells`. New `src/sync.js`:
+`ensureAnonymousSession()` (stable per-browser identity with zero login
+UI, matching the "no real account system yet" scoping already used for
+Black Hole/Supernova's consent model), `loadSharedWorld()` (returns the
+same `{worldName, version, cells, meta}` shape `worldstate.js`/
+`persistence.js` already use, so it drops straight into
+`createWorldStore`/`replaceAll` with no format translation),
+`pushCellUpsert`/`pushCellDelete`, `subscribeToSharedWorld()` (realtime
+INSERT/UPDATE/DELETE). Project URL + publishable key are hardcoded client-
+side deliberately — they're meant to be public, security comes entirely
+from RLS, same as every Supabase browser app. `@supabase/supabase-js`
+added to `index.html`'s import map via **esm.sh**, not the unpkg CDN
+three.js already uses — unlike three.js's single self-contained bundle,
+supabase-js pulls in several sibling npm packages (`auth-js`,
+`realtime-js`, `postgrest-js`, etc.) as bare specifiers that raw unpkg
+can't resolve without an import-map entry per sub-package; esm.sh
+resolves/flattens all of that server-side into one working ESM module.
+
+`worldstate.js`'s `createWorldStore` gained an optional `hooks: {onAdd,
+onRemove}` param, called at the end of `addCell`/`removeCell` — confirmed
+by grep that literally every mutation path in the app (build.js's click
+handlers, `recolorShell`/`removeShell`, and every `apply*()` derived-
+mechanic module: hydrosphere, black hole, star fusion, supernova) already
+goes through these two methods, making this the single correct hook
+point, with `worldstate.js` itself staying completely unaware of Supabase.
+Deliberately NOT called by `replaceAll` — a bulk local-view swap (Undo,
+New World, Import, Load preset) is a personal reset, not a real edit, and
+must never bulk-push/delete against a shared world.
+
+`render.js` wiring: a **Shared World** toggle button (`#shared-world-
+toggle`) next to New World/Export/Import, confirm-gated like Load preset
+since it swaps the current view. Enabling: anonymous sign-in →
+`loadSharedWorld()` → `world.replaceAll()` → subscribe. A module-level
+`applyingRemote` flag suppresses the push hooks specifically while a
+just-received remote change is being written into the local store
+(`applyRemoteUpsert`/`applyRemoteDelete`, both reuse the full `onChange()`
+pipeline so derived mechanics recompute correctly against remote cells
+too) — without it, every client echoing back what it just received would
+feedback-loop forever. **New World / Import JSON / Load preset are
+disabled outright for the duration of a Shared World session** (found by
+reasoning through, not by hitting the bug live): all three mutate via
+`replaceAll`, which bypasses the sync hooks by design (above), so New
+World's `clearLocalStorage()` would have silently wiped the player's real
+local save, and Undo/Import/Load-preset would silently desync the local
+view from the shared table with no way back except toggling off and back
+on. `onChange()`'s `saveToLocalStorage` call and the Undo button (both
+disabled AND its click handler) are guarded by the same `sharedWorldActive`
+flag, for the same reason — the local save must stay frozen at whatever
+the player's private build was while looking at the shared world, or
+switching back would silently lose it. Disabling reloads the local world
+from `localStorage` (or the static seed) and re-enables the three
+controls — a clean, symmetric mode switch, deliberately mirroring Walk
+Mode's own enter/exit pattern.
+
+**Real bug found and fixed, 2026-08-12: the shared world started
+genuinely empty, making Shared World unbuildable from a fresh project.**
+Unlike the local world (`data/starter-world.json` always seeds one cell),
+`public.cells` had zero rows on a fresh migration. Build/Fill/Generate all
+raycast onto an *existing* cell's face to place a neighbor — with nothing
+in the table, the very first player to enable Shared World had literally
+nothing to click. Found by real execution, not by inspection: a headless-
+Chromium Playwright run (portable venv + the `~/.cache/ms-playwright`
+Chromium binary cached from an earlier session, same reusable harness
+documented above under "Real testing infrastructure") clicked Enable
+Shared World, then clicked canvas-center in Build mode — network logging
+showed the `select` genuinely returning `[]` and the click's raycast
+correctly hitting nothing (not a bug in `build.js` — geometrically
+correct behavior against a truly empty scene). Fixed with a one-time
+migration inserting a single `(0,0,0)` `base`-material cell into
+`public.cells`, mirroring the local starter world's own shape. **Verified
+end-to-end after the fix, real execution throughout**: Enable Shared
+World → real anonymous-signup network call (200) → real `select` returning
+the seed cell → real Build-mode click on the seed → real `POST
+.../rest/v1/cells` (201) confirmed via direct SQL query to hold the
+correct neighbor cell; then, to test the *pull* direction specifically, a
+cell was inserted directly via SQL from **outside the browser entirely**
+(simulating a second, independent player) — the running page's realtime
+subscription picked it up and rendered it with zero page interaction and
+zero console/page errors, confirmed both by a before/after screenshot
+(a second, garnet-tinted cell visibly appears) and by the network log
+showing no errors during the wait window. Disable Shared World afterward
+correctly reverted the hint text, button label, and re-enabled the three
+guarded controls. Test artifacts ((1,0,1), (0,1,1)) were deleted after
+verification, leaving only the legitimate (0,0,0) seed cell in the shared
+table.
+
+**Known, deliberate limitations, not yet solved (documented per this
+project's own convention of flagging real gaps rather than hiding them):**
+undo/new-world/import/load-preset are unavailable for the whole duration
+of a Shared World session (not just incompatible with one specific
+action) — the only way back to local editing is the Disable button.
+Derived mechanics (hydrosphere/black hole/star fusion/supernova) only
+recompute on this client in response to either a local edit or an
+incoming realtime event for a cell that was pushed by `addCell`/
+`removeCell` — a mechanic threshold crossed purely by combining multiple
+*other* players' simultaneous edits without this client also receiving a
+matching realtime event for each could theoretically miss a recompute
+until this client's own next edit; not hit in testing (single extra
+client, sequential edits) but not proven safe under real concurrent
+multi-player load either. No presence/multi-cursor UI — you can't see
+who else is connected or where they're building.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
-Black Hole, Star System, Supernova) are done. Phase 5 (Shared World,
-optional realtime sync) or Phase 5.8 (Trust Zones/Moderation) — the real
-prerequisite for Black Hole/Supernova's cross-player consent model — are
-open next, ask
-which, don't assume. Crystal-growth mode (Phase 5.5's other bullet,
+Black Hole, Star System, Supernova) and Phase 5 (Shared World) are done.
+Phase 5.8 (Trust Zones/Moderation) — the real
+prerequisite for Black Hole/Supernova's cross-player consent model, and
+now the real one to ask about before assuming it's next — is open.
+Crystal-growth mode (Phase 5.5's other bullet,
 cells auto-growing over time) was intentionally left unbuilt; the plan
 marks it optional/tied to Phase 6 timing. Actual public deploy (Phase 4's
 GH Pages/Vercel step) is still explicitly held off per the instruction
@@ -869,6 +981,17 @@ calibrated to build on exactly what the prior phase produced.
   *and* entity-pull consent for that claim (the entity-pull gap was a
   loophole fixed in `docs/RHOMBIVERSE_SPEC_LOOPHOLES.md` section 5 — don't
   add a second consent field for entities, extend the existing one).
+- **Cross-player black hole/supernova consumption is never allowed, full
+  stop — binding direct instruction, 2026-08-12.** Not opt-in, not
+  `destructible`-gated: `blackhole.js`'s `applyBlackHoleConsumption` and
+  `supernova.js`'s `detonate` both skip any candidate cell whose
+  `authorId` (stamped from Supabase's `author_id` column by `sync.js`,
+  merged into cell data client-side) differs from the black hole/star's
+  own sticky `coreCell.authorId`. This predates and is independent of
+  Phase 5.8's eventual region/claim/consent system — treat it as a hard
+  floor Phase 5.8 builds on top of, not something Phase 5.8 introduces.
+  Any future consumption-adjacent mechanic (new spec, new material) must
+  preserve this check, not bypass it.
 - **Decay-reset and multi-account loopholes are spec-acknowledged, not
   spec-solved.** `docs/RHOMBIVERSE_SPEC_LOOPHOLES.md` section 2 explicitly
   states multi-accounting has no full spec-level fix (needs platform-level
@@ -889,6 +1012,9 @@ once deployed). Phase 5+ and the spec addenda layer on progressively:
    (LICENSE, ToS, Privacy Policy, SECURITY.md, XSS audit) must be done
    before this phase ships, not after.*
 5. **Shared World** (optional) — swap persistence backend to realtime sync.
+   DONE, 2026-08-12 (see status above) — Supabase `public.cells` table +
+   `src/sync.js`, gated behind an opt-in toggle (local single-player play
+   is still the default and fully unaffected when it's off).
 5.5. **Planetoid Building + Radial Gravity** — DONE, commit `30cd1c8` (2026-08-11,
      see status above), except crystal-growth (intentionally deferred to
      Phase 6 timing). `docs/RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md`.
