@@ -1,0 +1,22 @@
+title: "[Q&A] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions are welcome — including "dumb" ones. Filling in what
+        you've already tried just means someone can actually answer you
+        instead of guessing what you meant.
+  - type: textarea
+    id: question
+    attributes:
+      label: What are you trying to do, and what's happening instead?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you already checked?
+      description: e.g. read CLAUDE.md / CONTRIBUTING.md, checked the browser console, tried a hard refresh — whatever's relevant.
+    validations:
+      required: false

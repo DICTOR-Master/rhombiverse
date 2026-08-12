@@ -1,0 +1,31 @@
+title: "[Idea] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea for Rhombiverse? Great — this project grows from
+        ideas like this. A couple of quick prompts below just help your
+        idea land clearly; they're not a hoop to jump through.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would this make better?
+      description: A specific scenario, not just "this would be cool."
+      placeholder: "When I try to X, Y happens, and it would be better if..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Rough shape of the idea
+      description: Doesn't need to be a full spec — a sketch is fine.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before posting
+      options:
+        - label: I searched existing Discussions/Issues and didn't find this already
+          required: true
