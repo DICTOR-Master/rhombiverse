@@ -26,6 +26,7 @@
 // which only ever concerns OTHER players' cells).
 import { shellCount, cellKey, cellToWorld, cellsInShells } from './lattice.js';
 import { BSG_MATERIAL, findClusters, bsgClusterStats } from './gravity.js';
+import { isClaimProtected } from './regions.js';
 
 // First-guess constants, not yet playtested -- same "flag it, don't
 // silently invent tuning math" convention this project already follows
@@ -100,6 +101,7 @@ function saveLedger(world, coreCell, ledger) {
 // applyHydrosphere -- idempotent once nothing foreign remains in range.
 export function applyBlackHoleConsumption(world, now = Date.now()) {
   const clusters = findClusters(world);
+  const claims = world.getClaims();
   for (const cluster of clusters) {
     const stats = bsgClusterStats(cluster);
     if (!stats) continue;
@@ -117,6 +119,10 @@ export function applyBlackHoleConsumption(world, now = Date.now()) {
       if (cell.material === BSG_MATERIAL) continue;
       if (cell.generatedByBlackHole) continue;
       if (cell.destructible === false) continue;
+      // RHOMBIVERSE_SPEC_REGIONS.md section 4: destructible now also
+      // resolves via the cell's claim (if any), additively with the
+      // per-cell field just above.
+      if (isClaimProtected(claims, cell.x, cell.y, cell.z)) continue;
       // Absolute cross-player guard, per direct instruction (2026-08-12):
       // a foreign cell with a real authorId that differs from this black
       // hole's own core creator is NEVER consumable, full stop -- not an

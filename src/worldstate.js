@@ -3,6 +3,7 @@
 // to storage (localStorage) lives in persistence.js -- this module only
 // tracks state in memory and knows how to turn it back into JSON.
 import { cellKey, parseCellKey } from './lattice.js';
+import { claimIdAt } from './regions.js';
 
 export async function loadWorld(url) {
   const res = await fetch(url);
@@ -73,6 +74,17 @@ export function createWorldStore(worldJSON, hooks = {}) {
       // via replaceAll(), so it's never touched here.
       if (stamped.region === undefined) stamped = { ...stamped, region: 'open' };
       if (stamped.status === undefined) stamped = { ...stamped, status: 'pending' };
+      // RHOMBIVERSE_SPEC_REGIONS.md: claimId is decided once, at creation
+      // time, against whatever claims exist right now -- same "only stamp
+      // if genuinely absent" rule as region/status above, so an existing
+      // cell's real claimId (from before this run, or from a claim
+      // granted after it was built) is never silently overwritten. A
+      // later claim never retroactively annexes already-placed cells --
+      // matches regions.js's own Isolation guarantee (allocation only
+      // ever reads existing state, never touches it).
+      if (stamped.claimId === undefined) {
+        stamped = { ...stamped, claimId: claimIdAt(claims, x, y, z) };
+      }
       cells.set(cellKey(x, y, z), stamped);
       hooks.onAdd?.(x, y, z, stamped);
     },

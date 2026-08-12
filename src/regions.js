@@ -18,12 +18,19 @@ import { cellKey, cellsInShells } from './lattice.js';
 export const CLAIM_SIZE_SHELLS = 2;
 
 // How far out (in shells from world center) to search for a free claim
-// slot before giving up. First-guess/tunable, same convention as every
-// other numeric constant in this project (blackhole.js's damping window,
-// build.js's roundStructure TOLERANCE, etc.) -- generous enough that
-// running out during real use would itself be a signal population has
-// grown far past what this project has ever been tested at.
-const MAX_CLAIM_SEARCH_SHELL = 300;
+// slot before giving up. shellCount(n)=10n^2+2 means cellsInShells's own
+// candidate list grows QUADRATICALLY -- an earlier version of this
+// constant (300) computed roughly 90 MILLION candidate records before
+// checking a single one, hanging a real browser click; caught by an
+// actual Playwright run, not by reasoning about the number in isolation.
+// 40 shells is still generous (cumulative candidates ~219k, computed in
+// well under a second) while comfortably fitting dozens of non-
+// overlapping 2-shell claims -- each occupies real Euclidean radius up to
+// ~2.8 units, so claims pack far denser than "one shell ring per claim"
+// might suggest. First-guess/tunable like every other constant here, but
+// now grounded against an actual measured cost, not just "sounds big
+// enough."
+const MAX_CLAIM_SEARCH_SHELL = 40;
 
 function footprintOf(cx, cy, cz, sizeShells) {
   return [{ x: cx, y: cy, z: cz }, ...cellsInShells(cx, cy, cz, sizeShells)];
@@ -106,4 +113,16 @@ export function claimIdAt(claims, x, y, z) {
     if (inFootprint) return id;
   }
   return null;
+}
+
+// Section 4: "destructible flag ... now has a concrete referent: it's a
+// flag on a claimId's owned cells" -- consumption/blast mechanics
+// (blackhole.js, supernova.js) check this ADDITIVELY alongside their own
+// pre-existing per-cell `destructible` field (the single-player-era
+// stand-in, still honored for cells hand-set that way before claims
+// existed) -- either one being false protects the cell, neither replaces
+// the other.
+export function isClaimProtected(claims, x, y, z) {
+  const id = claimIdAt(claims, x, y, z);
+  return id ? claims[id].destructible === false : false;
 }

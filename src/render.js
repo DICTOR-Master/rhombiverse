@@ -30,6 +30,7 @@ import {
   pushCellDelete,
   subscribeToSharedWorld,
 } from './sync.js';
+import { allocateClaim } from './regions.js';
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -118,6 +119,10 @@ let planetoids = {};
 let sharedWorldActive = false;
 let applyingRemote = false;
 let unsubscribeShared = null;
+// This session's anonymous auth.uid(), captured once on enableSharedWorld
+// -- ownership (RHOMBIVERSE_SPEC_REGIONS.md) only means anything with a
+// real per-player identity, which local-only play doesn't have.
+let myUserId = null;
 
 function handleLocalAdd(x, y, z, data) {
   if (sharedWorldActive && !applyingRemote) pushCellUpsert(x, y, z, data);
@@ -661,6 +666,27 @@ async function init() {
   const sharedWorldHint = document.getElementById('shared-world-hint');
   const newWorldBtn = document.getElementById('new-world');
   const loadPresetBtn = document.getElementById('load-preset');
+  const claimLandBtn = document.getElementById('claim-land-btn');
+  const claimHint = document.getElementById('claim-hint');
+
+  // RHOMBIVERSE_SPEC_REGIONS.md, minimal UI trigger: grants this session's
+  // player one fixed-size claim in the first free slot found outward from
+  // world center. Only meaningful while Shared World is active (ownership
+  // needs a real per-player identity, and claims are pointless to protect
+  // in a world only you can ever see) -- claimLandBtn is enabled/disabled
+  // alongside the other Shared-World-only controls.
+  claimLandBtn.addEventListener('click', () => {
+    if (!sharedWorldActive || !myUserId) return;
+    try {
+      const claimId = allocateClaim(world, myUserId);
+      const claim = world.getClaims()[claimId];
+      claimHint.textContent =
+        `Claimed ${claimId}: center [${claim.center.join(', ')}], ` +
+        `shell ${claim.shellIndex}, size ${claim.size}.`;
+    } catch (err) {
+      claimHint.textContent = `Claim failed: ${err.message}`;
+    }
+  });
 
   // New World / Import / Load preset all mutate via world.replaceAll(),
   // which deliberately bypasses the addCell/removeCell sync hooks (see
@@ -672,6 +698,14 @@ async function init() {
     newWorldBtn.disabled = !enabled;
     importInput.disabled = !enabled;
     loadPresetBtn.disabled = !enabled;
+  }
+
+  // claimLandBtn is the inverse of the above -- disabled OUTSIDE Shared
+  // World (ownership is meaningless in a world only you can see), enabled
+  // only while connected.
+  function setClaimLandEnabled(enabled) {
+    claimLandBtn.disabled = !enabled;
+    if (!enabled) claimHint.textContent = '';
   }
 
   async function enableSharedWorld() {
@@ -687,7 +721,8 @@ async function init() {
     sharedWorldToggle.disabled = true;
     sharedWorldHint.textContent = 'Shared World: connecting…';
     try {
-      await ensureAnonymousSession();
+      const session = await ensureAnonymousSession();
+      myUserId = session.user.id;
       const shared = await loadSharedWorld();
       world.replaceAll(shared);
       // Set BEFORE onChange() so its localStorage guard and the undo
@@ -700,6 +735,7 @@ async function init() {
         onRemoteDelete: applyRemoteDelete,
       });
       setLocalResetControlsEnabled(false);
+      setClaimLandEnabled(true);
       sharedWorldToggle.textContent = 'Disable Shared World';
       sharedWorldHint.textContent = 'Shared World: live — building here syncs to everyone in realtime.';
     } catch (err) {
@@ -722,6 +758,8 @@ async function init() {
     world.replaceAll(local);
     onChange();
     setLocalResetControlsEnabled(true);
+    setClaimLandEnabled(false);
+    myUserId = null;
     sharedWorldToggle.textContent = 'Enable Shared World';
     sharedWorldHint.textContent = 'Shared World: off.';
   }

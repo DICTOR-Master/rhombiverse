@@ -6,6 +6,7 @@
 import { cellKey, cellToWorld, cellsInShells } from './lattice.js';
 import { BSG_MATERIAL, findClusters, bsgClusterStats } from './gravity.js';
 import { isStar, pickCoreCell, defaultLedger, STAR_BSG_THRESHOLD } from './starsystem.js';
+import { isClaimProtected } from './regions.js';
 
 // First-guess constants, not yet playtested -- same convention as every
 // other tunable in this project. SUPERNOVA_CRITICAL_MASS is the star's
@@ -75,11 +76,16 @@ export function applyDetonationCheck(world, now = Date.now()) {
 function detonate(world, cluster, stats, coreCell, ledger) {
   const { center, gravityRadius } = stats;
   const clusterKeys = new Set(cluster.map((c) => cellKey(c.x, c.y, c.z)));
+  const claims = world.getClaims();
 
   let scatterCount = 0;
   for (const cell of world.entries()) {
     if (clusterKeys.has(cellKey(cell.x, cell.y, cell.z))) continue; // never touches the star's own structure -- see remnant note above
     if (cell.destructible === false) continue;
+    // RHOMBIVERSE_SPEC_REGIONS.md section 4: same claim-level destructible
+    // check as blackhole.js's own consumption loop, additive with the
+    // per-cell field just above.
+    if (isClaimProtected(claims, cell.x, cell.y, cell.z)) continue;
     // Same absolute cross-player guard as blackhole.js's own consumption
     // loop (2026-08-12, direct instruction) -- a foreign cell authored by
     // a different player than this star's own core creator is never

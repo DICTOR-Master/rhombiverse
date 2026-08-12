@@ -952,43 +952,65 @@ selector the plan calls for, and `RHOMBIVERSE_SPEC_REGIONS.md`'s
 ownership-claims system (a related but distinct concept from this
 moderation `region` — see that spec's own section 1 naming note).
 
-**`RHOMBIVERSE_SPEC_REGIONS.md` (ownership claims) started, 2026-08-12 —
-data layer + allocation algorithm only, no UI wiring yet, per direct
-instruction to keep starting a new area lean rather than build it end-to-
-end in one pass.** `worldstate.js`'s `createWorldStore` gained a `claims`
-registry (`getClaims()`/`addClaim()`, included in `toJSON()`/restored by
-`replaceAll()`) — the first addendum needing a genuinely new top-level
-world-state key rather than fitting entirely inside per-cell fields, since
-every prior addendum (shell/shellCenter, gravitySource, blackHoleLedger,
-starLedger) did. New `src/regions.js`: `CLAIM_SIZE_SHELLS = 2` (the
-spec's own worked example, adopted as-is rather than inventing a
-different tunable), `allocateClaim(world, ownerId, sizeShells)` searches
-candidate claim CENTERS outward from world center in true 3D shell order
-(reusing `cellsInShells`/`shellCount` directly, world center itself tried
-first since that helper only returns shells 1+), granting the first
-whose own fixed-size footprint doesn't overlap any existing claim's —
-matches section 2's "fill each shell before moving to the next" and
-section 6's Isolation guarantee (only ever reads existing claims to check
-overlap, never resizes/moves one). `claimIdAt(claims, x, y, z)` resolves
-ownership geometrically against the registry rather than requiring a
-per-cell `claimId` to already be stamped, so a claim reserves space even
-before every cell in it is actually built. **Deliberately NOT done yet**:
-no UI to actually trigger `allocateClaim` (no "Claim Land" button), no
-per-cell `claimId` auto-stamping on build (build.js/worldstate.js's
-`addCell` don't call `claimIdAt` yet), and `blackhole.js`/`supernova.js`
-still use the blunter `authorId`-vs-core-creator guard from the earlier
-Shared World work rather than real claim/`destructible` checks — wiring
-those together is the natural next slice, not done here. Not live-tested
-(no Node/browser run this pass); verified by hand-tracing the allocation
-loop against the spec's own shell-order requirement instead, consistent
-with the lighter verification level requested for this project right now.
+**`RHOMBIVERSE_SPEC_REGIONS.md` (ownership claims) data layer + full
+wiring done, 2026-08-12 — built as two passes in the same session: data
+layer/algorithm first (hand-traced only), then wired end-to-end once the
+user asked to keep going.** `worldstate.js`'s `createWorldStore` gained a
+`claims` registry (`getClaims()`/`addClaim()`, included in `toJSON()`/
+restored by `replaceAll()`) — the first addendum needing a genuinely new
+top-level world-state key rather than fitting entirely inside per-cell
+fields, since every prior addendum (shell/shellCenter, gravitySource,
+blackHoleLedger, starLedger) did. `src/regions.js`: `CLAIM_SIZE_SHELLS =
+2` (the spec's own worked example, adopted as-is), `allocateClaim(world,
+ownerId, sizeShells)` searches candidate claim CENTERS outward from world
+center in true 3D shell order (reusing `cellsInShells`/`shellCount`
+directly, world center itself tried first since that helper only returns
+shells 1+), granting the first whose own fixed-size footprint doesn't
+overlap any existing claim's — matches section 2's "fill each shell
+before moving to the next" and section 6's Isolation guarantee (only ever
+reads existing claims, never resizes/moves one). `claimIdAt(claims, x, y,
+z)` resolves ownership geometrically against the registry, so a claim
+reserves space even before every cell in it is built.
+`worldstate.js`'s `addCell` now auto-stamps `claimId` via `claimIdAt` on
+any genuinely new cell (same "only default if absent" rule as region/
+status, so an existing cell's real claimId is never silently
+overwritten, and a later claim never retroactively annexes already-placed
+cells). `blackhole.js`'s `applyBlackHoleConsumption` and `supernova.js`'s
+`detonate` both gained `isClaimProtected()` checks alongside their
+existing per-cell `destructible`/authorId guards — additive, not a
+replacement: any of the three being true/false-as-appropriate protects a
+cell. A minimal **Claim Land** button (enabled only while Shared World is
+connected, since ownership needs a real per-player identity) calls
+`allocateClaim` with this session's own `auth.uid()` and reports the
+result inline — no claims list/map UI beyond that one line yet.
+**Real bug caught only by a live Playwright run, not by the earlier
+hand-trace**: `MAX_CLAIM_SEARCH_SHELL` was originally 300 — looks like a
+generous, safe margin in isolation, but `shellCount(n)=10n²+2` grows
+quadratically, so `cellsInShells(0,0,0,300)` tried to eagerly materialize
+roughly **90 million** candidate records before checking even one,
+hanging a real browser click for 30+ seconds (Playwright's own click
+timeout is what surfaced it — the underlying page had genuinely frozen).
+Fixed by lowering to 40 (cumulative ~219k candidates, sub-second, still
+comfortably enough to pack dozens of non-overlapping claims given each
+one's real Euclidean footprint is only ~2.8 units). Verified after the
+fix with the same real run: `claim_1` granted at world center (shell 0)
+as expected, a second call correctly skipped every overlapping candidate
+through shell 4 and landed `claim_2` at shell 5 — matching the spacing
+the design predicted — zero console/page errors throughout. **Still
+deferred, explicitly**: claims are not yet pushed to Supabase (no
+`claims` table/sync — a claim granted in one browser session is invisible
+to any other session connected to the same Shared World, so the
+ownership guarantee is currently local-only; the unconditional authorId
+cross-player guard from the earlier Shared World work is unaffected by
+this and still holds regardless), and there's no claims list/visualization
+UI beyond the one-line hint after clicking Claim Land.
 
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova) and Phase 5 (Shared World) are done.
 Phase 5.8 (Trust Zones/Moderation) is partially done, and
-`RHOMBIVERSE_SPEC_REGIONS.md` has its data layer + allocation algorithm
-but no UI or blackhole.js/supernova.js integration yet (see status
-above) — ask which of these to continue before assuming.
+`RHOMBIVERSE_SPEC_REGIONS.md` is functionally wired end-to-end but still
+local-only (no `claims` Supabase sync yet, see status above) — ask before
+assuming which of these to pick up next.
 Crystal-growth mode (Phase 5.5's other bullet,
 cells auto-growing over time) was intentionally left unbuilt; the plan
 marks it optional/tied to Phase 6 timing. Actual public deploy (Phase 4's
