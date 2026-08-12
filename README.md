@@ -101,6 +101,14 @@ standalone addenda, each extending specific phases of the plan:
 | `RHOMBIVERSE_SPEC_LOOPHOLES.md` | Patches gaps across regions/supernova/blackhole/asteroids/trade |
 | `RHOMBIVERSE_COMPLIANCE.md` | Legal/safety checklist, phased by when each item is required |
 
+## Contributing
+
+Humans and AI coding agents are both welcome to open PRs — see
+`CONTRIBUTING.md` for how this project actually works and
+`CODE_OF_CONDUCT.md` for the community standard. `CLAUDE.md` is the
+real technical onboarding doc, worth reading before `RHOMBIVERSE_PLAN.md`
+if you're jumping straight into code.
+
 ## Running (once Phase 1 exists)
 
 No build step — plain ES modules loaded via an import map in `index.html`.
