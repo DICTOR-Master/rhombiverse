@@ -972,6 +972,38 @@ selector the plan calls for, and `RHOMBIVERSE_SPEC_REGIONS.md`'s
 ownership-claims system (a related but distinct concept from this
 moderation `region` — see that spec's own section 1 naming note).
 
+**Reachability gate + age/mode selector deliberately NOT built,
+2026-08-13 — a scope decision, not an oversight, made when actually
+sitting down to build it.** Direct pushback from the user mid-
+investigation: "it seems quite a step to be able to create anything
+offensive enough at this juncture to warrant legal protection" — and
+on inspection, correct. This app's entire UGC surface is placing
+fixed-material voxels from an 8-item enum in a coarse lattice; there is
+still no chat, no free text, no usernames beyond anonymous UUIDs
+anywhere in the app (unchanged since the original Phase 5.8 pass
+above). The already-shipped `status: 'flagged'`/`'removed'` Report
+mechanism is a real, working, proportionate safety valve for that
+surface at this population (effectively zero real users). A full
+three-tier reachability gate with a client-side age/mode selector is
+real, nontrivial machinery (and, as investigation before stopping
+turned up, has a genuine sharp edge: the live Shared World seed cell
+in `public.cells` has no `region` field at all, so a naive `region ??
+'open'` default-deny gate would show a brand-new player literally
+nothing, not even something to build from, in the spec's own
+safest/default mode — a real bug that only matters if this gets built)
+for a risk that isn't pressing yet. Building it now would violate
+`RHOMBIVERSE_PRINCIPLES.md` section 0's own Grounded Simplicity law:
+don't build for a hypothetical future requirement. **Explicitly
+deferred, not abandoned** — revisit if any of these actually change:
+free-text UGC (chat, naming) gets added, the population grows past
+"effectively zero," or a real moderation incident occurs that the
+existing flagged/removed mechanism doesn't adequately handle. COPPA
+review and a moderator-scaling plan (`RHOMBIVERSE_COMPLIANCE.md`'s
+other two open Phase 5.8 items) are left open for the same reason plus
+their own: COPPA needs real legal review no Claude Code session can
+substitute for, and moderator scaling is a staffing decision only the
+maintainer can make.
+
 **`RHOMBIVERSE_SPEC_REGIONS.md` (ownership claims) data layer + full
 wiring done, 2026-08-12 — built as two passes in the same session: data
 layer/algorithm first (hand-traced only), then wired end-to-end once the
@@ -1580,10 +1612,14 @@ same discipline as every other live-DB test this session.
 Black Hole, Star System, Supernova), Phase 5 (Shared World),
 `RHOMBIVERSE_SPEC_REGIONS.md`, `RHOMBIVERSE_SPEC_ASTEROIDS.md`,
 `RHOMBIVERSE_SPEC_LOOPHOLES.md`, and `RHOMBIVERSE_SPEC_TRADE_INVENTORY.md`
-are all done now. Phase 5.8 (Trust Zones/Moderation) is still only
-partially done (see its own status above) — the only named gap left
-anywhere in this repo's scope, besides the explicitly-deferred
-crystal-growth mode. The repo is public
+are all done now. Phase 5.8 (Trust Zones/Moderation) is closed out as
+**deliberately, intentionally partial** (see its 2026-08-13 status
+above) — the flagged/removed Report mechanism is built and working; the
+three-tier reachability gate, age/mode selector, COPPA review, and a
+moderator-scaling plan are explicitly deferred with documented reasons,
+not left incomplete by oversight. Nothing named remains open anywhere
+in this repo's scope, besides the explicitly-deferred crystal-growth
+mode. The repo is public
 (`github.com/DICTOR-Master/rhombiverse`) with Discussions enabled. Ask
 before assuming what's next.
 Crystal-growth mode (Phase 5.5's other bullet,

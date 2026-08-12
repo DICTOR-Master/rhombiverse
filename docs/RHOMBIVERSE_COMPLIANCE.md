@@ -26,11 +26,26 @@ Phase 5 (Shared World) shipped 2026-08-12 — this section is no longer forward-
 
 ## Required before/alongside Phase 5.8 (Trust Zones / Moderation)
 
-- [ ] **Written community guidelines** — still open for the actual in-game moderation judgment layer (what gets promoted `pending → reviewed/core` vs `flagged/removed`); the ring system is mechanism, this is the judgment humans apply on top of it. Distinct from the *community-space* guidelines added 2026-08-13 (the Discussions welcome post + `CODE_OF_CONDUCT.md`), which cover conduct in GitHub Issues/PRs/Discussions, not in-world content review.
-- [ ] **DMCA takedown process, documented** — still open, and now genuinely relevant rather than forward-looking: the repo is public (2026-08-13) and Shared World is live UGC. Worth prioritizing.
+**2026-08-13: the remaining open items below are a deliberate scope
+decision, not an oversight.** Sat down to build the reachability gate/
+age-mode selector, got real pushback ("it seems quite a step to be able
+to create anything offensive enough at this juncture to warrant legal
+protection") — correct on inspection: this app's entire UGC surface is
+placing fixed-material voxels from an 8-item enum, no chat, no free
+text, no usernames beyond anonymous UUIDs, at effectively zero real
+users. The already-shipped `flagged`/`removed` Report mechanism is a
+real, working, proportionate safety valve for that surface right now.
+Building the rest now would be exactly what `RHOMBIVERSE_PRINCIPLES.md`
+section 0 (Grounded Simplicity) warns against — engineering for a
+hypothetical future requirement. **Revisit if**: free-text UGC (chat,
+naming) gets added, the population grows past "effectively zero," or a
+real incident occurs that flagged/removed doesn't adequately handle.
+
+- [ ] **Written community guidelines** — still open, deliberately not drafted this pass (see above) for the actual in-game moderation judgment layer (what gets promoted `pending → reviewed/core` vs `flagged/removed`); the ring system is mechanism, this is the judgment humans apply on top of it. Distinct from the *community-space* guidelines added 2026-08-13 (the Discussions welcome post + `CODE_OF_CONDUCT.md`), which cover conduct in GitHub Issues/PRs/Discussions, not in-world content review.
+- [ ] **DMCA takedown process, documented** — still open, deliberately not drafted this pass (see above). Genuinely more relevant than it was pre-launch (the repo is public and Shared World is live UGC), but not urgent at current scale/population.
 - [x] **User-content ownership clause in ToS** — `TERMS.md`'s "Shared World and your content" section (added 2026-08-13) states what placing content in Shared World means: visible to and buildable-near by other players, may outlive your session, and the license you grant Rhombiverse to store/transmit/display it.
-- [ ] **COPPA review** (US) — still open, real legal review needed if the audience may include children. `PRIVACY.md`'s "Children's privacy" section is honest about collecting no PII even via Shared World's anonymous identity, but that's not a substitute for real review.
-- [ ] **Moderator scaling plan** — still open (single maintainer).
+- [ ] **COPPA review** (US) — still open. Needs real legal review no Claude Code session can substitute for; not attempted here, deliberately, rather than faking a review. `PRIVACY.md`'s "Children's privacy" section is honest about collecting no PII even via Shared World's anonymous identity, but that's not a substitute for real review.
+- [ ] **Moderator scaling plan** — still open (single maintainer). A staffing decision only the maintainer can make; not something to draft on their behalf.
 - [ ] **Player-to-player abuse handling** — `CODE_OF_CONDUCT.md` (2026-08-13) now covers this for GitHub-side spaces (Issues/PRs/Discussions, which do have usernames). In-world player-to-player abuse handling (no chat/presence system exists yet) is still not applicable/not built.
 
 ## Required before/alongside going public as an open-source repo
