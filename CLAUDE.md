@@ -1292,25 +1292,44 @@ belts × 13 cells = 52, matching what was observed exactly. A genuine,
 unplanned live confirmation of section 5 working correctly beyond the
 synthetic direct-module test from the pass before this one.
 
-**Still not done this pass**: the regrowth queue itself remains
-local-only, not synced to Supabase (the original goal of this pass,
-superseded by the two bugs above once they were found) -- if the player
-who mined a cell disconnects before its cooldown elapses, that specific
-regrowth still won't fire from anyone else's client.
-`RHOMBIVERSE_SPEC_LOOPHOLES.md` section 4 (claim/belt collision guard)
-also remains unbuilt.
+**Regrowth queue synced to Supabase, 2026-08-12 — the item deferred
+above, finished right after.** New `public.asteroid_regrowth` table
+(`{x,y,z}` primary key, `node_id`/`material`/`mined_at`): INSERT/DELETE
+open to any authenticated user, deliberately -- regrowth is a system
+process, not owner-gated, same reasoning as `cells_delete_asteroid`
+above. `worldstate.js`'s `setRegrowthEntry`/`removeRegrowthEntry` gained
+`onRegrowthSet`/`onRegrowthClear` hooks (same pattern as `addCell`/
+`removeCell`'s existing `onAdd`/`onRemove`); `sync.js` gained
+`pushRegrowthSet`/`pushRegrowthClear`/`loadRegrowthQueue`, folded into
+`loadSharedWorld()`'s return value and the realtime subscription
+(INSERT/DELETE only -- an entry is either pending or gone, never updated
+in place). `render.js`'s `applyRemoteRegrowthSet`/`applyRemoteRegrowthClear`
+need the same `applyingRemote` guard cells use (unlike claims, which
+have no local push-hook to suppress) but deliberately skip `onChange()`
+-- setting/clearing a regrowth entry has no visual effect of its own,
+the cell actually reappearing/vanishing is a separate `cells`-table event
+that already triggers its own `onChange` independently. **Verified with
+a real two-session test, the exact scenario this closes**: Session A
+mined a real cell via a real click; confirmed via direct SQL that a row
+appeared in `asteroid_regrowth`; fast-forwarded its `mined_at` to
+simulate the cooldown elapsing; released Session B (which never mined
+anything, didn't even know this cell existed) to connect fresh --
+B's own periodic tick correctly processed A's entry: the cell reappeared
+server-side with its original material and node id intact, and the
+regrowth queue emptied. This is the precise gap the local-only version
+had (the original miner disconnecting before their own timer fired) --
+now any connected client can complete anyone's pending regrowth.
 
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World),
 `RHOMBIVERSE_SPEC_REGIONS.md` (data layer, allocation, hazard-mechanic
 wiring, and cross-session Supabase sync), and `RHOMBIVERSE_SPEC_ASTEROIDS.md`
-(acquisition + population-scaled spawning + discoverability UI) are all
-done. Two asteroids items remain, both already named above: the
-regrowth queue is still local-only (not synced to Supabase), and
-`RHOMBIVERSE_SPEC_LOOPHOLES.md` section 4 (claim/belt collision guard)
-is unblocked but not built. Phase 5.8 (Trust Zones/Moderation) is still
-only partially done (see its own status above) — ask before assuming
-what's next.
+(acquisition + population-scaled spawning + discoverability UI +
+Supabase-synced regrowth) are all done -- asteroids has no more named
+gaps left in this repo's own scope. `RHOMBIVERSE_SPEC_LOOPHOLES.md`
+section 4 (claim/belt collision guard) is unblocked but still not built.
+Phase 5.8 (Trust Zones/Moderation) is still only partially done (see its
+own status above) — ask before assuming what's next.
 Crystal-growth mode (Phase 5.5's other bullet,
 cells auto-growing over time) was intentionally left unbuilt; the plan
 marks it optional/tied to Phase 6 timing. Actual public deploy (Phase 4's

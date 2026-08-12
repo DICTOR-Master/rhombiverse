@@ -137,15 +137,23 @@ export function createWorldStore(worldJSON, hooks = {}) {
     },
     // Pending asteroid regrowth entries, keyed by "x,y,z" -- see
     // asteroids.js's mineAsteroidCell/applyAsteroidRegeneration.
+    // hooks.onRegrowthSet(key,entry)/onRegrowthClear(key), both optional,
+    // mirror onAdd/onRemove above -- the sync point sync.js's
+    // pushRegrowthSet/pushRegrowthClear hook into (RHOMBIVERSE_SPEC_
+    // ASTEROIDS.md section 4: any connected client should be able to
+    // process a pending regrowth, not just whoever originally mined the
+    // cell, who might disconnect before the cooldown elapses).
     getRegrowthQueue() {
       return { ...regrowthQueue };
     },
     setRegrowthEntry(key, entry) {
       regrowthQueue = { ...regrowthQueue, [key]: entry };
+      hooks.onRegrowthSet?.(key, entry);
     },
     removeRegrowthEntry(key) {
       const { [key]: _removed, ...rest } = regrowthQueue;
       regrowthQueue = rest;
+      hooks.onRegrowthClear?.(key);
     },
     // Serializes back to the full RHOMBIVERSE_PLAN.md section 3 shape,
     // for persistence.js to save/export.

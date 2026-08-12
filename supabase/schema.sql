@@ -148,3 +148,35 @@ alter table public.claims add constraint claims_one_per_owner unique (owner_id);
 -- one), either allows deletion.
 create policy "cells_delete_asteroid" on public.cells
   for delete using (data->>'asteroidNodeId' is not null);
+
+-- RHOMBIVERSE_SPEC_ASTEROIDS.md section 4: syncs the regrowth queue so
+-- ANY connected client can process a pending regrowth, not just whoever
+-- originally mined the cell (who might have disconnected before the
+-- cooldown elapsed). INSERT/DELETE open to any authenticated user --
+-- regrowth is a system process, not owner-gated, same reasoning as
+-- cells_delete_asteroid. Racing clients are safe by construction: the
+-- resulting cell write is the same idempotent upsert every cell write
+-- already uses, and deleting an already-deleted row is a silent no-op.
+create table public.asteroid_regrowth (
+  x integer not null,
+  y integer not null,
+  z integer not null,
+  node_id text not null,
+  material text not null,
+  mined_at timestamptz not null default now(),
+  primary key (x, y, z)
+);
+
+alter table public.asteroid_regrowth enable row level security;
+alter table public.asteroid_regrowth replica identity full;
+
+create policy "asteroid_regrowth_select_all" on public.asteroid_regrowth
+  for select using (true);
+
+create policy "asteroid_regrowth_insert_any" on public.asteroid_regrowth
+  for insert with check (auth.role() = 'authenticated');
+
+create policy "asteroid_regrowth_delete_any" on public.asteroid_regrowth
+  for delete using (auth.role() = 'authenticated');
+
+alter publication supabase_realtime add table public.asteroid_regrowth;

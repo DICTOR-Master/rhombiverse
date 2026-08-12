@@ -55,8 +55,30 @@ export async function loadClaims() {
   return claims;
 }
 
-// Fetches every row from public.cells and public.claims, returning both
-// in the same {worldName, version, cells, claims, meta} shape
+// Row <-> in-memory regrowth-entry shape, shared by loadRegrowthQueue and
+// the realtime handler below.
+function regrowthEntryFromRow(row) {
+  return {
+    nodeId: row.node_id,
+    material: row.material,
+    minedAt: new Date(row.mined_at).getTime(),
+  };
+}
+
+// Fetches every row from public.asteroid_regrowth (RHOMBIVERSE_SPEC_
+// ASTEROIDS.md section 4) into the same {"x,y,z": {...}} shape
+// worldstate.js's regrowth queue already uses.
+export async function loadRegrowthQueue() {
+  const { data, error } = await supabase.from('asteroid_regrowth').select('*');
+  if (error) throw error;
+  const queue = {};
+  for (const row of data) queue[cellKey(row.x, row.y, row.z)] = regrowthEntryFromRow(row);
+  return queue;
+}
+
+// Fetches every row from public.cells, public.claims, and
+// public.asteroid_regrowth, returning all three in the same
+// {worldName, version, cells, claims, asteroidRegrowth, meta} shape
 // worldstate.js/persistence.js already use, so callers can pass it
 // straight to createWorldStore() or world.replaceAll() with no format
 // translation.
@@ -83,12 +105,14 @@ export async function loadSharedWorld() {
     };
   }
   const claims = await loadClaims();
+  const asteroidRegrowth = await loadRegrowthQueue();
   const now = new Date().toISOString();
   return {
     worldName: 'Rhombiverse (Shared)',
     version: 1,
     cells,
     claims,
+    asteroidRegrowth,
     meta: { createdAt: now, lastModified: now },
   };
 }
@@ -159,17 +183,56 @@ export async function pushClaimDestructible(claimId, destructible) {
   if (error) throw error;
 }
 
+// Registers a mined cell for regrowth server-side (RHOMBIVERSE_SPEC_
+// ASTEROIDS.md section 4). Swallows errors like pushCellUpsert/
+// pushCellDelete (not thrown) -- a failed regrowth registration means
+// that specific cell just won't come back, a self-contained, low-stakes
+// failure mode, not one that needs to unwind the mining action itself
+// (the cell is already gone locally and via pushCellDelete by this point).
+export async function pushRegrowthSet(x, y, z, entry) {
+  const { error } = await supabase.from('asteroid_regrowth').upsert({
+    x,
+    y,
+    z,
+    node_id: entry.nodeId,
+    material: entry.material,
+    mined_at: new Date(entry.minedAt).toISOString(),
+  });
+  if (error) console.warn('Rhombiverse sync: regrowth registration failed', x, y, z, error);
+}
+
+// Clears a regrowth entry once processed (cell re-added) -- or if a
+// player has since built something else there (asteroids.js's own
+// "never overwrite real content" check already prevented the regrow
+// itself; this still needs to clear the now-stale queue entry). Deleting
+// an already-deleted row is a silent no-op, not an error, which is
+// exactly what makes multiple clients racing to process the same entry
+// safe (see supabase/schema.sql's own comment on this table).
+export async function pushRegrowthClear(x, y, z) {
+  const { error } = await supabase.from('asteroid_regrowth').delete().match({ x, y, z });
+  if (error) console.warn('Rhombiverse sync: regrowth clear failed', x, y, z, error);
+}
+
 // Subscribes to realtime INSERT/UPDATE/DELETE on public.cells (enabled
 // via schema.sql's `alter publication supabase_realtime add table
-// public.cells`), plus INSERT/UPDATE on public.claims (no DELETE there --
-// claims are never removed, only ever granted or destructible-toggled).
-// Postgres
+// public.cells`), INSERT/UPDATE on public.claims (no DELETE there --
+// claims are never removed, only ever granted or destructible-toggled),
+// and INSERT/DELETE on public.asteroid_regrowth (no UPDATE there -- an
+// entry is either pending or gone, never modified in place). Postgres
 // changes broadcast to every subscriber including the client that made
-// the write, so onRemoteUpsert/onRemoteDelete/onRemoteClaim WILL fire for
-// this session's own pushes too -- callers must be idempotent against
-// that, which worldstate.js's addCell/removeCell/addClaim already are
-// (Map set/delete). Returns an unsubscribe function.
-export function subscribeToSharedWorld({ onRemoteUpsert, onRemoteDelete, onRemoteClaim }) {
+// the write, so onRemoteUpsert/onRemoteDelete/onRemoteClaim/
+// onRemoteRegrowthSet/onRemoteRegrowthClear WILL fire for this session's
+// own pushes too -- callers must be idempotent against that, which
+// worldstate.js's addCell/removeCell/addClaim/setRegrowthEntry/
+// removeRegrowthEntry already are (Map set/delete). Returns an
+// unsubscribe function.
+export function subscribeToSharedWorld({
+  onRemoteUpsert,
+  onRemoteDelete,
+  onRemoteClaim,
+  onRemoteRegrowthSet,
+  onRemoteRegrowthClear,
+}) {
   const channel = supabase
     .channel('world-sync')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cells' }, (payload) => {
@@ -196,6 +259,18 @@ export function subscribeToSharedWorld({ onRemoteUpsert, onRemoteDelete, onRemot
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'claims' }, (payload) => {
       if (!onRemoteClaim) return;
       onRemoteClaim(payload.new.id, claimFromRow(payload.new));
+    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'asteroid_regrowth' }, (payload) => {
+      if (!onRemoteRegrowthSet) return;
+      const row = payload.new;
+      onRemoteRegrowthSet(cellKey(row.x, row.y, row.z), regrowthEntryFromRow(row));
+    })
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'asteroid_regrowth' }, (payload) => {
+      if (!onRemoteRegrowthClear) return;
+      // Needs replica identity full (schema.sql), same reason as cells'
+      // own DELETE handler above.
+      const row = payload.old;
+      onRemoteRegrowthClear(cellKey(row.x, row.y, row.z));
     })
     .subscribe();
 

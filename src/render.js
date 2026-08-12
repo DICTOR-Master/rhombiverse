@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { rdRawVerts, cellToWorld } from './lattice.js';
+import { rdRawVerts, cellToWorld, parseCellKey } from './lattice.js';
 import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController, removeShell, recolorShell } from './build.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
@@ -30,6 +30,8 @@ import {
   pushCellDelete,
   pushClaim,
   pushClaimDestructible,
+  pushRegrowthSet,
+  pushRegrowthClear,
   subscribeToSharedWorld,
 } from './sync.js';
 import { computeClaim, claimBoundingRadius } from './regions.js';
@@ -143,6 +145,23 @@ function handleLocalAdd(x, y, z, data) {
 }
 function handleLocalRemove(x, y, z) {
   if (sharedWorldActive && !applyingRemote) pushCellDelete(x, y, z);
+}
+// RHOMBIVERSE_SPEC_ASTEROIDS.md section 4: same push-on-local-mutation
+// pattern as cells above, wired into worldstate.js's setRegrowthEntry/
+// removeRegrowthEntry hooks -- so ANY connected client processing a
+// pending regrowth (not just whoever originally mined the cell) pushes
+// that outcome for everyone else too.
+function handleLocalRegrowthSet(key, entry) {
+  if (sharedWorldActive && !applyingRemote) {
+    const [x, y, z] = parseCellKey(key);
+    pushRegrowthSet(x, y, z, entry);
+  }
+}
+function handleLocalRegrowthClear(key) {
+  if (sharedWorldActive && !applyingRemote) {
+    const [x, y, z] = parseCellKey(key);
+    pushRegrowthClear(x, y, z);
+  }
 }
 
 // Shown near the mode controls regardless of Build/Walk mode -- useful
@@ -370,7 +389,12 @@ async function init() {
   // A saved build takes priority over the static seed -- that's the
   // whole point of Phase 3 (refreshing preserves the build).
   const worldJSON = loadFromLocalStorage() ?? (await loadWorld('./data/starter-world.json'));
-  const world = createWorldStore(worldJSON, { onAdd: handleLocalAdd, onRemove: handleLocalRemove });
+  const world = createWorldStore(worldJSON, {
+    onAdd: handleLocalAdd,
+    onRemove: handleLocalRemove,
+    onRegrowthSet: handleLocalRegrowthSet,
+    onRegrowthClear: handleLocalRegrowthClear,
+  });
   // Declared this early so the very first rebuildInstances() call below
   // (before the mode-button UI further down even exists) can safely
   // reference it -- report mode can't be active yet at that point, but
@@ -780,6 +804,26 @@ async function init() {
     refreshClaims();
   }
 
+  // RHOMBIVERSE_SPEC_ASTEROIDS.md section 4: unlike cells, setting/
+  // clearing a regrowth-queue entry is pure bookkeeping with no visual
+  // effect of its own (the actual cell reappearing/vanishing is a
+  // SEPARATE cells-table event that already triggers its own onChange
+  // via applyRemoteUpsert/applyRemoteDelete above) -- so no onChange()
+  // here, same reasoning as claims. DOES need the applyingRemote guard,
+  // unlike claims, since setRegrowthEntry/removeRegrowthEntry have real
+  // local push-hooks (handleLocalRegrowthSet/Clear) that would otherwise
+  // immediately re-push what was just received.
+  function applyRemoteRegrowthSet(key, entry) {
+    applyingRemote = true;
+    world.setRegrowthEntry(key, entry);
+    applyingRemote = false;
+  }
+  function applyRemoteRegrowthClear(key) {
+    applyingRemote = true;
+    world.removeRegrowthEntry(key);
+    applyingRemote = false;
+  }
+
   const sharedWorldToggle = document.getElementById('shared-world-toggle');
   const sharedWorldHint = document.getElementById('shared-world-hint');
   const newWorldBtn = document.getElementById('new-world');
@@ -983,6 +1027,8 @@ async function init() {
         onRemoteUpsert: applyRemoteUpsert,
         onRemoteDelete: applyRemoteDelete,
         onRemoteClaim: applyRemoteClaim,
+        onRemoteRegrowthSet: applyRemoteRegrowthSet,
+        onRemoteRegrowthClear: applyRemoteRegrowthClear,
       });
       setLocalResetControlsEnabled(false);
       setClaimLandEnabled(true);
