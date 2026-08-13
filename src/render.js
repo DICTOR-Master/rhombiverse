@@ -64,6 +64,13 @@ import {
   averageTraitValue,
   planetoidKeyFor,
 } from './evolution.js';
+import {
+  LAND_CREATURE_SPECIES,
+  SEA_CREATURE_SPECIES,
+  ANIMAL_TRAIT_RANGES,
+  plantAnimal,
+  movementStepHook,
+} from './animals.js';
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -292,7 +299,12 @@ function updateGravityInfo() {
 function resolveEvolution(world, now) {
   const organismIds = Object.keys(world.getOrganisms());
   if (organismIds.length === 0) return false;
-  const results = resolveCatchUpForAllPlanetoids(world, organismIds, now);
+  // RHOMBIVERSE_SPEC_ANIMALS.md Stage B: movementStepHook is a no-op for
+  // every non-animal organism (amoeba/plant), so passing it here
+  // unconditionally is safe and correct regardless of what's actually
+  // planted -- this is the one real wiring point Stage B's own bounded-
+  // random-walk mechanism needed to go live in the actual game.
+  const results = resolveCatchUpForAllPlanetoids(world, organismIds, now, movementStepHook);
   return Object.values(results).some((r) => r.generationsResolved > 0);
 }
 
@@ -546,6 +558,12 @@ const SPECIES_COLORS = {
   // another named template.
   amoeba_evolved: 0x6ee7b7,
   plant_evolved: 0x86efac,
+  // RHOMBIVERSE_SPEC_ANIMALS.md -- land/sea creatures, same warmer/
+  // saturated "genome-driven" treatment as amoeba/plant above, but a
+  // distinct hue per habitat (earthy tan for land, deep teal for sea) so
+  // the two read apart at a glance in the 3D view.
+  landCreature_evolved: 0xd4a574,
+  seaCreature_evolved: 0x0e7490,
 };
 
 // evolution.js's own plantOrganism deliberately namespaces the
@@ -1117,7 +1135,9 @@ async function init() {
     // genes directly" framing every other lever in section 9 already
     // uses (this is just the FOUNDING lever: what starts on the
     // planetoid at all).
-    if ((species === 'evo-amoeba' || species === 'evo-plant') && sharedWorldActive) {
+    const isEvolvingSpecies =
+      species === 'evo-amoeba' || species === 'evo-plant' || species === 'evo-land' || species === 'evo-land-dino' || species === 'evo-sea';
+    if (isEvolvingSpecies && sharedWorldActive) {
       // organisms/planetoidEvolution have no Supabase sync path yet
       // (see resolveEvolution's own header) -- planting one here would
       // sync the underlying SEED (seeds already sync) but not the
@@ -1136,6 +1156,43 @@ async function init() {
       }
       const organismId = `organism_${Date.now()}_${seedCounter}`;
       ({ seed } = plantOrganism(world, organismId, seedId, evoSpecies, genome, origin));
+    } else if (species === 'evo-land' || species === 'evo-land-dino' || species === 'evo-sea') {
+      // RHOMBIVERSE_SPEC_ANIMALS.md Stage A/B: same random-within-range
+      // founding genome as evo-amoeba/evo-plant above (no breeding UI),
+      // plus a random-within-range animalTraits object for mobilityRange/
+      // huntBias. plantAnimal enforces habitat validity at plant time --
+      // a land creature can't be planted on/near a liquid-permeated cell
+      // and vice versa, surfaced here as a friendly alert rather than an
+      // unhandled exception.
+      const animalSpecies = species === 'evo-sea' ? SEA_CREATURE_SPECIES : LAND_CREATURE_SPECIES;
+      const isDino = species === 'evo-land-dino';
+      const genome = {};
+      for (const [trait, [min, max]] of Object.entries(GENOME_TRAIT_RANGES)) {
+        // "Dinosaur": still a real, random genome (no hand-tuned exact
+        // numbers, no breeding UI) but biased toward the LARGE end of
+        // maturitySize specifically -- a real, grounded read (large-
+        // bodied land animals), not a special-cased new mechanic.
+        genome[trait] = isDino && trait === 'maturitySize' ? max - Math.random() * (max - min) * 0.3 : min + Math.random() * (max - min);
+      }
+      const animalTraits = {};
+      for (const [trait, [min, max]] of Object.entries(ANIMAL_TRAIT_RANGES)) {
+        // Biased toward high huntBias (carnivore) and high mobilityRange
+        // (a real predator's own mobility advantage) -- same "bias the
+        // random draw, never hand-fix a value" shape as maturitySize
+        // above, keeping this a real, still-evolvable genome.
+        animalTraits[trait] = isDino ? max - Math.random() * (max - min) * 0.3 : min + Math.random() * (max - min);
+      }
+      const organismId = `organism_${Date.now()}_${seedCounter}`;
+      try {
+        ({ seed } = plantAnimal(world, organismId, seedId, animalSpecies, genome, animalTraits, origin));
+      } catch (err) {
+        const habitatHint =
+          animalSpecies === LAND_CREATURE_SPECIES
+            ? 'Land creatures need dry ground, away from any Ice 9.9/liquid-permeated zone.'
+            : 'Sea creatures need a liquid-permeated zone (Ice 9.9 near a Blackstar-Glassite core).';
+        alert(`Can't plant here: ${err.message}. ${habitatHint}`);
+        return;
+      }
     } else {
       seed = plantSeed(world, seedId, species, origin);
     }

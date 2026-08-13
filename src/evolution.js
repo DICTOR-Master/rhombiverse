@@ -867,13 +867,27 @@ function offspringPlacement(world, parentOrganismId, rng) {
 // function's own prior fixed behavior (base CROWDING_THRESHOLD, no
 // mutation-rate cap), so a caller that doesn't pass it (none currently
 // do directly -- resolveCatchUp always supplies it) sees no change.
+// `onGenerationStep` (world, organismId, rng, generationIndex, simulatedNow)
+// -> void, added for RHOMBIVERSE_SPEC_ANIMALS.md Stage B (Mobility): an
+// optional, generic per-organism hook called once per organism per
+// generation, BEFORE growth/reproduction/survival resolve for it that
+// generation (so those react to wherever the hook may have just moved
+// it) -- same "extension point designed in, not retrofitted" shape this
+// module's own rng parameter already established. Defaults to null (a
+// no-op), so every existing caller/test sees zero change. Deliberately
+// generic rather than animal-specific: this module stays fully unaware
+// that "animals" exist as a concept, same one-directional-dependency
+// discipline growth.js/evolution.js already hold to -- animals.js is the
+// one that supplies a real hook (its own bounded-random-walk mobility
+// function), never the reverse.
 function resolveOneGeneration(
   world,
   organismIds,
   rng,
   generationIndex,
   simulatedNow,
-  dampingParams = { crowdingThreshold: CROWDING_THRESHOLD, mutationCeiling: 1 }
+  dampingParams = { crowdingThreshold: CROWDING_THRESHOLD, mutationCeiling: 1 },
+  onGenerationStep = null
 ) {
   const toRemove = new Set();
   const newIds = [];
@@ -882,6 +896,8 @@ function resolveOneGeneration(
   for (const organismId of organismIds) {
     const organism = world.getOrganisms()[organismId];
     if (!organism) continue;
+
+    onGenerationStep?.(world, organismId, rng, generationIndex, simulatedNow);
 
     // Real bug, caught only by tracing an actual multi-generation run,
     // not by any single-generation test: growth was left entirely to
@@ -985,7 +1001,11 @@ function resolveOneGeneration(
 // from that same generation's real population swing -- so damping
 // responds within a single long catch-up run, not just across separate
 // calls to this function.
-export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now = Date.now(), initialVolatilityScore = 0) {
+// `onGenerationStep`, added for Stage B (Mobility) -- threaded straight
+// through to resolveOneGeneration's own identically-named parameter (see
+// that function's own header). Default null, so every existing caller
+// sees no change.
+export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now = Date.now(), initialVolatilityScore = 0, onGenerationStep = null) {
   const elapsed = Math.max(0, now - lastSimulated);
   const generations = Math.min(Math.floor(elapsed / EVOLUTION_GENERATION_INTERVAL_MS), MAX_CATCHUP_GENERATIONS);
   const rng = createSeededRng(rngState);
@@ -999,7 +1019,7 @@ export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now 
       crowdingThreshold: CROWDING_THRESHOLD + carryingCapacityBonus(volatilityScore),
       mutationCeiling: mutationRateCeiling(volatilityScore),
     };
-    currentIds = resolveOneGeneration(world, currentIds, rng, g, simulatedNow, dampingParams);
+    currentIds = resolveOneGeneration(world, currentIds, rng, g, simulatedNow, dampingParams, onGenerationStep);
     volatilityScore = nextVolatilityScore(volatilityScore, beforeCount, currentIds.length);
   }
 
@@ -1082,7 +1102,10 @@ export function groupOrganismsByPlanetoid(world, organismIds) {
 // the first time seeds its own rng from a hash of its own key (not a
 // shared constant like 0), so two different never-before-resolved
 // planetoids don't coincidentally start from identical rng sequences.
-export function resolveCatchUpForAllPlanetoids(world, organismIds, now = Date.now()) {
+// `onGenerationStep`, added for Stage B (Mobility) -- threaded straight
+// through to resolveCatchUp's own identically-named parameter. Default
+// null, so every existing caller sees no change.
+export function resolveCatchUpForAllPlanetoids(world, organismIds, now = Date.now(), onGenerationStep = null) {
   const groups = groupOrganismsByPlanetoid(world, organismIds);
   const results = {};
   for (const [planetoidKey, ids] of Object.entries(groups)) {
@@ -1091,7 +1114,7 @@ export function resolveCatchUpForAllPlanetoids(world, organismIds, now = Date.no
       rngState: hashStringToSeed(planetoidKey),
       volatilityScore: 0,
     };
-    const result = resolveCatchUp(world, ids, stored.lastSimulated, stored.rngState, now, stored.volatilityScore ?? 0);
+    const result = resolveCatchUp(world, ids, stored.lastSimulated, stored.rngState, now, stored.volatilityScore ?? 0, onGenerationStep);
     world.setPlanetoidEvolution(planetoidKey, {
       lastSimulated: result.lastSimulated,
       rngState: result.rngState,

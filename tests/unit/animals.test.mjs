@@ -12,8 +12,11 @@ import {
   plantAnimal,
   isAnimal,
   HABITAT_SEARCH_RADIUS,
+  MAX_MOVE_ATTEMPTS,
+  attemptMove,
+  movementStepHook,
 } from '../../src/animals.js';
-import { isMature, growOrganism, GENOME_TRAIT_RANGES } from '../../src/evolution.js';
+import { isMature, growOrganism, GENOME_TRAIT_RANGES, resolveCatchUpForAllPlanetoids, plantOrganism } from '../../src/evolution.js';
 import { createWorldStore } from '../../src/worldstate.js';
 
 function growToMaturity(world, organismId, maxTicks = 20) {
@@ -120,4 +123,104 @@ test('plantAnimal: a planted animal organism still grows correctly via the uncha
 
 test('HABITAT_SEARCH_RADIUS reuses evolution.js\'s own RESOURCE_SEARCH_RADIUS grounding, not a second separately-tuned constant', () => {
   assert.equal(HABITAT_SEARCH_RADIUS, 10);
+});
+
+// ============================================================
+// Stage B -- Mobility
+// ============================================================
+
+test('attemptMove: a non-animal organism is always a no-op', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'p1', 'seed_p1', 'amoeba', {}, [0, 0, 0], 0);
+  const moved = attemptMove(world, 'p1');
+  assert.equal(moved, false);
+  assert.deepEqual(world.getSeeds()['seed_p1'].origin, [0, 0, 0]);
+});
+
+test('attemptMove: real movement never exceeds the organism\'s own mobilityRange, across many trials', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  // A wide-open dry field -- every candidate direction is valid land
+  // habitat, so this exercises real movement distance, not the retry path.
+  const origin = [0, 0, 0];
+  const { organism } = plantAnimal(world, 'a1', 'seed_a1', LAND_CREATURE_SPECIES, {}, { mobilityRange: 5 }, origin, 0);
+  for (let i = 0; i < 200; i++) {
+    const before = world.getSeeds()['seed_a1'].origin;
+    attemptMove(world, 'a1');
+    const after = world.getSeeds()['seed_a1'].origin;
+    const dist = Math.hypot(after[0] - before[0], after[1] - before[1], after[2] - before[2]);
+    assert.ok(dist <= organism.mobilityRange + 1e-9, `single-step distance ${dist} exceeded mobilityRange ${organism.mobilityRange}`);
+  }
+});
+
+test('attemptMove: a land creature confined to a small dry island surrounded by water never actually crosses into the liquid-permeated cells, across many real moves', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'base' });
+  // A ring of permeated water cells surrounding the dry island at a
+  // real, fixed distance -- confirms the real invariant Stage B's own
+  // success check asks for ("movement... stays within... valid cells"),
+  // not "never moves at all": a small dry island still permits real
+  // local movement, it just must never reach the surrounding water.
+  for (let x = -3; x <= 3; x++) {
+    for (let y = -3; y <= 3; y++) {
+      for (let z = -3; z <= 3; z++) {
+        if (x === 0 && y === 0 && z === 0) continue;
+        if ((x + y + z) % 2 !== 0) continue; // valid FCC parity only
+        world.addCell(x, y, z, { material: 'water', hydrospherePermeated: true });
+      }
+    }
+  }
+  plantAnimal(world, 'a1', 'seed_a1', LAND_CREATURE_SPECIES, {}, { mobilityRange: 15 }, [0, 0, 0], 0);
+  for (let i = 0; i < 30; i++) {
+    attemptMove(world, 'a1');
+    const pos = world.getSeeds()['seed_a1'].origin;
+    assert.ok(isValidHabitat(world, LAND_CREATURE_SPECIES, pos), `land creature must always remain in valid dry habitat, found at [${pos}]`);
+  }
+});
+
+test('attemptMove: a sea creature stays within its liquid-permeated pool, never wandering onto dry land', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  // A small pool of permeated water around the origin; dry land just
+  // beyond it in every direction.
+  for (let x = -1; x <= 1; x++) {
+    for (let y = -1; y <= 1; y++) {
+      for (let z = -1; z <= 1; z++) {
+        if ((x + y + z) % 2 !== 0) continue;
+        world.addCell(x, y, z, { material: 'water', hydrospherePermeated: true });
+      }
+    }
+  }
+  plantAnimal(world, 'a1', 'seed_a1', SEA_CREATURE_SPECIES, {}, { mobilityRange: 2 }, [0, 0, 0], 0);
+  for (let i = 0; i < 30; i++) {
+    attemptMove(world, 'a1');
+    const pos = world.getSeeds()['seed_a1'].origin;
+    assert.ok(isValidHabitat(world, SEA_CREATURE_SPECIES, pos), `sea creature must always remain in valid liquid habitat, found at [${pos}]`);
+  }
+});
+
+test('movementStepHook wired into resolveCatchUpForAllPlanetoids: a real multi-generation catch-up run actually moves a land animal over time, while never leaving valid habitat', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'blackstar-glassite' });
+  const origin = [1, 1, 1]; // adjacent to the BSG seed so a real planetoid exists
+  // maturitySize deliberately far beyond how many generations this test
+  // resolves -- reproduction (and the population dynamics/extinction-
+  // eligibility that come with a population > MIN_VIABLE_POPULATION)
+  // must never fire here, so the single tracked organism id is
+  // guaranteed to still exist at the end; this test is about mobility,
+  // not survival/reproduction (Stage C's own job).
+  plantAnimal(world, 'a1', 'seed_a1', LAND_CREATURE_SPECIES, { maturitySize: 15, mutationRate: 0 }, { mobilityRange: 3 }, origin, 0);
+
+  const startOrigin = [...world.getSeeds()['seed_a1'].origin];
+  // First call establishes this planetoid's own lastSimulated baseline
+  // (a never-before-resolved planetoid's fallback IS `now` itself, per
+  // resolveCatchUpForAllPlanetoids's own design -- zero elapsed time on
+  // a truly first call is correct, not a bug). A second call at a real
+  // LATER `now` then has genuine elapsed time to resolve against that
+  // stored baseline -- same two-call shape the Stage 4 catch-up tests
+  // above already use for this exact reason.
+  resolveCatchUpForAllPlanetoids(world, ['a1'], 0, movementStepHook);
+  resolveCatchUpForAllPlanetoids(world, ['a1'], 30000 * 10, movementStepHook);
+
+  const endOrigin = world.getSeeds()['seed_a1'].origin;
+  assert.notDeepEqual(endOrigin, startOrigin, 'a real multi-generation catch-up run must actually move the animal at least once');
+  assert.ok(isValidHabitat(world, LAND_CREATURE_SPECIES, endOrigin), 'final position must still be valid habitat');
 });

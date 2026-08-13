@@ -158,3 +158,82 @@ export function isAnimal(organism) {
 }
 
 export { GENOME_TRAIT_RANGES };
+
+// ============================================================
+// Stage B -- Mobility (Abstracted, Not Live Physics)
+// ============================================================
+// Section 2: NOT continuous physics -- each resolution step, a mobile
+// organism's effective location is resolved as a single bounded random
+// walk within its own genome's mobilityRange of its previous position,
+// constrained to its habitat type. Consistent with the whole framework's
+// deterministic-catch-up model (evolution.js's own section 4): this is a
+// population-level position update alongside reproduction/selection, not
+// a new physics/pathfinding system.
+//
+// Real, grounded reasoning for the bounded-retry shape below: section 2's
+// own blast-radius sentence is a HARD constraint ("an organism can never
+// move somewhere its habitat trait doesn't support") -- a single random
+// draw landing in invalid habitat (e.g. a land creature's walk stepping
+// over open water) must never actually move the organism there. Retrying
+// a bounded number of fresh random directions before giving up and
+// staying put is the simplest mechanism that still guarantees the hard
+// constraint holds on every call, without ever searching for the
+// "nearest valid" spot (which would smuggle in pathfinding, a
+// deliberately different, heavier system section 2 explicitly says this
+// isn't). MAX_MOVE_ATTEMPTS=8 is a first-guess, flagged as tunable, not
+// derived from a specific figure -- generous enough that an organism
+// deep in valid habitat (the common case) essentially always finds a
+// valid direction on its first try, small enough to stay cheap even for
+// an organism sitting right at a habitat boundary.
+export const MAX_MOVE_ATTEMPTS = 8;
+
+// A single candidate point: a uniformly-random direction (spherical) at
+// a uniformly-random distance up to mobilityRange -- "within mobilityRange
+// of its previous cell," per section 2's own wording, not always AT the
+// full range.
+function randomCandidatePosition(origin, mobilityRange, rng) {
+  const distance = rng() * mobilityRange;
+  const theta = rng() * Math.PI * 2;
+  const phi = rng() * Math.PI;
+  return [
+    origin[0] + distance * Math.sin(phi) * Math.cos(theta),
+    origin[1] + distance * Math.sin(phi) * Math.sin(theta),
+    origin[2] + distance * Math.cos(phi),
+  ];
+}
+
+// The real per-organism mechanism, exported for direct/manual use (Stage
+// B's own scope, mirroring evolution.js's Stage 2 "trigger manually to
+// verify each channel independently before wiring into automatic
+// resolution") and as the function movementStepHook below wraps for the
+// automatic catch-up loop. Non-animal organisms are always a no-op (this
+// module is the ONLY thing that knows what an "animal" is). Returns
+// whether the organism actually moved (false if it stayed put, either
+// because it isn't an animal or because every attempt landed in invalid
+// habitat).
+export function attemptMove(world, organismId, rng = Math.random) {
+  const organism = world.getOrganisms()[organismId];
+  if (!isAnimal(organism)) return false;
+  const seed = world.getSeeds()[organism.seedId];
+  if (!seed) return false;
+  const mobilityRange = clampAnimalTraits(organism).mobilityRange;
+
+  for (let attempt = 0; attempt < MAX_MOVE_ATTEMPTS; attempt++) {
+    const candidate = randomCandidatePosition(seed.origin, mobilityRange, rng);
+    if (isValidHabitat(world, organism.species, candidate)) {
+      world.setSeed(organism.seedId, { ...seed, origin: candidate });
+      return true;
+    }
+  }
+  return false; // no valid direction found this step -- stays put, never placed somewhere invalid
+}
+
+// The real onGenerationStep hook (evolution.js's own Stage B extension
+// point, added specifically for this) -- passed straight to
+// resolveCatchUpForAllPlanetoids by render.js's own wiring. Matches that
+// hook's exact signature; only the `world`/`organismId`/`rng` parameters
+// are actually needed here (generationIndex/simulatedNow are for other
+// hooks' potential use, not this one).
+export function movementStepHook(world, organismId, rng) {
+  attemptMove(world, organismId, rng);
+}
