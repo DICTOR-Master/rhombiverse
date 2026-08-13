@@ -261,12 +261,32 @@ building only, for now).
 
 ## 8. Build Order
 
-**Stage 1 — Static Sub-Lattice Geometry (no camera trigger yet)**
-Given one specific cell, generate and render its sub-lattice at a fixed
-test distance/scale, hardcoded, no LOD trigger logic. Verify the
+**Stage 1 — Static Sub-Lattice Geometry (no camera trigger yet) — DONE,
+2026-08-13.** Given one specific cell, generate and render its sub-lattice
+at a fixed test distance/scale, hardcoded, no LOD trigger logic. Verify the
 sub-cells' own packing is geometrically correct (real FCC adjacency,
 scaled) and their combined volume approximately tiles the parent cell,
 before any camera-driven logic exists.
+
+New `src/latticezoom.js`, reusing `lattice.js`'s own `cellsInShells`/
+`shellCount`/`cellToWorld` directly (no new geometry system). `SUB_SCALE_
+FACTOR` (`subScaleFactor(maxShell) = cbrt(1 / cumulativeCellCount(maxShell))`)
+is not guessed: the RD's own volume at scale 1 was verified numerically
+at exactly 2 (a real `ConvexGeometry` volume computation, 12 tetrahedra
+fanned from the origin, summed — independently cross-checked against the
+clean analytic argument that valid cells are exactly half of `Z^3`, so
+Voronoi volume = 1/density = 2, both methods agreeing). This makes the
+volume-conservation identity (`cellCount * factor^3 == 1`) exact, not
+approximate — verified in `tests/unit/latticezoom.test.mjs` (7 tests) —
+since Voronoi cells tile with zero gap/overlap by construction.
+`SUB_LATTICE_MAX_SHELL = 2` (55 sub-cells) is Stage 1's own fixed test
+value. Wired into `render.js`'s `init()` as a genuinely separate
+`InstancedMesh` (own geometry/material/capacity, never touching
+`MAX_CELLS`) demoed on the seed cell at `(0,0,0)`, unconditionally
+visible (no camera trigger, per this stage's own scope) — verified live
+via Playwright: real orange sub-cells render nested exactly at the seed
+cell's location, correctly scaled, tiling with no visible gap/overlap at
+both default and close zoom, zero console errors.
 
 **Stage 2 — Camera-Distance Trigger & Lifecycle**
 Wire real camera-distance detection (reusing `refreshClaims`'s own

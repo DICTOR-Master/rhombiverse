@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell } from './lattice.js';
+import { generateSubLattice, SUB_LATTICE_MAX_SHELL } from './latticezoom.js';
 import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController, removeShell, recolorShell } from './build.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
@@ -698,6 +699,50 @@ async function init() {
   const mesh = new THREE.InstancedMesh(geometry, material, MAX_CELLS);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(mesh);
+
+  // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 1: static sub-lattice
+  // geometry, demoed on one hardcoded cell (the seed cell, always
+  // present in every starting world) -- no camera-distance trigger yet
+  // (Stage 2's own job), no multi-level recursion, no blending. Proves
+  // the sub-lattice itself is geometrically correct (real FCC adjacency,
+  // scaled -- reuses latticezoom.js's own generateSubLattice, which
+  // itself reuses lattice.js's cellsInShells/cellToWorld directly, no
+  // new geometry system) and that its combined volume conserves the
+  // parent's own (see latticezoom.js's own header for the exact
+  // identity). A SEPARATE InstancedMesh, never sharing the top-level
+  // mesh's own buffer/capacity/MAX_CELLS (Isolation -- that spec's own
+  // section 4: "touches no existing gameplay data... a rendering-layer
+  // addition"), built the exact same way (buildRDGeometry + rdRawVerts)
+  // rather than inventing new geometry. Every sub-cell shares one
+  // geometry (they're all the same real scale), matching the top-level
+  // mesh's own single-shared-geometry InstancedMesh pattern.
+  const subLatticeCells = generateSubLattice(0, 0, 0, SUB_LATTICE_MAX_SHELL, SCALE);
+  const subLatticeGeometry = buildRDGeometry(subLatticeCells[0].scale);
+  const subLatticeMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffb347,
+    metalness: 0.15,
+    roughness: 0.55,
+    flatShading: true,
+  });
+  const subLatticeMesh = new THREE.InstancedMesh(subLatticeGeometry, subLatticeMaterial, subLatticeCells.length);
+  const subLatticeDummy = new THREE.Object3D();
+  subLatticeCells.forEach((cell, i) => {
+    subLatticeDummy.position.set(...cell.worldPosition);
+    subLatticeDummy.updateMatrix();
+    subLatticeMesh.setMatrixAt(i, subLatticeDummy.matrix);
+  });
+  subLatticeMesh.instanceMatrix.needsUpdate = true;
+  // Same real bug this project already found and fixed once for the
+  // top-level mesh (render.js's own history): InstancedMesh.raycast()
+  // lazily computes its boundingSphere ONCE and never auto-invalidates
+  // it -- calling this explicitly after populating every instance avoids
+  // that trap here too, even though Stage 1 doesn't raycast against this
+  // mesh yet (governing decision 4: block-level building/mining only,
+  // sub-lattice is purely visual for this whole spec's current scope) --
+  // cheap insurance against the exact class of bug this codebase has
+  // already paid for once.
+  subLatticeMesh.computeBoundingSphere();
+  scene.add(subLatticeMesh);
 
   // RHOMBIVERSE_SPEC_REGIONS.md territory visualization: one low-opacity
   // mesh per claim, its exact real footprint shape (via ConvexGeometry on
