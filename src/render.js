@@ -423,6 +423,16 @@ const SPECIES_COLORS = {
   moss: 0x4f7a3f,
   fungus: 0xd9b26b,
   fern: 0x2f6b3a,
+  // Wave 2 (2026-08-13) -- one distinct tint per template, not per
+  // category, so e.g. sapling/conifer/shrub (all species: 'plant')
+  // still read apart from each other in the 3D view.
+  sapling: 0x6fae4f,
+  conifer: 0x1f4a28,
+  shrub: 0x7a8f3f,
+  nautilus: 0xe8dcc0,
+  scallop: 0xe0a598,
+  spineling: 0xc9b896,
+  'cluster-frame': 0x8a8f99,
 };
 
 function speciesColor(species) {

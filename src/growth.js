@@ -312,6 +312,94 @@ export const GROWTH_TEMPLATES = {
   moss: { species: 'moss', maxGeneration: 5 },
   fungus: { species: 'fungus', maxGeneration: 6 },
   fern: { species: 'fern', maxGeneration: 6 },
+
+  // Wave 2 (2026-08-13), per the spec's own section 4.1 staging -- only
+  // attempted after Wave 1 was real and verified, which it now is. This
+  // is also where `species` (category: plant/shell/creature) and the
+  // template key genuinely diverge for the first time -- multiple
+  // templates now share one category, exactly the distinction the spec's
+  // own header flagged as "not real yet" for Wave 1. Each entry carries
+  // its OWN `bias` (rather than falling back to the coarser per-category
+  // SPECIES_BIAS table Wave 1 used) since the spec explicitly calls for
+  // per-template tuning, not per-category: "each entry pre-tunes the
+  // section 4 substitution bias parameters... to reliably produce one
+  // specific, recognizable silhouette."
+  //
+  // `preferType`/`facesPerTick`/`maxGeneration` remain the entire real
+  // tunable surface growSeed exposes (see SPECIES_BIAS above) -- these
+  // values are a first-guess, grounded in the real growth habit each
+  // template names, verified against actual generator output (tile
+  // count, bounding-box elongation) in growth.test.mjs and the preset
+  // generation script, not asserted here unchecked.
+  sapling: {
+    species: 'plant',
+    // Real biology: a young tree -- already elongating along one
+    // dominant axis (tree-like, not a blob) but modest in both height
+    // and generation count, distinct from a mature conifer.
+    maxGeneration: 8,
+    bias: { preferType: 'acute', facesPerTick: 2 },
+  },
+  conifer: {
+    species: 'plant',
+    // Real biology: a mature evergreen -- strongly single-axis
+    // elongating (acute prototile only, same facesPerTick as sapling so
+    // the read stays a single trunk-like column, not a wider crown) but
+    // grown far longer, so it reads unambiguously taller/older.
+    maxGeneration: 16,
+    bias: { preferType: 'acute', facesPerTick: 2 },
+  },
+  shrub: {
+    species: 'plant',
+    // Real biology: a bush -- many simultaneous low branches rather
+    // than one dominant axis (no preferred prototile, high
+    // facesPerTick), short-to-moderate generation cap so it reads
+    // bushy/wide rather than tall.
+    maxGeneration: 9,
+    bias: { preferType: null, facesPerTick: 4 },
+  },
+  nautilus: {
+    species: 'shell',
+    // Real biology: a nautilus shell's own logarithmic-spiral,
+    // tightly-wound growth. growSeed's grammar has no explicit
+    // radius/curvature primitive (flagged honestly, matching this
+    // module's own established practice of not overclaiming precision
+    // it doesn't have) -- the tightest available approximation within
+    // the existing two-prototile grammar is a strong, exclusive oblate
+    // preference (the lower-volume, more tightly-packing prototile) at
+    // the slowest possible growth rate (facesPerTick: 1), run for many
+    // generations, so the structure stays compact and dense rather than
+    // sprawling -- a coiled read, not a true parametric spiral.
+    maxGeneration: 14,
+    bias: { preferType: 'oblate', facesPerTick: 1 },
+  },
+  scallop: {
+    species: 'shell',
+    // Real biology: a scallop's fluted, radially-ribbed fan, wider and
+    // flatter than a nautilus's tight coil -- same oblate compactness
+    // preference, but more simultaneous growth points (a fanning
+    // frontier) and a shorter generation cap, so it reads as a smaller,
+    // broader fan rather than a long coil.
+    maxGeneration: 8,
+    bias: { preferType: 'oblate', facesPerTick: 3 },
+  },
+  spineling: {
+    species: 'creature',
+    // Real biology: a small creature's bilateral frame growing outward
+    // from a central spine -- acute (elongating) prototile, two
+    // simultaneous growth points per tick for a paired/bilateral read,
+    // moderate generation cap.
+    maxGeneration: 10,
+    bias: { preferType: 'acute', facesPerTick: 2 },
+  },
+  'cluster-frame': {
+    species: 'creature',
+    // Real biology: a bulkier, more skeletal cluster-frame -- no
+    // dominant axis (mixed prototiles) and more simultaneous growth
+    // points than spineling, run longer, for a denser, bulkier frame
+    // rather than a slender bilateral one.
+    maxGeneration: 13,
+    bias: { preferType: null, facesPerTick: 4 },
+  },
 };
 
 // Reuses asteroids.js's own regrowth-cooldown shape exactly (a
@@ -365,9 +453,13 @@ export function growSeed(seed, now = Date.now(), phenotypeOverride = null) {
   if (seed.generation >= maxGeneration) return false;
   if (now - seed.lastGrowthAt < GROWTH_TICK_MS) return false;
 
+  // Wave 2 templates carry their own `bias` directly (per-template
+  // tuning, per the spec); Wave 1 templates have no `bias` field and
+  // fall back to the coarser per-category SPECIES_BIAS table exactly as
+  // before -- unchanged behavior for every already-verified template.
   const bias = phenotypeOverride
     ? { preferType: phenotypeOverride.preferType, facesPerTick: phenotypeOverride.facesPerTick }
-    : SPECIES_BIAS[seed.species];
+    : (GROWTH_TEMPLATES[seed.species].bias ?? SPECIES_BIAS[seed.species]);
 
   // Frontier: every open face across every existing tile, in a stable
   // order (tile insertion order, then the fixed facesOfTile order) --

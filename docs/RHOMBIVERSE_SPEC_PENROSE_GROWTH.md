@@ -336,18 +336,35 @@ trail (unit tests + real Playwright runs). Wave 2 not started.
 - [x] Different `species` values produce visibly different growth
   shapes — verified for Wave 1's own four (elongated/branching `fern`,
   thread-like `fungus`, dense-compact `moss`, minimal `amoeba`) from
-  the same underlying tile set and grammar. `shell`/`creature`-category
-  species (radial/shell-like, spine-branching) are Wave 2, not yet
-  implemented — not claimed here.
+  the same underlying tile set and grammar. Wave 2 (2026-08-13) adds
+  the `shell` category (`nautilus`/`scallop`, an oblate-preferring
+  compact-coil approximation — flagged honestly in `growth.js` as not a
+  true parametric spiral, since the existing grammar has no
+  radius/curvature primitive) and the `creature` category
+  (`spineling`/`cluster-frame`, bilateral vs. bulkier-frame branching)
+  — verified via real generation (tile counts, generation caps, zero
+  geometric overlap) and a real Playwright screenshot showing distinct
+  colors/silhouettes for sapling/conifer/shrub/cluster-frame rendered
+  live through the real `InstancedMesh` pipeline, zero console errors.
 - [x] Each named Wave 1 `GROWTH_TEMPLATES` entry reliably produces its
   intended, recognizable silhouette — verified by generating it for
   real and looking at it (screenshots), the same discipline
   `data/presets/rocky-planetoid.json` etc. were held to, not assumed
-  from the parameters alone. Wave 2 templates not yet attempted.
+  from the parameters alone. Wave 2's 7 templates (`sapling`/`conifer`/
+  `shrub`/`nautilus`/`scallop`/`spineling`/`cluster-frame`) are
+  implemented, exercised by the existing generic overlap/generation-cap
+  test (now covering all 11 templates), and confirmed via real
+  screenshots — full close-up-per-template visual review (matching the
+  planetoid presets' own level of individual scrutiny) was not done for
+  every one of the 7 in this pass, flagged honestly rather than
+  overclaimed.
 - [x] At least one `data/growth-presets/*.json` file
   (`fern-grown.json`, 19 tiles) loads instantly into a pre-grown
   example structure, generated via the real template machinery rather
   than hand-authored, through the existing preset-select/Load UI.
+  Wave 2 adds `conifer-grown.json` (33 tiles, generation 16) and
+  `nautilus-grown.json` (15 tiles, generation 14), same generation
+  method, both verified loading live with zero console errors.
 - [x] Growth eventually stops (generation/tile cap) rather than running
   away indefinitely.
 - [x] `build.js` is untouched — no import either direction between it

@@ -449,10 +449,21 @@
     <div id="species-row" class="row" style="display: none;">
       <label>Species:
         <select id="species-select">
-          <option value="amoeba">Amoeba</option>
-          <option value="moss">Moss</option>
-          <option value="fungus">Fungus</option>
-          <option value="fern">Fern</option>
+          <optgroup label="Wave 1">
+            <option value="amoeba">Amoeba</option>
+            <option value="moss">Moss</option>
+            <option value="fungus">Fungus</option>
+            <option value="fern">Fern</option>
+          </optgroup>
+          <optgroup label="Wave 2">
+            <option value="sapling">Sapling</option>
+            <option value="conifer">Conifer</option>
+            <option value="shrub">Shrub</option>
+            <option value="nautilus">Nautilus</option>
+            <option value="scallop">Scallop</option>
+            <option value="spineling">Spineling</option>
+            <option value="cluster-frame">Cluster-Frame</option>
+          </optgroup>
         </select>
       </label>
     </div>
@@ -537,6 +548,8 @@
           <option value="continental-world-large">Continental World (Large, ~5800 cells, land+ocean)</option>
           <option value="ocean-world-large">Ocean World (Large, ~5800 cells, mostly ocean)</option>
           <option value="growth:fern-grown">Fern (Grown, Penrose/RT growth layer)</option>
+          <option value="growth:conifer-grown">Conifer (Grown, Wave 2)</option>
+          <option value="growth:nautilus-grown">Nautilus (Grown, Wave 2)</option>
         </select>
       </label>
       <button id="load-preset" type="button">Load</button>
