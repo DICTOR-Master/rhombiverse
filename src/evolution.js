@@ -220,6 +220,16 @@ export function organismBoundingRadius(world, organismId) {
   const organism = world.getOrganisms()[organismId];
   const seed = organism && world.getSeeds()[organism.seedId];
   if (!seed) return 0;
+  // growth.js's own growSeed caches this on the seed record after every
+  // real growth tick (see its own comment for why/how) -- reuse it when
+  // present rather than recomputing from scratch on every call, which is
+  // what turned this function into a real hot path under O(n^2) proximity
+  // checks (HGT, mate pairing, crowding) across many organisms. Falls
+  // back to a fresh computation for a seed with no cached value yet
+  // (freshly planted, generation 0, before its first growth tick, or
+  // loaded from an older preset predating this field) -- cheap in that
+  // case since there's at most one tile to measure.
+  if (typeof seed.cachedBoundingRadius === 'number') return seed.cachedBoundingRadius;
   let maxDist = 0;
   for (const tile of seed.tiles) {
     for (const v of tileWorldVertices(seed, tile)) {
@@ -795,6 +805,35 @@ export const EVOLUTION_GENERATION_INTERVAL_MS = GROWTH_TICK_MS;
 // Stage 1's genome ranges were.
 export const MAX_CATCHUP_GENERATIONS = 50;
 
+// A hard, real cap on organisms per planetoid -- RHOMBIVERSE_PRINCIPLES.md's
+// own "adaptive, not infinite" requirement, and matching this project's
+// established pattern of every other potentially-unbounded system
+// (MAX_CATCHUP_GENERATIONS above, MAX_CLAIM_SEARCH_SHELL, MAX_CELLS,
+// MAX_UNDO) -- a real cap grounded in measured cost, not an arbitrary-
+// feeling limit. Found LIVE, not guessed, while building the Lattice
+// Zoom showcase-world preset (2026-08-14): CROWDING_THRESHOLD only
+// applies a SOFT survival-probability penalty, with no hard ceiling
+// anywhere in this file -- attemptHorizontalTransfer's own O(n^2)
+// per-generation sweep (every mature organism tried against every OTHER
+// organism in the same generation) then compounds with MAX_CATCHUP_
+// GENERATIONS' own worst case (50 generations resolved synchronously in
+// ONE call, e.g. after a player leaves a populated planetoid running for
+// real hours and comes back) -- confirmed live: a real, unremarkable
+// 21-organism planetoid, revisited after several real hours, hung and
+// then crashed an actual Chromium tab outright, reproducible and
+// isolated down to exactly this path via direct Playwright
+// instrumentation (bare planetoids with zero organisms stayed
+// perfectly stable under the identical real-time test). 100 keeps
+// worst-case O(n^2) HGT sweeps at 100^2 * 50 = 500,000 pair-checks per
+// catch-up call -- comfortably fast in practice (see the new test
+// below), while leaving real headroom above any population size this
+// project's own live-verified scenarios have ever produced. Reproduction
+// is suppressed once a planetoid's own current-generation population
+// (existing + already-added this generation) reaches this cap; survival/
+// growth/mutation/HGT all continue normally regardless -- a population
+// stops GROWING at the cap, it doesn't get culled down to it.
+export const MAX_ORGANISMS_PER_PLANETOID = 100;
+
 // Section 2.4: bounded multiplier applied to a population-wide EFFECTIVE
 // mutation rate immediately after a detected jolt, decaying linearly
 // back to each organism's own heritable mutationRate over
@@ -983,7 +1022,13 @@ function resolveOneGeneration(
       // probability function (section 3's own "survival/reproduction
       // probability" framing -- one function, both purposes).
       const reproProbability = survivalProbabilityFn(world, organismId, organismIds, dampingParams.crowdingThreshold);
-      if (rng() < reproProbability) {
+      // MAX_ORGANISMS_PER_PLANETOID: the real, hard cap this file was
+      // missing (see that constant's own header for the live-found bug
+      // it closes) -- rng() is still drawn either way so the seeded rng
+      // stream's own draw COUNT/structure stays identical whether or not
+      // the cap is active; only the reproduction OUTCOME changes.
+      const belowPopulationCap = organismIds.length + newIds.length < MAX_ORGANISMS_PER_PLANETOID;
+      if (rng() < reproProbability && belowPopulationCap) {
         const offspringId = `${organismId}_g${generationIndex}_${idCounter++}`;
         const offspringOrigin = offspringPlacement(world, organismId, rng);
         const mateCandidates = organismIds.filter((id) => id !== organismId);

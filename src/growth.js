@@ -510,6 +510,28 @@ export function growSeed(seed, now = Date.now(), phenotypeOverride = null) {
   if (added > 0) {
     seed.generation += 1;
     seed.lastGrowthAt = now;
+    // Real bug found live (2026-08-14) profiling a hung catch-up call:
+    // evolution.js's own organismBoundingRadius recomputed a seed's full
+    // extent (every tile x every vertex) from scratch on EVERY call, and
+    // gets called repeatedly inside O(n^2) per-generation proximity
+    // checks (HGT, mate pairing, crowding) -- a real, avoidable cost
+    // multiplier. `placedVerts` here already holds every current tile's
+    // own LOCAL vertices (tileVertices, not tileWorldVertices) -- and
+    // since tileWorldVertices = tileVertices + seed.origin, distance
+    // from seed.origin to a WORLD vertex is exactly distance from the
+    // ORIGIN (0,0,0) to the same LOCAL vertex (seed.origin cancels out),
+    // so this is the real bounding radius, computed for free off data
+    // this function already built, no extra tileVertices calls needed.
+    // A generic, organism-agnostic cache on the seed's own record --
+    // growth.js stays fully unaware of organisms/genomes either way.
+    let maxDist = 0;
+    for (const verts of placedVerts) {
+      for (const v of verts) {
+        const d = Math.hypot(v[0], v[1], v[2]);
+        if (d > maxDist) maxDist = d;
+      }
+    }
+    seed.cachedBoundingRadius = maxDist;
   }
   return added > 0;
 }

@@ -53,6 +53,7 @@ import {
   SHAPE_NOVELTY_THRESHOLD,
   nextLandscapeState,
   LANDSCAPE_STATE_EMA_RATE,
+  MAX_ORGANISMS_PER_PLANETOID,
 } from '../../src/evolution.js';
 import { createWorldStore } from '../../src/worldstate.js';
 import { applyGrowth } from '../../src/growth.js';
@@ -1136,4 +1137,51 @@ test('resolveCatchUpForAllPlanetoids: landscapeState is real per-planetoid isola
   const keyB = Object.keys(evoState).find((k) => k.includes('200.0'));
   assert.ok(evoState[keyA].landscapeState > 0, `expected A's real sustained mature plant biomass to accumulate a nonzero landscapeState, got ${evoState[keyA].landscapeState}`);
   assert.equal(evoState[keyB].landscapeState, 0, "B (never-matured plant, no real biomass) must stay at 0, unaffected by A's own accumulation");
+});
+
+// ============================================================
+// MAX_ORGANISMS_PER_PLANETOID -- real hard population cap
+// ============================================================
+// Found live (2026-08-14) building the Lattice Zoom showcase-world
+// preset: a real 21-organism planetoid, revisited via resolveCatchUpForAllPlanetoids
+// after enough real elapsed wall-clock time to trigger MAX_CATCHUP_
+// GENERATIONS' own worst case (50 generations resolved in one
+// synchronous call), hung and then crashed an actual Chromium tab --
+// attemptHorizontalTransfer's own O(n^2) per-generation sweep compounds
+// with unbounded reproduction across that many generations. These tests
+// prove the fix: population growth genuinely stops at the cap, AND the
+// real worst-case timing this bug actually manifested through
+// (MAX_CATCHUP_GENERATIONS, a real high-reproduction starting
+// population) stays fast in practice.
+
+test('MAX_ORGANISMS_PER_PLANETOID: a real, positive, finite bound', () => {
+  assert.equal(typeof MAX_ORGANISMS_PER_PLANETOID, 'number');
+  assert.ok(MAX_ORGANISMS_PER_PLANETOID > 0);
+});
+
+test('resolveCatchUp: a real high-reproduction population never exceeds MAX_ORGANISMS_PER_PLANETOID, even across many real resolved generations', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  // High resourceEfficiency/growthRate/maturitySize floor -- a real,
+  // fast-maturing, strong reproducer, the same shape as the showcase
+  // world's own organisms that actually triggered this bug live.
+  for (let i = 0; i < 10; i++) {
+    plantOrganism(world, `p${i}`, `seed_p${i}`, 'amoeba', { maturitySize: 3, resourceEfficiency: 1, growthRate: 1 }, [i, 0, 0], 0);
+  }
+  const result = resolveCatchUp(world, Array.from({ length: 10 }, (_, i) => `p${i}`), 0, 99, EVOLUTION_GENERATION_INTERVAL_MS * MAX_CATCHUP_GENERATIONS);
+  assert.equal(result.generationsResolved, MAX_CATCHUP_GENERATIONS, 'this test needs the real worst-case generation count to be meaningful');
+  assert.ok(result.organismIds.length <= MAX_ORGANISMS_PER_PLANETOID,
+    `population must never exceed the real hard cap, got ${result.organismIds.length}`);
+});
+
+test('resolveCatchUp: the real worst-case scenario that actually crashed a live tab (MAX_CATCHUP_GENERATIONS from a real reproducing population) now completes fast', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  for (let i = 0; i < 21; i++) {
+    plantOrganism(world, `p${i}`, `seed_p${i}`, 'amoeba', { maturitySize: 3, resourceEfficiency: 1, growthRate: 1 }, [i % 5, Math.floor(i / 5), 0], 0);
+  }
+  const start = Date.now();
+  const result = resolveCatchUp(world, Array.from({ length: 21 }, (_, i) => `p${i}`), 0, 12345, EVOLUTION_GENERATION_INTERVAL_MS * MAX_CATCHUP_GENERATIONS);
+  const elapsedMs = Date.now() - start;
+  console.log(`worst-case 50-generation catch-up from 21 organisms: ${elapsedMs}ms, final population ${result.organismIds.length}`);
+  assert.ok(elapsedMs < 5000, `expected the real worst-case catch-up to complete in well under 5s (the class of hang that crashed a live tab), took ${elapsedMs}ms`);
+  assert.ok(result.organismIds.length <= MAX_ORGANISMS_PER_PLANETOID);
 });

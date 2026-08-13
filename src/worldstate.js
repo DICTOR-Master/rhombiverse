@@ -71,6 +71,29 @@ export function createWorldStore(worldJSON, hooks = {}) {
   // (one-directional dependency, evolution.js imports growth.js, never
   // the reverse). `?? {}` so JSON from before this existed still loads.
   let organisms = { ...(worldJSON.organisms ?? {}) };
+  // Memoized getSeeds()/getOrganisms()/getPlanetoidEvolution() copies --
+  // real bug found live (2026-08-14, building the Lattice Zoom showcase-
+  // world preset): getSeeds/getOrganisms's own defensive `{ ...x }` copy
+  // (see their own comments -- a deliberate, real safety guarantee,
+  // "callers can't mutate it directly," NOT the thing to remove) was
+  // being called repeatedly inside evolution.js's own O(n^2) per-
+  // generation loops (attemptHorizontalTransfer and several helpers each
+  // independently re-fetch the full registry), turning an already-O(n^2)
+  // pass into an effective O(n^3) one -- profiled live via `node --cpu-
+  // prof`: getSeeds/getOrganisms's own copy alone was ~40% of total
+  // self-time in a real worst-case MAX_CATCHUP_GENERATIONS run, which
+  // took 35-40 real seconds and hung/crashed a live browser tab. Since
+  // every mutation below already reassigns (copy-on-write), never
+  // mutates in place, the SAME already-built copy stays perfectly valid
+  // to hand out repeatedly between mutations -- caching it here keeps
+  // the exact same external safety contract (still a genuinely separate
+  // object no caller can corrupt live state through) while making
+  // repeated reads between writes O(1) instead of O(n) each.
+  // Invalidated (set back to null) by every mutator below and by
+  // replaceAll; lazily rebuilt on the next read after that.
+  let seedsCache = null;
+  let organismsCache = null;
+  let planetoidEvolutionCache = null;
   // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 6, 2026-08-13: per-
   // planetoid catch-up state (lastSimulated/rngState), keyed by a
   // deterministic string derived from that planetoid's own real
@@ -246,15 +269,18 @@ export function createWorldStore(worldJSON, hooks = {}) {
     // future Supabase sync pass (not required for a first, local-only
     // pass per the spec's own section 10).
     getSeeds() {
-      return { ...seeds };
+      if (seedsCache === null) seedsCache = { ...seeds };
+      return seedsCache;
     },
     setSeed(seedId, seedData) {
       seeds = { ...seeds, [seedId]: seedData };
+      seedsCache = null;
       hooks.onSeedSet?.(seedId, seedData);
     },
     removeSeed(seedId) {
       const { [seedId]: _removed, ...rest } = seeds;
       seeds = rest;
+      seedsCache = null;
       hooks.onSeedClear?.(seedId);
     },
     // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 1: heritable genomes,
@@ -264,24 +290,29 @@ export function createWorldStore(worldJSON, hooks = {}) {
     // onOrganismClear mirror onSeedSet/onSeedClear, pre-wired the same
     // way seeds' own hooks were before their sync pass existed.
     getOrganisms() {
-      return { ...organisms };
+      if (organismsCache === null) organismsCache = { ...organisms };
+      return organismsCache;
     },
     setOrganism(organismId, organismData) {
       organisms = { ...organisms, [organismId]: organismData };
+      organismsCache = null;
       hooks.onOrganismSet?.(organismId, organismData);
     },
     removeOrganism(organismId) {
       const { [organismId]: _removed, ...rest } = organisms;
       organisms = rest;
+      organismsCache = null;
       hooks.onOrganismClear?.(organismId);
     },
     // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 6: per-planetoid
     // catch-up clock/rng, same set-by-key shape as organisms/seeds above.
     getPlanetoidEvolution() {
-      return { ...planetoidEvolution };
+      if (planetoidEvolutionCache === null) planetoidEvolutionCache = { ...planetoidEvolution };
+      return planetoidEvolutionCache;
     },
     setPlanetoidEvolution(planetoidKey, data) {
       planetoidEvolution = { ...planetoidEvolution, [planetoidKey]: data };
+      planetoidEvolutionCache = null;
     },
     // Serializes back to the full RHOMBIVERSE_PLAN.md section 3 shape,
     // for persistence.js to save/export.
@@ -312,6 +343,9 @@ export function createWorldStore(worldJSON, hooks = {}) {
       seeds = { ...(newWorldJSON.seeds ?? {}) };
       organisms = { ...(newWorldJSON.organisms ?? {}) };
       planetoidEvolution = { ...(newWorldJSON.planetoidEvolution ?? {}) };
+      seedsCache = null;
+      organismsCache = null;
+      planetoidEvolutionCache = null;
       cells.clear();
       for (const [key, data] of Object.entries(newWorldJSON.cells)) {
         cells.set(key, data);

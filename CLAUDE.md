@@ -2729,10 +2729,42 @@ top.
 **Direct request from the project owner, 2026-08-13, now unblocked --
 Lattice Zoom Stages 5 AND 6 are both done as of this entry:** build a
 permanent "showcase world" in the player's own rhombi-space demonstrating
-everything built in this project so far. Not started yet. Confirm the
-concrete delivery mechanism (a real built structure via the existing
-Export/Import JSON + Load-preset pattern already in this app, vs.
-something else) when picking this up rather than assuming.
+everything built in this project so far. **DONE, 2026-08-14** — delivered
+via the exact mechanism flagged above (`data/presets/showcase-world.json`
++ a `#preset-select` dropdown entry, same Load-preset pattern every other
+preset already uses). A real continental planetoid (459 cells) with Wave
+1/2 growth species, real evolved organisms (amoeba/plant/land/sea
+creatures with real reproduction/mutation history and nonzero
+`landscapeState`), kept to ~11 organisms deliberately (not a scale limit
+anymore — see below — just reads better as a snapshot than a large
+population, per direct guidance).
+
+Building it surfaced three real, stacked performance bugs (found via
+`node --cpu-prof`, not guessed) that would have hit ANY sufficiently
+populated real planetoid, not just this preset — all fixed: (1)
+`worldstate.js`'s `getSeeds`/`getOrganisms` recopied their entire
+registry on every call, hit repeatedly inside `evolution.js`'s own O(n²)
+per-generation loops — now memoized, invalidated only on real mutation.
+(2) `evolution.js`'s `organismBoundingRadius` recomputed a seed's full
+tile-vertex extent from scratch every call for the same reason — now
+cached on the seed record by `growth.js`'s `growSeed` after each growth
+tick. (3) `evolution.js` had no hard population cap (only a soft
+crowding penalty) — `MAX_ORGANISMS_PER_PLANETOID` (100) now bounds it.
+Net effect: the real worst case (`MAX_CATCHUP_GENERATIONS`=50 from a
+reproducing population) went from ~40s to ~2s, confirmed via `node
+--test` (179 total, all passing) including two new perf-regression tests
+that assert real wall-clock bounds, not just correctness.
+
+**Honestly flagged, not resolved:** a live-browser crash still
+reproduced in this session's own sandboxed dev environment even after
+all three fixes, with a suspicious fixed ~42s timing that didn't scale
+with organism count — looks environmental (this session ran many
+consecutive headless Chromium launches under real system memory
+pressure: swap was 100% full at one point), not further app-code bugs,
+but NOT independently confirmed clean in a normal browser session yet.
+**Verify this yourself in an ordinary browser tab before trusting the
+showcase (or any populated planetoid, post-fix) is fully crash-free** —
+don't assume this note is stale without rechecking.
 
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
