@@ -15,8 +15,13 @@ import {
   MAX_MOVE_ATTEMPTS,
   attemptMove,
   movementStepHook,
+  blendAnimalTraits,
+  mutateAnimalTraits,
+  reproduceAnimal,
+  reproduceFn,
+  MATE_PREFERENCE_TRAIT,
 } from '../../src/animals.js';
-import { isMature, growOrganism, GENOME_TRAIT_RANGES, resolveCatchUpForAllPlanetoids, plantOrganism } from '../../src/evolution.js';
+import { isMature, growOrganism, GENOME_TRAIT_RANGES, resolveCatchUpForAllPlanetoids, plantOrganism, reproduce } from '../../src/evolution.js';
 import { createWorldStore } from '../../src/worldstate.js';
 
 function growToMaturity(world, organismId, maxTicks = 20) {
@@ -194,6 +199,158 @@ test('attemptMove: a sea creature stays within its liquid-permeated pool, never 
     attemptMove(world, 'a1');
     const pos = world.getSeeds()['seed_a1'].origin;
     assert.ok(isValidHabitat(world, SEA_CREATURE_SPECIES, pos), `sea creature must always remain in valid liquid habitat, found at [${pos}]`);
+  }
+});
+
+// ============================================================
+// Stage C -- Sexual Reproduction
+// ============================================================
+
+test('blendAnimalTraits: plain per-trait average, clamped', () => {
+  const blended = blendAnimalTraits({ mobilityRange: 1, huntBias: 0 }, { mobilityRange: 15, huntBias: 1 });
+  assert.equal(blended.mobilityRange, 8);
+  assert.equal(blended.huntBias, 0.5);
+});
+
+test('mutateAnimalTraits: mutationRate 0 never changes anything; mutationRate 1 always mutates while staying in range', () => {
+  const traits = { mobilityRange: 8, huntBias: 0.5 };
+  const unchanged = mutateAnimalTraits(traits, 0, Math.random);
+  assert.deepEqual(unchanged, traits);
+
+  const alwaysMutated = mutateAnimalTraits(traits, 1, () => 0.999);
+  assert.notDeepEqual(alwaysMutated, traits);
+  assert.ok(alwaysMutated.mobilityRange >= ANIMAL_TRAIT_RANGES.mobilityRange[0] && alwaysMutated.mobilityRange <= ANIMAL_TRAIT_RANGES.mobilityRange[1]);
+  assert.ok(alwaysMutated.huntBias >= 0 && alwaysMutated.huntBias <= 1);
+});
+
+test('reproduceAnimal: a non-animal parent is rejected outright (null)', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'p1', 'seed_p1', 'amoeba', {}, [0, 0, 0], 0);
+  assert.equal(reproduceAnimal(world, 'p1', 'child', 'seed_child'), null);
+});
+
+test('reproduceAnimal: no mate in range (or no other organisms at all) returns a real, distinguishable "no-mate-in-range" result, not a crash', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'base' });
+  plantAnimal(world, 'a1', 'seed_a1', LAND_CREATURE_SPECIES, {}, { mobilityRange: 2 }, [0, 0, 0], 0);
+  const outcome = reproduceAnimal(world, 'a1', 'child', 'seed_child', 0);
+  assert.equal(outcome.result, null);
+  assert.equal(outcome.mode, 'no-mate-in-range');
+});
+
+test('reproduceAnimal: a different species within physical range does NOT count as an eligible mate', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'base' });
+  plantAnimal(world, 'a1', 'seed_a1', LAND_CREATURE_SPECIES, { maturitySize: 3 }, { mobilityRange: 5 }, [0, 0, 0], 0);
+  plantOrganism(world, 'amoeba1', 'seed_amoeba1', 'amoeba', { maturitySize: 3 }, [1, 1, 0], 0);
+  for (const id of ['a1', 'amoeba1']) {
+    let now = 0;
+    for (let i = 0; i < 10 && !isMature(world, id); i++) {
+      now += 30001;
+      growOrganism(world, id, now);
+    }
+  }
+  const outcome = reproduceAnimal(world, 'a1', 'child', 'seed_child', 300000);
+  assert.equal(outcome.mode, 'no-mate-in-range');
+});
+
+test('reproduceAnimal: a real successful pairing produces an offspring with a BLENDED+MUTATED base genome AND animal traits, planted in valid habitat', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'base' });
+  // mutationRate: 0 explicitly -- mutateGenome's own fire check is
+  // `rng() < effectiveRate`, so an rng that always returns 0 would
+  // actually ALWAYS fire against any positive mutationRate (0 < rate),
+  // the opposite of "never mutates". Genuinely guaranteeing a blend-only
+  // outcome means mutationRate itself must be 0, not just picking a
+  // convenient-looking rng constant.
+  plantAnimal(world, 'a1', 'seed_a1', LAND_CREATURE_SPECIES, { maturitySize: 3, resourceEfficiency: 0.2, mutationRate: 0 }, { mobilityRange: 8, huntBias: 0.1 }, [0, 0, 0], 0);
+  plantAnimal(world, 'a2', 'seed_a2', LAND_CREATURE_SPECIES, { maturitySize: 3, resourceEfficiency: 0.8, mutationRate: 0 }, { mobilityRange: 8, huntBias: 0.9 }, [1, 1, 0], 0);
+  for (const id of ['a1', 'a2']) {
+    let now = 0;
+    for (let i = 0; i < 10 && !isMature(world, id); i++) {
+      now += 30001;
+      growOrganism(world, id, now);
+    }
+    assert.ok(isMature(world, id));
+  }
+
+  const outcome = reproduceAnimal(world, 'a1', 'child', 'seed_child', 300000, Math.random); // mutationRate 0 on both parents -> blend-only regardless of rng
+  assert.equal(outcome.mode, 'sexual');
+  assert.ok(outcome.mateId === 'a2');
+  const child = outcome.result.organism;
+  assert.equal(child.species, LAND_CREATURE_SPECIES);
+  // Blend-only (rng always 0 -> mutation never fires): exact midpoint of both parents.
+  assert.ok(Math.abs(child.genome.resourceEfficiency - 0.5) < 1e-9);
+  assert.ok(Math.abs(child.mobilityRange - 8) < 1e-9);
+  assert.ok(Math.abs(child.huntBias - 0.5) < 1e-9);
+  assert.ok(isValidHabitat(world, LAND_CREATURE_SPECIES, world.getSeeds()['seed_child'].origin));
+});
+
+test('reproduceFn: delegates non-animal species straight to evolution.js\'s own unmodified reproduce()', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'p1', 'seed_p1', 'amoeba', {}, [0, 0, 0], 0);
+  const outcome = reproduceFn(world, 'amoeba', 'p1', [], 'child', 'seed_child', [5, 0, 0], 1000, () => 0);
+  assert.equal(outcome.mode, 'asexual'); // matches reproduce()'s own dispatch for non-plant species
+  assert.ok(outcome.result);
+});
+
+test('reproduceFn: routes landCreature/seaCreature through reproduceAnimal, not the generic asexual fallback', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'base' });
+  plantAnimal(world, 'a1', 'seed_a1', LAND_CREATURE_SPECIES, { maturitySize: 3 }, { mobilityRange: 8 }, [0, 0, 0], 0);
+  plantAnimal(world, 'a2', 'seed_a2', LAND_CREATURE_SPECIES, { maturitySize: 3 }, { mobilityRange: 8 }, [1, 1, 0], 0);
+  for (const id of ['a1', 'a2']) {
+    let now = 0;
+    for (let i = 0; i < 10 && !isMature(world, id); i++) {
+      now += 30001;
+      growOrganism(world, id, now);
+    }
+  }
+  const outcome = reproduceFn(world, LAND_CREATURE_SPECIES, 'a1', ['a2'], 'child', 'seed_child', [5, 0, 0], 300000, () => 0);
+  assert.equal(outcome.mode, 'sexual');
+  assert.equal(outcome.mateId, 'a2');
+});
+
+test('Sexual selection bias (MATE_PREFERENCE_TRAIT=huntBias): statistically favors the higher-huntBias candidate without fully excluding the lower one', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'base' });
+  plantAnimal(world, 'parent', 'seed_parent', LAND_CREATURE_SPECIES, { maturitySize: 3 }, { mobilityRange: 8 }, [0, 0, 0], 0);
+  plantAnimal(world, 'low', 'seed_low', LAND_CREATURE_SPECIES, { maturitySize: 3 }, { mobilityRange: 8, huntBias: 0.05 }, [1, 1, 0], 0);
+  plantAnimal(world, 'high', 'seed_high', LAND_CREATURE_SPECIES, { maturitySize: 3 }, { mobilityRange: 8, huntBias: 0.95 }, [-1, -1, 0], 0);
+  for (const id of ['parent', 'low', 'high']) {
+    let now = 0;
+    for (let i = 0; i < 10 && !isMature(world, id); i++) {
+      now += 30001;
+      growOrganism(world, id, now);
+    }
+  }
+  let highCount = 0;
+  const trials = 300;
+  for (let i = 0; i < trials; i++) {
+    const outcome = reproduceAnimal(world, 'parent', `child_${i}`, `seed_child_${i}`, 300000 + i, Math.random);
+    if (outcome.mateId === 'high') highCount++;
+  }
+  assert.ok(highCount > trials * 0.55, `expected a real bias toward the higher-huntBias candidate, got ${highCount}/${trials}`);
+  assert.ok(highCount < trials, 'the lower-trait candidate must remain statistically reachable (bias, not a hard filter)');
+});
+
+test('movementStepHook + reproduceFn wired into a real multi-generation catch-up run: a land creature population actually grows via real sexual reproduction', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'blackstar-glassite' });
+  plantAnimal(world, 'a1', 'seed_a1', LAND_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0.1 }, { mobilityRange: 5 }, [1, 1, 1], 0);
+  plantAnimal(world, 'a2', 'seed_a2', LAND_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0.1 }, { mobilityRange: 5 }, [2, 2, 0], 0);
+
+  resolveCatchUpForAllPlanetoids(world, ['a1', 'a2'], 0, movementStepHook, reproduceFn);
+  const result = resolveCatchUpForAllPlanetoids(world, ['a1', 'a2'], 30000 * 30, movementStepHook, reproduceFn);
+  const finalIds = Object.values(result)[0].organismIds;
+
+  assert.ok(finalIds.length >= 2, 'a real 30-generation run with two mature-eligible land creatures in range must produce real sexual reproduction');
+  for (const id of finalIds) {
+    const organism = world.getOrganisms()[id];
+    assert.equal(organism.species, LAND_CREATURE_SPECIES);
+    assert.ok(organism.mobilityRange >= ANIMAL_TRAIT_RANGES.mobilityRange[0] && organism.mobilityRange <= ANIMAL_TRAIT_RANGES.mobilityRange[1]);
+    const seed = world.getSeeds()[organism.seedId];
+    assert.ok(isValidHabitat(world, LAND_CREATURE_SPECIES, seed.origin), 'every surviving organism must still be in valid habitat after a real multi-generation run');
   }
 });
 

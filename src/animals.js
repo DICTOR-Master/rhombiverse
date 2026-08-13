@@ -25,6 +25,11 @@ import {
   GENOME_TRAIT_RANGES,
   plantOrganism,
   RESOURCE_SEARCH_RADIUS,
+  isMature,
+  organismBoundingRadius,
+  reproduce,
+  reproduceSexual,
+  MUTATION_DELTA_FRACTION,
 } from './evolution.js';
 import { cellToWorld } from './lattice.js';
 
@@ -236,4 +241,176 @@ export function attemptMove(world, organismId, rng = Math.random) {
 // hooks' potential use, not this one).
 export function movementStepHook(world, organismId, rng) {
   attemptMove(world, organismId, rng);
+}
+
+// ============================================================
+// Stage C -- Sexual Reproduction
+// ============================================================
+// Section 3: "two mature, same-habitat, same-species individuals within
+// mobilityRange of each other" -- deliberately the PARENT's own
+// mobilityRange as the search radius (the organism whose reproduction is
+// being resolved is the one "reaching out" this far), not evolution.js's
+// own isInPairingRange (a multiple of combined bounding radius -- the
+// right grounding for a sessile plant, not a mobile creature whose real
+// reach is its own heritable mobilityRange trait).
+function isWithinMobilityRange(world, parentId, otherId) {
+  const parent = world.getOrganisms()[parentId];
+  const seedA = world.getSeeds()[parent.seedId];
+  const seedB = world.getSeeds()[world.getOrganisms()[otherId]?.seedId];
+  if (!seedA || !seedB) return false;
+  const dist = Math.hypot(seedA.origin[0] - seedB.origin[0], seedA.origin[1] - seedB.origin[1], seedA.origin[2] - seedB.origin[2]);
+  return dist <= clampAnimalTraits(parent).mobilityRange;
+}
+
+// Bounded blend of two parents' animal traits -- same plain per-trait
+// average shape as evolution.js's own blendGenomes, scoped to
+// ANIMAL_TRAIT_RANGES instead of the base genome table.
+export function blendAnimalTraits(traitsA, traitsB) {
+  const a = clampAnimalTraits(traitsA);
+  const b = clampAnimalTraits(traitsB);
+  const blended = {};
+  for (const trait of Object.keys(ANIMAL_TRAIT_RANGES)) {
+    blended[trait] = (a[trait] + b[trait]) / 2;
+  }
+  return clampAnimalTraits(blended);
+}
+
+// Mutates animal traits using the SAME per-trait mutation shape as
+// evolution.js's own mutateGenome (independent per-trait roll against
+// `mutationRate`, delta magnitude MUTATION_DELTA_FRACTION of the trait's
+// own range) -- reuses that exact constant rather than a second,
+// separately-tuned one. `mutationRate` is deliberately a required
+// parameter, not a second independently-tracked rate: the offspring's
+// own (already-mutated) base genome.mutationRate is the one heritable
+// concept governing volatility across the WHOLE genome, base traits and
+// animal-specific traits alike -- not two unrelated dials.
+export function mutateAnimalTraits(traits, mutationRate, rng = Math.random) {
+  const t = clampAnimalTraits(traits);
+  const mutated = { ...t };
+  for (const [trait, range] of Object.entries(ANIMAL_TRAIT_RANGES)) {
+    if (rng() < mutationRate) {
+      const width = range[1] - range[0];
+      mutated[trait] = t[trait] + (rng() * 2 - 1) * width * MUTATION_DELTA_FRACTION;
+    }
+  }
+  return clampAnimalTraits(mutated);
+}
+
+// Offspring placement for animals: unlike evolution.js's own private
+// offspringPlacement (used for amoeba/plant, which have no habitat
+// constraint), this MUST land somewhere the offspring's own species can
+// actually live. Tries a bounded number of random points near the
+// midpoint of both parents (their real average position, not just the
+// initiating parent's) before falling back to that midpoint outright --
+// "never invisible" (growth.js's own established convention) wins even
+// in the rare case no nearby valid spot is found, matching this
+// project's own precedent of a graceful, honestly-imperfect fallback
+// over a hard failure.
+function animalOffspringOrigin(world, parentAId, parentBId, species, rng) {
+  const seedA = world.getSeeds()[world.getOrganisms()[parentAId].seedId];
+  const seedB = world.getSeeds()[world.getOrganisms()[parentBId].seedId];
+  const midpoint = [
+    (seedA.origin[0] + seedB.origin[0]) / 2,
+    (seedA.origin[1] + seedB.origin[1]) / 2,
+    (seedA.origin[2] + seedB.origin[2]) / 2,
+  ];
+  const radius = Math.max(organismBoundingRadius(world, parentAId), organismBoundingRadius(world, parentBId)) * 1.5;
+  for (let attempt = 0; attempt < MAX_MOVE_ATTEMPTS; attempt++) {
+    const candidate = randomCandidatePosition(midpoint, radius, rng);
+    if (isValidHabitat(world, species, candidate)) return candidate;
+  }
+  return midpoint;
+}
+
+// Sexual selection bias (evolution doc section 2.3): huntBias, this
+// implementation's own choice among the spec's two proposed options
+// (huntBias or resourceEfficiency, "not fixed" per section 10's own open
+// question) -- huntBias is the more legible, animals-specific trait to
+// actually observe pairing bias toward, matching the spec's own
+// reasoning for why plants biased toward resourceEfficiency ("the most
+// legible/consequential trait").
+export const MATE_PREFERENCE_TRAIT = 'huntBias';
+
+// Real bug caught by a live statistical test before trusting this (a
+// scripted 300-trial run showed ~51/49, no real bias at all): evolution.js's
+// own selectMate hardcodes `organism.genome[preferredTrait]` -- correct
+// for plants' own resourceEfficiency (a base-genome trait), but huntBias
+// lives as a SIBLING field on the organism record (see this module's own
+// header on why), so that lookup silently read `undefined` for every
+// animal candidate, `Math.max(0.01, undefined)` produced NaN weights for
+// all of them, and the weighted pick degraded to an effectively broken,
+// near-uniform selection. Fixed with this module's own trait-aware
+// weighted pick -- otherwise byte-identical to evolution.js's own
+// selectMate (same fitness-proportionate weighting, same 0.01 floor so
+// no candidate is ever fully excluded) -- rather than modifying
+// evolution.js's own selectMate, which is correct exactly as written for
+// its own (base-genome-only) callers.
+function traitValue(organism, trait) {
+  return organism[trait] !== undefined ? organism[trait] : organism.genome?.[trait];
+}
+
+function selectMateByTrait(world, candidateIds, preferredTrait, rng) {
+  if (candidateIds.length === 0) return null;
+  const weights = candidateIds.map((id) => Math.max(0.01, traitValue(world.getOrganisms()[id], preferredTrait) ?? 0.01));
+  const total = weights.reduce((s, w) => s + w, 0);
+  let r = rng() * total;
+  for (let i = 0; i < candidateIds.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return candidateIds[i];
+  }
+  return candidateIds[candidateIds.length - 1];
+}
+
+// The real per-organism mechanism (Stage C's own "trigger manually to
+// verify" scope, mirroring evolution.js's own Stage 2 build order) --
+// finds a mature, same-species mate within the parent's own
+// mobilityRange, blends+mutates BOTH the base genome (entirely via
+// evolution.js's own reproduceSexual, unmodified) and the animal-specific
+// traits (this module's own blendAnimalTraits/mutateAnimalTraits), and
+// plants the result at a real, habitat-valid position. Returns null if no
+// eligible mate is in range this step (a real, expected outcome -- not
+// every resolution step finds a mate, section 3 doesn't promise one will).
+// `mutationRateOverride` (Stage 4's punctuated-equilibrium jolt boost)
+// threads through to BOTH the base genome's own mutation (via
+// reproduceSexual, unmodified) and this module's own animal-trait
+// mutation -- one shared override, composing with punctuated equilibrium
+// exactly the way evolution.js's own reproduceSexual/reproduceAsexual
+// already do, not a second untouched pathway.
+export function reproduceAnimal(world, parentOrganismId, offspringOrganismId, offspringSeedId, now = Date.now(), rng = Math.random, candidateIds = null, mutationRateOverride = undefined) {
+  const parent = world.getOrganisms()[parentOrganismId];
+  if (!isAnimal(parent)) return null;
+
+  const pool = candidateIds ?? Object.keys(world.getOrganisms());
+  const candidates = pool.filter((id) => {
+    if (id === parentOrganismId) return false;
+    const other = world.getOrganisms()[id];
+    return other && other.species === parent.species && isMature(world, id) && isWithinMobilityRange(world, parentOrganismId, id);
+  });
+  if (candidates.length === 0) return { result: null, mode: 'no-mate-in-range' };
+
+  const mateId = selectMateByTrait(world, candidates, MATE_PREFERENCE_TRAIT, rng);
+  const origin = animalOffspringOrigin(world, parentOrganismId, mateId, parent.species, rng);
+  const sexResult = reproduceSexual(world, parentOrganismId, mateId, offspringOrganismId, offspringSeedId, origin, now, rng, mutationRateOverride);
+  if (!sexResult) return { result: null, mode: 'sexual-failed' };
+
+  const mate = world.getOrganisms()[mateId];
+  const blendedTraits = blendAnimalTraits(parent, mate);
+  const offspringGenome = world.getOrganisms()[offspringOrganismId].genome;
+  const mutatedTraits = mutateAnimalTraits(blendedTraits, mutationRateOverride ?? offspringGenome.mutationRate, rng);
+  const updated = { ...world.getOrganisms()[offspringOrganismId], ...mutatedTraits };
+  world.setOrganism(offspringOrganismId, updated);
+  return { result: { seed: sexResult.seed, organism: updated }, mode: 'sexual', mateId };
+}
+
+// The real reproduceFn override (evolution.js's own Stage C extension
+// point, added specifically for this) -- matches `reproduce`'s exact
+// call shape. landCreature/seaCreature route through reproduceAnimal
+// above; every other species (amoeba, plant) delegates straight back to
+// evolution.js's own unmodified `reproduce`, so this override is a pure
+// superset, never a behavior change for non-animal species.
+export function reproduceFn(world, species, parentOrganismId, candidateMateIds, offspringOrganismId, offspringSeedId, offspringOriginHint, now, rng, mutationRateOverride) {
+  if (species !== LAND_CREATURE_SPECIES && species !== SEA_CREATURE_SPECIES) {
+    return reproduce(world, species, parentOrganismId, candidateMateIds, offspringOrganismId, offspringSeedId, offspringOriginHint, now, rng, mutationRateOverride);
+  }
+  return reproduceAnimal(world, parentOrganismId, offspringOrganismId, offspringSeedId, now, rng, candidateMateIds, mutationRateOverride);
 }

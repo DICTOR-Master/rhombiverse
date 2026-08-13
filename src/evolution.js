@@ -880,6 +880,21 @@ function offspringPlacement(world, parentOrganismId, rng) {
 // discipline growth.js/evolution.js already hold to -- animals.js is the
 // one that supplies a real hook (its own bounded-random-walk mobility
 // function), never the reverse.
+// `reproduceFn`, added for RHOMBIVERSE_SPEC_ANIMALS.md Stage C (Sexual
+// Reproduction): the exact same call shape as this module's own
+// `reproduce` dispatcher (species, parentId, candidateMateIds,
+// offspringId, offspringSeedId, offspringOrigin, now, rng,
+// mutationRateOverride) -> {result, mode, mateId?}, defaulting to
+// `reproduce` itself so every existing caller/test is byte-identical.
+// Needed because `reproduce`'s own species switch only recognizes
+// 'plant' (sexual) vs. everything else (asexual) -- land/sea creatures
+// need sexual mate-pairing too, but scoped to mobilityRange rather than
+// the fixed bounding-radius-based pairing range plants use, which
+// `reproduce` itself has no way to express. animals.js supplies an
+// override that handles landCreature/seaCreature itself and delegates
+// straight back to the real `reproduce` for every other species --
+// same override shape as onGenerationStep, this module still never
+// learns what an "animal" is.
 function resolveOneGeneration(
   world,
   organismIds,
@@ -887,7 +902,8 @@ function resolveOneGeneration(
   generationIndex,
   simulatedNow,
   dampingParams = { crowdingThreshold: CROWDING_THRESHOLD, mutationCeiling: 1 },
-  onGenerationStep = null
+  onGenerationStep = null,
+  reproduceFn = reproduce
 ) {
   const toRemove = new Set();
   const newIds = [];
@@ -938,7 +954,7 @@ function resolveOneGeneration(
         const offspringId = `${organismId}_g${generationIndex}_${idCounter++}`;
         const offspringOrigin = offspringPlacement(world, organismId, rng);
         const mateCandidates = organismIds.filter((id) => id !== organismId);
-        const { result } = reproduce(
+        const { result } = reproduceFn(
           world,
           organism.species,
           organismId,
@@ -1005,7 +1021,7 @@ function resolveOneGeneration(
 // through to resolveOneGeneration's own identically-named parameter (see
 // that function's own header). Default null, so every existing caller
 // sees no change.
-export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now = Date.now(), initialVolatilityScore = 0, onGenerationStep = null) {
+export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now = Date.now(), initialVolatilityScore = 0, onGenerationStep = null, reproduceFn = reproduce) {
   const elapsed = Math.max(0, now - lastSimulated);
   const generations = Math.min(Math.floor(elapsed / EVOLUTION_GENERATION_INTERVAL_MS), MAX_CATCHUP_GENERATIONS);
   const rng = createSeededRng(rngState);
@@ -1019,7 +1035,7 @@ export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now 
       crowdingThreshold: CROWDING_THRESHOLD + carryingCapacityBonus(volatilityScore),
       mutationCeiling: mutationRateCeiling(volatilityScore),
     };
-    currentIds = resolveOneGeneration(world, currentIds, rng, g, simulatedNow, dampingParams, onGenerationStep);
+    currentIds = resolveOneGeneration(world, currentIds, rng, g, simulatedNow, dampingParams, onGenerationStep, reproduceFn);
     volatilityScore = nextVolatilityScore(volatilityScore, beforeCount, currentIds.length);
   }
 
@@ -1105,7 +1121,7 @@ export function groupOrganismsByPlanetoid(world, organismIds) {
 // `onGenerationStep`, added for Stage B (Mobility) -- threaded straight
 // through to resolveCatchUp's own identically-named parameter. Default
 // null, so every existing caller sees no change.
-export function resolveCatchUpForAllPlanetoids(world, organismIds, now = Date.now(), onGenerationStep = null) {
+export function resolveCatchUpForAllPlanetoids(world, organismIds, now = Date.now(), onGenerationStep = null, reproduceFn = reproduce) {
   const groups = groupOrganismsByPlanetoid(world, organismIds);
   const results = {};
   for (const [planetoidKey, ids] of Object.entries(groups)) {
@@ -1114,7 +1130,7 @@ export function resolveCatchUpForAllPlanetoids(world, organismIds, now = Date.no
       rngState: hashStringToSeed(planetoidKey),
       volatilityScore: 0,
     };
-    const result = resolveCatchUp(world, ids, stored.lastSimulated, stored.rngState, now, stored.volatilityScore ?? 0, onGenerationStep);
+    const result = resolveCatchUp(world, ids, stored.lastSimulated, stored.rngState, now, stored.volatilityScore ?? 0, onGenerationStep, reproduceFn);
     world.setPlanetoidEvolution(planetoidKey, {
       lastSimulated: result.lastSimulated,
       rngState: result.rngState,

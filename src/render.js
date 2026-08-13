@@ -70,6 +70,7 @@ import {
   ANIMAL_TRAIT_RANGES,
   plantAnimal,
   movementStepHook,
+  reproduceFn,
 } from './animals.js';
 
 const SCALE = 1;
@@ -304,7 +305,7 @@ function resolveEvolution(world, now) {
   // unconditionally is safe and correct regardless of what's actually
   // planted -- this is the one real wiring point Stage B's own bounded-
   // random-walk mechanism needed to go live in the actual game.
-  const results = resolveCatchUpForAllPlanetoids(world, organismIds, now, movementStepHook);
+  const results = resolveCatchUpForAllPlanetoids(world, organismIds, now, movementStepHook, reproduceFn);
   return Object.values(results).some((r) => r.generationsResolved > 0);
 }
 
