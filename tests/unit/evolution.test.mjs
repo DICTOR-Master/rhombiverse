@@ -51,6 +51,8 @@ import {
   MIN_MUTATION_CEILING,
   isShapeNoveltyJump,
   SHAPE_NOVELTY_THRESHOLD,
+  nextLandscapeState,
+  LANDSCAPE_STATE_EMA_RATE,
 } from '../../src/evolution.js';
 import { createWorldStore } from '../../src/worldstate.js';
 import { applyGrowth } from '../../src/growth.js';
@@ -1035,4 +1037,103 @@ test('Punctuated-equilibrium composition: a jolt-boosted effective mutation rate
 
   assert.ok(boostedPending > baselinePending, `expected the jolt-boosted run (${boostedPending}/${trials} pending) to flag more than baseline (${baselinePending}/${trials})`);
   assert.ok(boostedPending < trials, 'even a full boost must not flag literally every offspring -- the queue must not be flooded wholesale');
+});
+
+// ============================================================
+// RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 6 -- Landscape Aggregate State
+// ============================================================
+
+test('nextLandscapeState: zero generations resolved is a real no-op regardless of target', () => {
+  assert.equal(nextLandscapeState(0.4, 0.9, 0), 0.4);
+  assert.equal(nextLandscapeState(0.4, 0.1, 0), 0.4);
+});
+
+test('nextLandscapeState: trends toward the target biomass signal as generations accumulate, never overshoots it', () => {
+  const target = 0.8;
+  let state = 0;
+  const samples = [];
+  for (const n of [1, 5, 20, 100]) {
+    state = nextLandscapeState(0, target, n);
+    samples.push(state);
+    assert.ok(state <= target + 1e-9, `must never overshoot the real target biomass (n=${n}, state=${state})`);
+  }
+  for (let i = 1; i < samples.length; i++) {
+    assert.ok(samples[i] >= samples[i - 1], 'more resolved generations must move strictly closer to (never further from) the target');
+  }
+  assert.ok(samples[samples.length - 1] > 0.99 * target, 'a real long sustained run must converge close to the target, not stall short of it');
+});
+
+test('nextLandscapeState: also relaxes back DOWN over time when the target drops (settling, not a one-way ratchet -- RHOMBIVERSE_PRINCIPLES.md section 2)', () => {
+  const high = nextLandscapeState(0.9, 0, 30);
+  assert.ok(high < 0.9, 'sustained zero biomass must genuinely relax an elevated landscape state back down');
+  assert.ok(high >= 0, 'must stay bounded, never go negative');
+});
+
+test('nextLandscapeState: real bounded output -- a convex combination of two [0,1] inputs never leaves [0,1]', () => {
+  for (const state of [0, 0.3, 0.7, 1]) {
+    for (const target of [0, 0.5, 1]) {
+      for (const n of [0, 1, 10, 1000]) {
+        const result = nextLandscapeState(state, target, n);
+        assert.ok(result >= -1e-9 && result <= 1 + 1e-9, `nextLandscapeState(${state}, ${target}, ${n}) = ${result} left [0,1]`);
+      }
+    }
+  }
+});
+
+// Five real, valid-parity water cells within evolution.js's own
+// RESOURCE_SEARCH_RADIUS (10) of the origin -- localBiomassAvailability
+// is genuinely 0 without real nearby water (localResourceAvailability's
+// own real requirement), so a landscapeState test needs a real resource
+// source present, not just a mature plant.
+function addAbundantWaterNear(world, [ox, oy, oz]) {
+  for (const [dx, dy, dz] of [[2, 0, 0], [0, 2, 0], [0, 0, 2], [1, 1, 0], [1, -1, 0]]) {
+    world.addCell(ox + dx, oy + dy, oz + dz, { material: 'water' });
+  }
+}
+
+test('resolveCatchUpForAllPlanetoids: a planetoid with a real sustained mature plant population accumulates a real nonzero landscapeState over multiple resolved generations', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'blackstar-glassite' });
+  addAbundantWaterNear(world, [0, 0, 0]);
+  // resourceEfficiency/growthRate both high -- a real, strong biomass
+  // producer once mature, not relying on default-midpoint genome values.
+  // Maturity itself is reached organically during the real catch-up
+  // generations below (growth/reproduction run every resolved
+  // generation), not pre-forced here.
+  plantOrganism(world, 'plant0', 'seed_plant0', 'plant', { maturitySize: 3, resourceEfficiency: 1, growthRate: 1 }, [0, 0, 0], 0);
+
+  // A planetoid's clock starts at whatever `now` its FIRST-ever
+  // resolution call passes (matches Evolution Stage 6's own established
+  // "starts now, doesn't retroactively catch up to organism-planting
+  // time" design) -- a second call with a later `now` is what actually
+  // produces real elapsed/resolved generations, same pattern the
+  // existing rngState-isolation test above already uses.
+  const now1 = EVOLUTION_GENERATION_INTERVAL_MS;
+  resolveCatchUpForAllPlanetoids(world, ['plant0'], now1);
+  const now2 = EVOLUTION_GENERATION_INTERVAL_MS * 20;
+  resolveCatchUpForAllPlanetoids(world, ['plant0'], now2);
+
+  const evoState = world.getPlanetoidEvolution();
+  const key = Object.keys(evoState)[0];
+  assert.ok(key, 'expected a real per-planetoid clock to have been created');
+  assert.ok(evoState[key].landscapeState > 0, `expected a real sustained mature plant population to produce a nonzero landscapeState, got ${evoState[key].landscapeState}`);
+  assert.ok(evoState[key].landscapeState <= 1, 'must stay bounded');
+});
+
+test('resolveCatchUpForAllPlanetoids: landscapeState is real per-planetoid isolated state -- a populated planetoid never affects an untouched one\'s landscapeState', () => {
+  const world = seedTwoPlanetoids();
+  addAbundantWaterNear(world, [0, 0, 0]); // only near A -- B has no real water/resource source at all
+  plantOrganism(world, 'a0', 'sa0', 'plant', { maturitySize: 3, resourceEfficiency: 1, growthRate: 1 }, [0, 0, 0], 0);
+  plantOrganism(world, 'b0', 'sb0', 'plant', { maturitySize: 3 }, [200, 200, 0], 0);
+
+  const now1 = EVOLUTION_GENERATION_INTERVAL_MS;
+  resolveCatchUpForAllPlanetoids(world, ['a0', 'b0'], now1);
+  const now2 = EVOLUTION_GENERATION_INTERVAL_MS * 20;
+  resolveCatchUpForAllPlanetoids(world, ['a0', 'b0'], now2);
+
+  const evoState = world.getPlanetoidEvolution();
+  const keyA = Object.keys(evoState).find((k) => !k.includes('200.0'));
+  const keyB = Object.keys(evoState).find((k) => k.includes('200.0'));
+  assert.ok(evoState[keyA].landscapeState > 0, `expected A's real sustained mature plant biomass to accumulate a nonzero landscapeState, got ${evoState[keyA].landscapeState}`);
+  assert.equal(evoState[keyB].landscapeState, 0, "B (never-matured plant, no real biomass) must stay at 0, unaffected by A's own accumulation");
 });

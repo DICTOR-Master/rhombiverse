@@ -559,15 +559,93 @@ that the later zoom-toward-target sequence never got close enough to
 reveal it, reading as a false "Tier 1 doesn't work" until traced back to
 the click position, not the rendering code.
 
-**Stage 6 — Landscape Aggregate State (Section 6.2)**
-Requires Evolution Stage 5 (biomass) to exist as real input. Add the
-minimal new planetoid-scoped landscape-aggregate tracked field, resolved
-through the same deterministic catch-up shape as Evolution Stage 4
-(bounded, `lastSimulated`-driven), influenced by nearby real biomass/
-organism history. Verify a specific location's landscape state genuinely
-persists and advances across a simulated absence, bounded regardless of
-elapsed time, and that a destabilized planetoid's landscape state has
-zero effect on another's.
+**Stage 6 — Landscape Aggregate State (Section 6.2) — DONE, 2026-08-13.**
+
+"Resolved through the SAME deterministic catch-up shape as Evolution
+Stage 4" is the spec's own instruction, taken literally: `landscapeState`
+is one more field on the EXACT SAME `planetoidEvolution` record
+`lastSimulated`/`rngState`/`volatilityScore` already live on (`evolution.js`'s
+own `resolveCatchUpForAllPlanetoids`) -- not a second registry, not a
+second clock. It advances the SAME number of times
+(`generationsResolved`) real organism generations just resolved for that
+planetoid, via a new pure `nextLandscapeState(currentState, targetBiomass,
+generationsResolved)`: an exponential moving average toward the
+planetoid's own current real biomass signal, computed in CLOSED FORM over
+N generations (`target + (current - target) * (1-rate)^N`) rather than a
+loop -- grounded directly in section 6.2's own text ("real landscapes are
+visibly shaped by SUSTAINED biological presence over TIME"): a spot with
+sustained high biomass slowly trends `landscapeState` upward; a spot that
+goes quiet slowly relaxes back down (RHOMBIVERSE_PRINCIPLES.md section
+2's own "settling, not a one-way ratchet" requirement, satisfied for
+free by the EMA's own shape). Bounded in [0,1] by construction (a convex
+combination of two already-[0,1] values) -- no separate clamp needed.
+`LANDSCAPE_STATE_EMA_RATE = 0.1` is a first-guess, flagged-tunable
+constant (reaching ~90% of a new sustained level takes ~22 generations,
+a real multi-generation span, not a single-tick snap).
+
+The real biomass SIGNAL driving this is evaluated at each planetoid's own
+`centerOfMass` against its POST-resolution organism population
+(`evolution.js`'s own already-existing `localBiomassAvailability`, found
+and reused a second time -- Stage 5 already established it as the real
+source for "how much life is here"). `resolveCatchUpForAllPlanetoids`
+recomputes `computePlanetoids(world)` once per call to look up each
+group's own real planetoid object by key (the same real cost every other
+per-tick planetoid lookup elsewhere in this project already pays, not a
+new expense class); the 'unowned' bucket (organisms with no nearby real
+planetoid at all) has no `centerOfMass` to evaluate against and is
+skipped for the landscape signal specifically, same as it's always had
+no real per-planetoid clock to speak of either.
+
+**Isolation (section 6.3):** falls directly out of the existing
+per-planetoid grouping/persistence Evolution Stage 6 already built --
+`landscapeState` lives inside the SAME per-key record `resolveCatchUpForAllPlanetoids`
+already resolves and persists independently per planetoid, so it
+inherits that isolation guarantee by construction, not a new mechanism
+built for this stage.
+
+**Rendering (the visible half of this stage):** `render.js`'s Stage 5
+aggregate speckle layer now blends its own dominant-species tint toward
+a new `LANDSCAPE_WEATHERED_COLOR` (an earthy brown/grey, deliberately
+distinct from every living-tissue hue in `SPECIES_COLORS`) by that
+speckle's own nearest planetoid's real, currently-stored `landscapeState`
+-- `0` (no tracked history, including a planetoid with no organisms at
+all) leaves the pure current-species tint untouched; a location with a
+long sustained biological history reads as visibly more weathered/soil-
+toned than a same-instantaneous-population spot with no real history
+yet, exactly section 6.2's own "a player who leaves and returns later
+finds that place genuinely changed" framing made visible.
+
+Verified via `node --test` (6 new tests -- `nextLandscapeState`'s
+no-op-at-zero-generations/monotonic-convergence/settling-back-down/
+bounded-output behavior, and two real `resolveCatchUpForAllPlanetoids`
+integration tests: a planetoid with a real sustained mature plant
+population near real water genuinely accumulates a nonzero
+`landscapeState` over many resolved generations, and a second untouched
+planetoid's own `landscapeState` stays exactly 0, real isolation, not
+theorized -- 176 total, all passing) AND a real Playwright run against
+the actual `render.js` wiring: planted a genuine organism via the live
+Plant-mode UI, then confirmed via a temporary debug hook (added for this
+one run, removed immediately after) that `world.getPlanetoidEvolution()`
+genuinely gains a real per-planetoid record carrying a `landscapeState`
+field once the periodic evolution tick actually fires in the running
+app -- proving the end-to-end wiring executes for real, not just in
+isolated unit tests. Zero console/page errors throughout planting, the
+periodic tick firing, and the render-side `nearestPlanetoid`/
+`planetoidKeyFor`/`getPlanetoidEvolution()` lookup inside the speckle
+color-blend code actually running under real (0-valued, not-yet-
+established) conditions -- the common case for any freshly-planted
+organism, exercised for real rather than just reasoned about. **Honestly
+flagged, not swept under the rug:** a live demonstration of `landscapeState`
+becoming NONZERO, or the speckle layer visibly trending toward the
+weathered tone, needs many real minutes of elapsed generations (the same
+"real sustained mature plant population near real water" setup the unit
+tests construct with controlled `now` jumps) plus manually-built water
+cells (the default starting world has none) -- not attempted live in
+this session's timeframe, same honesty standard Stage 5 already applied
+to its own aggregate speckle count.
+
+This closes out `RHOMBIVERSE_SPEC_LATTICE_ZOOM.md`'s entire six-stage
+build order.
 
 ## 9. Claude Code Prompt (copy-paste to start Stage 1)
 

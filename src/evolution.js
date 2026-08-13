@@ -1181,6 +1181,42 @@ export function groupOrganismsByPlanetoid(world, organismIds) {
 // `onGenerationStep`, added for Stage B (Mobility) -- threaded straight
 // through to resolveCatchUp's own identically-named parameter. Default
 // null, so every existing caller sees no change.
+// RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 6 -- Landscape Aggregate State
+// (section 6.2). "Resolved through the SAME deterministic catch-up shape
+// as Evolution Stage 4" is the spec's own explicit instruction, made
+// literal here: landscapeState is one more field on the SAME
+// planetoidEvolution record lastSimulated/rngState/volatilityScore
+// already live in (below), advanced the SAME number of times
+// (`generationsResolved`) real organism generations just resolved for
+// that planetoid -- not a second independent clock, not a second
+// registry.
+//
+// Real, grounded mechanism (section 6.2's own text: "real landscapes are
+// visibly shaped by SUSTAINED biological presence over TIME"): an
+// exponential moving average toward the planetoid's own current real
+// biomass signal, closed-form over N resolved generations rather than a
+// loop (`target + (current - target) * (1-rate)^N`) -- a spot with
+// sustained high biomass slowly trends landscapeState upward; a spot
+// that goes quiet slowly relaxes back down; either way it's gradual
+// (SUSTAINED presence), not an instant snapshot of the current
+// population. Bounded in [0,1] by construction (a convex combination of
+// two already-[0,1] values), satisfying section 2's "adaptive, not
+// infinite" requirement with no separate clamp needed.
+//
+// LANDSCAPE_STATE_EMA_RATE (0.1): first-guess, tunable (flagged per this
+// project's own established convention for this class of constant) --
+// reaching ~90% of the way to a new sustained biomass level takes
+// roughly ln(0.1)/ln(0.9) ≈ 22 generations, a real multi-generation span
+// rather than a single-generation snap, matching "over time" without a
+// live frame-cost measurement to derive an exact number from (nothing
+// here has a real-time render cost the way Lattice Zoom's own trigger
+// distances did).
+export const LANDSCAPE_STATE_EMA_RATE = 0.1;
+export function nextLandscapeState(currentState, targetBiomass, generationsResolved) {
+  const decay = Math.pow(1 - LANDSCAPE_STATE_EMA_RATE, generationsResolved);
+  return targetBiomass + (currentState - targetBiomass) * decay;
+}
+
 export function resolveCatchUpForAllPlanetoids(
   world,
   organismIds,
@@ -1190,12 +1226,20 @@ export function resolveCatchUpForAllPlanetoids(
   survivalProbabilityFn = computeSurvivalProbability
 ) {
   const groups = groupOrganismsByPlanetoid(world, organismIds);
+  // Real planetoid objects (own centerOfMass) for the landscape-state
+  // biomass signal below -- groupOrganismsByPlanetoid already computes
+  // this same list internally but doesn't return it (an existing,
+  // separately-tested contract this stage leaves untouched); recomputing
+  // it here is the same real cost every other per-tick planetoid lookup
+  // in this file already pays, not a new expense class.
+  const planetoidsList = computePlanetoids(world);
   const results = {};
   for (const [planetoidKey, ids] of Object.entries(groups)) {
     const stored = world.getPlanetoidEvolution()[planetoidKey] ?? {
       lastSimulated: now,
       rngState: hashStringToSeed(planetoidKey),
       volatilityScore: 0,
+      landscapeState: 0,
     };
     const result = resolveCatchUp(
       world,
@@ -1208,10 +1252,21 @@ export function resolveCatchUpForAllPlanetoids(
       reproduceFn,
       survivalProbabilityFn
     );
+    // Real 'unowned' organisms (groupOrganismsByPlanetoid's own fallback
+    // bucket for organisms with no nearby planetoid) have no real
+    // centerOfMass to evaluate biomass at -- landscapeState simply
+    // doesn't apply there, same as it never gets a lastSimulated/rngState
+    // clock of its own conceptually meaningful either (this bucket has
+    // always been persisted the same way regardless; only the biomass
+    // signal is skipped here).
+    const planetoid = Object.values(planetoidsList).find((p) => planetoidKeyFor(p.centerOfMass) === planetoidKey);
+    const targetBiomass = planetoid ? localBiomassAvailability(world, planetoid.centerOfMass, result.organismIds) : 0;
+    const landscapeState = nextLandscapeState(stored.landscapeState ?? 0, targetBiomass, result.generationsResolved);
     world.setPlanetoidEvolution(planetoidKey, {
       lastSimulated: result.lastSimulated,
       rngState: result.rngState,
       volatilityScore: result.volatilityScore,
+      landscapeState,
     });
     results[planetoidKey] = result;
   }

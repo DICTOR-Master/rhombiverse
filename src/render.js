@@ -591,6 +591,16 @@ const SPECIES_COLORS = {
   seaCreature_evolved: 0x0e7490,
 };
 
+// RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 6 (Landscape Aggregate State,
+// section 6.2): a real, distinct "weathered ground" tone -- earthy brown/
+// grey, deliberately NOT one of SPECIES_COLORS' own vivid living-tissue
+// hues -- blended into the aggregate speckle layer's own color by that
+// planetoid's real landscapeState (0 = pure current-species tint, 1 =
+// fully weathered), so a location with a long sustained biological
+// history reads as visibly different from one with only current, recent
+// life, even at the same instantaneous population size.
+const LANDSCAPE_WEATHERED_COLOR = new THREE.Color(0x8b6f47);
+
 // evolution.js's own plantOrganism deliberately namespaces the
 // underlying seed's `species` field as `organism:<species>` (see its own
 // header comment) so it can never collide with a real GROWTH_TEMPLATES
@@ -1015,6 +1025,18 @@ async function init() {
         });
         const dominant = dominantSpecies(nearbyForColor);
         const speckleColor = speciesColor(dominant ? `${ORGANISM_SEED_SPECIES_PREFIX}${dominant}` : 'plant');
+        // Stage 6: blend toward LANDSCAPE_WEATHERED_COLOR by however
+        // weathered/soil-built-up THIS parent's own nearest planetoid
+        // real tracked landscapeState currently is -- a real, slow,
+        // persisted signal (evolution.js's own resolveCatchUpForAllPlanetoids),
+        // not recomputed from scratch here; 0 (no tracked history yet,
+        // including planetoids with no organisms at all) leaves the
+        // speckle's pure current-species tint untouched.
+        const nearestForLandscape = nearestPlanetoid({ x: parentWorldPos[0], y: parentWorldPos[1], z: parentWorldPos[2] }, planetoids);
+        const landscapeState = nearestForLandscape
+          ? world.getPlanetoidEvolution()[planetoidKeyFor(nearestForLandscape.centerOfMass)]?.landscapeState ?? 0
+          : 0;
+        speckleColor.lerp(LANDSCAPE_WEATHERED_COLOR, landscapeState);
         for (let i = 0; i < speckleCount; i++) {
           aggregateSpeckleDummy.position.set(...subCells[i].worldPosition);
           aggregateSpeckleDummy.scale.setScalar(blend);

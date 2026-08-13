@@ -2685,19 +2685,54 @@ real Playwright gotchas hit writing that verification (both logged in
 **Not committed yet as of this entry** -- same files as Stage 3/4's own
 list, now with Stage 5's further changes on top.
 
-**Direct request from the project owner, 2026-08-13, to act on once
-Lattice Zoom Stages 5 AND 6 are BOTH done:** build a permanent "showcase
-world" in the player's own rhombi-space demonstrating everything built in
-this project so far. Not started -- Stage 6 isn't built yet. Confirm the
+**Lattice Zoom Stage 5 committed, Stage 6 (Landscape Aggregate State) done
+-- `RHOMBIVERSE_SPEC_LATTICE_ZOOM.md`'s ENTIRE SIX-STAGE BUILD ORDER IS
+NOW COMPLETE -- same session, 2026-08-13** (the "Not committed yet" note
+directly above is now stale -- Stage 5 landed as its own commit,
+`Lattice Zoom Stage 5: ecosystem rendering (real organisms + plant-
+coverage layer)`, before Stage 6 work started). Stage 6 took the spec's
+own "resolved through the SAME deterministic catch-up shape as Evolution
+Stage 4" instruction literally: `landscapeState` is one more field
+`evolution.js`'s own `resolveCatchUpForAllPlanetoids` now persists on the
+SAME `planetoidEvolution` record `lastSimulated`/`rngState`/
+`volatilityScore` already lived on -- not a second registry, not a
+second clock, advancing the same number of times real organism
+generations resolved for that planetoid each call. The real mechanism
+(a new pure `nextLandscapeState`) is a closed-form exponential moving
+average toward that planetoid's own current real biomass signal
+(`localBiomassAvailability`, found and reused a SECOND time -- Stage 5
+already established it as the real "how much life is here" source),
+directly grounded in section 6.2's own "real landscapes are visibly
+shaped by SUSTAINED biological presence over time" language: gradual
+convergence, real settling back down when biomass drops, bounded [0,1]
+by construction. On the rendering side, Stage 5's own aggregate speckle
+layer now blends its dominant-species tint toward a new weathered-ground
+color by that speckle's nearest planetoid's own real `landscapeState` --
+0 (no history) leaves it untouched. Full derivation of every constant,
+and the real verification story (6 new pure/integration tests, 176
+total, including two tests that needed a real debugging detour to
+discover `localBiomassAvailability` genuinely requires real nearby water
+cells the default test/game world doesn't have -- see the spec doc's own
+Stage 6 section for that story -- plus a real Playwright run confirming
+`world.getPlanetoidEvolution()` genuinely gains a live `landscapeState`
+field once the periodic evolution tick fires in the actual running app),
+is in `RHOMBIVERSE_SPEC_LATTICE_ZOOM.md`'s own Stage 6 section, not
+repeated here. **Honestly flagged, not claimed as fully proven live:** a
+real demonstration of `landscapeState` becoming NONZERO, or the speckle
+layer visibly trending weathered, needs many real minutes of elapsed
+generations plus manually-built water (not attempted live this session
+-- the unit/integration tests already prove the mechanism with
+controlled `now` jumps). **Not committed yet as of this entry** -- same
+files as Stage 3/4/5's own list, now with Stage 6's further changes on
+top.
+
+**Direct request from the project owner, 2026-08-13, now unblocked --
+Lattice Zoom Stages 5 AND 6 are both done as of this entry:** build a
+permanent "showcase world" in the player's own rhombi-space demonstrating
+everything built in this project so far. Not started yet. Confirm the
 concrete delivery mechanism (a real built structure via the existing
 Export/Import JSON + Load-preset pattern already in this app, vs.
 something else) when picking this up rather than assuming.
-
-Stage 6 (Landscape Aggregate State) of Lattice Zoom remains genuinely
-unstarted -- see the spec doc's own Build Order section for what it
-actually requires; it depends on Evolution's own Stage 5 (`biomass`)
-output, which is real and ready (Stage 5 above already found and reused
-`localBiomassAvailability` directly).
 
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
