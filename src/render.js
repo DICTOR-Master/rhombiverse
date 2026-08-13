@@ -38,6 +38,8 @@ import {
   pushTradePropose,
   pushTradeConfirm,
   pushTradeCancel,
+  pushSeedSet,
+  pushSeedClear,
 } from './sync.js';
 import { computeClaim, claimBoundingRadius } from './regions.js';
 import {
@@ -204,6 +206,19 @@ function handleLocalRegrowthClear(key) {
     const [x, y, z] = parseCellKey(key);
     pushRegrowthClear(x, y, z);
   }
+}
+// RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 10, closed 2026-08-13: same
+// push-on-local-mutation pattern as regrowth above, wired into
+// worldstate.js's setSeed/removeSeed hooks -- covers both the initial
+// Plant-mode click (plantSeed calls world.setSeed once) and every later
+// growth tick (applyGrowth calls world.setSeed again per seed that grew),
+// so a planted seed's growth is visible to every connected player over
+// time, not just a one-shot placement.
+function handleLocalSeedSet(seedId, seedData) {
+  if (sharedWorldActive && !applyingRemote) pushSeedSet(seedId, seedData);
+}
+function handleLocalSeedClear(seedId) {
+  if (sharedWorldActive && !applyingRemote) pushSeedClear(seedId);
 }
 
 // Shown near the mode controls regardless of Build/Walk mode -- useful
@@ -504,6 +519,8 @@ async function init() {
     onRemove: handleLocalRemove,
     onRegrowthSet: handleLocalRegrowthSet,
     onRegrowthClear: handleLocalRegrowthClear,
+    onSeedSet: handleLocalSeedSet,
+    onSeedClear: handleLocalSeedClear,
   });
   // Declared this early so the very first rebuildInstances() call below
   // (before the mode-button UI further down even exists) can safely
@@ -1025,6 +1042,26 @@ async function init() {
     applyingRemote = false;
   }
 
+  // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 10, closed 2026-08-13:
+  // unlike regrowth entries, a seed HAS real visual geometry (its
+  // tiles), so an incoming remote seed (a fresh plant from another
+  // player, or a growth tick on a seed this session didn't plant) needs
+  // rebuildSeedMeshes, not just a silent store update. No onChange()
+  // here -- a growth-layer seed's tiles are their own separate mesh
+  // group (see rebuildSeedMeshes), not part of the RD InstancedMesh
+  // onChange() re-syncs.
+  function applyRemoteSeedSet(seedId, seedData) {
+    applyingRemote = true;
+    world.setSeed(seedId, seedData);
+    applyingRemote = false;
+    rebuildSeedMeshes(seedId, seedData);
+  }
+  function applyRemoteSeedClear(seedId) {
+    applyingRemote = true;
+    world.removeSeed(seedId);
+    applyingRemote = false;
+  }
+
   // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md: inventory has no local push-hook
   // (worldstate.js's setInventoryEntry is a plain setter -- Shared World
   // inventory changes only ever originate server-side, via
@@ -1473,6 +1510,8 @@ async function init() {
         onRemoteInventory: applyRemoteInventory,
         onRemoteTrade: applyRemoteTrade,
         onRemoteTradeClear: applyRemoteTradeClear,
+        onRemoteSeedSet: applyRemoteSeedSet,
+        onRemoteSeedClear: applyRemoteSeedClear,
       });
       renderTradePanel();
       rebuildAllGrowth();

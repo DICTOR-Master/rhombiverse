@@ -1939,6 +1939,48 @@ delete-and-reclaim (bypassing the app's own RLS, a real one-off
 exception to a guarantee the spec states in absolute terms) — flagged
 as a decision for the claim owner, not done unilaterally.
 
+**Phase 6 growth-layer seeds synced to Shared World, 2026-08-13 —
+`RHOMBIVERSE_SPEC_PENROSE_GROWTH.md` section 10's own deferral, closed by
+direct request** (a player wanted to plant a fern and actually see it,
+which surfaced that Plant mode was local-only the whole time). New
+`public.seeds` table (`supabase/schema.sql`), mirroring `cells`' own
+`data jsonb` blob convention rather than decomposing into typed columns
+— `growth.js`'s `plantedAt`/`lastGrowthAt` are client-side epoch-ms
+numbers, not Postgres timestamps, so a single opaque blob sidesteps a
+type-mapping problem entirely. `UPDATE` policy is deliberately open to
+any authenticated user (not owner-restricted), same reasoning as
+`asteroid_regrowth`'s own "any connected client can process anyone's
+pending regrowth" — a seed needs to keep growing from ANY client's
+periodic tick, not just whoever planted it, who might disconnect long
+before it reaches `maxGeneration`. `worldstate.js` already had
+`onSeedSet`/`onSeedClear` hooks wired in anticipation of this pass (Phase
+6's own header said so) — `render.js` just needed to actually plug them
+into `pushSeedSet`/`pushSeedClear` (`sync.js`), and `loadSharedWorld()`
+gained a sixth registry (`seeds`, via a new `loadSeeds()`). Loading
+requires zero extra render.js code beyond that: `world.replaceAll()`
+already restores `seeds` from JSON, and `rebuildAllGrowth()` — already
+called after every `replaceAll()` — already iterates every seed and
+builds its mesh. Realtime subscription extended with seeds' own
+INSERT+UPDATE (one handler, same pattern as claims' own
+destructible-toggle) and DELETE. Verified: 4 new unit tests
+(`nearestValidCell`... — see the claims entry above; growth-seed sync
+itself was verified live, not via unit test, since it's pure wiring) —
+a genuinely two-session Playwright run (separate contexts/identities):
+Session A connected, planted a fern via a real click, zero errors;
+Session B connected fresh afterward, zero errors. **Real mistake caught
+only by then checking the database directly, not by the green test
+run**: the two-session script reported success, but a direct query
+against `public.seeds` immediately after showed zero rows — the
+render.js/sync.js changes had been written and unit-tested but never
+actually committed and pushed, so the LIVE production site the
+Playwright run was driving was still the OLD pre-sync code the whole
+time, silently planting locally-only exactly like before. A clean "zero
+console errors" result said nothing about whether the RIGHT code was
+even running — worth remembering as a real gap in "verify live" when
+the change hasn't been deployed yet. Re-verified correctly after
+committing and pushing (see the commit itself for the corrected
+end-to-end confirmation).
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.

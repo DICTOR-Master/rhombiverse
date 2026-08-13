@@ -659,3 +659,49 @@ $$;
 revoke all on function public.apply_inventory_decay() from public, anon, authenticated;
 
 select cron.schedule('inventory-decay', '*/5 * * * *', $$select public.apply_inventory_decay()$$);
+
+-- RHOMBIVERSE_SPEC_PENROSE_GROWTH.md: Phase 6 growth-layer seeds, synced
+-- across sessions -- section 10's own deferral, closed 2026-08-13 by
+-- direct request. `id` is the client-generated seedId (matches
+-- growth.js's own "caller owns id generation" convention, same as
+-- claims/trades/regrowth). `data` holds the entire seed object (species,
+-- origin, plantedAt, lastGrowthAt, generation, tiles) as one JSONB blob,
+-- same "world is data" convention cells.data already uses -- growth.js's
+-- own plantedAt/lastGrowthAt are client-side epoch-ms numbers, not
+-- Postgres timestamps, so a single opaque blob avoids inventing a type
+-- mapping for them.
+create table public.seeds (
+  id text primary key,
+  data jsonb not null,
+  owner_id uuid not null default auth.uid(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.seeds enable row level security;
+-- Needed so UPDATE/DELETE realtime payloads include the old row values,
+-- same reason as cells/claims/asteroid_regrowth.
+alter table public.seeds replica identity full;
+
+create policy "seeds_select_all" on public.seeds
+  for select using (true);
+
+create policy "seeds_insert_own" on public.seeds
+  for insert with check (owner_id = auth.uid());
+
+-- Broad on purpose, same reasoning as cells_update_any_authenticated: a
+-- seed needs to keep growing (growSeed/applyGrowth updates
+-- generation/tiles/lastGrowthAt) from ANY connected client's periodic
+-- tick, not just whoever planted it -- who might disconnect long before
+-- the seed reaches its maxGeneration cap. Mirrors asteroid_regrowth's
+-- own "any connected client can process anyone's pending regrowth"
+-- reasoning exactly.
+create policy "seeds_update_any_authenticated" on public.seeds
+  for update using (auth.role() = 'authenticated');
+
+-- Not currently exercised (nothing in the app ever calls removeSeed yet),
+-- included for symmetry with worldstate.js's own onSeedClear hook, which
+-- already existed in anticipation of this sync pass.
+create policy "seeds_delete_own" on public.seeds
+  for delete using (owner_id = auth.uid());
+
+alter publication supabase_realtime add table public.seeds;

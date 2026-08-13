@@ -119,12 +119,32 @@ export async function loadPendingTrades() {
   return trades;
 }
 
+// Row <-> in-memory seed shape. `data` is the whole growth.js seed object
+// verbatim (species/origin/plantedAt/lastGrowthAt/generation/tiles) --
+// see the migration's own comment for why this is one JSONB blob rather
+// than typed columns (growth.js's own epoch-ms timestamps don't map
+// cleanly onto Postgres timestamptz).
+function seedFromRow(row) {
+  return row.data;
+}
+
+// RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 10, closed 2026-08-13:
+// fetches every row from public.seeds into the same {seedId: {...}}
+// shape worldstate.js's seeds registry already uses.
+export async function loadSeeds() {
+  const { data, error } = await supabase.from('seeds').select('id,data');
+  if (error) throw error;
+  const seeds = {};
+  for (const row of data) seeds[row.id] = seedFromRow(row);
+  return seeds;
+}
+
 // Fetches every row from public.cells, public.claims,
-// public.asteroid_regrowth, public.player_inventory, and
-// public.pending_trades, returning all five in the same
+// public.asteroid_regrowth, public.player_inventory,
+// public.pending_trades, and public.seeds, returning all six in the same
 // {worldName, version, cells, claims, asteroidRegrowth, playerInventory,
-// pendingTrades, meta} shape worldstate.js/persistence.js already use,
-// so callers can pass it straight to createWorldStore() or
+// pendingTrades, seeds, meta} shape worldstate.js/persistence.js already
+// use, so callers can pass it straight to createWorldStore() or
 // world.replaceAll() with no format translation.
 export async function loadSharedWorld() {
   const { data, error } = await supabase.from('cells').select('x,y,z,data,author_id,updated_at');
@@ -152,6 +172,7 @@ export async function loadSharedWorld() {
   const asteroidRegrowth = await loadRegrowthQueue();
   const playerInventory = await loadInventory();
   const pendingTrades = await loadPendingTrades();
+  const seeds = await loadSeeds();
   const now = new Date().toISOString();
   return {
     worldName: 'Rhombiverse (Shared)',
@@ -161,6 +182,7 @@ export async function loadSharedWorld() {
     asteroidRegrowth,
     playerInventory,
     pendingTrades,
+    seeds,
     meta: { createdAt: now, lastModified: now },
   };
 }
@@ -280,6 +302,31 @@ export async function pushRegrowthClear(x, y, z) {
   if (error) console.warn('Rhombiverse sync: regrowth clear failed', x, y, z, error);
 }
 
+// RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 10, closed 2026-08-13:
+// upserts a seed's current state (covers both the initial plant AND
+// every later growth tick -- same single-upsert-covers-insert-and-update
+// pattern as pushCellUpsert). owner_id deliberately omitted from the
+// payload, same reasoning as author_id on cells: the column default
+// stamps the real planter on insert, and any later update (a growth tick
+// from a DIFFERENT connected client -- see seeds_update_any_authenticated
+// in schema.sql) leaves the original owner_id alone since supabase-js's
+// upsert only SETs columns actually passed. Swallows errors rather than
+// throwing, same as pushRegrowthSet -- a failed sync means that one
+// growth tick just doesn't reach other players this round, not something
+// that needs to unwind the local growth step already applied.
+export async function pushSeedSet(seedId, seedData) {
+  const { error } = await supabase.from('seeds').upsert({ id: seedId, data: seedData });
+  if (error) console.warn('Rhombiverse sync: seed upsert failed', seedId, error);
+}
+
+// Not currently called by any code path (nothing removes a seed yet),
+// included for symmetry with pushRegrowthClear and worldstate.js's own
+// onSeedClear hook, which already existed in anticipation of this pass.
+export async function pushSeedClear(seedId) {
+  const { error } = await supabase.from('seeds').delete().match({ id: seedId });
+  if (error) console.warn('Rhombiverse sync: seed clear failed', seedId, error);
+}
+
 // RHOMBIVERSE_SPEC_ASTEROIDS.md mining, made server-authoritative for
 // Shared World (unlike a cell placement, an inventory credit is a
 // currency-like resource -- a naive "trust whatever material/amount the
@@ -369,6 +416,8 @@ export function subscribeToSharedWorld({
   onRemoteInventory,
   onRemoteTrade,
   onRemoteTradeClear,
+  onRemoteSeedSet,
+  onRemoteSeedClear,
 }) {
   const channel = supabase
     .channel('world-sync')
@@ -445,6 +494,22 @@ export function subscribeToSharedWorld({
       // Needs replica identity full (schema.sql), same reason as cells'
       // own DELETE handler.
       onRemoteTradeClear(payload.old.id);
+    })
+    // seeds: INSERT covers the initial plant, UPDATE covers every later
+    // growth tick (from any connected client, not just the original
+    // planter -- see seeds_update_any_authenticated in schema.sql) --
+    // both handled identically, same as claims' own INSERT+UPDATE above.
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'seeds' }, (payload) => {
+      if (!onRemoteSeedSet) return;
+      onRemoteSeedSet(payload.new.id, seedFromRow(payload.new));
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'seeds' }, (payload) => {
+      if (!onRemoteSeedSet) return;
+      onRemoteSeedSet(payload.new.id, seedFromRow(payload.new));
+    })
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'seeds' }, (payload) => {
+      if (!onRemoteSeedClear) return;
+      onRemoteSeedClear(payload.old.id);
     })
     .subscribe();
 
