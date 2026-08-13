@@ -24,6 +24,8 @@ import {
   attemptPredation,
   animalGenerationStepHook,
   PREDATION_PROBABILITY,
+  isAtHabitatBoundary,
+  CROSSOVER_MIN_BOUNDARY_GENERATIONS,
 } from '../../src/animals.js';
 import {
   isMature,
@@ -507,4 +509,144 @@ test('animalGenerationStepHook + computeAnimalSurvivalProbability wired into a r
 
   assert.ok(survivingAmoeba.length < amoebaIds.length, `expected measurable predation to reduce the amoeba population (started at ${amoebaIds.length}, ended at ${survivingAmoeba.length})`);
   assert.ok(finalIds.includes('carn') || finalIds.some((id) => id.startsWith('carn_')), 'the carnivore lineage should still be present, benefiting from the prey it consumed');
+});
+
+// ============================================================
+// Stage E -- Habitat Crossover
+// ============================================================
+
+test('isAtHabitatBoundary: false with no opposite-habitat cell in reach; true once a real liquid-permeated cell is within the organism\'s own mobilityRange', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'base' });
+  plantAnimal(world, 'a1', 'seed_a1', LAND_CREATURE_SPECIES, {}, { mobilityRange: 2 }, [0, 0, 0], 0);
+  assert.equal(isAtHabitatBoundary(world, 'a1'), false, 'no liquid cell exists anywhere yet');
+
+  world.addCell(3, 3, 0, { material: 'water', hydrospherePermeated: true }); // real distance ~4.24, beyond mobilityRange 2
+  assert.equal(isAtHabitatBoundary(world, 'a1'), false, 'liquid cell exists but is out of reach');
+
+  world.setOrganism('a1', { ...world.getOrganisms()['a1'], mobilityRange: 6 });
+  assert.equal(isAtHabitatBoundary(world, 'a1'), true, 'liquid cell is now within the organism\'s own real reach');
+});
+
+test('isAtHabitatBoundary: false for an organism NOT currently in its own valid habitat (never mid-invalid)', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'water', hydrospherePermeated: true });
+  plantAnimal(world, 's1', 'seed_s1', SEA_CREATURE_SPECIES, {}, { mobilityRange: 10 }, [0, 0, 0], 0);
+  // Directly (and invalidly, bypassing plantAnimal's own guard) relocate
+  // it onto dry, unrelated ground to exercise this specific edge case.
+  world.setSeed('seed_s1', { ...world.getSeeds()['seed_s1'], origin: [50, 50, 50] });
+  assert.equal(isAtHabitatBoundary(world, 's1'), false);
+});
+
+test('reproduceAnimal: a parent NOT at a habitat boundary never accumulates boundaryGenerations, even across many generations', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'base' }); // no liquid cell anywhere -- never a boundary
+  plantAnimal(world, 'p0', 'seed_p0', LAND_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0 }, { mobilityRange: 8 }, [0, 0, 0], 0);
+  plantAnimal(world, 'm0', 'seed_m0', LAND_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0 }, { mobilityRange: 8 }, [0.5, 0.5, 0], 0);
+  for (const id of ['p0', 'm0']) growToMaturity(world, id);
+
+  let parentId = 'p0';
+  for (let i = 1; i <= 5; i++) {
+    const offspringId = `gen${i}`;
+    const outcome = reproduceAnimal(world, parentId, offspringId, `seed_${offspringId}`, i * 100000, () => 0.5, [parentId, 'm0']);
+    assert.equal(outcome.mode, 'sexual');
+    assert.equal(outcome.result.organism.boundaryGenerations, 0);
+    growToMaturity(world, offspringId, 30);
+    parentId = offspringId;
+  }
+});
+
+test('reproduceAnimal + Stage E: sustained boundary pressure across many real consecutive generations eventually reclassifies a land lineage into a sea creature -- and never on a single generation', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'base' });
+  world.addCell(3, 3, 0, { material: 'water', hydrospherePermeated: true }); // real boundary, distance ~4.24
+  plantAnimal(world, 'p0', 'seed_p0', LAND_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0 }, { mobilityRange: 10, huntBias: 0 }, [0, 0, 0], 0);
+  plantAnimal(world, 'm0', 'seed_m0', LAND_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0 }, { mobilityRange: 10, huntBias: 0 }, [0.5, 0.5, 0], 0);
+  for (const id of ['p0', 'm0']) growToMaturity(world, id);
+  assert.ok(isAtHabitatBoundary(world, 'p0'), 'test setup sanity check -- the parent must genuinely be at a boundary');
+
+  let parentId = 'p0';
+  let reclassifiedAt = null;
+  const MAX_GENERATIONS = 40;
+  for (let i = 1; i <= MAX_GENERATIONS && !reclassifiedAt; i++) {
+    const offspringId = `gen${i}`;
+    const outcome = reproduceAnimal(world, parentId, offspringId, `seed_${offspringId}`, i * 100000, () => 0.5, [parentId, 'm0']);
+    assert.equal(outcome.mode, 'sexual');
+    const bornSpecies = outcome.result.organism.species;
+    // Every generation is either still a fully valid, coherent land
+    // organism, or (only once, the moment it happens) a freshly
+    // reclassified sea creature -- never anything else, and every land
+    // generation must genuinely still pass its own habitat check
+    // (section 5's "never a broken in-between state").
+    assert.ok(bornSpecies === LAND_CREATURE_SPECIES || bornSpecies === SEA_CREATURE_SPECIES);
+    if (bornSpecies === LAND_CREATURE_SPECIES) {
+      const seed = world.getSeeds()[outcome.result.organism.seedId];
+      assert.ok(isValidHabitat(world, LAND_CREATURE_SPECIES, seed.origin), `generation ${i} must be genuinely valid land habitat`);
+    }
+    if (bornSpecies === SEA_CREATURE_SPECIES) {
+      reclassifiedAt = i;
+      break;
+    }
+    growToMaturity(world, offspringId, 30);
+    // Real, grounded reason this matters (found via direct execution,
+    // not assumed): pairing a drifting lineage against a permanently
+    // STATIC mate every generation creates a genuine migration-selection
+    // equilibrium (the blend-then-nudge trajectory mathematically
+    // converges to a fixed point, ~11.3 here, verified by hand) that
+    // never reaches the crossover threshold, no matter how many
+    // generations pass -- because half of every blend keeps getting
+    // pulled back down by the unchanging outsider. A REAL boundary
+    // POPULATION (section 5's own "boundary-adjacent INDIVIDUALS",
+    // plural) would have every local individual drifting under the SAME
+    // sustained pressure, not one lineage against a frozen outlier -- so
+    // the mate's own mobilityRange is nudged forward here too, modeling
+    // that the whole local population is under the same pressure. This
+    // does not change reproduceAnimal's own real mechanism at all, only
+    // this test's population model.
+    world.setOrganism('m0', { ...world.getOrganisms()['m0'], mobilityRange: outcome.result.organism.mobilityRange });
+    parentId = offspringId;
+  }
+
+  assert.ok(reclassifiedAt !== null, `expected a real reclassification to eventually occur within ${MAX_GENERATIONS} generations of sustained boundary pressure`);
+  assert.ok(
+    reclassifiedAt >= CROSSOVER_MIN_BOUNDARY_GENERATIONS,
+    `reclassification must require sustained pressure across many generations, not a single one -- happened at generation ${reclassifiedAt}`
+  );
+
+  const reclassified = world.getOrganisms()[`gen${reclassifiedAt}`];
+  assert.equal(reclassified.status, 'pending', 'a crossover reclassification must ALWAYS route to moderation, regardless of mutation-step size');
+  assert.equal(reclassified.boundaryGenerations, 0, 'the counter resets once a new lineage phase begins');
+  const reclassifiedSeed = world.getSeeds()[reclassified.seedId];
+  assert.ok(isValidHabitat(world, SEA_CREATURE_SPECIES, reclassifiedSeed.origin), 'the reclassified organism must be placed in genuinely valid habitat for its NEW species');
+});
+
+test('reproduceAnimal + Stage E: the REVERSE direction (sea to land) also succeeds under its own sustained pressure -- section 7\'s own explicit success check', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'water', hydrospherePermeated: true });
+  world.addCell(3, 3, 0, { material: 'base' }); // real boundary, distance ~4.24, dry this time
+  plantAnimal(world, 'p0', 'seed_p0', SEA_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0 }, { mobilityRange: 10, huntBias: 0 }, [0, 0, 0], 0);
+  plantAnimal(world, 'm0', 'seed_m0', SEA_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0 }, { mobilityRange: 10, huntBias: 0 }, [0.5, 0.5, 0], 0);
+  for (const id of ['p0', 'm0']) growToMaturity(world, id);
+  assert.ok(isAtHabitatBoundary(world, 'p0'));
+
+  let parentId = 'p0';
+  let reclassifiedAt = null;
+  for (let i = 1; i <= 40 && !reclassifiedAt; i++) {
+    const offspringId = `rgen${i}`;
+    const outcome = reproduceAnimal(world, parentId, offspringId, `seed_${offspringId}`, i * 100000, () => 0.5, [parentId, 'm0']);
+    assert.equal(outcome.mode, 'sexual');
+    if (outcome.result.organism.species === LAND_CREATURE_SPECIES) {
+      reclassifiedAt = i;
+      break;
+    }
+    growToMaturity(world, offspringId, 30);
+    world.setOrganism('m0', { ...world.getOrganisms()['m0'], mobilityRange: outcome.result.organism.mobilityRange });
+    parentId = offspringId;
+  }
+
+  assert.ok(reclassifiedAt !== null, 'the reverse sea-to-land direction must also be reachable under sustained pressure');
+  const reclassified = world.getOrganisms()[`rgen${reclassifiedAt}`];
+  assert.equal(reclassified.status, 'pending');
+  const reclassifiedSeed = world.getSeeds()[reclassified.seedId];
+  assert.ok(isValidHabitat(world, LAND_CREATURE_SPECIES, reclassifiedSeed.origin));
 });

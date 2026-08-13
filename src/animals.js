@@ -34,6 +34,7 @@ import {
   localBiomassAvailability,
   CROWDING_THRESHOLD,
   CROWDING_PENALTY_PER_EXCESS,
+  ORGANISM_SEED_SPECIES_PREFIX,
 } from './evolution.js';
 import { cellToWorld } from './lattice.js';
 
@@ -380,6 +381,148 @@ function selectMateByTrait(world, candidateIds, preferredTrait, rng) {
 // mutation -- one shared override, composing with punctuated equilibrium
 // exactly the way evolution.js's own reproduceSexual/reproduceAsexual
 // already do, not a second untouched pathway.
+// ============================================================
+// Stage E -- Habitat Crossover
+// ============================================================
+// Section 5's own real open design questions (section 10: boundary-
+// adjacency definition, sustained-pressure generation minimum, and the
+// trait-value reclassification threshold are all explicitly "not fixed
+// here") -- real, grounded decisions made below rather than left
+// unimplemented:
+//
+// - The drift happens across GENERATIONS via inheritance, not within one
+//   living individual's own lifetime -- matches the spec's own literal
+//   wording ("boundary-adjacent individuals' OFFSPRING gradually
+//   mutate... once an OFFSPRING's mutated traits cross the threshold, IT
+//   is reclassified"), and composes naturally with reproduceAnimal
+//   (already the one place a new organism record is created) rather than
+//   needing a second, separate per-tick mutation pass on living adults.
+//   This is also what makes "never a single environmental jolt" true BY
+//   CONSTRUCTION: reclassification can only ever advance through a REAL
+//   successful reproduction event (itself already gated on maturity,
+//   mate availability, and a genome x conditions survival-probability
+//   roll), so a lineage genuinely has to keep succeeding at reproducing
+//   while staying at the boundary, generation after generation -- not
+//   one lucky/unlucky tick.
+// - "Boundary" = currently in genuinely valid habitat for the
+//   organism's OWN species (never mid-invalid), AND the OPPOSITE
+//   habitat type is reachable within its own real mobilityRange --
+//   "regularly present at the edge of the other's territory," per the
+//   spec's own wording, grounded in the same real reach concept mobility/
+//   reproduction/predation already use, not a new radius.
+// - mobilityRange is the one real, already-heritable trait genuinely
+//   relevant to habitat tolerance (it IS how far an organism can reach
+//   into unfamiliar terrain) -- sustained boundary pressure nudges it
+//   DIRECTIONALLY toward its own range ceiling each qualifying
+//   generation (on top of, not instead of, ordinary blend+mutation),
+//   and crossing CROSSOVER_MOBILITY_THRESHOLD_FRACTION of that range is
+//   the real "trait-value threshold" section 5 asks for.
+export const CROSSOVER_MIN_BOUNDARY_GENERATIONS = 10;
+export const CROSSOVER_MOBILITY_THRESHOLD_FRACTION = 0.9;
+export const CROSSOVER_DIRECTED_NUDGE_FRACTION = 0.15;
+
+function oppositeAnimalSpecies(species) {
+  return species === LAND_CREATURE_SPECIES ? SEA_CREATURE_SPECIES : LAND_CREATURE_SPECIES;
+}
+
+function hasCellTypeNearby(world, position, radius, matches) {
+  for (const cell of world.entries()) {
+    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z);
+    if (Math.hypot(wx - position[0], wy - position[1], wz - position[2]) > radius) continue;
+    if (matches(cell)) return true;
+  }
+  return false;
+}
+
+const isLiquidCell = (cell) => cell.material === 'water' && cell.hydrospherePermeated === true;
+const isDryCell = (cell) => cell.material !== 'water';
+
+// Real bug caught by direct execution before trusting this stage: the
+// FIRST version of performCrossoverReclassification (below) picked a
+// candidate position by uniformly sampling within the WHOLE mobilityRange
+// sphere around the organism's current position, the same technique
+// attemptMove/animalOffspringOrigin already use successfully elsewhere.
+// That works fine for THOSE (any locally-valid-habitat point is an
+// acceptable outcome) but fails here specifically: the region where the
+// OPPOSITE habitat type is actually the nearest cell is a small lens
+// near the one real boundary cell, and shrinks (as a fraction of the
+// full sampling sphere) precisely as mobilityRange grows large under
+// sustained pressure -- exactly the condition crossover eligibility
+// requires. A scripted 40-generation run confirmed this concretely:
+// mobilityRange grew past 11, and 8 random attempts within an 11-unit
+// sphere essentially never landed in the correct few-unit lens near the
+// actual boundary cell, so it kept silently falling back to the
+// PRE-crossover (now genuinely invalid) origin. Fixed by finding the
+// real nearest opposite-type cell first, then sampling a small jitter
+// radius AROUND that specific cell instead of the organism's own
+// position -- guarantees the target cell is the region's own nearest
+// neighbor, so the search reliably succeeds regardless of how large
+// mobilityRange has grown.
+function nearestOppositeHabitatCellPosition(world, currentSpecies, position, radius) {
+  const matches = currentSpecies === LAND_CREATURE_SPECIES ? isLiquidCell : isDryCell;
+  let nearest = null;
+  let nearestDist = Infinity;
+  for (const cell of world.entries()) {
+    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z);
+    const d = Math.hypot(wx - position[0], wy - position[1], wz - position[2]);
+    if (d > radius || d >= nearestDist || !matches(cell)) continue;
+    nearestDist = d;
+    nearest = [wx, wy, wz];
+  }
+  return nearest;
+}
+
+export function isAtHabitatBoundary(world, organismId) {
+  const organism = world.getOrganisms()[organismId];
+  if (!isAnimal(organism)) return false;
+  const seed = world.getSeeds()[organism.seedId];
+  if (!seed) return false;
+  if (!isValidHabitat(world, organism.species, seed.origin)) return false; // never mid-invalid -- section 5's own guarantee
+  const radius = clampAnimalTraits(organism).mobilityRange;
+  return organism.species === LAND_CREATURE_SPECIES
+    ? hasCellTypeNearby(world, seed.origin, radius, isLiquidCell)
+    : hasCellTypeNearby(world, seed.origin, radius, isDryCell);
+}
+
+// The real reclassification event: flips the species on BOTH the
+// organism record (dispatch/behavior) and the underlying seed's own
+// namespaced species field (evolution.js's own ORGANISM_SEED_SPECIES_
+// PREFIX convention -- keeps render.js's speciesColor tinting correct
+// after crossover too), repositions into a real, freshly-verified valid
+// position for the NEW species (bounded retry, same "never invisible,
+// never placed in invalid habitat" shape as animalOffspringOrigin/
+// attemptMove -- falling back to the pre-crossover origin only in the
+// rare case no nearby valid spot is found), resets the boundary-pressure
+// counter (a new lineage phase starts clean), and -- per section 5's own
+// explicit, unconditional instruction -- ALWAYS routes to the pending
+// moderation queue regardless of how small this specific mutation step
+// was, since a species reclassification is significant BY KIND, not by
+// measured novelty magnitude (overrides whatever isShapeNoveltyJump
+// already decided for the ordinary base-genome mutation this same
+// generation).
+function performCrossoverReclassification(world, organismId, rng) {
+  const organism = world.getOrganisms()[organismId];
+  const seed = world.getSeeds()[organism.seedId];
+  const newSpecies = oppositeAnimalSpecies(organism.species);
+  let newOrigin = seed.origin;
+  const boundaryCell = nearestOppositeHabitatCellPosition(world, organism.species, seed.origin, organism.mobilityRange);
+  if (boundaryCell) {
+    for (let attempt = 0; attempt < MAX_MOVE_ATTEMPTS; attempt++) {
+      // Small jitter radius AROUND the real boundary cell (not the
+      // organism's own possibly-distant position) -- see this function's
+      // own header comment for why sampling around the organism itself
+      // fails once mobilityRange has grown large.
+      const candidate = randomCandidatePosition(boundaryCell, 1, rng);
+      if (isValidHabitat(world, newSpecies, candidate)) {
+        newOrigin = candidate;
+        break;
+      }
+    }
+  }
+  world.setSeed(organism.seedId, { ...seed, origin: newOrigin, species: `${ORGANISM_SEED_SPECIES_PREFIX}${newSpecies}` });
+  world.setOrganism(organismId, { ...organism, species: newSpecies, boundaryGenerations: 0, status: 'pending' });
+}
+
 export function reproduceAnimal(world, parentOrganismId, offspringOrganismId, offspringSeedId, now = Date.now(), rng = Math.random, candidateIds = null, mutationRateOverride = undefined) {
   const parent = world.getOrganisms()[parentOrganismId];
   if (!isAnimal(parent)) return null;
@@ -393,6 +536,10 @@ export function reproduceAnimal(world, parentOrganismId, offspringOrganismId, of
   if (candidates.length === 0) return { result: null, mode: 'no-mate-in-range' };
 
   const mateId = selectMateByTrait(world, candidates, MATE_PREFERENCE_TRAIT, rng);
+  // Read BEFORE reproduction mutates any state -- this generation's
+  // crossover eligibility is about the PARENT's own standing position/
+  // pressure at the moment of conceiving this offspring.
+  const parentAtBoundary = isAtHabitatBoundary(world, parentOrganismId);
   const origin = animalOffspringOrigin(world, parentOrganismId, mateId, parent.species, rng);
   const sexResult = reproduceSexual(world, parentOrganismId, mateId, offspringOrganismId, offspringSeedId, origin, now, rng, mutationRateOverride);
   if (!sexResult) return { result: null, mode: 'sexual-failed' };
@@ -401,9 +548,25 @@ export function reproduceAnimal(world, parentOrganismId, offspringOrganismId, of
   const blendedTraits = blendAnimalTraits(parent, mate);
   const offspringGenome = world.getOrganisms()[offspringOrganismId].genome;
   const mutatedTraits = mutateAnimalTraits(blendedTraits, mutationRateOverride ?? offspringGenome.mutationRate, rng);
-  const updated = { ...world.getOrganisms()[offspringOrganismId], ...mutatedTraits };
+
+  const boundaryGenerations = parentAtBoundary ? (parent.boundaryGenerations ?? 0) + 1 : 0;
+  let mobilityRange = mutatedTraits.mobilityRange;
+  if (parentAtBoundary) {
+    const ceiling = ANIMAL_TRAIT_RANGES.mobilityRange[1];
+    mobilityRange = clamp(mobilityRange + (ceiling - mobilityRange) * CROSSOVER_DIRECTED_NUDGE_FRACTION, ANIMAL_TRAIT_RANGES.mobilityRange);
+  }
+
+  const updated = { ...world.getOrganisms()[offspringOrganismId], ...mutatedTraits, mobilityRange, boundaryGenerations };
   world.setOrganism(offspringOrganismId, updated);
-  return { result: { seed: sexResult.seed, organism: updated }, mode: 'sexual', mateId };
+
+  const threshold =
+    ANIMAL_TRAIT_RANGES.mobilityRange[0] +
+    (ANIMAL_TRAIT_RANGES.mobilityRange[1] - ANIMAL_TRAIT_RANGES.mobilityRange[0]) * CROSSOVER_MOBILITY_THRESHOLD_FRACTION;
+  if (boundaryGenerations >= CROSSOVER_MIN_BOUNDARY_GENERATIONS && mobilityRange >= threshold) {
+    performCrossoverReclassification(world, offspringOrganismId, rng);
+  }
+
+  return { result: { seed: sexResult.seed, organism: world.getOrganisms()[offspringOrganismId] }, mode: 'sexual', mateId };
 }
 
 // The real reproduceFn override (evolution.js's own Stage C extension
