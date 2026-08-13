@@ -11,6 +11,7 @@ import {
   plantSeed,
   applyGrowth,
   tileWorldVertices,
+  tilesOverlap,
 } from '../../src/growth.js';
 import { createWorldStore } from '../../src/worldstate.js';
 
@@ -117,15 +118,21 @@ test('growSeed: grows after the tick cooldown, and every tile is a real, distinc
       `${species}: generation ${seed.generation} exceeded maxGeneration ${GROWTH_TEMPLATES[species].maxGeneration}`
     );
 
-    // No two tiles share a centroid (the same dedup key growth.js
-    // itself uses) -- i.e. nothing was placed twice or overlapping.
-    const centroidKeys = new Set();
-    for (const tile of seed.tiles) {
-      const verts = tileWorldVertices(seed, tile);
-      const c = verts.reduce((acc, v) => [acc[0] + v[0], acc[1] + v[1], acc[2] + v[2]], [0, 0, 0]).map((x) => x / 8);
-      const key = c.map((x) => x.toFixed(5)).join(',');
-      assert.ok(!centroidKeys.has(key), `${species}: duplicate/overlapping tile centroid at ${key}`);
-      centroidKeys.add(key);
+    // Real pairwise 3D overlap check (separating-axis test on the
+    // actual tile geometry), not just centroid-equality -- a 2026-08-13
+    // bug (see growSeed's own header) produced tiles with DIFFERENT
+    // centroids that still genuinely overlapped in space, which a
+    // centroid-only check can never catch. Touching along a shared
+    // face (the normal, expected way tiles connect) is correctly NOT
+    // an overlap here -- only real interior penetration is.
+    const allVerts = seed.tiles.map((tile) => tileWorldVertices(seed, tile));
+    for (let i = 0; i < allVerts.length; i++) {
+      for (let j = i + 1; j < allVerts.length; j++) {
+        assert.ok(
+          !tilesOverlap(allVerts[i], allVerts[j]),
+          `${species}: tile ${i} and tile ${j} genuinely overlap in space`
+        );
+      }
     }
   }
 });

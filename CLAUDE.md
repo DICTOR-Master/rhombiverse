@@ -1772,6 +1772,60 @@ here only so a future reader doesn't trust an old snapshot over the
 actual current state; always verify repo visibility directly
 (`gh repo view --json visibility`) rather than trusting any prior
 session's note including this one.
+**Real overlap bug found and fixed in the Phase 6 growth layer,
+2026-08-13 — found by direct request to check it, not spontaneously.**
+The user specifically asked to verify Penrose/RT growth tiles weren't
+overlapping and could still grow from every face, drawing the parallel
+to the original RD-cell 2x-overlap bug from Phase 1. Investigated with
+the same discipline as that original bug: real execution, not code
+reading. A live growth run (Node, all four species grown to their
+generation cap) followed by an independent geometric check — a real 3D
+separating-axis test (SAT) against the tiles' own actual vertices, not
+`growth.js`'s own centroid-equality dedup — found genuine volumetric
+overlaps in every species (e.g. amoeba: 1 of 6 tile pairs; fern: 42 of
+171). The centroid check the code already had could never have caught
+this: two DIFFERENT, non-identical tiles can still occupy overlapping
+space, and it only ever compared tiles for being the *exact same*
+placement. **Root cause, confirmed numerically before fixing anything**:
+`growSeed` excluded reusing a face's "current direction" on the theory
+that doing so always recreates the same tile (self-overlap) — true for
+a tile's NEAR corner face (same origin, genuinely identical tile), but
+false for its FAR corner face (a different origin — reusing the same
+direction there is actually the one guaranteed-safe way to keep
+extending straight outward). Excluding it on far faces forced the
+algorithm onto whatever OTHER option existed for that face, and checking
+all 120 real face-instances confirmed that "other option" folds back
+into the parent tile's own volume for exactly half of them (60/120) —
+not a rare edge case, a routine one. Verified a genuine fix existed
+before writing it: re-running the same 120-instance check using a real
+SAT overlap test instead of the flawed direction-exclusion heuristic
+found a safe, non-overlapping option for literally every face instance
+— confirming the fix wouldn't trade the overlap bug for a new "some
+faces can never grow" dead-end bug. Fixed by replacing the heuristic
+entirely: `growSeed` now tries every real extension option for a face
+(species-preferred type first), testing each against the tiles actually
+placed so far with a new `tilesOverlap` (exported, real SAT geometry,
+same 15-candidate-axis test used to find the bug) instead of a rounded-
+centroid Set. `tileCentroid`/`centroidKey`/`occupiedKeySet` were dead
+code after this and removed rather than left unused. **Also fixed the
+test that should have caught this but couldn't**: `growth.test.mjs`'s
+own overlap check only compared centroid keys (the exact same weak
+check the buggy code itself used) — replaced with real pairwise
+`tilesOverlap` checks across every placed tile, so this specific class
+of bug can't silently regress again. **Verified end-to-end after the
+fix**: the same Node stress run (all four species to generation cap) now
+reports zero overlapping pairs everywhere they were previously found,
+still reaches every species' generation cap with the same tick counts
+(confirming the fix didn't introduce a new "can't find a face" stall);
+the full unit suite passes, including the strengthened overlap test;
+and a live Playwright run (plant a fern, rewind `lastGrowthAt`
+repeatedly, let the real 5s periodic interval actually grow it in a
+running page — matching this project's own established growth-testing
+technique) grew a real fern to 16 tiles across 5 real ticks with zero
+console errors, and pulling that exact live-grown data back out for an
+independent offline SAT check confirmed zero overlaps in the real
+app's own output, not just the isolated simulation.
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.

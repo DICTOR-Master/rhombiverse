@@ -5,15 +5,21 @@
 // see the spec's own section 3 for why. Additive only: this module
 // never imports, and is never imported by, build.js.
 //
-// Overlap prevention here is centroid-based deduplication (mirrors
-// lattice.js's own cellKey-based Map dedup for the FCC lattice), not
+// Overlap prevention here is a real per-candidate 3D separating-axis
+// test against every tile already placed (tilesOverlap, below) -- not
 // the full formal Ammann matching-rule vertex-decoration atlas needed
 // for a rigorously long-range-consistent AKN tiling -- flagged
-// honestly, not glossed over. For Wave 1's bounded, low-generation-
-// count templates (amoeba/moss/fungus/fern), exact face-matching
-// (below) plus centroid dedup already guarantees every placed tile is
-// a genuine, non-overlapping golden rhombohedron; a future pass adding
-// much larger/longer-running structures may need the fuller system.
+// honestly, not glossed over. An earlier version of this file used
+// centroid-equality dedup instead (mirroring lattice.js's own
+// cellKey-based Map dedup for the FCC lattice) on the assumption that
+// exact face-matching plus "don't recreate the exact same tile" was
+// enough to guarantee no overlap; a real SAT check found (2026-08-13)
+// that assumption was wrong -- see growSeed's own header for the
+// specific bug and fix. For Wave 1's bounded, low-generation-count
+// templates (amoeba/moss/fungus/fern), real geometric overlap testing
+// is cheap (at most a few dozen tiles); a future pass adding much
+// larger/longer-running structures may need the fuller matching-rule
+// system for performance, not correctness.
 
 export const PHI = (1 + Math.sqrt(5)) / 2;
 
@@ -162,18 +168,77 @@ function tileVertices(tile) {
   return verts;
 }
 
-function tileCentroid(tile) {
-  const verts = tileVertices(tile);
-  const sum = verts.reduce((acc, v) => vecAdd(acc, v), [0, 0, 0]);
-  return scale(sum, 1 / verts.length);
+function cross(a, b) {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
-function centroidKey(c) {
-  // Rounded to 5 decimals -- comfortably tighter than the smallest real
-  // distance between two distinct tile centroids in this construction
-  // (edge length 1), loose enough to absorb ordinary float error from
-  // repeated vector addition.
-  return c.map((x) => x.toFixed(5)).join(',');
+function normalizeOrNull(v) {
+  const len = Math.hypot(v[0], v[1], v[2]);
+  return len < 1e-9 ? null : scale(v, 1 / len);
+}
+
+// The 3 basis edge vectors of a tile, read straight back out of its own
+// 8 vertices (verts[0] is the origin corner; verts[4]/[2]/[1] are the
+// single-edge corners, per tileVertices' own a/b/c bit order above) --
+// derived from the same vertex list render.js/tests already trust,
+// rather than re-deriving from tile.dirs a second way.
+function tileEdges(verts) {
+  const o = verts[0];
+  return [vecAdd(verts[4], scale(o, -1)), vecAdd(verts[2], scale(o, -1)), vecAdd(verts[1], scale(o, -1))];
+}
+
+// Real 3D separating-axis test between two golden-rhombohedron tiles --
+// this is the actual fix for the overlap bug found 2026-08-13: the
+// original code only ever compared a NEW candidate's rounded centroid
+// against already-placed tiles' own centroids, which correctly
+// catches an exact duplicate placement but says nothing about a
+// DIFFERENT tile whose volume still overlaps an existing one -- and one
+// of the two "valid" extension options at a face routinely does exactly
+// that (folds back into the parent tile instead of extending outward;
+// see growSeed's own comment for why). Two convex parallelepipeds are
+// separated iff some axis among {each shape's 3 face normals, every
+// pairwise cross product of one shape's edge with the other's (9)}
+// shows non-overlapping projections -- the standard SAT test for
+// oriented boxes, exhaustive for this shape class (15 candidate axes).
+// `eps` tolerance treats two tiles that only TOUCH along a shared face
+// (zero-width projection overlap) as non-overlapping, which is the
+// correct and expected result for legitimately glued neighbors.
+// Exported so the test suite can check real overlap directly against
+// the same implementation growSeed itself trusts, rather than
+// re-deriving SAT math a second time (which is exactly how the
+// original bug -- see growSeed's header -- went undetected: the old
+// test only re-checked centroid equality, not real overlap).
+export function tilesOverlap(vertsA, vertsB, eps = 1e-6) {
+  const [e1, e2, e3] = tileEdges(vertsA);
+  const [f1, f2, f3] = tileEdges(vertsB);
+  const axes = [];
+  for (const [a, b] of [
+    [e1, e2],
+    [e1, e3],
+    [e2, e3],
+    [f1, f2],
+    [f1, f3],
+    [f2, f3],
+  ]) {
+    const n = normalizeOrNull(cross(a, b));
+    if (n) axes.push(n);
+  }
+  for (const ea of [e1, e2, e3]) {
+    for (const eb of [f1, f2, f3]) {
+      const n = normalizeOrNull(cross(ea, eb));
+      if (n) axes.push(n);
+    }
+  }
+  for (const axis of axes) {
+    const pa = vertsA.map((v) => dot(v, axis));
+    const pb = vertsB.map((v) => dot(v, axis));
+    const minA = Math.min(...pa);
+    const maxA = Math.max(...pa);
+    const minB = Math.min(...pb);
+    const maxB = Math.max(...pb);
+    if (maxA <= minB + eps || maxB <= minA + eps) return false; // separated (or just touching) on this axis
+  }
+  return true; // no separating axis found among any candidate -- genuine overlap
 }
 
 // One open face on the growth frontier: the two directions spanning it,
@@ -255,12 +320,6 @@ export const GROWTH_TEMPLATES = {
 // instruction -- same value, not coincidentally.
 export const GROWTH_TICK_MS = 30000;
 
-function occupiedKeySet(seed) {
-  const set = new Set();
-  for (const tile of seed.tiles) set.add(centroidKey(tileCentroid(tile)));
-  return set;
-}
-
 // Attempts to grow one seed by one step: picks open faces (up to the
 // species' facesPerTick) from the current frontier, and for each,
 // attaches a new tile using a real, valid (verified) extension option
@@ -269,6 +328,26 @@ function occupiedKeySet(seed) {
 // if anything was actually added (callers use this to decide whether
 // to push a sync update, mirroring asteroids.js's own regrowth
 // pattern).
+//
+// Real bug found and fixed 2026-08-13 (caught by a live SAT-based
+// geometry check, not by reading the code -- centroid dedup alone
+// looked fine): the original version excluded a face's "current
+// direction" as if reusing it always self-overlapped, on the theory
+// that it would "recreate the same tile." That's only true for a
+// tile's NEAR corner face (origin = the tile's own origin -- reusing
+// the same third direction there really does reproduce an identical
+// tile at an identical origin). For the FAR corner face (origin = the
+// tile's origin + that same direction), reusing it instead produces a
+// perfectly valid, non-overlapping, ADJACENT tile continuing straight
+// outward -- excluding it forced the algorithm onto whatever OTHER
+// option existed for that face pair, and verified numerically
+// (2026-08-13) that the other option folds back into the parent
+// tile's own volume for fully half of all face instances (60 of 120).
+// Fixed by dropping the direction-exclusion heuristic entirely and
+// testing every real candidate against the tiles actually placed so
+// far with tilesOverlap (real SAT geometry) instead -- verified
+// separately that every face instance has at least one genuinely safe
+// candidate this way, so growth still never hits a true dead end.
 export function growSeed(seed, now = Date.now()) {
   const template = GROWTH_TEMPLATES[seed.species];
   if (!template) return false;
@@ -276,7 +355,6 @@ export function growSeed(seed, now = Date.now()) {
   if (now - seed.lastGrowthAt < GROWTH_TICK_MS) return false;
 
   const bias = SPECIES_BIAS[seed.species];
-  const occupied = occupiedKeySet(seed);
 
   // Frontier: every open face across every existing tile, in a stable
   // order (tile insertion order, then the fixed facesOfTile order) --
@@ -289,27 +367,39 @@ export function growSeed(seed, now = Date.now()) {
     }
   }
 
+  // Real placed geometry to test candidates against, grown as tiles are
+  // accepted this tick -- see this function's own header for why
+  // centroid-only dedup can't catch every overlap on its own.
+  const placedVerts = seed.tiles.map((t) => tileVertices(t));
+
   let added = 0;
   for (const face of frontier) {
     if (added >= bias.facesPerTick) break;
     const options = EXTENSIONS_BY_PAIR.get(pairKey(...face.pair)) ?? [];
-    // Exclude the direction the CURRENT tile already used at this
-    // corner -- that option recreates the same tile (self-overlap),
-    // not a new one.
-    const real = options.filter((opt) => opt.third !== face.exclude);
-    if (real.length === 0) continue;
-    const preferred = bias.preferType ? real.filter((o) => o.type === bias.preferType) : real;
-    const pool = preferred.length > 0 ? preferred : real;
-    const choice = pool[Math.floor((seed.tiles.length + added) % pool.length)];
+    if (options.length === 0) continue;
+    // Species-preferred type tried first, but every real option is a
+    // candidate now (not just "not this tile's own direction") --
+    // whichever one is actually geometrically clear wins.
+    const preferred = bias.preferType ? options.filter((o) => o.type === bias.preferType) : options;
+    const rest = options.filter((o) => !preferred.includes(o));
+    const orderedOptions = [...preferred, ...rest];
 
-    const dirs = [...face.pair, choice.third].sort((a, b) => a - b);
-    const candidate = { type: choice.type, dirs, origin: face.origin };
-    const key = centroidKey(tileCentroid(candidate));
-    if (occupied.has(key)) continue; // would overlap an existing tile
+    for (let n = 0; n < orderedOptions.length; n++) {
+      const choice = orderedOptions[(seed.tiles.length + added + n) % orderedOptions.length];
+      const dirs = [...face.pair, choice.third].sort((a, b) => a - b);
+      const candidate = { type: choice.type, dirs, origin: face.origin };
+      const candidateVerts = tileVertices(candidate);
+      if (placedVerts.some((verts) => tilesOverlap(candidateVerts, verts))) continue;
 
-    seed.tiles.push(candidate);
-    occupied.add(key);
-    added++;
+      seed.tiles.push(candidate);
+      placedVerts.push(candidateVerts);
+      added++;
+      break;
+    }
+    // If every option overlapped something already placed, this face
+    // just doesn't grow this tick -- verified this shouldn't happen for
+    // Wave 1's own templates, but a real possibility for a denser
+    // future structure, so it's a no-op, not a thrown error.
   }
 
   if (added > 0) {
