@@ -21,6 +21,13 @@ import {
   reproduceSexual,
   reproduce,
   attemptHorizontalTransfer,
+  localResourceAvailability,
+  computeSurvivalProbability,
+  resolveSurvival,
+  RESOURCE_SEARCH_RADIUS,
+  CROWDING_THRESHOLD,
+  DRIFT_THRESHOLD,
+  MIN_VIABLE_POPULATION,
 } from '../../src/evolution.js';
 import { createWorldStore } from '../../src/worldstate.js';
 
@@ -286,4 +293,130 @@ test('offspring produced via reproduceAsexual/reproduceSexual still grow into fu
 
   const coherence = verifyGenomeCoherence(organism.genome, 'plant', 13);
   assert.ok(coherence.coherent, `mutated offspring genome produced a real overlap: ${JSON.stringify(organism.genome)}`);
+});
+
+// ============================================================
+// Stage 3 -- Environmental Selection & Genetic Drift
+// ============================================================
+
+test('localResourceAvailability: 0 with no nearby water, ramps to 1 as real water cells are added within the search radius', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  assert.equal(localResourceAvailability(world, [0, 0, 0]), 0);
+
+  // Step size 1 (not 2): farthest cell here (i=5) is at real distance
+  // 5*sqrt(2) ~= 7.07, comfortably inside RESOURCE_SEARCH_RADIUS (10) --
+  // a step of 2 put the last couple of cells outside the radius entirely,
+  // caught by this test itself failing rather than assumed safe.
+  for (let i = 0; i < 3; i++) world.addCell(i, i, 0, { material: 'water' });
+  const partial = localResourceAvailability(world, [0, 0, 0]);
+  assert.ok(partial > 0 && partial < 1, `expected partial availability, got ${partial}`);
+
+  for (let i = 3; i < 6; i++) world.addCell(i, i, 0, { material: 'water' });
+  assert.equal(localResourceAvailability(world, [0, 0, 0]), 1);
+});
+
+test('localResourceAvailability: water far outside RESOURCE_SEARCH_RADIUS does not count', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(RESOURCE_SEARCH_RADIUS * 10, 0, 0, { material: 'water' });
+  assert.equal(localResourceAvailability(world, [0, 0, 0]), 0);
+});
+
+test('computeSurvivalProbability: under scarcity, higher resourceEfficiency genuinely survives better; under abundance, genome barely matters', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'efficient', 'seed_eff', 'plant', { resourceEfficiency: 0.95 }, [0, 0, 0], 0);
+  plantOrganism(world, 'wasteful', 'seed_waste', 'plant', { resourceEfficiency: 0.05 }, [500, 0, 0], 0); // far apart -- no crowding interaction between them
+
+  // Scarcity: zero local water for either.
+  const scarceEfficient = computeSurvivalProbability(world, 'efficient', ['efficient']);
+  const scarceWasteful = computeSurvivalProbability(world, 'wasteful', ['wasteful']);
+  assert.ok(scarceEfficient > scarceWasteful, `expected efficient genome to survive scarcity better: ${scarceEfficient} vs ${scarceWasteful}`);
+
+  // Abundance: flood both neighborhoods with water (step size 1, same
+  // real-distance grounding fix as the localResourceAvailability test
+  // above -- 5*sqrt(2) ~= 7.07 stays inside RESOURCE_SEARCH_RADIUS).
+  for (let i = 0; i < 6; i++) {
+    world.addCell(i, i, 0, { material: 'water' });
+    world.addCell(500 + i, i, 0, { material: 'water' });
+  }
+  const abundantEfficient = computeSurvivalProbability(world, 'efficient', ['efficient']);
+  const abundantWasteful = computeSurvivalProbability(world, 'wasteful', ['wasteful']);
+  assert.ok(Math.abs(abundantEfficient - abundantWasteful) < 0.01, `expected genome to barely matter under abundance: ${abundantEfficient} vs ${abundantWasteful}`);
+  assert.equal(abundantEfficient, 1);
+});
+
+test('computeSurvivalProbability: crowding above CROWDING_THRESHOLD penalizes uniformly, independent of genome', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  // A tight cluster of same-species mature plants, all within pairing range of each other.
+  const ids = [];
+  for (let i = 0; i < CROWDING_THRESHOLD + 3; i++) {
+    const id = `plant_${i}`;
+    plantOrganism(world, id, `seed_${i}`, 'plant', { maturitySize: 3, resourceEfficiency: 1 }, [i * 0.3, 0, 0], 0);
+    growToMaturity(world, id);
+    ids.push(id);
+  }
+  const crowded = computeSurvivalProbability(world, ids[0], ids);
+
+  const world2 = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world2, 'lone', 'seed_lone', 'plant', { maturitySize: 3, resourceEfficiency: 1 }, [0, 0, 0], 0);
+  growToMaturity(world2, 'lone');
+  const uncrowded = computeSurvivalProbability(world2, 'lone', ['lone']);
+
+  assert.ok(crowded < uncrowded, `expected crowding to reduce survival probability: ${crowded} vs ${uncrowded}`);
+});
+
+test('resolveSurvival: at/below MIN_VIABLE_POPULATION, survival is unconditional regardless of fitness or rng (the extinction floor)', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'last', 'seed_last', 'plant', { resourceEfficiency: 0 }, [0, 0, 0], 0); // worst possible fitness
+  // rng always returns 0.999 -- would fail almost any real probability check.
+  assert.equal(MIN_VIABLE_POPULATION >= 1, true);
+  const candidateIds = ['last']; // local population of 1, well under MIN_VIABLE_POPULATION
+  assert.equal(resolveSurvival(world, 'last', candidateIds, () => 0.999), true);
+});
+
+test('resolveSurvival: above DRIFT_THRESHOLD, outcome tracks real fitness exactly (no drift blending)', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  // Local population counting (resolveSurvival/crowding) is gated on
+  // isMature -- these need to actually finish growing, and clustered
+  // close enough to count as the same local neighborhood.
+  const ids = [];
+  for (let i = 0; i < DRIFT_THRESHOLD + 2; i++) {
+    const id = `p${i}`;
+    plantOrganism(world, id, `s${i}`, 'plant', { resourceEfficiency: 1, maturitySize: 3 }, [i * 0.3, 0, 0], 0);
+    growToMaturity(world, id);
+    ids.push(id);
+  }
+  // Above DRIFT_THRESHOLD means zero drift bypass -- confirm the decision
+  // boundary is EXACTLY the real computed fitness value (whatever it is,
+  // crowding included), not blended toward 0.5 at all.
+  const fitness = computeSurvivalProbability(world, ids[0], ids);
+  assert.equal(resolveSurvival(world, ids[0], ids, () => fitness - 0.01), true);
+  assert.equal(resolveSurvival(world, ids[0], ids, () => fitness + 0.01), false);
+});
+
+test('resolveSurvival: below DRIFT_THRESHOLD (but above MIN_VIABLE_POPULATION), outcome blends toward pure chance regardless of genome', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  // Local population of 3 (all mature, clustered) -- below DRIFT_THRESHOLD
+  // (5), above MIN_VIABLE_POPULATION (2), and below CROWDING_THRESHOLD's
+  // own neighbor count (2 neighbors each, not > 3), so crowding doesn't
+  // also confound this specifically-drift-focused check.
+  plantOrganism(world, 'a', 'sa', 'plant', { resourceEfficiency: 0, maturitySize: 3 }, [0, 0, 0], 0); // worst possible fitness
+  plantOrganism(world, 'b', 'sb', 'plant', { maturitySize: 3 }, [0.3, 0, 0], 0);
+  plantOrganism(world, 'c', 'sc', 'plant', { maturitySize: 3 }, [0.6, 0, 0], 0);
+  const ids = ['a', 'b', 'c'];
+  for (const id of ids) growToMaturity(world, id);
+
+  const fitness = computeSurvivalProbability(world, 'a', ids);
+  assert.equal(fitness, 0, 'expected pure fitness (no drift) to be exactly 0 for this genome/environment');
+
+  // Pure fitness (no drift) would give this organism survival probability
+  // 0. With drift partially bypassing fitness at this population size, a
+  // low-but-not-zero rng roll should now sometimes succeed.
+  let successes = 0;
+  const trials = 200;
+  for (let i = 0; i < trials; i++) {
+    const r = i / trials;
+    if (resolveSurvival(world, 'a', ids, () => r)) successes++;
+  }
+  assert.ok(successes > 0, 'expected drift to give a worst-fitness organism SOME chance of survival below DRIFT_THRESHOLD');
+  assert.ok(successes < trials, 'expected drift to still be a BLEND, not guaranteed survival');
 });

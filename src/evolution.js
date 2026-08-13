@@ -20,6 +20,7 @@
 // inert in this stage (wired up by later stages per the spec's own
 // staging).
 import { growSeed, tileWorldVertices, tilesOverlap, VALID_TRIPLES } from './growth.js';
+import { cellToWorld } from './lattice.js';
 
 // Real, MEASURED bounds, not guessed -- verified 2026-08-13 with a
 // throwaway stress-test copy of growth.js (never committed) that
@@ -388,4 +389,131 @@ export function verifyGenomeCoherence(genome, species, ticks) {
     }
   }
   return { coherent: true, tileCount: seed.tiles.length, generation: seed.generation };
+}
+
+// ============================================================
+// Stage 3 -- Environmental Selection & Genetic Drift
+// ============================================================
+// "Selection is applied only at the resolution step... one clear
+// function: genome x local conditions -> survival/reproduction
+// probability" (section 3's own words) -- everything below is exactly
+// that one function plus its inputs, a pure probability calculation.
+// Nothing here mutates world state or removes an organism; a caller
+// (Stage 4's catch-up loop) decides what to DO with the probability.
+
+// How far around an organism's own origin to sample for local water
+// availability -- section 3 reuses the existing hydrosphere spec's
+// permeated-water material as the resource signal, not a new one.
+// Grounded at 10 world units: comfortably larger than a single mature
+// organism's own real bounding radius (measured ~2.4-20 units across
+// Stage 1/2's own genome ranges) so "local" genuinely means the
+// organism's immediate surroundings, not the whole planetoid.
+export const RESOURCE_SEARCH_RADIUS = 10;
+// Water cells within that radius counted as "fully abundant" -- below
+// this, availability ramps down linearly to 0 (no water cells at all).
+export const RESOURCE_ABUNDANT_COUNT = 5;
+
+function countLocalWaterCells(world, position) {
+  let count = 0;
+  for (const cell of world.entries()) {
+    if (cell.material !== 'water') continue;
+    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z);
+    if (Math.hypot(wx - position[0], wy - position[1], wz - position[2]) <= RESOURCE_SEARCH_RADIUS) count++;
+  }
+  return count;
+}
+
+// 0 (no local water at all) .. 1 (at or above RESOURCE_ABUNDANT_COUNT).
+export function localResourceAvailability(world, position) {
+  return Math.min(1, countLocalWaterCells(world, position) / RESOURCE_ABUNDANT_COUNT);
+}
+
+// Crowding: same-species mature organisms within this radius. Reuses
+// the same "multiple of real bounding radius" grounding as Stage 2's
+// pairing/adjacency checks rather than a flat guessed distance.
+export const CROWDING_RANGE_MULTIPLIER = 3;
+export const CROWDING_THRESHOLD = 3; // local mature same-species count above which crowding starts penalizing
+export const CROWDING_PENALTY_PER_EXCESS = 0.15; // survival multiplier lost per organism above threshold
+
+function localMatureSameSpeciesCount(world, organismId, candidateIds) {
+  const self = world.getOrganisms()[organismId];
+  if (!self) return 0;
+  let count = 0;
+  for (const id of candidateIds) {
+    if (id === organismId) continue;
+    const other = world.getOrganisms()[id];
+    if (!other || other.species !== self.species || !isMature(world, id)) continue;
+    if (isInPairingRange(world, organismId, id)) count++; // reuses the same "same neighborhood" radius as mate pairing, by design -- crowding and mate-availability are the same real neighborhood, not two separately-tuned radii
+  }
+  return count;
+}
+
+function clamp01(x) {
+  return Math.min(1, Math.max(0, x));
+}
+
+// The section 3 function itself: genome x local conditions ->
+// probability in [0,1]. Resource scarcity scales survival with
+// resourceEfficiency (at full abundance every genome does equally well;
+// at full scarcity only efficient genomes do); crowding applies
+// uniformly regardless of genome, per the spec's own explicit "uniform,
+// independent of genome" wording.
+export function computeSurvivalProbability(world, organismId, candidateIds) {
+  const organism = world.getOrganisms()[organismId];
+  const seed = organism && world.getSeeds()[organism.seedId];
+  if (!organism || !seed) return 0;
+
+  const availability = localResourceAvailability(world, seed.origin);
+  const scarcityFactor = availability + (1 - availability) * organism.genome.resourceEfficiency;
+
+  const crowd = localMatureSameSpeciesCount(world, organismId, candidateIds);
+  const crowdingFactor = crowd > CROWDING_THRESHOLD ? clamp01(1 - (crowd - CROWDING_THRESHOLD) * CROWDING_PENALTY_PER_EXCESS) : 1;
+
+  return clamp01(scarcityFactor * crowdingFactor);
+}
+
+// Section 2.2: below this LOCAL (same-species, in-neighborhood)
+// population count, selection is partially bypassed in favor of chance
+// -- a real, small-founding-population number (population genetics'
+// own "drift dominates in small populations" holds even more strongly
+// at game-scale populations of a handful of individuals than in real
+// large populations), flagged as tunable per the spec's own open
+// question, not derived from a specific real-world figure.
+export const DRIFT_THRESHOLD = 5;
+
+// DIRECT REQUIREMENT, 2026-08-13: selection must never drive an
+// established lineage to full local extinction -- older/simpler
+// organism types need to persist alongside newer ones for long-term
+// world variation. Below this population count, survival is forced to
+// certain (probability 1) regardless of fitness or drift, protecting
+// the lineage's own ability to recover. 2 (not 1) is deliberate: a
+// lone survivor of a SEXUAL species (plants) can never pair again, so
+// the real floor for "still a viable, recoverable lineage" is a pair,
+// not a single individual.
+export const MIN_VIABLE_POPULATION = 2;
+
+// Fraction of the survival decision resolved by uniform chance (0.5)
+// rather than fitness, scaling from 0 (at/above DRIFT_THRESHOLD, pure
+// fitness) up toward 1 as local population approaches zero -- "scaled
+// by how far below threshold the population is," per section 2.2's own
+// wording.
+function driftBypassFraction(localPopulation) {
+  if (localPopulation >= DRIFT_THRESHOLD) return 0;
+  return (DRIFT_THRESHOLD - localPopulation) / DRIFT_THRESHOLD;
+}
+
+// The real per-organism decision a caller (Stage 4) applies each
+// resolution step. `candidateIds` is the pool of other organisms to
+// measure local population/crowding/mate-availability against (Stage 4
+// would pass "everything on this planetoid"; kept as an explicit
+// parameter here, same as Stage 2's own functions, rather than this
+// module reaching into a not-yet-defined per-planetoid registry).
+export function resolveSurvival(world, organismId, candidateIds, rng = Math.random) {
+  const localPopulation = localMatureSameSpeciesCount(world, organismId, candidateIds) + 1; // +1 for the organism itself
+  if (localPopulation <= MIN_VIABLE_POPULATION) return true; // extinction floor -- never resolved by chance or fitness below this
+
+  const fitness = computeSurvivalProbability(world, organismId, candidateIds);
+  const bypass = driftBypassFraction(localPopulation);
+  const effectiveProbability = fitness * (1 - bypass) + 0.5 * bypass;
+  return rng() < effectiveProbability;
 }

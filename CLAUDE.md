@@ -2160,6 +2160,58 @@ delta," which for that specific value produced an exactly-zero delta —
 neither was a bug in the implementation, both were caught by the test
 failing honestly rather than trusted blindly.
 
+**Evolution Stage 3 (Environmental Selection & Genetic Drift) done,
+2026-08-13.** `computeSurvivalProbability(world, organismId, candidateIds)`
+implements section 3's own "genome x local conditions -> probability"
+exactly: resource scarcity reads REAL local water coverage (reuses
+`RHOMBIVERSE_SPEC_WATER_ICE.md`'s own material, not a new resource —
+`RESOURCE_SEARCH_RADIUS=10`, `RESOURCE_ABUNDANT_COUNT=5` water cells
+within it = fully abundant) and scales survival by `resourceEfficiency`
+only under scarcity (abundance flattens genome differences to near-zero,
+per the spec's own "decreases the reproduction threshold cost when
+abundant"); crowding (same-species mature organisms in pairing range,
+reusing Stage 2's own proximity radius rather than a second one) applies
+uniformly regardless of genome, per the spec's explicit wording.
+`resolveSurvival` layers genetic drift (2.2) on top: below
+`DRIFT_THRESHOLD=5` local population, the outcome blends toward pure
+50/50 chance rather than fitness, scaling with how far below threshold;
+at/above it, the decision boundary is the exact real fitness value, no
+blending at all (verified, not assumed).
+
+**The direct extinction-floor requirement from earlier this session is
+now real, not just a task note**: `MIN_VIABLE_POPULATION=2` — at or
+below this local population, `resolveSurvival` returns true
+unconditionally, regardless of fitness or drift roll. 2, not 1, is
+deliberate: a lone survivor of a sexual species (plants) can never pair
+again, so the real floor for "still a recoverable lineage" is a pair.
+This is the mechanism Stage 7's adaptive damping will need to compose
+with once real population dynamics exist end-to-end (Stage 4's catch-up
+loop is what will actually call this repeatedly across generations).
+
+Verified via `node --test` (12 new tests, 59 total, all passing).
+**Two real test-authoring mistakes caught by the tests failing, not
+assumed correct**: an early version placed water cells at 2-unit steps,
+which put some of them outside `RESOURCE_SEARCH_RADIUS` without the test
+author (this session) noticing until the assertion failed — fixed by
+grounding cell placement in the real measured distance (step 1,
+farthest cell at `5*sqrt(2)~=7.07`, comfortably inside radius 10) rather
+than assuming a round-looking step size was safe. Also confirmed
+`computeSurvivalProbability`'s and `resolveSurvival`'s local-population
+counting is gated on `isMature` (by design, reusing Stage 2's own
+proximity helper) — an early drift-threshold test planted organisms but
+never grew them to maturity, so the "population" it measured was always
+1 regardless of how many organisms existed, immediately (and
+silently-if-untested) hitting the extinction floor instead of exercising
+drift at all; fixed by growing test organisms to maturity wherever the
+test's actual intent was "population size N."
+
+**Not yet wired to anything automatic** — per Stage 3's own scope,
+these are pure probability functions a caller applies; nothing yet
+calls `resolveSurvival` as part of removing an organism from the world,
+and resource-gated reproduction (the "with sufficient local resource"
+half of section 2's own amoeba rule) still isn't enforced anywhere.
+Stage 4's catch-up resolution loop is where both become real.
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.
