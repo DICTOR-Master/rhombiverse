@@ -27,24 +27,35 @@ async function main() {
   const overlayDisplay = await page.$eval('#welcome-overlay', (el) => getComputedStyle(el).display);
   assert.equal(overlayDisplay, 'none', 'welcome overlay should hide after Enter');
 
-  // The seed cell rendered -- InstancedMesh count should be exactly 1.
-  const initialCount = await page.evaluate(() => {
-    const raw = localStorage.getItem('rhombiverse-world');
-    if (!raw) return null;
-    return Object.keys(JSON.parse(raw).cells).length;
-  });
-  assert.equal(initialCount, 1, 'expected exactly the seed cell before any build action');
+  // Nothing is saved to localStorage until the first onChange() fires
+  // (documented, pre-existing behavior -- render.js only persists on a
+  // real mutation, not right after initial seeding), and the starting
+  // cell count isn't just the seed cell either -- seedAsteroidBelts()
+  // runs unconditionally in init(), even in local-only mode (the two
+  // belts are real, minable content locally too, not just in Shared
+  // World). So this checks the DELTA from one build action, not an
+  // absolute count -- the only thing actually worth asserting here.
+  const cellCount = async () => {
+    const raw = await page.evaluate(() => localStorage.getItem('rhombiverse-world'));
+    return raw ? Object.keys(JSON.parse(raw).cells).length : 0;
+  };
 
   // A real Build-mode click on the seed cell's face adds a neighbor.
-  const canvas = await page.$('canvas');
+  // waitForSelector (not page.$, which does a single instantaneous
+  // query) actively retries until the canvas is actually attached --
+  // a single-shot query flaked once in local testing even though the
+  // canvas was confirmed present a moment later.
+  const canvas = await page.waitForSelector('canvas', { state: 'attached', timeout: 10000 });
   const box = await canvas.boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await page.waitForTimeout(500);
-  const afterBuildCount = await page.evaluate(() => {
-    const raw = localStorage.getItem('rhombiverse-world');
-    return Object.keys(JSON.parse(raw).cells).length;
-  });
-  assert.equal(afterBuildCount, 2, 'expected the seed cell plus one newly built neighbor');
+  const afterFirstClick = await cellCount();
+  assert.ok(afterFirstClick > 0, 'expected at least one cell to exist after the first click');
+
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForTimeout(500);
+  const afterSecondClick = await cellCount();
+  assert.equal(afterSecondClick, afterFirstClick + 1, 'expected exactly one new cell from the second build click');
 
   // Mode buttons are present and switchable without error.
   await page.click('.mode-btn[data-mode="fill"]');
