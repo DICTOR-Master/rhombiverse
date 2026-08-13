@@ -2392,6 +2392,57 @@ planetoid's surviving organisms are byte-identical to before — not just
 involving only one planetoid never touch the other's stored clock/rng
 state at all, even across multiple separate calls.
 
+**Evolution Stage 7 (Adaptive Damping) done, 2026-08-13.** Implements
+section 7's own pseudocode directly:
+`carryingCapacity = baseCapacity + f(volatility)` widens
+`CROWDING_THRESHOLD` for a volatile planetoid;
+`mutationRateCeiling = baseCeiling - g(volatility)` (bounded down, not
+up, per the spec's own explicit parenthetical) caps effective mutation
+rate, floored at `MIN_MUTATION_CEILING=0.3` so a volatile planetoid can
+still evolve, just more cautiously. `nextVolatilityScore` is the real
+swing-detection function — a population change ≥`SWING_FRACTION_
+THRESHOLD` (30%) between consecutive generations raises the score;
+anything smaller decays it by `VOLATILITY_DECAY_FACTOR` (0.9/generation)
+— "settling toward stability... during calm periods," per
+`RHOMBIVERSE_PRINCIPLES.md` §2's own wording. Section 7's own explicit
+composition rule — "the jolt-triggered mutation boost is itself subject
+to `mutationRateCeiling`" — is real:
+`Math.min(effectiveMutationRate(...), dampingParams.mutationCeiling)`
+in the resolution loop, not two independently-acting caps.
+
+The score itself threads through `resolveCatchUp` as a bare number (the
+same pattern `rngState` already uses — this function stays fully
+planetoid-agnostic, never touching `world.getPlanetoidEvolution`
+directly), recomputed at the START of each generation from the CURRENT
+score before that generation resolves, then updated immediately after
+from that generation's real population change — so damping responds
+within a single long catch-up run, not only across separate calls.
+`resolveCatchUpForAllPlanetoids` persists it as one more field on the
+same per-planetoid `planetoidEvolution` record Stage 6 introduced.
+
+**Real methodology finding, caught before trusting any assertion**: the
+FINAL volatility score at the end of a full-length run is a poor test
+signal — it's a genuinely rolling measure that decays back toward zero
+during any calm stretch, so reading it only at generation 50 often just
+reflects whether the last few generations happened to be quiet, not the
+run's real history. Confirmed by tracking the score generation-by-
+generation before writing any test: a genuinely harsher/more chaotic
+planetoid (high mutation rate, harsh scarcity, large starting
+population) reliably runs its PEAK score 40–50% hotter than a calm
+control throughout a real run, even though — also confirmed directly,
+not assumed — both show real, nonzero volatility, since ordinary
+population/crowding oscillation is a genuine, expected feature of this
+system's dynamics, not something a "calm" planetoid is exempt from.
+
+Verified via `node --test` (6 new tests, 84 total, all passing),
+including the DIRECT REQUIREMENT recorded earlier this session (Stage
+3/7 composition): a deterministic check that the widened crowding
+threshold measurably improves survival probability for an actually-
+crowded organism (not just "doesn't hurt"), and that the extinction
+floor still holds — population never reaches zero — for a
+maximally-stressed, high-mutation planetoid across a full
+`MAX_CATCHUP_GENERATIONS`-length run with damping active throughout.
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.

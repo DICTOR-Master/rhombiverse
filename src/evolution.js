@@ -530,7 +530,12 @@ function computeSymbiosisFactor(world, plantOrganismId, candidateIds) {
 // per the spec's own explicit "uniform, independent of genome" wording.
 // Plants additionally get the symbiotic amoeba-proximity boost (section
 // 5) layered on top -- 1x (no effect) for any other species.
-export function computeSurvivalProbability(world, organismId, candidateIds) {
+// `crowdingThreshold` (added for Stage 7's adaptive damping, default
+// CROWDING_THRESHOLD so every existing caller is unaffected) lets a
+// volatile planetoid's own widened carrying-capacity buffer raise the
+// point where crowding starts penalizing, without this function needing
+// to know anything about volatility scores or planetoids itself.
+export function computeSurvivalProbability(world, organismId, candidateIds, crowdingThreshold = CROWDING_THRESHOLD) {
   const organism = world.getOrganisms()[organismId];
   const seed = organism && world.getSeeds()[organism.seedId];
   if (!organism || !seed) return 0;
@@ -540,7 +545,7 @@ export function computeSurvivalProbability(world, organismId, candidateIds) {
   const scarcityFactor = availability + (1 - availability) * organism.genome.resourceEfficiency;
 
   const crowd = localMatureSameSpeciesCount(world, organismId, candidateIds);
-  const crowdingFactor = crowd > CROWDING_THRESHOLD ? clamp01(1 - (crowd - CROWDING_THRESHOLD) * CROWDING_PENALTY_PER_EXCESS) : 1;
+  const crowdingFactor = crowd > crowdingThreshold ? clamp01(1 - (crowd - crowdingThreshold) * CROWDING_PENALTY_PER_EXCESS) : 1;
 
   const symbiosisFactor = organism.species === 'plant' ? computeSymbiosisFactor(world, organismId, candidateIds) : 1;
 
@@ -612,11 +617,11 @@ function driftBypassFraction(localPopulation) {
 // would pass "everything on this planetoid"; kept as an explicit
 // parameter here, same as Stage 2's own functions, rather than this
 // module reaching into a not-yet-defined per-planetoid registry).
-export function resolveSurvival(world, organismId, candidateIds, rng = Math.random) {
+export function resolveSurvival(world, organismId, candidateIds, rng = Math.random, crowdingThreshold = CROWDING_THRESHOLD) {
   const localPopulation = localMatureSameSpeciesCount(world, organismId, candidateIds) + 1; // +1 for the organism itself
   if (localPopulation <= MIN_VIABLE_POPULATION) return true; // extinction floor -- never resolved by chance or fitness below this
 
-  const fitness = computeSurvivalProbability(world, organismId, candidateIds);
+  const fitness = computeSurvivalProbability(world, organismId, candidateIds, crowdingThreshold);
   const bypass = driftBypassFraction(localPopulation);
   const effectiveProbability = fitness * (1 - bypass) + 0.5 * bypass;
   return rng() < effectiveProbability;
@@ -757,7 +762,19 @@ function offspringPlacement(world, parentOrganismId, rng) {
 // the same stored state at different real wall-clock moments must still
 // produce byte-identical results, including every offspring's own
 // plantedAt/lastGrowthAt.
-function resolveOneGeneration(world, organismIds, rng, generationIndex, simulatedNow) {
+// `dampingParams` ({crowdingThreshold, mutationCeiling}), added for
+// Stage 7's adaptive damping -- default values are exactly this
+// function's own prior fixed behavior (base CROWDING_THRESHOLD, no
+// mutation-rate cap), so a caller that doesn't pass it (none currently
+// do directly -- resolveCatchUp always supplies it) sees no change.
+function resolveOneGeneration(
+  world,
+  organismIds,
+  rng,
+  generationIndex,
+  simulatedNow,
+  dampingParams = { crowdingThreshold: CROWDING_THRESHOLD, mutationCeiling: 1 }
+) {
   const toRemove = new Set();
   const newIds = [];
   let idCounter = 0;
@@ -789,13 +806,18 @@ function resolveOneGeneration(world, organismIds, rng, generationIndex, simulate
     const updatedOrganism = { ...organism, lastConditions: current, generationsSinceJolt };
     world.setOrganism(organismId, updatedOrganism);
 
-    const mutRate = effectiveMutationRate(updatedOrganism.genome.mutationRate, generationsSinceJolt);
+    // Section 7's own explicit interaction rule: "the jolt-triggered
+    // mutation boost is itself subject to mutationRateCeiling... a rate
+    // cap, separate from and in addition to section 1.1's coherence
+    // bounds." A calm planetoid's ceiling is 1 (no effect); a volatile
+    // one's is lower, damping even a fresh jolt's own boost.
+    const mutRate = Math.min(effectiveMutationRate(updatedOrganism.genome.mutationRate, generationsSinceJolt), dampingParams.mutationCeiling);
 
     if (isMature(world, organismId)) {
       // Reproduction and survival share the SAME genome x conditions
       // probability function (section 3's own "survival/reproduction
       // probability" framing -- one function, both purposes).
-      const reproProbability = computeSurvivalProbability(world, organismId, organismIds);
+      const reproProbability = computeSurvivalProbability(world, organismId, organismIds, dampingParams.crowdingThreshold);
       if (rng() < reproProbability) {
         const offspringId = `${organismId}_g${generationIndex}_${idCounter++}`;
         const offspringOrigin = offspringPlacement(world, organismId, rng);
@@ -824,7 +846,7 @@ function resolveOneGeneration(world, organismIds, rng, generationIndex, simulate
       }
     }
 
-    if (!resolveSurvival(world, organismId, organismIds, rng)) {
+    if (!resolveSurvival(world, organismId, organismIds, rng, dampingParams.crowdingThreshold)) {
       toRemove.add(organismId);
     }
   }
@@ -850,15 +872,35 @@ function resolveOneGeneration(world, organismIds, rng, generationIndex, simulate
 // generations (never jumps straight to `now`), so leftover fractional
 // elapsed time correctly carries over into the next catch-up call
 // rather than being lost or double-counted.
-export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now = Date.now()) {
+//
+// `initialVolatilityScore` (Stage 7, default 0 -- so every existing
+// caller sees no change) threads a bare numeric damping score through
+// the generation loop, the same way rngState threads a bare numeric rng
+// state through it -- this function stays fully planetoid-agnostic
+// (it never touches world.getPlanetoidEvolution itself); the actual
+// per-planetoid persistence is resolveCatchUpForAllPlanetoids's own job,
+// below. Each generation's damping parameters (crowdingThreshold/
+// mutationCeiling) are derived from the CURRENT score before that
+// generation resolves, and the score itself updates immediately after,
+// from that same generation's real population swing -- so damping
+// responds within a single long catch-up run, not just across separate
+// calls to this function.
+export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now = Date.now(), initialVolatilityScore = 0) {
   const elapsed = Math.max(0, now - lastSimulated);
   const generations = Math.min(Math.floor(elapsed / EVOLUTION_GENERATION_INTERVAL_MS), MAX_CATCHUP_GENERATIONS);
   const rng = createSeededRng(rngState);
 
   let currentIds = organismIds;
+  let volatilityScore = initialVolatilityScore;
   for (let g = 0; g < generations; g++) {
     const simulatedNow = lastSimulated + (g + 1) * EVOLUTION_GENERATION_INTERVAL_MS;
-    currentIds = resolveOneGeneration(world, currentIds, rng, g, simulatedNow);
+    const beforeCount = currentIds.length;
+    const dampingParams = {
+      crowdingThreshold: CROWDING_THRESHOLD + carryingCapacityBonus(volatilityScore),
+      mutationCeiling: mutationRateCeiling(volatilityScore),
+    };
+    currentIds = resolveOneGeneration(world, currentIds, rng, g, simulatedNow, dampingParams);
+    volatilityScore = nextVolatilityScore(volatilityScore, beforeCount, currentIds.length);
   }
 
   return {
@@ -866,6 +908,7 @@ export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now 
     rngState: rng.getState(),
     lastSimulated: lastSimulated + generations * EVOLUTION_GENERATION_INTERVAL_MS,
     generationsResolved: generations,
+    volatilityScore,
   };
 }
 
@@ -943,9 +986,17 @@ export function resolveCatchUpForAllPlanetoids(world, organismIds, now = Date.no
   const groups = groupOrganismsByPlanetoid(world, organismIds);
   const results = {};
   for (const [planetoidKey, ids] of Object.entries(groups)) {
-    const stored = world.getPlanetoidEvolution()[planetoidKey] ?? { lastSimulated: now, rngState: hashStringToSeed(planetoidKey) };
-    const result = resolveCatchUp(world, ids, stored.lastSimulated, stored.rngState, now);
-    world.setPlanetoidEvolution(planetoidKey, { lastSimulated: result.lastSimulated, rngState: result.rngState });
+    const stored = world.getPlanetoidEvolution()[planetoidKey] ?? {
+      lastSimulated: now,
+      rngState: hashStringToSeed(planetoidKey),
+      volatilityScore: 0,
+    };
+    const result = resolveCatchUp(world, ids, stored.lastSimulated, stored.rngState, now, stored.volatilityScore ?? 0);
+    world.setPlanetoidEvolution(planetoidKey, {
+      lastSimulated: result.lastSimulated,
+      rngState: result.rngState,
+      volatilityScore: result.volatilityScore,
+    });
     results[planetoidKey] = result;
   }
   return results;
@@ -973,4 +1024,62 @@ export function snapshotGenomeForCarrying(world, organismId) {
 // handles a carried genome correctly by construction.
 export function plantCarriedGenome(world, snapshot, organismId, seedId, origin, now = Date.now()) {
   return plantOrganism(world, organismId, seedId, snapshot.species, snapshot.genome, origin, now);
+}
+
+// ============================================================
+// Stage 7 -- Adaptive Damping (Population Volatility)
+// ============================================================
+// Applies RHOMBIVERSE_PRINCIPLES.md section 2's own generalized
+// algorithm directly, with population swings as the correction-
+// triggering event -- section 7's own pseudocode, made real. The score
+// itself is threaded through resolveCatchUp as a bare number (see that
+// function's own header) and persisted per-planetoid by
+// resolveCatchUpForAllPlanetoids via the SAME planetoidEvolution
+// registry Stage 6 introduced for lastSimulated/rngState -- one more
+// field on the same record, not a new registry.
+
+// A population change between two consecutive generations exceeding
+// this fraction of the population's own prior size counts as a real
+// "swing" -- first-guess, tunable, aimed at "a genuine boom/crash," not
+// routine single-birth/death noise a population of any real size
+// experiences constantly.
+export const SWING_FRACTION_THRESHOLD = 0.3;
+// Below-threshold ("quiet") generations decay the score back down --
+// "settling toward stability... during calm periods," per
+// RHOMBIVERSE_PRINCIPLES.md section 2's own wording.
+export const VOLATILITY_DECAY_FACTOR = 0.9;
+// Extra crowding-threshold headroom granted per unit of accumulated
+// volatility -- a wider carrying-capacity buffer, per section 7's own
+// pseudocode (`carryingCapacity = baseCapacity + f(volatility_score)`).
+export const CARRYING_CAPACITY_PER_VOLATILITY = 1;
+// Mutation-rate ceiling reduction per unit of volatility -- "bounded
+// DOWN, not up" per the spec's own explicit parenthetical
+// (`mutationRateCeiling = baseCeiling - g(volatility_score)`).
+export const MUTATION_CEILING_PER_VOLATILITY = 0.02;
+// Never dampens the ceiling below this -- a volatile planetoid still
+// needs to be ABLE to evolve at all, just more cautiously; a ceiling of
+// 0 would freeze mutation entirely, which nothing in the spec asks for.
+export const MIN_MUTATION_CEILING = 0.3;
+
+function swingMagnitude(beforeCount, afterCount) {
+  if (beforeCount === 0) return 0;
+  return Math.abs(afterCount - beforeCount) / beforeCount;
+}
+
+// Pure: current score + this generation's real population change ->
+// next score. Exported so the test suite can verify the boom/decay
+// curve directly, not used by any other runtime code path (resolveCatchUp
+// inlines the same two branches against its own live loop state).
+export function nextVolatilityScore(currentScore, beforeCount, afterCount) {
+  const magnitude = swingMagnitude(beforeCount, afterCount);
+  if (magnitude >= SWING_FRACTION_THRESHOLD) return currentScore + magnitude;
+  return currentScore * VOLATILITY_DECAY_FACTOR;
+}
+
+export function carryingCapacityBonus(volatilityScore) {
+  return volatilityScore * CARRYING_CAPACITY_PER_VOLATILITY;
+}
+
+export function mutationRateCeiling(volatilityScore) {
+  return Math.max(MIN_MUTATION_CEILING, 1 - volatilityScore * MUTATION_CEILING_PER_VOLATILITY);
 }
