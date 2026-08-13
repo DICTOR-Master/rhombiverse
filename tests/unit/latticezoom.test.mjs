@@ -8,6 +8,7 @@ import {
   subScaleFactor,
   generateSubLattice,
   SUB_LATTICE_MAX_SHELL,
+  selectNearbyCells,
 } from '../../src/latticezoom.js';
 import { shellCount, isValidCell, cellToWorld } from '../../src/lattice.js';
 
@@ -85,4 +86,63 @@ test('SUB_LATTICE_MAX_SHELL default produces a real, moderate sub-lattice (55 ce
   const sub = generateSubLattice(0, 0, 0);
   assert.equal(sub.length, cumulativeCellCount(SUB_LATTICE_MAX_SHELL));
   assert.equal(sub.length, 55);
+});
+
+// ============================================================
+// Stage 2 -- Camera-Distance Trigger & Lifecycle (pure selection logic)
+// ============================================================
+
+test('selectNearbyCells: a cell far from the reference position is excluded entirely', () => {
+  const cells = [{ x: 0, y: 0, z: 0 }, { x: 20, y: 0, z: 0 }];
+  const chosen = selectNearbyCells(cells, [0, 0, 0], 4, 20, 1);
+  assert.equal(chosen.length, 1);
+  assert.deepEqual([chosen[0].x, chosen[0].y, chosen[0].z], [0, 0, 0]);
+});
+
+test('selectNearbyCells: real distance-based, not a flat radius per axis -- a diagonally-close cell within Euclidean range is included, one just outside is not', () => {
+  const cells = [
+    { x: 2, y: 2, z: 0 }, // real distance sqrt(8) ~= 2.83, inside a radius-3 trigger
+    { x: 4, y: 4, z: 0 }, // real distance sqrt(32) ~= 5.66, outside
+  ];
+  const chosen = selectNearbyCells(cells, [0, 0, 0], 3, 20, 1);
+  assert.equal(chosen.length, 1);
+  assert.deepEqual([chosen[0].x, chosen[0].y, chosen[0].z], [2, 2, 0]);
+});
+
+test('selectNearbyCells: respects a real scale factor (world position = cell coord * scale, not the raw lattice coordinate)', () => {
+  const cells = [{ x: 2, y: 0, z: 0 }];
+  // At scale=1, world position (2,0,0) is distance 2 from the origin --
+  // inside a radius-3 trigger.
+  assert.equal(selectNearbyCells(cells, [0, 0, 0], 3, 20, 1).length, 1);
+  // At scale=5, the SAME cell's real world position is (10,0,0) --
+  // outside a radius-3 trigger. Confirms the function scales cell
+  // coordinates into real world space rather than comparing raw lattice
+  // coordinates directly.
+  assert.equal(selectNearbyCells(cells, [0, 0, 0], 3, 20, 5).length, 0);
+});
+
+test('selectNearbyCells: caps at maxCells, keeping the CLOSEST ones when more candidates are in range than the bound allows', () => {
+  const cells = [
+    { x: 1, y: 0, z: 0 },
+    { x: 2, y: 0, z: 0 },
+    { x: 3, y: 0, z: 0 },
+  ];
+  const chosen = selectNearbyCells(cells, [0, 0, 0], 10, 2, 1);
+  assert.equal(chosen.length, 2);
+  const xs = chosen.map((c) => c.x).sort();
+  assert.deepEqual(xs, [1, 2], 'the two CLOSEST cells must be kept, not an arbitrary/insertion-order pair');
+});
+
+test('selectNearbyCells: real distance is available on each returned entry, sorted nearest-first', () => {
+  const cells = [
+    { x: 3, y: 0, z: 0 },
+    { x: 1, y: 0, z: 0 },
+    { x: 2, y: 0, z: 0 },
+  ];
+  const chosen = selectNearbyCells(cells, [0, 0, 0], 10, 20, 1);
+  assert.equal(chosen.length, 3);
+  for (let i = 1; i < chosen.length; i++) {
+    assert.ok(chosen[i].d >= chosen[i - 1].d, 'results must be sorted nearest-first');
+  }
+  assert.equal(chosen[0].x, 1);
 });

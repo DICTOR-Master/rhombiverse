@@ -288,11 +288,40 @@ via Playwright: real orange sub-cells render nested exactly at the seed
 cell's location, correctly scaled, tiling with no visible gap/overlap at
 both default and close zoom, zero console errors.
 
-**Stage 2 — Camera-Distance Trigger & Lifecycle**
-Wire real camera-distance detection (reusing `refreshClaims`'s own
-clear-and-rebuild pattern) so nearby cells' sub-lattices appear/dispose
-as the camera moves, throttled. Verify bounded memory over a long
+**Stage 2 — Camera-Distance Trigger & Lifecycle — DONE, 2026-08-13.**
+Wire real camera-distance detection so nearby cells' sub-lattices appear/
+dispose as the camera moves, throttled. Verify bounded memory over a long
 simulated camera path (no leaked geometry).
+
+Real, deliberate deviation from this stage's own suggested pattern
+(`refreshClaims`'s clear-and-rebuild): claims are few, irregularly-shaped,
+and each needs its own real convex-hull geometry, so that pattern
+allocates/disposes a mesh per claim every recompute. Sub-lattice cells are
+many but every one is the exact same shape (one shared geometry per Stage
+1) — reused the TOP-LEVEL `mesh`'s own pattern instead (a fixed-capacity
+`InstancedMesh` with an adjustable `.count`, never allocating/disposing
+after one-time setup), a strictly stronger answer to "no leaked geometry"
+than clear-and-rebuild: there is nothing to leak, since nothing is ever
+created or destroyed after the initial allocation. `SUB_LATTICE_TRIGGER_
+DISTANCE = 4` world units (real-reasoned: the default camera framing sits
+~11.2 units from the origin, so 4 keeps the sub-lattice invisible at the
+ordinary starting view while comfortably reachable by zooming in, per
+this stage's own first success check) and `MAX_NEARBY_SUBLATTICE_CELLS =
+20` (bounds worst-case cost independent of world size, same discipline as
+`MAX_CELLS`/`MAX_UNDO` elsewhere) are flagged as tunable per section 10's
+own open question. `selectNearbyCells` (`latticezoom.js`) is the real,
+pure, unit-tested selection logic (Euclidean distance, real scale
+factor, closest-first capped at the bound); `render.js`'s `refreshSubLattice`
+is pure THREE-specific mesh-buffer wiring on top, self-rescheduled via a
+throttled `setTimeout` loop (250ms default) rather than a fixed
+`setInterval`, so Stage 4's own adaptive-damping widening can take effect
+on the very next tick with no timer teardown needed.
+
+Verified via `node --test` (5 new tests, 148 total) and a real Playwright
+run through all three states: default zoom shows a single solid block
+(no sub-lattice computed), close zoom reveals the real sub-lattice
+nested at the cell's location, and zooming back out makes it disappear
+again — zero console errors throughout.
 
 **Stage 3 — Multi-Level Depth & Blending**
 Extend to `MAX_LOD_DEPTH` real nested levels; add cross-fade/scale

@@ -71,3 +71,26 @@ export function generateSubLattice(parentX, parentY, parentZ, maxShell = SUB_LAT
     return { x: cell.x, y: cell.y, z: cell.z, shell: cell.shell, worldPosition: [px + lx, py + ly, pz + lz], scale: subScale };
   });
 }
+
+// RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 2 -- Camera-Distance Trigger &
+// Lifecycle. Pure selection logic, deliberately factored out of
+// render.js's own THREE-specific mesh-buffer code so it's independently
+// unit-testable (this project's own established discipline: business
+// logic lives in a pure, THREE-free module; only actual scene-graph
+// wiring lives in render.js, verified live instead). Given every built
+// cell and a real reference position (the camera, or the live player
+// position while walking), returns the closest `maxCells` cells within
+// `triggerDistance`, nearest-first -- render.js generates each chosen
+// cell's own sub-lattice and writes it into its shared InstancedMesh
+// buffer.
+export function selectNearbyCells(cells, referencePosition, triggerDistance, maxCells, scale = 1) {
+  const [rx, ry, rz] = referencePosition;
+  const nearby = [];
+  for (const cell of cells) {
+    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, scale);
+    const d = Math.hypot(wx - rx, wy - ry, wz - rz);
+    if (d <= triggerDistance) nearby.push({ x: cell.x, y: cell.y, z: cell.z, d });
+  }
+  nearby.sort((a, b) => a.d - b.d);
+  return nearby.slice(0, maxCells);
+}

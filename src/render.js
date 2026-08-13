@@ -8,7 +8,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell } from './lattice.js';
-import { generateSubLattice, SUB_LATTICE_MAX_SHELL } from './latticezoom.js';
+import {
+  generateSubLattice,
+  SUB_LATTICE_MAX_SHELL,
+  cumulativeCellCount,
+  subScaleFactor,
+  selectNearbyCells,
+} from './latticezoom.js';
 import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController, removeShell, recolorShell } from './build.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
@@ -700,49 +706,112 @@ async function init() {
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(mesh);
 
-  // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 1: static sub-lattice
-  // geometry, demoed on one hardcoded cell (the seed cell, always
-  // present in every starting world) -- no camera-distance trigger yet
-  // (Stage 2's own job), no multi-level recursion, no blending. Proves
-  // the sub-lattice itself is geometrically correct (real FCC adjacency,
-  // scaled -- reuses latticezoom.js's own generateSubLattice, which
-  // itself reuses lattice.js's cellsInShells/cellToWorld directly, no
-  // new geometry system) and that its combined volume conserves the
-  // parent's own (see latticezoom.js's own header for the exact
-  // identity). A SEPARATE InstancedMesh, never sharing the top-level
-  // mesh's own buffer/capacity/MAX_CELLS (Isolation -- that spec's own
-  // section 4: "touches no existing gameplay data... a rendering-layer
-  // addition"), built the exact same way (buildRDGeometry + rdRawVerts)
-  // rather than inventing new geometry. Every sub-cell shares one
-  // geometry (they're all the same real scale), matching the top-level
-  // mesh's own single-shared-geometry InstancedMesh pattern.
-  const subLatticeCells = generateSubLattice(0, 0, 0, SUB_LATTICE_MAX_SHELL, SCALE);
-  const subLatticeGeometry = buildRDGeometry(subLatticeCells[0].scale);
+  // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 2: real camera-distance
+  // trigger & lifecycle, replacing Stage 1's single-hardcoded-cell demo.
+  // Real, deliberate deviation from the spec's own suggested pattern
+  // ("reusing refreshClaims's own clear-and-rebuild pattern"): claims are
+  // few, irregularly-shaped, and each needs its own real convex-hull
+  // geometry, so refreshClaims allocates/disposes a THREE.Mesh per claim
+  // every recompute. Sub-lattice cells are many, but every one is the
+  // EXACT SAME shape (one shared geometry, per Stage 1) -- the top-level
+  // `mesh` above already solves exactly this shape of problem (many
+  // identical objects, count changes over time) via a FIXED-capacity
+  // InstancedMesh with an adjustable `.count`, never allocating/disposing
+  // per recompute at all. Reusing THAT pattern here is a strictly
+  // stronger answer to this stage's own "no leaked geometry" success
+  // check than clear-and-rebuild would be: there is nothing to leak,
+  // because nothing is ever created or destroyed after this one-time
+  // allocation -- only the same buffer's contents and `.count` change.
+  //
+  // SUB_LATTICE_TRIGGER_DISTANCE (4 world units) is a real, reasoned
+  // first value, flagged as tunable per this spec's own section 10 open
+  // question ("needs real frame-cost measurement... not guessed here"):
+  // the default camera framing sits ~11.2 units from the origin (real
+  // Euclidean distance for position (6,5,8)), so 4 keeps the sub-lattice
+  // invisible at the ordinary starting view (this stage's own first
+  // success check) while comfortably reachable by zooming in, matching
+  // Stage 1's own live-verified "close zoom" screenshot distance.
+  // MAX_NEARBY_SUBLATTICE_CELLS (20) bounds worst-case cost independent
+  // of how many cells exist in the whole world -- the same "a real cap
+  // grounded in reasoned cost" discipline as MAX_CELLS/MAX_UNDO/
+  // MAX_CATCHUP_GENERATIONS elsewhere in this project.
+  const SUB_LATTICE_TRIGGER_DISTANCE = 4;
+  const MAX_NEARBY_SUBLATTICE_CELLS = 20;
+  const SUB_LATTICE_CELLS_PER_PARENT = cumulativeCellCount(SUB_LATTICE_MAX_SHELL);
+  const subLatticeScale = subScaleFactor(SUB_LATTICE_MAX_SHELL) * SCALE;
+  const subLatticeGeometry = buildRDGeometry(subLatticeScale);
   const subLatticeMaterial = new THREE.MeshStandardMaterial({
     color: 0xffb347,
     metalness: 0.15,
     roughness: 0.55,
     flatShading: true,
   });
-  const subLatticeMesh = new THREE.InstancedMesh(subLatticeGeometry, subLatticeMaterial, subLatticeCells.length);
-  const subLatticeDummy = new THREE.Object3D();
-  subLatticeCells.forEach((cell, i) => {
-    subLatticeDummy.position.set(...cell.worldPosition);
-    subLatticeDummy.updateMatrix();
-    subLatticeMesh.setMatrixAt(i, subLatticeDummy.matrix);
-  });
-  subLatticeMesh.instanceMatrix.needsUpdate = true;
-  // Same real bug this project already found and fixed once for the
-  // top-level mesh (render.js's own history): InstancedMesh.raycast()
-  // lazily computes its boundingSphere ONCE and never auto-invalidates
-  // it -- calling this explicitly after populating every instance avoids
-  // that trap here too, even though Stage 1 doesn't raycast against this
-  // mesh yet (governing decision 4: block-level building/mining only,
-  // sub-lattice is purely visual for this whole spec's current scope) --
-  // cheap insurance against the exact class of bug this codebase has
-  // already paid for once.
-  subLatticeMesh.computeBoundingSphere();
+  const subLatticeMesh = new THREE.InstancedMesh(
+    subLatticeGeometry,
+    subLatticeMaterial,
+    MAX_NEARBY_SUBLATTICE_CELLS * SUB_LATTICE_CELLS_PER_PARENT
+  );
+  subLatticeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  subLatticeMesh.count = 0;
   scene.add(subLatticeMesh);
+
+  // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md section 5 (Adaptive Damping) --
+  // Stage 4's own job to make this widen under rapid repeated triggers;
+  // this module-level mutable throttle value is the real extension point
+  // Stage 4 will adjust, left as a plain `let` rather than a constant for
+  // exactly that reason.
+  let subLatticeThrottleMs = 250;
+  let lastSubLatticeRefresh = 0;
+  const subLatticeDummy = new THREE.Object3D();
+
+  // Recomputes which built cells are near enough to the camera (or the
+  // live player position while walking) to reveal sub-lattice detail,
+  // closest-first up to the real MAX_NEARBY_SUBLATTICE_CELLS bound, and
+  // rewrites the shared InstancedMesh's own instance buffer in place --
+  // no allocation, no disposal, ever, after the one-time setup above.
+  function refreshSubLattice() {
+    const camPos = walking && player ? player.getPosition() : camera.position;
+    const chosen = selectNearbyCells(
+      world.entries(),
+      [camPos.x, camPos.y, camPos.z],
+      SUB_LATTICE_TRIGGER_DISTANCE,
+      MAX_NEARBY_SUBLATTICE_CELLS,
+      SCALE
+    );
+
+    let idx = 0;
+    for (const parent of chosen) {
+      const subCells = generateSubLattice(parent.x, parent.y, parent.z, SUB_LATTICE_MAX_SHELL, SCALE);
+      for (const sub of subCells) {
+        subLatticeDummy.position.set(...sub.worldPosition);
+        subLatticeDummy.updateMatrix();
+        subLatticeMesh.setMatrixAt(idx, subLatticeDummy.matrix);
+        idx++;
+      }
+    }
+    subLatticeMesh.count = idx;
+    subLatticeMesh.instanceMatrix.needsUpdate = true;
+    // Same real bug this project already found and fixed once for the
+    // top-level mesh: InstancedMesh.raycast() lazily computes its
+    // boundingSphere ONCE and never auto-invalidates it. Not yet
+    // raycast against (governing decision 4: block-level building/
+    // mining only, sub-lattice is purely visual for this whole spec's
+    // current scope) -- cheap insurance regardless, same as Stage 1.
+    subLatticeMesh.computeBoundingSphere();
+  }
+  refreshSubLattice();
+
+  // Self-rescheduling throttle (not a fixed setInterval) so Stage 4's
+  // own adaptive-damping widening of `subLatticeThrottleMs` takes effect
+  // on the very next tick, with no need to clear/recreate a timer.
+  function scheduleSubLatticeRefresh() {
+    setTimeout(() => {
+      refreshSubLattice();
+      lastSubLatticeRefresh = performance.now();
+      scheduleSubLatticeRefresh();
+    }, subLatticeThrottleMs);
+  }
+  scheduleSubLatticeRefresh();
 
   // RHOMBIVERSE_SPEC_REGIONS.md territory visualization: one low-opacity
   // mesh per claim, its exact real footprint shape (via ConvexGeometry on
