@@ -39,6 +39,51 @@ function fractionalRecipe(bands) {
   };
 }
 
+// Deterministic pseudo-random value noise -- the standard GLSL
+// sine-hash technique (borrowed, not invented, per Grounded Simplicity),
+// quantized to a patch grid so nearby cells usually land in the same
+// bucket and read as chunky coastlines/lake patches rather than
+// salt-and-pepper speckle. Same input always produces the same output,
+// so a generated body is reproducible from its own coordinates alone --
+// no seed needs to be stored anywhere.
+function surfaceNoise(x, y, z, patchSize) {
+  const px = Math.floor(x / patchSize);
+  const py = Math.floor(y / patchSize);
+  const pz = Math.floor(z / patchSize);
+  const s = Math.sin(px * 12.9898 + py * 78.233 + pz * 37.719) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// A layered body with OPEN water on the surface (oceans/lakes), distinct
+// from ice-moon/ice-giant's icy-mantle-reaches-the-surface design: per
+// direct request, ice belongs NEAR THE CORE (a buried layer, same real
+// basis as Europa/Enceladus subsurface oceans -- ice-moon's own existing
+// justification, reused here) while the crust itself is a genuine mix of
+// dry land and standing water bodies, so there's always land to plant
+// RHOMBIVERSE_SPEC_PENROSE_GROWTH.md's growth-layer life on. `waterFraction`
+// (0..1) is the one tunable knob varying the three presets below --
+// higher means more of the crust reads as ocean rather than continent.
+// The subsurface ice band still auto-permeates to (subsurface) water via
+// hydrosphere.js the instant the body loads, same established mechanic
+// as ice-moon/ice-giant -- not prevented here, since a buried liquid
+// layer under solid crust is the correct real-world reading (a
+// subsurface ocean), not a bug to work around.
+function oceanicRecipe(waterFraction, patchSize = 2.2) {
+  return (cell, dist, radius) => {
+    const f = dist / radius;
+    if (f <= 0.18) return 'ferrostone'; // dense core
+    if (f <= 0.4) return 'ice99'; // buried ice layer near the core -- auto-permeates to a subsurface ocean
+    if (f <= 0.62) return 'garnet'; // rocky mantle separating the subsurface ocean from the crust
+    // Crust: dry land by default, open water in patches sized/positioned
+    // by surfaceNoise -- 'water' is placed directly (already the
+    // terminal liquid material, no permeation step needed) so oceans/
+    // lakes are visible immediately on generation, not only after
+    // hydrosphere.js's next pass.
+    const n = surfaceNoise(cell.x, cell.y, cell.z, patchSize);
+    return n < waterFraction ? 'water' : 'base';
+  };
+}
+
 export const PLANETOID_RECIPES = {
   rocky: {
     label: 'Rocky Planetoid',
@@ -75,6 +120,23 @@ export const PLANETOID_RECIPES = {
       [4 / 5, 'ice99'], // deep icy mantle -- auto-permeates via hydrosphere.js
       [1, 'glassite'], // thin translucent outer atmosphere
     ]),
+  },
+  // Three points along one real gradient -- how much of a rocky body's
+  // surface is open water vs. dry land -- rather than three unrelated
+  // recipes, per the direct request for "varying water surface" bodies.
+  // All three share the exact same layering (core -> subsurface ice ->
+  // rocky mantle -> land/water crust); only waterFraction differs.
+  'arid-world': {
+    label: 'Arid World',
+    materialForCell: oceanicRecipe(0.12), // scattered oases/inland lakes, mostly dry land -- roomiest for sowing life
+  },
+  continental: {
+    label: 'Continental World',
+    materialForCell: oceanicRecipe(0.42), // Earth-like balance of continents and oceans/seas
+  },
+  'ocean-world': {
+    label: 'Ocean World',
+    materialForCell: oceanicRecipe(0.72), // mostly ocean with scattered islands -- land is the rare resource here
   },
 };
 
@@ -117,7 +179,13 @@ export function generatePlanetoid(world, type, centerX, centerY, centerZ, radius
     if (world.has(cell.x, cell.y, cell.z)) continue;
     const dist = Math.hypot(cell.x - centerX, cell.y - centerY, cell.z - centerZ);
     if (dist > radius) continue;
-    const material = recipe.materialForShell(dist, radius);
+    // materialForCell (oceanicRecipe) needs the cell's own coordinates
+    // for surface noise; materialForShell (every other recipe) only
+    // ever needed depth, so it's untouched -- one or the other is
+    // always defined, never both.
+    const material = recipe.materialForCell
+      ? recipe.materialForCell(cell, dist, radius)
+      : recipe.materialForShell(dist, radius);
     if (!canPlaceMaterial(material, cell.x, cell.y, cell.z)) continue;
     world.addCell(cell.x, cell.y, cell.z, {
       material,

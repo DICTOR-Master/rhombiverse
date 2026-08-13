@@ -1772,6 +1772,53 @@ here only so a future reader doesn't trust an old snapshot over the
 actual current state; always verify repo visibility directly
 (`gh repo view --json visibility`) rather than trusting any prior
 session's note including this one.
+**Three new formula-driven planetoid types added, 2026-08-13 — direct
+request for "more planetoid prebuilds with varying water surface
+suitable for sowing plant/life prebuilds on."** Distinct from every
+existing recipe: ice-moon/ice-giant put ice AT the surface (the whole
+crust reaches it), which leaves no dry land to plant Phase 6 growth-
+layer life on. Per direct clarification mid-session ("ice9.9 near core;
+water on surface, oceans lakes etc"), the new recipes instead layer ice
+BURIED near the core (same real basis as ice-moon's own Europa/
+Enceladus subsurface-ocean justification, reused here — still auto-
+permeates via hydrosphere.js the moment the body loads) under a rocky
+mantle, with the crust itself a genuine mix of dry land and directly-
+placed open `water` (already the terminal liquid material, visible
+immediately, no permeation step needed) — real oceans/lakes a player
+can build around. `planetoidgen.js`'s `generatePlanetoid` gained an
+optional `materialForCell(cell, dist, radius)` recipe hook (checked
+before the existing `materialForShell(dist, radius)`, which every prior
+recipe still uses unchanged) since surface variation needs each cell's
+own coordinates, not just its depth. New `oceanicRecipe(waterFraction)`
+picks land vs. water per crust cell via `surfaceNoise` — a quantized
+sine-hash value-noise (the standard GLSL technique, borrowed not
+invented), patch-sized so nearby cells usually land in the same bucket
+and read as coastlines/lakes rather than speckle. Three presets share
+this one recipe shape, differing only in `waterFraction`: **Arid World**
+(0.12 — scattered oases, roomiest for sowing), **Continental World**
+(0.42 — Earth-like balance), **Ocean World** (0.72 — mostly ocean,
+scattered islands). Wired as both new Generate-mode body types
+(`#generator-type-select`) and three new large presets (`data/presets/
+{arid-world,continental-world,ocean-world}-large.json`, radius 14 —
+matching the existing four large presets' own exact cell count, 5775,
+confirmed by reproducing their generation parameters first rather than
+guessing a new size). **Verified thoroughly before trusting**: a direct
+Node harness (no browser needed, pure math) confirmed each preset's
+crust water fraction lands within ~1% of its target
+(0.126/0.430/0.730), and a full `createWorldStore` → `generatePlanetoid`
+→ `applyHydrosphere` → `computePlanetoids` pipeline run confirmed the
+buried ice band fully converts to a permeated subsurface ocean
+(`hydrosphereActive: true`) while directly-placed surface `water` stays
+distinguishable (no `hydrospherePermeated` flag) from the permeated
+kind — genuinely two different water populations, not a naming
+coincidence. Live-verified in a real browser (Playwright): Load-preset
+for Continental World and a live Generate-mode click for Ocean World
+both produced zero console errors; zoomed-out screenshots of all three
+confirm real, round, genuinely-varying land/water silhouettes (Arid:
+mostly land with small scattered pools; Continental: real coastline-
+scale mixing; Ocean: mostly blue with scattered islands) — not just
+matching numbers.
+
 **Real overlap bug found and fixed in the Phase 6 growth layer,
 2026-08-13 — found by direct request to check it, not spontaneously.**
 The user specifically asked to verify Penrose/RT growth tiles weren't
