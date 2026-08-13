@@ -1608,6 +1608,35 @@ both sessions throughout. All test identities' cells/inventory/rate-
 limit rows cleaned from the live shared database after verification,
 same discipline as every other live-DB test this session.
 
+**Phase 6 (Penrose/RT Growth Layer) spec pass done, 2026-08-13 —
+design only, per direct instruction; implementation not started.**
+New `docs/RHOMBIVERSE_SPEC_PENROSE_GROWTH.md`. Grounded the whole spec
+in real, named math rather than an "aperiodic-looking" invention, and
+verified the core geometric claims numerically in this session (Python,
+not just cited): the six icosahedral star vectors (half of a regular
+icosahedron's 12 vertices, one per antipodal pair) split into exactly
+two pairwise-angle classes, 63.43° and 116.57°; three star vectors at
+each angle span an acute/obtuse golden rhombohedron (the real Ammann
+rhombohedron pair underlying the Ammann–Kramer–Neri tiling, the
+standard 3D generalization of Penrose tiling); both rhombohedra's faces
+verified as genuine golden rhombi (diagonal ratio exactly
+`φ = 1.618033988749895`) and their volumes verified in exact ratio `φ`
+too. Design: local/incremental substitution growth (not a full
+re-inflation per tick, to match "leave it, come back to find it
+grown"), a `species` bias (`plant`/`shell`/`creature`, direct
+instruction to cover both plant and animal forms) on which
+locally-valid substitution choice gets picked, and — per a direct
+follow-up request mid-session ("off the peg" organic forms, not just an
+abstract bias) — a `GROWTH_TEMPLATES` named-recipe table plus
+`data/growth-presets/*.json`, explicitly mirroring
+`planetoidgen.js`'s `PLANETOID_RECIPES` + `data/presets/*.json`'s own
+already-proven pattern rather than inventing a new one. Exact
+substitution multiplicities and template parameter values are left
+implementation-tunable (verify against a primary source / the real
+generator output, not guessed here) — same "flag it, don't fake
+precision" convention as every other tuned constant in this project.
+`RHOMBIVERSE_PLAN.md`/`README.md` cross-referenced.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World),
 `RHOMBIVERSE_SPEC_REGIONS.md`, `RHOMBIVERSE_SPEC_ASTEROIDS.md`,

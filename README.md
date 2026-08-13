@@ -99,6 +99,7 @@ standalone addenda, each extending specific phases of the plan:
 | `RHOMBIVERSE_SPEC_REGIONS.md` | Plan section 2/Phase 5.8 — ownership claims |
 | `RHOMBIVERSE_SPEC_TRADE_INVENTORY.md` | Asteroids — barter trade, resource decay |
 | `RHOMBIVERSE_SPEC_LOOPHOLES.md` | Patches gaps across regions/supernova/blackhole/asteroids/trade |
+| `RHOMBIVERSE_SPEC_PENROSE_GROWTH.md` | Phase 6 — aperiodic quasicrystal growth layer, real Ammann-rhombohedra geometry |
 | `RHOMBIVERSE_COMPLIANCE.md` | Legal/safety checklist, phased by when each item is required |
 
 ## Contributing
