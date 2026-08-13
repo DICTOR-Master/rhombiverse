@@ -323,12 +323,75 @@ run through all three states: default zoom shows a single solid block
 nested at the cell's location, and zooming back out makes it disappear
 again — zero console errors throughout.
 
-**Stage 3 — Multi-Level Depth & Blending**
-Extend to `MAX_LOD_DEPTH` real nested levels; add cross-fade/scale
-blending across threshold crossings so the transition reads as
-continuous rather than a pop. Verify depth never exceeds the cap and the
-transition looks smooth at ordinary movement speed (real Playwright
-screenshots at multiple distances, not just code review).
+**Stage 3 — Multi-Level Depth & Blending — DONE, 2026-08-13.** Extended to
+a real second nested level (`MAX_LOD_DEPTH = 2`) with cross-fade/scale
+blending across every threshold crossing, both the base reveal (world
+cell → depth-1 sub-lattice) and the recursive one (depth-1 sub-cell →
+depth-2 sub-sub-lattice).
+
+`latticezoom.js` grew a general, non-integer-coordinate core
+(`generateSubLatticeAt(parentCenter, parentScale, maxShell)`) that
+`generateSubLattice` (the original top-level-only call shape) now just
+delegates to -- this is what makes recursion possible at all: a depth-1
+sub-cell's own real `worldPosition`/`scale` (both already returned per
+cell) feeds straight back in as the "parent" for depth 2, zero special-
+casing between levels. `selectNearbyByWorldPosition` is the same
+generalization for the selection side (`selectNearbyCells` itself
+untouched, still used for the top-level/depth-1 case). `levelTriggerDistance`
+and `blendFactor` are the two new pure functions Stage 3 actually needed:
+a deeper level's trigger distance AND blend width both shrink by the
+SAME `subScaleFactor` the geometry itself shrinks by (self-similar reveal
+ratio at every depth, not a second unrelated set of numbers per level),
+and `blendFactor` is a plain linear ramp (1.0 at/inside the inner
+trigger, 0.0 at/beyond `inner + blendWidth`).
+
+`render.js` wiring: a second fixed-capacity `InstancedMesh` (`level2Mesh`,
+same "no allocation/disposal after one-time setup" pattern as level 1,
+reusing `subLatticeMaterial` unmodified per governing decision 3's
+"uniform substructure" -- no new color invented per depth).
+`refreshSubLattice` now computes a real blend value per PARENT (using the
+`.d` distance `selectNearbyCells`/`selectNearbyByWorldPosition` already
+attach to each result) and applies it as a uniform SCALE multiplier to
+every sub-cell that parent reveals, via a shared `writeBlendedInstance`
+helper -- a whole-parent fade, not each of its own sub-cells dissolving
+independently (which would read as the sub-lattice partially melting
+rather than the parent smoothly resolving into it). `SUB_LATTICE_BLEND_
+WIDTH`/`LEVEL2_BLEND_WIDTH` are grounded as roughly one cell-width of
+that level's own geometry (the fade completes over about the distance
+the cell itself spans) -- `levelTriggerDistance` reused verbatim for the
+depth-2 blend width too, which happens to come out exactly equal to
+`level2Scale`, confirming the grounding holds at depth as well as at the
+base. `MAX_NEARBY_LEVEL2_PARENTS = 4`: `LEVEL2_TRIGGER_DISTANCE` is
+already ~0.26x the depth-1 trigger (`subScaleFactor(2) = cbrt(1/55)`), so
+only a small handful of depth-1 cells can ever be that close to the
+camera at once -- same "real cap grounded in reasoned cost" discipline
+as `MAX_NEARBY_SUBLATTICE_CELLS`.
+
+Verified via `node --test` (6 new tests in `latticezoom.test.mjs` --
+delegation parity between `generateSubLattice`/`generateSubLatticeAt`,
+real recursion positioning a level-2 sub-lattice at a level-1 cell's own
+center rather than the top-level parent's, `selectNearbyByWorldPosition`
+parity, `levelTriggerDistance`'s self-similar shrink, `blendFactor`'s
+ramp/monotonicity -- 155 total, all passing) and a real Playwright run
+(`chromium`, driving actual mouse-wheel zoom over the canvas, not a
+hardcoded camera jump): default zoom shows a single solid block; a fine-
+grained zoom sequence shows the depth-1 sub-lattice revealing with a
+visibly irregular (distance-based, not a flat clipping plane) boundary
+as the camera approaches, then genuinely smaller depth-2 facets appearing
+nested within it at closer range still -- both confirmed by eye in the
+actual screenshots, not inferred from code; zoomed back out, both meshes'
+`.count` return to empty (no stuck/leaked geometry); zero console/page
+errors throughout. One real gotcha hit while WRITING that Playwright
+script, not in `render.js` itself: `#controls`/`#shells-panel` are fixed-
+position overlay divs with their own `overflow-y: auto`, so a wheel event
+dispatched at the viewport's visual center lands ON the panel and scrolls
+IT instead of reaching the canvas/OrbitControls -- the first verification
+attempt silently zoomed nothing at all for exactly this reason, caught
+only because the "close zoom" screenshot looked identical to the default
+one. Fixed by targeting a screen point clear of both panels. Logged in
+`.claude/skills/browser-test-harness/SKILL.md` so a future session
+driving OrbitControls zoom via Playwright doesn't lose time to the same
+thing.
 
 **Stage 4 — Adaptive Damping**
 Implement the volatility-driven recompute-throttle widening (section 5).

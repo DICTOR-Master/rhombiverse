@@ -7,8 +7,13 @@ import {
   cumulativeCellCount,
   subScaleFactor,
   generateSubLattice,
+  generateSubLatticeAt,
   SUB_LATTICE_MAX_SHELL,
   selectNearbyCells,
+  selectNearbyByWorldPosition,
+  MAX_LOD_DEPTH,
+  levelTriggerDistance,
+  blendFactor,
 } from '../../src/latticezoom.js';
 import { shellCount, isValidCell, cellToWorld } from '../../src/lattice.js';
 
@@ -145,4 +150,68 @@ test('selectNearbyCells: real distance is available on each returned entry, sort
     assert.ok(chosen[i].d >= chosen[i - 1].d, 'results must be sorted nearest-first');
   }
   assert.equal(chosen[0].x, 1);
+});
+
+// ============================================================
+// Stage 3 -- Multi-Level Depth & Blending
+// ============================================================
+
+test('generateSubLatticeAt: the general core produces IDENTICAL output to generateSubLattice for the same parent, proving the wrapper is a true delegation, not a re-derivation', () => {
+  const viaWrapper = generateSubLattice(2, -1, 3, 2, 1.5);
+  const viaCore = generateSubLatticeAt([2 * 1.5, -1 * 1.5, 3 * 1.5], 1.5, 2);
+  assert.deepEqual(viaWrapper, viaCore);
+});
+
+test('generateSubLatticeAt: real recursion -- a level-1 sub-cell\'s own worldPosition/scale fed back in produces a genuinely nested level-2 sub-lattice, positioned relative to the level-1 cell (not the original top-level parent)', () => {
+  const level1 = generateSubLattice(0, 0, 0, 1, 1);
+  const aLevel1Cell = level1.find((c) => c.shell === 1);
+  const level2 = generateSubLatticeAt(aLevel1Cell.worldPosition, aLevel1Cell.scale, 1);
+  // The level-2 center must sit exactly at the level-1 cell's own real
+  // position -- not the top-level parent's.
+  const level2Center = level2.find((c) => c.shell === 0);
+  assert.deepEqual(level2Center.worldPosition, aLevel1Cell.worldPosition);
+  // And level-2 cells are meaningfully SMALLER/closer together than
+  // level-1 ones -- real nested detail, not a same-scale duplicate.
+  assert.ok(aLevel1Cell.scale > 0);
+  assert.ok(level2[1].scale < aLevel1Cell.scale);
+});
+
+test('selectNearbyByWorldPosition: same real distance-based selection as selectNearbyCells, generalized to pre-positioned items (the recursive level-2 case)', () => {
+  const items = [
+    { id: 'near', worldPosition: [1, 0, 0] },
+    { id: 'far', worldPosition: [10, 0, 0] },
+  ];
+  const chosen = selectNearbyByWorldPosition(items, [0, 0, 0], 3, 20);
+  assert.equal(chosen.length, 1);
+  assert.equal(chosen[0].id, 'near');
+});
+
+test('levelTriggerDistance: depth 1 returns exactly the base distance; deeper levels shrink proportionally to how the geometry itself shrinks (self-similar reveal ratio at every depth)', () => {
+  const base = 4;
+  assert.equal(levelTriggerDistance(base, 1), base);
+  const factor = subScaleFactor(SUB_LATTICE_MAX_SHELL);
+  assert.ok(Math.abs(levelTriggerDistance(base, 2) - base * factor) < 1e-9);
+  assert.ok(levelTriggerDistance(base, 2) < levelTriggerDistance(base, 1), 'deeper levels must have a strictly smaller trigger radius');
+});
+
+test('MAX_LOD_DEPTH is a real, fixed, positive bound', () => {
+  assert.equal(typeof MAX_LOD_DEPTH, 'number');
+  assert.ok(MAX_LOD_DEPTH >= 1);
+});
+
+test('blendFactor: 1.0 at or inside the inner trigger, 0.0 at or beyond the outer edge, real linear ramp in between (not a hard pop)', () => {
+  assert.equal(blendFactor(0, 4, 1), 1);
+  assert.equal(blendFactor(4, 4, 1), 1);
+  assert.equal(blendFactor(5, 4, 1), 0);
+  assert.equal(blendFactor(10, 4, 1), 0);
+  const mid = blendFactor(4.5, 4, 1);
+  assert.ok(mid > 0 && mid < 1, `expected a real intermediate value in the blend band, got ${mid}`);
+  assert.ok(Math.abs(mid - 0.5) < 1e-9, 'exact midpoint of the blend band must be exactly 0.5 (linear ramp)');
+});
+
+test('blendFactor: monotonically decreasing as distance increases through the blend band -- a real continuous ramp, not a step function', () => {
+  const samples = [4, 4.2, 4.4, 4.6, 4.8, 5].map((d) => blendFactor(d, 4, 1));
+  for (let i = 1; i < samples.length; i++) {
+    assert.ok(samples[i] <= samples[i - 1], `blendFactor must never increase as distance grows: ${samples}`);
+  }
 });

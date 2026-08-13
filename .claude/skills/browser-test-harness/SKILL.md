@@ -76,3 +76,14 @@ shortcut is tied to genuine trusted input and doesn't fire from
 automation — not an app bug; real physical Escape presses do trigger it).
 Call `document.exitPointerLock()` directly via `page.evaluate()` to
 simulate what a real Escape does at the browser-chrome level instead.
+
+Known gotcha, found verifying Lattice Zoom Stage 3 (2026-08-13): `page.
+mouse.wheel()` dispatched at the viewport's visual center can silently
+zoom nothing at all. `#controls` (left) and `#shells-panel` (top-right)
+are real fixed-position overlay divs with their own `overflow-y: auto`;
+a wheel event landing on either scrolls THAT panel instead of reaching
+the canvas/OrbitControls underneath, and it fails quietly — no error, no
+exception, just an unchanged screenshot that's easy to misread as "the
+camera didn't move yet, zoom more." Target a screen point clearly clear
+of both panels (e.g. `boundingBox().x + width*0.8, y + height*0.75` at a
+1000×800 viewport) before trusting a wheel-driven zoom test.

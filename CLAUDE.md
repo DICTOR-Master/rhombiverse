@@ -2591,6 +2591,40 @@ claimed as the spec's own fixed answer, since the spec explicitly left
 them open. **Not yet started**: `RHOMBIVERSE_SPEC_LATTICE_ZOOM.md`, all
 six stages — still just the drafted spec doc, per the handoff above.
 
+**Lattice Zoom Stages 1-3 done, 2026-08-13 (later the same day as the
+"Not yet started" note above -- that note is now stale; Stages 1/2 were
+built and committed after it was written, Stage 3 in this pass).** Stage
+1 (static sub-lattice geometry) and Stage 2 (camera-distance trigger &
+lifecycle) are each their own commit, both DONE per their own dated
+entries in `docs/RHOMBIVERSE_SPEC_LATTICE_ZOOM.md`'s own Build Order
+section -- read that doc's Stage 1/2/3 entries directly rather than this
+pointer for the real detail (every tuned constant's derivation, the
+InstancedMesh reuse pattern, real bugs found). Stage 3 (multi-level depth
++ blending) picked up mid-flight: a prior session had already written
+Stage 3's pure logic (`generateSubLatticeAt`, `selectNearbyByWorldPosition`,
+`MAX_LOD_DEPTH`, `levelTriggerDistance`, `blendFactor`, plus their unit
+tests) but left it uncommitted and NOT wired into `render.js` -- this
+session verified that logic still passed (`node --test`, all green),
+wrote the actual `render.js` wiring (a second fixed-capacity
+`InstancedMesh` for the recursive depth-2 layer, real per-parent
+distance-driven blend scale on both levels), and verified the result with
+a real Playwright run (fine-grained wheel-zoom screenshot sequence,
+confirmed by eye: the depth-1 reveal boundary is visibly irregular/
+distance-based rather than a flat clipping plane, and genuinely smaller
+depth-2 facets appear nested within it at closer range still). Zero
+console/page errors, both meshes' `.count` returns to 0 on zoom-out (no
+leaked geometry). Full detail, including the one real gotcha hit while
+writing the verification script itself (not a `render.js` bug -- see
+`.claude/skills/browser-test-harness/SKILL.md`'s own new entry), is in
+`RHOMBIVERSE_SPEC_LATTICE_ZOOM.md`'s Stage 3 section. **Not committed
+yet** -- `src/latticezoom.js`, `src/render.js`, `tests/unit/latticezoom.
+test.mjs`, this file, the spec doc, and the skill doc all have real
+uncommitted changes as of this entry.
+
+Stages 4 (Adaptive Damping) and 5-6 (Ecosystem/Landscape Rendering) of
+Lattice Zoom remain genuinely unstarted -- see the spec doc's own Build
+Order section for what each actually requires.
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.

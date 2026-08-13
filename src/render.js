@@ -10,10 +10,15 @@ import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell } from './lattice.js';
 import {
   generateSubLattice,
+  generateSubLatticeAt,
   SUB_LATTICE_MAX_SHELL,
   cumulativeCellCount,
   subScaleFactor,
   selectNearbyCells,
+  selectNearbyByWorldPosition,
+  MAX_LOD_DEPTH,
+  levelTriggerDistance,
+  blendFactor,
 } from './latticezoom.js';
 import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController, removeShell, recolorShell } from './build.js';
@@ -755,6 +760,54 @@ async function init() {
   subLatticeMesh.count = 0;
   scene.add(subLatticeMesh);
 
+  // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 3 -- Multi-Level Depth &
+  // Blending, level 2 (the sub-sub-lattice, MAX_LOD_DEPTH's own second
+  // and -- per that constant's own reasoning -- last level for this
+  // pass). Same "one shared, fixed-capacity InstancedMesh" pattern as
+  // level 1 above, just hung off individual depth-1 sub-cells instead of
+  // top-level world cells. Reuses subLatticeMaterial unmodified (governing
+  // decision 3, "uniform substructure": every level repeats the exact same
+  // material, not a new color invented per depth).
+  //
+  // LEVEL2_TRIGGER_DISTANCE shrinks from the depth-1 trigger by the SAME
+  // subScaleFactor the geometry itself shrinks by (levelTriggerDistance's
+  // own doc comment) -- self-similar reveal ratio at every depth, not a
+  // second unrelated number picked freehand.
+  //
+  // MAX_NEARBY_LEVEL2_PARENTS (4): LEVEL2_TRIGGER_DISTANCE is already
+  // ~0.26x the depth-1 trigger (subScaleFactor(2) = cbrt(1/55)), so only
+  // whatever handful of depth-1 sub-cells are already extremely close to
+  // the camera can ever qualify -- a small bounded cap, same "real cap
+  // grounded in reasoned cost, not arbitrary" discipline as
+  // MAX_NEARBY_SUBLATTICE_CELLS above.
+  const LEVEL2_TRIGGER_DISTANCE = levelTriggerDistance(SUB_LATTICE_TRIGGER_DISTANCE, 2, SUB_LATTICE_MAX_SHELL);
+  const MAX_NEARBY_LEVEL2_PARENTS = 4;
+  const level2Scale = subLatticeScale * subScaleFactor(SUB_LATTICE_MAX_SHELL);
+  const level2Geometry = buildRDGeometry(level2Scale);
+  const level2Mesh = new THREE.InstancedMesh(
+    level2Geometry,
+    subLatticeMaterial,
+    MAX_NEARBY_LEVEL2_PARENTS * SUB_LATTICE_CELLS_PER_PARENT
+  );
+  level2Mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  level2Mesh.count = 0;
+  scene.add(level2Mesh);
+
+  // Blend width per level (section 3's own "not a hard pop" requirement,
+  // via latticezoom.js's blendFactor): grounded as roughly ONE cell-width
+  // of that level's own geometry -- the fade completes over about the
+  // same distance the cell itself spans, a physically meaningful zone
+  // rather than an arbitrary fraction of the trigger distance. Deeper
+  // levels shrink their own blend width by the SAME subScaleFactor as
+  // their trigger distance (levelTriggerDistance reused verbatim for
+  // this, per its own doc comment: "trigger distance and blend width are
+  // the SAME real fraction... as the geometry itself shrinks by") -- and
+  // that self-similar formula happens to make LEVEL2_BLEND_WIDTH come out
+  // exactly equal to level2Scale too, confirming the grounding holds at
+  // depth as well as at the base.
+  const SUB_LATTICE_BLEND_WIDTH = subLatticeScale;
+  const LEVEL2_BLEND_WIDTH = levelTriggerDistance(SUB_LATTICE_BLEND_WIDTH, 2, SUB_LATTICE_MAX_SHELL);
+
   // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md section 5 (Adaptive Damping) --
   // Stage 4's own job to make this widen under rapid repeated triggers;
   // this module-level mutable throttle value is the real extension point
@@ -764,29 +817,56 @@ async function init() {
   let lastSubLatticeRefresh = 0;
   const subLatticeDummy = new THREE.Object3D();
 
+  // Writes one blended instance into `mesh` at `idx`: position at the
+  // cell's real world center, uniform SCALE set to `blend` (1 = full
+  // size, shrinking toward 0 as the cell approaches its outer fade
+  // distance) -- Stage 3's own cross-fade mechanism, a single shared
+  // helper so level 1 and level 2 apply it identically.
+  function writeBlendedInstance(mesh, idx, worldPosition, blend) {
+    subLatticeDummy.position.set(...worldPosition);
+    subLatticeDummy.scale.setScalar(blend);
+    subLatticeDummy.updateMatrix();
+    mesh.setMatrixAt(idx, subLatticeDummy.matrix);
+  }
+
   // Recomputes which built cells are near enough to the camera (or the
   // live player position while walking) to reveal sub-lattice detail,
   // closest-first up to the real MAX_NEARBY_SUBLATTICE_CELLS bound, and
   // rewrites the shared InstancedMesh's own instance buffer in place --
   // no allocation, no disposal, ever, after the one-time setup above.
+  //
+  // Stage 3: each PARENT's own real distance (already computed by
+  // selectNearbyCells/selectNearbyByWorldPosition as `.d`) drives a
+  // single uniform blend factor applied to every sub-cell that parent
+  // reveals -- a clean whole-parent fade rather than each of its own
+  // sub-cells dissolving independently, which would read as the
+  // sub-lattice partially melting rather than the parent smoothly
+  // resolving into it. Also recurses one further level (up to
+  // MAX_LOD_DEPTH): whichever depth-1 sub-cells are themselves close
+  // enough to the reference position get their own depth-2 sub-sub-
+  // lattice, generated via generateSubLatticeAt/selectNearbyByWorldPosition
+  // (the general, non-integer-coordinate cores Stage 3 added), the exact
+  // same real recursion the unit tests already proved correct.
   function refreshSubLattice() {
     const camPos = walking && player ? player.getPosition() : camera.position;
+    const refPos = [camPos.x, camPos.y, camPos.z];
     const chosen = selectNearbyCells(
       world.entries(),
-      [camPos.x, camPos.y, camPos.z],
-      SUB_LATTICE_TRIGGER_DISTANCE,
+      refPos,
+      SUB_LATTICE_TRIGGER_DISTANCE + SUB_LATTICE_BLEND_WIDTH,
       MAX_NEARBY_SUBLATTICE_CELLS,
       SCALE
     );
 
     let idx = 0;
+    const level1Cells = [];
     for (const parent of chosen) {
+      const blend = blendFactor(parent.d, SUB_LATTICE_TRIGGER_DISTANCE, SUB_LATTICE_BLEND_WIDTH);
       const subCells = generateSubLattice(parent.x, parent.y, parent.z, SUB_LATTICE_MAX_SHELL, SCALE);
       for (const sub of subCells) {
-        subLatticeDummy.position.set(...sub.worldPosition);
-        subLatticeDummy.updateMatrix();
-        subLatticeMesh.setMatrixAt(idx, subLatticeDummy.matrix);
+        writeBlendedInstance(subLatticeMesh, idx, sub.worldPosition, blend);
         idx++;
+        level1Cells.push(sub);
       }
     }
     subLatticeMesh.count = idx;
@@ -798,6 +878,27 @@ async function init() {
     // mining only, sub-lattice is purely visual for this whole spec's
     // current scope) -- cheap insurance regardless, same as Stage 1.
     subLatticeMesh.computeBoundingSphere();
+
+    let idx2 = 0;
+    if (MAX_LOD_DEPTH >= 2) {
+      const chosen2 = selectNearbyByWorldPosition(
+        level1Cells,
+        refPos,
+        LEVEL2_TRIGGER_DISTANCE + LEVEL2_BLEND_WIDTH,
+        MAX_NEARBY_LEVEL2_PARENTS
+      );
+      for (const parent of chosen2) {
+        const blend2 = blendFactor(parent.d, LEVEL2_TRIGGER_DISTANCE, LEVEL2_BLEND_WIDTH);
+        const subCells2 = generateSubLatticeAt(parent.worldPosition, parent.scale, SUB_LATTICE_MAX_SHELL);
+        for (const sub of subCells2) {
+          writeBlendedInstance(level2Mesh, idx2, sub.worldPosition, blend2);
+          idx2++;
+        }
+      }
+    }
+    level2Mesh.count = idx2;
+    level2Mesh.instanceMatrix.needsUpdate = true;
+    level2Mesh.computeBoundingSphere();
   }
   refreshSubLattice();
 

@@ -48,28 +48,40 @@ export function subScaleFactor(maxShell) {
 // job, not this one -- this constant is Stage 1's own fixed test value.
 export const SUB_LATTICE_MAX_SHELL = 2;
 
-// Given a parent cell's own integer lattice coordinate (and the SAME
-// `parentScale` render.js's top-level mesh already uses), generates its
-// sub-lattice: cellsInShells run from a fresh LOCAL origin (0,0,0) --
-// not the parent's own real coordinate, which keeps sub-cell coordinates
-// small and independent of where the parent actually sits in the world
-// -- then each sub-cell's real world position is the parent's own real
-// center plus that local offset scaled down by subScaleFactor. The
+// Real, general core: given ANY parent's real world CENTER + real scale
+// (not necessarily an integer top-level lattice coordinate), generates
+// its sub-lattice the same way every time. This is what makes Stage 3's
+// recursion possible -- a level-1 sub-cell's own `worldPosition`/`scale`
+// (below) can be fed straight back in as the "parent" for a level-2
+// sub-lattice, with zero special-casing between depths. `cellsInShells`
+// runs from a fresh LOCAL origin (0,0,0) -- not the parent's own real
+// coordinate, which keeps sub-cell coordinates small regardless of
+// depth -- then each sub-cell's real world position is the parent's own
+// real center plus that local offset scaled down by subScaleFactor. The
 // center sub-cell (shell 0) is added explicitly: cellsInShells (by
 // design, matching its own existing "shell fill" callers elsewhere in
 // this project) never returns the seed/center cell itself, only cells
 // discovered during BFS expansion -- so it needs to be added here the
 // same "never invisible" way plantSeed/generatePlanetoid already handle
 // their own center cell elsewhere in this codebase.
-export function generateSubLattice(parentX, parentY, parentZ, maxShell = SUB_LATTICE_MAX_SHELL, parentScale = 1) {
+export function generateSubLatticeAt(parentCenter, parentScale, maxShell = SUB_LATTICE_MAX_SHELL) {
   const factor = subScaleFactor(maxShell);
   const subScale = parentScale * factor;
-  const [px, py, pz] = cellToWorld(parentX, parentY, parentZ, parentScale);
+  const [px, py, pz] = parentCenter;
   const localCells = [{ x: 0, y: 0, z: 0, shell: 0 }, ...cellsInShells(0, 0, 0, maxShell)];
   return localCells.map((cell) => {
     const [lx, ly, lz] = cellToWorld(cell.x, cell.y, cell.z, subScale);
     return { x: cell.x, y: cell.y, z: cell.z, shell: cell.shell, worldPosition: [px + lx, py + ly, pz + lz], scale: subScale };
   });
+}
+
+// Thin wrapper for the TOP-level case (an integer lattice parent
+// coordinate, Stage 1/2's own original call shape) -- kept as its own
+// named function so every existing caller/test stays unchanged; just
+// resolves the parent's real world center via lattice.js's own
+// cellToWorld, then delegates to the general core above.
+export function generateSubLattice(parentX, parentY, parentZ, maxShell = SUB_LATTICE_MAX_SHELL, parentScale = 1) {
+  return generateSubLatticeAt(cellToWorld(parentX, parentY, parentZ, parentScale), parentScale, maxShell);
 }
 
 // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 2 -- Camera-Distance Trigger &
@@ -93,4 +105,62 @@ export function selectNearbyCells(cells, referencePosition, triggerDistance, max
   }
   nearby.sort((a, b) => a.d - b.d);
   return nearby.slice(0, maxCells);
+}
+
+// Same real selection logic as selectNearbyCells above, generalized to
+// operate on items that already carry a real `worldPosition` (a level-1
+// sub-cell, when selecting level-2 candidates) rather than an integer
+// lattice coordinate needing cellToWorld -- the recursive case Stage 3
+// needs. selectNearbyCells itself is left untouched (its own existing
+// callers/tests keep working byte-identical); this is the general core
+// underneath both.
+export function selectNearbyByWorldPosition(items, referencePosition, triggerDistance, maxCount) {
+  const [rx, ry, rz] = referencePosition;
+  const nearby = [];
+  for (const item of items) {
+    const [wx, wy, wz] = item.worldPosition;
+    const d = Math.hypot(wx - rx, wy - ry, wz - rz);
+    if (d <= triggerDistance) nearby.push({ ...item, d });
+  }
+  nearby.sort((a, b) => a.d - b.d);
+  return nearby.slice(0, maxCount);
+}
+
+// RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 3 -- Multi-Level Depth &
+// Blending.
+//
+// MAX_LOD_DEPTH=2 (sub-lattice, then sub-sub-lattice) -- per section 2's
+// own "2 or 3 is the likely practical range." Real reasoning, not
+// arbitrary: each deeper level's own trigger radius is scaled down by
+// the SAME subScaleFactor the geometry itself shrinks by (see
+// levelTriggerDistance below), so the number of simultaneously-active
+// deeper-level cells stays small by construction -- only whatever is
+// within an already-tiny radius of the camera can ever qualify. Picked
+// 2 rather than 3 to keep this pass's real cost/complexity bounded
+// (two InstancedMeshes, not three) while still proving genuine
+// recursion works, not just one extra fixed level -- revisit only if
+// real play ever shows a concrete need for a third depth.
+export const MAX_LOD_DEPTH = 2;
+
+// A deeper level's own trigger distance and blend width are the SAME
+// real fraction of its parent's own as the geometry itself shrinks by
+// (subScaleFactor) -- keeps the "reveal ratio" self-similar at every
+// depth rather than picking a second, unrelated set of numbers per
+// level.
+export function levelTriggerDistance(baseTriggerDistance, depth, maxShell = SUB_LATTICE_MAX_SHELL) {
+  return baseTriggerDistance * Math.pow(subScaleFactor(maxShell), depth - 1);
+}
+
+// Cross-fade/scale blending (section 3's own explicit "not a hard pop"
+// requirement): 1.0 (full scale) at or inside `innerTrigger`, ramping
+// LINEARLY down to 0.0 (invisible) at `innerTrigger + blendWidth`, and
+// exactly 0 beyond that -- render.js applies this as a uniform scale
+// multiplier on each instance's own transform, so a cell visibly grows
+// in as the camera approaches and shrinks back out as it retreats,
+// rather than popping in/out at a hard boundary.
+export function blendFactor(distance, innerTrigger, blendWidth) {
+  if (distance <= innerTrigger) return 1;
+  const outer = innerTrigger + blendWidth;
+  if (distance >= outer) return 0;
+  return (outer - distance) / blendWidth;
 }
