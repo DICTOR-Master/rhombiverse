@@ -2066,6 +2066,31 @@ must ease near this floor, never eliminate a lineage outright. Flagged
 in both stages' own task descriptions so it isn't designed in as an
 afterthought once population dynamics actually exist.
 
+**Claim territory visualization fixed to its real footprint shape,
+2026-08-13.** A player noticed claim territories visually overlapping on
+screen even though land allocation never actually does. Root cause:
+`refreshClaims()` rendered a wireframe sphere sized to `claimBoundingRadius`
+(the farthest single CORNER of a claim's footprint) — a real, much looser
+bound than the actual territory, which (since this lattice's own 12-
+neighbor adjacency is literally the rhombic dodecahedron's own face
+normals) is itself rhombic-dodecahedron-shaped, not spherical. Only got
+visible once claims grew 2-shell → 8-shell (the size increase above),
+since sphere volume scales with the cube of that much looser radius.
+New `regions.js` export `claimFootprintWorldVertices(claim, scale)`
+returns the real cell-center points of a claim's own footprint;
+`render.js` builds the exact true convex hull from them via
+`ConvexGeometry` (the same tool already used for every RD cell and every
+Penrose tile in this app) instead of a sphere — accurate by
+construction, not an improved estimate. Rendered as a solid, low-opacity
+fill (`depthWrite: false`, `DoubleSide`) rather than the old wireframe,
+per direct request, so overlapping claims read as legible translucent
+layering instead of wireframe noise. Verified live: zero console errors,
+a real screenshot shows a genuinely faceted (not smooth) low-opacity
+hull with the seed cell still visible through it, and all four claims
+currently in the live database load into the scene (confirmed via the
+claims-list text, which the same unconditional per-claim loop that
+builds the meshes also populates).
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.
