@@ -2509,6 +2509,88 @@ Evolution; if Animals' own trophic/habitat mechanics ever threaten a
 land/sea population, the same floor discipline applies, not a
 carve-out.
 
+**Growth Wave 2 + Evolution Stages 8-9 + Animals Stages A-F all done,
+2026-08-13, new session (picked up cold from the handoff above) — per
+direct instruction to build everything, not the prior session's own
+"defer some of this" recommendation.** `RHOMBIVERSE_SPEC_PENROSE_GROWTH.md`
+Wave 2 (`sapling`/`conifer`/`shrub`/`nautilus`/`scallop`/`spineling`/
+`cluster-frame`, each with its own tuned bias rather than a shared
+per-category one) shipped first, verified via the existing generic
+overlap test (now covering all 11 templates) plus real Playwright
+screenshots. `RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md` is now fully
+done: Stage 8 (shape-novelty moderation, comparing against the
+PRE-mutation genome so ordinary parent-blend distance never gets
+mistaken for a real novelty jump) and Stage 9 (the real Stage 1-7 catch-
+up engine wired into render.js for the first time — until this pass it
+was fully tested but 100% inert in the live game; two new `evo-*` Plant-
+mode species plant genome-bearing organisms with a randomly-drawn
+starting genome, no breeding UI). `RHOMBIVERSE_SPEC_ANIMALS.md` is now
+fully done, all six stages (species profiles/habitat placement,
+mobility, sexual reproduction, trophic herbivory+carnivory, habitat
+crossover, and a final full-verification pass) — see `src/animals.js`,
+a data layer on top of `evolution.js` (same one-directional-dependency
+shape as every prior layer). `landCreature`/`seaCreature` (plus an
+`evo-land-dino` large-carnivore preset, honoring an explicit "dinosaurs"
+request) are now real, evolving, reproducing, predating, occasionally-
+crossing-over Plant-mode species.
+
+**Real architectural pattern established this pass, reusable for any
+future per-species behavior**: rather than teaching `evolution.js`
+anything about animals, it gained three small, generic, optional
+override points on its own catch-up loop — `onGenerationStep` (a per-
+organism per-generation hook, used for movement + predation),
+`reproduceFn` (overrides the species-dispatch `reproduce` call, used for
+sexual mate-pairing scoped to `mobilityRange`), and
+`survivalProbabilityFn` (overrides `computeSurvivalProbability`, used
+for huntBias-blended herbivory/carnivory) — each defaulting to
+`evolution.js`'s own existing behavior, so every one of Stages 1-9's
+already-tested functions/tests stayed byte-identical. `animals.js`
+supplies all three; `evolution.js` still has zero knowledge animals
+exist. `mobilityRange`/`huntBias` live as SIBLING fields on the organism
+record, not nested inside `genome` — `clampGenome`/`mutateGenome`/
+`blendGenomes` are all hardcoded to the fixed 5-trait table by design,
+so nesting new traits there would silently strip them on every call.
+
+**Five real bugs found only by direct execution, not code review, worth
+remembering as a class**: (1) `plantOrganism`'s underlying seed reused
+the same species string as the organism's own dispatch species (e.g.
+`'amoeba'`), colliding with `growth.js`'s own `GROWTH_TEMPLATES['amoeba']`
+key — fixed by namespacing the seed's species as `organism:<species>`.
+(2) The periodic tick and on-load resolve only persisted to
+`localStorage` when a generation actually resolved (matching
+`applyGrowth`'s own pattern, correct THERE since `lastGrowthAt` is never
+touched without real growth) — wrong for evolution specifically, since a
+brand-new planetoid's clock baseline only exists in memory until saved;
+a reload before the first real generation resolved silently lost it.
+(3) Sexual selection's `selectMate` reads `organism.genome[trait]`,
+correct for plants' own `resourceEfficiency` but not for `huntBias`
+(a sibling field) — silently produced NaN weights and a broken near-
+uniform pick, caught by a 300-trial statistical test showing no real
+bias. (4) Habitat-crossover reclassification originally placed the
+offspring by uniformly sampling the whole (large, post-pressure)
+`mobilityRange` sphere — the region where the opposite habitat type is
+actually nearest shrinks as a fraction of that sphere exactly as
+`mobilityRange` grows, so it kept silently falling back to the (now
+invalid) old position; fixed by searching near the real, known boundary
+cell instead. (5) `resolveOneGeneration`'s own return statement only
+filtered by its own `toRemove` set, not by whether an organism still
+exists at all — Stage D's predation hook removes a DIFFERENT organism
+entirely outside that bookkeeping, leaving a "zombie" id lingering in
+every future generation's organism list forever (harmless internally,
+real for any caller enumerating "the current population").
+
+**Known, deliberate limitation, unchanged from the handoff above**:
+`organisms`/`planetoidEvolution` still have no Supabase sync path —
+evolving species are blocked outright from Shared World with an
+explanatory alert, same reasoning as before (the underlying seed would
+sync but not the organism record behind it). Animals Stage E's own
+genuinely-open design questions (boundary-adjacency radius, sustained-
+pressure generation count, reclassification threshold) were resolved
+with real, documented, grounded choices — flagged as tunable, not
+claimed as the spec's own fixed answer, since the spec explicitly left
+them open. **Not yet started**: `RHOMBIVERSE_SPEC_LATTICE_ZOOM.md`, all
+six stages — still just the drafted spec doc, per the handoff above.
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.
