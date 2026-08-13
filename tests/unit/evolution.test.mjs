@@ -38,6 +38,11 @@ import {
   localBiomassAvailability,
   SYMBIOSIS_MAX_BOOST,
   averageTraitValue,
+  planetoidKeyFor,
+  groupOrganismsByPlanetoid,
+  resolveCatchUpForAllPlanetoids,
+  snapshotGenomeForCarrying,
+  plantCarriedGenome,
 } from '../../src/evolution.js';
 import { createWorldStore } from '../../src/worldstate.js';
 
@@ -669,4 +674,121 @@ test('Convergent evolution (5.1, diagnostic): selection consistently favors the 
   assert.ok(validTrials >= trials * 0.5, `expected most trials to leave surviving organisms to measure, got ${validTrials}/${trials}`);
   assert.equal(highPopWins, validTrials, `expected the higher-starting-fitness population to end up >= population size every trial: ${highPopWins}/${validTrials}`);
   assert.equal(highAvgWins, validTrials, `expected the higher-starting-fitness population to keep >= average trait value every trial: ${highAvgWins}/${validTrials}`);
+});
+
+// ============================================================
+// Stage 6 -- Isolation Enforcement
+// ============================================================
+
+function seedTwoPlanetoids() {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  // Two real, independent BSG clusters far apart -- gravity.js's own
+  // findClusters requires actual adjacency-connected cells, and far
+  // enough apart that they can never be mistaken for the same cluster.
+  world.addCell(0, 0, 0, { material: 'blackstar-glassite' });
+  world.addCell(200, 200, 0, { material: 'blackstar-glassite' });
+  return world;
+}
+
+test('planetoidKeyFor: deterministic given the same centerOfMass', () => {
+  assert.equal(planetoidKeyFor([1.23, -4.56, 0]), planetoidKeyFor([1.23, -4.56, 0]));
+  assert.notEqual(planetoidKeyFor([0, 0, 0]), planetoidKeyFor([200, 200, 0]));
+});
+
+test('groupOrganismsByPlanetoid: organisms near different real planetoids land in different groups; same planetoid, same group', () => {
+  const world = seedTwoPlanetoids();
+  plantOrganism(world, 'near1a', 's1a', 'plant', {}, [1, 0, 0], 0);
+  plantOrganism(world, 'near1b', 's1b', 'plant', {}, [1.5, 0, 0], 0);
+  plantOrganism(world, 'near2', 's2', 'plant', {}, [201, 200, 0], 0);
+
+  const groups = groupOrganismsByPlanetoid(world, ['near1a', 'near1b', 'near2']);
+  const keys = Object.keys(groups);
+  assert.equal(keys.length, 2, `expected exactly 2 real planetoid groups, got ${keys.length}: ${JSON.stringify(groups)}`);
+  const groupOfNear1 = keys.find((k) => groups[k].includes('near1a'));
+  assert.ok(groups[groupOfNear1].includes('near1b'), 'organisms near the same planetoid should share a group');
+  assert.ok(!groups[groupOfNear1].includes('near2'), 'an organism near a DIFFERENT planetoid must not share the group');
+});
+
+test('resolveCatchUpForAllPlanetoids: a deliberately destabilized planetoid has ZERO measurable effect on a second, untouched planetoid', () => {
+  const world = seedTwoPlanetoids();
+
+  // Planetoid A: deliberately destabilized -- maxed mutationRate, many
+  // individuals, harsh scarcity (no water at all near it) to maximize
+  // volatility/genetic runaway risk.
+  const idsA = [];
+  for (let i = 0; i < 10; i++) {
+    const id = `a${i}`;
+    plantOrganism(world, id, `sa${i}`, 'plant', { mutationRate: 1, resourceEfficiency: 0.1, maturitySize: 3 }, [i * 0.3, 0, 0], 0);
+    idsA.push(id);
+  }
+
+  // Planetoid B: calm, healthy, far away.
+  const idsB = [];
+  for (let i = 0; i < 5; i++) {
+    const id = `b${i}`;
+    plantOrganism(world, id, `sb${i}`, 'plant', { mutationRate: 0.2, resourceEfficiency: 0.8, maturitySize: 3 }, [200 + i * 0.3, 200, 0], 0);
+    idsB.push(id);
+  }
+  world.addCell(200, 201, 0, { material: 'water' }); // real water for B's own neighborhood
+
+  const genomeSnapshotB = idsB.map((id) => JSON.stringify(world.getOrganisms()[id].genome));
+
+  const now = EVOLUTION_GENERATION_INTERVAL_MS * MAX_CATCHUP_GENERATIONS;
+  resolveCatchUpForAllPlanetoids(world, [...idsA, ...idsB], now);
+
+  // B's own surviving original organisms must be byte-identical to
+  // before A's own resolution ever ran -- not just "similar," EXACTLY
+  // unchanged, since A and B are resolved as fully separate groups with
+  // zero shared state.
+  for (let i = 0; i < idsB.length; i++) {
+    const stillThere = world.getOrganisms()[idsB[i]];
+    if (stillThere) {
+      assert.equal(JSON.stringify(stillThere.genome), genomeSnapshotB[i], `B's organism ${idsB[i]} genome changed -- isolation violated`);
+    }
+  }
+
+  // B's own planetoid evolution state must be independently keyed from A's.
+  const evoState = world.getPlanetoidEvolution();
+  const keys = Object.keys(evoState);
+  assert.equal(keys.length, 2, `expected 2 independently-tracked planetoid clocks, got ${keys.length}`);
+});
+
+test('resolveCatchUpForAllPlanetoids: running twice with an untouched second planetoid in between produces the SAME rngState for the untouched one (no cross-contamination over repeated calls)', () => {
+  const world = seedTwoPlanetoids();
+  plantOrganism(world, 'a0', 'sa0', 'plant', { maturitySize: 3 }, [0, 0, 0], 0);
+  plantOrganism(world, 'b0', 'sb0', 'plant', { maturitySize: 3 }, [200, 200, 0], 0);
+
+  const now1 = EVOLUTION_GENERATION_INTERVAL_MS * 5;
+  resolveCatchUpForAllPlanetoids(world, ['a0', 'b0'], now1);
+  const bStateAfterFirst = world.getPlanetoidEvolution()[Object.keys(world.getPlanetoidEvolution()).find((k) => k.includes('200.0'))];
+
+  // Resolve again, but only involving A's own organism this time (B not
+  // included in the id list at all -- simulating B being far outside
+  // whatever region is currently being resolved).
+  const now2 = EVOLUTION_GENERATION_INTERVAL_MS * 10;
+  resolveCatchUpForAllPlanetoids(world, ['a0'], now2);
+
+  const bStateAfterSecond = world.getPlanetoidEvolution()[Object.keys(world.getPlanetoidEvolution()).find((k) => k.includes('200.0'))];
+  assert.deepEqual(bStateAfterSecond, bStateAfterFirst, "B's own stored clock/rng must be untouched by a resolution pass that never included any of B's organisms");
+});
+
+test('snapshotGenomeForCarrying: contains ONLY species + genome, never live simulation state (tiles, generation, jolt tracking)', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'org1', 'seed1', 'plant', { growthRate: 0.7 }, [0, 0, 0], 0);
+  const snapshot = snapshotGenomeForCarrying(world, 'org1');
+  assert.deepEqual(Object.keys(snapshot).sort(), ['genome', 'species']);
+  assert.equal(snapshot.genome.growthRate, 0.7);
+});
+
+test('plantCarriedGenome: a genome carried to a brand-new location grows into a fully coherent structure, identical genome preserved', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'origOrg', 'origSeed', 'plant', { growthRate: 0.9, branchingAngle: 0.8, maturitySize: 10 }, [0, 0, 0], 0);
+  const snapshot = snapshotGenomeForCarrying(world, 'origOrg');
+
+  const { organism } = plantCarriedGenome(world, snapshot, 'carriedOrg', 'carriedSeed', [9999, 9999, 0], 0);
+  assert.deepEqual(organism.genome, snapshot.genome);
+  assert.deepEqual(world.getSeeds().carriedSeed.origin, [9999, 9999, 0]);
+
+  const coherence = verifyGenomeCoherence(snapshot.genome, snapshot.species, 13);
+  assert.ok(coherence.coherent, 'a carried genome must be exactly as coherent on its new planetoid as it was on the old one');
 });

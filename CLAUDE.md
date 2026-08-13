@@ -2349,6 +2349,49 @@ own idealized wording, not a workaround to make a flaky test pass.
 
 Verified via `node --test` (13 new tests, 72 total, all passing).
 
+**Evolution Stage 6 (Isolation Enforcement) done, 2026-08-13.** Every
+function through Stage 5 already only ever operated on an explicitly-
+passed organism id list — never a global "all organisms in the world"
+scan — so `resolveCatchUp` itself was already isolated by construction.
+This stage's real job was the grouping/keying that makes "resolve each
+planetoid independently" actually possible, plus the sanctioned cross-
+planetoid vector. `groupOrganismsByPlanetoid` reuses `gravity.js`'s own
+`computePlanetoids`/`nearestPlanetoid` (not a second clustering system)
+to sort organisms by whichever real planetoid their seed origin is
+nearest to. `planetoidKeyFor` derives a deterministic string key from a
+planetoid's own real `centerOfMass`, since `computePlanetoids`'s own
+`planetoid_N` ids are sequential and NOT stable across recomputes
+(cluster enumeration order can change between calls) — honestly flagged
+as an approximation (the key can drift if a planetoid's own BSG
+cell count/position shifts its center of mass across a rounding
+boundary), not a claim of perfect permanent identity tracking; a future
+pass tying it to a sticky anchor cell (the same pattern `blackhole.js`'s
+own "sticky core" already uses) would close that gap if it matters in
+practice. New `worldstate.js` key `planetoidEvolution` (parallel in
+shape to `organisms`/`seeds`) stores each planetoid's own
+`lastSimulated`/`rngState` independently — `resolveCatchUpForAllPlanetoids`
+resolves every group through its own `resolveCatchUp` call with zero
+shared state between them, which IS the isolation guarantee, not a
+special-cased check bolted on top.
+
+The one sanctioned cross-planetoid vector (seed-carrying): 
+`snapshotGenomeForCarrying` returns ONLY `{species, genome}` — never
+tiles, generation, or jolt-tracking state, matching the spec's own
+explicit "genome data only, never live simulation state." `
+plantCarriedGenome` plants it via the exact same `plantOrganism` path
+every other organism already uses — section 1.1's coherence bounds
+travel with the genome itself, so a carried genome needs no special-
+casing at the migration boundary, verified directly rather than assumed.
+
+Verified via `node --test` (6 new tests, 78 total, all passing): a
+deliberately destabilized 10-organism planetoid (maxed `mutationRate`,
+harsh scarcity) run through a full `MAX_CATCHUP_GENERATIONS` resolution
+alongside a calm, healthy second planetoid confirmed the second
+planetoid's surviving organisms are byte-identical to before — not just
+"similar," exactly unchanged — and that repeated resolution calls
+involving only one planetoid never touch the other's stored clock/rng
+state at all, even across multiple separate calls.
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.

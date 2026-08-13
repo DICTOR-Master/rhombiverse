@@ -21,6 +21,7 @@
 // staging).
 import { growSeed, tileWorldVertices, tilesOverlap, VALID_TRIPLES, GROWTH_TICK_MS } from './growth.js';
 import { cellToWorld } from './lattice.js';
+import { computePlanetoids, nearestPlanetoid } from './gravity.js';
 
 // Real, MEASURED bounds, not guessed -- verified 2026-08-13 with a
 // throwaway stress-test copy of growth.js (never committed) that
@@ -866,4 +867,110 @@ export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now 
     lastSimulated: lastSimulated + generations * EVOLUTION_GENERATION_INTERVAL_MS,
     generationsResolved: generations,
   };
+}
+
+// ============================================================
+// Stage 6 -- Isolation Enforcement
+// ============================================================
+// Section 6's own blast radius: an ecosystem crash/genetic runaway/
+// trophic collapse on one planetoid must never affect another. Every
+// function through Stage 5 already only ever operates on an explicitly-
+// passed organism id list (never a global "all organisms in the world"
+// scan), so the resolution ENGINE itself was already isolated by
+// construction -- this stage's real job is the grouping/keying that
+// makes "resolve each planetoid independently, never the whole world at
+// once" possible, plus the one sanctioned cross-planetoid vector
+// (genome-only seed carrying).
+
+function hashStringToSeed(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return h >>> 0;
+}
+
+// A deterministic string key for a planetoid, derived from its own real
+// centerOfMass (gravity.js's computePlanetoids) rather than that
+// module's own sequential `planetoid_N` id, which is NOT stable across
+// recomputes (cluster enumeration order can change between calls).
+// Honestly flagged limitation, not hidden: this key can drift if a
+// planetoid's own BSG cell count/position changes enough to shift its
+// center of mass across a rounding boundary between two resolutions --
+// acceptable for this stage's own actual scope (real isolation BETWEEN
+// distinct planetoids), not a claim of perfect permanent identity
+// tracking across arbitrary structural edits. A future pass tying this
+// to a sticky anchor cell (the same pattern blackhole.js's own "sticky
+// core" already uses) would close that gap if it ever matters in
+// practice.
+export function planetoidKeyFor(centerOfMass) {
+  const [x, y, z] = centerOfMass;
+  return `planetoid_${x.toFixed(1)}_${y.toFixed(1)}_${z.toFixed(1)}`;
+}
+
+// Groups organism ids by whichever real planetoid (gravity.js's own
+// clustering) each one's seed origin is nearest to. Organisms with no
+// planetoid at all nearby are grouped under a single 'unowned' bucket --
+// fine for isolation purposes (an unowned organism's resolution still
+// never touches a real planetoid's state), just not eligible for a
+// persistent per-planetoid clock.
+export function groupOrganismsByPlanetoid(world, organismIds) {
+  const planetoids = computePlanetoids(world);
+  const groups = {};
+  for (const organismId of organismIds) {
+    const organism = world.getOrganisms()[organismId];
+    const seed = organism && world.getSeeds()[organism.seedId];
+    if (!organism || !seed) continue;
+    const nearest = nearestPlanetoid({ x: seed.origin[0], y: seed.origin[1], z: seed.origin[2] }, planetoids);
+    const key = nearest ? planetoidKeyFor(nearest.centerOfMass) : 'unowned';
+    (groups[key] ??= []).push(organismId);
+  }
+  return groups;
+}
+
+// Resolves EVERY planetoid's own catch-up independently -- the real
+// isolation enforcement. Each group gets its own lastSimulated/rngState
+// (persisted per-planetoid via world.getPlanetoidEvolution/
+// setPlanetoidEvolution) and its own resolveCatchUp call, so nothing
+// about how volatile/crashed/jolt-boosted one planetoid's population is
+// can leak into another's rng sequence, generation count, or population
+// -- there is no shared state between two groups' resolution at all, by
+// construction, not by a special-cased guard. A planetoid resolved for
+// the first time seeds its own rng from a hash of its own key (not a
+// shared constant like 0), so two different never-before-resolved
+// planetoids don't coincidentally start from identical rng sequences.
+export function resolveCatchUpForAllPlanetoids(world, organismIds, now = Date.now()) {
+  const groups = groupOrganismsByPlanetoid(world, organismIds);
+  const results = {};
+  for (const [planetoidKey, ids] of Object.entries(groups)) {
+    const stored = world.getPlanetoidEvolution()[planetoidKey] ?? { lastSimulated: now, rngState: hashStringToSeed(planetoidKey) };
+    const result = resolveCatchUp(world, ids, stored.lastSimulated, stored.rngState, now);
+    world.setPlanetoidEvolution(planetoidKey, { lastSimulated: result.lastSimulated, rngState: result.rngState });
+    results[planetoidKey] = result;
+  }
+  return results;
+}
+
+// Section 6's ONE sanctioned cross-planetoid vector: a player carries an
+// organism's GENOME ONLY (never live simulation state -- no tiles, no
+// generation, no jolt/condition tracking) to plant fresh elsewhere.
+// Mirrors RHOMBIVERSE_SPEC_TRADE_INVENTORY.md's own existing "a player
+// holds a real item" shape rather than inventing a second carrying
+// mechanism -- this function is the data half of that; the inventory-UI
+// half is Stage 9's job.
+export function snapshotGenomeForCarrying(world, organismId) {
+  const organism = world.getOrganisms()[organismId];
+  if (!organism) return null;
+  return { species: organism.species, genome: clampGenome(organism.genome) };
+}
+
+// Plants a carried genome snapshot as a brand-new organism, typically on
+// a different planetoid than the one it was carried from. Coherence
+// bounds travel with the genome itself (section 1.1: they're a property
+// of the trait ranges, not of any one planetoid), so this needs no
+// special-casing at the migration boundary -- the exact same
+// genomeToPhenotype/growSeed path every other organism already uses
+// handles a carried genome correctly by construction.
+export function plantCarriedGenome(world, snapshot, organismId, seedId, origin, now = Date.now()) {
+  return plantOrganism(world, organismId, seedId, snapshot.species, snapshot.genome, origin, now);
 }

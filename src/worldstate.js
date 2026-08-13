@@ -71,6 +71,15 @@ export function createWorldStore(worldJSON, hooks = {}) {
   // (one-directional dependency, evolution.js imports growth.js, never
   // the reverse). `?? {}` so JSON from before this existed still loads.
   let organisms = { ...(worldJSON.organisms ?? {}) };
+  // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 6, 2026-08-13: per-
+  // planetoid catch-up state (lastSimulated/rngState), keyed by a
+  // deterministic string derived from that planetoid's own real
+  // centerOfMass -- see evolution.js's own planetoidKeyFor for the exact
+  // derivation and its honestly-flagged limits. Genuinely separate from
+  // `organisms` (which individuals exist) -- this is which PLANETOID's
+  // clock/rng an individual's resolution draws from. `?? {}` so JSON
+  // from before this existed still loads.
+  let planetoidEvolution = { ...(worldJSON.planetoidEvolution ?? {}) };
 
   return {
     has(x, y, z) {
@@ -266,6 +275,14 @@ export function createWorldStore(worldJSON, hooks = {}) {
       organisms = rest;
       hooks.onOrganismClear?.(organismId);
     },
+    // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 6: per-planetoid
+    // catch-up clock/rng, same set-by-key shape as organisms/seeds above.
+    getPlanetoidEvolution() {
+      return { ...planetoidEvolution };
+    },
+    setPlanetoidEvolution(planetoidKey, data) {
+      planetoidEvolution = { ...planetoidEvolution, [planetoidKey]: data };
+    },
     // Serializes back to the full RHOMBIVERSE_PLAN.md section 3 shape,
     // for persistence.js to save/export.
     toJSON() {
@@ -279,6 +296,7 @@ export function createWorldStore(worldJSON, hooks = {}) {
         pendingTrades,
         seeds,
         organisms,
+        planetoidEvolution,
         meta: { ...meta, lastModified: new Date().toISOString() },
       };
     },
@@ -293,6 +311,7 @@ export function createWorldStore(worldJSON, hooks = {}) {
       pendingTrades = { ...(newWorldJSON.pendingTrades ?? {}) };
       seeds = { ...(newWorldJSON.seeds ?? {}) };
       organisms = { ...(newWorldJSON.organisms ?? {}) };
+      planetoidEvolution = { ...(newWorldJSON.planetoidEvolution ?? {}) };
       cells.clear();
       for (const [key, data] of Object.entries(newWorldJSON.cells)) {
         cells.set(key, data);
