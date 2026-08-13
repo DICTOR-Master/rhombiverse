@@ -458,13 +458,106 @@ same tick, not a bug; the verification script had to poll for the decay
 rather than assume a fixed wait would be long enough, and that fixed-wait
 version genuinely failed on the first run before being corrected.
 
-**Stage 5 — Ecosystem Rendering (Real Organisms + Plant-Coverage Layer)**
-Requires Evolution Stage 4+ (real tracked organism population) to have
-real data to render. Render nearby real `organisms` as themselves at
-correct small scale; add the plant-coverage aggregate layer driven by
-that same population's real aggregate stats (section 6.1). Verify the
-layer's visible output actually changes when the underlying tracked
-population's stats change.
+**Stage 5 — Ecosystem Rendering (Real Organisms + Plant-Coverage Layer) —
+DONE, 2026-08-13.**
+
+Real design call made re-reading section 6.1's own text closely before
+building anything (not guessed, not asked either -- the text itself
+resolves it): "an organism is just more content that becomes visible
+once the camera is close enough for its actual (tiny) size to register
+at all" describes REPLACING an organism's existing always-visible,
+wrong-scale rendering with this stage's LOD-gated tiny version, not
+adding a second copy alongside the old one -- that always-visible
+rendering (Evolution Stage 9's own real, tested, shipped feature) WAS
+the literal "scale-mismatch problem the project owner raised" this
+section opens with (an amoeba/plant rendered via the same growth-tile
+pipeline as ordinary Penrose-growth content, at the same order of
+magnitude as a whole building block). `render.js`'s `rebuildSeedMeshes`
+now returns early (after clearing any stale mesh entry) for any seed
+whose `species` carries `evolution.js`'s own `ORGANISM_SEED_SPECIES_
+PREFIX` -- ordinary (non-organism) growth species are completely
+unaffected, still rendered exactly as before.
+
+**Tier 1 (a few real organisms, section 6.1):** a new `organismMiniGroup`
+(clear-and-rebuild `THREE.Group`, the SAME pattern `refreshClaims` already
+uses for "few, irregularly-shaped, real-hull-per-item" content -- not the
+sub-lattice's own many-identical-instances InstancedMesh shape, a
+deliberately different reuse than Stage 3/4's own). Every refresh, the
+closest `MAX_NEARBY_ORGANISMS` (20) real tracked organisms to the
+reference position (via `selectNearbyByWorldPosition` on each organism's
+own real seed origin, the exact same selection core Stage 3's recursion
+already uses) get their own EXISTING, already-correct growth-tile
+geometry (`tileWorldVertices`) reused outright -- just scaled DOWN around
+the organism's own real rooted position (`scaleVerticesAroundOrigin`,
+new pure helper) by the SAME ratio depth-1 sub-lattice cells shrink by
+(`subScaleFactor(SUB_LATTICE_MAX_SHELL)`), times that organism's own
+real distance-driven `blendFactor` -- so it fades in/out exactly like
+every other Lattice Zoom reveal, no separately-tuned fade. Organisms
+whose blend has decayed to exactly 0 are skipped rather than building a
+degenerate (every-vertex-collapsed-to-a-point) `ConvexGeometry`.
+
+**Tier 2 (aggregate/plant-coverage layer, section 6.1):** NOT
+independently tracked per instance, per section 6.1's own explicit
+governing decision -- section 10's own "leaning toward instanced
+geometry... for a first pass" is what got built: a new fixed-capacity
+`aggregateSpeckleMesh` (the SAME white-base-material + per-instance
+`setColorAt` pattern the TOP-LEVEL `mesh` already uses for cell tinting,
+reused verbatim rather than a second color mechanism). Density is driven
+directly by `evolution.js`'s own `localBiomassAvailability` (already
+[0,1]-normalized -- section 6.1's own explicit "reusing section 5's own
+biomass figure," a REAL existing function found and reused, not
+reinvented) evaluated at each revealed top-level parent's own real
+position, mapped to a speckle count via the new pure `speckleCountForBiomass`
+(0 biomass = 0 speckles, capped at `AGGREGATE_MAX_SPECKLES` = 8). Placed
+at that SAME parent's own already-generated depth-1 sub-cell positions
+(reusing real existing geometry rather than inventing a second scattering/
+jitter scheme), tinted by whichever species is locally dominant among
+real nearby organisms (`dominantSpecies`, new pure helper; falls back to
+a `'plant'` tint if biomass is nonzero but no organism happens to fall
+within the color-lookup radius specifically, since biomass is
+plant-sourced by construction).
+
+Verified via `node --test` (13 new pure-function tests in `latticezoom.
+test.mjs` -- `scaleVerticesAroundOrigin`'s identity/shrink/degenerate-
+collapse behavior, `dominantSpecies`'s real-majority and empty-list
+cases, `speckleCountForBiomass`'s monotonicity/clamping and this stage's
+own literal success check ["a real change in underlying population stats
+visibly changes the layer's output"] -- 170 total, all passing) AND a
+real Playwright run against the actual `render.js` wiring: planted a
+real `evo-plant` organism via the genuine Plant-mode UI, confirmed NO
+full-scale structure appears at normal view distance (before/after
+screenshots identical -- the scale-mismatch fix holding), then a
+temporary `window.__scratchStage5Debug()` hook (added for this one run,
+removed immediately after -- `render.js` carries no permanent debug
+surface) confirmed `organismMiniGroup`'s child count goes from 0 to 1
+partway through a real fine-grained zoom-in sequence -- the real
+organism genuinely appearing once close enough, not just theorized from
+the code. `aggregateSpeckleCount` correctly stayed 0 throughout that same
+run: a freshly-planted organism is IMMATURE (`isMature` requires real
+generations to resolve, which takes real elapsed time this short test
+window can't reach), so real local biomass is genuinely 0 -- expected,
+not a bug, and exactly the case the pure-function tests above already
+prove the formula handles correctly (0 biomass -> 0 speckles). A live
+demonstration of NONZERO aggregate speckles from a real matured
+population is flagged honestly as NOT verified in this session's
+timeframe, same "not yet live-playtested" honesty this project already
+applies to other feel-tuned/hard-to-reach-live states.
+
+Two real gotchas hit WRITING the verification script, neither a
+`render.js` bug: (1) `#controls` grows noticeably WIDER in Plant mode
+(the "Evolving..." optgroup/hint text) than in Build mode -- enough to
+cover a 1000px-wide viewport's exact center, silently swallowing the
+plant click with zero console error (same silent-swallow CLASS as the
+Stage 3 wheel-zoom gotcha already logged in `browser-test-harness/
+SKILL.md`, just for click instead of wheel, and mode-dependent this
+time). Widening the test viewport to 1600x900 cleared it. (2) The first
+planting attempt used an off-center click (an earlier, wrong attempt to
+dodge gotcha #1) -- this technically still plants an organism (the
+raycaster's own documented fallback: a fixed distance along the camera
+ray when nothing is hit), but far enough off-axis from `controls.target`
+that the later zoom-toward-target sequence never got close enough to
+reveal it, reading as a false "Tier 1 doesn't work" until traced back to
+the click position, not the rendering code.
 
 **Stage 6 — Landscape Aggregate State (Section 6.2)**
 Requires Evolution Stage 5 (biomass) to exist as real input. Add the

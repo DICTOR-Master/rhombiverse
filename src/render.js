@@ -22,6 +22,10 @@ import {
   SUB_LATTICE_THROTTLE_BASE_MS,
   nextVolatilityScore,
   throttleForVolatility,
+  scaleVerticesAroundOrigin,
+  dominantSpecies,
+  speckleCountForBiomass,
+  AGGREGATE_MAX_SPECKLES,
 } from './latticezoom.js';
 import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController, removeShell, recolorShell } from './build.js';
@@ -78,6 +82,7 @@ import {
   resolveCatchUpForAllPlanetoids,
   averageTraitValue,
   planetoidKeyFor,
+  localBiomassAvailability,
 } from './evolution.js';
 import {
   LAND_CREATURE_SPECIES,
@@ -827,6 +832,52 @@ async function init() {
   let lastSubLatticeRefresh = 0;
   const subLatticeDummy = new THREE.Object3D();
 
+  // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 5 -- Ecosystem Rendering.
+  //
+  // Tier 1 (section 6.1, "a few real organisms"): each real tracked
+  // organism is FEW and IRREGULARLY SHAPED (its own real growth-tile
+  // hull, not a shared uniform cell shape), the same real content class
+  // Stage 2's own doc comment already distinguishes from the sub-lattice
+  // cells above -- so this reuses `claimGroup`'s established "clear-and-
+  // rebuild THREE.Group, real convex-hull-per-item" pattern rather than a
+  // fixed-capacity InstancedMesh, not the sub-lattice's own pattern.
+  const organismMiniGroup = new THREE.Group();
+  scene.add(organismMiniGroup);
+  // Bounds worst-case per-refresh cost independent of total organism
+  // count, same "real cap grounded in reasoned cost" discipline as
+  // MAX_NEARBY_SUBLATTICE_CELLS/MAX_NEARBY_LEVEL2_PARENTS above.
+  const MAX_NEARBY_ORGANISMS = 20;
+
+  // Tier 2 (section 6.1, "aggregate/general layer"): NOT independently
+  // tracked per instance -- section 10's own "leaning toward instanced
+  // geometry... for a first pass," so this DOES reuse the sub-lattice's
+  // own fixed-capacity InstancedMesh + setColorAt pattern (the exact same
+  // white-base-material + per-instance-setColorAt shape the TOP-LEVEL
+  // `mesh` already uses for cell tinting, reused verbatim rather than a
+  // second color mechanism). Each revealed top-level parent gets up to
+  // AGGREGATE_MAX_SPECKLES speckles, placed at that SAME parent's own
+  // already-computed depth-1 sub-cell positions (reusing real existing
+  // geometry rather than inventing a second scattering/jitter scheme),
+  // sized deliberately smaller than a real depth-2 cell so a speckle is
+  // never mistaken for actual per-organism detail.
+  const aggregateSpeckleScale = level2Scale * 0.4;
+  const aggregateSpeckleGeometry = buildRDGeometry(aggregateSpeckleScale);
+  const aggregateSpeckleMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff, // identity multiplier -- real color comes entirely from setColorAt, same pattern as the top-level `mesh`
+    metalness: 0.1,
+    roughness: 0.7,
+    flatShading: true,
+  });
+  const aggregateSpeckleMesh = new THREE.InstancedMesh(
+    aggregateSpeckleGeometry,
+    aggregateSpeckleMaterial,
+    MAX_NEARBY_SUBLATTICE_CELLS * AGGREGATE_MAX_SPECKLES
+  );
+  aggregateSpeckleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  aggregateSpeckleMesh.count = 0;
+  scene.add(aggregateSpeckleMesh);
+  const aggregateSpeckleDummy = new THREE.Object3D();
+
   // Writes one blended instance into `mesh` at `idx`: position at the
   // cell's real world center, uniform SCALE set to `blend` (1 = full
   // size, shrinking toward 0 as the cell approaches its outer fade
@@ -837,6 +888,56 @@ async function init() {
     subLatticeDummy.scale.setScalar(blend);
     subLatticeDummy.updateMatrix();
     mesh.setMatrixAt(idx, subLatticeDummy.matrix);
+  }
+
+  // Stage 5, Tier 1 (section 6.1, "a few real organisms"): rebuilds the
+  // real tiny growth-structure for each real tracked organism close
+  // enough to the reference position, clear-and-rebuild same as
+  // refreshClaims (few, irregularly-shaped, real-hull-per-item content --
+  // not the sub-lattice's own many-identical-instances shape). Each
+  // organism's own EXISTING, already-correct tile geometry is reused
+  // outright (tileWorldVertices), just scaled down around its own real
+  // rooted position (seed.origin) by the SAME ratio depth-1 sub-lattice
+  // cells shrink by, times that organism's own real distance-driven
+  // blend -- so it fades in/out exactly like every other Lattice Zoom
+  // reveal, rather than a separately-tuned fade.
+  function refreshOrganismMiniatures(refPos) {
+    while (organismMiniGroup.children.length > 0) {
+      const group = organismMiniGroup.children[0];
+      organismMiniGroup.remove(group);
+      for (const child of group.children) {
+        child.geometry.dispose();
+        child.material.dispose();
+      }
+    }
+    const items = Object.values(organismsSnapshot)
+      .filter((o) => o.origin)
+      .map((o) => ({ worldPosition: o.origin, seedId: o.seedId }));
+    const chosen = selectNearbyByWorldPosition(
+      items,
+      refPos,
+      SUB_LATTICE_TRIGGER_DISTANCE + SUB_LATTICE_BLEND_WIDTH,
+      MAX_NEARBY_ORGANISMS
+    );
+    const baseFactor = subScaleFactor(SUB_LATTICE_MAX_SHELL);
+    for (const item of chosen) {
+      const blend = blendFactor(item.d, SUB_LATTICE_TRIGGER_DISTANCE, SUB_LATTICE_BLEND_WIDTH);
+      if (blend <= 0) continue; // degenerate (every vertex would collapse onto origin) -- skip rather than build a zero-size hull
+      const seed = world.getSeeds()[item.seedId];
+      if (!seed) continue;
+      const factor = baseFactor * blend;
+      const color = speciesColor(seed.species);
+      const group = new THREE.Group();
+      for (const tile of seed.tiles) {
+        const verts = scaleVerticesAroundOrigin(tileWorldVertices(seed, tile), seed.origin, factor).map(
+          ([x, y, z]) => new THREE.Vector3(x, y, z)
+        );
+        const geometry = new ConvexGeometry(verts);
+        const material = new THREE.MeshStandardMaterial({ color, flatShading: true });
+        group.add(new THREE.Mesh(geometry, material));
+      }
+      organismMiniGroup.add(group);
+    }
   }
 
   // Recomputes which built cells are near enough to the camera (or the
@@ -881,7 +982,9 @@ async function init() {
     );
 
     let idx = 0;
+    let speckleIdx = 0;
     const level1Cells = [];
+    const organismList = Object.values(organismsSnapshot);
     for (const parent of chosen) {
       const blend = blendFactor(parent.d, SUB_LATTICE_TRIGGER_DISTANCE, SUB_LATTICE_BLEND_WIDTH);
       const subCells = generateSubLattice(parent.x, parent.y, parent.z, SUB_LATTICE_MAX_SHELL, SCALE);
@@ -890,7 +993,42 @@ async function init() {
         idx++;
         level1Cells.push(sub);
       }
+
+      // Stage 5, Tier 2 (aggregate plant-coverage layer): real local
+      // biomass at THIS parent's own position drives how many speckles
+      // show here, placed at that same parent's own already-generated
+      // depth-1 sub-cell positions (reusing real geometry, not a second
+      // scattering scheme), tinted by whichever species is locally
+      // dominant among real nearby organisms (organism.species is never
+      // prefixed -- only its seed's species carries evolution.js's own
+      // "organism:" prefix -- so speciesColor needs that prefix added
+      // back on to reach the same _evolved color lookup normal organism
+      // rendering already uses).
+      const parentWorldPos = cellToWorld(parent.x, parent.y, parent.z, SCALE);
+      const biomass = localBiomassAvailability(world, parentWorldPos, Object.keys(organismsSnapshot));
+      const speckleCount = Math.min(speckleCountForBiomass(biomass), subCells.length);
+      if (speckleCount > 0) {
+        const nearbyForColor = organismList.filter((o) => {
+          if (!o.origin) return false;
+          const d = Math.hypot(o.origin[0] - parentWorldPos[0], o.origin[1] - parentWorldPos[1], o.origin[2] - parentWorldPos[2]);
+          return d <= SUB_LATTICE_TRIGGER_DISTANCE;
+        });
+        const dominant = dominantSpecies(nearbyForColor);
+        const speckleColor = speciesColor(dominant ? `${ORGANISM_SEED_SPECIES_PREFIX}${dominant}` : 'plant');
+        for (let i = 0; i < speckleCount; i++) {
+          aggregateSpeckleDummy.position.set(...subCells[i].worldPosition);
+          aggregateSpeckleDummy.scale.setScalar(blend);
+          aggregateSpeckleDummy.updateMatrix();
+          aggregateSpeckleMesh.setMatrixAt(speckleIdx, aggregateSpeckleDummy.matrix);
+          aggregateSpeckleMesh.setColorAt(speckleIdx, speckleColor);
+          speckleIdx++;
+        }
+      }
     }
+    aggregateSpeckleMesh.count = speckleIdx;
+    aggregateSpeckleMesh.instanceMatrix.needsUpdate = true;
+    if (aggregateSpeckleMesh.instanceColor) aggregateSpeckleMesh.instanceColor.needsUpdate = true;
+    aggregateSpeckleMesh.computeBoundingSphere();
     subLatticeMesh.count = idx;
     subLatticeMesh.instanceMatrix.needsUpdate = true;
     // Same real bug this project already found and fixed once for the
@@ -921,6 +1059,8 @@ async function init() {
     level2Mesh.count = idx2;
     level2Mesh.instanceMatrix.needsUpdate = true;
     level2Mesh.computeBoundingSphere();
+
+    refreshOrganismMiniatures(refPos);
   }
   refreshSubLattice();
 
@@ -1714,7 +1854,20 @@ async function init() {
         child.geometry.dispose();
         child.material.dispose();
       }
+      growthMeshesBySeed.delete(seedId);
     }
+    // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 5: a real tracked organism's
+    // seed is deliberately EXCLUDED from this always-visible, full-block-
+    // scale rendering -- this is the exact "scale-mismatch problem the
+    // project owner raised" section 6.1 opens with (an amoeba/plant
+    // rendered at the same order of magnitude as a whole building block).
+    // Stage 5's own refreshOrganismMiniatures below replaces it with a
+    // correctly tiny, LOD-gated version instead, reusing this exact same
+    // real tile geometry, just scaled down and only revealed once the
+    // camera is genuinely close. Ordinary (non-organism) growth species
+    // are completely unaffected -- this only skips seeds whose species
+    // carries evolution.js's own ORGANISM_SEED_SPECIES_PREFIX.
+    if (seed.species.startsWith(ORGANISM_SEED_SPECIES_PREFIX)) return;
     const group = new THREE.Group();
     const color = speciesColor(seed.species);
     for (const tile of seed.tiles) {

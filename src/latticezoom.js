@@ -239,3 +239,63 @@ export function throttleForVolatility(volatilityScore) {
     SUB_LATTICE_THROTTLE_BASE_MS + volatilityScore * SUB_LATTICE_THROTTLE_MS_PER_VOLATILITY
   );
 }
+
+// RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 5 -- Ecosystem Rendering (Real
+// Organisms + Plant-Coverage Layer). Pure geometry/aggregate helpers;
+// render.js supplies the real THREE-specific wiring and reads real
+// evolution.js data (organisms/biomass) -- same "business logic lives in
+// a pure module" split every prior stage already used.
+//
+// Real design call made re-reading section 6.1's own text closely (not
+// guessed): "an organism is just more content that becomes visible once
+// the camera is close enough for its actual (tiny) size to register at
+// all" -- this REPLACES an organism's existing always-visible, wrong-
+// scale rendering (the literal "scale-mismatch problem the project
+// owner raised" the section opens with) with this stage's LOD-gated tiny
+// version, rather than adding a second copy alongside the old one.
+
+// Scales a set of real world-space vertices DOWN around a fixed real
+// world-space origin -- shrinks an organism's own already-correct
+// growth-tile shape around its own rooted position, rather than
+// re-deriving its geometry from scratch at a different scale. factor=1
+// is a no-op; factor=0 collapses every vertex onto origin itself
+// (degenerate -- callers must skip building geometry from that output,
+// not feed it to a hull constructor).
+export function scaleVerticesAroundOrigin(vertices, origin, factor) {
+  const [ox, oy, oz] = origin;
+  return vertices.map(([x, y, z]) => [ox + (x - ox) * factor, oy + (y - oy) * factor, oz + (z - oz) * factor]);
+}
+
+// Which species has the most individuals among a real nearby organism
+// list -- the aggregate layer's own "dominant species" signal (section
+// 6.1). Ties broken by first-seen order (stable, not random): real ties
+// are rare with real population data, but a DETERMINISTIC break avoids
+// the aggregate layer's tint flickering between two colors frame to
+// frame on a near-tied population.
+export function dominantSpecies(organisms) {
+  if (organisms.length === 0) return null;
+  const counts = new Map();
+  for (const o of organisms) counts.set(o.species, (counts.get(o.species) ?? 0) + 1);
+  let best = null;
+  let bestCount = -1;
+  for (const [species, count] of counts) {
+    if (count > bestCount) {
+      best = species;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
+// Real, bounded instanced-speckle count for the aggregate plant-coverage
+// layer -- section 10's own "leaning toward instanced geometry...
+// cheaper, cruder... for a first pass," driven directly by evolution.js's
+// own localBiomassAvailability (already [0,1]-normalized -- section
+// 6.1's own "reusing section 5's own biomass figure"). AGGREGATE_MAX_
+// SPECKLES (8): a small, cheap, first-pass density range -- real per-cell
+// coverage visibly changes as biomass changes (this stage's own success
+// check) without rendering hundreds of instances per revealed cell.
+export const AGGREGATE_MAX_SPECKLES = 8;
+export function speckleCountForBiomass(biomassAvailability) {
+  return Math.round(Math.min(1, Math.max(0, biomassAvailability)) * AGGREGATE_MAX_SPECKLES);
+}

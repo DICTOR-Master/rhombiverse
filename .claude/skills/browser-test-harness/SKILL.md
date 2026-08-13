@@ -87,3 +87,24 @@ exception, just an unchanged screenshot that's easy to misread as "the
 camera didn't move yet, zoom more." Target a screen point clearly clear
 of both panels (e.g. `boundingBox().x + width*0.8, y + height*0.75` at a
 1000×800 viewport) before trusting a wheel-driven zoom test.
+
+Related gotcha, found verifying Lattice Zoom Stage 5 (2026-08-13): the
+same silent-swallow problem also hits `page.mouse.click()`, and `#controls`'
+real width is MODE-DEPENDENT — it grows noticeably wider in Plant mode
+(the "Evolving..." species optgroup/hint text) than in Build mode, enough
+to newly cover a 1000px-wide viewport's exact center even though that
+same point was clear in Build mode moments earlier. A click swallowed
+this way produces no error either — the click handler simply never
+fires, so whatever it was supposed to do (here, planting an organism)
+silently doesn't happen. Before trusting ANY click/wheel test against a
+specific screen point, verify with `document.elementFromPoint(x, y)`
+that the target really is the canvas (or whatever's expected), not an
+overlay div — don't assume a point that was clear in one mode/state
+stays clear in another. If the point needs to be genuinely centered
+(e.g. so a raycast-based click lands near `controls.target`/world
+origin, not just anywhere clickable), widen the viewport rather than
+shifting the click point off-center — an off-center click can still
+"work" via a raycaster's own fallback behavior (a fixed distance along
+the camera ray when nothing is hit) while landing far enough off-axis
+that a later zoom-toward-target sequence never reaches it, reading as a
+feature bug until traced back to the click position.

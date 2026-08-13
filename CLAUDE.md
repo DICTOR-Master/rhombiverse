@@ -2653,10 +2653,51 @@ genuinely decays back down again during a real held-still period
 afterward. **Not committed yet as of this entry** -- same files as
 Stage 3's own list, now with Stage 4's further changes on top.
 
-Stages 5-6 (Ecosystem/Landscape Rendering) of Lattice Zoom remain
-genuinely unstarted -- see the spec doc's own Build Order section for
-what each actually requires; both depend on Evolution's own Stage 4/5
-output, which is real and ready.
+**Lattice Zoom Stage 4 committed, Stage 5 (Ecosystem Rendering) done, same
+session, 2026-08-13** (the "Not committed yet" note directly above is now
+stale -- Stage 4 landed as its own commit, `Lattice Zoom Stage 4: adaptive
+damping on the recompute throttle`, before Stage 5 work started). Stage 5
+made one real, deliberate design call worth flagging here since it changes
+existing shipped behavior: a real tracked organism's seed (evolution.js's
+own `ORGANISM_SEED_SPECIES_PREFIX`) is now EXCLUDED from the always-
+visible, full-block-scale growth rendering Evolution Stage 9 shipped --
+that always-visible rendering WAS the literal scale-mismatch problem
+section 6.1 of the spec describes ("an organism is just more content
+that becomes visible once the camera is close enough... to register at
+all"), re-read closely rather than guessed. Organisms now render ONLY
+through two new Lattice-Zoom-gated layers: Tier 1, a real tiny copy of
+each nearby organism's own existing growth-tile geometry (reused outright,
+just scaled down around its own rooted position and blended in/out with
+distance, clear-and-rebuild `THREE.Group` same as `refreshClaims`); Tier
+2, an aggregate "plant-coverage" InstancedMesh of small speckles whose
+COUNT is driven by `evolution.js`'s own real `localBiomassAvailability`
+(a function that already existed, found and reused rather than
+reinvented) and whose color reflects the locally dominant species. Every
+other (non-organism) growth species is completely unaffected. Full
+derivation of every new constant/helper, and the real verification story
+(13 new pure-function tests, 170 total, plus a real Playwright run that
+planted a genuine organism via the actual Plant-mode UI and confirmed via
+a temporary debug hook that `organismMiniGroup` really does go from empty
+to populated partway through a real zoom-in), is in `RHOMBIVERSE_SPEC_
+LATTICE_ZOOM.md`'s own Stage 5 section, not repeated here -- including two
+real Playwright gotchas hit writing that verification (both logged in
+`.claude/skills/browser-test-harness/SKILL.md`, not `render.js` bugs).
+**Not committed yet as of this entry** -- same files as Stage 3/4's own
+list, now with Stage 5's further changes on top.
+
+**Direct request from the project owner, 2026-08-13, to act on once
+Lattice Zoom Stages 5 AND 6 are BOTH done:** build a permanent "showcase
+world" in the player's own rhombi-space demonstrating everything built in
+this project so far. Not started -- Stage 6 isn't built yet. Confirm the
+concrete delivery mechanism (a real built structure via the existing
+Export/Import JSON + Load-preset pattern already in this app, vs.
+something else) when picking this up rather than assuming.
+
+Stage 6 (Landscape Aggregate State) of Lattice Zoom remains genuinely
+unstarted -- see the spec doc's own Build Order section for what it
+actually requires; it depends on Evolution's own Stage 5 (`biomass`)
+output, which is real and ready (Stage 5 above already found and reused
+`localBiomassAvailability` directly).
 
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're

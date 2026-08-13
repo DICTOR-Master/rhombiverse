@@ -21,6 +21,10 @@ import {
   swingMagnitude,
   nextVolatilityScore,
   throttleForVolatility,
+  scaleVerticesAroundOrigin,
+  dominantSpecies,
+  AGGREGATE_MAX_SPECKLES,
+  speckleCountForBiomass,
 } from '../../src/latticezoom.js';
 import { shellCount, isValidCell, cellToWorld } from '../../src/lattice.js';
 
@@ -283,4 +287,61 @@ test('throttleForVolatility: a real scripted rapid-zoom scenario produces a meas
   const calmThrottle = throttleForVolatility(calmScore);
   assert.equal(calmThrottle, SUB_LATTICE_THROTTLE_BASE_MS, 'a calm-movement control should stay at the tight default');
   assert.ok(rapidThrottle > calmThrottle, `rapid scrubbing must produce a measurably wider throttle interval than the calm control (rapid=${rapidThrottle}, calm=${calmThrottle})`);
+});
+
+// ============================================================
+// Stage 5 -- Ecosystem Rendering (Real Organisms + Plant-Coverage Layer)
+// ============================================================
+
+test('scaleVerticesAroundOrigin: factor=1 is a real no-op (identity)', () => {
+  const verts = [[1, 2, 3], [4, 5, 6]];
+  const origin = [1, 2, 3];
+  const result = scaleVerticesAroundOrigin(verts, origin, 1);
+  assert.deepEqual(result, verts);
+});
+
+test('scaleVerticesAroundOrigin: shrinks every vertex toward origin, origin itself stays fixed', () => {
+  const origin = [10, 0, 0];
+  const verts = [[10, 0, 0], [20, 0, 0], [10, 10, 0]];
+  const result = scaleVerticesAroundOrigin(verts, origin, 0.5);
+  assert.deepEqual(result[0], [10, 0, 0], 'the origin-coincident vertex must stay exactly at origin');
+  assert.deepEqual(result[1], [15, 0, 0], 'halfway between origin and the original vertex');
+  assert.deepEqual(result[2], [10, 5, 0]);
+});
+
+test('scaleVerticesAroundOrigin: factor=0 collapses every vertex exactly onto origin (degenerate, callers must guard)', () => {
+  const origin = [3, 4, 5];
+  const verts = [[100, 200, 300], [-5, -5, -5]];
+  const result = scaleVerticesAroundOrigin(verts, origin, 0);
+  for (const v of result) assert.deepEqual(v, origin);
+});
+
+test('dominantSpecies: real majority wins, empty list returns null', () => {
+  assert.equal(dominantSpecies([]), null);
+  const organisms = [{ species: 'plant' }, { species: 'plant' }, { species: 'amoeba' }];
+  assert.equal(dominantSpecies(organisms), 'plant');
+});
+
+test('dominantSpecies: a single organism is trivially its own species\' majority', () => {
+  assert.equal(dominantSpecies([{ species: 'amoeba' }]), 'amoeba');
+});
+
+test('speckleCountForBiomass: zero biomass produces zero speckles, full (1.0) biomass produces AGGREGATE_MAX_SPECKLES', () => {
+  assert.equal(speckleCountForBiomass(0), 0);
+  assert.equal(speckleCountForBiomass(1), AGGREGATE_MAX_SPECKLES);
+});
+
+test('speckleCountForBiomass: monotonically non-decreasing with biomass, and clamps input outside [0,1]', () => {
+  const samples = [0, 0.2, 0.4, 0.6, 0.8, 1].map(speckleCountForBiomass);
+  for (let i = 1; i < samples.length; i++) {
+    assert.ok(samples[i] >= samples[i - 1], `speckle count must never decrease as biomass grows: ${samples}`);
+  }
+  assert.equal(speckleCountForBiomass(-5), 0, 'must clamp a nonsensical negative input rather than go negative');
+  assert.equal(speckleCountForBiomass(50), AGGREGATE_MAX_SPECKLES, 'must clamp a nonsensical >1 input rather than exceed the cap');
+});
+
+test('speckleCountForBiomass: this stage\'s own success check -- a real change in underlying population stats visibly changes the layer\'s output', () => {
+  const noPopulation = speckleCountForBiomass(0);
+  const thrivingPopulation = speckleCountForBiomass(0.9);
+  assert.ok(thrivingPopulation > noPopulation, 'a thriving nearby population must produce visibly more coverage than none at all');
 });
