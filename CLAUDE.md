@@ -1978,8 +1978,18 @@ time, silently planting locally-only exactly like before. A clean "zero
 console errors" result said nothing about whether the RIGHT code was
 even running — worth remembering as a real gap in "verify live" when
 the change hasn't been deployed yet. Re-verified correctly after
-committing and pushing (see the commit itself for the corrected
-end-to-end confirmation).
+committing and pushing: a real row appeared in `public.seeds` (species,
+generation, tile count all correct) immediately after planting, and
+forcing a real growth tick (rewinding `lastGrowthAt` directly in the
+database, then letting a fresh session's own real periodic interval
+fire) correctly bumped `generation`/`tiles` in that same row — confirming
+sync works for BOTH the initial plant and every later growth update, not
+just the one-shot placement. **Real bug caught by that same check, not
+by review**: `pushSeedSet`'s upsert didn't explicitly set `updated_at`,
+so a growth-tick update left it stuck at the seed's original plant
+time — the column's own `default now()` only ever applies on INSERT,
+not on the UPDATE half of an upsert. Fixed to match `pushCellUpsert`'s
+own convention of always setting it explicitly.
 
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're

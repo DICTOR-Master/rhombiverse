@@ -315,7 +315,15 @@ export async function pushRegrowthClear(x, y, z) {
 // growth tick just doesn't reach other players this round, not something
 // that needs to unwind the local growth step already applied.
 export async function pushSeedSet(seedId, seedData) {
-  const { error } = await supabase.from('seeds').upsert({ id: seedId, data: seedData });
+  // updated_at explicitly set on every call, same as pushCellUpsert --
+  // the column's own `default now()` only applies on INSERT, not on an
+  // UPDATE via upsert, so a growth tick without this would silently
+  // leave updated_at stuck at the seed's original plant time (caught
+  // live, 2026-08-13: generation/tiles updated correctly but
+  // updated_at didn't move).
+  const { error } = await supabase
+    .from('seeds')
+    .upsert({ id: seedId, data: seedData, updated_at: new Date().toISOString() });
   if (error) console.warn('Rhombiverse sync: seed upsert failed', seedId, error);
 }
 
