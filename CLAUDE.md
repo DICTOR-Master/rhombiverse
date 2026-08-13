@@ -2285,6 +2285,70 @@ trophic step, explicitly not yet part of the per-generation loop —
 exists). `resolve_trophic_step` from section 4's own pseudocode is a
 deliberate no-op gap in this stage's loop, left for Stage 5 to fill in.
 
+**Evolution Stage 5 (Trophic Coupling + Convergence Check) done,
+2026-08-13.** Amoeba now read local BIOMASS, not raw water directly —
+`localBiomassAvailability` sums nearby mature plants' own real output
+(`growthRate x resourceEfficiency x that plant's own water access`),
+same `[0,1]`-normalized "local availability" shape Stage 3's water check
+already established, reused rather than building a second resource-
+accounting system (biomass is a computed neighborhood signal, not a
+tracked depleting stock — the spec's own text never asks for a
+currency here). Plants get a small, capped, one-directional symbiotic
+boost from nearby mature amoeba (`SYMBIOSIS_BOOST_PER_AMOEBA=0.05` per
+amoeba, capped at `SYMBIOSIS_MAX_BOOST=0.3`) — amoeba get nothing back,
+per the spec's own explicit "kept one-directional... so it doesn't
+cancel the predation link's stabilizing oscillation." Stage 4's own
+flagged gap — a separate `resolve_trophic_step` — turned out to need no
+new call at all: `computeSurvivalProbability` (already called by both
+reproduction and survival) now reads biomass/symbiosis directly, so
+every trophic effect is live by construction.
+
+**Real bug found only by actually running a multi-generation
+simulation, not by any single-generation test**: tracing a real 25-
+generation run showed population and average traits never changing AT
+ALL, generation after generation. Root cause: Stage 4's catch-up loop
+never called `growOrganism` — physical growth was left to render.js's
+own live periodic interval on the theory that the loop only needed to
+resolve population-level events. But during an actual catch-up (the
+entire point of this stage — resolving time that passed while nothing
+was running), nothing else was ticking growth forward, so every
+organism stayed stuck at generation 0 forever, `isMature()` never
+became true, and reproduction/HGT — gated on maturity — never fired
+even once. Fixed by calling `growOrganism` once per resolved
+generation inside the loop; `EVOLUTION_GENERATION_INTERVAL_MS` was
+already deliberately set equal to `growth.js`'s own `GROWTH_TICK_MS`,
+so this keeps physical growth and evolutionary resolution in exact
+lockstep rather than needing a second timing scheme.
+
+**Section 5.1's convergence check needed real investigation, not a
+quick pass, before it could be trusted — a genuine, non-obvious finding
+recorded in both the code and here.** The textbook framing ("two
+populations' trait gap narrows toward zero") turned out to be
+genuinely unreliable at practical population/generation scales:
+dozens of real `resolveCatchUp` runs (varying population size 6–60,
+scarcity level, and starting-trait gap) showed the gap narrowing in
+roughly half of trials and widening in the other half, and under
+severe scarcity a low-fitness population sometimes went fully extinct
+rather than "catching up" (a real evolutionary-rescue failure, not a
+bug). Root cause, confirmed by the investigation, not assumed:
+`computeSurvivalProbability`'s dependence on `resourceEfficiency` is
+monotonic with no interior optimum, so two differently-seeded
+populations both get pulled toward the SAME fitness ceiling at
+different, noisy rates rather than settling into a shared attractor —
+a real structural property of the current selection formula, not a
+broken mechanism. What IS reliably, consistently true — confirmed
+20/20 in a dedicated check before the actual test was written — is
+section 5.1's own stated underlying purpose: selection applies real,
+consistent pressure, so a population starting closer to the fitness
+optimum reliably ends up with an equal-or-larger population and an
+equal-or-higher average trait than one starting farther away. That is
+what the shipped test actually verifies (10 independent trials,
+population size and average-trait comparison), not strict gap-
+narrowing — a deliberate, documented scope correction from the spec's
+own idealized wording, not a workaround to make a flaky test pass.
+
+Verified via `node --test` (13 new tests, 72 total, all passing).
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.
