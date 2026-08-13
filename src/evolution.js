@@ -19,7 +19,7 @@
 // genome trait below maps onto exactly one of these three, or is left
 // inert in this stage (wired up by later stages per the spec's own
 // staging).
-import { growSeed, tileWorldVertices, tilesOverlap, VALID_TRIPLES } from './growth.js';
+import { growSeed, tileWorldVertices, tilesOverlap, VALID_TRIPLES, GROWTH_TICK_MS } from './growth.js';
 import { cellToWorld } from './lattice.js';
 
 // Real, MEASURED bounds, not guessed -- verified 2026-08-13 with a
@@ -240,12 +240,19 @@ export const MUTATION_DELTA_FRACTION = 0.1;
 // delta if it fires, and is re-clamped -- so no mutation, however
 // unlucky, can ever land outside GENOME_TRAIT_RANGES (section 1.1's
 // guarantee holding through this stage too, not just Stage 1's own
-// direct clamp).
-export function mutateGenome(genome, rng = Math.random) {
+// direct clamp). `mutationRateOverride`, added for Stage 4's punctuated
+// equilibrium (2.4): when provided, used INSTEAD of the genome's own
+// stored mutationRate for the "does it fire" roll on every trait this
+// call -- a temporary, population-level effect, never a permanent
+// change to what the genome itself carries (the offspring's own
+// mutationRate trait still ends up wherever this same mutation pass
+// lands it, unaffected by the override except through that one roll).
+export function mutateGenome(genome, rng = Math.random, mutationRateOverride = undefined) {
   const g = clampGenome(genome);
+  const effectiveRate = mutationRateOverride ?? g.mutationRate;
   const mutated = { ...g };
   for (const [trait, range] of Object.entries(GENOME_TRAIT_RANGES)) {
-    if (rng() < g.mutationRate) {
+    if (rng() < effectiveRate) {
       const width = range[1] - range[0];
       mutated[trait] = g[trait] + (rng() * 2 - 1) * width * MUTATION_DELTA_FRACTION;
     }
@@ -293,19 +300,19 @@ export function selectMate(world, candidateIds, preferredTrait = MATE_PREFERENCE
 // supplied rather than computed here -- real placement choice belongs to
 // Stage 4's seeded-RNG resolution loop once it exists; this function is
 // the raw mechanism, triggered manually per Stage 2's own scope.
-export function reproduceAsexual(world, parentOrganismId, offspringOrganismId, offspringSeedId, offspringOrigin, now = Date.now(), rng = Math.random) {
+export function reproduceAsexual(world, parentOrganismId, offspringOrganismId, offspringSeedId, offspringOrigin, now = Date.now(), rng = Math.random, mutationRateOverride = undefined) {
   const parent = world.getOrganisms()[parentOrganismId];
   if (!parent) return null;
-  return plantOrganism(world, offspringOrganismId, offspringSeedId, parent.species, mutateGenome(parent.genome, rng), offspringOrigin, now);
+  return plantOrganism(world, offspringOrganismId, offspringSeedId, parent.species, mutateGenome(parent.genome, rng, mutationRateOverride), offspringOrigin, now);
 }
 
 // Plants' own reproduction channel (section 2): bounded blend of both
 // parents, then mutated.
-export function reproduceSexual(world, parentAId, parentBId, offspringOrganismId, offspringSeedId, offspringOrigin, now = Date.now(), rng = Math.random) {
+export function reproduceSexual(world, parentAId, parentBId, offspringOrganismId, offspringSeedId, offspringOrigin, now = Date.now(), rng = Math.random, mutationRateOverride = undefined) {
   const a = world.getOrganisms()[parentAId];
   const b = world.getOrganisms()[parentBId];
   if (!a || !b) return null;
-  return plantOrganism(world, offspringOrganismId, offspringSeedId, a.species, mutateGenome(blendGenomes(a.genome, b.genome), rng), offspringOrigin, now);
+  return plantOrganism(world, offspringOrganismId, offspringSeedId, a.species, mutateGenome(blendGenomes(a.genome, b.genome), rng, mutationRateOverride), offspringOrigin, now);
 }
 
 // Species-level dispatch, matching section 2's own rules exactly: plants
@@ -316,16 +323,16 @@ export function reproduceSexual(world, parentAId, parentBId, offspringOrganismId
 // later add that doesn't opt into sexual pairing) reproduces asexually
 // only, no fallback needed since it never had a sexual path to fall back
 // from.
-export function reproduce(world, species, parentOrganismId, candidateMateIds, offspringOrganismId, offspringSeedId, offspringOrigin, now = Date.now(), rng = Math.random) {
+export function reproduce(world, species, parentOrganismId, candidateMateIds, offspringOrganismId, offspringSeedId, offspringOrigin, now = Date.now(), rng = Math.random, mutationRateOverride = undefined) {
   if (species === 'plant') {
     const matureCandidates = candidateMateIds.filter((id) => isMature(world, id) && isInPairingRange(world, parentOrganismId, id));
     if (matureCandidates.length > 0) {
       const mateId = selectMate(world, matureCandidates, MATE_PREFERENCE_TRAIT, rng);
-      return { result: reproduceSexual(world, parentOrganismId, mateId, offspringOrganismId, offspringSeedId, offspringOrigin, now, rng), mode: 'sexual', mateId };
+      return { result: reproduceSexual(world, parentOrganismId, mateId, offspringOrganismId, offspringSeedId, offspringOrigin, now, rng, mutationRateOverride), mode: 'sexual', mateId };
     }
-    return { result: reproduceAsexual(world, parentOrganismId, offspringOrganismId, offspringSeedId, offspringOrigin, now, rng), mode: 'asexual-fallback' };
+    return { result: reproduceAsexual(world, parentOrganismId, offspringOrganismId, offspringSeedId, offspringOrigin, now, rng, mutationRateOverride), mode: 'asexual-fallback' };
   }
-  return { result: reproduceAsexual(world, parentOrganismId, offspringOrganismId, offspringSeedId, offspringOrigin, now, rng), mode: 'asexual' };
+  return { result: reproduceAsexual(world, parentOrganismId, offspringOrganismId, offspringSeedId, offspringOrigin, now, rng, mutationRateOverride), mode: 'asexual' };
 }
 
 // Section 2.1, amoeba-specific: a small, fixed chance that one randomly
@@ -516,4 +523,231 @@ export function resolveSurvival(world, organismId, candidateIds, rng = Math.rand
   const bypass = driftBypassFraction(localPopulation);
   const effectiveProbability = fitness * (1 - bypass) + 0.5 * bypass;
   return rng() < effectiveProbability;
+}
+
+// ============================================================
+// Stage 4 -- Deterministic Catch-Up Simulation + Punctuated Equilibrium
+// ============================================================
+
+// mulberry32 -- a small, well-known, fast 32-bit seeded PRNG (public
+// domain, widely used in games/creative coding for exactly this
+// "deterministic, reproducible randomness from a stored seed" need) --
+// borrowed, not invented, per Grounded Simplicity. State is a plain
+// 32-bit integer; calling the returned function both returns a value in
+// [0,1) and advances the internal state, so two clients starting from
+// the same stored state and calling it the same number of times get
+// IDENTICAL sequences -- section 4's own "two clients loading the same
+// planetoid state get the same outcome" requirement, satisfied
+// structurally, not hoped for.
+export function createSeededRng(seedState) {
+  let s = seedState >>> 0;
+  const rng = () => {
+    s |= 0;
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  rng.getState = () => s >>> 0;
+  return rng;
+}
+
+// One "generation" of unattended catch-up time, in real wall-clock ms --
+// reuses growth.js's own GROWTH_TICK_MS exactly, the same "reuse the
+// existing tick shape, don't invent a new one" convention asteroids.js/
+// trade.js's own decay tick already established.
+export const EVOLUTION_GENERATION_INTERVAL_MS = GROWTH_TICK_MS;
+
+// Real reasoning, not guessed: unlike growth.js's own per-organism
+// growth (already measured expensive at scale in Stage 1, and bounded
+// separately by each genome's own maxGeneration cap), one catch-up
+// generation here only performs O(local neighbors) bookkeeping per
+// organism (resolveSurvival/reproduce/attemptHorizontalTransfer) --
+// none of it touches growth.js's own O(n^2) tile-overlap math, which
+// stays fully separate (physical growth is driven by growOrganism's own
+// existing real-time tick, called independently of this loop). 50 is a
+// moderate, tunable starting point, flagged per the spec's own open
+// question on this exact constant, not a hard measured ceiling the way
+// Stage 1's genome ranges were.
+export const MAX_CATCHUP_GENERATIONS = 50;
+
+// Section 2.4: bounded multiplier applied to a population-wide EFFECTIVE
+// mutation rate immediately after a detected jolt, decaying linearly
+// back to each organism's own heritable mutationRate over
+// JOLT_DECAY_GENERATIONS subsequent generations -- first-guess, tunable
+// values (flagged, matching this doc's own open question on this exact
+// pair), not derived from a specific real figure.
+export const JOLT_MUTATION_BOOST_MULTIPLIER = 2;
+export const JOLT_DECAY_GENERATIONS = 5;
+
+// A resource-availability or crowding-count change between two
+// consecutive resolution steps exceeding either of these thresholds
+// counts as an environmental jolt -- section 2.4's own wording.
+// First-guess, tunable thresholds aimed at "a real, noticeable shift,"
+// not routine fluctuation.
+export const JOLT_AVAILABILITY_DELTA_THRESHOLD = 0.3;
+export const JOLT_CROWD_DELTA_THRESHOLD = 3;
+
+function detectJolt(previous, current) {
+  if (!previous) return false; // no prior reading yet -- nothing to compare against
+  const availabilityDelta = Math.abs(current.availability - previous.availability);
+  const crowdDelta = Math.abs(current.crowd - previous.crowd);
+  return availabilityDelta >= JOLT_AVAILABILITY_DELTA_THRESHOLD || crowdDelta >= JOLT_CROWD_DELTA_THRESHOLD;
+}
+
+// Effective, temporarily-boosted mutation rate for one organism this
+// generation -- composes with (multiplies on top of, never replaces)
+// its own heritable mutationRate trait, per section 2.4's own "the two
+// are designed to compose, not conflict." generationsSinceJolt===0
+// means "jolt just happened this generation" (full boost); linearly
+// decays to 1x (no boost) by JOLT_DECAY_GENERATIONS. Passed through
+// mutateGenome's own clamp wherever it's actually used, so a boosted
+// rate can never itself exceed GENOME_TRAIT_RANGES.mutationRate's own
+// bound -- section 1.1's coherence guarantee holding through a jolt
+// burst too, not just ordinary mutation.
+export function effectiveMutationRate(baseMutationRate, generationsSinceJolt) {
+  if (generationsSinceJolt === null || generationsSinceJolt === undefined || generationsSinceJolt >= JOLT_DECAY_GENERATIONS) {
+    return baseMutationRate;
+  }
+  const decayFraction = 1 - generationsSinceJolt / JOLT_DECAY_GENERATIONS;
+  const boost = 1 + (JOLT_MUTATION_BOOST_MULTIPLIER - 1) * decayFraction;
+  return clamp(baseMutationRate * boost, [0, 1]);
+}
+
+function localConditions(world, organismId, candidateIds) {
+  const organism = world.getOrganisms()[organismId];
+  const seed = organism && world.getSeeds()[organism.seedId];
+  if (!organism || !seed) return null;
+  return {
+    availability: localResourceAvailability(world, seed.origin),
+    crowd: localMatureSameSpeciesCount(world, organismId, candidateIds),
+  };
+}
+
+// Deterministic offspring placement: just outside the parent's own real
+// extent, at a pseudo-random (seeded, not Math.random) direction and
+// distance -- avoids spawning inside the parent's own tiles while
+// staying fully reproducible from the same rng thread as everything
+// else in a catch-up run.
+function offspringPlacement(world, parentOrganismId, rng) {
+  const organism = world.getOrganisms()[parentOrganismId];
+  const seed = world.getSeeds()[organism.seedId];
+  const radius = organismBoundingRadius(world, parentOrganismId);
+  const distance = radius * (1.5 + rng());
+  const theta = rng() * Math.PI * 2;
+  const phi = rng() * Math.PI;
+  return [
+    seed.origin[0] + distance * Math.sin(phi) * Math.cos(theta),
+    seed.origin[1] + distance * Math.sin(phi) * Math.sin(theta),
+    seed.origin[2] + distance * Math.cos(phi),
+  ];
+}
+
+// Resolves exactly one generation for a given population, mutating world
+// state directly (reproduction adds new organisms, failed survival
+// removes them) -- the per-iteration body of section 4's own pseudocode
+// loop (resolve_reproduction/resolve_gene_transfer/resolve_selection;
+// resolve_trophic_step is Stage 5's own addition, not wired here yet).
+// Returns the updated organism id list for the next generation.
+// `simulatedNow` (NOT a real Date.now() read here) is the deterministic
+// in-simulation timestamp for this generation, supplied by the caller --
+// calling the real clock inside this function would break the whole
+// point of a seeded, reproducible catch-up run: two clients resolving
+// the same stored state at different real wall-clock moments must still
+// produce byte-identical results, including every offspring's own
+// plantedAt/lastGrowthAt.
+function resolveOneGeneration(world, organismIds, rng, generationIndex, simulatedNow) {
+  const toRemove = new Set();
+  const newIds = [];
+  let idCounter = 0;
+
+  for (const organismId of organismIds) {
+    const organism = world.getOrganisms()[organismId];
+    if (!organism) continue;
+
+    const current = localConditions(world, organismId, organismIds);
+    if (!current) continue;
+    const jolted = detectJolt(organism.lastConditions, current);
+    const generationsSinceJolt = jolted ? 0 : organism.generationsSinceJolt != null ? organism.generationsSinceJolt + 1 : null;
+    const updatedOrganism = { ...organism, lastConditions: current, generationsSinceJolt };
+    world.setOrganism(organismId, updatedOrganism);
+
+    const mutRate = effectiveMutationRate(updatedOrganism.genome.mutationRate, generationsSinceJolt);
+
+    if (isMature(world, organismId)) {
+      // Reproduction and survival share the SAME genome x conditions
+      // probability function (section 3's own "survival/reproduction
+      // probability" framing -- one function, both purposes).
+      const reproProbability = computeSurvivalProbability(world, organismId, organismIds);
+      if (rng() < reproProbability) {
+        const offspringId = `${organismId}_g${generationIndex}_${idCounter++}`;
+        const offspringOrigin = offspringPlacement(world, organismId, rng);
+        const mateCandidates = organismIds.filter((id) => id !== organismId);
+        const { result } = reproduce(
+          world,
+          organism.species,
+          organismId,
+          mateCandidates,
+          offspringId,
+          `seed_${offspringId}`,
+          offspringOrigin,
+          simulatedNow,
+          rng,
+          mutRate
+        );
+        if (result) newIds.push(offspringId);
+      }
+
+      // Horizontal gene transfer (2.1, amoeba-specific) -- tried against
+      // every other candidate; the function's own adjacency/maturity/
+      // probability gates decide whether anything actually happens.
+      for (const otherId of organismIds) {
+        if (otherId === organismId) continue;
+        attemptHorizontalTransfer(world, organismId, otherId, rng);
+      }
+    }
+
+    if (!resolveSurvival(world, organismId, organismIds, rng)) {
+      toRemove.add(organismId);
+    }
+  }
+
+  for (const id of toRemove) {
+    const organism = world.getOrganisms()[id];
+    if (organism) world.removeSeed(organism.seedId);
+    world.removeOrganism(id);
+  }
+
+  return organismIds.filter((id) => !toRemove.has(id)).concat(newIds);
+}
+
+// Section 4's own pseudocode, made real: given a planetoid's tracked
+// lastSimulated/rngState and the population of organisms living there
+// right now, resolves however many whole generations have elapsed
+// since, bounded by MAX_CATCHUP_GENERATIONS -- "the planetoid waited, it
+// didn't fast-forward unboundedly," per the spec's own wording.
+// Deterministic: the same starting world state + organism population +
+// `now` always produces the same outcome, since every random decision
+// in every generation draws from the one seeded rng thread here, never
+// Math.random(). `lastSimulated` only advances by whole resolved
+// generations (never jumps straight to `now`), so leftover fractional
+// elapsed time correctly carries over into the next catch-up call
+// rather than being lost or double-counted.
+export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now = Date.now()) {
+  const elapsed = Math.max(0, now - lastSimulated);
+  const generations = Math.min(Math.floor(elapsed / EVOLUTION_GENERATION_INTERVAL_MS), MAX_CATCHUP_GENERATIONS);
+  const rng = createSeededRng(rngState);
+
+  let currentIds = organismIds;
+  for (let g = 0; g < generations; g++) {
+    const simulatedNow = lastSimulated + (g + 1) * EVOLUTION_GENERATION_INTERVAL_MS;
+    currentIds = resolveOneGeneration(world, currentIds, rng, g, simulatedNow);
+  }
+
+  return {
+    organismIds: currentIds,
+    rngState: rng.getState(),
+    lastSimulated: lastSimulated + generations * EVOLUTION_GENERATION_INTERVAL_MS,
+    generationsResolved: generations,
+  };
 }

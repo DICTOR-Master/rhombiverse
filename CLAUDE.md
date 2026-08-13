@@ -2212,6 +2212,79 @@ and resource-gated reproduction (the "with sufficient local resource"
 half of section 2's own amoeba rule) still isn't enforced anywhere.
 Stage 4's catch-up resolution loop is where both become real.
 
+**Evolution Stage 4 (Deterministic Catch-Up Engine + Punctuated
+Equilibrium) done, 2026-08-13.** `createSeededRng` implements mulberry32
+(a small, well-known public-domain 32-bit PRNG — borrowed, not invented)
+so a stored integer state, replayed the same number of times, always
+produces the same sequence — section 4's own "two clients loading the
+same planetoid state get the same outcome" requirement, satisfied
+structurally. `resolveCatchUp(world, organismIds, lastSimulated,
+rngState, now)` is section 4's own pseudocode made real: resolves
+`min(floor(elapsed/EVOLUTION_GENERATION_INTERVAL_MS),
+MAX_CATCHUP_GENERATIONS)` generations, each one running reproduction
+(gated by the same genome×conditions probability Stage 3 already
+defines — "survival/reproduction probability," one function, both
+purposes, per the spec's own framing), horizontal gene transfer, and
+survival/selection against the SAME seeded rng thread throughout — never
+`Math.random()`. `EVOLUTION_GENERATION_INTERVAL_MS` reuses
+`growth.js`'s own `GROWTH_TICK_MS` exactly rather than inventing a new
+tick value, matching the "reuse the existing shape" convention
+`asteroids.js`/`trade.js`'s own decay ticks already established.
+`MAX_CATCHUP_GENERATIONS=50` is reasoned (not stress-tested to the same
+degree as Stage 1's genome ranges): unlike growth's own O(n²) tile-
+overlap math, one catch-up generation is O(local neighbors) bookkeeping
+per organism, so cost scales with population×generations, not squared
+tile count — flagged as tunable per the spec's own open question, not a
+hard measured ceiling.
+
+Punctuated equilibrium (2.4): `effectiveMutationRate` composes a
+temporary boost (`JOLT_MUTATION_BOOST_MULTIPLIER=2`) on top of — never
+replacing — an organism's own heritable `mutationRate`, decaying
+linearly back to baseline over `JOLT_DECAY_GENERATIONS=5`. A jolt is
+detected per-organism (a resource-availability or crowding-count swing
+between consecutive generations exceeding
+`JOLT_AVAILABILITY_DELTA_THRESHOLD`/`JOLT_CROWD_DELTA_THRESHOLD`, both
+first-guess/tunable) by comparing each generation's real local
+conditions against the previous one, now tracked on the organism record
+itself (`lastConditions`/`generationsSinceJolt` — a real, minimal new
+per-organism field, not purely derived). The boosted rate still only
+ever reaches `mutateGenome` (which re-clamps regardless), so section
+1.1's coherence guarantee holds through a jolt burst exactly like
+ordinary mutation — verified directly, not assumed.
+
+**Real bug caught and fixed before any test was written, not by a test
+failing**: the first draft of the per-generation resolution function
+called `Date.now()` directly to timestamp new offspring, which would
+have silently broken the entire point of a seeded catch-up engine — two
+clients resolving the same stored state at different real wall-clock
+moments must produce byte-identical results, including every
+offspring's own `plantedAt`. Caught by re-reading the function against
+its own "deterministic" claim before trusting it, not by a failing
+assertion — fixed by threading a deterministic in-simulation timestamp
+(`lastSimulated + generationIndex * EVOLUTION_GENERATION_INTERVAL_MS`)
+through instead, with zero real-clock reads anywhere in the resolution
+path.
+
+Verified via `node --test` (9 new tests, 68 total, all passing),
+covering exactly Stage 4's own build-order success criteria: bounded
+runtime regardless of real elapsed time, a stop-and-resume `getState()`
+round-trip producing the identical continuation as one unbroken run,
+the full boost-then-linear-decay curve, two independent world stores
+given identical starting state producing byte-identical outcomes
+(genomes included, not just population counts), surviving organisms
+still fully coherent after a real multi-generation run, and the
+extinction floor holding end-to-end (not just in isolation) across a
+full `MAX_CATCHUP_GENERATIONS`-length run for a worst-fitness lone
+organism.
+
+**Not yet wired to anything automatic in the running app** — this is
+still a pure, callable engine; nothing in `render.js` invokes
+`resolveCatchUp` on world load yet (that belongs with Stage 9's
+player-facing wiring, once more of the pipeline — especially Stage 5's
+trophic step, explicitly not yet part of the per-generation loop —
+exists). `resolve_trophic_step` from section 4's own pseudocode is a
+deliberate no-op gap in this stage's loop, left for Stage 5 to fill in.
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.

@@ -28,6 +28,13 @@ import {
   CROWDING_THRESHOLD,
   DRIFT_THRESHOLD,
   MIN_VIABLE_POPULATION,
+  createSeededRng,
+  effectiveMutationRate,
+  resolveCatchUp,
+  MAX_CATCHUP_GENERATIONS,
+  EVOLUTION_GENERATION_INTERVAL_MS,
+  JOLT_MUTATION_BOOST_MULTIPLIER,
+  JOLT_DECAY_GENERATIONS,
 } from '../../src/evolution.js';
 import { createWorldStore } from '../../src/worldstate.js';
 
@@ -419,4 +426,115 @@ test('resolveSurvival: below DRIFT_THRESHOLD (but above MIN_VIABLE_POPULATION), 
   }
   assert.ok(successes > 0, 'expected drift to give a worst-fitness organism SOME chance of survival below DRIFT_THRESHOLD');
   assert.ok(successes < trials, 'expected drift to still be a BLEND, not guaranteed survival');
+});
+
+// ============================================================
+// Stage 4 -- Deterministic Catch-Up Simulation + Punctuated Equilibrium
+// ============================================================
+
+test('createSeededRng: same seed produces an identical sequence; different seeds diverge', () => {
+  const a = createSeededRng(12345);
+  const b = createSeededRng(12345);
+  const c = createSeededRng(99999);
+  const seqA = Array.from({ length: 10 }, () => a());
+  const seqB = Array.from({ length: 10 }, () => b());
+  const seqC = Array.from({ length: 10 }, () => c());
+  assert.deepEqual(seqA, seqB);
+  assert.notDeepEqual(seqA, seqC);
+  for (const v of seqA) assert.ok(v >= 0 && v < 1, `rng value out of [0,1): ${v}`);
+});
+
+test('createSeededRng: stopping and resuming from getState() produces the exact same continuation as one unbroken run', () => {
+  const full = createSeededRng(42);
+  const fullSeq = Array.from({ length: 10 }, () => full());
+
+  const firstHalf = createSeededRng(42);
+  const firstSeq = Array.from({ length: 5 }, () => firstHalf());
+  const resumedState = firstHalf.getState();
+  const secondHalf = createSeededRng(resumedState);
+  const secondSeq = Array.from({ length: 5 }, () => secondHalf());
+
+  assert.deepEqual(firstSeq, fullSeq.slice(0, 5));
+  assert.deepEqual(secondSeq, fullSeq.slice(5, 10));
+});
+
+test('effectiveMutationRate: full boost immediately after a jolt, decaying linearly to baseline by JOLT_DECAY_GENERATIONS', () => {
+  const base = 0.1;
+  const atJolt = effectiveMutationRate(base, 0);
+  assert.equal(atJolt, base * JOLT_MUTATION_BOOST_MULTIPLIER);
+
+  const midDecay = effectiveMutationRate(base, Math.floor(JOLT_DECAY_GENERATIONS / 2));
+  assert.ok(midDecay > base && midDecay < atJolt, `expected a value strictly between baseline and full boost, got ${midDecay}`);
+
+  assert.equal(effectiveMutationRate(base, JOLT_DECAY_GENERATIONS), base);
+  assert.equal(effectiveMutationRate(base, JOLT_DECAY_GENERATIONS + 10), base);
+  assert.equal(effectiveMutationRate(base, null), base); // never jolted
+});
+
+test('effectiveMutationRate: never exceeds the real [0,1] mutationRate range even at the boosted extreme', () => {
+  const boosted = effectiveMutationRate(0.9, 0); // 0.9 * 2 would be 1.8 unclamped
+  assert.ok(boosted <= 1, `boosted mutation rate exceeded 1: ${boosted}`);
+});
+
+test('resolveCatchUp: bounded by MAX_CATCHUP_GENERATIONS regardless of how much real time elapsed', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'a', 'sa', 'plant', { maturitySize: 3 }, [0, 0, 0], 0);
+  const hugeElapsed = EVOLUTION_GENERATION_INTERVAL_MS * (MAX_CATCHUP_GENERATIONS * 1000);
+  const result = resolveCatchUp(world, ['a'], 0, 1, hugeElapsed);
+  assert.equal(result.generationsResolved, MAX_CATCHUP_GENERATIONS);
+});
+
+test('resolveCatchUp: lastSimulated advances by exactly the resolved generations, preserving fractional leftover time', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'a', 'sa', 'plant', { maturitySize: 3 }, [0, 0, 0], 0);
+  const now = EVOLUTION_GENERATION_INTERVAL_MS * 3.5; // 3 whole generations, half a generation left over
+  const result = resolveCatchUp(world, ['a'], 0, 1, now);
+  assert.equal(result.generationsResolved, 3);
+  assert.equal(result.lastSimulated, EVOLUTION_GENERATION_INTERVAL_MS * 3);
+});
+
+test('resolveCatchUp: fully deterministic -- identical starting state + params produce byte-identical outcomes across two independent world stores', () => {
+  function freshWorldWithPopulation() {
+    const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+    plantOrganism(world, 'p1', 's1', 'plant', { maturitySize: 4, resourceEfficiency: 0.6 }, [0, 0, 0], 0);
+    plantOrganism(world, 'p2', 's2', 'plant', { maturitySize: 4, resourceEfficiency: 0.4 }, [0.4, 0, 0], 0);
+    return world;
+  }
+
+  const worldA = freshWorldWithPopulation();
+  const worldB = freshWorldWithPopulation();
+  const now = EVOLUTION_GENERATION_INTERVAL_MS * 8;
+
+  const resultA = resolveCatchUp(worldA, ['p1', 'p2'], 0, 777, now);
+  const resultB = resolveCatchUp(worldB, ['p1', 'p2'], 0, 777, now);
+
+  assert.deepEqual(resultA.organismIds.slice().sort(), resultB.organismIds.slice().sort());
+  assert.equal(resultA.rngState, resultB.rngState);
+  assert.equal(resultA.lastSimulated, resultB.lastSimulated);
+  for (const id of resultA.organismIds) {
+    assert.deepEqual(worldA.getOrganisms()[id].genome, worldB.getOrganisms()[id].genome, `organism ${id}'s genome diverged between two identical runs`);
+  }
+});
+
+test('resolveCatchUp: surviving organisms after a real multi-generation run still have fully coherent (non-overlapping) grown structures', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'p1', 's1', 'plant', { maturitySize: 4, growthRate: 0.8, branchingAngle: 0.5 }, [0, 0, 0], 0);
+  const now = EVOLUTION_GENERATION_INTERVAL_MS * 6;
+  const result = resolveCatchUp(world, ['p1'], 0, 555, now);
+
+  for (const id of result.organismIds) {
+    const organism = world.getOrganisms()[id];
+    const coherence = verifyGenomeCoherence(organism.genome, organism.species, 13);
+    assert.ok(coherence.coherent, `organism ${id}'s genome produced a real overlap after catch-up: ${JSON.stringify(organism.genome)}`);
+  }
+});
+
+test('resolveCatchUp: a lone organism never goes extinct through a real multi-generation run (extinction floor holding end-to-end)', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  // Worst-case genome for survival odds -- if the extinction floor didn't
+  // hold, this organism should die quickly under pure fitness/drift.
+  plantOrganism(world, 'lone', 'seed_lone', 'plant', { resourceEfficiency: 0, maturitySize: 3 }, [0, 0, 0], 0);
+  const now = EVOLUTION_GENERATION_INTERVAL_MS * MAX_CATCHUP_GENERATIONS;
+  const result = resolveCatchUp(world, ['lone'], 0, 314159, now);
+  assert.ok(result.organismIds.includes('lone'), 'the lone organism should never be removed while population <= MIN_VIABLE_POPULATION');
 });
