@@ -24,6 +24,32 @@ test('computeClaim: second claim avoids the first, one per owner (LOOPHOLES.md s
   assert.throws(() => computeClaim(world, 'p1'), /already have a claim/);
 });
 
+test('computeClaim: a custom origin lands a claim near THAT point, not world center (2026-08-13)', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  const { claimId, claimData } = computeClaim(world, 'p1', undefined, { x: 100, y: 100, z: 0 });
+  assert.equal(claimId, 'claim_100_100_0');
+  assert.deepEqual(claimData.center, [100, 100, 0]);
+  assert.equal(claimData.shellIndex, 0);
+});
+
+test('computeClaim: a claim already occupying the requested origin is skipped, same as world center', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  const origin = { x: 50, y: 50, z: 0 };
+  const first = computeClaim(world, 'p1', undefined, origin);
+  world.addClaim(first.claimId, first.claimData);
+
+  const second = computeClaim(world, 'p2', undefined, origin);
+  assert.notEqual(second.claimId, first.claimId);
+  // Still found something close by, not a totally unrelated location --
+  // real distance should be small (a handful of shells), not huge.
+  const dist = Math.hypot(
+    second.claimData.center[0] - origin.x,
+    second.claimData.center[1] - origin.y,
+    second.claimData.center[2] - origin.z
+  );
+  assert.ok(dist < 30, `expected the second claim to land near the origin, got distance ${dist}`);
+});
+
 test('claimBoundingRadius: positive, roughly matches a 2-shell footprint', () => {
   const claim = { center: [0, 0, 0], size: '2-shell' };
   const radius = claimBoundingRadius(claim);

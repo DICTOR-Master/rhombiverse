@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { rdRawVerts, cellToWorld, parseCellKey } from './lattice.js';
+import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell } from './lattice.js';
 import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController, removeShell, recolorShell } from './build.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
@@ -1371,7 +1371,18 @@ async function init() {
     if (!sharedWorldActive || !myUserId) return;
     claimLandBtn.disabled = true;
     try {
-      const { claimId, claimData } = computeClaim(world, myUserId);
+      // Search near wherever this player actually is -- their real
+      // position while walking, or wherever they're currently looking/
+      // orbiting otherwise -- rather than always world center. See
+      // findFreeSlot's own header (regions.js, 2026-08-13) for why: a
+      // fixed shared search origin gets more crowded, and thus more
+      // expensive to search past, as every player who has ever claimed
+      // land accumulates near it; a per-player origin keeps search cost
+      // flat regardless of total claims elsewhere in the (genuinely
+      // unbounded) lattice.
+      const focus = walking ? camera.position : controls.target;
+      const [ox, oy, oz] = nearestValidCell(focus.x / SCALE, focus.y / SCALE, focus.z / SCALE);
+      const { claimId, claimData } = computeClaim(world, myUserId, undefined, { x: ox, y: oy, z: oz });
       await pushClaim(claimId, claimData);
       world.addClaim(claimId, claimData);
       refreshClaims();

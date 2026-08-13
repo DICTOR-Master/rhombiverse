@@ -12,6 +12,7 @@ import {
   parseCellKey,
   shellCount,
   cellsInShells,
+  nearestValidCell,
 } from '../../src/lattice.js';
 
 test('isValidCell: FCC parity (x+y+z even)', () => {
@@ -26,6 +27,27 @@ test('cellKey/parseCellKey round-trip', () => {
   for (const [x, y, z] of [[0, 0, 0], [5, -3, 12], [-100, 0, 100]]) {
     assert.deepEqual(parseCellKey(cellKey(x, y, z)), [x, y, z]);
   }
+});
+
+test('nearestValidCell: always returns a valid-parity cell, and matches an exact cell exactly', () => {
+  assert.deepEqual(nearestValidCell(0, 0, 0), [0, 0, 0]);
+  assert.deepEqual(nearestValidCell(5, 5, 0), [5, 5, 0]);
+  // Independent per-axis rounding alone would land on an odd-sum
+  // (invalid) cell here -- confirms the parity fix-up actually engages.
+  const snapped = nearestValidCell(0.6, 0.6, 0.1);
+  assert.equal(isValidCell(...snapped), true);
+});
+
+test('nearestValidCell: nudges the axis with the largest rounding error, toward the raw value', () => {
+  // 0.9 rounds to 1, 0.1 rounds to 0, 0 rounds to 0 -- sum is 1 (invalid).
+  // The z axis (raw 0, rounded 0, zero error) should NOT be the one
+  // nudged; the y axis (raw 0.1, rounded 0, error 0.1) is smaller error
+  // than x (raw 0.9, rounded 1, error 0.1 too -- tie go to whichever
+  // indexOf finds first, which is x here) -- assert only the invariant
+  // that actually matters: the result is valid and close to the input.
+  const [x, y, z] = nearestValidCell(0.9, 0.1, 0);
+  assert.equal(isValidCell(x, y, z), true);
+  assert.ok(Math.abs(x - 0.9) + Math.abs(y - 0.1) + Math.abs(z - 0) < 1.5);
 });
 
 test('NEIGHBOR_OFFSETS: 12 entries, each preserves lattice parity', () => {

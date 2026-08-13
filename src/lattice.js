@@ -55,6 +55,28 @@ export function neighbors(x, y, z) {
   return NEIGHBOR_OFFSETS.map(([dx, dy, dz]) => [x + dx, y + dy, z + dz]);
 }
 
+// Snaps an arbitrary real-valued position (e.g. camera/player world
+// coordinates, already divided by whatever scale factor cellToWorld
+// used) to the nearest valid FCC lattice cell -- the inverse of
+// cellToWorld, needed anywhere a real-space point (not already an
+// integer cell) has to become a search/build origin. Rounds each axis
+// independently, then -- since independent rounding can land on an
+// invalid (odd-sum) parity -- nudges whichever axis had the largest
+// rounding error by +-1 toward the raw value, the adjustment that
+// changes the snapped point the least.
+export function nearestValidCell(x, y, z) {
+  const rx = Math.round(x);
+  const ry = Math.round(y);
+  const rz = Math.round(z);
+  if (isValidCell(rx, ry, rz)) return [rx, ry, rz];
+  const errs = [Math.abs(x - rx), Math.abs(y - ry), Math.abs(z - rz)];
+  const worst = errs.indexOf(Math.max(...errs));
+  const nudged = [rx, ry, rz];
+  const raw = [x, y, z];
+  nudged[worst] += raw[worst] >= nudged[worst] ? 1 : -1;
+  return nudged;
+}
+
 // World-state cell keys are "x,y,z" strings (RHOMBIVERSE_PLAN.md section 3).
 export function cellKey(x, y, z) {
   return `${x},${y},${z}`;

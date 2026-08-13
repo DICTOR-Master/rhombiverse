@@ -1873,6 +1873,72 @@ console errors, and pulling that exact live-grown data back out for an
 independent offline SAT check confirmed zero overlaps in the real
 app's own output, not just the isolated simulation.
 
+**Claim size raised 2→8 shells, and claim search decentralized away from
+world center, 2026-08-13 — both direct requests, both grounded in real
+numbers rather than picked by feel.** First request: a player claimed
+land, then couldn't fit anything that read as a real structure in it —
+the spec's own original 2-shell example (55 cells, real bounding radius
+~2.8 units) is smaller than this project's own smallest-ever "still
+visibly faceted but recognizable" planetoid test (radius 8, ~2,057
+cells, ~11.3 unit radius) that was itself later abandoned for being too
+small before landing on radius 14 for the actual preset planetoids.
+`regions.js`'s `CLAIM_SIZE_SHELLS` raised from 2 to 8 — reusing that
+already-field-tested radius-8 size rather than picking a new number, and
+deliberately NOT jumping to full planetoid scale (14+, ~28-shell
+separation between claims) since that was calculated to leave room for
+only a handful of total claims within the existing 40-shell search
+budget. **Second, sharper insight from the same player**: the *actual*
+reason claims can't just be made arbitrarily large is that
+`findFreeSlot` always restarted its search from a single fixed point,
+world center — so search cost grows with TOTAL claims ever granted
+(everyone crowds the same origin), not just with claim size, meaning
+the system doesn't scale as the community grows regardless of what
+`CLAIM_SIZE_SHELLS` is set to. Since the lattice is genuinely unbounded,
+there's no reason every search has to restart from the same place.
+Fixed by threading an `origin` parameter through `findFreeSlot`/
+`computeClaim`/`allocateClaim` (defaults to world center for backward
+compatibility with existing callers/tests) and having `render.js`'s
+Claim button pass wherever the player actually is —
+`camera.position` while walking (the real player position), else
+`controls.target` (where they're currently focused/orbiting) — snapped
+to a valid lattice cell via a new `lattice.js` `nearestValidCell(x,y,z)`
+(inverse of `cellToWorld`; rounds each axis, then fixes FCC parity by
+nudging whichever axis had the largest rounding error, toward the raw
+value). Search cost per claim now stays flat regardless of how many
+total claims exist elsewhere in the lattice — it only has to escape
+LOCAL crowding near that one player, not global crowding near a single
+shared point. Tradeoff, stated plainly: a claim's `shellIndex` is now
+relative to THAT claim's own search origin, not one shared reference
+point, so it's no longer directly comparable across claims with
+different origins — still meaningful as "how far this player had to
+search from where they were," just not as a universal distance-from-
+center. Verified: `node --test` (4 new tests — `nearestValidCell`
+parity correctness, a custom-origin claim landing exactly at that
+origin, a claim correctly routing around both an existing claim AND
+reserved asteroid-belt cells near a shared non-default origin — 31
+total, all passing) and a real live end-to-end run against the
+production Shared World: navigated via the existing "Go to belt 1"
+button (moves `controls.target` to `[80,80,0]`) before claiming, and the
+resulting claim landed at `[90,90,0]` — near the requested origin, not
+world center, correctly routed around the belt's own reserved cells,
+and correctly sized at 8-shell. Zero console errors. The verification
+claim was deleted afterward (admin DB access, not the app's own RLS-
+gated client — ordinary players still can't delete a claim through the
+app; see the next entry for why that matters for existing claims).
+
+**Real design constraint surfaced while doing this, not yet resolved**:
+`public.claims` has no UPDATE/DELETE policy for claim geometry at all
+(only `destructible` is toggleable) — a genuine, deliberate permanence
+guarantee from `RHOMBIVERSE_SPEC_REGIONS.md`'s own Isolation section
+("never resized, moved, or shrunk"). This means the two claims already
+granted at the OLD 2-shell size before this change (`claim_0_0_0`,
+`claim_5_5_0`) stay that small permanently through ordinary means — the
+size increase only affects claims granted from now on. Getting an
+existing claim upgraded to the new size would require an admin-side
+delete-and-reclaim (bypassing the app's own RLS, a real one-off
+exception to a guarantee the spec states in absolute terms) — flagged
+as a decision for the claim owner, not done unilaterally.
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.

@@ -11,11 +11,21 @@
 // not re-derived, reused directly from lattice.js.
 import { cellKey, cellsInShells, cellToWorld } from './lattice.js';
 
-// "A claim is a 2-shell cluster" -- the spec's own example size, adopted
-// as-is (implementation-tunable per the spec, not fixed by it; picking
-// the spec's own example rather than inventing a different number).
-// 1 (center) + 12 (shell 1) + 42 (shell 2) = 55 cells per claim.
-export const CLAIM_SIZE_SHELLS = 2;
+// Raised from the spec's own original 2-shell example (55 cells, real
+// bounding radius ~2.8 units) to 8-shell, 2026-08-13 -- direct request
+// after a player found a 2-shell claim genuinely too small to build
+// anything that reads as a real structure in: this project's own
+// planetoid-generation history already found an 8-shell/radius-8 body
+// "still visibly faceted" but recognizably round (it needed radius 14 to
+// look fully smooth) before it was itself bumped larger for the preset
+// planetoids -- reusing that already-field-tested size here rather than
+// picking a new number. 2,057 cells per claim, real bounding radius
+// 11.314 units (both verified directly, not estimated). Fixed-size
+// claims only (section 2's own explicit rejection of a fractionalizing/
+// shrinking model) -- this is a global default for every FUTURE claim;
+// claims already granted at the old size keep it (Isolation guarantee,
+// below: a claim is never resized after granting).
+export const CLAIM_SIZE_SHELLS = 8;
 
 // How far out (in shells from world center) to search for a free claim
 // slot before giving up. shellCount(n)=10n^2+2 means cellsInShells's own
@@ -23,13 +33,20 @@ export const CLAIM_SIZE_SHELLS = 2;
 // constant (300) computed roughly 90 MILLION candidate records before
 // checking a single one, hanging a real browser click; caught by an
 // actual Playwright run, not by reasoning about the number in isolation.
-// 40 shells is still generous (cumulative candidates ~219k, computed in
-// well under a second) while comfortably fitting dozens of non-
-// overlapping 2-shell claims -- each occupies real Euclidean radius up to
-// ~2.8 units, so claims pack far denser than "one shell ring per claim"
-// might suggest. First-guess/tunable like every other constant here, but
-// now grounded against an actual measured cost, not just "sounds big
-// enough."
+// This search cost is driven purely by MAX_CLAIM_SEARCH_SHELL itself,
+// independent of CLAIM_SIZE_SHELLS -- 40 shells is still ~219k candidate
+// centers, computed in well under a second, same as before the claim
+// size increase above. What DOES shrink with a bigger claim size is how
+// many non-overlapping claims actually fit inside that search range: two
+// claims' footprints can't share a cell, so claim centers need roughly
+// 2*CLAIM_SIZE_SHELLS shells of separation -- at 8-shell claims that's
+// ~16 shells apart, comfortably fitting many players within 40 shells
+// (though far fewer than the old 2-shell claims did); a jump to
+// full-planetoid-scale claims (14+ shells, ~28-shell separation) was
+// explicitly rejected for this reason -- it would leave room for only a
+// handful of players before the search genuinely runs out. First-guess/
+// tunable like every other constant here, but grounded against an actual
+// measured cost, not just "sounds big enough."
 const MAX_CLAIM_SEARCH_SHELL = 40;
 
 function footprintOf(cx, cy, cz, sizeShells) {
@@ -78,9 +95,9 @@ function reservedAsteroidCellKeys(world) {
 }
 
 // Finds the first free claim-sized footprint, searching candidate CENTERS
-// outward from world center in true 3D shell order (section 2: "filled
+// outward from a given origin in true 3D shell order (section 2: "filled
 // each shell before moving to the next... first-come claims are placed
-// in Shell 1 space, then Shell 2, and so on"). world center itself
+// in Shell 1 space, then Shell 2, and so on") -- the origin itself
 // (shell 0) is tried first, since cellsInShells only ever returns shells
 // 1+. Isolation (section 6): only ever reads existing claims to check for
 // overlap, never resizes/moves/touches one -- granting a claim is a
@@ -89,12 +106,29 @@ function reservedAsteroidCellKeys(world) {
 // section 4's fix, "continuing to the next available cell in shell order
 // rather than overlapping it" is exactly what this loop already does,
 // now with reserved cells added to what counts as "not free".
-function findFreeSlot(world, sizeShells) {
+//
+// `origin` defaults to world center, but callers should pass wherever
+// the requesting player actually is (render.js does) -- 2026-08-13,
+// direct insight from a player: the lattice is genuinely unbounded, so
+// there's no reason every search has to restart from the same shared
+// point and re-scan an increasingly crowded origin as more claims
+// accumulate. Search cost is bounded by MAX_CLAIM_SEARCH_SHELL
+// regardless of origin, but with a fixed origin that cost grows toward
+// the ceiling as the community grows (more claims to scan past before
+// reaching free space); with a per-player origin, each search only ever
+// needs to escape LOCAL crowding near that player, so cost stays flat no
+// matter how many total claims exist elsewhere in the lattice. The
+// tradeoff: `shellIndex` on a granted claim is relative to THAT claim's
+// own search origin, not a single shared reference point -- it's no
+// longer directly comparable across claims with different origins, only
+// meaningful as "how far this player had to search from where they
+// were."
+function findFreeSlot(world, sizeShells, origin = { x: 0, y: 0, z: 0 }) {
   const claimed = claimedCellKeys(world.getClaims());
   const reserved = reservedAsteroidCellKeys(world);
   const candidateCenters = [
-    { x: 0, y: 0, z: 0, shell: 0 },
-    ...cellsInShells(0, 0, 0, MAX_CLAIM_SEARCH_SHELL),
+    { x: origin.x, y: origin.y, z: origin.z, shell: 0 },
+    ...cellsInShells(origin.x, origin.y, origin.z, MAX_CLAIM_SEARCH_SHELL),
   ];
   for (const center of candidateCenters) {
     const footprint = footprintOf(center.x, center.y, center.z, sizeShells);
@@ -115,7 +149,7 @@ function findFreeSlot(world, sizeShells) {
 // might then fail to sync (e.g. a genuine concurrent-grant race on the
 // same free slot, caught server-side by the claims table's own primary
 // key -- see supabase/schema.sql).
-export function computeClaim(world, ownerId, sizeShells = CLAIM_SIZE_SHELLS) {
+export function computeClaim(world, ownerId, sizeShells = CLAIM_SIZE_SHELLS, origin = { x: 0, y: 0, z: 0 }) {
   // RHOMBIVERSE_SPEC_LOOPHOLES.md section 2: "one claim per verified
   // account." This is a fast, friendly pre-check against the LOCAL
   // (possibly slightly stale) claims view -- the real guarantee is
@@ -126,9 +160,9 @@ export function computeClaim(world, ownerId, sizeShells = CLAIM_SIZE_SHELLS) {
   if (alreadyOwns) {
     throw new Error('You already have a claim — one claim per player.');
   }
-  const center = findFreeSlot(world, sizeShells);
+  const center = findFreeSlot(world, sizeShells, origin);
   if (!center) {
-    throw new Error(`No free claim slot found within ${MAX_CLAIM_SEARCH_SHELL} shells of world center`);
+    throw new Error(`No free claim slot found within ${MAX_CLAIM_SEARCH_SHELL} shells of [${origin.x}, ${origin.y}, ${origin.z}]`);
   }
   // The claim's own center coordinate makes a naturally unique,
   // deterministic id -- no counter/race needed, since a candidate is
@@ -148,8 +182,8 @@ export function computeClaim(world, ownerId, sizeShells = CLAIM_SIZE_SHELLS) {
 // Convenience wrapper for local-only (non-shared, e.g. single-player or
 // tests) use: computes AND immediately applies to the local store in one
 // call, since there's no separate shared backend to race against.
-export function allocateClaim(world, ownerId, sizeShells = CLAIM_SIZE_SHELLS) {
-  const { claimId, claimData } = computeClaim(world, ownerId, sizeShells);
+export function allocateClaim(world, ownerId, sizeShells = CLAIM_SIZE_SHELLS, origin = { x: 0, y: 0, z: 0 }) {
+  const { claimId, claimData } = computeClaim(world, ownerId, sizeShells, origin);
   world.addClaim(claimId, claimData);
   return claimId;
 }
