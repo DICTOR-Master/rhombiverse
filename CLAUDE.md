@@ -2443,6 +2443,72 @@ floor still holds — population never reaches zero — for a
 maximally-stressed, high-mutation planetoid across a full
 `MAX_CATCHUP_GENERATIONS`-length run with damping active throughout.
 
+**SESSION HANDOFF, 2026-08-13 — Evolution/Animals/Lattice Zoom work
+continues in a NEW chat from here, per direct instruction (this session
+became too context-heavy to keep going in).** Everything below is
+current, real state, not aspirational — verify it holds (`git log`,
+`node --test tests/unit/`) before trusting it blindly, same as this
+file's own standing rule.
+
+**Done, real, tested, committed, and pushed — nothing uncommitted left
+behind:** `RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md` Stages 1–7 (genome/
+phenotype/coherence bounds → reproduction/HGT/sexual selection →
+environmental selection/genetic drift → deterministic seeded catch-up
+engine + punctuated equilibrium → trophic coupling/convergence →
+isolation enforcement → adaptive damping). `src/evolution.js` is a real,
+substantial module now (genome struct through `resolveCatchUpForAllPlanetoids`),
+covered by 53 of the project's 84 total unit tests. Each stage's own
+dated entry above this one has the full real detail (root causes of
+every bug found, why every tuned constant is what it is, what was
+verified and how) — this paragraph is only a pointer, not a replacement
+for reading them before touching this code.
+
+**Not started at all — genuinely nothing built yet, not even a
+first-pass attempt:**
+- Evolution **Stage 8** (Moderation Hook) and **Stage 9** (Player-Facing
+  Surface). Stage 9 matters more than its number suggests: nothing in
+  `render.js` calls `resolveCatchUpForAllPlanetoids` yet, so the entire
+  Stage 1–7 engine — real, tested, working — is currently 100% invisible
+  and inert in the actual running game. A planted organism today still
+  only grows via the OLD Wave-1 `growth.js` path (fixed species tables),
+  not genome-driven evolution, until Stage 9 wires it in.
+- `RHOMBIVERSE_SPEC_ANIMALS.md`, all 6 stages (A–F) — land/sea
+  creatures, mobility, a third trophic tier, habitat crossover. Zero
+  code exists for this yet.
+- `RHOMBIVERSE_SPEC_LATTICE_ZOOM.md`, all 6 stages — the recursive-
+  lattice-detail-on-zoom idea from this session's own design
+  discussion. Still just the drafted spec doc; not one line of
+  implementation exists. Stages 5–6 of it depend on Evolution's own
+  Stage 4/5 output, which IS now ready, but Stages 1–4 (the base
+  renderer) are unstarted rendering/graphics engineering, a genuinely
+  different kind of work from everything else in this list.
+
+**A scoping recommendation was made this session, NOT yet confirmed —
+read it, don't assume it's decided:** Stage 8 (moderation) and Animals
+Stage E/F (habitat crossover + its own moderation) were flagged as
+low-value to build right now — Stage 8 because this project already
+made a direct, reasoned call to defer the full moderation system given
+Section 1.1's coherence bounds already exclude unsafe/incoherent shapes
+and the existing flagged/removed Report tool is a real, proportionate
+safety valve at current scale; Animals Stage E because the spec's own
+language frames habitat crossover as a rare cherry-picked flourish, not
+core, with its own key parameters left explicitly undetermined.
+Stage 9 was recommended as MINIMAL wiring only (load-time + periodic
+`resolveCatchUpForAllPlanetoids` calls), not also building the
+"inspect dominant traits" tool in the same pass. Animals Stages A–D and
+all of Lattice Zoom were recommended as separate follow-up efforts, not
+squeezed into one session. **None of this was actually agreed to before
+the session ended** — the next session should either confirm this plan
+or set its own, not assume it's settled.
+
+**Direct requirement from earlier this session, already load-bearing in
+Stage 3/7's own code, keep honoring it in whatever comes next**:
+selection/damping must never drive an established lineage to full
+local extinction — `MIN_VIABLE_POPULATION=2` already enforces this for
+Evolution; if Animals' own trophic/habitat mechanics ever threaten a
+land/sea population, the same floor discipline applies, not a
+carve-out.
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.
