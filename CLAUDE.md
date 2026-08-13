@@ -2091,6 +2091,75 @@ currently in the live database load into the scene (confirmed via the
 claims-list text, which the same unconditional per-claim loop that
 builds the meshes also populates).
 
+**Evolution Stage 2 (Reproduction, Inheritance, HGT & Sexual Selection)
+done, 2026-08-13.** Added to `src/evolution.js`, still strictly a data
+layer on top of `growth.js`/`worldstate.js` — no UI wiring yet
+(automatic resolution is explicitly Stage 4's job, this stage is "trigger
+manually," per the doc's own scope). Section 2's own "on reaching
+maturitySize WITH SUFFICIENT LOCAL RESOURCE" is deliberately NOT enforced
+by anything here — resource/selection gating is Stage 3's job to layer
+on top as a caller-level check; these functions are the raw reproduction
+mechanism only. Every function takes an `rng` parameter (default
+`Math.random`) rather than hardcoding randomness — Stage 4 needs a
+SEEDED rng for real cross-client determinism, so the extension point is
+designed in now rather than retrofitted, matching how `seeds`' own
+`onSeedSet` hook was pre-wired well before its sync pass existed.
+
+Real, grounded (not guessed) design decisions: "maturity" is just
+`generation` catching up to the genome's own `maturitySize` (already
+`maxGeneration` per Stage 1's mapping — no separate tracked concept
+needed). Proximity checks (HGT's "adjacent cells," plants' "a defined
+lattice radius," both left numerically open by the spec) reuse each
+organism's REAL bounding radius (computed from `tileWorldVertices`, not
+guessed) — HGT requires structures within `1.2×` their combined radii
+(a small real-contact buffer beyond literal touching), plant pairing
+within `3×` (a "same neighborhood," not "touching," relationship) — so
+both scale correctly whether organisms are small saplings or large
+mature structures, rather than using one flat arbitrary distance for
+every organism size. Mutation delta is `10%` of each trait's own range
+width per mutation event (scales correctly per-trait rather than one
+flat number across traits with very different spans); HGT fires at a
+flat `10%` per adjacent mature pair per resolution step, explicitly
+flagged as a game-balance choice aimed at "occasional, not routine" per
+the spec's own open question, not derived from a real transfer-rate
+figure. Sexual selection (2.3) is real fitness-proportionate weighted
+selection with a `0.01` floor per candidate — a bias, never a hard
+filter, so genetic diversity can't collapse to always-the-same winner
+(protects Stage 2.2's future drift mechanism and Stage 5.1's convergent-
+evolution check before either exists yet). Species dispatch
+(`reproduce()`) matches section 2's exact rule: plants pair sexually
+when a mature, in-range candidate exists, falling back to asexual
+budding otherwise ("to avoid a hard reproduction-blocking edge case," the
+spec's own words); every other species (amoeba now, Animals' land/sea
+profiles later unless they opt in) is asexual-only, no fallback needed.
+
+Verified via `node --test` (12 new tests, 52 total, all passing):
+maturity transitions correctly at the genome's own cap; bounding radius
+is real and grows with the organism; adjacency/pairing-range checks are
+genuinely distance-based (a mid-range pair is HGT-false but pairing-true,
+not a coincidence — calibrated against the real measured single-tile
+radius, ~2.38 units, not a guessed test distance); `mutationRate=0`
+never mutates, `mutationRate=1` always does while staying fully
+in-range; blending is a plain per-trait average; `selectMate` is
+statistically biased toward the preferred trait via an exhaustive sweep
+of the rng domain (not a hope-the-sample-size-is-big-enough approach)
+while confirming the lower-trait candidate stays reachable; asexual/
+sexual/dispatch reproduction all produce correct offspring; HGT only
+fires between mature, adjacent pairs, copies exactly one trait, and
+leaves the donor untouched; and — closing the loop back to section
+1.1's own coherence guarantee — offspring genomes produced by real
+reproduction (not just hand-constructed ones) still grow into fully
+non-overlapping structures when verified through `verifyGenomeCoherence`.
+Two real test-authoring bugs caught and fixed before trusting the suite:
+an adjacency test used a "mid-range" distance that was actually still
+inside a fresh single-tile organism's own real ~2.38-unit radius (so
+both organisms' bounding spheres already overlapped at that distance,
+before HGT's 1.2x multiplier even applied), and a mutation test reused
+the same fixed rng value for both "does it fire" and "how large is the
+delta," which for that specific value produced an exactly-zero delta —
+neither was a bug in the implementation, both were caught by the test
+failing honestly rather than trusted blindly.
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.
