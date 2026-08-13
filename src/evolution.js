@@ -120,7 +120,15 @@ export function genomeToPhenotype(genome) {
 // since plantSeed's own species lookup (GROWTH_TEMPLATES[species]) would
 // reject a non-Wave-1 species label; the first tile is placed directly
 // here instead, matching plantSeed's own logic exactly.
-export function plantOrganism(world, organismId, seedId, species, genome, origin, now = Date.now()) {
+// `status` ('approved' | 'pending'), added for Stage 8 (Moderation Hook):
+// mirrors worldstate.js's own cell status vocabulary rather than inventing
+// a second one, but the DEFAULT is deliberately the opposite of cells'
+// own default -- a manually-planted organism (a deliberate player action,
+// same as a manual build) is 'approved' by default; only reproduceAsexual/
+// reproduceSexual below ever pass 'pending' explicitly, when the offspring
+// genome itself crosses the novelty threshold (section 8's own scope: a
+// GENERATION event, not a planting one).
+export function plantOrganism(world, organismId, seedId, species, genome, origin, now = Date.now(), status = 'approved') {
   const clamped = clampGenome(genome);
   const firstTriple = VALID_TRIPLES.find((t) => t.type === 'acute');
   const seed = {
@@ -132,7 +140,7 @@ export function plantOrganism(world, organismId, seedId, species, genome, origin
     tiles: [{ type: firstTriple.type, dirs: [...firstTriple.dirs], origin: [0, 0, 0] }],
   };
   world.setSeed(seedId, seed);
-  world.setOrganism(organismId, { genome: clamped, seedId, species, plantedAt: now });
+  world.setOrganism(organismId, { genome: clamped, seedId, species, plantedAt: now, status });
   return { seed, organism: world.getOrganisms()[organismId] };
 }
 
@@ -296,6 +304,69 @@ export function selectMate(world, candidateIds, preferredTrait = MATE_PREFERENCE
   return candidateIds[candidateIds.length - 1];
 }
 
+// ============================================================
+// Stage 8 -- Moderation Hook (ties to the existing Trust Zones pipeline)
+// ============================================================
+// Section 8's own scope: "a generation whose phenotype crosses a defined
+// shape-novelty threshold FROM ITS PARENT (large jump in substitution-
+// depth/branching, not routine small mutation)... routine, small-delta
+// generations do not need per-individual review." The real signal for
+// "how big a jump" is the MUTATION step itself, not lineage distance --
+// for sexual reproduction, comparing straight against either raw parent
+// would conflate this with the ordinary, expected blend-toward-the-middle
+// distance (which can be large for two very different parents even with
+// zero mutation), swamping the actual "did mutation do something
+// unusual" signal this section cares about. So novelty is measured
+// against the PRE-mutation genome (the parent's own genome for asexual
+// budding, the blended-but-unmutated genome for sexual pairing) -- the
+// isolated mutation-only delta, which is exactly what "not routine small
+// mutation" is asking about.
+//
+// Distance is the average, per-trait, RANGE-NORMALIZED absolute
+// difference (0 = identical, 1 = every trait moved across its entire
+// valid range) -- normalized per trait so traits with different real
+// spans contribute comparably, same reasoning MUTATION_DELTA_FRACTION
+// above already uses.
+function genomeNoveltyDistance(genomeA, genomeB) {
+  const a = clampGenome(genomeA);
+  const b = clampGenome(genomeB);
+  let total = 0;
+  let count = 0;
+  for (const [trait, range] of Object.entries(GENOME_TRAIT_RANGES)) {
+    const width = range[1] - range[0];
+    total += Math.abs(a[trait] - b[trait]) / width;
+    count++;
+  }
+  return total / count;
+}
+
+// Real ceiling, not guessed: ONE mutateGenome call can shift a given
+// trait by at most MUTATION_DELTA_FRACTION (0.1) of its own range, so
+// even in the most extreme case -- every one of the 5 traits firing and
+// shifting by the maximum delta in the same tick -- the average
+// normalized distance this function can ever produce tops out at exactly
+// 0.1. A "large jump" therefore has to sit meaningfully below that
+// absolute ceiling (a threshold at or above 0.1 could never fire at
+// all), while staying well above what ordinary reproduction typically
+// produces (1-2 traits firing at a middling magnitude averages roughly
+// 0.01-0.03). 0.06 requires most/all traits to fire at a large magnitude
+// in the same event -- reliably reachable during a punctuated-
+// equilibrium jolt (which raises how many traits are LIKELY to fire, not
+// how large any one delta can be) or from a naturally high-mutationRate
+// genome, and reliably NOT reached by routine single/dual-trait
+// mutation -- flagged as tunable, matching this project's established
+// "first-guess, verify against real output" convention for exactly this
+// class of constant (e.g. roundStructure's 0.75).
+export const SHAPE_NOVELTY_THRESHOLD = 0.06;
+
+// Exported for the test suite and for any future review-queue UI (Stage
+// 9 and beyond) that wants to re-check a stored organism's own novelty
+// history -- not used by any other runtime code path besides
+// reproduceAsexual/reproduceSexual below.
+export function isShapeNoveltyJump(preMutationGenome, offspringGenome, threshold = SHAPE_NOVELTY_THRESHOLD) {
+  return genomeNoveltyDistance(preMutationGenome, offspringGenome) >= threshold;
+}
+
 // Amoeba's own reproduction channel (section 2): asexual budding, a
 // mutated copy of the parent's own genome. `offspringOrigin` is caller-
 // supplied rather than computed here -- real placement choice belongs to
@@ -304,7 +375,9 @@ export function selectMate(world, candidateIds, preferredTrait = MATE_PREFERENCE
 export function reproduceAsexual(world, parentOrganismId, offspringOrganismId, offspringSeedId, offspringOrigin, now = Date.now(), rng = Math.random, mutationRateOverride = undefined) {
   const parent = world.getOrganisms()[parentOrganismId];
   if (!parent) return null;
-  return plantOrganism(world, offspringOrganismId, offspringSeedId, parent.species, mutateGenome(parent.genome, rng, mutationRateOverride), offspringOrigin, now);
+  const offspringGenome = mutateGenome(parent.genome, rng, mutationRateOverride);
+  const status = isShapeNoveltyJump(parent.genome, offspringGenome) ? 'pending' : 'approved';
+  return plantOrganism(world, offspringOrganismId, offspringSeedId, parent.species, offspringGenome, offspringOrigin, now, status);
 }
 
 // Plants' own reproduction channel (section 2): bounded blend of both
@@ -313,7 +386,10 @@ export function reproduceSexual(world, parentAId, parentBId, offspringOrganismId
   const a = world.getOrganisms()[parentAId];
   const b = world.getOrganisms()[parentBId];
   if (!a || !b) return null;
-  return plantOrganism(world, offspringOrganismId, offspringSeedId, a.species, mutateGenome(blendGenomes(a.genome, b.genome), rng, mutationRateOverride), offspringOrigin, now);
+  const blended = blendGenomes(a.genome, b.genome);
+  const offspringGenome = mutateGenome(blended, rng, mutationRateOverride);
+  const status = isShapeNoveltyJump(blended, offspringGenome) ? 'pending' : 'approved';
+  return plantOrganism(world, offspringOrganismId, offspringSeedId, a.species, offspringGenome, offspringOrigin, now, status);
 }
 
 // Species-level dispatch, matching section 2's own rules exactly: plants

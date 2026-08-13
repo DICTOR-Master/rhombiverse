@@ -49,6 +49,8 @@ import {
   SWING_FRACTION_THRESHOLD,
   VOLATILITY_DECAY_FACTOR,
   MIN_MUTATION_CEILING,
+  isShapeNoveltyJump,
+  SHAPE_NOVELTY_THRESHOLD,
 } from '../../src/evolution.js';
 import { createWorldStore } from '../../src/worldstate.js';
 
@@ -910,4 +912,107 @@ test('Extinction floor still holds under real adaptive damping: a harsh, high-mu
   const result = resolveCatchUpForAllPlanetoids(world, ids, now);
   const final = Object.values(result)[0];
   assert.ok(final.organismIds.length >= 1, 'population must never reach zero, even under maximal stress with damping active');
+});
+
+// ============================================================
+// Stage 8 -- Moderation Hook
+// ============================================================
+
+// A scripted rng alternating [always-fire, always-max-positive-delta] --
+// forces every trait mutateGenome visits to shift by the maximum
+// possible delta (MUTATION_DELTA_FRACTION of its own range) in the same
+// tick, the real worst case genomeNoveltyDistance can ever produce from
+// one mutation event (see SHAPE_NOVELTY_THRESHOLD's own comment).
+function maxDeltaRng() {
+  let call = 0;
+  return () => (call++ % 2 === 0 ? 0 : 1);
+}
+
+// A scripted rng that never fires at all (every "does it fire" check
+// reads 1, always >= any real effectiveRate) -- the zero-mutation floor.
+function neverFireRng() {
+  return () => 1;
+}
+
+test('isShapeNoveltyJump: identical genomes are never novel; maximally-different genomes are', () => {
+  const base = clampGenome({});
+  assert.equal(isShapeNoveltyJump(base, base), false);
+  const extreme = {};
+  for (const trait of Object.keys(GENOME_TRAIT_RANGES)) {
+    extreme[trait] = GENOME_TRAIT_RANGES[trait][1];
+  }
+  assert.equal(isShapeNoveltyJump(base, clampGenome(extreme)), true);
+});
+
+test('isShapeNoveltyJump: SHAPE_NOVELTY_THRESHOLD sits below the real ceiling one mutateGenome call can ever produce', () => {
+  // Real ceiling: every trait fires and shifts by the max delta ->
+  // average normalized distance == MUTATION_DELTA_FRACTION exactly.
+  const parent = clampGenome({});
+  const offspring = mutateGenome(parent, maxDeltaRng(), 1);
+  assert.ok(isShapeNoveltyJump(parent, offspring), 'the real worst-case single mutation must be reachable as a novelty jump');
+  assert.ok(SHAPE_NOVELTY_THRESHOLD < 0.1, 'threshold must sit below the real 0.1 per-event ceiling or it could never fire');
+});
+
+test('reproduceAsexual: routine mutation (never-fire rng, zero delta) produces an approved offspring, never pending', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'parent', 'seed_parent', 'amoeba', { mutationRate: 0.5 }, [0, 0, 0], 0);
+  const { organism } = reproduceAsexual(world, 'parent', 'child', 'seed_child', [5, 0, 0], 1000, neverFireRng());
+  assert.equal(organism.status, 'approved');
+});
+
+test('reproduceAsexual: a scripted maximal mutation burst (every trait, max delta) produces a pending offspring', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'parent', 'seed_parent', 'amoeba', {}, [0, 0, 0], 0);
+  const { organism } = reproduceAsexual(world, 'parent', 'child', 'seed_child', [5, 0, 0], 1000, maxDeltaRng(), 1);
+  assert.equal(organism.status, 'pending');
+});
+
+test('reproduceSexual: novelty is measured against the BLENDED-but-unmutated genome, not either raw parent -- two very different parents blending routinely (no extra mutation) still stay approved', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'a', 'seed_a', 'plant', { resourceEfficiency: 0 }, [0, 0, 0], 0);
+  plantOrganism(world, 'b', 'seed_b', 'plant', { resourceEfficiency: 1 }, [10, 0, 0], 0);
+  // never-fire rng: pure blend, zero mutation-induced delta, even though
+  // the two parents themselves are maximally different on this trait.
+  const { organism } = reproduceSexual(world, 'a', 'b', 'child', 'seed_child', [5, 0, 0], 1000, neverFireRng());
+  assert.equal(organism.status, 'approved');
+});
+
+test('reproduceSexual: a scripted maximal mutation burst on top of the blend still produces a pending offspring', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'a', 'seed_a', 'plant', {}, [0, 0, 0], 0);
+  plantOrganism(world, 'b', 'seed_b', 'plant', {}, [10, 0, 0], 0);
+  const { organism } = reproduceSexual(world, 'a', 'b', 'child', 'seed_child', [5, 0, 0], 1000, maxDeltaRng(), 1);
+  assert.equal(organism.status, 'pending');
+});
+
+test('plantOrganism: a manually/directly planted organism (not a reproduction event) defaults to approved, never pending', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  const { organism } = plantOrganism(world, 'o1', 'seed_o1', 'amoeba', {}, [0, 0, 0], 0);
+  assert.equal(organism.status, 'approved');
+});
+
+test('Punctuated-equilibrium composition: a jolt-boosted effective mutation rate produces measurably more pending offspring than baseline over many reproduction events, without flooding the queue (most still approved)', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  const rng = createSeededRng(42);
+
+  let baselinePending = 0;
+  const trials = 60;
+  for (let i = 0; i < trials; i++) {
+    plantOrganism(world, `p${i}`, `seed_p${i}`, 'amoeba', { mutationRate: 0.1 }, [0, 0, 0], 0);
+    const { organism } = reproduceAsexual(world, `p${i}`, `c${i}`, `seed_c${i}`, [5, 0, 0], 1000, rng);
+    if (organism.status === 'pending') baselinePending++;
+  }
+
+  let boostedPending = 0;
+  for (let i = 0; i < trials; i++) {
+    plantOrganism(world, `bp${i}`, `seed_bp${i}`, 'amoeba', { mutationRate: 0.1 }, [0, 0, 0], 0);
+    // mutationRateOverride simulates a fresh jolt's full boost -- every
+    // trait now independently likely to fire, same shape resolveOneGeneration
+    // itself applies via effectiveMutationRate.
+    const { organism } = reproduceAsexual(world, `bp${i}`, `bc${i}`, `seed_bc${i}`, [5, 0, 0], 1000, rng, 1);
+    if (organism.status === 'pending') boostedPending++;
+  }
+
+  assert.ok(boostedPending > baselinePending, `expected the jolt-boosted run (${boostedPending}/${trials} pending) to flag more than baseline (${baselinePending}/${trials})`);
+  assert.ok(boostedPending < trials, 'even a full boost must not flag literally every offspring -- the queue must not be flooded wholesale');
 });
