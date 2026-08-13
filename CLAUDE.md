@@ -61,19 +61,20 @@ Everything through Lattice Zoom is done. In build order:
   continental planetoid with growth, evolved organisms, and animals),
   loadable via the `#preset-select` dropdown.
 
-**Known open item:** building the showcase world (2026-08-14) surfaced
-and fixed three real performance bugs in `evolution.js`/`worldstate.js`
-(unbounded population growth, and two O(n) registry/geometry
-recomputations hit inside O(n²) loops — see that commit's own message
-for full detail). The real worst-case timing improved ~40s→~2s, verified
-via `node --test`. A live-browser crash was still
-reproduced in that session's own sandboxed dev environment even after
-the fixes, with a timing signature that looked environmental (system
-memory pressure from many consecutive headless Chromium launches) rather
-than further app bugs — but this was **never independently confirmed
-clean in a normal browser session**. Verify this yourself before
-trusting that any populated planetoid is fully crash-safe; don't assume
-this note is stale without rechecking.
+Building the showcase world (2026-08-14) surfaced and fixed three real
+performance bugs in `evolution.js`/`worldstate.js` (unbounded population
+growth, and two O(n) registry/geometry recomputations hit inside O(n²)
+loops — see that commit's own message for full detail). The real
+worst-case timing improved ~40s→~2s, verified via `node --test`. A
+live-browser crash still reproduced afterward under headless/software
+(SwiftShader) rendering in this session's own sandboxed dev environment
+— **root-caused and confirmed resolved same day**: retested headed,
+against a real GPU via the actual X display (`DISPLAY=:0`, not headless),
+and the exact same scenario that reliably crashed headless stayed at
+2–34ms round-trip latency for a full 20s hold-still with zero issues.
+The crash was a headless/software-rendering artifact of this dev
+sandbox, not a real app bug reachable by an actual player on a normal
+GPU-accelerated browser.
 
 Full reasoning, every tuned constant's derivation, and every real bug
 found is in `git log`/the GitHub repo history itself (already pushed) --

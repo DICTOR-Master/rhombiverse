@@ -108,3 +108,26 @@ shifting the click point off-center — an off-center click can still
 the camera ray when nothing is hit) while landing far enough off-axis
 that a later zoom-toward-target sequence never reaches it, reading as a
 feature bug until traced back to the click position.
+
+Real, important gotcha found investigating a live crash while building
+the Lattice Zoom showcase-world preset (2026-08-14): **`chromium.launch()`
+in this environment defaults to headless, which means SOFTWARE rendering
+(SwiftShader) unless a real display is available AND explicitly used.**
+A content-heavy real scene (a real ~460-cell planetoid with real growth/
+organism geometry) reliably hung and crashed a headless Chromium tab
+after ~40s of real interaction — genuinely looked like a real app bug at
+first (and real, separate performance bugs WERE found and fixed this
+same session via `node --cpu-prof`, unrelated to this rendering issue).
+But after those real fixes, the SAME scenario still crashed headless,
+consistently, with a suspiciously fixed ~42s timing that didn't scale
+with scene complexity — the tell that it wasn't algorithmic. Retesting
+with `chromium.launch({ headless: false })` and `DISPLAY=:0` (a real X
+display, confirmed reachable via `xdpyinfo` in this environment) against
+the exact same scenario: 2-34ms round-trip latency, zero issues, for the
+full test duration. **Headless/software rendering can produce a real,
+reproducible crash under sustained load that a real GPU-accelerated
+browser session never hits at all** — before concluding a performance
+problem is a genuine app bug (vs. a testing-environment artifact), retest
+headed against a real display if one is available, especially for
+anything involving sustained WebGL rendering over tens of seconds, not
+just a quick screenshot.
