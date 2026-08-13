@@ -57,6 +57,13 @@ import {
 // pushTradePropose/Confirm/Cancel instead.
 import { applyInventoryDecay } from './trade.js';
 import { GROWTH_TEMPLATES, plantSeed, applyGrowth, tileWorldVertices } from './growth.js';
+import {
+  GENOME_TRAIT_RANGES,
+  plantOrganism,
+  resolveCatchUpForAllPlanetoids,
+  averageTraitValue,
+  planetoidKeyFor,
+} from './evolution.js';
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -164,6 +171,15 @@ let planetoids = {};
 // `world` itself is declared, so it's kept in sync via refreshClaims()
 // (inside init()) instead of read from world directly.
 let currentClaims = {};
+// RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 9: mirrors
+// world.getOrganisms(), same module-level pattern as planetoids/
+// currentClaims above -- updateEvolutionInfo() lives outside init()'s
+// scope (it needs to run from the same call sites as updateGravityInfo,
+// several of which are also module-level) but the underlying `organisms`
+// registry only ever changes inside init()/onChange()/the periodic
+// catch-up tick, all of which already have `world` in scope to refresh
+// this from directly.
+let organismsSnapshot = {};
 
 // Shared World (Phase 5) state. sharedWorldActive gates both directions
 // of sync: whether local mutations get pushed (handleLocalAdd/Remove,
@@ -260,6 +276,94 @@ function updateGravityInfo() {
     `recommended core: ${nearest.coreShellRecommendation} shell${nearest.coreShellRecommendation === 1 ? '' : 's'}${hydro}${blackHole}${star}`;
 }
 
+// RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 9: the one call site that
+// actually drives the Stage 1-7 catch-up engine, which until now was
+// real, tested, and 100% inert in the live game (nothing called it).
+// Resolves every planetoid's own organisms independently (Stage 6's
+// isolation), returns whether anything actually changed (new offspring,
+// removed-by-selection organisms, or ordinary growth) so the caller only
+// pays for a rebuildAllGrowth() when something real happened -- same
+// "cheap no-op most ticks" shape growth.js's own applyGrowth already has.
+// Deliberately local-only for this pass: `organisms`/`planetoidEvolution`
+// have no Supabase sync path yet (unlike `seeds`, which gained one
+// earlier this session) -- flagged honestly as a known gap rather than
+// silently assumed solved, same discipline as every other deferred-sync
+// registry this project has shipped before its own sync pass existed.
+function resolveEvolution(world, now) {
+  const organismIds = Object.keys(world.getOrganisms());
+  if (organismIds.length === 0) return false;
+  const results = resolveCatchUpForAllPlanetoids(world, organismIds, now);
+  return Object.values(results).some((r) => r.generationsResolved > 0);
+}
+
+// Refreshes organismsSnapshot with each organism's own seed origin
+// pre-attached -- keeps updateEvolutionInfo below fully self-contained
+// (reads only module-level state, same as updateGravityInfo/
+// updateBeltHint), rather than needing `world` itself in scope, which
+// isn't available to the module-level call sites (e.g. the animate()
+// render loop) this needs to run from.
+function refreshOrganismsSnapshot(world) {
+  const seeds = world.getSeeds();
+  organismsSnapshot = Object.fromEntries(
+    Object.entries(world.getOrganisms()).map(([id, o]) => [id, { ...o, origin: seeds[o.seedId]?.origin }])
+  );
+}
+
+// RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md section 9's own read-only
+// "inspect dominant traits" tool -- observation only, never a breeding/
+// culling control, per that section's explicit governing decision. Scoped
+// to whichever planetoid updateGravityInfo is already reporting on (same
+// refPos logic), so a player reads "what's evolving HERE" rather than a
+// whole-world aggregate that would blur together isolated planetoids
+// (RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md section 6's own Isolation law
+// -- a UI that averaged across planetoids would visually contradict the
+// very isolation the simulation itself enforces).
+function updateEvolutionInfo() {
+  const el = document.getElementById('evolution-info');
+  if (!el) return;
+  const refPos = walking && player ? player.getPosition() : controls.target;
+  const nearest = nearestPlanetoid(refPos, planetoids);
+  const allIds = Object.keys(organismsSnapshot);
+  if (allIds.length === 0) {
+    el.textContent = 'No evolving life yet — Plant an "(evolving)" species to start a real, adapting population.';
+    return;
+  }
+  // Same planetoid-grouping key evolution.js's own groupOrganismsByPlanetoid
+  // uses, so "here" means the exact same planetoid the catch-up engine
+  // itself resolves independently -- not re-derived a second way.
+  const key = nearest ? planetoidKeyFor(nearest.centerOfMass) : null;
+  const localIds = key
+    ? allIds.filter((id) => {
+        const origin = organismsSnapshot[id].origin;
+        if (!origin) return false;
+        const p = nearestPlanetoid({ x: origin[0], y: origin[1], z: origin[2] }, planetoids);
+        return p && planetoidKeyFor(p.centerOfMass) === key;
+      })
+    : [];
+  if (localIds.length === 0) {
+    el.textContent = 'No evolving life near this planetoid yet.';
+    return;
+  }
+  const bySpecies = {};
+  for (const id of localIds) {
+    const s = organismsSnapshot[id].species;
+    bySpecies[s] = (bySpecies[s] ?? 0) + 1;
+  }
+  const mix = Object.entries(bySpecies)
+    .map(([s, n]) => `${n} ${s}`)
+    .join(', ');
+  const avgEfficiency = averageTraitValue(
+    { getOrganisms: () => organismsSnapshot },
+    localIds,
+    'resourceEfficiency'
+  );
+  const avgMutation = averageTraitValue({ getOrganisms: () => organismsSnapshot }, localIds, 'mutationRate');
+  const pendingCount = localIds.filter((id) => organismsSnapshot[id].status === 'pending').length;
+  el.textContent =
+    `Life here: ${mix} · avg resourceEfficiency ${avgEfficiency.toFixed(2)} · avg mutationRate ${avgMutation.toFixed(2)}` +
+    (pendingCount > 0 ? ` · ${pendingCount} pending review` : '');
+}
+
 // RHOMBIVERSE_SPEC_ASTEROIDS.md UI: belts sit 80+ units from the default
 // camera framing -- without this, a player has no way to discover or
 // reach them at all short of reading source. listBelts() is a pure
@@ -294,6 +398,7 @@ function enterWalk() {
   player.requestLock();
   updateGravityInfo();
   updateBeltHint();
+  updateEvolutionInfo();
 }
 
 function exitWalk() {
@@ -306,6 +411,7 @@ function exitWalk() {
   document.getElementById('walk-hint').style.display = 'none';
   updateGravityInfo();
   updateBeltHint();
+  updateEvolutionInfo();
 }
 
 document.getElementById('walk-toggle').addEventListener('click', () => {
@@ -433,9 +539,26 @@ const SPECIES_COLORS = {
   scallop: 0xe0a598,
   spineling: 0xc9b896,
   'cluster-frame': 0x8a8f99,
+  // Evolution Stage 9 -- genome-driven organisms (evolution.js's own
+  // plantOrganism/reproduceAsexual/reproduceSexual), distinct from the
+  // fixed Wave-1/Wave-2 templates above: a warmer, saturated palette so
+  // an evolving structure reads as visibly different in kind, not just
+  // another named template.
+  amoeba_evolved: 0x6ee7b7,
+  plant_evolved: 0x86efac,
 };
 
+// evolution.js's own plantOrganism deliberately namespaces the
+// underlying seed's `species` field as `organism:<species>` (see its own
+// header comment) so it can never collide with a real GROWTH_TEMPLATES
+// key -- unwrap that prefix here so an evolved organism still gets a
+// real color instead of falling through to the ?? 0xffffff default.
+const ORGANISM_SEED_SPECIES_PREFIX = 'organism:';
 function speciesColor(species) {
+  if (species.startsWith(ORGANISM_SEED_SPECIES_PREFIX)) {
+    const base = species.slice(ORGANISM_SEED_SPECIES_PREFIX.length);
+    return new THREE.Color(SPECIES_COLORS[`${base}_evolved`] ?? SPECIES_COLORS[base] ?? 0xffffff);
+  }
   return new THREE.Color(SPECIES_COLORS[species] ?? 0xffffff);
 }
 
@@ -616,6 +739,24 @@ async function init() {
   renderTradePanel();
   rebuildAllGrowth();
 
+  // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md section 4's own "on
+  // planetoid_load(planetoid)" -- resolve however much real time passed
+  // while nobody was here BEFORE the player sees anything, same as the
+  // spec's own pseudocode names it. Deliberately NOT run while Shared
+  // World is active (see resolveEvolution's own header): organisms/
+  // planetoidEvolution have no sync path yet, so mutating them locally
+  // against a shared view would desync exactly like Undo/New World are
+  // already guarded against. Saves unconditionally (not just when
+  // something visibly changed) whenever any organism exists, for the
+  // same real reason the periodic tick below does -- see that call
+  // site's own header for the bug this fixes.
+  if (!sharedWorldActive && Object.keys(world.getOrganisms()).length > 0) {
+    if (resolveEvolution(world, Date.now())) rebuildAllGrowth();
+    saveToLocalStorage(world.toJSON());
+  }
+  refreshOrganismsSnapshot(world);
+  updateEvolutionInfo();
+
   // RHOMBIVERSE_SPEC_ASTEROIDS.md UI: belts are otherwise undiscoverable
   // (80+ units from the default camera framing, no minimap) -- one
   // button per belt reframes the camera exactly like the initial
@@ -635,6 +776,7 @@ async function init() {
       controls.target.set(bx, by, bz);
       updateGravityInfo();
       updateBeltHint();
+      updateEvolutionInfo();
     });
     beltNavRow.appendChild(btn);
   }
@@ -813,6 +955,8 @@ async function init() {
     updateGravityInfo();
     updateBeltHint();
     updateInventoryHint();
+    refreshOrganismsSnapshot(world);
+    updateEvolutionInfo();
     const afterJSON = world.toJSON();
     const afterStr = JSON.stringify(afterJSON);
     if (afterStr !== lastSnapshot) {
@@ -961,9 +1105,44 @@ async function init() {
     const species = document.getElementById('species-select').value;
     seedCounter += 1;
     const seedId = `seed_${Date.now()}_${seedCounter}`;
-    const seed = plantSeed(world, seedId, species, origin);
+    let seed;
+    // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 9: 'evo-*' options
+    // are the one new player-facing lever this stage adds -- plant a
+    // REAL, genome-bearing organism (evolution.js's plantOrganism)
+    // instead of a fixed Wave-1/Wave-2 template seed. Per section 9's own
+    // governing decision ("no breeding/culling UI"), the player never
+    // hand-edits genome numbers -- a starting genome is drawn uniformly
+    // at random within each trait's own real, coherence-bounded range
+    // (GENOME_TRAIT_RANGES), the same "player influences conditions, not
+    // genes directly" framing every other lever in section 9 already
+    // uses (this is just the FOUNDING lever: what starts on the
+    // planetoid at all).
+    if ((species === 'evo-amoeba' || species === 'evo-plant') && sharedWorldActive) {
+      // organisms/planetoidEvolution have no Supabase sync path yet
+      // (see resolveEvolution's own header) -- planting one here would
+      // sync the underlying SEED (seeds already sync) but not the
+      // organism record behind it, leaving every other client with a
+      // frozen, never-evolving tile cluster instead of a real shared
+      // organism. Blocked outright rather than shipping a silently
+      // half-synced experience.
+      alert('Evolving species require local (non-Shared-World) play for now -- disable Shared World first.');
+      return;
+    }
+    if (species === 'evo-amoeba' || species === 'evo-plant') {
+      const evoSpecies = species.slice('evo-'.length);
+      const genome = {};
+      for (const [trait, [min, max]] of Object.entries(GENOME_TRAIT_RANGES)) {
+        genome[trait] = min + Math.random() * (max - min);
+      }
+      const organismId = `organism_${Date.now()}_${seedCounter}`;
+      ({ seed } = plantOrganism(world, organismId, seedId, evoSpecies, genome, origin));
+    } else {
+      seed = plantSeed(world, seedId, species, origin);
+    }
     rebuildSeedMeshes(seedId, seed);
     if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
+    refreshOrganismsSnapshot(world);
+    updateEvolutionInfo();
   });
   updateModeUI();
 
@@ -1673,6 +1852,38 @@ async function init() {
       rebuildAllGrowth();
       if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
     }
+    // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md section 4: the same
+    // periodic-tick shape covers real elapsed time for organisms too --
+    // most ticks resolve zero generations (EVOLUTION_GENERATION_
+    // INTERVAL_MS is 30s, this tick is 5s) and are cheap no-ops, exactly
+    // like applyGrowth's own cooldown above. Gated off while Shared
+    // World is active for the same reason the initial on-load resolve
+    // is (see resolveEvolution's own header -- no sync path yet).
+    //
+    // Real bug caught by a live Playwright run before trusting this:
+    // resolveCatchUpForAllPlanetoids advances each planetoid's own
+    // lastSimulated/rngState bookkeeping in the LIVE in-memory world
+    // object on every call, even when zero generations resolve -- that
+    // part is correct and accumulates fine across ticks within one
+    // continuous session. But this used to only call saveToLocalStorage
+    // when resolveEvolution returned true (something visibly changed),
+    // exactly mirroring applyGrowth's own pattern above -- which is
+    // wrong here specifically, because unlike a growth seed (whose
+    // lastGrowthAt is never touched at all unless real growth happens),
+    // a brand-new planetoid's very first resolve falls back to `now` as
+    // its baseline lastSimulated and only that in-memory value ever
+    // advances it correctly afterward. A page reload before the first
+    // real generation ever resolves (up to a 30s window) would have lost
+    // that in-memory baseline entirely, silently resetting the clock.
+    // Saving on every tick that has at least one organism to track
+    // (regardless of whether this specific tick grew anything) closes
+    // that gap.
+    if (!sharedWorldActive && Object.keys(world.getOrganisms()).length > 0) {
+      if (resolveEvolution(world, Date.now())) rebuildAllGrowth();
+      saveToLocalStorage(world.toJSON());
+    }
+    refreshOrganismsSnapshot(world);
+    updateEvolutionInfo();
     if (world.entries().length === before) return;
     rebuildInstances(mesh, world, currentMode === 'report');
     if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
@@ -1698,6 +1909,7 @@ function animate() {
     // player position changes every frame, unlike Build mode's onChange-driven updates
     updateGravityInfo();
     updateBeltHint();
+    updateEvolutionInfo();
   } else {
     controls.update();
   }

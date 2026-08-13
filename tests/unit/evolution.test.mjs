@@ -53,6 +53,7 @@ import {
   SHAPE_NOVELTY_THRESHOLD,
 } from '../../src/evolution.js';
 import { createWorldStore } from '../../src/worldstate.js';
+import { applyGrowth } from '../../src/growth.js';
 
 function growToMaturity(world, organismId, maxTicks = 20) {
   let now = 0;
@@ -983,6 +984,25 @@ test('reproduceSexual: a scripted maximal mutation burst on top of the blend sti
   plantOrganism(world, 'b', 'seed_b', 'plant', {}, [10, 0, 0], 0);
   const { organism } = reproduceSexual(world, 'a', 'b', 'child', 'seed_child', [5, 0, 0], 1000, maxDeltaRng(), 1);
   assert.equal(organism.status, 'pending');
+});
+
+test('plantOrganism: an organism seed never collides with a real GROWTH_TEMPLATES key -- growth.js\'s applyGrowth() (called unconditionally on every seed by render.js\'s periodic tick) must be a total no-op against it', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  // 'amoeba' is deliberately the real colliding case: it's both a valid
+  // organism dispatch species AND a real Wave-1 GROWTH_TEMPLATES key.
+  const { seed, organism } = plantOrganism(world, 'o1', 'seed_o1', 'amoeba', { maturitySize: 10 }, [0, 0, 0], 0);
+  assert.notEqual(seed.species, 'amoeba', 'the underlying seed must not carry the raw, collidable species string');
+  assert.equal(organism.species, 'amoeba', 'the ORGANISM record itself must still carry the plain dispatch species');
+
+  // Advance well past growth.js's own 30s tick cooldown and Wave-1
+  // amoeba's own maxGeneration (3) -- if applyGrowth mistakenly matched
+  // this seed against GROWTH_TEMPLATES.amoeba, it would have grown and
+  // capped out by now using the WRONG (template, not genome-driven) bias.
+  const changed = applyGrowth(world, 200000);
+  assert.equal(changed, false, 'applyGrowth must never touch an organism-tracked seed');
+  const seedAfter = world.getSeeds()['seed_o1'];
+  assert.equal(seedAfter.generation, 0, 'only growOrganism (genome-driven) may grow an organism seed, never the template path');
+  assert.equal(seedAfter.tiles.length, 1);
 });
 
 test('plantOrganism: a manually/directly planted organism (not a reproduction event) defaults to approved, never pending', () => {

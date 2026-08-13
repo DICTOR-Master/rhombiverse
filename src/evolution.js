@@ -120,6 +120,29 @@ export function genomeToPhenotype(genome) {
 // since plantSeed's own species lookup (GROWTH_TEMPLATES[species]) would
 // reject a non-Wave-1 species label; the first tile is placed directly
 // here instead, matching plantSeed's own logic exactly.
+//
+// Real bug, caught before Stage 9 ever wired this into the live
+// render.js pipeline (where it would otherwise have gone live silently):
+// the SEED's own `species` field was being set to the exact same string
+// as the organism's dispatch species (e.g. 'amoeba') -- which collides
+// with growth.js's OWN GROWTH_TEMPLATES['amoeba'] key. Once anything
+// calls growth.js's applyGrowth() (render.js's existing periodic tick
+// already does, for every ordinary Wave-1/Wave-2 seed) it iterates
+// EVERY seed in the registry unconditionally and calls growSeed(seed,
+// now) with NO phenotype override -- for an organism-seed whose species
+// happened to read 'amoeba', that would silently apply the FIXED Wave-1
+// amoeba template's own bias/maxGeneration (oblate, 1 face/tick, cap 3)
+// as a second, competing growth path racing against growOrganism's own
+// genome-driven one, with whichever tick fires first each cycle
+// consuming the seed's shared cooldown. Fixed by giving the underlying
+// SEED a namespaced species string (`organism:<species>`) that can never
+// collide with a real GROWTH_TEMPLATES key, while the ORGANISM record's
+// own `species` field (used for reproduce()'s sexual/asexual dispatch
+// and display) stays the plain, undecorated value everywhere else in
+// this file already expects. growSeed's own `GROWTH_TEMPLATES[seed.
+// species]?.maxGeneration === undefined` early-return then makes
+// applyGrowth a guaranteed no-op for any organism-seed, by construction,
+// not by teaching growth.js anything about organisms.
 // `status` ('approved' | 'pending'), added for Stage 8 (Moderation Hook):
 // mirrors worldstate.js's own cell status vocabulary rather than inventing
 // a second one, but the DEFAULT is deliberately the opposite of cells'
@@ -128,11 +151,12 @@ export function genomeToPhenotype(genome) {
 // reproduceSexual below ever pass 'pending' explicitly, when the offspring
 // genome itself crosses the novelty threshold (section 8's own scope: a
 // GENERATION event, not a planting one).
+export const ORGANISM_SEED_SPECIES_PREFIX = 'organism:';
 export function plantOrganism(world, organismId, seedId, species, genome, origin, now = Date.now(), status = 'approved') {
   const clamped = clampGenome(genome);
   const firstTriple = VALID_TRIPLES.find((t) => t.type === 'acute');
   const seed = {
-    species,
+    species: `${ORGANISM_SEED_SPECIES_PREFIX}${species}`,
     origin,
     plantedAt: now,
     lastGrowthAt: now,
