@@ -224,6 +224,14 @@ export function createBuildController({
 
     const mode = getMode();
     if (!mode) return; // e.g. Walk mode active -- editing is disabled while walking
+    // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md: Plant mode's own click handling
+    // lives entirely in render.js (a separate listener on the same
+    // canvas) -- this is the one line of awareness build.js needs so its
+    // own unconditional "build" fallthrough below doesn't ALSO place a
+    // normal RD cell on every Plant-mode click. Not an import, not
+    // growth-specific logic, just a mode-string no-op matching the same
+    // shape as every other mode branch here.
+    if (mode === 'plant') return;
 
     if (onCellClicked) onCellClicked(cell);
 
@@ -341,11 +349,72 @@ export function createBuildController({
     onChange();
   }
 
+  // Touch support, 2026-08-13. Tap-to-build needed zero new code here --
+  // browsers already synthesize a 'click' from a real tap (OrbitControls'
+  // own one-finger-drag-orbit already relies on this NOT firing on a real
+  // drag, so onClick above already does the right thing for a tap). What
+  // touch has no built-in equivalent for is right-click-to-remove; the
+  // industry-standard mapping (Minecraft Bedrock, and the wider
+  // voxel-builder convention researched before building this) is
+  // long-press. Reuses onContextMenu directly via a synthetic event
+  // object rather than duplicating its logic.
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let longPressTimer = null;
+  let longPressFired = false;
+  const LONG_PRESS_MS = 500;
+  const LONG_PRESS_MOVE_TOLERANCE = 12; // px -- a held finger drifts a little even at rest
+
+  function onTouchStart(event) {
+    if (event.touches.length !== 1) {
+      // A second finger means pinch-zoom, not a build/remove gesture --
+      // leave it to OrbitControls and cancel any pending long-press.
+      clearTimeout(longPressTimer);
+      return;
+    }
+    const t = event.touches[0];
+    touchStartX = t.clientX;
+    touchStartY = t.clientY;
+    longPressFired = false;
+    clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(() => {
+      longPressFired = true;
+      onContextMenu({ preventDefault: () => {}, clientX: touchStartX, clientY: touchStartY });
+    }, LONG_PRESS_MS);
+  }
+
+  function onTouchMove(event) {
+    if (event.touches.length !== 1) {
+      clearTimeout(longPressTimer);
+      return;
+    }
+    const t = event.touches[0];
+    const moved = Math.hypot(t.clientX - touchStartX, t.clientY - touchStartY);
+    if (moved > LONG_PRESS_MOVE_TOLERANCE) clearTimeout(longPressTimer);
+  }
+
+  function onTouchEnd(event) {
+    clearTimeout(longPressTimer);
+    if (longPressFired) {
+      // The browser would otherwise also synthesize a 'click' right
+      // after this touchend -- without suppressing it, a long-press
+      // remove would immediately place a new block via onClick.
+      event.preventDefault();
+    }
+  }
+
   renderer.domElement.addEventListener('click', onClick);
   renderer.domElement.addEventListener('contextmenu', onContextMenu);
+  renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: true });
+  renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: true });
+  renderer.domElement.addEventListener('touchend', onTouchEnd);
 
   return function dispose() {
     renderer.domElement.removeEventListener('click', onClick);
     renderer.domElement.removeEventListener('contextmenu', onContextMenu);
+    renderer.domElement.removeEventListener('touchstart', onTouchStart);
+    renderer.domElement.removeEventListener('touchmove', onTouchMove);
+    renderer.domElement.removeEventListener('touchend', onTouchEnd);
+    clearTimeout(longPressTimer);
   };
 }

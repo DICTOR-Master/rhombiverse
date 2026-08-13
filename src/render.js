@@ -306,6 +306,57 @@ document.addEventListener('pointerlockchange', () => {
   if (walking && document.pointerLockElement !== renderer.domElement) exitWalk();
 });
 
+// Mobile/touch support, 2026-08-13. Two independent fixes, per direct
+// user decisions this session:
+//
+// 1. Walk Mode hidden on touch-primary devices. Pointer lock + WASD has
+//    no touch equivalent wired up yet, and the user explicitly chose
+//    "hide it on touch for now" over building full touch controls for
+//    it in this pass. A feature check (pointer: coarse), not a viewport
+//    width check -- an iPad is plenty wide but still touch-primary.
+if (window.matchMedia('(pointer: coarse)').matches) {
+  const walkRow = document.getElementById('walk-toggle')?.closest('.row');
+  if (walkRow) walkRow.style.display = 'none';
+}
+
+// 2. Screen-navigation model for #controls/#shells-panel on narrow/touch
+//    viewports, per direct feedback: "touch buttons that move you
+//    through menu screens seems to make sense, minimal options...
+//    always simplicity." A live phone-viewport diagnostic (Playwright,
+//    iPhone 13 emulation) found #controls measured ~480px wide -- wider
+//    than the whole 390px viewport -- completely covering the canvas
+//    with no way to reach it at all; this replaces "both panels visible
+//    at once" with one full-screen panel at a time (closed -> controls
+//    -> shells), matching index.html's own
+//    `(pointer: coarse), (max-width: 700px)` media query, under which
+//    these become full-screen `inset:0` drawers. On desktop, where that
+//    media query never applies, these listeners are harmless no-ops --
+//    the CSS classList toggles have nothing to show/hide.
+const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+const controlsPanelEl = document.getElementById('controls');
+const shellsPanelEl = document.getElementById('shells-panel');
+
+function openMobileControls() {
+  shellsPanelEl.classList.remove('mobile-screen-open');
+  controlsPanelEl.classList.add('mobile-screen-open');
+  mobileMenuToggle.style.display = 'none';
+}
+function openMobileShells() {
+  controlsPanelEl.classList.remove('mobile-screen-open');
+  shellsPanelEl.classList.add('mobile-screen-open');
+  mobileMenuToggle.style.display = 'none';
+}
+function closeMobilePanels() {
+  controlsPanelEl.classList.remove('mobile-screen-open');
+  shellsPanelEl.classList.remove('mobile-screen-open');
+  mobileMenuToggle.style.display = '';
+}
+
+mobileMenuToggle.addEventListener('click', openMobileControls);
+document.getElementById('mobile-close-controls').addEventListener('click', closeMobilePanels);
+document.getElementById('mobile-goto-shells').addEventListener('click', openMobileShells);
+document.getElementById('mobile-back-to-controls').addEventListener('click', openMobileControls);
+
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 const sun = new THREE.DirectionalLight(0xffffff, 1.2);
 sun.position.set(5, 8, 4);
@@ -832,6 +883,12 @@ async function init() {
       // (visibleCells) -- re-sync immediately rather than waiting for the
       // next unrelated onChange.
       rebuildInstances(mesh, world, currentMode === 'report');
+      // Mobile screen-navigation: picking a mode is the whole reason to
+      // have opened the controls screen -- return straight to the 3D
+      // view so the next tap lands on the canvas, not a second manual
+      // "Close" tap. No-op on desktop (closeMobilePanels only affects a
+      // CSS class the desktop layout never uses).
+      closeMobilePanels();
     });
   });
 
@@ -889,14 +946,17 @@ async function init() {
     cellAt: (instanceId) => cellOrder[instanceId],
     world,
     onChange,
-    // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md: Plant mode is handled entirely
-    // in render.js (its own click listener below), never in build.js --
-    // returning null here for 'plant' the same way walking already does
-    // is what keeps build.js's own onClick correctly no-op-ing (it
-    // already treats a falsy mode as "editing disabled") without
-    // build.js ever needing to know Plant mode exists, per the spec's
-    // own hard "never touches build.js" constraint.
-    getMode: () => (walking || currentMode === 'plant' ? null : currentMode),
+    // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md: Plant mode's own build/place
+    // handling is in render.js (its own click listener below), never
+    // build.js -- but getMode() must still return the real 'plant'
+    // string here, not null. A real bug caught fixing this: returning
+    // null (mirroring how Walk mode disables editing entirely) also
+    // silently disabled onContextMenu's right-click removal in Plant
+    // mode, contradicting "right-click always removes the clicked
+    // cell, in every mode." build.js's own onClick has a one-line
+    // `mode === 'plant'` no-op instead, so its own unconditional build
+    // fallthrough is skipped WITHOUT also disabling removal.
+    getMode: () => (walking ? null : currentMode),
     getShellCount,
     getMinShell: () => Math.min(Math.max(1, Number(hollowFromInput.value) || 1), getShellCount()),
     getMaterial: () => materialSelect.value,
