@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  unit-tests:
+    # Pure math/logic tests (lattice.js, worldstate.js, regions.js) --
+    # zero npm dependencies, src/package.json's "type": "module" is the
+    # only thing making plain `node --test` treat these as ESM. Scoped
+    # to src/ specifically, not the repo root, so it can never affect
+    # how Vercel detects/builds this project (still zero build step).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/unit/
+
+  browser-smoke-test:
+    # Real-browser check (Playwright) -- the actual app, served exactly
+    # as README.md's own local-dev instructions describe (plain
+    # `python3 -m http.server`, no build step), driven the same way a
+    # real player would use it.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright
+        working-directory: tests/browser
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+      - name: Serve app
+        run: python3 -m http.server 8000 &
+      - name: Wait for server
+        run: |
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8000/index.html > /dev/null && exit 0
+            sleep 0.5
+          done
+          echo "server never came up" >&2
+          exit 1
+      - name: Run smoke test
+        working-directory: tests/browser
+        run: node smoke.mjs

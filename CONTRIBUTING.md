@@ -57,7 +57,12 @@ Then open `http://localhost:8000`.
 
 ## Testing your change
 
-There's no automated test suite wired into CI yet. In practice, changes
+`tests/` has a CI-wired suite (`.github/workflows/ci.yml`, runs on every
+push/PR): unit tests for pure lattice/world-state logic (`node --test
+tests/unit/`) and a real-browser Playwright smoke test (`tests/browser/`).
+See `tests/README.md` to run either locally. That covers regressions in
+the core math and a basic real-browser sanity check — it does not
+replace direct execution for anything nontrivial. In practice, changes
 in this repo have been verified by direct execution — real browser runs
 (Playwright), or a portable Node.js + the real `three` package for pure
 lattice/raycast math — rather than by static reading alone, because
