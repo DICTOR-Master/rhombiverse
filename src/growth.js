@@ -348,13 +348,26 @@ export const GROWTH_TICK_MS = 30000;
 // far with tilesOverlap (real SAT geometry) instead -- verified
 // separately that every face instance has at least one genuinely safe
 // candidate this way, so growth still never hits a true dead end.
-export function growSeed(seed, now = Date.now()) {
-  const template = GROWTH_TEMPLATES[seed.species];
-  if (!template) return false;
-  if (seed.generation >= template.maxGeneration) return false;
+// `phenotypeOverride` ({ facesPerTick, preferType, maxGeneration }), added
+// 2026-08-13 for RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 1: lets a
+// caller feed this function DIFFERENT parameters than the fixed Wave-1
+// species tables (SPECIES_BIAS/GROWTH_TEMPLATES) -- exactly the doc's own
+// "do not modify growth.js's rendering path, only feed it different
+// parameters" instruction. growth.js itself stays fully unaware of
+// genomes/organisms (evolution.js imports from here, never the reverse,
+// same one-directional-dependency shape as build.js/growth.js already
+// have) -- it just accepts an already-computed, already-coherence-bounded
+// parameter set from whoever calls it. Omitting it (the default, `null`)
+// preserves every existing Wave-1 template's exact prior behavior.
+export function growSeed(seed, now = Date.now(), phenotypeOverride = null) {
+  const maxGeneration = phenotypeOverride ? phenotypeOverride.maxGeneration : GROWTH_TEMPLATES[seed.species]?.maxGeneration;
+  if (maxGeneration === undefined) return false;
+  if (seed.generation >= maxGeneration) return false;
   if (now - seed.lastGrowthAt < GROWTH_TICK_MS) return false;
 
-  const bias = SPECIES_BIAS[seed.species];
+  const bias = phenotypeOverride
+    ? { preferType: phenotypeOverride.preferType, facesPerTick: phenotypeOverride.facesPerTick }
+    : SPECIES_BIAS[seed.species];
 
   // Frontier: every open face across every existing tile, in a stable
   // order (tile insertion order, then the fixed facesOfTile order) --

@@ -1991,6 +1991,81 @@ time — the column's own `default now()` only ever applies on INSERT,
 not on the UPDATE half of an upsert. Fixed to match `pushCellUpsert`'s
 own convention of always setting it explicitly.
 
+**`RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md` + `RHOMBIVERSE_SPEC_ANIMALS.md`
+started, 2026-08-13 — Stage 1 (genome, phenotype, coherence bounds)
+done, both docs' own staged build order followed rather than attempting
+either doc's full scope at once.** The two specs work together: the
+evolution doc is the species-agnostic organism framework (genome,
+reproduction, selection, deterministic catch-up simulation, plant↔amoeba
+trophic coupling); the animals doc extends it with two more species
+profiles (land/sea creatures — mobility, sexual reproduction generalized
+to a moving population, a third trophic tier, and a rare habitat-
+crossover mechanism). 15 tracked stages total (9 evolution + 6 animals),
+worked one at a time with real verification at each, per both docs'
+explicit staging and this project's own established discipline.
+
+New `src/evolution.js`, a data layer strictly ON TOP of `growth.js` (one-
+directional dependency — `growth.js` stays fully unaware genomes/
+organisms exist, matching its own existing relationship to `build.js`).
+Section 1.1's "genome ranges must be derived from what growth.js's real
+substitution rules actually accept, not guessed" was taken literally:
+inspected `growth.js` directly first and found its ENTIRE tunable
+parameter surface is exactly three things — `facesPerTick`, `preferType`
+(acute/oblate/unbiased — the two real prototile shapes, not a continuous
+angle; the underlying icosahedral geometry itself is fixed, no angle
+degree of freedom exists to tune), and `maxGeneration`. `growSeed`
+gained an optional trailing `phenotypeOverride` parameter (default
+`null`, preserving every existing Wave-1 template's behavior byte-for-
+byte) — the actual mechanism for "feed it different parameters, don't
+touch the rendering path."
+
+**Real, measured (not guessed) finding that shaped the trait ranges**: a
+throwaway stress-test copy of `growth.js` (temporarily raising
+`facesPerTick`/`maxGeneration` far past any shipped template, never
+committed) confirmed coherence holds with zero overlaps even at
+`facesPerTick=8`/60 generations/479 tiles — geometric coherence has no
+reachable failure at these scales. But compute cost scales roughly
+quadratically with tile count (the real-SAT overlap check tests each
+candidate against every already-placed tile): 15 ticks/119 tiles
+~386ms, 40 ticks/319 tiles ~8.9s. So the real ceiling on `maturitySize`/
+`growthRate` isn't a coherence bound at all, it's a **performance**
+bound — exactly the class of concern Adaptive Damping (and this same
+spec's own later `MAX_CATCHUP_GENERATIONS`) exists to police. Ranges set
+accordingly: `maturitySize` ∈ [3, 15] (floor matches amoeba's existing
+minimum; ceiling keeps any single organism's full growth well under
+~500ms), `growthRate` → `facesPerTick` ∈ [1, 6] (a modest doubling of
+Wave-1's existing top end, comfortably inside the verified-safe range).
+`branchingAngle` ∈ [0, 1] maps to the three discrete `preferType` values
+via simple thresholds (no new probabilistic mechanism — real randomness
+is Stage 4's seeded-RNG job, not this stage's). `resourceEfficiency`/
+`mutationRate` are stored, clamped, and otherwise inert this stage —
+correctly, per the doc's own staging (Stages 3/2 wire them up).
+
+Verified via `node --test` (9 new tests, 40 total, all passing): trait
+clamping/defaulting, each mapping's real output range, an organism
+planted with a genome growing correctly and respecting its own
+genome-derived cap — and, per section 1.1's own "verified structurally,
+not spot-checked" success check, an exhaustive 3×3×3 sweep of every
+trait's extremes-plus-midpoint (27 genomes total) confirmed zero real
+geometric overlaps across the board, plus a targeted re-check of the
+exact near/far-face fold-back bug class found earlier this session,
+this time under genome-driven (not fixed-template) parameters
+specifically. No UI/rendering wiring yet (out of scope for Stage 1 by
+the doc's own instruction) — nothing changed from a player's
+perspective, so no live-deploy verification was needed this stage.
+
+**Direct requirement recorded for later stages, not yet implemented**:
+selection (Stage 3) and adaptive damping (Stage 7) must never be allowed
+to drive an established species/lineage to full extinction on a
+planetoid — older, simpler organism types need to persist alongside
+more advanced/diverse ones for long-term world variation. This needs an
+explicit minimum-viable-population floor, distinct from the existing
+`driftThreshold` concept (which changes HOW selection resolves below a
+threshold, not whether it can still reach zero) — selection pressure
+must ease near this floor, never eliminate a lineage outright. Flagged
+in both stages' own task descriptions so it isn't designed in as an
+afterthought once population dynamics actually exist.
+
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.

@@ -64,6 +64,13 @@ export function createWorldStore(worldJSON, hooks = {}) {
   // that spec's own section 5/6 for why. `?? {}` so JSON from before
   // this existed still loads.
   let seeds = { ...(worldJSON.seeds ?? {}) };
+  // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 1, 2026-08-13: heritable
+  // genomes, parallel in shape to `seeds` (flat id-keyed map) but a
+  // genuinely separate registry, not a field bolted onto a seed --
+  // evolution.js owns this key and growth.js stays fully unaware of it
+  // (one-directional dependency, evolution.js imports growth.js, never
+  // the reverse). `?? {}` so JSON from before this existed still loads.
+  let organisms = { ...(worldJSON.organisms ?? {}) };
 
   return {
     has(x, y, z) {
@@ -241,6 +248,24 @@ export function createWorldStore(worldJSON, hooks = {}) {
       seeds = rest;
       hooks.onSeedClear?.(seedId);
     },
+    // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 1: heritable genomes,
+    // same set/remove-by-id shape as seeds above -- evolution.js owns id
+    // generation (matches every other registry's own "caller owns id
+    // generation" division of responsibility). hooks.onOrganismSet/
+    // onOrganismClear mirror onSeedSet/onSeedClear, pre-wired the same
+    // way seeds' own hooks were before their sync pass existed.
+    getOrganisms() {
+      return { ...organisms };
+    },
+    setOrganism(organismId, organismData) {
+      organisms = { ...organisms, [organismId]: organismData };
+      hooks.onOrganismSet?.(organismId, organismData);
+    },
+    removeOrganism(organismId) {
+      const { [organismId]: _removed, ...rest } = organisms;
+      organisms = rest;
+      hooks.onOrganismClear?.(organismId);
+    },
     // Serializes back to the full RHOMBIVERSE_PLAN.md section 3 shape,
     // for persistence.js to save/export.
     toJSON() {
@@ -253,6 +278,7 @@ export function createWorldStore(worldJSON, hooks = {}) {
         asteroidRegrowth: regrowthQueue,
         pendingTrades,
         seeds,
+        organisms,
         meta: { ...meta, lastModified: new Date().toISOString() },
       };
     },
@@ -266,6 +292,7 @@ export function createWorldStore(worldJSON, hooks = {}) {
       regrowthQueue = { ...(newWorldJSON.asteroidRegrowth ?? {}) };
       pendingTrades = { ...(newWorldJSON.pendingTrades ?? {}) };
       seeds = { ...(newWorldJSON.seeds ?? {}) };
+      organisms = { ...(newWorldJSON.organisms ?? {}) };
       cells.clear();
       for (const [key, data] of Object.entries(newWorldJSON.cells)) {
         cells.set(key, data);
