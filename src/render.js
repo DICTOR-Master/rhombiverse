@@ -54,6 +54,7 @@ import {
 // where every trade action goes through sync.js's server-backed
 // pushTradePropose/Confirm/Cancel instead.
 import { applyInventoryDecay } from './trade.js';
+import { GROWTH_TEMPLATES, plantSeed, applyGrowth, tileWorldVertices } from './growth.js';
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -345,6 +346,23 @@ function materialColor(material) {
   return new THREE.Color(MATERIAL_COLORS[material] ?? MATERIAL_COLORS.base);
 }
 
+// RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 5: "reuse the existing
+// MATERIAL_COLORS palette... unless a real reason argues otherwise" --
+// distinguishing a planted structure's species at a glance is that real
+// reason (tile-type, acute vs. oblate, is far less useful to a player
+// than which organism they're looking at), so this is a small,
+// deliberately separate map, not a wholesale new palette.
+const SPECIES_COLORS = {
+  amoeba: 0x9fd8a0,
+  moss: 0x4f7a3f,
+  fungus: 0xd9b26b,
+  fern: 0x2f6b3a,
+};
+
+function speciesColor(species) {
+  return new THREE.Color(SPECIES_COLORS[species] ?? 0xffffff);
+}
+
 // Tint for a cell by its shell-fill distance (lattice.js's
 // cellsInShells), so shells placed by the shift+click fill tool are
 // visually distinguishable outward. Cells with no `shell` (plain single
@@ -469,6 +487,23 @@ async function init() {
   const CLAIM_COLOR_MINE = 0x4ade80; // green -- this session's own claims
   const CLAIM_COLOR_OTHER = 0xf59e0b; // amber -- everyone else's
 
+  // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 5: additive rendering,
+  // never touches the RD `mesh`/`MAX_CELLS` system. Each of the 40 real
+  // valid direction-triples (growth.js's own VALID_TRIPLES) is a
+  // genuinely different orientation in space, not just a translated
+  // copy of one shape -- an InstancedMesh would need a per-instance
+  // rotation matrix computed against a template, real complexity for
+  // Wave 1's actual bounded scale (a handful of tiles per seed, per the
+  // spec's own low-generation-count templates). Simplicity wins here:
+  // one plain Mesh per tile (ConvexGeometry on that tile's own real
+  // world vertices, always correct regardless of orientation), grouped
+  // per seed so a whole seed's meshes can be cleared/rebuilt together.
+  // Revisit with real instancing only if actual usage ever shows this
+  // is a performance problem -- not assumed up front.
+  const growthGroup = new THREE.Group();
+  scene.add(growthGroup);
+  const growthMeshesBySeed = new Map(); // seedId -> THREE.Group
+
   seedAsteroidBelts(world);
   applyAsteroidRegeneration(world);
   applyPopulationScaledSpawning(world);
@@ -493,6 +528,7 @@ async function init() {
   updateBeltHint();
   updateInventoryHint();
   renderTradePanel();
+  rebuildAllGrowth();
 
   // RHOMBIVERSE_SPEC_ASTEROIDS.md UI: belts are otherwise undiscoverable
   // (80+ units from the default camera framing, no minimap) -- one
@@ -772,14 +808,17 @@ async function init() {
     excavate: 'Click a shell-tagged structure to hollow out its interior below "Hollow from shell".',
     generate: 'Click a cell to generate a full body of the chosen type there (radius = Shell fill radius), formula-built in one click instead of hand-placing every cell.',
     report: 'Shows flagged/removed cells (normally hidden) in red. Click one to flag it, click a flagged one to approve it back.',
+    plant: 'Click anywhere to plant a seed of the chosen species. Left alone, it grows on its own over real time.',
   };
   function updateModeUI() {
     const showRadius = currentMode === 'fill' || currentMode === 'generate';
     const showHollowFrom = currentMode === 'fill' || currentMode === 'excavate';
     const showGenerator = currentMode === 'generate';
+    const showSpecies = currentMode === 'plant';
     document.getElementById('shell-radius-row').style.display = showRadius ? '' : 'none';
     document.getElementById('hollow-from-row').style.display = showHollowFrom ? '' : 'none';
     document.getElementById('generator-row').style.display = showGenerator ? '' : 'none';
+    document.getElementById('species-row').style.display = showSpecies ? '' : 'none';
     document.getElementById('mode-hint').textContent = MODE_HINTS[currentMode];
   }
 
@@ -794,6 +833,45 @@ async function init() {
       // next unrelated onChange.
       rebuildInstances(mesh, world, currentMode === 'report');
     });
+  });
+
+  // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 4: Plant mode's own
+  // click handling, entirely separate from build.js's controller (see
+  // getMode's own comment above for why). Section 10's own deferral --
+  // "freestanding, fewer cross-system dependencies" -- means planting
+  // doesn't need to hit an existing cell; it raycasts against the RD
+  // mesh purely to translate a 2D click into a real 3D point (whatever
+  // surface is under the cursor), falling back to a fixed distance
+  // along the camera ray when nothing is hit (open space, or no cells
+  // built yet). A tiny outward offset along the hit normal keeps a
+  // freshly-planted seed from spawning literally inside the RD cell it
+  // was clicked on.
+  const plantRaycaster = new THREE.Raycaster();
+  const plantPointer = new THREE.Vector2();
+  let seedCounter = 0;
+  renderer.domElement.addEventListener('click', (event) => {
+    if (currentMode !== 'plant' || walking) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    plantPointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    plantPointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    plantRaycaster.setFromCamera(plantPointer, camera);
+    const hits = plantRaycaster.intersectObject(mesh);
+    let origin;
+    if (hits.length > 0) {
+      const hit = hits[0];
+      const normal = hit.face.normal;
+      origin = [hit.point.x + normal.x * 0.5, hit.point.y + normal.y * 0.5, hit.point.z + normal.z * 0.5];
+    } else {
+      const dir = plantRaycaster.ray.direction;
+      const p = camera.position.clone().add(dir.clone().multiplyScalar(10));
+      origin = [p.x, p.y, p.z];
+    }
+    const species = document.getElementById('species-select').value;
+    seedCounter += 1;
+    const seedId = `seed_${Date.now()}_${seedCounter}`;
+    const seed = plantSeed(world, seedId, species, origin);
+    rebuildSeedMeshes(seedId, seed);
+    if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
   });
   updateModeUI();
 
@@ -811,7 +889,14 @@ async function init() {
     cellAt: (instanceId) => cellOrder[instanceId],
     world,
     onChange,
-    getMode: () => (walking ? null : currentMode),
+    // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md: Plant mode is handled entirely
+    // in render.js (its own click listener below), never in build.js --
+    // returning null here for 'plant' the same way walking already does
+    // is what keeps build.js's own onClick correctly no-op-ing (it
+    // already treats a falsy mode as "editing disabled") without
+    // build.js ever needing to know Plant mode exists, per the spec's
+    // own hard "never touches build.js" constraint.
+    getMode: () => (walking || currentMode === 'plant' ? null : currentMode),
     getShellCount,
     getMinShell: () => Math.min(Math.max(1, Number(hollowFromInput.value) || 1), getShellCount()),
     getMaterial: () => materialSelect.value,
@@ -1006,6 +1091,51 @@ async function init() {
         row.appendChild(toggle);
       }
       claimsListEl.appendChild(row);
+    }
+  }
+
+  // Rebuilds ONE seed's own tile meshes from its current world-state --
+  // called after growth (not a full-world rebuild) so an idle seed's
+  // meshes are never touched just because something unrelated changed
+  // elsewhere. Disposes the previous group's geometries/materials
+  // before replacing them, same cleanup discipline refreshClaims above
+  // already uses for its own THREE objects.
+  function rebuildSeedMeshes(seedId, seed) {
+    const existing = growthMeshesBySeed.get(seedId);
+    if (existing) {
+      growthGroup.remove(existing);
+      for (const child of existing.children) {
+        child.geometry.dispose();
+        child.material.dispose();
+      }
+    }
+    const group = new THREE.Group();
+    const color = speciesColor(seed.species);
+    for (const tile of seed.tiles) {
+      const verts = tileWorldVertices(seed, tile).map(([x, y, z]) => new THREE.Vector3(x, y, z));
+      const geometry = new ConvexGeometry(verts);
+      const material = new THREE.MeshStandardMaterial({ color, flatShading: true });
+      group.add(new THREE.Mesh(geometry, material));
+    }
+    growthGroup.add(group);
+    growthMeshesBySeed.set(seedId, group);
+  }
+
+  // Full rebuild -- every planted seed, from scratch. Used on init/
+  // Shared World connect-disconnect/preset load, where the whole world
+  // (not just one seed) may have changed.
+  function rebuildAllGrowth() {
+    for (const [seedId] of growthMeshesBySeed) {
+      const group = growthMeshesBySeed.get(seedId);
+      growthGroup.remove(group);
+      for (const child of group.children) {
+        child.geometry.dispose();
+        child.material.dispose();
+      }
+    }
+    growthMeshesBySeed.clear();
+    for (const [seedId, seed] of Object.entries(world.getSeeds())) {
+      rebuildSeedMeshes(seedId, seed);
     }
   }
 
@@ -1274,6 +1404,7 @@ async function init() {
         onRemoteTradeClear: applyRemoteTradeClear,
       });
       renderTradePanel();
+      rebuildAllGrowth();
       setLocalResetControlsEnabled(false);
       setClaimLandEnabled(true);
       sharedWorldToggle.textContent = 'Disable Shared World';
@@ -1302,6 +1433,7 @@ async function init() {
     myUserId = null;
     refreshClaims();
     renderTradePanel();
+    rebuildAllGrowth();
     sharedWorldToggle.textContent = 'Enable Shared World';
     sharedWorldHint.textContent = 'Shared World: off.';
   }
@@ -1317,6 +1449,7 @@ async function init() {
     const fresh = await loadWorld('./data/starter-world.json');
     world.replaceAll(fresh);
     onChange();
+    rebuildAllGrowth();
   });
 
   document.getElementById('export-json').addEventListener('click', () => {
@@ -1331,6 +1464,7 @@ async function init() {
       const parsed = await importWorldFile(file);
       world.replaceAll(parsed);
       onChange();
+      rebuildAllGrowth();
     } catch (err) {
       alert('That file is not valid Rhombiverse world JSON.');
       console.warn('Rhombiverse: import failed', err);
@@ -1354,9 +1488,18 @@ async function init() {
     const key = document.getElementById('preset-select').value;
     if (!key) return;
     if (!confirm('Load this preset? This clears your current build.')) return;
-    const preset = await loadWorld(`./data/presets/${key}.json`);
+    // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 4.1: growth-layer
+    // presets live in their own data/growth-presets/ directory
+    // (distinct from data/presets/*.json's planetoid presets), selected
+    // by a "growth:" prefix on the option value rather than a second
+    // dropdown -- simplest thing that works for one extra directory.
+    const path = key.startsWith('growth:')
+      ? `./data/growth-presets/${key.slice('growth:'.length)}.json`
+      : `./data/presets/${key}.json`;
+    const preset = await loadWorld(path);
     world.replaceAll(preset);
     onChange();
+    rebuildAllGrowth();
   });
 
   // RHOMBIVERSE_SPEC_ASTEROIDS.md section 4: a mined cell should regrow
@@ -1379,6 +1522,16 @@ async function init() {
     // only after the player's next unrelated edit.
     applyInventoryDecay(world);
     updateInventoryHint();
+    // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md: same "periodic tick covers
+    // idle time" reasoning as asteroid regrowth above, and the exact
+    // same "don't route through onChange()" avoidance -- but checked
+    // independently of the cells before/after comparison, since growth
+    // never touches `cells` at all (a seed's own tiles live entirely in
+    // `seeds`, per the spec's Isolation section).
+    if (applyGrowth(world, Date.now())) {
+      rebuildAllGrowth();
+      if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
+    }
     if (world.entries().length === before) return;
     rebuildInstances(mesh, world, currentMode === 'report');
     if (!sharedWorldActive) saveToLocalStorage(world.toJSON());

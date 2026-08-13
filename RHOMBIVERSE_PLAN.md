@@ -129,7 +129,8 @@ World-space position = lattice coord × scale factor `s` (start `s = 1`). No rot
 **Phase 6 — Penrose/RT Growth Layer (v2, separate spec)**
 - New `growth.js` module, new `seeds` key in world-state, generation via substitution/L-system rules on rhombic triacontahedron geometry.
 - Does not modify or depend on `build.js` — additive only.
-- Spec pass done: `docs/RHOMBIVERSE_SPEC_PENROSE_GROWTH.md` — real Ammann-rhombohedra/AKN-tiling geometry, verified numerically before being written down, scoped for plant/animal organic growth forms per direct instruction. Implementation not started.
+- Spec pass done: `docs/RHOMBIVERSE_SPEC_PENROSE_GROWTH.md` — real Ammann-rhombohedra/AKN-tiling geometry, verified numerically before being written down, scoped for plant/animal organic growth forms per direct instruction.
+- Wave 1 implementation done (`src/growth.js`, `amoeba`/`moss`/`fungus`/`fern`) — see CLAUDE.md's 2026-08-13 status for what was built, real findings along the way, and how it was verified. Wave 2 (larger/more complex templates) not started, per the spec's own staging.
 
 ---
 

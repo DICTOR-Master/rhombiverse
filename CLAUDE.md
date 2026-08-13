@@ -1637,6 +1637,105 @@ generator output, not guessed here) — same "flag it, don't fake
 precision" convention as every other tuned constant in this project.
 `RHOMBIVERSE_PLAN.md`/`README.md` cross-referenced.
 
+**Phase 6 implementation done (Wave 1 only), 2026-08-13, immediately
+after the spec pass, per direct instruction ("start on the
+implementation now").** New `src/growth.js`. Re-verified the spec's own
+geometric claims programmatically at module load (not just trusted from
+the spec doc) and found the REAL local-attachment structure needed a
+second look: the spec's 6 unsigned star vectors are correct for
+classifying acute (63.43°) vs. oblate (116.57°) angle types, but actual
+tile placement needs all 12 SIGNED directions (each edge can point
+either way along its axis) -- verified this gives exactly 20 valid
+acute + 20 valid oblate direction-triples (40 total, out of 220
+possible), and critically that every non-antipodal direction pair has
+at least one valid extension, so local growth never hits a dead end
+using only the real prototile shapes. Re-verified the golden-ratio face
+diagonals and the exact-phi volume ratio between prototiles
+programmatically again here, not just carried over from the spec pass.
+
+Growth is local/incremental exactly as the spec called for: each tick,
+open faces on a seed's frontier get a new tile attached using a real,
+verified valid extension (species-biased, never an invented option),
+with centroid-based deduplication preventing overlaps -- explicitly
+NOT the full formal Ammann matching-rule vertex-decoration atlas (flagged
+honestly in code comments, not glossed over as if it were the complete
+rigorous system) -- sufficient for Wave 1's bounded scale, revisit if a
+future pass needs much larger structures. `worldstate.js` gained a
+`seeds` top-level key (`getSeeds`/`setSeed`/`removeSeed`), same shape as
+`claims`/`pendingTrades` before it.
+
+**Real rendering-complexity finding, caught during implementation, not
+assumed away**: the spec's own section 5 called for a separate
+`InstancedMesh` pair (acute/oblate), mirroring the RD mesh -- but each
+of the 40 valid direction-triples is a genuinely different orientation
+in space, not a translated copy of one shape, so instancing would need
+a per-instance rotation matrix computed against a template. Given
+direct feedback mid-session ("remember anything you struggle with
+players will find even more difficult... simplicity is key"), pivoted
+to one plain `THREE.Mesh` per tile (`ConvexGeometry` on that tile's own
+real world vertices, always correct regardless of orientation, no
+template/instancing math) grouped per seed -- correct and simple for
+Wave 1's actual scale (a handful to ~20 tiles per mature seed), with
+real InstancedMesh explicitly deferred as a future performance pass,
+not assumed necessary up front.
+
+Plant mode (7th mode button) is handled entirely in `render.js`, with
+its OWN click listener -- `build.js` itself is untouched, never imports
+or is imported by `growth.js`, satisfying the spec's hard constraint by
+construction: `getMode()` returns `null` for `'plant'` the same way it
+already does for Walk mode, so `build.js`'s own dispatch correctly
+no-ops without ever needing to know Plant mode exists (a real trap
+avoided here: without this, `build.js`'s unconditional "mode==='build'
+default" fallthrough would have silently placed a normal RD cell on
+every Plant-mode click). A species selector (`amoeba`/`moss`/`fungus`/
+`fern`, Wave 1 only) shows contextually, matching every other mode's
+UI pattern. Growth ticks via the SAME standalone 5s `setInterval`
+asteroid regrowth already uses (not routed through `onChange()`, same
+"no phantom undo entries" reasoning).
+
+**Real bug found and fixed while generating the growth preset, caught
+before it shipped**: the preset-generation script looped
+`while (seed.generation < maxGeneration + 3)`, but `growSeed` correctly
+refuses to grow past its own `maxGeneration` cap -- meaning generation
+permanently stalls at the cap and the loop condition can never become
+false, an infinite loop. Fixed by bounding the loop on tick COUNT
+instead of an unreachable generation target (exactly the pattern the
+unit tests already used correctly) -- a real reminder that "run past
+the cap to reach a mature structure" needs a bounded driver, not a
+target past the thing that's bounding it.
+
+**Verified end-to-end via real execution, not just the unit-level
+math**: `node --test` (9 new tests: direction/triple counts, golden
+diagonal ratio, exact-phi volume ratio, seed-never-invisible, cooldown
+respected, full-growth no-overlap check across all four species,
+`applyGrowth` world-level dispatch, world-space vertex offsetting -- 27
+total across the whole suite, all passing) -- then real Playwright runs
+against the actual app: planted a real fern via a real click (species
+row appeared, seed saved with a real world-space origin, zero console
+errors); rewound a seed's `lastGrowthAt` and waited for the REAL 5s
+periodic interval (not a simulated call) to grow it live in the running
+page (1 tile → 3 tiles, generation 0 → 1, screenshot confirms a real
+non-overlapping branching structure); generated and loaded a real
+`data/growth-presets/fern-grown.json` (19 tiles, generation 6) through
+the existing preset-select/Load mechanism with zero new UI code needed
+(it already called `rebuildAllGrowth()` after every `replaceAll()`, a
+site I'd already wired for exactly this); re-ran the existing browser
+smoke test and a Shared World enable/disable regression pass afterward
+-- both clean, zero console errors throughout.
+
+**Not yet built, left for a real follow-up**: Wave 2 templates
+(sapling/conifer/shrub, nautilus/scallop, spineling/cluster-frame,
+per the spec's own explicit staging -- not attempted until Wave 1 was
+proven, which it now is); the full formal Ammann matching-rule
+system (current overlap prevention is centroid-dedup, real but
+simpler, per its own code comment); Shared World sync for `seeds`
+(local-only for this pass, per the spec's own section 10 deferral).
+
+**Also fixed this session, unrelated to Phase 6 but requested
+alongside it**: "Claim Land" button renamed to "Claim Rhombi-space"
+(direct feedback that "Land" wasn't an accurate label for claiming a
+region of the rhombic lattice) -- `index.html` only, no logic change.
+
 **To continue implementation**, all four Phase 5.5 addenda (Water/Ice,
 Black Hole, Star System, Supernova), Phase 5 (Shared World),
 `RHOMBIVERSE_SPEC_REGIONS.md`, `RHOMBIVERSE_SPEC_ASTEROIDS.md`,
@@ -1646,20 +1745,33 @@ are all done now. Phase 5.8 (Trust Zones/Moderation) is closed out as
 above) — the flagged/removed Report mechanism is built and working; the
 three-tier reachability gate, age/mode selector, COPPA review, and a
 moderator-scaling plan are explicitly deferred with documented reasons,
-not left incomplete by oversight. Nothing named remains open anywhere
-in this repo's scope, besides the explicitly-deferred crystal-growth
-mode. The repo is public
-(`github.com/DICTOR-Master/rhombiverse`) with Discussions enabled. Ask
-before assuming what's next.
-Crystal-growth mode (Phase 5.5's other bullet,
-cells auto-growing over time) was intentionally left unbuilt; the plan
-marks it optional/tied to Phase 6 timing. Public deploy is DONE (see the
-2026-08-12 entry above, live at https://rhombiverse.vercel.app) — the
-repo itself stays private (Vercel deploys from it without requiring
-public visibility), but the built site is genuinely live and public now;
-factor that into any future security/compliance judgment calls (e.g. the
-XSS audit already done in Phase 4 is no longer a hypothetical-future
-concern).
+not left incomplete by oversight. **Phase 6 (Penrose/RT Growth Layer)
+Wave 1 is done** (`amoeba`/`moss`/`fungus`/`fern`, see its own
+2026-08-13 status above) — Wave 2 (larger/more complex templates) is
+the next real follow-up there, per the spec's own staging, not before.
+CI is real and green (`.github/workflows/ci.yml`: unit tests + a
+browser smoke test on every push/PR). The repo is public
+(`github.com/DICTOR-Master/rhombiverse`) with Discussions enabled. A
+known, explicitly-flagged (not yet fixed) usability gap: touch/mobile
+interaction is difficult on phone/tablet — this is the same
+never-implemented touch gap Phase 2's own status already documented
+(mouse-only click/right-click, no tap/long-press), now confirmed as a
+real problem by the user testing on an actual phone/iPad; a real
+follow-up, not attempted this session per direct instruction to settle
+other work first. Ask before assuming what's next.
+Crystal-growth mode (Phase 5.5's other bullet, cells auto-growing over
+time on the periodic FCC/RD lattice specifically) remains intentionally
+unbuilt and distinct from Phase 6's own organic growth layer — see
+Phase 6's own status above (section 8 of its spec) for why both can
+coexist without one satisfying the other. Public deploy is DONE (see
+the 2026-08-12 entry above, live at https://rhombiverse.vercel.app),
+and as of 2026-08-13 the GitHub repo itself is ALSO genuinely public
+now (not just the deployed site) — the note in this file's own history
+claiming "the repo itself stays private" is now stale/superseded, left
+here only so a future reader doesn't trust an old snapshot over the
+actual current state; always verify repo visibility directly
+(`gh repo view --json visibility`) rather than trusting any prior
+session's note including this one.
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're
 calibrated to build on exactly what the prior phase produced.

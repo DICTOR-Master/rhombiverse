@@ -318,30 +318,43 @@ session doesn't assume this spec already covers it.
 
 ## 9. Success Checks
 
-- [ ] A player can Plant a seed at a chosen world location; a
+Wave 1 (`amoeba`/`moss`/`fungus`/`fern`) implemented and verified
+2026-08-13 — see CLAUDE.md's own status entry for the full verification
+trail (unit tests + real Playwright runs). Wave 2 not started.
+
+- [x] A player can Plant a seed at a chosen world location; a
   rhombohedra structure appears there immediately (even a single tile
   — a seed is never invisible).
-- [ ] Left alone, a planted seed measurably grows (more tiles) after
-  real elapsed time, without any player action.
-- [ ] The two prototile shapes used are verifiably golden rhombohedra
+- [x] Left alone, a planted seed measurably grows (more tiles) after
+  real elapsed time, without any player action. Verified against the
+  REAL 5-second periodic interval in a live browser, not a simulated
+  call.
+- [x] The two prototile shapes used are verifiably golden rhombohedra
   (face diagonal ratio `φ`, per section 2's own verification method) —
-  not an approximation.
-- [ ] Different `species` values produce visibly different growth
-  shapes (elongated/branching vs. thread-like/mycelial vs.
-  radial/shell-like vs. spine-branching) from the same underlying tile
-  set and grammar.
-- [ ] Each named `GROWTH_TEMPLATES` entry (section 4.1) reliably
-  produces its intended, recognizable silhouette — verified by
-  generating it for real and looking at it, the same discipline
+  not an approximation. Re-verified programmatically again at
+  implementation time, not just carried over from the spec pass.
+- [x] Different `species` values produce visibly different growth
+  shapes — verified for Wave 1's own four (elongated/branching `fern`,
+  thread-like `fungus`, dense-compact `moss`, minimal `amoeba`) from
+  the same underlying tile set and grammar. `shell`/`creature`-category
+  species (radial/shell-like, spine-branching) are Wave 2, not yet
+  implemented — not claimed here.
+- [x] Each named Wave 1 `GROWTH_TEMPLATES` entry reliably produces its
+  intended, recognizable silhouette — verified by generating it for
+  real and looking at it (screenshots), the same discipline
   `data/presets/rocky-planetoid.json` etc. were held to, not assumed
-  from the parameters alone.
-- [ ] At least one `data/growth-presets/*.json` file loads instantly
-  into a large, pre-grown example structure, generated via the real
-  template machinery rather than hand-authored.
-- [ ] Growth eventually stops (generation/tile cap) rather than running
+  from the parameters alone. Wave 2 templates not yet attempted.
+- [x] At least one `data/growth-presets/*.json` file
+  (`fern-grown.json`, 19 tiles) loads instantly into a pre-grown
+  example structure, generated via the real template machinery rather
+  than hand-authored, through the existing preset-select/Load UI.
+- [x] Growth eventually stops (generation/tile cap) rather than running
   away indefinitely.
-- [ ] `build.js` is untouched — no import either direction between it
-  and `growth.js`.
+- [x] `build.js` is untouched — no import either direction between it
+  and `growth.js`. Plant mode's own click handling lives entirely in
+  `render.js`; `getMode()` returns `null` for `'plant'` the same way it
+  already does for Walk mode, so `build.js` never needs to know Plant
+  mode exists.
 - [ ] Two planted seeds' growth never interact, overlap-detect, or
   otherwise reference each other.
 

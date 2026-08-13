@@ -339,6 +339,7 @@
       <button class="mode-btn" data-mode="excavate" type="button">Excavate</button>
       <button class="mode-btn" data-mode="generate" type="button">Generate</button>
       <button class="mode-btn" data-mode="report" type="button">Report</button>
+      <button class="mode-btn" data-mode="plant" type="button">Plant</button>
     </div>
     <div class="row">
       <button id="walk-toggle" type="button">Enter Walk Mode</button>
@@ -369,6 +370,16 @@
           <option value="ice-moon">Ice Moon</option>
           <option value="gas-giant">Gas Giant</option>
           <option value="ice-giant">Ice Giant</option>
+        </select>
+      </label>
+    </div>
+    <div id="species-row" class="row" style="display: none;">
+      <label>Species:
+        <select id="species-select">
+          <option value="amoeba">Amoeba</option>
+          <option value="moss">Moss</option>
+          <option value="fungus">Fungus</option>
+          <option value="fern">Fern</option>
         </select>
       </label>
     </div>
@@ -408,7 +419,7 @@
     </div>
     <div id="shared-world-hint" class="hint">Shared World: off.</div>
     <div class="row">
-      <button id="claim-land-btn" type="button" disabled>Claim Land</button>
+      <button id="claim-land-btn" type="button" disabled>Claim Rhombi-space</button>
     </div>
     <div id="claim-hint" class="hint"></div>
     <div id="claims-list"><div class="placeholder">No claims granted yet.</div></div>
@@ -449,6 +460,7 @@
           <option value="ice-moon-large">Ice Moon (Large, ~5800 cells, sphere)</option>
           <option value="gas-giant-large">Gas Giant (Large, ~5800 cells, sphere)</option>
           <option value="ice-giant-large">Ice Giant (Large, ~5800 cells, sphere)</option>
+          <option value="growth:fern-grown">Fern (Grown, Penrose/RT growth layer)</option>
         </select>
       </label>
       <button id="load-preset" type="button">Load</button>

@@ -57,6 +57,13 @@ export function createWorldStore(worldJSON, hooks = {}) {
   // key -- atomic barter proposals, resolved (or left pending/cancelled)
   // by trade.js. `?? {}` so JSON from before this existed still loads.
   let pendingTrades = { ...(worldJSON.pendingTrades ?? {}) };
+  // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 6's own top-level schema
+  // key -- planted growth-layer seeds, owned/mutated by growth.js.
+  // Genuinely separate coordinate space from `cells` (real-valued
+  // world-space points, not integer FCC lattice coordinates) -- see
+  // that spec's own section 5/6 for why. `?? {}` so JSON from before
+  // this existed still loads.
+  let seeds = { ...(worldJSON.seeds ?? {}) };
 
   return {
     has(x, y, z) {
@@ -214,6 +221,26 @@ export function createWorldStore(worldJSON, hooks = {}) {
       regrowthQueue = rest;
       hooks.onRegrowthClear?.(key);
     },
+    // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md: planted growth-layer seeds,
+    // owned by growth.js (plantSeed/growSeed/applyGrowth). Same
+    // set/remove-by-id shape as pendingTrades above, keyed by an
+    // arbitrary seedId the caller chooses (matches claims'/trades' own
+    // "caller owns id generation" division of responsibility).
+    // hooks.onSeedSet/onSeedClear mirror onTradeSet/onTradeClear, for a
+    // future Supabase sync pass (not required for a first, local-only
+    // pass per the spec's own section 10).
+    getSeeds() {
+      return { ...seeds };
+    },
+    setSeed(seedId, seedData) {
+      seeds = { ...seeds, [seedId]: seedData };
+      hooks.onSeedSet?.(seedId, seedData);
+    },
+    removeSeed(seedId) {
+      const { [seedId]: _removed, ...rest } = seeds;
+      seeds = rest;
+      hooks.onSeedClear?.(seedId);
+    },
     // Serializes back to the full RHOMBIVERSE_PLAN.md section 3 shape,
     // for persistence.js to save/export.
     toJSON() {
@@ -225,6 +252,7 @@ export function createWorldStore(worldJSON, hooks = {}) {
         playerInventory: inventory,
         asteroidRegrowth: regrowthQueue,
         pendingTrades,
+        seeds,
         meta: { ...meta, lastModified: new Date().toISOString() },
       };
     },
@@ -237,6 +265,7 @@ export function createWorldStore(worldJSON, hooks = {}) {
       inventory = { ...(newWorldJSON.playerInventory ?? {}) };
       regrowthQueue = { ...(newWorldJSON.asteroidRegrowth ?? {}) };
       pendingTrades = { ...(newWorldJSON.pendingTrades ?? {}) };
+      seeds = { ...(newWorldJSON.seeds ?? {}) };
       cells.clear();
       for (const [key, data] of Object.entries(newWorldJSON.cells)) {
         cells.set(key, data);
