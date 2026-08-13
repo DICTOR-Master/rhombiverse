@@ -41,7 +41,7 @@ import {
   pushSeedSet,
   pushSeedClear,
 } from './sync.js';
-import { computeClaim, claimBoundingRadius } from './regions.js';
+import { computeClaim, claimFootprintWorldVertices } from './regions.js';
 import {
   seedAsteroidBelts,
   applyAsteroidRegeneration,
@@ -543,13 +543,21 @@ async function init() {
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(mesh);
 
-  // RHOMBIVERSE_SPEC_REGIONS.md territory visualization: one wireframe
-  // sphere per claim, sized to its real bounding radius (claimBoundingRadius
-  // -- exact geometry, not an estimate) rather than tinting individual
-  // cells, since most of a claim's footprint is typically unbuilt space
-  // with no cell to tint at all. A plain THREE.Group so the whole set can
-  // be cleared and rebuilt in one call (refreshClaims below) without
-  // tracking individual mesh references.
+  // RHOMBIVERSE_SPEC_REGIONS.md territory visualization: one low-opacity
+  // mesh per claim, its exact real footprint shape (via ConvexGeometry on
+  // claimFootprintWorldVertices -- ACTUAL cell-center points, the same
+  // "real geometry, not an estimate" standard every other shape in this
+  // app already holds to) rather than tinting individual cells, since
+  // most of a claim's footprint is typically unbuilt space with no cell
+  // to tint at all. Replaced a bounding-SPHERE version, 2026-08-13, after
+  // a player noticed claim territories visually overlapping on screen
+  // even though their real footprints never do -- claimBoundingRadius
+  // (the farthest single CORNER of a claim's footprint) made a genuinely
+  // much looser sphere than the real rhombic-dodecahedron-shaped
+  // territory, which only got more visible once claims got bigger. A
+  // plain THREE.Group so the whole set can be cleared and rebuilt in one
+  // call (refreshClaims below) without tracking individual mesh
+  // references.
   const claimGroup = new THREE.Group();
   scene.add(claimGroup);
   const CLAIM_COLOR_MINE = 0x4ade80; // green -- this session's own claims
@@ -1128,19 +1136,32 @@ async function init() {
 
     for (const id of ids) {
       const claim = claims[id];
-      const radius = claimBoundingRadius(claim);
       const [wx, wy, wz] = cellToWorld(...claim.center, SCALE);
-      const sphereGeom = new THREE.SphereGeometry(radius, 16, 12);
+      // Footprint points are already in world space (claimFootprintWorldVertices
+      // applies SCALE itself), offset by -claim center so the resulting
+      // geometry is centered at its own local origin -- the mesh is then
+      // positioned via `.position.set`, matching how every other object
+      // in this scene is placed, rather than baking the offset into the
+      // geometry itself.
+      const points = claimFootprintWorldVertices(claim, SCALE).map(([x, y, z]) => new THREE.Vector3(x - wx, y - wy, z - wz));
+      const hullGeom = new ConvexGeometry(points);
       const mine = claim.ownerId === myUserId;
-      const sphereMat = new THREE.MeshBasicMaterial({
+      // Solid, low-opacity fill (not wireframe) -- a wireframe of an
+      // 8-shell claim's real convex hull has far more facets than the
+      // old sphere ever did and reads as visual noise; a translucent
+      // solid volume is what actually makes overlapping claims legible
+      // at a glance. DoubleSide since the camera can end up inside a
+      // large claim's own hull while walking.
+      const hullMat = new THREE.MeshBasicMaterial({
         color: mine ? CLAIM_COLOR_MINE : CLAIM_COLOR_OTHER,
-        wireframe: true,
         transparent: true,
-        opacity: 0.5,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+        depthWrite: false,
       });
-      const sphere = new THREE.Mesh(sphereGeom, sphereMat);
-      sphere.position.set(wx, wy, wz);
-      claimGroup.add(sphere);
+      const hull = new THREE.Mesh(hullGeom, hullMat);
+      hull.position.set(wx, wy, wz);
+      claimGroup.add(hull);
     }
 
     if (!claimsListEl) return;

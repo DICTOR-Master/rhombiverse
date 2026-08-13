@@ -207,6 +207,26 @@ export function claimBoundingRadius(claim) {
   return maxDist;
 }
 
+// World-space cell-center points for every cell in a claim's own real
+// footprint -- 2026-08-13, replacing the old sphere visualization, which
+// used claimBoundingRadius (the farthest single CORNER of the footprint)
+// as a sphere radius. That's a real, MUCH looser bound than the actual
+// territory: this project's own lattice is built from the rhombic
+// dodecahedron's own 12 face-normal directions (NEIGHBOR_OFFSETS), so a
+// BFS "ball" in this graph metric is not a sphere at all -- its outer
+// boundary is itself rhombic-dodecahedron-shaped (min real distance
+// N, max N*sqrt(2) at shell N, same fact build.js's own roundStructure
+// already documents). Rather than deriving that shape analytically, this
+// returns the REAL cell-center points of the claim's own footprint so a
+// caller can build the exact true convex hull (render.js does, via
+// three/addons' ConvexGeometry, the same tool already used for every RD
+// cell and every Penrose tile in this app) -- the accurate shape by
+// construction, not an approximation of one.
+export function claimFootprintWorldVertices(claim, scale = 1) {
+  const [cx, cy, cz] = claim.center;
+  return footprintOf(cx, cy, cz, parseClaimSizeShells(claim.size)).map((c) => cellToWorld(c.x, c.y, c.z, scale));
+}
+
 // Which claim (if any) owns a given lattice coordinate -- computed
 // geometrically against the claims registry rather than requiring a
 // per-cell claimId to already be stamped, so ownership of not-yet-built
