@@ -717,11 +717,28 @@ function driftBypassFraction(localPopulation) {
 // would pass "everything on this planetoid"; kept as an explicit
 // parameter here, same as Stage 2's own functions, rather than this
 // module reaching into a not-yet-defined per-planetoid registry).
-export function resolveSurvival(world, organismId, candidateIds, rng = Math.random, crowdingThreshold = CROWDING_THRESHOLD) {
+// `survivalProbabilityFn`, added for RHOMBIVERSE_SPEC_ANIMALS.md Stage D
+// (Trophic Extension): the exact same call shape as this module's own
+// computeSurvivalProbability -- default is that function itself, so
+// every existing caller/test is byte-identical. Needed because
+// computeSurvivalProbability's own resource-availability branch only
+// recognizes 'amoeba' (biomass) vs. everything else (raw water) -- land/
+// sea creatures need a huntBias-blended herbivory/carnivory signal
+// instead, which this module has no reason to know about. Same override
+// shape as onGenerationStep/reproduceFn -- this module still never
+// learns what an "animal" is.
+export function resolveSurvival(
+  world,
+  organismId,
+  candidateIds,
+  rng = Math.random,
+  crowdingThreshold = CROWDING_THRESHOLD,
+  survivalProbabilityFn = computeSurvivalProbability
+) {
   const localPopulation = localMatureSameSpeciesCount(world, organismId, candidateIds) + 1; // +1 for the organism itself
   if (localPopulation <= MIN_VIABLE_POPULATION) return true; // extinction floor -- never resolved by chance or fitness below this
 
-  const fitness = computeSurvivalProbability(world, organismId, candidateIds, crowdingThreshold);
+  const fitness = survivalProbabilityFn(world, organismId, candidateIds, crowdingThreshold);
   const bypass = driftBypassFraction(localPopulation);
   const effectiveProbability = fitness * (1 - bypass) + 0.5 * bypass;
   return rng() < effectiveProbability;
@@ -895,6 +912,10 @@ function offspringPlacement(world, parentOrganismId, rng) {
 // straight back to the real `reproduce` for every other species --
 // same override shape as onGenerationStep, this module still never
 // learns what an "animal" is.
+// `survivalProbabilityFn`, added for Stage D (Trophic Extension) -- see
+// resolveSurvival's own header for what this overrides and why. Threaded
+// through to BOTH places this function reads fitness: the reproduction-
+// probability check below, and resolveSurvival's own internal call.
 function resolveOneGeneration(
   world,
   organismIds,
@@ -903,7 +924,8 @@ function resolveOneGeneration(
   simulatedNow,
   dampingParams = { crowdingThreshold: CROWDING_THRESHOLD, mutationCeiling: 1 },
   onGenerationStep = null,
-  reproduceFn = reproduce
+  reproduceFn = reproduce,
+  survivalProbabilityFn = computeSurvivalProbability
 ) {
   const toRemove = new Set();
   const newIds = [];
@@ -913,7 +935,13 @@ function resolveOneGeneration(
     const organism = world.getOrganisms()[organismId];
     if (!organism) continue;
 
-    onGenerationStep?.(world, organismId, rng, generationIndex, simulatedNow);
+    // organismIds (the 6th argument) is this generation's own planetoid-
+    // scoped population -- passed through so a hook (e.g. animals.js's
+    // own predation search) can stay strictly scoped to Stage 6's
+    // isolation guarantee rather than scanning world.getOrganisms()
+    // globally, which mobilityRange's own small real-valued bound would
+    // make a practical non-issue but not a hard architectural one.
+    onGenerationStep?.(world, organismId, rng, generationIndex, simulatedNow, organismIds);
 
     // Real bug, caught only by tracing an actual multi-generation run,
     // not by any single-generation test: growth was left entirely to
@@ -949,7 +977,7 @@ function resolveOneGeneration(
       // Reproduction and survival share the SAME genome x conditions
       // probability function (section 3's own "survival/reproduction
       // probability" framing -- one function, both purposes).
-      const reproProbability = computeSurvivalProbability(world, organismId, organismIds, dampingParams.crowdingThreshold);
+      const reproProbability = survivalProbabilityFn(world, organismId, organismIds, dampingParams.crowdingThreshold);
       if (rng() < reproProbability) {
         const offspringId = `${organismId}_g${generationIndex}_${idCounter++}`;
         const offspringOrigin = offspringPlacement(world, organismId, rng);
@@ -978,7 +1006,7 @@ function resolveOneGeneration(
       }
     }
 
-    if (!resolveSurvival(world, organismId, organismIds, rng, dampingParams.crowdingThreshold)) {
+    if (!resolveSurvival(world, organismId, organismIds, rng, dampingParams.crowdingThreshold, survivalProbabilityFn)) {
       toRemove.add(organismId);
     }
   }
@@ -1021,7 +1049,17 @@ function resolveOneGeneration(
 // through to resolveOneGeneration's own identically-named parameter (see
 // that function's own header). Default null, so every existing caller
 // sees no change.
-export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now = Date.now(), initialVolatilityScore = 0, onGenerationStep = null, reproduceFn = reproduce) {
+export function resolveCatchUp(
+  world,
+  organismIds,
+  lastSimulated,
+  rngState,
+  now = Date.now(),
+  initialVolatilityScore = 0,
+  onGenerationStep = null,
+  reproduceFn = reproduce,
+  survivalProbabilityFn = computeSurvivalProbability
+) {
   const elapsed = Math.max(0, now - lastSimulated);
   const generations = Math.min(Math.floor(elapsed / EVOLUTION_GENERATION_INTERVAL_MS), MAX_CATCHUP_GENERATIONS);
   const rng = createSeededRng(rngState);
@@ -1035,7 +1073,7 @@ export function resolveCatchUp(world, organismIds, lastSimulated, rngState, now 
       crowdingThreshold: CROWDING_THRESHOLD + carryingCapacityBonus(volatilityScore),
       mutationCeiling: mutationRateCeiling(volatilityScore),
     };
-    currentIds = resolveOneGeneration(world, currentIds, rng, g, simulatedNow, dampingParams, onGenerationStep, reproduceFn);
+    currentIds = resolveOneGeneration(world, currentIds, rng, g, simulatedNow, dampingParams, onGenerationStep, reproduceFn, survivalProbabilityFn);
     volatilityScore = nextVolatilityScore(volatilityScore, beforeCount, currentIds.length);
   }
 
@@ -1121,7 +1159,14 @@ export function groupOrganismsByPlanetoid(world, organismIds) {
 // `onGenerationStep`, added for Stage B (Mobility) -- threaded straight
 // through to resolveCatchUp's own identically-named parameter. Default
 // null, so every existing caller sees no change.
-export function resolveCatchUpForAllPlanetoids(world, organismIds, now = Date.now(), onGenerationStep = null, reproduceFn = reproduce) {
+export function resolveCatchUpForAllPlanetoids(
+  world,
+  organismIds,
+  now = Date.now(),
+  onGenerationStep = null,
+  reproduceFn = reproduce,
+  survivalProbabilityFn = computeSurvivalProbability
+) {
   const groups = groupOrganismsByPlanetoid(world, organismIds);
   const results = {};
   for (const [planetoidKey, ids] of Object.entries(groups)) {
@@ -1130,7 +1175,17 @@ export function resolveCatchUpForAllPlanetoids(world, organismIds, now = Date.no
       rngState: hashStringToSeed(planetoidKey),
       volatilityScore: 0,
     };
-    const result = resolveCatchUp(world, ids, stored.lastSimulated, stored.rngState, now, stored.volatilityScore ?? 0, onGenerationStep, reproduceFn);
+    const result = resolveCatchUp(
+      world,
+      ids,
+      stored.lastSimulated,
+      stored.rngState,
+      now,
+      stored.volatilityScore ?? 0,
+      onGenerationStep,
+      reproduceFn,
+      survivalProbabilityFn
+    );
     world.setPlanetoidEvolution(planetoidKey, {
       lastSimulated: result.lastSimulated,
       rngState: result.rngState,

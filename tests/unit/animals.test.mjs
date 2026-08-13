@@ -20,8 +20,20 @@ import {
   reproduceAnimal,
   reproduceFn,
   MATE_PREFERENCE_TRAIT,
+  computeAnimalSurvivalProbability,
+  attemptPredation,
+  animalGenerationStepHook,
+  PREDATION_PROBABILITY,
 } from '../../src/animals.js';
-import { isMature, growOrganism, GENOME_TRAIT_RANGES, resolveCatchUpForAllPlanetoids, plantOrganism, reproduce } from '../../src/evolution.js';
+import {
+  isMature,
+  growOrganism,
+  GENOME_TRAIT_RANGES,
+  resolveCatchUpForAllPlanetoids,
+  plantOrganism,
+  reproduce,
+  computeSurvivalProbability,
+} from '../../src/evolution.js';
 import { createWorldStore } from '../../src/worldstate.js';
 
 function growToMaturity(world, organismId, maxTicks = 20) {
@@ -380,4 +392,119 @@ test('movementStepHook wired into resolveCatchUpForAllPlanetoids: a real multi-g
   const endOrigin = world.getSeeds()['seed_a1'].origin;
   assert.notDeepEqual(endOrigin, startOrigin, 'a real multi-generation catch-up run must actually move the animal at least once');
   assert.ok(isValidHabitat(world, LAND_CREATURE_SPECIES, endOrigin), 'final position must still be valid habitat');
+});
+
+// ============================================================
+// Stage D -- Trophic Tier Extension (Herbivory + Carnivory)
+// ============================================================
+
+test('computeAnimalSurvivalProbability: delegates straight to evolution.js\'s own unmodified computeSurvivalProbability for a non-animal organism', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantOrganism(world, 'p1', 'seed_p1', 'amoeba', {}, [0, 0, 0], 0);
+  assert.equal(computeAnimalSurvivalProbability(world, 'p1', ['p1']), computeSurvivalProbability(world, 'p1', ['p1']));
+});
+
+test('computeAnimalSurvivalProbability: a pure herbivore (huntBias=0) responds to local BIOMASS -- a nearby mature plant WITH real water access measurably raises its odds under scarcity', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantAnimal(world, 'herb', 'seed_herb', LAND_CREATURE_SPECIES, { maturitySize: 3, resourceEfficiency: 0 }, { huntBias: 0 }, [0, 0, 0], 0);
+  const withoutPlant = computeAnimalSurvivalProbability(world, 'herb', ['herb']);
+
+  // localBiomassAvailability's own formula needs the PLANT itself to
+  // have real water access (growthRate*resourceEfficiency*0 = 0
+  // otherwise, per evolution.test.mjs's own established pattern) --
+  // biomass isn't produced from nothing.
+  for (let i = 0; i < 6; i++) world.addCell(3 + i, i, 0, { material: 'water' });
+  plantOrganism(world, 'plant1', 'seed_plant1', 'plant', { maturitySize: 3, growthRate: 1, resourceEfficiency: 1 }, [3, 0, 0], 0);
+  growToMaturity(world, 'plant1');
+  const withPlant = computeAnimalSurvivalProbability(world, 'herb', ['herb', 'plant1']);
+
+  assert.ok(withPlant > withoutPlant, `expected local plant biomass to raise a low-resourceEfficiency herbivore's odds, got ${withoutPlant} -> ${withPlant}`);
+});
+
+test('computeAnimalSurvivalProbability: a pure carnivore (huntBias=1) responds to local PREY density -- nearby mature amoeba measurably raise its odds under scarcity', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantAnimal(world, 'carn', 'seed_carn', LAND_CREATURE_SPECIES, { maturitySize: 3, resourceEfficiency: 0 }, { huntBias: 1 }, [0, 0, 0], 0);
+  const withoutPrey = computeAnimalSurvivalProbability(world, 'carn', ['carn']);
+
+  plantOrganism(world, 'amoeba1', 'seed_amoeba1', 'amoeba', { maturitySize: 3 }, [1, 1, 0], 0);
+  growToMaturity(world, 'amoeba1');
+  const withPrey = computeAnimalSurvivalProbability(world, 'carn', ['carn', 'amoeba1']);
+
+  assert.ok(withPrey > withoutPrey, `expected nearby prey to raise a low-resourceEfficiency carnivore's odds, got ${withoutPrey} -> ${withPrey}`);
+});
+
+test('computeAnimalSurvivalProbability: huntBias is a continuous blend, not a hard split -- an intermediate huntBias responds to BOTH biomass and prey', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantAnimal(world, 'omni', 'seed_omni', LAND_CREATURE_SPECIES, { maturitySize: 3, resourceEfficiency: 0 }, { huntBias: 0.5 }, [0, 0, 0], 0);
+  const baseline = computeAnimalSurvivalProbability(world, 'omni', ['omni']);
+
+  for (let i = 0; i < 6; i++) world.addCell(3 + i, i, 0, { material: 'water' });
+  plantOrganism(world, 'plant1', 'seed_plant1', 'plant', { maturitySize: 3, growthRate: 1, resourceEfficiency: 1 }, [3, 0, 0], 0);
+  growToMaturity(world, 'plant1');
+  const withPlantOnly = computeAnimalSurvivalProbability(world, 'omni', ['omni', 'plant1']);
+  assert.ok(withPlantOnly > baseline, 'a mid-huntBias animal must still benefit at least partially from nearby biomass');
+
+  plantOrganism(world, 'amoeba1', 'seed_amoeba1', 'amoeba', { maturitySize: 3 }, [1, 1, 0], 0);
+  growToMaturity(world, 'amoeba1');
+  const withBoth = computeAnimalSurvivalProbability(world, 'omni', ['omni', 'plant1', 'amoeba1']);
+  assert.ok(withBoth > withPlantOnly, 'adding real prey on top must raise it further still');
+});
+
+test('attemptPredation: a pure herbivore (huntBias=0) never preys, even with abundant prey in range', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantAnimal(world, 'herb', 'seed_herb', LAND_CREATURE_SPECIES, { maturitySize: 3 }, { huntBias: 0, mobilityRange: 5 }, [0, 0, 0], 0);
+  plantOrganism(world, 'amoeba1', 'seed_amoeba1', 'amoeba', { maturitySize: 3 }, [1, 1, 0], 0);
+  for (const id of ['herb', 'amoeba1']) growToMaturity(world, id);
+  const happened = attemptPredation(world, 'herb', () => 0, ['herb', 'amoeba1']);
+  assert.equal(happened, false);
+  assert.ok(world.getOrganisms()['amoeba1'], 'prey must survive when the predator has zero huntBias');
+});
+
+test('attemptPredation: a real carnivore with prey in range and a favorable roll actually REMOVES the prey organism and its seed', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantAnimal(world, 'carn', 'seed_carn', LAND_CREATURE_SPECIES, { maturitySize: 3 }, { huntBias: 1, mobilityRange: 5 }, [0, 0, 0], 0);
+  plantOrganism(world, 'amoeba1', 'seed_amoeba1', 'amoeba', { maturitySize: 3 }, [1, 1, 0], 0);
+  for (const id of ['carn', 'amoeba1']) growToMaturity(world, id);
+  const happened = attemptPredation(world, 'carn', () => 0, ['carn', 'amoeba1']); // rng=0 always beats PREDATION_PROBABILITY*huntBias (positive)
+  assert.equal(happened, true);
+  assert.equal(world.getOrganisms()['amoeba1'], undefined, 'prey organism must be genuinely removed');
+  assert.equal(world.getSeeds()['seed_amoeba1'], undefined, 'prey seed (its rendered structure) must be genuinely removed too');
+});
+
+test('attemptPredation: an animal never preys on a same-or-higher-huntBias animal (strict lower-tier only)', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  plantAnimal(world, 'a', 'seed_a', LAND_CREATURE_SPECIES, { maturitySize: 3 }, { huntBias: 0.5, mobilityRange: 5 }, [0, 0, 0], 0);
+  plantAnimal(world, 'b_equal', 'seed_b', LAND_CREATURE_SPECIES, { maturitySize: 3 }, { huntBias: 0.5, mobilityRange: 5 }, [1, 1, 0], 0);
+  for (const id of ['a', 'b_equal']) growToMaturity(world, id);
+  const happened = attemptPredation(world, 'a', () => 0, ['a', 'b_equal']);
+  assert.equal(happened, false, 'equal huntBias must never count as prey');
+  assert.ok(world.getOrganisms()['b_equal']);
+});
+
+test('animalGenerationStepHook + computeAnimalSurvivalProbability wired into a real multi-generation catch-up run: a carnivore land creature measurably reduces a nearby amoeba population over time', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'blackstar-glassite' });
+  plantAnimal(world, 'carn', 'seed_carn', LAND_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0 }, { huntBias: 1, mobilityRange: 6 }, [1, 1, 1], 0);
+  const amoebaIds = [];
+  for (let i = 0; i < 6; i++) {
+    const id = `amoeba${i}`;
+    plantOrganism(world, id, `seed_${id}`, 'amoeba', { maturitySize: 3, mutationRate: 0 }, [1 + i * 0.3, 1, 1], 0);
+    amoebaIds.push(id);
+  }
+  const allIds = ['carn', ...amoebaIds];
+
+  resolveCatchUpForAllPlanetoids(world, allIds, 0, animalGenerationStepHook, reproduceFn, computeAnimalSurvivalProbability);
+  const result = resolveCatchUpForAllPlanetoids(
+    world,
+    allIds,
+    30000 * 25,
+    animalGenerationStepHook,
+    reproduceFn,
+    computeAnimalSurvivalProbability
+  );
+  const finalIds = Object.values(result)[0].organismIds;
+  const survivingAmoeba = finalIds.filter((id) => world.getOrganisms()[id]?.species === 'amoeba');
+
+  assert.ok(survivingAmoeba.length < amoebaIds.length, `expected measurable predation to reduce the amoeba population (started at ${amoebaIds.length}, ended at ${survivingAmoeba.length})`);
+  assert.ok(finalIds.includes('carn') || finalIds.some((id) => id.startsWith('carn_')), 'the carnivore lineage should still be present, benefiting from the prey it consumed');
 });

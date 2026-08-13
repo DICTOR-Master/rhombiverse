@@ -30,6 +30,10 @@ import {
   reproduce,
   reproduceSexual,
   MUTATION_DELTA_FRACTION,
+  computeSurvivalProbability,
+  localBiomassAvailability,
+  CROWDING_THRESHOLD,
+  CROWDING_PENALTY_PER_EXCESS,
 } from './evolution.js';
 import { cellToWorld } from './lattice.js';
 
@@ -413,4 +417,154 @@ export function reproduceFn(world, species, parentOrganismId, candidateMateIds, 
     return reproduce(world, species, parentOrganismId, candidateMateIds, offspringOrganismId, offspringSeedId, offspringOriginHint, now, rng, mutationRateOverride);
   }
   return reproduceAnimal(world, parentOrganismId, offspringOrganismId, offspringSeedId, now, rng, candidateMateIds, mutationRateOverride);
+}
+
+// ============================================================
+// Stage D -- Trophic Tier Extension (Herbivory + Carnivory)
+// ============================================================
+// Section 4: huntBias is a CONTINUOUS dial, not a herbivore/carnivore
+// species split -- "one more difference-equation link," reusing the
+// exact same biomass resource pool evolution.js's Stage 5 already
+// created for amoeba (herbivory: a second consumer of the same pool,
+// which naturally creates real competitive pressure with amoeba without
+// inventing a new resource type), plus a real, direct predation event
+// for the carnivory half (a genuine per-generation prey-removal, the
+// most honest/grounded representation of "eats another organism" --
+// simpler and more legible than a purely probabilistic nudge, and it's
+// what makes the effect on prey populations actually MEASURABLE per
+// section 7's own success check, not just theoretically present).
+
+// Same "count within range, normalize to [0,1] at an abundant threshold"
+// shape evolution.js's own RESOURCE_ABUNDANT_COUNT/BIOMASS_ABUNDANT_OUTPUT
+// already use -- reused here for prey, not a new normalization scheme.
+export const PREY_ABUNDANT_COUNT = 3;
+
+// A hunt only actually succeeds probabilistically per generation (real
+// predators don't catch prey on every encounter) -- first-guess,
+// flagged as tunable per this project's established convention for
+// exactly this class of constant.
+export const PREDATION_PROBABILITY = 0.3;
+
+// True prey relationship (section 4): amoeba are always valid prey
+// (any huntBias > 0 carnivore can target them, matching the spec's own
+// "prey on amoeba directly, or on other animals of lower huntBias" --
+// amoeba have no huntBias of their own, treated as huntBias 0 for this
+// comparison); an animal is prey only to another animal with a STRICTLY
+// higher huntBias, so two equal-huntBias animals never prey on each
+// other.
+function isPreyOf(predator, candidate) {
+  if (candidate.species === 'amoeba') return true;
+  if (!isAnimal(candidate)) return false;
+  return (candidate.huntBias ?? 0) < (predator.huntBias ?? 0);
+}
+
+// Every mature, in-mobilityRange organism from `candidateIds` (Stage 6's
+// own planetoid-scoped population, passed through onGenerationStep's own
+// extension -- see evolution.js's own comment on why -- rather than a
+// global world.getOrganisms() scan) that counts as this predator's prey.
+function findPreyWithinRange(world, predatorId, candidateIds) {
+  const predator = world.getOrganisms()[predatorId];
+  const result = [];
+  for (const id of candidateIds) {
+    if (id === predatorId) continue;
+    const other = world.getOrganisms()[id];
+    if (!other || !isMature(world, id)) continue;
+    if (isPreyOf(predator, other) && isWithinMobilityRange(world, predatorId, id)) result.push(id);
+  }
+  return result;
+}
+
+function localPreyAvailability(world, organismId, candidateIds) {
+  return Math.min(1, findPreyWithinRange(world, organismId, candidateIds).length / PREY_ABUNDANT_COUNT);
+}
+
+// Same-species crowding count, but scoped to the organism's OWN
+// mobilityRange (its real reach) rather than evolution.js's own
+// bounding-radius-multiplier neighborhood -- same reasoning as
+// reproduceAnimal's own isWithinMobilityRange (a mobile creature's real
+// "local" is defined by how far it can move, not how big it physically
+// is).
+function localSameSpeciesCountWithinMobilityRange(world, organismId, candidateIds) {
+  const self = world.getOrganisms()[organismId];
+  let count = 0;
+  for (const id of candidateIds) {
+    if (id === organismId) continue;
+    const other = world.getOrganisms()[id];
+    if (!other || other.species !== self.species || !isMature(world, id)) continue;
+    if (isWithinMobilityRange(world, organismId, id)) count++;
+  }
+  return count;
+}
+
+function clamp01(x) {
+  return Math.min(1, Math.max(0, x));
+}
+
+// The real survivalProbabilityFn override (evolution.js's own Stage D
+// extension point) -- huntBias blends two availability signals into one
+// (0 = pure herbivore reading local biomass exactly like amoeba already
+// does, 1 = pure carnivore reading local prey density, continuous
+// in-between per section 4's own "dial, not a split"), then reuses the
+// SAME scarcity/crowding formula SHAPE evolution.js's own
+// computeSurvivalProbability already established (resourceEfficiency
+// matters more under scarcity, crowding penalizes uniformly above
+// threshold) rather than inventing a new one. Delegates straight back to
+// evolution.js's own unmodified computeSurvivalProbability for any
+// non-animal species -- a pure superset, same pattern as reproduceFn.
+export function computeAnimalSurvivalProbability(world, organismId, candidateIds, crowdingThreshold = CROWDING_THRESHOLD) {
+  const organism = world.getOrganisms()[organismId];
+  if (!isAnimal(organism)) return computeSurvivalProbability(world, organismId, candidateIds, crowdingThreshold);
+  const seed = world.getSeeds()[organism.seedId];
+  if (!seed) return 0;
+
+  const huntBias = organism.huntBias ?? 0.5;
+  const herbivoreAvailability = localBiomassAvailability(world, seed.origin, candidateIds);
+  const carnivoreAvailability = localPreyAvailability(world, organismId, candidateIds);
+  const availability = (1 - huntBias) * herbivoreAvailability + huntBias * carnivoreAvailability;
+  const scarcityFactor = availability + (1 - availability) * organism.genome.resourceEfficiency;
+
+  const crowd = localSameSpeciesCountWithinMobilityRange(world, organismId, candidateIds);
+  const crowdingFactor = crowd > crowdingThreshold ? clamp01(1 - (crowd - crowdingThreshold) * CROWDING_PENALTY_PER_EXCESS) : 1;
+
+  return clamp01(scarcityFactor * crowdingFactor);
+}
+
+// The real, direct predation event: a mature carnivore-leaning animal
+// (huntBias alone gates whether it hunts at all THIS generation via the
+// probability roll below -- there is no separate hard species/threshold
+// split, matching section 4's own "continuous dial" framing: a huntBias
+// of, say, 0.2 still occasionally hunts, just proportionally rarely,
+// since huntBias also feeds directly into its own survival-probability
+// blend above) with real prey in range has a real, bounded chance per
+// generation of removing ONE prey organism outright -- section 4's own
+// carnivory mechanism, made concrete. Never removes more than one prey
+// per predator per generation (bounded, not a massacre).
+export function attemptPredation(world, organismId, rng = Math.random, candidateIds = null) {
+  const organism = world.getOrganisms()[organismId];
+  if (!isAnimal(organism) || !isMature(world, organismId)) return false;
+  const huntBias = organism.huntBias ?? 0;
+  if (huntBias <= 0) return false;
+  const pool = candidateIds ?? Object.keys(world.getOrganisms());
+  const prey = findPreyWithinRange(world, organismId, pool);
+  if (prey.length === 0) return false;
+  if (rng() >= PREDATION_PROBABILITY * huntBias) return false; // higher huntBias hunts more reliably, still never certain
+  const preyId = prey[Math.floor(rng() * prey.length)];
+  const preyOrganism = world.getOrganisms()[preyId];
+  world.removeSeed(preyOrganism.seedId);
+  world.removeOrganism(preyId);
+  return true;
+}
+
+export function predationStepHook(world, organismId, rng, generationIndex, simulatedNow, candidateIds) {
+  attemptPredation(world, organismId, rng, candidateIds);
+}
+
+// The real combined per-generation hook, wired into render.js's own
+// resolveEvolution as the actual onGenerationStep -- resolves predation
+// BEFORE movement (hunt from the current position, then move), matching
+// this module's own established "hook order reflects the generation's
+// real event order" convention from Stage B.
+export function animalGenerationStepHook(world, organismId, rng, generationIndex, simulatedNow, candidateIds) {
+  predationStepHook(world, organismId, rng, generationIndex, simulatedNow, candidateIds);
+  movementStepHook(world, organismId, rng, generationIndex, simulatedNow);
 }

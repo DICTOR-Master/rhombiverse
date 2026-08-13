@@ -69,8 +69,9 @@ import {
   SEA_CREATURE_SPECIES,
   ANIMAL_TRAIT_RANGES,
   plantAnimal,
-  movementStepHook,
+  animalGenerationStepHook,
   reproduceFn,
+  computeAnimalSurvivalProbability,
 } from './animals.js';
 
 const SCALE = 1;
@@ -300,12 +301,15 @@ function updateGravityInfo() {
 function resolveEvolution(world, now) {
   const organismIds = Object.keys(world.getOrganisms());
   if (organismIds.length === 0) return false;
-  // RHOMBIVERSE_SPEC_ANIMALS.md Stage B: movementStepHook is a no-op for
-  // every non-animal organism (amoeba/plant), so passing it here
+  // RHOMBIVERSE_SPEC_ANIMALS.md Stages B-D: all three overrides
+  // (animalGenerationStepHook -- movement + predation, reproduceFn --
+  // sexual mate-pairing, computeAnimalSurvivalProbability -- huntBias-
+  // blended herbivory/carnivory survival odds) are no-ops/pure delegates
+  // for every non-animal organism (amoeba/plant), so passing them here
   // unconditionally is safe and correct regardless of what's actually
-  // planted -- this is the one real wiring point Stage B's own bounded-
-  // random-walk mechanism needed to go live in the actual game.
-  const results = resolveCatchUpForAllPlanetoids(world, organismIds, now, movementStepHook, reproduceFn);
+  // planted -- this is the one real wiring point Animals' own mechanics
+  // needed to go live in the actual game.
+  const results = resolveCatchUpForAllPlanetoids(world, organismIds, now, animalGenerationStepHook, reproduceFn, computeAnimalSurvivalProbability);
   return Object.values(results).some((r) => r.generationsResolved > 0);
 }
 
