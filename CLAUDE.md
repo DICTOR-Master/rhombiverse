@@ -2621,9 +2621,42 @@ yet** -- `src/latticezoom.js`, `src/render.js`, `tests/unit/latticezoom.
 test.mjs`, this file, the spec doc, and the skill doc all have real
 uncommitted changes as of this entry.
 
-Stages 4 (Adaptive Damping) and 5-6 (Ecosystem/Landscape Rendering) of
-Lattice Zoom remain genuinely unstarted -- see the spec doc's own Build
-Order section for what each actually requires.
+**Lattice Zoom Stage 3 committed, Stage 4 (Adaptive Damping) done, same
+session, 2026-08-13 (the "Not committed yet" note directly above is now
+stale -- Stage 3 landed as its own commit, `Lattice Zoom Stage 3:
+multi-level depth & blending`, before Stage 4 work started).** Stage 4
+reuses `RHOMBIVERSE_PRINCIPLES.md` section 2's generalized volatility
+shape verbatim -- the same one `evolution.js`'s own `nextVolatilityScore`/
+`VOLATILITY_DECAY_FACTOR` already implements for population swings, just
+with `latticezoom.js` growing its own local, analogous pure functions
+(`swingMagnitude`, `nextVolatilityScore`, `throttleForVolatility`) rather
+than importing evolution's -- a different subsystem's own tunable, same
+shape, same literal threshold/decay VALUES reused as a real reference
+point (0.3 swing threshold, 0.9 decay factor). `render.js`'s
+`refreshSubLattice` now tracks real movement since the previous refresh
+and feeds it through those functions to widen/narrow its own
+self-rescheduling throttle -- no changes needed to the scheduling loop
+itself, since Stage 2 already built it to pick up a widened value on its
+very next tick specifically so Stage 4 wouldn't have to touch it. Real
+detail (every constant's derivation, the full verification story
+including a genuine test bug caught and fixed, and a non-obvious emergent
+behavior -- decay itself ticks slower while the throttle is widened, so
+wall-clock settle time after a big scrub is proportionally longer, not a
+bug) is in `RHOMBIVERSE_SPEC_LATTICE_ZOOM.md`'s own Stage 4 section, not
+repeated here. Verified via `node --test` (7 new tests, 162 total) AND a
+real Playwright run against the actual `render.js` wiring, via a
+temporary debug hook added just for that one run and removed immediately
+after (`render.js` carries no permanent debug surface) -- confirmed a
+real scripted rapid-scrub sequence widens the LIVE throttle to its
+1000ms cap while a calm control stays at the 250ms base, and that it
+genuinely decays back down again during a real held-still period
+afterward. **Not committed yet as of this entry** -- same files as
+Stage 3's own list, now with Stage 4's further changes on top.
+
+Stages 5-6 (Ecosystem/Landscape Rendering) of Lattice Zoom remain
+genuinely unstarted -- see the spec doc's own Build Order section for
+what each actually requires; both depend on Evolution's own Stage 4/5
+output, which is real and ready.
 
 Each subsequent phase and spec addendum ends with its own copy-paste-ready
 Claude Code prompt — use those rather than improvising scope, they're

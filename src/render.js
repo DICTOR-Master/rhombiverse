@@ -19,6 +19,9 @@ import {
   MAX_LOD_DEPTH,
   levelTriggerDistance,
   blendFactor,
+  SUB_LATTICE_THROTTLE_BASE_MS,
+  nextVolatilityScore,
+  throttleForVolatility,
 } from './latticezoom.js';
 import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController, removeShell, recolorShell } from './build.js';
@@ -808,12 +811,19 @@ async function init() {
   const SUB_LATTICE_BLEND_WIDTH = subLatticeScale;
   const LEVEL2_BLEND_WIDTH = levelTriggerDistance(SUB_LATTICE_BLEND_WIDTH, 2, SUB_LATTICE_MAX_SHELL);
 
-  // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md section 5 (Adaptive Damping) --
-  // Stage 4's own job to make this widen under rapid repeated triggers;
-  // this module-level mutable throttle value is the real extension point
-  // Stage 4 will adjust, left as a plain `let` rather than a constant for
-  // exactly that reason.
-  let subLatticeThrottleMs = 250;
+  // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 4 (Adaptive Damping): real
+  // volatility-driven widening of this throttle, via latticezoom.js's
+  // own pure nextVolatilityScore/throttleForVolatility (the same
+  // RHOMBIVERSE_PRINCIPLES.md section 2 shape evolution.js's own
+  // volatility score already implements elsewhere in this project).
+  // subLatticeVolatilityScore/lastSubLatticeRefPos are the real per-
+  // refresh state the pure functions need; subLatticeThrottleMs itself
+  // stays a plain `let` (the self-rescheduling setTimeout loop below
+  // reads it fresh on every tick, so a widened value takes effect on the
+  // very next scheduling, no timer teardown needed).
+  let subLatticeThrottleMs = SUB_LATTICE_THROTTLE_BASE_MS;
+  let subLatticeVolatilityScore = 0;
+  let lastSubLatticeRefPos = null;
   let lastSubLatticeRefresh = 0;
   const subLatticeDummy = new THREE.Object3D();
 
@@ -850,6 +860,18 @@ async function init() {
   function refreshSubLattice() {
     const camPos = walking && player ? player.getPosition() : camera.position;
     const refPos = [camPos.x, camPos.y, camPos.z];
+
+    // Stage 4: real movement since the last refresh drives the
+    // volatility score, which drives the NEXT scheduled throttle
+    // interval -- rapid repeated scrubbing widens it, calm/slow movement
+    // decays it back toward the tight default.
+    const movement = lastSubLatticeRefPos
+      ? Math.hypot(refPos[0] - lastSubLatticeRefPos[0], refPos[1] - lastSubLatticeRefPos[1], refPos[2] - lastSubLatticeRefPos[2])
+      : 0;
+    subLatticeVolatilityScore = nextVolatilityScore(subLatticeVolatilityScore, movement, SUB_LATTICE_TRIGGER_DISTANCE);
+    subLatticeThrottleMs = throttleForVolatility(subLatticeVolatilityScore);
+    lastSubLatticeRefPos = refPos;
+
     const chosen = selectNearbyCells(
       world.entries(),
       refPos,

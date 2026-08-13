@@ -393,10 +393,70 @@ one. Fixed by targeting a screen point clear of both panels. Logged in
 driving OrbitControls zoom via Playwright doesn't lose time to the same
 thing.
 
-**Stage 4 — Adaptive Damping**
-Implement the volatility-driven recompute-throttle widening (section 5).
-Verify a scripted rapid-zoom test shows a measurably wider throttle
-interval than a calm-movement control.
+**Stage 4 — Adaptive Damping — DONE, 2026-08-13.** Real volatility-driven
+widening of the recompute throttle (section 5), reusing
+`RHOMBIVERSE_PRINCIPLES.md` section 2's own generalized shape verbatim --
+the exact same one `evolution.js`'s `nextVolatilityScore`/
+`VOLATILITY_DECAY_FACTOR` already implements for population swings, not a
+new mechanic invented for this spec. `latticezoom.js` gained the pure
+side: `swingMagnitude(movement, triggerDistance)` normalizes real
+reference-position movement between refreshes by the base trigger
+distance (the same "normalize by something already real in the system"
+shape `evolution.js`'s own swing check uses, there normalizing by prior
+population); `nextVolatilityScore(currentScore, movement, triggerDistance)`
+mirrors `evolution.js`'s own function shape exactly -- accumulate the
+magnitude on a real swing (`SUB_LATTICE_SWING_FRACTION_THRESHOLD = 0.3`,
+the same literal threshold VALUE `evolution.js` uses, adapted to this
+domain), multiplicatively decay otherwise
+(`SUB_LATTICE_VOLATILITY_DECAY_FACTOR = 0.9`, same value and role as
+`evolution.js`'s own decay factor); `throttleForVolatility(volatilityScore)`
+maps the score onto the real interval `render.js`'s self-rescheduling
+timer should use next, linearly widening from `SUB_LATTICE_THROTTLE_
+BASE_MS` (250, the pre-existing Stage 2 tight default, now named) up to a
+bounded `SUB_LATTICE_THROTTLE_MAX_MS` (1000 -- even under sustained rapid
+scrubbing, a recompute still happens at least once a second, so the
+revealed sub-lattice never lags the camera by more than that) at a rate
+(`SUB_LATTICE_THROTTLE_MS_PER_VOLATILITY = 150`) reasoned so reaching the
+cap requires roughly five consecutive full-strength swings with no
+intervening calm tick -- genuinely sustained scrubbing, not one flick of
+the wheel.
+
+`render.js`'s `refreshSubLattice` tracks `lastSubLatticeRefPos` and
+computes real movement since the previous refresh at the top of every
+call, feeding it through `nextVolatilityScore` to update
+`subLatticeVolatilityScore`, then `throttleForVolatility` to update
+`subLatticeThrottleMs` -- the pre-existing self-rescheduling `setTimeout`
+loop (built this way back in Stage 2 specifically so this would need no
+changes) picks up the widened/narrowed value on its very next scheduling
+call automatically.
+
+Verified via `node --test` (7 new tests in `latticezoom.test.mjs` --
+`swingMagnitude`'s normalization and zero-trigger-distance guard,
+`nextVolatilityScore`'s real accumulate-vs-decay branches and multi-tick
+divergence between sustained rapid and sustained calm sequences,
+`throttleForVolatility`'s monotonic widening bounded at the cap, and a
+literal "scripted rapid-zoom vs calm-movement control" test matching this
+stage's own build-order success check verbatim -- 162 total, all
+passing) AND a real Playwright run against the actual `render.js` wiring
+(not just the pure functions): a temporary `window.__scratchSubLatticeDebug()`
+hook (added for this one verification run, removed again immediately
+after -- `render.js` itself carries no permanent debug surface, same as
+every prior stage) confirmed a real scripted rapid-scrub sequence widens
+the live throttle to the 1000ms cap (`volatilityScore` reaching ~5-9 in
+the process) while a calm control stays exactly at the 250ms base, and
+that the throttle genuinely decays back down again during a real held-
+still period afterward -- settling, not a one-way ratchet, confirming
+section 2's own "not infinite... genuine settling" requirement holds in
+the actual running app, not just in the isolated math. One real,
+non-obvious behavior surfaced only by this live run, not by reading the
+code: while throttled near the cap, refreshes (and therefore decay ticks,
+which only fire once per refresh) happen only about once a second, so
+wall-clock recovery time after a big scrubbing burst is itself
+proportionally longer right after the burst -- a genuine emergent
+consequence of the throttle interval and the decay mechanism sharing the
+same tick, not a bug; the verification script had to poll for the decay
+rather than assume a fixed wait would be long enough, and that fixed-wait
+version genuinely failed on the first run before being corrected.
 
 **Stage 5 — Ecosystem Rendering (Real Organisms + Plant-Coverage Layer)**
 Requires Evolution Stage 4+ (real tracked organism population) to have

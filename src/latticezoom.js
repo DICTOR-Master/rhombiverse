@@ -164,3 +164,78 @@ export function blendFactor(distance, innerTrigger, blendWidth) {
   if (distance >= outer) return 0;
   return (outer - distance) / blendWidth;
 }
+
+// RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 4 -- Adaptive Damping.
+//
+// Not a new mechanic invented for this spec -- RHOMBIVERSE_PRINCIPLES.md
+// section 2's own generalized volatility-response shape, the same one
+// evolution.js's nextVolatilityScore/VOLATILITY_DECAY_FACTOR already
+// implements for population swings: accumulate a volatility score on
+// each "correction event" (there, a >=30%-of-prior-population swing
+// between generations; here, real camera/reference-position movement
+// between refreshes), decay it during calm periods, and drive a bounded,
+// monotonically-increasing response off of it (there, carrying-capacity
+// headroom + a lowered mutation ceiling; here, a widened recompute
+// throttle interval). Deliberately its own local constants, not a
+// literal import of evolution.js's -- a different subsystem's own
+// tunable, same shape.
+//
+// SUB_LATTICE_SWING_FRACTION_THRESHOLD (0.3): reuses evolution.js's own
+// exact threshold VALUE as a real reference point, not an unrelated
+// number -- adapted to this domain as "real movement across one refresh
+// tick exceeding 30% of the base trigger distance counts as a genuine
+// rapid scrub," the same "genuine swing vs routine noise" cutoff shape,
+// just normalized by a different (but equally real, already-existing)
+// baseline quantity.
+export const SUB_LATTICE_SWING_FRACTION_THRESHOLD = 0.3;
+// Same value AND same role as evolution.js's own VOLATILITY_DECAY_FACTOR
+// -- "settling toward stability... during calm periods," per
+// RHOMBIVERSE_PRINCIPLES.md section 2's own wording.
+export const SUB_LATTICE_VOLATILITY_DECAY_FACTOR = 0.9;
+// The existing Stage 2 tight default (250ms), now named so Stage 4's
+// widening has a real base to widen FROM rather than a bare literal.
+export const SUB_LATTICE_THROTTLE_BASE_MS = 250;
+// Bounded widening cap (section 2's own "adaptive, not infinite"
+// requirement) -- even under sustained rapid scrubbing, a recompute
+// still happens at least once a second, so the revealed sub-lattice
+// never lags the camera by more than that regardless of how volatile
+// movement gets.
+export const SUB_LATTICE_THROTTLE_MAX_MS = 1000;
+// Linear widening rate: reaching the 1000ms cap from the 250ms base
+// takes a volatility score of (1000-250)/150 = 5 -- roughly five
+// consecutive "full-strength" swings (each tick's movement equal to a
+// full trigger-distance, magnitude ~1.0) accumulated without an
+// intervening calm tick to decay them, i.e. genuinely sustained rapid
+// scrubbing, not one quick flick of the wheel.
+export const SUB_LATTICE_THROTTLE_MS_PER_VOLATILITY = 150;
+
+// Pure: how far the reference position moved since the last refresh,
+// expressed as a fraction of the base trigger distance -- the same
+// "normalize the raw metric by something already real in the system"
+// shape evolution.js's own swingMagnitude uses (there: population change
+// as a fraction of prior population).
+export function swingMagnitude(movement, triggerDistance) {
+  if (triggerDistance <= 0) return 0;
+  return movement / triggerDistance;
+}
+
+// Pure: current volatility score + this refresh's own real movement ->
+// next score. Mirrors evolution.js's own nextVolatilityScore shape
+// exactly (accumulate on a real swing, multiplicatively decay
+// otherwise), parameterized on movement/triggerDistance instead of
+// before/after population counts.
+export function nextVolatilityScore(currentScore, movement, triggerDistance) {
+  const magnitude = swingMagnitude(movement, triggerDistance);
+  if (magnitude >= SUB_LATTICE_SWING_FRACTION_THRESHOLD) return currentScore + magnitude;
+  return currentScore * SUB_LATTICE_VOLATILITY_DECAY_FACTOR;
+}
+
+// Pure: volatility score -> the real throttle interval render.js's own
+// self-rescheduling refresh loop should use next, bounded between the
+// tight default and the widened cap.
+export function throttleForVolatility(volatilityScore) {
+  return Math.min(
+    SUB_LATTICE_THROTTLE_MAX_MS,
+    SUB_LATTICE_THROTTLE_BASE_MS + volatilityScore * SUB_LATTICE_THROTTLE_MS_PER_VOLATILITY
+  );
+}

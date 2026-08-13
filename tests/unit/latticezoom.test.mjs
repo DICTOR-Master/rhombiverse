@@ -14,6 +14,13 @@ import {
   MAX_LOD_DEPTH,
   levelTriggerDistance,
   blendFactor,
+  SUB_LATTICE_SWING_FRACTION_THRESHOLD,
+  SUB_LATTICE_VOLATILITY_DECAY_FACTOR,
+  SUB_LATTICE_THROTTLE_BASE_MS,
+  SUB_LATTICE_THROTTLE_MAX_MS,
+  swingMagnitude,
+  nextVolatilityScore,
+  throttleForVolatility,
 } from '../../src/latticezoom.js';
 import { shellCount, isValidCell, cellToWorld } from '../../src/lattice.js';
 
@@ -214,4 +221,66 @@ test('blendFactor: monotonically decreasing as distance increases through the bl
   for (let i = 1; i < samples.length; i++) {
     assert.ok(samples[i] <= samples[i - 1], `blendFactor must never increase as distance grows: ${samples}`);
   }
+});
+
+// ============================================================
+// Stage 4 -- Adaptive Damping
+// ============================================================
+
+test('swingMagnitude: real ratio of movement to the base trigger distance, zero when there is no movement', () => {
+  assert.equal(swingMagnitude(0, 4), 0);
+  assert.equal(swingMagnitude(2, 4), 0.5);
+  assert.equal(swingMagnitude(4, 4), 1);
+  assert.equal(swingMagnitude(1, 0), 0, 'must not divide by zero if a caller ever passes a zero trigger distance');
+});
+
+test('nextVolatilityScore: a real rapid swing (>= SUB_LATTICE_SWING_FRACTION_THRESHOLD) ACCUMULATES onto the current score', () => {
+  const bigMovement = 4; // movement == triggerDistance -> magnitude exactly 1.0
+  const next = nextVolatilityScore(0.5, bigMovement, 4);
+  assert.ok(Math.abs(next - (0.5 + 1.0)) < 1e-9, `expected accumulation to exactly current + magnitude, got ${next}`);
+});
+
+test('nextVolatilityScore: a calm tick (below threshold) DECAYS the current score by SUB_LATTICE_VOLATILITY_DECAY_FACTOR, never accumulates', () => {
+  const tinyMovement = 0.01 * 4; // well under the 0.3 threshold fraction
+  const next = nextVolatilityScore(2, tinyMovement, 4);
+  assert.ok(Math.abs(next - 2 * SUB_LATTICE_VOLATILITY_DECAY_FACTOR) < 1e-9);
+  assert.ok(next < 2, 'a calm tick must reduce the score, never grow it');
+});
+
+test('nextVolatilityScore: repeated rapid swings vs repeated calm ticks from the same starting score diverge -- real accumulation vs real settling, not noise', () => {
+  let rapidScore = 0;
+  let calmScore = 5; // start elevated, as if from a prior burst of scrubbing
+  for (let i = 0; i < 5; i++) {
+    rapidScore = nextVolatilityScore(rapidScore, 4, 4); // magnitude 1.0 every tick
+    calmScore = nextVolatilityScore(calmScore, 0, 4); // zero movement every tick
+  }
+  assert.ok(rapidScore > 4, `sustained rapid scrubbing should accumulate a real elevated score, got ${rapidScore}`);
+  assert.ok(calmScore < 5 * Math.pow(SUB_LATTICE_VOLATILITY_DECAY_FACTOR, 5) + 1e-9, `sustained calm movement should decay toward zero, got ${calmScore}`);
+  assert.ok(rapidScore > calmScore, 'rapid scrubbing must end up with a strictly higher volatility score than sustained calm movement from a higher start');
+});
+
+test('throttleForVolatility: zero volatility returns exactly the base throttle (the Stage 2 tight default)', () => {
+  assert.equal(throttleForVolatility(0), SUB_LATTICE_THROTTLE_BASE_MS);
+});
+
+test('throttleForVolatility: monotonically increasing with volatility, bounded at SUB_LATTICE_THROTTLE_MAX_MS -- adaptive, not infinite, per RHOMBIVERSE_PRINCIPLES.md section 2', () => {
+  const low = throttleForVolatility(1);
+  const high = throttleForVolatility(10);
+  const extreme = throttleForVolatility(1000);
+  assert.ok(low > SUB_LATTICE_THROTTLE_BASE_MS, 'any real volatility must widen the throttle above the base');
+  assert.ok(high > low, 'more volatility must widen the throttle further');
+  assert.equal(extreme, SUB_LATTICE_THROTTLE_MAX_MS, 'extreme volatility must be capped, never unbounded');
+});
+
+test('throttleForVolatility: a real scripted rapid-zoom scenario produces a measurably wider throttle than a calm-movement control -- Stage 4\'s own success check', () => {
+  let rapidScore = 0;
+  let calmScore = 0;
+  for (let i = 0; i < 8; i++) {
+    rapidScore = nextVolatilityScore(rapidScore, 6, 4); // large real movement every tick (a player scrubbing fast)
+    calmScore = nextVolatilityScore(calmScore, 0.05, 4); // near-stationary camera
+  }
+  const rapidThrottle = throttleForVolatility(rapidScore);
+  const calmThrottle = throttleForVolatility(calmScore);
+  assert.equal(calmThrottle, SUB_LATTICE_THROTTLE_BASE_MS, 'a calm-movement control should stay at the tight default');
+  assert.ok(rapidThrottle > calmThrottle, `rapid scrubbing must produce a measurably wider throttle interval than the calm control (rapid=${rapidThrottle}, calm=${calmThrottle})`);
 });
