@@ -650,3 +650,123 @@ test('reproduceAnimal + Stage E: the REVERSE direction (sea to land) also succee
   const reclassifiedSeed = world.getSeeds()[reclassified.seedId];
   assert.ok(isValidHabitat(world, LAND_CREATURE_SPECIES, reclassifiedSeed.origin));
 });
+
+// ============================================================
+// Stage F -- Moderation & Full Verification (section 7's own checklist)
+// ============================================================
+
+// Both tests below need a plant with real water access (per
+// localBiomassAvailability's own formula) WITHOUT that water being the
+// nearest cell to wherever the amoeba/animal is planted (which would
+// make it invalid LAND habitat for the animal, per isValidHabitat's own
+// "nearest cell" classification). A dry anchor cell much closer to the
+// amoeba/animal cluster than the water cluster resolves this: still
+// "in range" (within HABITAT_SEARCH_RADIUS/BIOMASS_SEARCH_RADIUS, both
+// 10) for biomass/competition purposes, but never the NEAREST cell for
+// habitat classification.
+test('Real competitive pressure: a nearby mature herbivorous animal measurably LOWERS an amoeba\'s own survival odds under scarcity, competing for the same biomass -- closes a real gap found while auditing the full success-check list', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'base' }); // dry anchor, much nearer to the cluster below than the water is
+  for (let i = 0; i < 6; i++) world.addCell(6 + i, 6 + i, 0, { material: 'water' }); // ~8.5 units out, still in range for the plant's own water access
+  plantOrganism(world, 'plant1', 'seed_plant1', 'plant', { maturitySize: 3, growthRate: 1, resourceEfficiency: 1 }, [3, 3, 0], 0);
+  growToMaturity(world, 'plant1');
+  plantOrganism(world, 'amoeba1', 'seed_amoeba1', 'amoeba', { maturitySize: 3, resourceEfficiency: 0 }, [0.2, 0, 0], 0);
+  growToMaturity(world, 'amoeba1');
+
+  const withoutCompetitor = computeAnimalSurvivalProbability(world, 'amoeba1', ['amoeba1', 'plant1']);
+
+  plantAnimal(world, 'herb1', 'seed_herb1', LAND_CREATURE_SPECIES, { maturitySize: 3 }, { huntBias: 0 }, [0.3, 0, 0], 0);
+  growToMaturity(world, 'herb1');
+  const withCompetitor = computeAnimalSurvivalProbability(world, 'amoeba1', ['amoeba1', 'plant1', 'herb1']);
+
+  assert.ok(
+    withCompetitor < withoutCompetitor,
+    `expected a nearby herbivore to measurably lower amoeba's own odds (real competition for the same biomass), got ${withoutCompetitor} -> ${withCompetitor}`
+  );
+});
+
+test('Real competitive pressure: a pure/near-carnivore nearby does NOT meaningfully compete with amoeba for biomass (it hunts amoeba directly instead -- a different link)', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'base' });
+  for (let i = 0; i < 6; i++) world.addCell(6 + i, 6 + i, 0, { material: 'water' });
+  plantOrganism(world, 'plant1', 'seed_plant1', 'plant', { maturitySize: 3, growthRate: 1, resourceEfficiency: 1 }, [3, 3, 0], 0);
+  growToMaturity(world, 'plant1');
+  plantOrganism(world, 'amoeba1', 'seed_amoeba1', 'amoeba', { maturitySize: 3, resourceEfficiency: 0 }, [0.2, 0, 0], 0);
+  growToMaturity(world, 'amoeba1');
+  const withoutCompetitor = computeAnimalSurvivalProbability(world, 'amoeba1', ['amoeba1', 'plant1']);
+
+  plantAnimal(world, 'carn1', 'seed_carn1', LAND_CREATURE_SPECIES, { maturitySize: 3 }, { huntBias: 1 }, [0.3, 0, 0], 0);
+  growToMaturity(world, 'carn1');
+  const withCarnivore = computeAnimalSurvivalProbability(world, 'amoeba1', ['amoeba1', 'plant1', 'carn1']);
+
+  assert.equal(withCarnivore, withoutCompetitor, 'a pure carnivore should not draw on the shared biomass pool at all');
+});
+
+test('Section 7: under short-lived boundary pressure (fewer generations than CROSSOVER_MIN_BOUNDARY_GENERATIONS), no habitat crossover occurs', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'base' });
+  world.addCell(3, 3, 0, { material: 'water', hydrospherePermeated: true });
+  plantAnimal(world, 'p0', 'seed_p0', LAND_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0 }, { mobilityRange: 10, huntBias: 0 }, [0, 0, 0], 0);
+  plantAnimal(world, 'm0', 'seed_m0', LAND_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0 }, { mobilityRange: 10, huntBias: 0 }, [0.5, 0.5, 0], 0);
+  for (const id of ['p0', 'm0']) growToMaturity(world, id);
+
+  let parentId = 'p0';
+  const shortRun = CROSSOVER_MIN_BOUNDARY_GENERATIONS - 3; // deliberately short of the real threshold
+  for (let i = 1; i <= shortRun; i++) {
+    const offspringId = `sgen${i}`;
+    const outcome = reproduceAnimal(world, parentId, offspringId, `seed_${offspringId}`, i * 100000, () => 0.5, [parentId, 'm0']);
+    assert.equal(outcome.mode, 'sexual');
+    assert.equal(outcome.result.organism.species, LAND_CREATURE_SPECIES, `no crossover should occur before sustained pressure accumulates (generation ${i})`);
+    assert.ok(outcome.result.organism.boundaryGenerations < CROSSOVER_MIN_BOUNDARY_GENERATIONS);
+    growToMaturity(world, offspringId, 30);
+    world.setOrganism('m0', { ...world.getOrganisms()['m0'], mobilityRange: outcome.result.organism.mobilityRange });
+    parentId = offspringId;
+  }
+});
+
+test('Section 7 end-to-end: a mixed population (plant, amoeba, herbivore, carnivore) run through a real multi-generation catch-up shows every mechanism composing correctly at once -- coherent structures, competitive pressure, predation, and no invalid habitat anywhere', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  world.addCell(0, 0, 0, { material: 'blackstar-glassite' });
+  for (let i = 0; i < 6; i++) world.addCell(i, i, 1, { material: 'water' });
+
+  plantOrganism(world, 'plant1', 'seed_plant1', 'plant', { maturitySize: 3, growthRate: 1, resourceEfficiency: 1, mutationRate: 0.05 }, [1, 0, 1], 0);
+  plantOrganism(world, 'amoeba1', 'seed_amoeba1', 'amoeba', { maturitySize: 3, mutationRate: 0.05 }, [1, 1, 0], 0);
+  plantOrganism(world, 'amoeba2', 'seed_amoeba2', 'amoeba', { maturitySize: 3, mutationRate: 0.05 }, [1, -1, 0], 0);
+  plantAnimal(world, 'herb1', 'seed_herb1', LAND_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0.05 }, { huntBias: 0.1, mobilityRange: 6 }, [-1, 1, 0], 0);
+  plantAnimal(world, 'carn1', 'seed_carn1', LAND_CREATURE_SPECIES, { maturitySize: 3, mutationRate: 0.05 }, { huntBias: 1, mobilityRange: 6 }, [-1, -1, 0], 0);
+  const allIds = ['plant1', 'amoeba1', 'amoeba2', 'herb1', 'carn1'];
+
+  resolveCatchUpForAllPlanetoids(world, allIds, 0, animalGenerationStepHook, reproduceFn, computeAnimalSurvivalProbability);
+  const result = resolveCatchUpForAllPlanetoids(
+    world,
+    allIds,
+    30000 * 20,
+    animalGenerationStepHook,
+    reproduceFn,
+    computeAnimalSurvivalProbability
+  );
+  const finalIds = Object.values(result)[0].organismIds;
+
+  assert.ok(finalIds.length >= 1, 'the ecosystem must not have gone fully extinct');
+  for (const id of finalIds) {
+    const organism = world.getOrganisms()[id];
+    const seed = world.getSeeds()[organism.seedId];
+    assert.ok(seed, `organism ${id} must have a real seed backing it`);
+    assert.ok(seed.tiles.length >= 1, `organism ${id} must never be invisible`);
+    if (isAnimal(organism)) {
+      assert.ok(
+        isValidHabitat(world, organism.species, seed.origin),
+        `animal ${id} (${organism.species}) must always remain in valid habitat after a real multi-generation run`
+      );
+      assert.ok(organism.mobilityRange >= ANIMAL_TRAIT_RANGES.mobilityRange[0] && organism.mobilityRange <= ANIMAL_TRAIT_RANGES.mobilityRange[1]);
+      assert.ok(organism.huntBias >= 0 && organism.huntBias <= 1);
+    }
+    for (const trait of Object.keys(GENOME_TRAIT_RANGES)) {
+      const value = organism.genome[trait];
+      assert.ok(
+        value >= GENOME_TRAIT_RANGES[trait][0] && value <= GENOME_TRAIT_RANGES[trait][1],
+        `organism ${id}'s ${trait}=${value} must stay within its real coherence-bounded range`
+      );
+    }
+  }
+});

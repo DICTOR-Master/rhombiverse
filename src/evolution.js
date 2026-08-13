@@ -543,7 +543,12 @@ export const CROWDING_RANGE_MULTIPLIER = 3;
 export const CROWDING_THRESHOLD = 3; // local mature same-species count above which crowding starts penalizing
 export const CROWDING_PENALTY_PER_EXCESS = 0.15; // survival multiplier lost per organism above threshold
 
-function localMatureSameSpeciesCount(world, organismId, candidateIds) {
+// Exported (2026-08-13, RHOMBIVERSE_SPEC_ANIMALS.md Stage F): animals.js
+// needs this exact same crowding-count building block to compose amoeba's
+// own real survival formula (scarcity x crowding) with a competition-
+// adjusted biomass availability, without duplicating this logic. Pure,
+// no behavior change for any existing caller.
+export function localMatureSameSpeciesCount(world, organismId, candidateIds) {
   const self = world.getOrganisms()[organismId];
   if (!self) return 0;
   let count = 0;
@@ -1017,7 +1022,24 @@ function resolveOneGeneration(
     world.removeOrganism(id);
   }
 
-  return organismIds.filter((id) => !toRemove.has(id)).concat(newIds);
+  // Real bug caught 2026-08-13 while working through
+  // RHOMBIVERSE_SPEC_ANIMALS.md Stage F's own full end-to-end
+  // verification, not by any single-generation test: this used to filter
+  // ONLY by this function's own `toRemove` set, which correctly tracks
+  // organisms removed via THIS generation's own resolveSurvival calls --
+  // but Stage D's onGenerationStep hook (animals.js's attemptPredation)
+  // can ALSO remove a DIFFERENT organism directly, mid-loop, entirely
+  // outside this bookkeeping. That organism's id would linger forever in
+  // every future generation's own organismIds list as a "zombie" --
+  // harmless internally (the `if (!organism) continue` guard at this
+  // loop's own top already skips it safely every generation), but a real
+  // correctness gap in what this function actually returns as "the
+  // current living population," which a real caller (this project's own
+  // test suite, and potentially a future render.js consumer) can
+  // reasonably expect to be exactly that. Re-checking
+  // world.getOrganisms() here catches ANY removal, by any mechanism, not
+  // just this function's own.
+  return organismIds.filter((id) => !toRemove.has(id) && world.getOrganisms()[id]).concat(newIds);
 }
 
 // Section 4's own pseudocode, made real: given a planetoid's tracked

@@ -35,6 +35,8 @@ import {
   CROWDING_THRESHOLD,
   CROWDING_PENALTY_PER_EXCESS,
   ORGANISM_SEED_SPECIES_PREFIX,
+  localMatureSameSpeciesCount,
+  BIOMASS_SEARCH_RADIUS,
 } from './evolution.js';
 import { cellToWorld } from './lattice.js';
 
@@ -663,6 +665,69 @@ function clamp01(x) {
   return Math.min(1, Math.max(0, x));
 }
 
+// ============================================================
+// Stage F -- Real Amoeba/Herbivore Competitive Pressure
+// ============================================================
+// Real gap found while working through section 7's own success-check
+// list end-to-end, not assumed away: section 4's own explicit claim is
+// that herbivorous animals are "a second consumer of the same resource
+// pool, which naturally creates competitive pressure between amoeba and
+// low-huntBias animals for the same biomass." But evolution.js's own
+// localBiomassAvailability is a pure SUPPLY-side calculation (nearby
+// mature plant output) -- it has no notion of how many consumers are
+// drawing on that same supply, so an amoeba's own survival odds were
+// completely unaffected by nearby herbivore animals, no matter how many
+// existed. This closes that gap for real: each nearby mature, herbivore-
+// leaning animal (low huntBias) reduces the EFFECTIVE biomass an amoeba
+// itself reads by a real, bounded fraction -- more herbivorous
+// (lower huntBias) means more direct competition for the same plant
+// output; a pure/near-carnivore (huntBias near 1, mostly eating other
+// animals instead) barely competes for biomass at all.
+export const HERBIVORE_COMPETITION_PENALTY_PER_PRESSURE = 0.15;
+// Above this huntBias, an animal is considered to be drawing so little
+// on the shared biomass pool that it doesn't meaningfully compete with
+// amoeba for it at all -- consistent with huntBias already being a
+// continuous dial (section 4), this just bounds how far the competition
+// signal itself extends, not a new hard species split.
+export const HERBIVORE_COMPETITION_HUNT_BIAS_CEILING = 0.7;
+
+function nearbyHerbivoreCompetitionFactor(world, position, candidateIds) {
+  let pressure = 0;
+  for (const id of candidateIds) {
+    const other = world.getOrganisms()[id];
+    if (!other || !isAnimal(other) || !isMature(world, id)) continue;
+    const huntBias = other.huntBias ?? 0.5;
+    if (huntBias >= HERBIVORE_COMPETITION_HUNT_BIAS_CEILING) continue;
+    const otherSeed = world.getSeeds()[other.seedId];
+    if (!otherSeed) continue;
+    const dist = Math.hypot(otherSeed.origin[0] - position[0], otherSeed.origin[1] - position[1], otherSeed.origin[2] - position[2]);
+    if (dist > BIOMASS_SEARCH_RADIUS) continue;
+    pressure += 1 - huntBias; // more herbivorous = more real competitive draw on the same pool
+  }
+  return clamp01(1 - pressure * HERBIVORE_COMPETITION_PENALTY_PER_PRESSURE);
+}
+
+// Recomposes evolution.js's own real amoeba formula (scarcity x
+// crowding -- amoeba get no symbiosis factor, per computeSurvivalProbability's
+// own species check, so this is the complete formula, not a partial
+// approximation) using the SAME building blocks that function uses
+// internally (localMatureSameSpeciesCount, CROWDING_PENALTY_PER_EXCESS),
+// substituting a competition-adjusted biomass availability in place of
+// the raw supply-side figure. Reuses, does not reinvent, the underlying
+// formula shape.
+function computeAmoebaSurvivalWithCompetition(world, organismId, candidateIds, crowdingThreshold) {
+  const organism = world.getOrganisms()[organismId];
+  const seed = world.getSeeds()[organism.seedId];
+  if (!seed) return 0;
+  const baseBiomass = localBiomassAvailability(world, seed.origin, candidateIds);
+  const competitionFactor = nearbyHerbivoreCompetitionFactor(world, seed.origin, candidateIds);
+  const availability = baseBiomass * competitionFactor;
+  const scarcityFactor = availability + (1 - availability) * organism.genome.resourceEfficiency;
+  const crowd = localMatureSameSpeciesCount(world, organismId, candidateIds);
+  const crowdingFactor = crowd > crowdingThreshold ? clamp01(1 - (crowd - crowdingThreshold) * CROWDING_PENALTY_PER_EXCESS) : 1;
+  return clamp01(scarcityFactor * crowdingFactor);
+}
+
 // The real survivalProbabilityFn override (evolution.js's own Stage D
 // extension point) -- huntBias blends two availability signals into one
 // (0 = pure herbivore reading local biomass exactly like amoeba already
@@ -672,10 +737,13 @@ function clamp01(x) {
 // computeSurvivalProbability already established (resourceEfficiency
 // matters more under scarcity, crowding penalizes uniformly above
 // threshold) rather than inventing a new one. Delegates straight back to
-// evolution.js's own unmodified computeSurvivalProbability for any
-// non-animal species -- a pure superset, same pattern as reproduceFn.
+// evolution.js's own unmodified computeSurvivalProbability for 'plant'
+// and anything else -- a pure superset, same pattern as reproduceFn.
+// 'amoeba' is the one other species this override touches, per Stage F's
+// own real competitive-pressure fix above.
 export function computeAnimalSurvivalProbability(world, organismId, candidateIds, crowdingThreshold = CROWDING_THRESHOLD) {
   const organism = world.getOrganisms()[organismId];
+  if (organism?.species === 'amoeba') return computeAmoebaSurvivalWithCompetition(world, organismId, candidateIds, crowdingThreshold);
   if (!isAnimal(organism)) return computeSurvivalProbability(world, organismId, candidateIds, crowdingThreshold);
   const seed = world.getSeeds()[organism.seedId];
   if (!seed) return 0;
