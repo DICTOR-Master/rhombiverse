@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell } from './lattice.js';
+import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell } from './lattice.js';
 import {
   generateSubLattice,
   generateSubLatticeAt,
@@ -35,6 +35,19 @@ import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACT
 import { playPlaceSound, playRemoveSound, playMenuSound } from './sfx.js';
 import { createRhombicWheel } from './wheel.js';
 import { createCyborgMode } from './cyborg.js';
+import {
+  MIRROR_PLANES,
+  createSculptureSession,
+  sculptStroke,
+  updateSemiCyborgSuggestion,
+  acceptSuggestion as acceptSculptSuggestion,
+  dismissSuggestion as dismissSculptSuggestion,
+  parseFullCyborgIntent,
+  requestFullCyborgIntent,
+  canFullCyborgEditAt,
+  executeFullCyborgIntent,
+} from './sculpture.js';
+import { matchNeighborOffset } from './build.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
 import { applyHydrosphere } from './hydrosphere.js';
 import { applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } from './blackhole.js';
@@ -145,6 +158,26 @@ setSyncErrorHandler(showSyncWarning);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05050a);
+
+// B4b: standalone Sculpture Mode -- "a fresh, fully isolated lattice
+// space: no connection to the player's claim, no authorId, no
+// moderation state, no persistence in shared world-state." A genuinely
+// separate THREE.Scene (not a swap of `scene`'s own contents), so it
+// never touches the dozens of scene.add() call sites the main world
+// already has scattered through init() (gravity/claims/organisms/
+// asteroids/etc. -- none of which apply to a bare scratch lattice
+// anyway). The render loop (animate(), bottom of this file) picks
+// whichever scene sculptureModeActive selects; camera/renderer/
+// OrbitControls are reused as-is since they're scene-agnostic.
+const sculptureScene = new THREE.Scene();
+sculptureScene.background = new THREE.Color(0x0a0a14);
+sculptureScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const sculptureSun = new THREE.DirectionalLight(0xffffff, 1.2);
+sculptureSun.position.set(5, 8, 4);
+sculptureScene.add(sculptureSun);
+let sculptureModeActive = false;
+let sculptureWorld = null; // created lazily, first time Sculpture Mode is entered
+let sculptureMesh = null; // created inside init(), once geometry/material exist
 
 const camera = new THREE.PerspectiveCamera(
   getSettings().fov,
@@ -858,6 +891,13 @@ async function init() {
   const mesh = new THREE.InstancedMesh(geometry, material, MAX_CELLS);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(mesh);
+
+  // B4b's standalone mesh -- same geometry/material recipe as the main
+  // world's (a real sculpture should look identical either place), own
+  // InstancedMesh/capacity since it's a genuinely separate scene.
+  sculptureMesh = new THREE.InstancedMesh(geometry, material.clone(), MAX_CELLS);
+  sculptureMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  sculptureScene.add(sculptureMesh);
 
   // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 2: real camera-distance
   // trigger & lifecycle, replacing Stage 1's single-hardcoded-cell demo.
@@ -1746,6 +1786,7 @@ async function init() {
     generate: 'Click a cell to generate a full body of the chosen type there (radius = Shell fill radius), formula-built in one click instead of hand-placing every cell.',
     report: 'Shows flagged/removed cells (normally hidden) in red. Click one to flag it, click a flagged one to approve it back.',
     plant: 'Click anywhere to plant a seed of the chosen species. Left alone, it grows on its own over real time.',
+    sculpt: 'Model (add) onto a face, or Chisel (subtract) a clicked cell -- see the Sculpt panel for tier/mirror/brush.',
   };
   function updateModeUI() {
     const showRadius = currentMode === 'fill' || currentMode === 'generate';
@@ -1780,6 +1821,10 @@ async function init() {
     if (!el) return;
     if (walking) {
       el.textContent = 'Exploring';
+      return;
+    }
+    if (sculptureModeActive) {
+      el.textContent = 'Sculpture Mode (standalone)';
       return;
     }
     const modeLabel = PLAYER_FACING_MODE_LABEL[currentMode] ?? currentMode;
@@ -1928,6 +1973,326 @@ async function init() {
   // recent onChange.
   const canPlaceMaterial = (material, x, y, z) =>
     canPlaceForStars(material, x, y, z, Object.values(planetoids).filter((p) => p.isStar));
+
+  // B4a: Sculpt tool (Create -> Sculpt). Full-Cyborg stays behind this
+  // flag in the shared world until B7's moderation work is verified --
+  // per the plan's own instruction, the logic itself is fully built
+  // either way, just not reachable here while false. Standalone
+  // Sculpture Mode (B4b) enables it unconditionally, since nothing
+  // there touches shared world-state.
+  const FULL_CYBORG_INWORLD_ENABLED = false;
+  const sculptSession = createSculptureSession(myUserId ?? 'local-player');
+  let sculptMirrorPlane = '';
+  let sculptActionMode = 'add';
+
+  const sculptPanelEl = document.getElementById('sculpt-panel');
+  const sculptSuggestionEl = document.getElementById('sculpt-suggestion');
+  const sculptSuggestionTextEl = document.getElementById('sculpt-suggestion-text');
+  const sculptFullCyborgSection = document.getElementById('sculpt-fullcyborg-section');
+  const sculptFullCyborgGated = document.getElementById('sculpt-fullcyborg-gated');
+
+  function openSculptPanel() {
+    sculptPanelEl.classList.add('open');
+  }
+  function closeSculptPanel() {
+    sculptPanelEl.classList.remove('open');
+  }
+  document.getElementById('sculpt-close').addEventListener('click', closeSculptPanel);
+
+  document.querySelectorAll('#sculpt-tier-row .tier-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#sculpt-tier-row .tier-btn').forEach((b) => b.classList.toggle('active', b === btn));
+      sculptSession.assistanceTier = btn.dataset.tier;
+      sculptSession.pendingSuggestion = null;
+      sculptSuggestionEl.style.display = 'none';
+      const isFullCyborg = sculptSession.assistanceTier === 'full-cyborg';
+      // Standalone Sculpture Mode enables Full-Cyborg unconditionally
+      // (nothing there touches shared world-state); in-world stays
+      // behind FULL_CYBORG_INWORLD_ENABLED until B7's moderation work is
+      // verified.
+      const fullCyborgUsable = sculptureModeActive || FULL_CYBORG_INWORLD_ENABLED;
+      sculptFullCyborgSection.style.display = isFullCyborg && fullCyborgUsable ? '' : 'none';
+      sculptFullCyborgGated.style.display = isFullCyborg && !fullCyborgUsable ? '' : 'none';
+    });
+  });
+
+  document.querySelectorAll('#sculpt-mode-row .mode-toggle-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#sculpt-mode-row .mode-toggle-btn').forEach((b) => b.classList.toggle('active', b === btn));
+      sculptActionMode = btn.dataset.sculptMode;
+    });
+  });
+
+  document.querySelectorAll('#sculpt-mirror-row .mirror-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#sculpt-mirror-row .mirror-btn').forEach((b) => b.classList.toggle('active', b === btn));
+      sculptMirrorPlane = btn.dataset.plane;
+    });
+  });
+
+  const sculptBrushRadiusInput = document.getElementById('sculpt-brush-radius');
+
+  function renderSculptSuggestion() {
+    const s = sculptSession.pendingSuggestion;
+    if (!s) {
+      sculptSuggestionEl.style.display = 'none';
+      return;
+    }
+    sculptSuggestionTextEl.textContent = `Suggestion: ${s.reason} (${s.action === 'remove' ? 'Chisel' : 'Model'}, ${s.cells.length} cell${s.cells.length === 1 ? '' : 's'}).`;
+    sculptSuggestionEl.style.display = '';
+  }
+  document.getElementById('sculpt-suggestion-accept').addEventListener('click', () => {
+    acceptSculptSuggestion(sculptSession, sculptTarget.world, sculptTarget.canPlaceMaterial);
+    sculptTarget.apply();
+    renderSculptSuggestion();
+  });
+  document.getElementById('sculpt-suggestion-dismiss').addEventListener('click', () => {
+    dismissSculptSuggestion(sculptSession);
+    renderSculptSuggestion();
+  });
+
+  // Full-Cyborg (only reachable in-world once FULL_CYBORG_INWORLD_ENABLED
+  // flips true -- see the tier-button handler above, which keeps this
+  // section hidden until then).
+  document.getElementById('sculpt-nl-go').addEventListener('click', async () => {
+    const input = document.getElementById('sculpt-nl-input');
+    const resultEl = document.getElementById('sculpt-nl-result');
+    const text = input.value.trim();
+    if (!text) return;
+    resultEl.textContent = 'Thinking…';
+    const origin = { x: 0, y: 0, z: 0 }; // TODO: last-hovered cell once Sculpt mode grows ghost-hover support
+    const intent = await requestFullCyborgIntent(text, origin, sculptMirrorPlane);
+    if (intent.unrecognized) {
+      resultEl.textContent = intent.description;
+      return;
+    }
+    const material = materialSelect.value;
+    const { applied, skipped } = executeFullCyborgIntent(
+      sculptTarget.world,
+      intent,
+      sculptTarget.world.getClaims(),
+      myUserId ?? 'local-player',
+      material,
+      sculptTarget.canPlaceMaterial
+    );
+    resultEl.textContent = `${intent.description}${intent.viaAI ? ' (AI)' : ' (local parser)'} -- ${applied.length} cell${applied.length === 1 ? '' : 's'} placed${skipped.length ? `, ${skipped.length} skipped (outside your claim)` : ''}.`;
+    if (applied.length > 0) sculptTarget.apply();
+    input.value = '';
+  });
+
+  // Sculpt mode's own click handling (build.js has a one-line no-op for
+  // mode === 'sculpt', same shape as its Plant-mode no-op above).
+  // sculptTarget is an indirection so the SAME click handler/panel serves
+  // both B4a (in-world, targets `world`/`mesh`) and B4b (standalone,
+  // targets `sculptureWorld`/`sculptureMesh`) -- swapped by
+  // enterSculptureMode/exitSculptureMode below, never duplicated.
+  const sculptTarget = {
+    world,
+    mesh,
+    canPlaceMaterial,
+    apply: onChange,
+  };
+  const sculptRaycaster = new THREE.Raycaster();
+  const sculptPointer = new THREE.Vector2();
+  renderer.domElement.addEventListener('click', (event) => {
+    if (!sculptureModeActive && (currentMode !== 'sculpt' || walking)) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    sculptPointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    sculptPointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    sculptRaycaster.setFromCamera(sculptPointer, camera);
+    const hits = sculptRaycaster.intersectObject(sculptTarget.mesh);
+    if (hits.length === 0 || hits[0].instanceId === undefined) return;
+    const hit = hits[0];
+    const cell = cellOrder[hit.instanceId];
+    if (!cell) return;
+
+    // Model (add): the neighbor cell across the clicked face, same
+    // target-selection rule Build mode uses. Chisel (remove): the
+    // clicked cell itself, matching the tool's own "carve away what
+    // you're pointing at" framing.
+    let targetX, targetY, targetZ;
+    if (sculptActionMode === 'add') {
+      const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
+      targetX = cell.x + dx;
+      targetY = cell.y + dy;
+      targetZ = cell.z + dz;
+    } else {
+      targetX = cell.x;
+      targetY = cell.y;
+      targetZ = cell.z;
+    }
+
+    const radius = Math.max(0, Math.min(10, Number(sculptBrushRadiusInput.value) || 0));
+    const material = materialSelect.value;
+    const isSemiCyborg = sculptSession.assistanceTier === 'semi-cyborg';
+    // Manual tier auto-mirrors immediately (a direct player action, same
+    // as every other consent-free build tool). Semi-Cyborg deliberately
+    // does NOT auto-mirror here -- the whole point of that tier is that
+    // completing the mirror is the AGENT's proposal, surfaced as an
+    // accept/dismiss suggestion below, not applied inline with the
+    // player's own click.
+    const touched = sculptStroke(sculptTarget.world, sculptActionMode, targetX, targetY, targetZ, radius, material, isSemiCyborg ? null : sculptMirrorPlane || null, sculptTarget.canPlaceMaterial);
+    if (touched.length === 0) return;
+    sculptTarget.apply();
+
+    if (isSemiCyborg) {
+      const lastCell = { ...touched[touched.length - 1], action: sculptActionMode, material };
+      updateSemiCyborgSuggestion(sculptSession, sculptTarget.world, lastCell, sculptMirrorPlane || null);
+      renderSculptSuggestion();
+    }
+  });
+
+  // --- B4b: standalone Sculpture Mode ---------------------------------
+  const permissiveCanPlaceMaterial = () => true; // no frost-line stars exist in a bare scratch lattice
+  const sculptureBanner = document.getElementById('sculpture-mode-banner');
+  const savedCameraState = { position: new THREE.Vector3(), target: new THREE.Vector3() };
+
+  function enterSculptureMode() {
+    if (sculptureModeActive) return;
+    if (walking) exitWalk();
+    savedCameraState.position.copy(camera.position);
+    savedCameraState.target.copy(controls.target);
+    if (!sculptureWorld) {
+      sculptureWorld = createWorldStore({ worldName: 'Sculpture Scratch', version: 1, cells: {}, meta: {} });
+      // A completely empty world has no face to click "Model" onto at
+      // all (the same bootstrap problem B1 fixed for the main world's
+      // old single-empty-cell starter) -- one seed cell, not a whole
+      // planetoid, since this is meant to be a bare scratch space.
+      sculptureWorld.addCell(0, 0, 0, { material: 'base' });
+    }
+    sculptureModeActive = true;
+    sculptTarget.world = sculptureWorld;
+    sculptTarget.mesh = sculptureMesh;
+    sculptTarget.canPlaceMaterial = permissiveCanPlaceMaterial;
+    sculptTarget.apply = () => rebuildInstances(sculptureMesh, sculptureWorld);
+    rebuildInstances(sculptureMesh, sculptureWorld);
+    camera.position.set(6, 5, 8);
+    controls.target.set(0, 0, 0);
+    // Full-Cyborg is enabled unconditionally here -- nothing in this
+    // scratch space writes shared world-state, so B7's moderation gate
+    // (which the in-world tier stays behind) doesn't apply.
+    sculptFullCyborgGated.style.display = 'none';
+    if (sculptSession.assistanceTier === 'full-cyborg') sculptFullCyborgSection.style.display = '';
+    sculptureBanner.style.display = 'flex';
+    document.getElementById('sculpt-standalone-section').style.display = '';
+    openSculptPanel();
+    clickModeShimSculpt();
+    updateHudIndicator();
+  }
+
+  function exitSculptureMode() {
+    if (!sculptureModeActive) return;
+    sculptureModeActive = false;
+    sculptTarget.world = world;
+    sculptTarget.mesh = mesh;
+    sculptTarget.canPlaceMaterial = canPlaceMaterial;
+    sculptTarget.apply = onChange;
+    camera.position.copy(savedCameraState.position);
+    controls.target.copy(savedCameraState.target);
+    sculptFullCyborgGated.style.display = sculptSession.assistanceTier === 'full-cyborg' && !FULL_CYBORG_INWORLD_ENABLED ? '' : 'none';
+    if (sculptSession.assistanceTier === 'full-cyborg' && !FULL_CYBORG_INWORLD_ENABLED) sculptFullCyborgSection.style.display = 'none';
+    sculptureBanner.style.display = 'none';
+    document.getElementById('sculpt-standalone-section').style.display = 'none';
+    updateHudIndicator();
+  }
+
+  function clickModeShimSculpt() {
+    const btn = document.querySelector('.mode-btn[data-mode="sculpt"]');
+    if (btn) btn.click();
+  }
+
+  document.getElementById('sculpture-mode-toggle')?.addEventListener('click', enterSculptureMode);
+  document.getElementById('sculpture-mode-exit')?.addEventListener('click', exitSculptureMode);
+
+  // Export -- reuses the exact same buildRDGeometry-derived `geometry`
+  // every in-world cell already renders with (via sculptureMesh's own
+  // geometry), merged into one real BufferGeometry per active instance
+  // rather than a new from-scratch export pipeline.
+  async function exportSculpture(format) {
+    if (!sculptureWorld) return;
+    const cells = sculptureWorld.entries();
+    if (cells.length === 0) {
+      showHudPrompt('Nothing to export yet -- Model a few cells first.');
+      return;
+    }
+    const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
+    const pieces = cells.map((cell) => {
+      const g = geometry.clone();
+      const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+      g.translate(wx, wy, wz);
+      return g;
+    });
+    const merged = mergeGeometries(pieces, false);
+    const exportMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ color: 0x8899aa }));
+    const filenameBase = `rhombiverse-sculpture-${Date.now()}`;
+
+    if (format === 'stl') {
+      const { STLExporter } = await import('three/addons/exporters/STLExporter.js');
+      const data = new STLExporter().parse(exportMesh, { binary: true });
+      downloadBlob(new Blob([data], { type: 'application/octet-stream' }), `${filenameBase}.stl`);
+    } else if (format === 'obj') {
+      const { OBJExporter } = await import('three/addons/exporters/OBJExporter.js');
+      const data = new OBJExporter().parse(exportMesh);
+      downloadBlob(new Blob([data], { type: 'text/plain' }), `${filenameBase}.obj`);
+    } else if (format === 'gltf') {
+      const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+      new GLTFExporter().parse(
+        exportMesh,
+        (result) => {
+          const json = result instanceof ArrayBuffer ? null : JSON.stringify(result, null, 2);
+          downloadBlob(
+            json ? new Blob([json], { type: 'application/json' }) : new Blob([result], { type: 'application/octet-stream' }),
+            json ? `${filenameBase}.gltf` : `${filenameBase}.glb`
+          );
+        },
+        (err) => console.error('Rhombiverse: GLTF export failed', err),
+        { binary: false }
+      );
+    }
+    pieces.forEach((g) => g.dispose());
+    merged.dispose();
+  }
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  document.getElementById('sculpture-export-stl')?.addEventListener('click', () => exportSculpture('stl'));
+  document.getElementById('sculpture-export-obj')?.addEventListener('click', () => exportSculpture('obj'));
+  document.getElementById('sculpture-export-gltf')?.addEventListener('click', () => exportSculpture('gltf'));
+
+  // "place a copy in-world" -- the ONLY bridge back to shared world-state
+  // (B4b's own wording). A normal player-attributed placement (the
+  // player placing something they made), not a live agent write, so it
+  // doesn't need the Full-Cyborg gate either -- it's just world.addCell,
+  // the same call every manual build action already makes, offset so it
+  // doesn't land on top of whatever's already at the main world's origin.
+  document.getElementById('sculpture-place-in-world')?.addEventListener('click', () => {
+    if (!sculptureWorld) return;
+    const cells = sculptureWorld.entries();
+    if (cells.length === 0) return;
+    const xs = cells.map((c) => c.x);
+    // Must be an EVEN shift -- isValidCell requires x+y+z even, and this
+    // only offsets x, so an odd offset would flip every placed cell's
+    // parity and make isValidCell reject all of them below.
+    let offsetX = Math.max(...xs) - Math.min(...xs) + 6;
+    if (offsetX % 2 !== 0) offsetX += 1;
+    let placed = 0;
+    for (const cell of cells) {
+      const nx = cell.x + offsetX;
+      const ny = cell.y;
+      const nz = cell.z;
+      if (isValidCell(nx, ny, nz) && !world.has(nx, ny, nz)) {
+        world.addCell(nx, ny, nz, { material: cell.material });
+        placed += 1;
+      }
+    }
+    onChange();
+    showHudPrompt(`Placed a copy of your sculpture in-world (${placed} cells), next to the origin.`);
+  });
 
   // Ghost block preview (B1's "intelligent ghost block"): up to two
   // translucent RD meshes, reusing the exact same geometry as the real
@@ -2081,6 +2446,7 @@ async function init() {
     onPrompt: (text) => showHudPrompt(text),
     onMenuSound: playMenuSound,
     onSelectionChange: updateHudIndicator,
+    onOpenSculptPanel: openSculptPanel,
     getMaterialColor: (value) => `#${(MATERIAL_COLORS[value] ?? MATERIAL_COLORS.base).toString(16).padStart(6, '0')}`,
     onMaterialHoverPreview: (value) => {
       materialPreviewColor = MATERIAL_COLORS[value] ?? MATERIAL_COLORS.base;
@@ -2833,7 +3199,7 @@ function animate() {
   } else {
     controls.update();
   }
-  renderer.render(scene, camera);
+  renderer.render(sculptureModeActive ? sculptureScene : scene, camera);
 }
 
 init();

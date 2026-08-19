@@ -1,0 +1,9 @@
+{
+  "name": "rhombiverse",
+  "private": true,
+  "description": "Dependencies for the /api serverless functions only -- the game client itself stays no-build-step (plain ES modules via import map, see index.html/CLAUDE.md). Vercel installs this automatically for the /api directory; it has no effect on the static frontend.",
+  "dependencies": {
+    "ai": "^6.0.0",
+    "zod": "^3.24.0"
+  }
+}

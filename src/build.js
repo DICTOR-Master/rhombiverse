@@ -255,6 +255,10 @@ export function createBuildController({
     // growth-specific logic, just a mode-string no-op matching the same
     // shape as every other mode branch here.
     if (mode === 'plant') return;
+    // B4a: Sculpt mode's own click handling lives in render.js too (the
+    // Assistance Spectrum/brush/mirror logic belongs to sculpture.js, not
+    // build.js) -- same no-op shape as Plant mode above.
+    if (mode === 'sculpt') return;
 
     if (onCellClicked) onCellClicked(cell);
 

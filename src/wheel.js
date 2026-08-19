@@ -44,12 +44,16 @@ const ALTER_SUBMENU = [
   { id: 'replace', label: 'Replace', kind: 'mode', mode: 'replace' },
 ];
 
-// Create's real tool module (symmetry mirroring, shell brush, the
-// Assistance Spectrum) is B4a's job, not B1's -- these two leaves are a
-// deliberately narrow interim home for the two existing "make a whole
-// structure/organism" mechanics that don't fit Build (single cell) or
-// Alter (modifies existing structure), each opening a level-3 picker.
+// B4a: the real Sculpture tool module (symmetry mirroring, shell brush,
+// Assistance Spectrum tiers) now lives behind the "Sculpt" leaf, opening
+// #sculpt-panel (render.js owns it -- a dedicated panel, not a wheel
+// picker, since it has several independent controls at once: tier,
+// mirror plane, brush radius, and Full-Cyborg's text box). The other two
+// leaves are B1's original interim placement for the two pre-existing
+// "make a whole structure/organism" mechanics -- kept as-is, B4a's own
+// text never asked for them to move.
 const CREATE_SUBMENU = [
+  { id: 'sculpt', label: 'Sculpt', kind: 'sculpt-panel' },
   { id: 'generate-body', label: 'Generate a Body', kind: 'generator-picker' },
   { id: 'plant-seed', label: 'Plant a Seed', kind: 'species-picker' },
 ];
@@ -225,6 +229,10 @@ export function createRhombicWheel({
   getMaterialColor = () => '#8899aa',
   onMaterialHoverPreview = () => {},
   onMaterialHoverEnd = () => {},
+  // B4a: Create -> Sculpt opens render.js's own #sculpt-panel (several
+  // independent controls at once -- tier/mirror/brush/NL box -- don't
+  // fit the wheel's picker-strip or material-wheel patterns cleanly).
+  onOpenSculptPanel = () => {},
 }) {
   injectCssOnce();
 
@@ -445,6 +453,13 @@ export function createRhombicWheel({
         onModeChosen('plant');
         onPrompt(`Click anywhere to plant a ${select.options[select.selectedIndex].textContent}.`);
       }, select.value);
+      return;
+    }
+    if (item.kind === 'sculpt-panel') {
+      clickModeShim('sculpt');
+      onModeChosen('sculpt');
+      close();
+      onOpenSculptPanel();
       return;
     }
   }
