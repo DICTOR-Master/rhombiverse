@@ -47,7 +47,9 @@ its own tools:
   mobility, and trophic relationships. **Duality Mode** shows the aperiodic
   tiling a crystal structure casts as its shadow, reusing the same real
   growth geometry rather than separate projection math.
-- **Explore** — first-person walk mode with real gravity underfoot.
+- **Explore** — first-person walk mode with real gravity underfoot. On
+  touch devices, a real on-screen joystick, jump button, and drag-to-look
+  zone appear automatically — not just a desktop-only mode.
 
 Supporting systems: **Shared World** (opt-in — Supabase realtime sync, no
 account needed beyond a lightweight anonymous session), a **pseudonymous
@@ -55,10 +57,13 @@ display name** with live named avatars for other connected players, an
 in-world **Interact** action for two-sided drag-and-tap barter trades,
 mining/inventory/resource decay, ownership claims, an **achievements** toast
 system, **World sharing** via a compressed shareable link, a public
-**Gallery** of shared/showcase Worlds, and **Cyborg Mode** — an optional
-guided walkthrough (and, for Sculpt/Cultivate's Full-Cyborg tier, real AI
-assistance via the Vercel AI Gateway or your own API key, never required to
-play).
+**Gallery** of shared/showcase Worlds, a **What's New** changelog (the 🕘
+button next to About), and **Cyborg Mode** — an optional guided walkthrough
+that, once finished, can also suggest a genuinely creative next thing to
+build (real AI, same three-tier pattern as Full-Cyborg: your own API key,
+the shared Vercel AI Gateway, or a local fallback — never required to
+play). Full-Cyborg itself (Sculpt/Cultivate's most assisted tier) uses that
+same AI pattern.
 
 A first-time visit loads the real Showcase World (a continental planetoid
 with growth, evolved organisms, and animals already in it) and walks you
@@ -68,17 +73,20 @@ Rhombitect / Rhombisculptor / Rhombiologist) are clickable — picking one
 drops you straight into that persona's mode.
 
 `docs/RHOMBIVERSE_UIUX_BUILD_PLAN.md` is the spec for this whole control-
-surface/onboarding/AI-assistance layer (tracks B1–B7); everything above
-through B6 is done. `CLAUDE.md`'s status section has the full phase-by-phase
-build history underneath it (planetoid gravity, water/ice, black holes, star
-systems, supernovae, Penrose growth, evolution, animals, lattice zoom).
+surface/onboarding/AI-assistance layer (tracks B1–B7); B1–B6 are done, and
+B7 (accessibility, performance guardrails, moderation/compliance
+scaffolding) is partially started — the changelog panel and Walk mode's
+touch controls are done, the rest is open. `CLAUDE.md`'s status section has
+the full phase-by-phase build history underneath it (planetoid gravity,
+water/ice, black holes, star systems, supernovae, Penrose growth,
+evolution, animals, lattice zoom).
 
 ## Structure
 
 ```
 rhombiverse/
   index.html                # static entry point, Three.js via import map, no build step
-  api/                       # Vercel serverless functions (AI Gateway proxy for shared Full-Cyborg use)
+  api/                       # Vercel serverless functions (AI Gateway proxy: sculpt/cultivate/cyborg-suggest)
   src/
     lattice.js               # RD/FCC coordinate math, 12-neighbor lookup
     render.js                 # Three.js scene, per-frame loop, most UI wiring
@@ -104,13 +112,15 @@ rhombiverse/
     byok.js                         # bring-your-own-AI-key (direct browser calls) + shared AI Gateway fallback
     achievements.js                  # soft-goal toast system
     worldshare.js                     # compressed shareable World links
-    sync.js                            # Supabase realtime: cells, claims, trades, inventory, presence, gallery
-    sfx.js                               # menu/build sound cues
+    changelog.js                       # What's New panel (fetches data/changelog.json)
+    sync.js                             # Supabase realtime: cells, claims, trades, inventory, presence, gallery
+    sfx.js                                # menu/build sound cues
   data/
     starter-world.json         # single seed cell at the FCC origin
     presets/                    # loadable Worlds, incl. the Showcase World
     growth-presets/               # pre-grown organism data
     cyborg/                         # guided-walkthrough subscripts (first-build-session, onboarding)
+    changelog.json                    # What's New panel content, real dated entries
   supabase/schema.sql          # Shared World backend schema + RLS policies
   docs/                        # design specs (see below)
   RHOMBIVERSE_PLAN.md          # construction-order plan -- read this first

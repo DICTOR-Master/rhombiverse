@@ -53,8 +53,56 @@ build order:
   to open a two-sided drag-and-tap offer view, replacing the old
   permanent Lab-panel trade form. All "Under Construction" branding was
   deliberately removed (2026-08-19, user feedback: it undermined trust).
-  **B7** (versioned "What's new" changelog, further polish) is the only
-  track not started.
+- **B7 partially started** (`docs/RHOMBIVERSE_UIUX_BUILD_PLAN.md`) — the
+  rest is the biggest remaining track (Lab view audit, accessibility
+  pass, performance guardrails, OG screenshot, moderation/compliance
+  scaffolding are all still open). Shipped so far: the versioned
+  "What's New" changelog panel (`src/changelog.js`,
+  `data/changelog.json`, real dated entries) replacing the branding
+  that was removed above; and real touch controls for Walk/Explore mode
+  (`player.js`'s `setVirtualMove`/`setVirtualKey`/`lookBy`, an on-screen
+  joystick/jump button/drag-to-look zone in `render.js`) — Walk mode was
+  previously completely unusable on touch (keyboard-only movement,
+  Pointer-Lock-only look), and a prior session had worked around that
+  by hiding its toggle on touch devices entirely; that hiding is now
+  removed since there's something real to show. Also shipped, off-plan
+  but explicitly requested: Cyborg Mode can now suggest a genuinely
+  creative next build (`api/cyborg-suggest.js`, same three-tier AI
+  pattern as Full-Cyborg) once its walkthrough finishes — Cyborg Mode
+  itself stays narration-only, exactly what B3 defined it as.
+- **Known, real, pre-existing gap found while building Walk-mode touch
+  controls (not caused by that work, not yet fixed):** `render.js`
+  passes `getMode: () => (walking ? null : currentMode)` into
+  `build.js`'s `createBuildController`, and `onContextMenu`'s first
+  line is `if (!getMode()) return;` — so right-click mining is
+  currently a silent no-op while walking, on desktop too, contradicting
+  the belt-approach hint text's own "right-click an asteroid cell to
+  harvest it" promise. Needs a decision: should Walk mode's `getMode()`
+  distinguish "can freely build/edit" (no) from "can still mine" (should
+  probably be yes)?
+- **A real CI regression chase, 2026-08-19** (see `tests/browser/
+  smoke.mjs` and `.github/workflows/ci.yml`): the smoke test started
+  failing/hanging from B6's first commit onward, for two distinct
+  reasons, not one. (1) Cold JS parse/eval time genuinely grew past the
+  old fixed 10s `waitForSelector` timeouts as the module graph grew
+  across B1-B6 — recalibrated to 25s, a real test-maintenance fix, not
+  a bug (no build step is a deliberate project principle, so a bundler
+  was never the right fix for a test timeout). (2)
+  `page.click('.wheel-item:has-text(...)')` reproducibly hung on one
+  specific interaction, both locally and on GitHub's runners, even
+  though a live diagnostic proved the DOM state was completely correct
+  and stable every time (a MutationObserver over 2s of idle showed zero
+  mutations, `elementFromPoint` confirmed no occluding element, a raw
+  `querySelectorAll` via `evaluate()` found the target instantly) — a
+  genuine Playwright/CDP-level polling failure, not an app bug. Fixed
+  by dispatching `.click()` directly via `evaluate()` for wheel-item
+  clicks instead of Playwright's own `page.click()`. Also bumped
+  `actions/checkout`/`actions/setup-node` v4→v7 (clears a real Node-20-
+  deprecated platform warning) while deliberately keeping
+  `node-version: 20` for the jobs themselves — bumping that to 24 broke
+  `node --test tests/unit/` outright (a real Node 22+ regression
+  resolving a bare directory argument, reproduced locally too) and was
+  reverted.
 
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
