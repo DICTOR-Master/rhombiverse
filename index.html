@@ -799,6 +799,23 @@
       </div>
       <div class="row"><label for="setting-volume">Volume</label><input id="setting-volume" type="range" min="0" max="1" step="0.05" value="0.5" /></div>
     </div>
+    <h2>Your Own AI (optional)</h2>
+    <div id="byok-section">
+      <div class="sculpt-row">
+        <label>Provider
+          <select id="byok-provider">
+            <option value="none">Off (use this site's shared AI)</option>
+            <option value="anthropic">Anthropic (your own key)</option>
+            <option value="openai">OpenAI (your own key)</option>
+          </select>
+        </label>
+      </div>
+      <div id="byok-fields" style="display:none;">
+        <div class="sculpt-row"><input id="byok-api-key" class="assist-nl-input" type="password" placeholder="Your API key" autocomplete="off" /></div>
+        <div class="sculpt-row"><input id="byok-model" class="assist-nl-input" type="text" placeholder="e.g. claude-haiku-4-5-20251001" autocomplete="off" /></div>
+      </div>
+      <div class="sculpt-hint">Stored only in your own browser, sent only to your chosen provider directly -- never to this site's server. Powers Full-Cyborg (Sculpt/Cultivate) in place of the shared AI Gateway.</div>
+    </div>
     <h2>Advanced Building &amp; World (technical names)</h2>
     <div id="controls">
     <div class="row" style="display:none;">

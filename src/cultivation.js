@@ -11,6 +11,7 @@
 import { plantSeed } from './growth.js';
 import { canFullCyborgEditAt } from './sculpture.js';
 import { nearestValidCell } from './lattice.js';
+import { requestBYOKJson } from './byok.js';
 
 export function createCultivationSession(playerId, assistanceTier = 'manual') {
   return { playerId, assistanceTier, pendingSuggestion: null };
@@ -88,7 +89,33 @@ export function parseCultivationIntent(text, origin) {
   };
 }
 
+const CULTIVATE_SYSTEM_PROMPT = `You translate a player's plain-language planting/growing request in a voxel-building game (Rhombiverse) into a small structured plan.
+
+Pick the closest matching species from: fern, moss, fungus, shrub, conifer, sapling, nautilus, scallop -- or "none" if the request isn't about planting/growing anything at all.
+
+Respond with a JSON object with exactly these fields: species (one of the above), count (integer 1-8, how many seeds -- 1 for a single plant, more for "forest"/"garden"/"cluster"/"grove" requests), description (a short friendly confirmation, <140 chars).`;
+
+function decisionToIntent(decision, origin, viaAI) {
+  if (decision.species === 'none') {
+    return { seeds: [], description: decision.description, unrecognized: true };
+  }
+  return {
+    seeds: seedsAround(origin, decision.species, decision.count),
+    description: decision.description,
+    unrecognized: false,
+    viaAI,
+  };
+}
+
+// Same three-tier fallback as sculpture.js's Full-Cyborg: the player's
+// own AI key, then this site's shared AI Gateway, then the local parser.
 export async function requestCultivationIntent(text, origin) {
+  try {
+    const decision = await requestBYOKJson(CULTIVATE_SYSTEM_PROMPT, `Player said: "${text}"`);
+    if (decision) return decisionToIntent(decision, origin, true);
+  } catch (err) {
+    console.warn('Rhombiverse: personal AI key call failed, trying the shared AI Gateway instead', err);
+  }
   try {
     const res = await fetch('/api/cultivate-intent', {
       method: 'POST',
@@ -97,15 +124,7 @@ export async function requestCultivationIntent(text, origin) {
     });
     if (!res.ok) throw new Error(`cultivate-intent API returned ${res.status}`);
     const decision = await res.json();
-    if (decision.species === 'none') {
-      return { seeds: [], description: decision.description, unrecognized: true };
-    }
-    return {
-      seeds: seedsAround(origin, decision.species, decision.count),
-      description: decision.description,
-      unrecognized: false,
-      viaAI: true,
-    };
+    return decisionToIntent(decision, origin, true);
   } catch (err) {
     console.warn('Rhombiverse: Cultivation AI Gateway call failed, using local parser instead', err);
     return parseCultivationIntent(text, origin);

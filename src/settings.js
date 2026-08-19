@@ -19,6 +19,12 @@ const DEFAULTS = {
   fov: 50, // matches the camera's original hardcoded PerspectiveCamera fov
   quality: 'high',
   volume: 0.5,
+  // Bring-Your-Own-AI-Key (requested mid-B5): 'none' | 'anthropic' | 'openai'.
+  // The key/model live ONLY here (this visitor's own localStorage) --
+  // see byok.js, never sent to this site's own server.
+  byokProvider: 'none',
+  byokApiKey: '',
+  byokModel: '',
 };
 
 function loadSaved() {

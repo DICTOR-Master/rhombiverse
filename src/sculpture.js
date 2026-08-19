@@ -6,6 +6,7 @@
 // brush, and Full-Cyborg's natural-language intent parsing/execution.
 import { cellKey, cellsInShells, isValidCell } from './lattice.js';
 import { claimIdAt, isClaimProtected } from './regions.js';
+import { requestBYOKJson } from './byok.js';
 
 // --- Symmetry mirroring -----------------------------------------------
 // "Reuse the lattice's existing order-48 cubic symmetry group" (B4's own
@@ -310,7 +311,27 @@ export function parseFullCyborgIntent(text, origin, mirrorPlaneId) {
 // resilience path, not a formality: this makes the feature work even
 // before AI Gateway is enabled on the Vercel project dashboard (a one-
 // time manual step only the project owner can do).
+const SCULPT_SYSTEM_PROMPT = `You translate a player's plain-language building request in a voxel-building game (Rhombiverse) into a small structured plan.
+
+The game has exactly two basic sculpting modes: "Model" (adds material -- action "add") and "Chisel" (removes/carves away material -- action "remove"). Pick whichever the player's words imply; default to "add" if unclear.
+
+Shapes you can produce: "dome" (a mound/hemisphere), "sphere" (a full round cluster), "wall" (a straight line/ridge), "mirror-wing" (build one side, meant to be mirrored), or "none" if the request doesn't describe a buildable shape at all.
+
+Respond with a JSON object with exactly these fields: shape (one of the above), action ("add" or "remove"), radius (integer 1-8, default 3 if unclear), useMirror (boolean, true if the player mentions symmetry/mirroring/"the other side"), description (a short friendly confirmation, <140 chars, using "Model" or "Chisel").`;
+
+// Three-tier fallback, in order: (1) the player's own AI key (byok.js --
+// their key, their browser, their choice), (2) this site's shared AI
+// Gateway (/api/sculpt-intent), (3) the local keyword parser. Each tier
+// only runs if the one before it is unavailable or fails -- the feature
+// works at every tier, just with more real language understanding the
+// higher up the chain it succeeds.
 export async function requestFullCyborgIntent(text, origin, mirrorPlaneId) {
+  try {
+    const decision = await requestBYOKJson(SCULPT_SYSTEM_PROMPT, `Player said: "${text}"`);
+    if (decision) return decisionToIntent(decision, origin, mirrorPlaneId, true);
+  } catch (err) {
+    console.warn('Rhombiverse: personal AI key call failed, trying the shared AI Gateway instead', err);
+  }
   try {
     const res = await fetch('/api/sculpt-intent', {
       method: 'POST',
@@ -319,15 +340,19 @@ export async function requestFullCyborgIntent(text, origin, mirrorPlaneId) {
     });
     if (!res.ok) throw new Error(`sculpt-intent API returned ${res.status}`);
     const decision = await res.json();
-    if (decision.shape === 'none') {
-      return { cells: [], action: decision.action, description: decision.description, unrecognized: true };
-    }
-    const cells = intentToCells(decision.shape, decision.action, decision.radius, origin, decision.useMirror, mirrorPlaneId);
-    return { cells, action: decision.action, description: decision.description, unrecognized: false, viaAI: true };
+    return decisionToIntent(decision, origin, mirrorPlaneId, true);
   } catch (err) {
     console.warn('Rhombiverse: Full-Cyborg AI Gateway call failed, using local parser instead', err);
     return parseFullCyborgIntent(text, origin, mirrorPlaneId);
   }
+}
+
+function decisionToIntent(decision, origin, mirrorPlaneId, viaAI) {
+  if (decision.shape === 'none') {
+    return { cells: [], action: decision.action, description: decision.description, unrecognized: true };
+  }
+  const cells = intentToCells(decision.shape, decision.action, decision.radius, origin, decision.useMirror, mirrorPlaneId);
+  return { cells, action: decision.action, description: decision.description, unrecognized: false, viaAI };
 }
 
 // Scoping rule shared by B4a's Full-Cyborg tier: "restricted to the

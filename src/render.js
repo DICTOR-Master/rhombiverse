@@ -670,6 +670,23 @@ cyborgToggleEl.addEventListener('click', () => {
   fovInput.addEventListener('input', () => updateSettings({ fov: Number(fovInput.value) }));
   qualitySelect.addEventListener('change', () => updateSettings({ quality: qualitySelect.value }));
   volumeInput.addEventListener('input', () => updateSettings({ volume: Number(volumeInput.value) }));
+
+  // Bring-Your-Own-AI-Key (mid-B5 addition) -- see byok.js's own header
+  // for why this is plain fetch, not the @anthropic-ai/sdk package.
+  const byokProviderSelect = document.getElementById('byok-provider');
+  const byokFields = document.getElementById('byok-fields');
+  const byokApiKeyInput = document.getElementById('byok-api-key');
+  const byokModelInput = document.getElementById('byok-model');
+  byokProviderSelect.value = s.byokProvider;
+  byokApiKeyInput.value = s.byokApiKey;
+  byokModelInput.value = s.byokModel;
+  byokFields.style.display = s.byokProvider === 'none' ? 'none' : '';
+  byokProviderSelect.addEventListener('change', () => {
+    updateSettings({ byokProvider: byokProviderSelect.value });
+    byokFields.style.display = byokProviderSelect.value === 'none' ? 'none' : '';
+  });
+  byokApiKeyInput.addEventListener('input', () => updateSettings({ byokApiKey: byokApiKeyInput.value }));
+  byokModelInput.addEventListener('input', () => updateSettings({ byokModel: byokModelInput.value }));
 })();
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
