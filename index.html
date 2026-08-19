@@ -582,6 +582,36 @@
     }
     #welcome-card .tagline { margin: 2px 0 14px; opacity: 0.8; font-style: italic; }
     #welcome-card .description { text-align: left; margin: 0 0 12px; }
+    #welcome-card .identity-block { margin: 0 0 14px; }
+    #welcome-card .identity-prompt {
+      text-align: left;
+      font: 700 12px system-ui, sans-serif;
+      letter-spacing: 0.03em;
+      color: #9de0ff;
+      margin-bottom: 6px;
+    }
+    #welcome-card .identity-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 14px;
+      text-align: left;
+    }
+    #welcome-card .identity-item {
+      font-size: 12.5px;
+      line-height: 1.35;
+      opacity: 0.9;
+      position: relative;
+      padding-left: 14px;
+    }
+    #welcome-card .identity-item::before {
+      content: "";
+      position: absolute;
+      left: 1px; top: 5px;
+      width: 6px; height: 6px;
+      background: #7cf;
+      transform: rotate(45deg);
+    }
+    #welcome-card .identity-item strong { color: #fff; }
     #welcome-card .howto {
       text-align: left;
       margin: 0 0 14px;

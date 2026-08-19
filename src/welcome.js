@@ -50,7 +50,7 @@ function overlayHtml() {
       ${logoSvg()}
       <h1>Rhombiverse</h1>
       <div class="construction-badge">🚧 Under Construction 🚧</div>
-      <p class="tagline">A tiny universe made of magic diamond blocks.</p>
+      <p class="tagline">Explore Rhombiverse. Explore yourself.</p>
       <p class="description">
         Every block here is a special shape called a
         <em>rhombic dodecahedron</em> (say that five times fast!) that
@@ -58,17 +58,27 @@ function overlayHtml() {
         Stack them into towers, grow whole planets, walk around on what
         you build, and share it with friends.
       </p>
+      <div class="identity-block">
+        <div class="identity-prompt">Who are you here?</div>
+        <div class="identity-grid">
+          <div class="identity-item"><strong>Rhombinaut</strong> -- walk your worlds</div>
+          <div class="identity-item"><strong>Rhombitect</strong> -- build whole planets</div>
+          <div class="identity-item"><strong>Rhombisculptor</strong> -- model, chisel, create</div>
+          <div class="identity-item"><strong>Rhombiologist</strong> -- grow real, evolving life</div>
+        </div>
+      </div>
       <ul class="howto">
-        <li>Click a block's face to add a new block there</li>
-        <li>Right-click any block to remove it</li>
-        <li>Try <strong>Generate</strong> mode to build a whole planet in one click</li>
-        <li><strong>Enter Walk Mode</strong> to walk around on what you've built</li>
+        <li><strong>Tab</strong> or <strong>Space</strong> opens the Rhombic Wheel -- Build, Alter, Create, Explore</li>
+        <li>Click a block's face to add one; right-click any block to remove it</li>
+        <li>Try <strong>Create &rarr; Sculpt</strong> to Model and Chisel with real building tools</li>
+        <li><strong>Explore</strong> to walk around on what you've built</li>
       </ul>
       <div class="construction-notice">
-        🚧 <strong>Under construction!</strong> Rhombiverse is a work in
-        progress -- things may change, break, or get reset without
-        notice. Use <strong>Export JSON</strong> often to keep a copy of
-        anything you love. 🚧
+        🚧 <strong>Under construction!</strong> The future is under
+        construction. So are you. Rhombiverse is a work in progress --
+        things may change, break, or get reset without notice. Use
+        <strong>Export JSON</strong> often to keep a copy of anything you
+        love. 🚧
       </div>
       <label class="dont-show">
         <input type="checkbox" id="skip-intro-checkbox" />
