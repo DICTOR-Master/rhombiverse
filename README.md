@@ -18,66 +18,102 @@ coherent universe of shape.
 See `RHOMBIVERSE_PLAN.md` section 6 for the full vision statement, and
 `CLAUDE.md` for a technical map of this repo.
 
+Play it at **[rhombiverse.vercel.app](https://rhombiverse.vercel.app)** — no
+install, no account required.
+
 ## What this is (right now)
 
-**Phase 1** (renderer + lattice math), **Phase 2** (build/remove), and
-**Phase 3** (local persistence — builds survive a refresh; New World /
-Export JSON / Import JSON) are all implemented and visually confirmed.
+Everything lives behind one control surface, the **Rhombic Wheel** (Tab /
+Space, or tap the "Menu" label bottom-left) — five categories, each opening
+its own tools:
 
-**Planetoid tools**, pulled forward ahead of Phase 5.5. Pick a **mode**
-with the Build / Fill / Round / Excavate buttons on the left — a plain
-click then does whatever that mode does, and only the controls relevant
-to that mode are shown. **Right-click always removes the clicked cell,
-in every mode.**
-- **Build** — click a face to add the neighboring cell (default mode).
-- **Fill** — click a cell to fill shells ("hollow from"–"radius") outward
-  around it, approximating a sphere. A second Fill click on the same
-  structure grows it further rather than starting a new one.
-- **Round** — click a shell-tagged cell to smooth its outer boundary.
-  Shell-based fills are naturally faceted; round reselects the boundary
-  by actual distance from center instead, trimming the far points and
-  filling the gaps that leaves.
-- **Excavate** — click an already-built structure to hollow it out down
-  to "Hollow from shell", for retrofitting something you built solid.
+- **Build** — click/tap a face to place a block; right-click (or long-press
+  on touch) always removes the clicked cell, in every mode. A material
+  picker, Repeat (drag to place a run of cells), and a **Fill/Round/
+  Excavate** planetoid toolkit for building whole spheres and retrofitting
+  them (radial gravity bends toward the core once a body is large enough to
+  have one).
+- **Alter** — Dig, Smooth, Fill, Replace: reshaping existing structure.
+- **Create** — **Sculpt** (a real order-48 cubic symmetry/mirror tool with a
+  shell brush, Model/Chisel modes, and an Assistance Spectrum from fully
+  manual up through an AI-assisted Full-Cyborg tier), plus body-generator
+  and seed-planting shortcuts. A separate, fully isolated **Sculpture Mode**
+  scratch workspace opens the same tool with nothing connected to your real
+  World.
+- **Grow** — **Cultivate**: real Ammann-rhombohedra/Penrose aperiodic
+  growth (not baked animation) unfolds a planted seed into a tree, shell, or
+  crystal cluster over time; a genome/phenotype evolution system lets
+  planted organisms reproduce, mutate, and speciate; animals have habitats,
+  mobility, and trophic relationships. **Duality Mode** shows the aperiodic
+  tiling a crystal structure casts as its shadow, reusing the same real
+  growth geometry rather than separate projection math.
+- **Explore** — first-person walk mode with real gravity underfoot.
 
-A **material picker** selects which material new cells use (Base Rhomb,
-Garnet, Ferrostone, Glassite, Star-Glassite, Blackstar-Glassite, Ice 9.9,
-Water), each with its own tint — cosmetic only for now. A **section
-view** (cutaway clipping plane, pick an axis/position/flip) lets you see
-inside a structure instead of just its solid exterior.
+Supporting systems: **Shared World** (opt-in — Supabase realtime sync, no
+account needed beyond a lightweight anonymous session), a **pseudonymous
+display name** with live named avatars for other connected players, an
+in-world **Interact** action for two-sided drag-and-tap barter trades,
+mining/inventory/resource decay, ownership claims, an **achievements** toast
+system, **World sharing** via a compressed shareable link, a public
+**Gallery** of shared/showcase Worlds, and **Cyborg Mode** — an optional
+guided walkthrough (and, for Sculpt/Cultivate's Full-Cyborg tier, real AI
+assistance via the Vercel AI Gateway or your own API key, never required to
+play).
 
-On the right, a **shells panel** always shows the last-clicked
-structure's shells as a live bullseye diagram (colored to match the 3D
-view) plus a precise list with a remove button per shell — click a ring,
-either in the diagram or the list, to delete it. A prominent **Undo**
-button at the top covers every mutating action (Build/Fill/Round/
-Excavate/ring removal/New World/Import), not just ring removal, up to
-20 steps back. Each ring row also has a **Recolor** button — sets that
-ring's material in place to whatever's selected in the material
-dropdown, no geometry change, so it works even after other cells around
-it have been removed (unlike trying to refill a gap via Fill mode,
-which needs an existing cell to click on).
+A first-time visit loads the real Showcase World (a continental planetoid
+with growth, evolved organisms, and animals already in it) and walks you
+through build → open the wheel → plant something → explore, rather than a
+tutorial modal. The welcome screen's four identity choices (Rhombinaut /
+Rhombitect / Rhombisculptor / Rhombiologist) are clickable — picking one
+drops you straight into that persona's mode.
 
-Phase 4 (deploy publicly) is next — see `RHOMBIVERSE_PLAN.md` section 4
-for the full phased build order. `docs/RHOMBIVERSE_COMPLIANCE.md`'s
-"Required before Phase 4" items (LICENSE, ToS, Privacy Policy,
-SECURITY.md, XSS audit) haven't been started yet.
+`docs/RHOMBIVERSE_UIUX_BUILD_PLAN.md` is the spec for this whole control-
+surface/onboarding/AI-assistance layer (tracks B1–B7); everything above
+through B6 is done. `CLAUDE.md`'s status section has the full phase-by-phase
+build history underneath it (planetoid gravity, water/ice, black holes, star
+systems, supernovae, Penrose growth, evolution, animals, lattice zoom).
 
 ## Structure
 
 ```
 rhombiverse/
-  index.html              # static entry point, Three.js via import map, no build step
+  index.html                # static entry point, Three.js via import map, no build step
+  api/                       # Vercel serverless functions (AI Gateway proxy for shared Full-Cyborg use)
   src/
-    lattice.js             # RD/FCC coordinate math, 12-neighbor lookup
-    render.js               # Three.js scene + RD mesh generation
-    build.js                 # placement/removal, face-picking, input
-    worldstate.js           # world JSON load/save/serialize
-    persistence.js          # storage backend (localStorage first)
+    lattice.js               # RD/FCC coordinate math, 12-neighbor lookup
+    render.js                 # Three.js scene, per-frame loop, most UI wiring
+    build.js                   # placement/removal, face-picking, mouse+touch input
+    worldstate.js             # world JSON load/save/serialize (cells, seeds, claims, organisms, inventory, trades)
+    persistence.js            # localStorage backend
+    wheel.js                   # the Rhombic Wheel radial menu
+    welcome.js                 # first-run overlay, persona picker
+    settings.js                # sensitivity/FOV/quality/volume, Lab panel state
+    player.js                  # first-person walk controller
+    sculpture.js               # Sculpt tool: symmetry/mirror, shell brush, Assistance Spectrum
+    cultivation.js             # Cultivate tool: planting assistance tiers
+    growth.js                  # Penrose/Ammann-rhombohedra aperiodic growth layer
+    evolution.js                # genome/phenotype/reproduction/speciation for grown organisms
+    animals.js                  # species, habitat, mobility, trophic relationships
+    latticezoom.js               # sub-lattice zoom rendering near organisms/plants
+    planetoidgen.js               # planetoid body generation (rocky/ice/gas/ocean/etc.)
+    gravity.js, hydrosphere.js, blackhole.js, starsystem.js, supernova.js  # radial gravity + the four addenda
+    asteroids.js                 # mining/resource belts
+    regions.js                    # ownership claims
+    trade.js                      # barter/decay data model
+    cyborg.js                      # guided-walkthrough narration engine
+    byok.js                         # bring-your-own-AI-key (direct browser calls) + shared AI Gateway fallback
+    achievements.js                  # soft-goal toast system
+    worldshare.js                     # compressed shareable World links
+    sync.js                            # Supabase realtime: cells, claims, trades, inventory, presence, gallery
+    sfx.js                               # menu/build sound cues
   data/
-    starter-world.json      # single seed cell at the FCC origin
-  docs/                    # design specs (see below)
-  RHOMBIVERSE_PLAN.md     # construction-order plan -- read this first
+    starter-world.json         # single seed cell at the FCC origin
+    presets/                    # loadable Worlds, incl. the Showcase World
+    growth-presets/               # pre-grown organism data
+    cyborg/                         # guided-walkthrough subscripts (first-build-session, onboarding)
+  supabase/schema.sql          # Shared World backend schema + RLS policies
+  docs/                        # design specs (see below)
+  RHOMBIVERSE_PLAN.md          # construction-order plan -- read this first
   README.md
 ```
 
@@ -90,6 +126,7 @@ standalone addenda, each extending specific phases of the plan:
 | Doc | Extends |
 |---|---|
 | `RHOMBIVERSE_PRINCIPLES.md` | Cross-cutting law: Grounded Simplicity, Isolation, Adaptive Damping |
+| `RHOMBIVERSE_UIUX_BUILD_PLAN.md` | The Rhombic Wheel control surface, Sculpture/Duality/Cultivation Modes, Cyborg Mode + AI assistance, onboarding, world sharing/gallery, in-world trade (tracks B1–B7) |
 | `RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md` | Phase 5.5 — planetoid building, radial gravity, BSG core |
 | `RHOMBIVERSE_SPEC_BLACKHOLE.md` | Planetoid gravity — extreme case, asymptotic containment |
 | `RHOMBIVERSE_SPEC_STAR_SYSTEM.md` | Planetoid gravity + water/ice — BSG at star scale |
@@ -100,6 +137,9 @@ standalone addenda, each extending specific phases of the plan:
 | `RHOMBIVERSE_SPEC_TRADE_INVENTORY.md` | Asteroids — barter trade, resource decay |
 | `RHOMBIVERSE_SPEC_LOOPHOLES.md` | Patches gaps across regions/supernova/blackhole/asteroids/trade |
 | `RHOMBIVERSE_SPEC_PENROSE_GROWTH.md` | Phase 6 — aperiodic quasicrystal growth layer, real Ammann-rhombohedra geometry |
+| `RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md` | Growth layer — genome/phenotype, reproduction, speciation, trophic coupling |
+| `RHOMBIVERSE_SPEC_ANIMALS.md` | Evolution — species/habitat, mobility, sexual reproduction, herbivory/carnivory |
+| `RHOMBIVERSE_SPEC_LATTICE_ZOOM.md` | Growth/evolution — sub-lattice zoom rendering near organisms |
 | `RHOMBIVERSE_COMPLIANCE.md` | Legal/safety checklist, phased by when each item is required |
 
 ## Contributing
@@ -110,7 +150,7 @@ Humans and AI coding agents are both welcome to open PRs — see
 real technical onboarding doc, worth reading before `RHOMBIVERSE_PLAN.md`
 if you're jumping straight into code.
 
-## Running (once Phase 1 exists)
+## Running locally
 
 No build step — plain ES modules loaded via an import map in `index.html`.
 Serve the directory with any static file server, e.g.:
@@ -120,4 +160,7 @@ cd ~/rhombiverse
 python3 -m http.server 8000
 ```
 
-Then open `http://localhost:8000`.
+Then open `http://localhost:8000`. Shared World mode, the AI Gateway
+fallback, and the public Gallery need real Supabase/Vercel backends
+(`src/sync.js`, `api/`) — everything else works fully offline against
+`localStorage`.

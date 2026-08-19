@@ -23,9 +23,38 @@ don't cross-reference code or specs between the two repos.
 **GitHub**: private repo at https://github.com/DICTOR-Master/rhombiverse
 (account `DICTOR-Master`, `gh` already authenticated).
 
-## Current status (as of 2026-08-14)
+## Current status (as of 2026-08-19)
 
-Everything through Lattice Zoom is done. In build order:
+Everything through Lattice Zoom (2026-08-14) plus the entire UI/UX
+overhaul tracks B1–B6 (`docs/RHOMBIVERSE_UIUX_BUILD_PLAN.md`) is done. In
+build order:
+
+- **B1–B6** (`docs/RHOMBIVERSE_UIUX_BUILD_PLAN.md`) — DONE. Replaced the
+  always-visible sidebar with the **Rhombic Wheel** radial menu
+  (`src/wheel.js`) as the single control surface; added **Sculpture
+  Mode** (`src/sculpture.js`, order-48 cubic symmetry group, Model/
+  Chisel, an Assistance Spectrum up to AI-assisted Full-Cyborg), **Cyborg
+  Mode** guided walkthroughs (`src/cyborg.js`, supports multiple
+  concurrent instances — the manual toggle and the auto-started
+  onboarding sequence are two separate instances), **Duality Mode**
+  (reuses `growth.js`'s real Ammann-rhombohedra tile geometry, not
+  separate projection math) and **Cultivation Mode**
+  (`src/cultivation.js`), **bring-your-own-AI-key** support
+  (`src/byok.js` — direct browser calls to Anthropic/OpenAI/etc., with a
+  shared Vercel AI Gateway fallback in `api/` and a local keyword-parser
+  last resort), an **achievements** toast system (`src/achievements.js`),
+  **World sharing** via compressed URLs (`src/worldshare.js`) and a
+  public **Gallery** (`shared_worlds` table, `src/sync.js`), a sequenced
+  first-visit **onboarding** walkthrough that loads the real Showcase
+  World and ends with a clickable persona picker on the welcome screen,
+  and a rebuilt **in-world trade UI** — walk near another player (visible
+  as a live named avatar via Supabase Realtime **Presence**, a
+  lightweight pseudonymous display name, no accounts) and use **Interact**
+  to open a two-sided drag-and-tap offer view, replacing the old
+  permanent Lab-panel trade form. All "Under Construction" branding was
+  deliberately removed (2026-08-19, user feedback: it undermined trust).
+  **B7** (versioned "What's new" changelog, further polish) is the only
+  track not started.
 
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
@@ -194,6 +223,10 @@ once deployed). Phase 5+ and the spec addenda layer on progressively:
      legal, not just technical.*
 6. **Penrose/RT Growth Layer** (v2) — additive-only `growth.js`, does not
    modify `build.js`. DONE, both waves (see status above).
+7. **UI/UX overhaul** (`docs/RHOMBIVERSE_UIUX_BUILD_PLAN.md`, tracks
+   B1–B7) — a later, separate build plan layered on top of everything
+   above once the core mechanics were all in place. B1–B6 DONE (see
+   status above); B7 not started.
 
 `docs/RHOMBIVERSE_SPEC_ASTEROIDS.md` (mining/resources) and
 `docs/RHOMBIVERSE_SPEC_TRADE_INVENTORY.md` (barter/decay) extend Phase 2's
