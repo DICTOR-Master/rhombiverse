@@ -659,6 +659,7 @@ function enterWalk() {
     document.getElementById('walk-toggle').textContent = 'Exit Walk Mode (Esc)';
     document.getElementById('walk-hint').style.display = '';
     document.getElementById('hud-crosshair')?.classList.add('visible');
+    setWalkTouchControlsVisible(true);
     player.reset(camera.position);
     player.setEnabled(true);
     player.requestLock();
@@ -680,6 +681,7 @@ function exitWalk() {
   document.body.classList.add('explore-transitioning');
   showHudPrompt('Leaving Explore…', WALK_TRANSITION_MS + 400);
   document.getElementById('hud-crosshair')?.classList.remove('visible');
+  setWalkTouchControlsVisible(false);
   animateBackground(WALK_BG_COLOR, SPACE_BG_COLOR, WALK_TRANSITION_MS);
   setTimeout(() => {
     document.body.classList.remove('explore-transitioning');
@@ -707,17 +709,130 @@ document.addEventListener('pointerlockchange', () => {
   if (walking && document.pointerLockElement !== renderer.domElement) exitWalk();
 });
 
-// Mobile/touch support, 2026-08-13. Two independent fixes, per direct
-// user decisions this session:
+// Mobile/touch support.
 //
-// 1. Walk Mode hidden on touch-primary devices. Pointer lock + WASD has
-//    no touch equivalent wired up yet, and the user explicitly chose
-//    "hide it on touch for now" over building full touch controls for
-//    it in this pass. A feature check (pointer: coarse), not a viewport
-//    width check -- an iPad is plenty wide but still touch-primary.
-if (window.matchMedia('(pointer: coarse)').matches) {
-  const walkRow = document.getElementById('walk-toggle')?.closest('.row');
-  if (walkRow) walkRow.style.display = 'none';
+// 1. Walk Mode's touch controls (B7 mobile layout: "on-screen joystick
+//    for Explore mode"). 2026-08-13 originally hid the Lab panel's Walk
+//    Mode row entirely on touch-primary devices -- Pointer Lock + WASD
+//    has no touch equivalent, so there was nothing usable to show. That
+//    justification no longer holds now that real touch controls exist
+//    below, so the row stays visible; the wheel's own Explore category
+//    already reached Walk Mode on touch regardless (it .click()s this
+//    same button programmatically), it just wasn't usable once there.
+const IS_TOUCH_PRIMARY = window.matchMedia('(pointer: coarse)').matches;
+
+const walkLookZoneEl = document.getElementById('walk-look-zone');
+const walkJoystickEl = document.getElementById('walk-joystick');
+const walkJoystickKnobEl = document.getElementById('walk-joystick-knob');
+const walkJumpBtnEl = document.getElementById('walk-jump-btn');
+
+function setWalkTouchControlsVisible(visible) {
+  if (!IS_TOUCH_PRIMARY) return;
+  walkLookZoneEl.classList.toggle('visible', visible);
+  walkJoystickEl.classList.toggle('visible', visible);
+  walkJumpBtnEl.classList.toggle('visible', visible);
+}
+
+if (IS_TOUCH_PRIMARY) {
+  const JOYSTICK_RADIUS = 50; // px -- knob travel distance for full-speed input
+  let joystickTouchId = null;
+  let joystickCenter = { x: 0, y: 0 };
+
+  walkJoystickEl.addEventListener('touchstart', (e) => {
+    const t = e.changedTouches[0];
+    joystickTouchId = t.identifier;
+    const r = walkJoystickEl.getBoundingClientRect();
+    joystickCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }, { passive: true });
+  walkJoystickEl.addEventListener('touchmove', (e) => {
+    const t = [...e.changedTouches].find((t) => t.identifier === joystickTouchId);
+    if (!t || !player) return;
+    let dx = t.clientX - joystickCenter.x;
+    let dy = t.clientY - joystickCenter.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > JOYSTICK_RADIUS) {
+      dx = (dx / dist) * JOYSTICK_RADIUS;
+      dy = (dy / dist) * JOYSTICK_RADIUS;
+    }
+    walkJoystickKnobEl.style.transform = `translate(${dx}px, ${dy}px)`;
+    // Screen-down (positive dy) is backward, matching a real joystick's
+    // "pull toward you to go back" convention.
+    player.setVirtualMove(-dy / JOYSTICK_RADIUS, dx / JOYSTICK_RADIUS);
+  }, { passive: true });
+  const endJoystickTouch = (e) => {
+    if (![...e.changedTouches].some((t) => t.identifier === joystickTouchId)) return;
+    joystickTouchId = null;
+    walkJoystickKnobEl.style.transform = '';
+    player?.setVirtualMove(0, 0);
+  };
+  walkJoystickEl.addEventListener('touchend', endJoystickTouch);
+  walkJoystickEl.addEventListener('touchcancel', endJoystickTouch);
+
+  walkJumpBtnEl.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    player?.setVirtualKey('Space', true);
+  });
+  const endJumpTouch = () => player?.setVirtualKey('Space', false);
+  walkJumpBtnEl.addEventListener('touchend', endJumpTouch);
+  walkJumpBtnEl.addEventListener('touchcancel', endJumpTouch);
+
+  // Drag-to-look: standard mobile-FPS convention. A long-press without
+  // meaningful drag forwards as a synthetic contextmenu at the same
+  // point instead -- build.js's own onContextMenu (mining/removal) is
+  // reused exactly as-is rather than duplicated, same "replay the real
+  // event" approach already used elsewhere this session (e.g. the
+  // persona picker replaying real wheel clicks).
+  const LOOK_LONG_PRESS_MS = 500;
+  const LOOK_MOVE_TOLERANCE = 12; // px
+  let lookTouchId = null;
+  let lookLastX = 0;
+  let lookLastY = 0;
+  let lookStartX = 0;
+  let lookStartY = 0;
+  let lookLongPressTimer = null;
+  let lookLongPressFired = false;
+
+  walkLookZoneEl.addEventListener('touchstart', (e) => {
+    if (lookTouchId !== null) return; // one look-drag at a time
+    const t = e.changedTouches[0];
+    lookTouchId = t.identifier;
+    lookStartX = lookLastX = t.clientX;
+    lookStartY = lookLastY = t.clientY;
+    lookLongPressFired = false;
+    clearTimeout(lookLongPressTimer);
+    lookLongPressTimer = setTimeout(() => {
+      lookLongPressFired = true;
+      renderer.domElement.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: lookLastX,
+        clientY: lookLastY,
+      }));
+    }, LOOK_LONG_PRESS_MS);
+  }, { passive: true });
+
+  walkLookZoneEl.addEventListener('touchmove', (e) => {
+    const t = [...e.changedTouches].find((t) => t.identifier === lookTouchId);
+    if (!t || !player) return;
+    const dx = t.clientX - lookLastX;
+    const dy = t.clientY - lookLastY;
+    lookLastX = t.clientX;
+    lookLastY = t.clientY;
+    if (Math.hypot(t.clientX - lookStartX, t.clientY - lookStartY) > LOOK_MOVE_TOLERANCE) {
+      clearTimeout(lookLongPressTimer);
+    }
+    // "Standard mobile-FPS convention": drag right -> look right, same
+    // sign as a real mouse's movementX/Y feeding the same applyLookDelta.
+    if (!lookLongPressFired) player.lookBy(dx, dy);
+  }, { passive: true });
+
+  const endLookTouch = (e) => {
+    if (![...e.changedTouches].some((t) => t.identifier === lookTouchId)) return;
+    lookTouchId = null;
+    clearTimeout(lookLongPressTimer);
+  };
+  walkLookZoneEl.addEventListener('touchend', endLookTouch);
+  walkLookZoneEl.addEventListener('touchcancel', endLookTouch);
 }
 
 // 2. B1 (RHOMBIVERSE_UIUX_BUILD_PLAN.md) replaced the old always-visible

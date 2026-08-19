@@ -36,15 +36,40 @@ export function createPlayerController({ camera, domElement, getGravity }) {
   const keys = new Set();
   const onKeyDown = (e) => keys.add(e.code);
   const onKeyUp = (e) => keys.delete(e.code);
-  const onMouseMove = (e) => {
-    if (document.pointerLockElement !== domElement) return;
+
+  // Shared by real mouse movement (pointer-lock, desktop) and the touch
+  // look-drag zone (render.js) -- same sensitivity/invert/clamp either
+  // way, just a different source of raw dx/dy.
+  function applyLookDelta(dx, dy) {
     const { sensitivity, invertY } = getSettings();
     const sens = MOUSE_SENSITIVITY * sensitivity;
-    yaw -= e.movementX * sens;
-    pitch -= (invertY ? -1 : 1) * e.movementY * sens;
+    yaw -= dx * sens;
+    pitch -= (invertY ? -1 : 1) * dy * sens;
     const limit = Math.PI / 2 - 0.01;
     pitch = Math.max(-limit, Math.min(limit, pitch));
+  }
+  const onMouseMove = (e) => {
+    if (document.pointerLockElement !== domElement) return;
+    applyLookDelta(e.movementX, e.movementY);
   };
+
+  // Touch has no keyboard and mobile browsers don't support Pointer
+  // Lock the way desktop does -- render.js's on-screen joystick/look
+  // layer drives movement and look through these instead of real
+  // keyboard/mouse events. virtualMove is analog (joystick displacement,
+  // -1..1 per axis), blended additively with any real WASD input rather
+  // than replacing it, so a hybrid device with both isn't penalized.
+  let virtualMove = { forward: 0, strafe: 0 };
+  function setVirtualMove(forward, strafe) {
+    virtualMove = { forward, strafe };
+  }
+  function setVirtualKey(code, pressed) {
+    if (pressed) keys.add(code);
+    else keys.delete(code);
+  }
+  function lookBy(dx, dy) {
+    applyLookDelta(dx, dy);
+  }
 
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
@@ -61,6 +86,7 @@ export function createPlayerController({ camera, domElement, getGravity }) {
   function setEnabled(v) {
     enabled = v;
     keys.clear();
+    virtualMove = { forward: 0, strafe: 0 };
     if (!v && document.pointerLockElement === domElement) document.exitPointerLock();
   }
 
@@ -89,7 +115,9 @@ export function createPlayerController({ camera, domElement, getGravity }) {
     if (keys.has('KeyS')) moveDir.sub(forward);
     if (keys.has('KeyD')) moveDir.add(right);
     if (keys.has('KeyA')) moveDir.sub(right);
-    if (moveDir.lengthSq() > 0) moveDir.normalize();
+    moveDir.addScaledVector(forward, virtualMove.forward);
+    moveDir.addScaledVector(right, virtualMove.strafe);
+    if (moveDir.lengthSq() > 1) moveDir.normalize(); // only clamp when combined input actually exceeds full speed
 
     if (gravity) {
       velocity.addScaledVector(up, -GRAVITY_ACCEL * dt);
@@ -139,5 +167,8 @@ export function createPlayerController({ camera, domElement, getGravity }) {
     dispose,
     isGrounded: () => grounded,
     getPosition: () => position.clone(),
+    setVirtualMove,
+    setVirtualKey,
+    lookBy,
   };
 }

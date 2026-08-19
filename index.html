@@ -60,6 +60,48 @@
       pointer-events: none;
     }
     #hud-crosshair.visible { display: block; }
+
+    /* B7 mobile layout: Walk mode has no keyboard on touch (no WASD, no
+       Pointer Lock the way desktop gets it) -- these three only exist on
+       touch-capable devices (render.js feature-detects once at startup)
+       and only show while actually walking. */
+    #walk-look-zone {
+      display: none;
+      position: fixed; inset: 0; z-index: 890;
+      touch-action: none;
+    }
+    #walk-look-zone.visible { display: block; }
+    #walk-joystick {
+      display: none;
+      position: fixed; left: 24px; bottom: 90px; z-index: 895;
+      width: 120px; height: 120px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1.5px solid rgba(234, 246, 255, 0.35);
+      touch-action: none;
+    }
+    #walk-joystick.visible { display: block; }
+    #walk-joystick-knob {
+      position: absolute; left: 50%; top: 50%;
+      width: 52px; height: 52px;
+      margin: -26px 0 0 -26px;
+      border-radius: 50%;
+      background: rgba(124, 204, 255, 0.35);
+      border: 1.5px solid rgba(234, 246, 255, 0.7);
+    }
+    #walk-jump-btn {
+      display: none;
+      position: fixed; right: 28px; bottom: 52px; z-index: 895;
+      width: 68px; height: 68px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1.5px solid rgba(234, 246, 255, 0.5);
+      color: #eaf6ff;
+      font: 700 11px system-ui, sans-serif;
+      touch-action: none;
+    }
+    #walk-jump-btn.visible { display: block; }
+    #walk-jump-btn:active { background: rgba(124, 204, 255, 0.35); }
     #hud-wheel-cue {
       position: fixed; bottom: 14px; left: 16px; z-index: 900;
       color: #9cd; font: 11px system-ui, sans-serif; opacity: 0.7;
@@ -983,6 +1025,9 @@
   <div id="hud-indicator"></div>
   <div id="hud-prompt"></div>
   <div id="hud-crosshair"></div>
+  <div id="walk-look-zone"></div>
+  <div id="walk-joystick"><div id="walk-joystick-knob"></div></div>
+  <button id="walk-jump-btn" type="button">JUMP</button>
   <div id="avatar-layer"></div>
   <button id="interact-btn" type="button">Interact</button>
   <div id="sculpture-mode-banner"><span>Sculpture Mode -- isolated scratch space, nothing here is saved to the shared world</span><button id="sculpture-mode-exit" type="button">Exit to Universe</button></div>
