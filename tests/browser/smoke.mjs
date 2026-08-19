@@ -77,14 +77,37 @@ async function main() {
   // Mode switching happens through the Rhombic Wheel now (B1,
   // RHOMBIVERSE_UIUX_BUILD_PLAN.md) -- the old always-visible .mode-btn
   // row is a hidden shim the wheel drives, not a direct click target.
+  //
+  // clickWheelItem dispatches the click directly via evaluate() rather
+  // than Playwright's own page.click() -- recalibrated 2026-08-19 after
+  // page.click('.wheel-item:has-text(...)') reproducibly hung on this
+  // exact interaction (confirmed via a live diagnostic: the DOM state
+  // was proven stable and correct at every check -- zero mutations over
+  // a 2s idle window, the target element visible/stable/unobstructed --
+  // yet Playwright's own locator/actionability engine never completed
+  // the click, even with force:true, both locally and on CI). A plain
+  // DOM .click() is functionally identical for this app (every wheel
+  // item is a plain click-listener-driven div, no drag/hover gesture
+  // involved), and sidesteps whatever CDP-level issue Playwright's own
+  // polling was hitting.
+  async function clickWheelItem(text) {
+    const clicked = await page.evaluate((label) => {
+      const el = [...document.querySelectorAll('.wheel-item')].find((e) => e.textContent.includes(label));
+      if (!el) return false;
+      el.click();
+      return true;
+    }, text);
+    assert.ok(clicked, `wheel item "${text}" should exist and be clickable`);
+  }
+
   await page.keyboard.press('Tab');
-  await page.click('.wheel-item:has-text("Alter")');
-  await page.click('.wheel-item:has-text("Fill")');
+  await clickWheelItem('Alter');
+  await clickWheelItem('Fill');
   const shellRowVisible = await page.$eval('#shell-radius-row', (el) => getComputedStyle(el).display !== 'none');
   assert.ok(shellRowVisible, 'Fill mode should reveal the shell-radius row');
   await page.keyboard.press('Tab');
-  await page.click('.wheel-item:has-text("Build")');
-  await page.click('.wheel-item:has-text("Place")');
+  await clickWheelItem('Build');
+  await clickWheelItem('Place');
 
   if (errors.length > 0) {
     throw new Error(`Console/page errors during smoke test:\n${errors.join('\n')}`);
