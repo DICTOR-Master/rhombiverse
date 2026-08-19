@@ -19,11 +19,21 @@
 // center, which traces a rhombus/diamond outline as a whole -- the shape
 // language holds at both the single-control and whole-composition level.
 
+// B5: Cultivation Mode's own wheel placement was an explicit either/or
+// in the spec ("whichever of the existing 'Alter' category or a new
+// 'Grow' category fits the existing wheel taxonomy more cleanly...
+// document which one you chose"). Chose a new "Grow" category: Alter's
+// own identity is reshaping EXISTING structure (Dig/Smooth/Fill/
+// Replace), whereas Cultivation is about planting and tending living
+// growth -- a different enough mental model that folding it into Alter
+// would misfile it, and the wheel already tolerates a non-diamond
+// (5-item) layout fine via positionsFor's generic even-spacing.
 const LEVEL1 = [
   { id: 'build', label: 'Build' },
   { id: 'alter', label: 'Alter' },
   { id: 'create', label: 'Create' },
   { id: 'explore', label: 'Explore' },
+  { id: 'grow', label: 'Grow' },
 ];
 
 // Build -> Place/Repeat/Pattern/Material and Alter -> Dig/Smooth/Fill/
@@ -57,6 +67,11 @@ const CREATE_SUBMENU = [
   { id: 'generate-body', label: 'Generate a Body', kind: 'generator-picker' },
   { id: 'plant-seed', label: 'Plant a Seed', kind: 'species-picker' },
 ];
+
+// B5: Cultivation's own dedicated panel, same reasoning as Sculpt's --
+// tier/growthParameters/NL box are several independent controls at
+// once, not a single pick-one-of-N leaf.
+const GROW_SUBMENU = [{ id: 'cultivate', label: 'Cultivate', kind: 'cultivate-panel' }];
 
 const CSS = `
 #rhombic-wheel-overlay {
@@ -233,6 +248,9 @@ export function createRhombicWheel({
   // independent controls at once -- tier/mirror/brush/NL box -- don't
   // fit the wheel's picker-strip or material-wheel patterns cleanly).
   onOpenSculptPanel = () => {},
+  // B5: Grow -> Cultivate opens render.js's own #cultivate-panel, same
+  // reasoning as onOpenSculptPanel above.
+  onOpenCultivatePanel = () => {},
 }) {
   injectCssOnce();
 
@@ -384,7 +402,7 @@ export function createRhombicWheel({
 
   function selectItem(item) {
     onMenuSound();
-    if (item.id === 'build' || item.id === 'alter' || item.id === 'create') {
+    if (item.id === 'build' || item.id === 'alter' || item.id === 'create' || item.id === 'grow') {
       activeCategory = item.id;
       level = 2;
       renderLevel2();
@@ -462,6 +480,13 @@ export function createRhombicWheel({
       onOpenSculptPanel();
       return;
     }
+    if (item.kind === 'cultivate-panel') {
+      clickModeShim('plant');
+      onModeChosen('plant');
+      close();
+      onOpenCultivatePanel();
+      return;
+    }
   }
 
   function renderLevel2() {
@@ -474,7 +499,11 @@ export function createRhombicWheel({
       activeCategory = null;
       renderLevel1();
     });
-    const submenu = activeCategory === 'build' ? BUILD_SUBMENU : activeCategory === 'alter' ? ALTER_SUBMENU : CREATE_SUBMENU;
+    const submenu =
+      activeCategory === 'build' ? BUILD_SUBMENU :
+      activeCategory === 'alter' ? ALTER_SUBMENU :
+      activeCategory === 'grow' ? GROW_SUBMENU :
+      CREATE_SUBMENU;
     buildLevel(submenu, 90, 'wheel-level2');
     root.appendChild(back);
     const hint = document.createElement('div');

@@ -32,7 +32,7 @@
       pointer-events: none;
     }
     #hud-indicator {
-      position: fixed; top: 14px; right: 168px; z-index: 900;
+      position: fixed; top: 14px; right: 206px; z-index: 900;
       color: #bcd; font: 12px/1.4 system-ui, sans-serif;
       text-align: right; user-select: none; pointer-events: none;
       max-width: 45vw;
@@ -111,6 +111,18 @@
       cursor: pointer;
     }
     #sculpture-mode-toggle:hover { background: rgba(255, 255, 255, 0.15); }
+    #duality-toggle {
+      position: fixed; top: 12px; right: 164px; z-index: 900;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      color: #ddd;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font: 15px system-ui, sans-serif;
+      cursor: pointer;
+    }
+    #duality-toggle:hover { background: rgba(255, 255, 255, 0.15); }
+    #duality-toggle.active { background: rgba(200, 140, 255, 0.4); border-color: #c88cff; color: #fff; }
 
     /* B4b: standalone Sculpture Mode banner -- shown only while active,
        makes it unmistakable this is the isolated scratch space, not the
@@ -142,7 +154,7 @@
        and #hud-crosshair are deliberately excluded -- the prompt IS the
        transition's own cue text, and the crosshair fades in/out on its
        own timing (render.js), not this one. */
-    #hud-wordmark, #hud-indicator, #hud-wheel-cue, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle {
+    #hud-wordmark, #hud-indicator, #hud-wheel-cue, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle {
       transition: opacity 0.3s ease;
     }
     body.explore-transitioning #hud-wordmark,
@@ -151,7 +163,8 @@
     body.explore-transitioning #lab-toggle,
     body.explore-transitioning #xray-toggle,
     body.explore-transitioning #cyborg-toggle,
-    body.explore-transitioning #sculpture-mode-toggle {
+    body.explore-transitioning #sculpture-mode-toggle,
+    body.explore-transitioning #duality-toggle {
       opacity: 0;
       pointer-events: none;
     }
@@ -325,6 +338,44 @@
     }
     #sculpt-close { background: none; border: none; color: #9de0ff; cursor: pointer; font: 13px system-ui, sans-serif; opacity: 0.8; }
     #sculpt-close:hover { opacity: 1; }
+    /* B5: same panel shell as #sculpt-panel (position/size/chrome), same
+       .sculpt-* control classes -- only the id differs, so the two
+       panels never fight over layout even though only one is ever
+       meaningfully open at a time. */
+    #cultivate-panel {
+      display: none;
+      position: fixed;
+      top: 54px; left: 12px; bottom: 12px;
+      width: 300px;
+      max-width: calc(100vw - 24px);
+      background: rgba(6, 6, 12, 0.94);
+      border: 1px solid rgba(124, 204, 255, 0.3);
+      border-radius: 8px;
+      z-index: 975;
+      overflow-y: auto;
+      box-sizing: border-box;
+      padding: 10px 12px 16px;
+      color: #ddd;
+      font: 13px/1.4 system-ui, sans-serif;
+    }
+    #cultivate-panel.open { display: block; }
+    #cultivate-header {
+      display: flex; align-items: center; justify-content: space-between;
+      font: 700 13px system-ui, sans-serif;
+      color: #9de0ff;
+      margin-bottom: 6px;
+    }
+    #cultivate-close { background: none; border: none; color: #9de0ff; cursor: pointer; font: 13px system-ui, sans-serif; opacity: 0.8; }
+    #cultivate-close:hover { opacity: 1; }
+    #cultivate-suggestion {
+      margin-top: 10px;
+      padding: 8px 10px;
+      background: rgba(124, 204, 255, 0.1);
+      border: 1px solid rgba(124, 204, 255, 0.4);
+      border-radius: 6px;
+    }
+    #cultivate-suggestion-text { margin-bottom: 6px; font-size: 12px; }
+    #cultivate-nl-input { flex: 1; min-width: 0; font: inherit; padding: 4px 6px; background: rgba(255,255,255,0.08); border: 1px solid rgba(124,204,255,0.35); color: inherit; }
     .sculpt-section-label { margin: 10px 0 4px; font: 700 11px system-ui, sans-serif; color: #9cd; letter-spacing: 0.03em; }
     .sculpt-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
     .sculpt-hint { opacity: 0.7; margin-top: 6px; font-size: 12px; }
@@ -349,15 +400,18 @@
       color: #fff;
     }
     #sculpt-brush-radius { width: 4em; font: inherit; }
-    #sculpt-suggestion {
+    /* Shared by both Sculpt's (#sculpt-suggestion) and Cultivate's
+       (#cultivate-suggestion) Semi-Cyborg accept/dismiss cards -- same
+       Assistance Spectrum concept, reused rather than duplicated. */
+    .assist-suggestion {
       margin-top: 10px;
       padding: 8px 10px;
       background: rgba(124, 204, 255, 0.1);
       border: 1px solid rgba(124, 204, 255, 0.4);
       border-radius: 6px;
     }
-    #sculpt-suggestion-text { margin-bottom: 6px; font-size: 12px; }
-    #sculpt-nl-input { flex: 1; min-width: 0; font: inherit; padding: 4px 6px; background: rgba(255,255,255,0.08); border: 1px solid rgba(124,204,255,0.35); color: inherit; }
+    .assist-suggestion-text { margin-bottom: 6px; font-size: 12px; }
+    .assist-nl-input { flex: 1; min-width: 0; font: inherit; padding: 4px 6px; background: rgba(255,255,255,0.08); border: 1px solid rgba(124,204,255,0.35); color: inherit; }
 
     /* Lab panel is already a single scrollable overlay at any viewport
        size (see #lab-panel above) -- on a narrow/touch viewport it just
@@ -727,6 +781,7 @@
   <button id="sculpture-mode-toggle" type="button" title="Sculpture Mode: a separate, isolated scratch workspace">◆</button>
   <button id="cyborg-toggle" type="button" title="Cyborg Mode: guided walkthrough">◈</button>
   <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>
+  <button id="duality-toggle" type="button" title="Duality: view this structure's aperiodic shadow">◐</button>
   <button id="lab-toggle" type="button" title="Advanced / Lab">⚙</button>
 
   <div id="lab-panel">
@@ -999,6 +1054,59 @@
         <button class="sculpt-btn" id="sculpture-place-in-world" type="button">Place a copy in-world</button>
       </div>
     </div>
+  </div>
+
+  <!-- B5: Cultivation panel (Grow -> Cultivate). Reuses the Sculpt
+       panel's .sculpt-btn/.sculpt-row/.sculpt-section-label styling --
+       same rhombic-grammar panel language, no new CSS needed. -->
+  <div id="cultivate-panel">
+    <div id="cultivate-header"><span>Cultivate</span><button id="cultivate-close" type="button" title="Close">✕</button></div>
+
+    <div class="sculpt-section-label">Assistance</div>
+    <div class="sculpt-row" id="cultivate-tier-row">
+      <button class="sculpt-btn tier-btn active" data-tier="manual" type="button">Manual</button>
+      <button class="sculpt-btn tier-btn" data-tier="semi-cyborg" type="button">Semi-Cyborg</button>
+      <button class="sculpt-btn tier-btn" data-tier="full-cyborg" type="button">Full-Cyborg</button>
+    </div>
+
+    <div class="sculpt-section-label">Growth Parameters (Manual)</div>
+    <div class="sculpt-row">
+      <label>Directional bias
+        <select id="cultivate-directional-bias">
+          <option value="0,1,0">Upward</option>
+          <option value="0,-1,0">Downward</option>
+          <option value="1,0,0">+X</option>
+          <option value="-1,0,0">-X</option>
+          <option value="0,0,1">+Z</option>
+          <option value="0,0,-1">-Z</option>
+        </select>
+      </label>
+    </div>
+    <div class="sculpt-row">
+      <label>Density vs. spread <input id="cultivate-density-bias" type="range" min="0" max="1" step="0.05" value="0.5" /></label>
+    </div>
+
+    <div id="cultivate-suggestion" style="display:none;">
+      <div id="cultivate-suggestion-text"></div>
+      <div class="sculpt-row">
+        <button id="cultivate-suggestion-accept" type="button">Accept</button>
+        <button id="cultivate-suggestion-dismiss" type="button">Dismiss</button>
+      </div>
+    </div>
+
+    <div id="cultivate-fullcyborg-section" style="display:none;">
+      <div class="sculpt-section-label">Describe what to grow</div>
+      <div class="sculpt-row">
+        <input id="cultivate-nl-input" type="text" placeholder="e.g. grow a forest along this ridge" maxlength="200" />
+        <button id="cultivate-nl-go" type="button">Go</button>
+      </div>
+      <div id="cultivate-nl-result" class="sculpt-hint"></div>
+    </div>
+    <div id="cultivate-fullcyborg-gated" class="sculpt-hint" style="display:none;">
+      Full-Cyborg planting/tending is built and ready, but stays off until moderation review is verified (B7), same as Sculpt's in-world Full-Cyborg.
+    </div>
+
+    <div class="sculpt-hint">Pick a species from Create &rarr; Plant a Seed, set your growth parameters here, then click anywhere to plant with them applied.</div>
   </div>
 
   <script type="module" src="./src/render.js"></script>

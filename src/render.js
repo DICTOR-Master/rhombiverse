@@ -94,7 +94,15 @@ import {
 // where every trade action goes through sync.js's server-backed
 // pushTradePropose/Confirm/Cancel instead.
 import { applyInventoryDecay } from './trade.js';
-import { GROWTH_TEMPLATES, plantSeed, applyGrowth, tileWorldVertices } from './growth.js';
+import { GROWTH_TEMPLATES, plantSeed, applyGrowth, tileWorldVertices, pruneTile, VALID_TRIPLES, unitTileVertices } from './growth.js';
+import {
+  createCultivationSession,
+  proposeCultivationSite,
+  acceptCultivationSuggestion,
+  dismissCultivationSuggestion,
+  requestCultivationIntent,
+  executeCultivationIntent,
+} from './cultivation.js';
 import {
   GENOME_TRAIT_RANGES,
   plantOrganism,
@@ -1755,6 +1763,76 @@ async function init() {
     }
   });
 
+  // --- B5 Duality Mode --------------------------------------------
+  // "The RD lattice as a 4D hypercube shadow, the rhombic triacontahedron
+  // as a 6D hypercube shadow" -- no such cut-and-project mapping exists
+  // anywhere in this codebase or its specs (checked before writing this,
+  // same kind of gap as B4's "order-48 symmetry group" claim, but
+  // deeper: the textbook 6D construction uses the icosahedral point
+  // group, order 120, which doesn't act on this lattice's actual cubic
+  // (order-48) FCC symmetry at all -- there's no clean way to apply the
+  // literal method here). What IS real and already built: growth.js's
+  // own Ammann-rhombohedra tile geometry (STAR_DIRECTIONS/VALID_TRIPLES/
+  // unitTileVertices), a genuine quasicrystal-related construction this
+  // project already uses for its Penrose growth layer. Duality Mode
+  // reveals that SAME real geometry applied to every regular built cell
+  // instead of just grown seeds -- "display it for free" rather than
+  // inventing new projection math, per direct steer. Deterministic (same
+  // cell always picks the same real prototile triple) but not a literal
+  // verified hypercube-shadow projection -- disclosed here, not silently
+  // oversold.
+  let dualityModeActive = false;
+  let dualityShadowMesh = null;
+  function tripleForCell(x, y, z) {
+    const h = Math.abs((x * 73856093) ^ (y * 19349663) ^ (z * 83492791));
+    return VALID_TRIPLES[h % VALID_TRIPLES.length];
+  }
+  function activeWorldTriple() {
+    return sculptureModeActive
+      ? { world: sculptureWorld, scene: sculptureScene }
+      : { world, scene };
+  }
+  async function rebuildDualityShadow() {
+    const { world: w, scene: s } = activeWorldTriple();
+    if (dualityShadowMesh) {
+      s.remove(dualityShadowMesh);
+      dualityShadowMesh.geometry.dispose();
+      dualityShadowMesh.material.dispose();
+      dualityShadowMesh = null;
+    }
+    const cells = w ? w.entries() : [];
+    if (cells.length === 0) return;
+    const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
+    const pieces = cells.map((cell) => {
+      const triple = tripleForCell(cell.x, cell.y, cell.z);
+      const verts = unitTileVertices(triple.dirs).map(([x, y, z]) => new THREE.Vector3(x, y, z));
+      const geom = new ConvexGeometry(verts);
+      const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+      geom.translate(wx, wy, wz);
+      return geom;
+    });
+    const merged = mergeGeometries(pieces, false);
+    pieces.forEach((g) => g.dispose());
+    dualityShadowMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ color: 0xc88cff, flatShading: true, metalness: 0.1, roughness: 0.6 }));
+    s.add(dualityShadowMesh);
+  }
+  document.getElementById('duality-toggle')?.addEventListener('click', async () => {
+    dualityModeActive = !dualityModeActive;
+    document.getElementById('duality-toggle').classList.toggle('active', dualityModeActive);
+    const { world: w, scene: s } = activeWorldTriple();
+    const activeMesh = sculptureModeActive ? sculptureMesh : mesh;
+    activeMesh.visible = !dualityModeActive;
+    if (dualityModeActive) {
+      showHudPrompt('Duality: showing this structure’s real Ammann-rhombohedra shadow (a client-side render only -- your cells are untouched).', 5000);
+      await rebuildDualityShadow();
+    } else if (dualityShadowMesh) {
+      s.remove(dualityShadowMesh);
+      dualityShadowMesh.geometry.dispose();
+      dualityShadowMesh.material.dispose();
+      dualityShadowMesh = null;
+    }
+  });
+
   const shellCountInput = document.getElementById('shell-count');
   const hollowFromInput = document.getElementById('hollow-from');
   const materialSelect = document.getElementById('material-select');
@@ -1885,6 +1963,20 @@ async function init() {
       origin = [p.x, p.y, p.z];
     }
     const species = document.getElementById('species-select').value;
+
+    // B5 Cultivation Mode's Semi-Cyborg tier: propose a planting site
+    // instead of planting immediately -- nothing plants without
+    // explicit accept. Only applies to plain (non-evolving) species;
+    // evolving organisms/animals are a different, unrelated planting
+    // path this mode doesn't touch.
+    if (cultivateSession.assistanceTier === 'semi-cyborg' && !species.startsWith('evo-')) {
+      const [cx, cy, cz] = nearestValidCell(origin[0], origin[1], origin[2]);
+      const hitCell = world.has(cx, cy, cz) ? { x: cx, y: cy, z: cz, ...world.entries().find((c) => c.x === cx && c.y === cy && c.z === cz) } : { x: cx, y: cy, z: cz };
+      proposeCultivationSite(cultivateSession, world, hitCell, species, currentGrowthParameters());
+      renderCultivateSuggestion();
+      return;
+    }
+
     seedCounter += 1;
     const seedId = `seed_${Date.now()}_${seedCounter}`;
     let seed;
@@ -1959,6 +2051,13 @@ async function init() {
       }
     } else {
       seed = plantSeed(world, seedId, species, origin);
+      // B5 Cultivation Mode Manual tier: "expose the existing growth-
+      // layer's... parameters... as player-adjustable inputs at planting
+      // time" -- layered on here rather than changing plantSeed's own
+      // signature, since every OTHER planting path (evolving organisms/
+      // animals above) is explicitly out of Cultivation's scope and
+      // must stay completely unaffected.
+      world.setSeed(seedId, { ...seed, growthParameters: currentGrowthParameters(), assistanceTier: cultivateSession.assistanceTier, authorId: myUserId ?? 'local-player' });
     }
     rebuildSeedMeshes(seedId, seed);
     if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
@@ -1966,6 +2065,103 @@ async function init() {
     updateEvolutionInfo();
   });
   updateModeUI();
+
+  // B5 Cultivation Mode: "manually pruning part of an already-grown
+  // structure should trigger the existing aperiodic fill/reroute
+  // behavior the growth system already has" -- reuses the same right-
+  // click-always-removes convention every other mode already has,
+  // scoped to Plant mode (grown tiles aren't normal world.cells, so
+  // build.js's own onContextMenu never sees them). growSeed's frontier
+  // scan already re-derives itself from seed.tiles fresh every call, so
+  // the "reroute" is genuinely free -- pruneTile is the whole mechanic.
+  renderer.domElement.addEventListener('contextmenu', (event) => {
+    if (currentMode !== 'plant' || walking) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    plantPointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    plantPointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    plantRaycaster.setFromCamera(plantPointer, camera);
+    const hits = plantRaycaster.intersectObjects(growthGroup.children, true);
+    if (hits.length === 0) return;
+    const { seedId, tileIndex } = hits[0].object.userData;
+    if (seedId === undefined) return;
+    event.preventDefault();
+    if (pruneTile(world, seedId, tileIndex)) {
+      const seed = world.getSeeds()[seedId];
+      rebuildSeedMeshes(seedId, seed);
+      if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
+      showHudPrompt('Pruned -- the growth layer will fill the gap back in on its own.');
+    }
+  });
+
+  // --- B5: Cultivation Mode (Grow -> Cultivate) -----------------------
+  const cultivateSession = createCultivationSession(myUserId ?? 'local-player');
+
+  function currentGrowthParameters() {
+    const [bx, by, bz] = document.getElementById('cultivate-directional-bias').value.split(',').map(Number);
+    const densityBias = Number(document.getElementById('cultivate-density-bias').value);
+    return { directionalBias: [bx, by, bz], densityBias };
+  }
+
+  function renderCultivateSuggestion() {
+    const el = document.getElementById('cultivate-suggestion');
+    const s = cultivateSession.pendingSuggestion;
+    if (!s) {
+      el.style.display = 'none';
+      return;
+    }
+    document.getElementById('cultivate-suggestion-text').textContent = `Plant ${s.species} here -- ${s.reason}.`;
+    el.style.display = '';
+  }
+
+  document.querySelectorAll('#cultivate-tier-row .tier-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#cultivate-tier-row .tier-btn').forEach((b) => b.classList.toggle('active', b === btn));
+      cultivateSession.assistanceTier = btn.dataset.tier;
+      cultivateSession.pendingSuggestion = null;
+      renderCultivateSuggestion();
+      const isFullCyborg = cultivateSession.assistanceTier === 'full-cyborg';
+      // Same standalone-mode-or-flag rule as Sculpt's own Full-Cyborg
+      // gate (B5's own instruction: "gated the same way" as B4a's).
+      const fullCyborgUsable = sculptureModeActive || FULL_CYBORG_INWORLD_ENABLED;
+      document.getElementById('cultivate-fullcyborg-section').style.display = isFullCyborg && fullCyborgUsable ? '' : 'none';
+      document.getElementById('cultivate-fullcyborg-gated').style.display = isFullCyborg && !fullCyborgUsable ? '' : 'none';
+    });
+  });
+
+  document.getElementById('cultivate-close')?.addEventListener('click', () => {
+    document.getElementById('cultivate-panel').classList.remove('open');
+  });
+
+  document.getElementById('cultivate-suggestion-accept').addEventListener('click', () => {
+    acceptCultivationSuggestion(cultivateSession, world, myUserId ?? 'local-player');
+    onChange();
+    renderCultivateSuggestion();
+  });
+  document.getElementById('cultivate-suggestion-dismiss').addEventListener('click', () => {
+    dismissCultivationSuggestion(cultivateSession);
+    renderCultivateSuggestion();
+  });
+
+  document.getElementById('cultivate-nl-go').addEventListener('click', async () => {
+    const input = document.getElementById('cultivate-nl-input');
+    const resultEl = document.getElementById('cultivate-nl-result');
+    const text = input.value.trim();
+    if (!text) return;
+    resultEl.textContent = 'Thinking…';
+    const origin = { x: 0, y: 0, z: 0 }; // TODO: same last-hovered-cell limitation as Sculpt's own Full-Cyborg box
+    const intent = await requestCultivationIntent(text, origin);
+    if (intent.unrecognized) {
+      resultEl.textContent = intent.description;
+      return;
+    }
+    const { applied, skipped } = executeCultivationIntent(world, intent, world.getClaims(), myUserId ?? 'local-player', currentGrowthParameters());
+    resultEl.textContent = `${intent.description}${intent.viaAI ? ' (AI)' : ' (local parser)'} -- ${applied.length} seed${applied.length === 1 ? '' : 's'} planted${skipped.length ? `, ${skipped.length} skipped (outside your claim)` : ''}.`;
+    if (applied.length > 0) {
+      refreshOrganismsSnapshot(world);
+      onChange();
+    }
+    input.value = '';
+  });
 
   // Frost line (RHOMBIVERSE_SPEC_STAR_SYSTEM.md section 3): reads the
   // live `planetoids` closure variable at call time (not a stale
@@ -2150,6 +2346,10 @@ async function init() {
   function enterSculptureMode() {
     if (sculptureModeActive) return;
     if (walking) exitWalk();
+    // Duality's shadow mesh lives in whichever scene was active when it
+    // was built -- turn it off cleanly before switching scenes rather
+    // than leaving a stale shadow (and a hidden main mesh) behind.
+    document.getElementById('duality-toggle')?.classList.contains('active') && document.getElementById('duality-toggle').click();
     savedCameraState.position.copy(camera.position);
     savedCameraState.target.copy(controls.target);
     if (!sculptureWorld) {
@@ -2182,6 +2382,7 @@ async function init() {
 
   function exitSculptureMode() {
     if (!sculptureModeActive) return;
+    document.getElementById('duality-toggle')?.classList.contains('active') && document.getElementById('duality-toggle').click();
     sculptureModeActive = false;
     sculptTarget.world = world;
     sculptTarget.mesh = mesh;
@@ -2447,6 +2648,7 @@ async function init() {
     onMenuSound: playMenuSound,
     onSelectionChange: updateHudIndicator,
     onOpenSculptPanel: openSculptPanel,
+    onOpenCultivatePanel: () => document.getElementById('cultivate-panel').classList.add('open'),
     getMaterialColor: (value) => `#${(MATERIAL_COLORS[value] ?? MATERIAL_COLORS.base).toString(16).padStart(6, '0')}`,
     onMaterialHoverPreview: (value) => {
       materialPreviewColor = MATERIAL_COLORS[value] ?? MATERIAL_COLORS.base;
@@ -2704,12 +2906,17 @@ async function init() {
     if (seed.species.startsWith(ORGANISM_SEED_SPECIES_PREFIX)) return;
     const group = new THREE.Group();
     const color = speciesColor(seed.species);
-    for (const tile of seed.tiles) {
+    seed.tiles.forEach((tile, tileIndex) => {
       const verts = tileWorldVertices(seed, tile).map(([x, y, z]) => new THREE.Vector3(x, y, z));
       const geometry = new ConvexGeometry(verts);
       const material = new THREE.MeshStandardMaterial({ color, flatShading: true });
-      group.add(new THREE.Mesh(geometry, material));
-    }
+      const tileMesh = new THREE.Mesh(geometry, material);
+      // B5 Cultivation Mode: lets the prune contextmenu handler below
+      // identify exactly which seed/tile a right-click landed on.
+      tileMesh.userData.seedId = seedId;
+      tileMesh.userData.tileIndex = tileIndex;
+      group.add(tileMesh);
+    });
     growthGroup.add(group);
     growthMeshesBySeed.set(seedId, group);
   }

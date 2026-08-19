@@ -461,6 +461,21 @@ export function growSeed(seed, now = Date.now(), phenotypeOverride = null) {
     ? { preferType: phenotypeOverride.preferType, facesPerTick: phenotypeOverride.facesPerTick }
     : (GROWTH_TEMPLATES[seed.species].bias ?? SPECIES_BIAS[seed.species]);
 
+  // B5 Cultivation Mode: growthParameters, if the player set any at
+  // planting time, layer ON TOP of the species' own bias rather than
+  // replacing it -- densityBias (0..1) scales facesPerTick (this is
+  // the real "density vs. spread" L-system parameter the spec asks to
+  // expose: how many open faces fill per tick); directionalBias (a 3D
+  // vector) re-sorts the otherwise-equal candidate options below by
+  // alignment, so growth still only ever picks among geometrically
+  // valid, non-overlapping extensions -- a player preference among what
+  // the real prototile rules already allow, not a new growth rule.
+  const growthParams = seed.growthParameters;
+  const facesPerTick =
+    growthParams?.densityBias != null
+      ? Math.max(1, Math.round(bias.facesPerTick * (0.4 + growthParams.densityBias * 1.2)))
+      : bias.facesPerTick;
+
   // Frontier: every open face across every existing tile, in a stable
   // order (tile insertion order, then the fixed facesOfTile order) --
   // deterministic, not Math.random()-ordered, so growth is reproducible
@@ -479,7 +494,7 @@ export function growSeed(seed, now = Date.now(), phenotypeOverride = null) {
 
   let added = 0;
   for (const face of frontier) {
-    if (added >= bias.facesPerTick) break;
+    if (added >= facesPerTick) break;
     const options = EXTENSIONS_BY_PAIR.get(pairKey(...face.pair)) ?? [];
     if (options.length === 0) continue;
     // Species-preferred type tried first, but every real option is a
@@ -487,7 +502,14 @@ export function growSeed(seed, now = Date.now(), phenotypeOverride = null) {
     // whichever one is actually geometrically clear wins.
     const preferred = bias.preferType ? options.filter((o) => o.type === bias.preferType) : options;
     const rest = options.filter((o) => !preferred.includes(o));
-    const orderedOptions = [...preferred, ...rest];
+    let orderedOptions = [...preferred, ...rest];
+    if (growthParams?.directionalBias) {
+      const [bx, by, bz] = growthParams.directionalBias;
+      orderedOptions = orderedOptions
+        .map((o) => ({ o, align: STAR_DIRECTIONS[o.third][0] * bx + STAR_DIRECTIONS[o.third][1] * by + STAR_DIRECTIONS[o.third][2] * bz }))
+        .sort((a, b) => b.align - a.align)
+        .map(({ o }) => o);
+    }
 
     for (let n = 0; n < orderedOptions.length; n++) {
       const choice = orderedOptions[(seed.tiles.length + added + n) % orderedOptions.length];
@@ -572,6 +594,24 @@ export function plantSeed(world, seedId, species, origin, now = Date.now()) {
   };
   world.setSeed(seedId, seed);
   return seed;
+}
+
+// B5 Cultivation Mode's Manual tier: "manually pruning part of an
+// already-grown structure should trigger the existing aperiodic
+// fill/reroute behavior the growth system already has, with no new
+// rule added." That behavior already exists for free -- growSeed always
+// recomputes its frontier from seed.tiles fresh on every call (see
+// above), so removing one tile here is the whole mechanic: the next
+// growth tick naturally finds the newly-exposed open faces on the
+// removed tile's former neighbors and continues from there. Refuses to
+// prune the seed's very first tile (index 0) -- a seed with zero tiles
+// isn't a smaller plant, it's not a seed anymore.
+export function pruneTile(world, seedId, tileIndex) {
+  const seed = world.getSeeds()[seedId];
+  if (!seed || tileIndex <= 0 || tileIndex >= seed.tiles.length) return false;
+  seed.tiles.splice(tileIndex, 1);
+  world.setSeed(seedId, seed);
+  return true;
 }
 
 // World-space vertices for one tile, offset by its seed's own origin --
