@@ -1,0 +1,30 @@
+{
+  "subscriptName": "first-build-session",
+  "steps": [
+    {
+      "stepId": "orbit_camera",
+      "instruction": "Try dragging with your mouse to look around the shape.",
+      "successCondition": "cameraRotated",
+      "hintAfterSeconds": 8,
+      "hint": "Click and hold anywhere on the screen, then move your mouse.",
+      "highlightTarget": "#app"
+    },
+    {
+      "stepId": "find_face",
+      "instruction": "See the diamond shape? Move your mouse over one of its flat faces.",
+      "successCondition": "faceHovered",
+      "hintAfterSeconds": 10,
+      "hint": "Any of the 12 flat sides works — just hover over one.",
+      "highlightTarget": "#app"
+    },
+    {
+      "stepId": "place_block",
+      "instruction": "Click that face to place a new block there.",
+      "successCondition": "cellPlaced",
+      "hintAfterSeconds": 8,
+      "hint": "Left-click on the highlighted face.",
+      "highlightTarget": "#app"
+    }
+  ],
+  "completionMessage": "That's the whole build tool — hover a face, click, and keep going. You've got it."
+}

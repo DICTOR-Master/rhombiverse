@@ -32,7 +32,7 @@
       pointer-events: none;
     }
     #hud-indicator {
-      position: fixed; top: 14px; right: 92px; z-index: 900;
+      position: fixed; top: 14px; right: 130px; z-index: 900;
       color: #bcd; font: 12px/1.4 system-ui, sans-serif;
       text-align: right; user-select: none; pointer-events: none;
       max-width: 45vw;
@@ -88,19 +88,32 @@
     }
     #xray-toggle:hover { background: rgba(255, 255, 255, 0.15); }
     #xray-toggle.active { background: rgba(120, 190, 255, 0.4); border-color: #7cf; color: #fff; }
+    #cyborg-toggle {
+      position: fixed; top: 12px; right: 88px; z-index: 900;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      color: #ddd;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font: 14px system-ui, sans-serif;
+      cursor: pointer;
+    }
+    #cyborg-toggle:hover { background: rgba(255, 255, 255, 0.15); }
+    #cyborg-toggle.active { background: rgba(120, 190, 255, 0.4); border-color: #7cf; color: #fff; }
 
     /* B2's Explore transition sequence: the HUD-fade half. #hud-prompt
        and #hud-crosshair are deliberately excluded -- the prompt IS the
        transition's own cue text, and the crosshair fades in/out on its
        own timing (render.js), not this one. */
-    #hud-wordmark, #hud-indicator, #hud-wheel-cue, #lab-toggle, #xray-toggle {
+    #hud-wordmark, #hud-indicator, #hud-wheel-cue, #lab-toggle, #xray-toggle, #cyborg-toggle {
       transition: opacity 0.3s ease;
     }
     body.explore-transitioning #hud-wordmark,
     body.explore-transitioning #hud-indicator,
     body.explore-transitioning #hud-wheel-cue,
     body.explore-transitioning #lab-toggle,
-    body.explore-transitioning #xray-toggle {
+    body.explore-transitioning #xray-toggle,
+    body.explore-transitioning #cyborg-toggle {
       opacity: 0;
       pointer-events: none;
     }
@@ -587,6 +600,7 @@
   <div id="hud-prompt"></div>
   <div id="hud-crosshair"></div>
   <div id="hud-wheel-cue">Tab / Space — Menu</div>
+  <button id="cyborg-toggle" type="button" title="Cyborg Mode: guided walkthrough">◈</button>
   <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>
   <button id="lab-toggle" type="button" title="Advanced / Lab">⚙</button>
 

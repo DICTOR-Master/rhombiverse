@@ -34,6 +34,7 @@ import { generatePlanetoid } from './planetoidgen.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR } from './settings.js';
 import { playPlaceSound, playRemoveSound, playMenuSound } from './sfx.js';
 import { createRhombicWheel } from './wheel.js';
+import { createCyborgMode } from './cyborg.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
 import { applyHydrosphere } from './hydrosphere.js';
 import { applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } from './blackhole.js';
@@ -193,6 +194,29 @@ controls.rotateSpeed = getSettings().sensitivity;
 // Right-click is reserved for block removal (build.js), not camera pan.
 controls.mouseButtons.RIGHT = null;
 const ORBIT_LEFT_DEFAULT = controls.mouseButtons.LEFT;
+
+// B3 (Cyborg Mode, RHOMBIVERSE_UIUX_BUILD_PLAN.md): the 'cameraRotated'
+// success-condition event a first-build-session subscript step listens
+// for. OrbitControls' own 'change' event fires identically for rotate/
+// zoom/pan with no way to tell them apart, so this tracks a real
+// left-button drag directly instead -- dispatched globally (not scoped
+// to cyborg.js) since it's a real, generically useful signal, same
+// spirit as build.js's onPlaced/onHover callbacks.
+let camRotateStart = null;
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (e.button === 0) camRotateStart = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener('pointermove', (e) => {
+  if (!camRotateStart) return;
+  const moved = Math.hypot(e.clientX - camRotateStart.x, e.clientY - camRotateStart.y);
+  if (moved > 6) {
+    window.dispatchEvent(new CustomEvent('rhombiverse:cameraRotated'));
+    camRotateStart = null; // one dispatch per drag gesture is enough
+  }
+});
+window.addEventListener('pointerup', () => {
+  camRotateStart = null;
+});
 
 // Settings panel (B1, behind the Lab entry point) -- applies live, no
 // page reload needed. Quality only affects pixel ratio for now (WebGL
@@ -573,6 +597,17 @@ function closeMobilePanels() {
 
 labToggleEl.addEventListener('click', () => {
   labPanelEl.classList.toggle('open');
+});
+
+// B3: Cyborg Mode is fully self-contained (fetches its own subscript
+// JSON, listens for the rhombiverse:* events dispatched elsewhere in
+// this file, never touches world-state) -- module-level like the toggle
+// above, no init()-local dependency needed.
+const cyborgMode = createCyborgMode();
+const cyborgToggleEl = document.getElementById('cyborg-toggle');
+cyborgToggleEl.addEventListener('click', () => {
+  cyborgMode.toggle();
+  cyborgToggleEl.classList.toggle('active', cyborgMode.isEnabled());
 });
 
 // Settings inputs (Lab panel only, per B1) -- initialized from whatever
@@ -1978,13 +2013,21 @@ async function init() {
     world,
     onChange,
     onHover: (cells, valid) => {
-      if (cells && cells.length > 0) showGhost(cells);
-      else hideGhost();
+      if (cells && cells.length > 0) {
+        showGhost(cells);
+        // B3: 'faceHovered' -- fires on any valid hovered face, not just
+        // an unoccupied one, matching the subscript step's own plain-
+        // language framing ("hover over one" of the 12 faces).
+        window.dispatchEvent(new CustomEvent('rhombiverse:faceHovered'));
+      } else {
+        hideGhost();
+      }
     },
     onHoverEnd: hideGhost,
     onPlaced: (cell) => {
       flashAt(cell, 0x9de0ff);
       playPlaceSound();
+      window.dispatchEvent(new CustomEvent('rhombiverse:cellPlaced', { detail: cell })); // B3
     },
     onRemoved: (cell) => {
       flashAt(cell, 0xff8866);
