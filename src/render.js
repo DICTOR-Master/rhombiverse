@@ -3974,6 +3974,7 @@ async function init() {
     closeInteractPanel();
     const local = loadFromLocalStorage() ?? (await loadWorld('./data/starter-world.json'));
     world.replaceAll(local);
+    seedAsteroidBelts(world); // no-op if `local` already has its own asteroid cells -- see load-preset's own comment on why this call is needed after any replaceAll()
     onChange();
     setLocalResetControlsEnabled(true);
     setClaimLandEnabled(false);
@@ -3995,6 +3996,7 @@ async function init() {
     clearLocalStorage();
     const fresh = await loadWorld('./data/starter-world.json');
     world.replaceAll(fresh);
+    seedAsteroidBelts(world); // matches what a true first visit gets, see load-preset's own comment
     onChange();
     rebuildAllGrowth();
   });
@@ -4047,6 +4049,7 @@ async function init() {
           try {
             const data = await fetchGalleryWorldData(w.id);
             world.replaceAll(data);
+            seedAsteroidBelts(world); // see load-preset's own comment
             onChange();
             rebuildAllGrowth();
             galleryOverlay.classList.remove('open');
@@ -4124,6 +4127,7 @@ async function init() {
     try {
       const parsed = await importWorldFile(file);
       world.replaceAll(parsed);
+      seedAsteroidBelts(world); // see load-preset's own comment
       onChange();
       rebuildAllGrowth();
     } catch (err) {
@@ -4159,6 +4163,16 @@ async function init() {
       : `./data/presets/${key}.json`;
     const preset = await loadWorld(path);
     world.replaceAll(preset);
+    // Loading a World is a full replace, not additive -- any asteroid
+    // belts seeded at first visit (init()'s own unconditional
+    // seedAsteroidBelts() call) are gone the moment this fires, and
+    // this never re-seeded them, silently leaving nothing minable
+    // behind for any preset that wasn't itself authored with asteroid
+    // cells baked in (true of every Body Type preset -- planetoidgen.js
+    // never tags any). Same idempotent call enableSharedWorld() already
+    // makes -- a no-op if the loaded World already has its own asteroid
+    // cells, otherwise seeds the standard two belts.
+    seedAsteroidBelts(world);
     onChange();
     rebuildAllGrowth();
   });

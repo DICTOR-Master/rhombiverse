@@ -370,7 +370,6 @@ export function createBuildController({
 
   function onContextMenu(event) {
     event.preventDefault();
-    if (!getMode()) return; // e.g. Walk mode active -- editing is disabled while walking
     const hit = pick(event);
     if (!hit || hit.instanceId === undefined) return;
     const cell = cellAt(hit.instanceId);
@@ -379,6 +378,16 @@ export function createBuildController({
     // existing block-delete action" -- right-click already removed any
     // cell; an asteroid-tagged one now also credits inventory and
     // registers regrowth instead of just vanishing.
+    //
+    // Mining is checked BEFORE the getMode() gate below, deliberately --
+    // Walk mode reports a null mode specifically to disable general
+    // editing (getMode: () => (walking ? null : currentMode), see
+    // render.js), but the belt-approach hint text has always promised
+    // "close enough to mine -- right-click an asteroid cell to harvest
+    // it" while walking. That promise was silently false until this
+    // fix: harvesting an asteroid cell is allowed regardless of mode,
+    // walking included; only editing a NON-asteroid cell still needs a
+    // real mode.
     if (cell.asteroidNodeId && mineRemote) {
       // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md: Shared World routes through
       // the server-authoritative RPC instead of a local removeCell +
@@ -393,6 +402,7 @@ export function createBuildController({
     if (cell.asteroidNodeId) {
       mineAsteroidCell(world, cell, getOwnerId());
     } else {
+      if (!getMode()) return; // e.g. Walk mode active -- general editing (non-asteroid removal) stays disabled
       world.removeCell(cell.x, cell.y, cell.z);
     }
     onChange();
