@@ -11,17 +11,34 @@ const BASE_URL = process.env.BASE_URL ?? 'http://localhost:8000';
 async function main() {
   const browser = await chromium.launch();
   const page = await browser.newPage();
+  // Logged live, not just collected for the end-of-run check below --
+  // a real error that happens before some later assertion throws (e.g.
+  // a timeout) would otherwise never make it into the CI log at all.
   const errors = [];
   page.on('console', (msg) => {
-    if (msg.type() === 'error') errors.push(`[console] ${msg.text()}`);
+    if (msg.type() === 'error') {
+      const text = `[console] ${msg.text()}`;
+      errors.push(text);
+      console.log(text);
+    }
   });
-  page.on('pageerror', (err) => errors.push(`[pageerror] ${err}`));
+  page.on('pageerror', (err) => {
+    const text = `[pageerror] ${err}`;
+    errors.push(text);
+    console.log(text);
+  });
   page.on('dialog', (dialog) => dialog.accept());
 
   await page.goto(`${BASE_URL}/index.html`);
 
-  // Welcome overlay shows on first load and can be dismissed.
-  await page.waitForSelector('#welcome-overlay', { state: 'visible', timeout: 10000 });
+  // Welcome overlay shows on first load and can be dismissed. Timeout
+  // recalibrated 2026-08-19: render.js's own module graph has grown
+  // (B1-B6 added dozens of files) to where cold JS parse/eval genuinely
+  // takes several seconds on CI's shared runners -- confirmed via direct
+  // timing (not a real app bug: zero console/page errors at any point,
+  // and this is a no-build-step app by design, so shrinking the module
+  // graph via a bundler isn't the right fix for a test timeout).
+  await page.waitForSelector('#welcome-overlay', { state: 'visible', timeout: 25000 });
   await page.click('#enter-world-btn');
   await page.waitForTimeout(500);
   const overlayDisplay = await page.$eval('#welcome-overlay', (el) => getComputedStyle(el).display);
@@ -45,7 +62,7 @@ async function main() {
   // query) actively retries until the canvas is actually attached --
   // a single-shot query flaked once in local testing even though the
   // canvas was confirmed present a moment later.
-  const canvas = await page.waitForSelector('canvas', { state: 'attached', timeout: 10000 });
+  const canvas = await page.waitForSelector('canvas', { state: 'attached', timeout: 25000 });
   const box = await canvas.boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await page.waitForTimeout(500);
