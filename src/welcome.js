@@ -51,13 +51,6 @@ function overlayHtml() {
       <h1>Rhombiverse</h1>
       <div class="construction-badge">🚧 Under Construction 🚧</div>
       <p class="tagline">Explore Rhombiverse. Explore yourself.</p>
-      <p class="description">
-        Every block here is a special shape called a
-        <em>rhombic dodecahedron</em> (say that five times fast!) that
-        clicks perfectly against its neighbors -- no gaps, no glue.
-        Stack them into towers, grow whole planets, walk around on what
-        you build, and share it with friends.
-      </p>
       <div class="identity-block">
         <div class="identity-prompt">Who are you here?</div>
         <div class="identity-grid">
@@ -67,17 +60,10 @@ function overlayHtml() {
           <div class="identity-item"><strong>Rhombiologist</strong> -- grow real, evolving life</div>
         </div>
       </div>
-      <ul class="howto">
-        <li><strong>Tab</strong> or <strong>Space</strong> opens the Rhombic Wheel -- Build, Alter, Create, Explore</li>
-        <li>Click a block's face to add one; right-click any block to remove it</li>
-        <li>Try <strong>Create &rarr; Sculpt</strong> to Model and Chisel with real building tools</li>
-        <li><strong>Explore</strong> to walk around on what you've built</li>
-      </ul>
+      <p class="quickstart"><strong>Tab</strong> / <strong>Space</strong> opens the Rhombic Wheel. Click a face to build, right-click to remove.</p>
       <div class="construction-notice">
-        🚧 <strong>Under construction!</strong> The future is under
-        construction. So are you. Rhombiverse is a work in progress --
-        things may change, break, or get reset without notice. Use
-        <strong>Export JSON</strong> often to keep a copy of anything you
+        🚧 The future is under construction. So are you. Things may
+        change or reset -- <strong>Export JSON</strong> to keep what you
         love. 🚧
       </div>
       <label class="dont-show">
