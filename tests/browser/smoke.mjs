@@ -57,11 +57,17 @@ async function main() {
   const afterSecondClick = await cellCount();
   assert.equal(afterSecondClick, afterFirstClick + 1, 'expected exactly one new cell from the second build click');
 
-  // Mode buttons are present and switchable without error.
-  await page.click('.mode-btn[data-mode="fill"]');
+  // Mode switching happens through the Rhombic Wheel now (B1,
+  // RHOMBIVERSE_UIUX_BUILD_PLAN.md) -- the old always-visible .mode-btn
+  // row is a hidden shim the wheel drives, not a direct click target.
+  await page.keyboard.press('Tab');
+  await page.click('.wheel-item:has-text("Alter")');
+  await page.click('.wheel-item:has-text("Fill")');
   const shellRowVisible = await page.$eval('#shell-radius-row', (el) => getComputedStyle(el).display !== 'none');
   assert.ok(shellRowVisible, 'Fill mode should reveal the shell-radius row');
-  await page.click('.mode-btn[data-mode="build"]');
+  await page.keyboard.press('Tab');
+  await page.click('.wheel-item:has-text("Build")');
+  await page.click('.wheel-item:has-text("Place")');
 
   if (errors.length > 0) {
     throw new Error(`Console/page errors during smoke test:\n${errors.join('\n')}`);

@@ -29,6 +29,10 @@ import {
 } from './latticezoom.js';
 import { loadWorld, createWorldStore } from './worldstate.js';
 import { createBuildController, removeShell, recolorShell } from './build.js';
+import { generatePlanetoid } from './planetoidgen.js';
+import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR } from './settings.js';
+import { playPlaceSound, playRemoveSound, playMenuSound } from './sfx.js';
+import { createRhombicWheel } from './wheel.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
 import { applyHydrosphere } from './hydrosphere.js';
 import { applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } from './blackhole.js';
@@ -141,7 +145,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05050a);
 
 const camera = new THREE.PerspectiveCamera(
-  50,
+  getSettings().fov,
   window.innerWidth / window.innerHeight,
   0.1,
   1000
@@ -150,7 +154,7 @@ camera.position.set(6, 5, 8);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setPixelRatio(window.devicePixelRatio * QUALITY_PIXEL_RATIO_FACTOR[getSettings().quality]);
 renderer.localClippingEnabled = true; // required once, globally, for any clippingPlanes to take effect
 document.getElementById('app').appendChild(renderer.domElement);
 
@@ -184,8 +188,20 @@ function updateSectionPlane() {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0, 0, 0);
+controls.rotateSpeed = getSettings().sensitivity;
 // Right-click is reserved for block removal (build.js), not camera pan.
 controls.mouseButtons.RIGHT = null;
+const ORBIT_LEFT_DEFAULT = controls.mouseButtons.LEFT;
+
+// Settings panel (B1, behind the Lab entry point) -- applies live, no
+// page reload needed. Quality only affects pixel ratio for now (WebGL
+// antialiasing can't be toggled after the renderer is created).
+onSettingsChange((s) => {
+  camera.fov = s.fov;
+  camera.updateProjectionMatrix();
+  controls.rotateSpeed = s.sensitivity;
+  renderer.setPixelRatio(window.devicePixelRatio * QUALITY_PIXEL_RATIO_FACTOR[s.quality]);
+});
 
 // Walk mode (RHOMBIVERSE_PLAN.md Phase 5.5) state, module-level since
 // both init() (which creates `player` once the world is loaded) and
@@ -193,6 +209,10 @@ controls.mouseButtons.RIGHT = null;
 // from world-state and recomputed in onChange() -- see gravity.js.
 let walking = false;
 let player = null;
+// Assigned inside init() once updateHudIndicator exists there -- enterWalk/
+// exitWalk are module-level (defined before init()) but still need to
+// refresh the HUD's mode/material indicator on every Explore transition.
+let refreshHudIndicator = () => {};
 let planetoids = {};
 // Mirrors world.getClaims(), same module-level pattern as planetoids
 // above -- gravityAt() (RHOMBIVERSE_SPEC_LOOPHOLES.md section 5) and
@@ -430,12 +450,14 @@ function enterWalk() {
   controls.enabled = false;
   document.getElementById('walk-toggle').textContent = 'Exit Walk Mode (Esc)';
   document.getElementById('walk-hint').style.display = '';
+  document.getElementById('hud-crosshair')?.classList.add('visible');
   player.reset(camera.position);
   player.setEnabled(true);
   player.requestLock();
   updateGravityInfo();
   updateBeltHint();
   updateEvolutionInfo();
+  refreshHudIndicator();
 }
 
 function exitWalk() {
@@ -446,9 +468,11 @@ function exitWalk() {
   camera.up.set(0, 1, 0);
   document.getElementById('walk-toggle').textContent = 'Enter Walk Mode';
   document.getElementById('walk-hint').style.display = 'none';
+  document.getElementById('hud-crosshair')?.classList.remove('visible');
   updateGravityInfo();
   updateBeltHint();
   updateEvolutionInfo();
+  refreshHudIndicator();
 }
 
 document.getElementById('walk-toggle').addEventListener('click', () => {
@@ -477,43 +501,45 @@ if (window.matchMedia('(pointer: coarse)').matches) {
   if (walkRow) walkRow.style.display = 'none';
 }
 
-// 2. Screen-navigation model for #controls/#shells-panel on narrow/touch
-//    viewports, per direct feedback: "touch buttons that move you
-//    through menu screens seems to make sense, minimal options...
-//    always simplicity." A live phone-viewport diagnostic (Playwright,
-//    iPhone 13 emulation) found #controls measured ~480px wide -- wider
-//    than the whole 390px viewport -- completely covering the canvas
-//    with no way to reach it at all; this replaces "both panels visible
-//    at once" with one full-screen panel at a time (closed -> controls
-//    -> shells), matching index.html's own
-//    `(pointer: coarse), (max-width: 700px)` media query, under which
-//    these become full-screen `inset:0` drawers. On desktop, where that
-//    media query never applies, these listeners are harmless no-ops --
-//    the CSS classList toggles have nothing to show/hide.
-const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-const controlsPanelEl = document.getElementById('controls');
-const shellsPanelEl = document.getElementById('shells-panel');
+// 2. B1 (RHOMBIVERSE_UIUX_BUILD_PLAN.md) replaced the old always-visible
+//    two-panel sidebar with one Lab panel behind an explicit #lab-toggle
+//    entry point -- superseding the mobile "closed -> controls -> shells"
+//    screen-navigation scheme this comment used to describe (that whole
+//    problem, a sidebar too wide for a phone viewport, doesn't apply to
+//    a single already-scrollable overlay). closeMobilePanels() is kept
+//    as a small alias so the mode-btn click handler further down (a
+//    genuine, unrelated existing call site) doesn't need editing.
+const labToggleEl = document.getElementById('lab-toggle');
+const labPanelEl = document.getElementById('lab-panel');
 
-function openMobileControls() {
-  shellsPanelEl.classList.remove('mobile-screen-open');
-  controlsPanelEl.classList.add('mobile-screen-open');
-  mobileMenuToggle.style.display = 'none';
-}
-function openMobileShells() {
-  controlsPanelEl.classList.remove('mobile-screen-open');
-  shellsPanelEl.classList.add('mobile-screen-open');
-  mobileMenuToggle.style.display = 'none';
-}
 function closeMobilePanels() {
-  controlsPanelEl.classList.remove('mobile-screen-open');
-  shellsPanelEl.classList.remove('mobile-screen-open');
-  mobileMenuToggle.style.display = '';
+  labPanelEl.classList.remove('open');
 }
 
-mobileMenuToggle.addEventListener('click', openMobileControls);
-document.getElementById('mobile-close-controls').addEventListener('click', closeMobilePanels);
-document.getElementById('mobile-goto-shells').addEventListener('click', openMobileShells);
-document.getElementById('mobile-back-to-controls').addEventListener('click', openMobileControls);
+labToggleEl.addEventListener('click', () => {
+  labPanelEl.classList.toggle('open');
+});
+
+// Settings inputs (Lab panel only, per B1) -- initialized from whatever
+// was last saved/defaulted in settings.js, then pushed back on any change.
+(function wireSettingsPanel() {
+  const s = getSettings();
+  const sensitivityInput = document.getElementById('setting-sensitivity');
+  const invertYInput = document.getElementById('setting-invert-y');
+  const fovInput = document.getElementById('setting-fov');
+  const qualitySelect = document.getElementById('setting-quality');
+  const volumeInput = document.getElementById('setting-volume');
+  sensitivityInput.value = s.sensitivity;
+  invertYInput.checked = s.invertY;
+  fovInput.value = s.fov;
+  qualitySelect.value = s.quality;
+  volumeInput.value = s.volume;
+  sensitivityInput.addEventListener('input', () => updateSettings({ sensitivity: Number(sensitivityInput.value) }));
+  invertYInput.addEventListener('change', () => updateSettings({ invertY: invertYInput.checked }));
+  fovInput.addEventListener('input', () => updateSettings({ fov: Number(fovInput.value) }));
+  qualitySelect.addEventListener('change', () => updateSettings({ quality: qualitySelect.value }));
+  volumeInput.addEventListener('input', () => updateSettings({ volume: Number(volumeInput.value) }));
+})();
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 const sun = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -698,8 +724,19 @@ function rebuildInstances(mesh, world, inReportMode = false) {
 
 async function init() {
   // A saved build takes priority over the static seed -- that's the
-  // whole point of Phase 3 (refreshing preserves the build).
-  const worldJSON = loadFromLocalStorage() ?? (await loadWorld('./data/starter-world.json'));
+  // whole point of Phase 3 (refreshing preserves the build). On a true
+  // first-ever visit (no saved build) B1 calls for a small starter
+  // planetoid instead of a single empty cell -- data/starter-world.json
+  // still supplies the base worldName/meta shape (a real body needs a
+  // Blackstar-Glassite core placed via createWorldStore's own onAdd
+  // hooks, not baked into a static JSON, so it's generated below rather
+  // than hand-authored into the file).
+  const savedJSON = loadFromLocalStorage();
+  const worldJSON = savedJSON ?? (await loadWorld('./data/starter-world.json'));
+  const isFirstVisit = !savedJSON;
+  if (isFirstVisit) {
+    worldJSON.cells = {}; // drop starter-world.json's single placeholder cell -- generatePlanetoid below replaces it
+  }
   const world = createWorldStore(worldJSON, {
     onAdd: handleLocalAdd,
     onRemove: handleLocalRemove,
@@ -708,6 +745,9 @@ async function init() {
     onSeedSet: handleLocalSeedSet,
     onSeedClear: handleLocalSeedClear,
   });
+  if (isFirstVisit) {
+    generatePlanetoid(world, 'rocky', 0, 0, 0, 2);
+  }
   // Declared this early so the very first rebuildInstances() call below
   // (before the mode-button UI further down even exists) can safely
   // reference it -- report mode can't be active yet at that point, but
@@ -1472,6 +1512,46 @@ async function init() {
     document.getElementById('generator-row').style.display = showGenerator ? '' : 'none';
     document.getElementById('species-row').style.display = showSpecies ? '' : 'none';
     document.getElementById('mode-hint').textContent = MODE_HINTS[currentMode];
+    updateHudIndicator();
+  }
+
+  // Player-facing terminology (RHOMBIVERSE_UIUX_BUILD_PLAN.md B1's rename
+  // table) for the HUD's top-right indicator -- the Lab panel keeps the
+  // original technical labels (Generate, Excavate, Round, Walk Mode,
+  // Presets) untouched, per that same table's "outside Lab/Advanced view"
+  // scope.
+  const PLAYER_FACING_MODE_LABEL = {
+    build: 'Build',
+    fill: 'Fill',
+    round: 'Smooth',
+    excavate: 'Dig',
+    generate: 'Create',
+    replace: 'Replace',
+    report: 'Report',
+    plant: 'Plant',
+  };
+  function updateHudIndicator() {
+    const el = document.getElementById('hud-indicator');
+    if (!el) return;
+    if (walking) {
+      el.textContent = 'Exploring';
+      return;
+    }
+    const modeLabel = PLAYER_FACING_MODE_LABEL[currentMode] ?? currentMode;
+    const materialLabel = materialSelect.options[materialSelect.selectedIndex]?.textContent ?? '';
+    el.textContent = `${modeLabel} · ${materialLabel}`;
+  }
+  refreshHudIndicator = updateHudIndicator;
+  materialSelect.addEventListener('change', updateHudIndicator);
+
+  let hudPromptTimer = null;
+  function showHudPrompt(text, ms = 4000) {
+    const el = document.getElementById('hud-prompt');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.add('visible');
+    clearTimeout(hudPromptTimer);
+    hudPromptTimer = setTimeout(() => el.classList.remove('visible'), ms);
   }
 
   const modeButtons = document.querySelectorAll('.mode-btn');
@@ -1614,6 +1694,75 @@ async function init() {
   const canPlaceMaterial = (material, x, y, z) =>
     canPlaceForStars(material, x, y, z, Object.values(planetoids).filter((p) => p.isStar));
 
+  // Ghost block preview (B1's "intelligent ghost block"): up to two
+  // translucent RD meshes, reusing the exact same geometry as the real
+  // mesh so the preview always matches the real shape exactly. Hidden by
+  // default; build.js's onHover/onHoverEnd callbacks below drive
+  // position/visibility -- render.js owns the actual THREE objects since
+  // it already owns `scene`/`geometry`, keeping build.js's own job pure
+  // raycasting/state (same separation the rest of this file already uses).
+  const ghostMaterial = new THREE.MeshBasicMaterial({
+    color: 0x9de0ff,
+    transparent: true,
+    opacity: 0.35,
+    depthWrite: false,
+  });
+  const ghostMeshes = [0, 1].map(() => {
+    const m = new THREE.Mesh(geometry, ghostMaterial);
+    m.visible = false;
+    scene.add(m);
+    return m;
+  });
+  function showGhost(cells) {
+    ghostMeshes.forEach((m, i) => {
+      const cell = cells[i];
+      if (!cell) {
+        m.visible = false;
+        return;
+      }
+      const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z);
+      m.position.set(wx, wy, wz);
+      m.visible = true;
+      ghostMaterial.color.set(cell.occupied ? 0xff8866 : 0x9de0ff);
+    });
+  }
+  function hideGhost() {
+    ghostMeshes.forEach((m) => {
+      m.visible = false;
+    });
+  }
+
+  // Placement/removal feedback (B1): a short outline flash at the
+  // affected cell plus a WebAudio blip (sfx.js). Reuses the same shared
+  // geometry as the ghost preview -- a wireframe wrapper via
+  // EdgesGeometry, scaled up and faded out over a fixed short duration,
+  // then disposed, so nothing here needs its own per-frame animation
+  // loop beyond a single requestAnimationFrame chain.
+  function flashAt(cell, color) {
+    const edges = new THREE.EdgesGeometry(geometry);
+    const flashMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
+    const outline = new THREE.LineSegments(edges, flashMat);
+    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z);
+    outline.position.set(wx, wy, wz);
+    scene.add(outline);
+    const start = performance.now();
+    const DURATION = 260;
+    function step(now) {
+      const t = Math.min(1, (now - start) / DURATION);
+      const scale = 1 + t * 0.6;
+      outline.scale.setScalar(scale);
+      flashMat.opacity = 0.9 * (1 - t);
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else {
+        scene.remove(outline);
+        edges.dispose();
+        flashMat.dispose();
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
   createBuildController({
     renderer,
     camera,
@@ -1621,6 +1770,20 @@ async function init() {
     cellAt: (instanceId) => cellOrder[instanceId],
     world,
     onChange,
+    onHover: (cells, valid) => {
+      if (cells && cells.length > 0) showGhost(cells);
+      else hideGhost();
+    },
+    onHoverEnd: hideGhost,
+    onPlaced: (cell) => {
+      flashAt(cell, 0x9de0ff);
+      playPlaceSound();
+    },
+    onRemoved: (cell) => {
+      flashAt(cell, 0xff8866);
+      playRemoveSound();
+    },
+    getDragPlacementEnabled: () => wheel.isDragPlacementEnabled(),
     // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md: Plant mode's own build/place
     // handling is in render.js (its own click listener below), never
     // build.js -- but getMode() must still return the real 'plant'
@@ -1646,6 +1809,30 @@ async function init() {
       renderRingList();
     },
   });
+
+  // Rhombic Wheel (B1) -- the one control surface all mode/material
+  // interaction is meant to go through now that the old always-visible
+  // sidebar is gone. Drives the hidden .mode-btn/#material-select/etc.
+  // shim elements directly (see wheel.js's own header for why), so this
+  // needs no further wiring into build.js's mode dispatch itself.
+  const wheel = createRhombicWheel({
+    onModeChosen: () => {
+      updateModeUI();
+      rebuildInstances(mesh, world, currentMode === 'report');
+    },
+    onDragPlacementChange: (enabled) => {
+      // Left-drag normally orbits the camera (OrbitControls' own
+      // default) -- while Repeat is armed, left-drag instead paints a
+      // run of cells (build.js's onPointerMove), so orbiting via that
+      // button has to yield for as long as Repeat stays selected.
+      // Right-click (remove) and middle-drag (zoom) are unaffected.
+      controls.mouseButtons.LEFT = enabled ? null : ORBIT_LEFT_DEFAULT;
+    },
+    onPrompt: (text) => showHudPrompt(text),
+    onMenuSound: playMenuSound,
+    onSelectionChange: updateHudIndicator,
+  });
+  updateHudIndicator();
 
   // Shared World (Phase 5): applyRemoteUpsert/Delete write an incoming
   // realtime change into the LOCAL store via the same world.addCell/

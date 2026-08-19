@@ -15,6 +15,7 @@
 // boundary) -- acceptable for now since a single-planetoid session is the
 // realistic first-playtest case; revisit if that changes.
 import * as THREE from 'three';
+import { getSettings } from './settings.js';
 
 const WALK_SPEED = 4.0; // world units/sec, first-guess, not yet playtested
 const FLY_SPEED = 6.0;
@@ -37,8 +38,10 @@ export function createPlayerController({ camera, domElement, getGravity }) {
   const onKeyUp = (e) => keys.delete(e.code);
   const onMouseMove = (e) => {
     if (document.pointerLockElement !== domElement) return;
-    yaw -= e.movementX * MOUSE_SENSITIVITY;
-    pitch -= e.movementY * MOUSE_SENSITIVITY;
+    const { sensitivity, invertY } = getSettings();
+    const sens = MOUSE_SENSITIVITY * sensitivity;
+    yaw -= e.movementX * sens;
+    pitch -= (invertY ? -1 : 1) * e.movementY * sens;
     const limit = Math.PI / 2 - 0.01;
     pitch = Math.max(-limit, Math.min(limit, pitch));
   };

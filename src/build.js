@@ -42,7 +42,7 @@ const NEIGHBOR_DIRECTIONS = NEIGHBOR_OFFSETS.map(
   ([x, y, z]) => new THREE.Vector3(x, y, z).normalize()
 );
 
-function matchNeighborOffset(faceNormal) {
+export function matchNeighborOffset(faceNormal) {
   let bestIdx = 0;
   let bestDot = -Infinity;
   NEIGHBOR_DIRECTIONS.forEach((dir, i) => {
@@ -203,6 +203,19 @@ export function createBuildController({
   // local mineAsteroidCell, since inventory credit there has to be
   // server-authoritative (see sync.js's mineAsteroidCellRemote).
   mineRemote = null,
+  // RHOMBIVERSE_UIUX_BUILD_PLAN.md B1: "intelligent ghost block" hover
+  // preview and placement/removal feedback. All optional so tests and
+  // any future headless caller don't need to supply them.
+  onHover = null, // (cells: [{x,y,z}], valid: boolean) -- one entry normally, two while "held"
+  onHoverEnd = null,
+  onPlaced = null,
+  onRemoved = null,
+  // Wheel's Build->Repeat leaf (see wheel.js): while true, holding the
+  // left mouse button and dragging across faces places a cell under the
+  // cursor on every new face entered ("walls, curves" per the plan),
+  // instead of the default single click-to-place. Defaults to a no-op
+  // false so every other mode/tool is completely unaffected.
+  getDragPlacementEnabled = () => false,
 }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -216,7 +229,17 @@ export function createBuildController({
     return hits.length > 0 ? hits[0] : null;
   }
 
+  // Suppressed after a drag-placement gesture so the browser's own
+  // post-drag synthetic 'click' (fired on mouseup against the same
+  // element the drag started on) doesn't ALSO place a cell at the
+  // release point on top of whatever drag-placement already did.
+  let suppressNextClick = false;
+
   function onClick(event) {
+    if (suppressNextClick) {
+      suppressNextClick = false;
+      return;
+    }
     const hit = pick(event);
     if (!hit || hit.instanceId === undefined) return;
     const cell = cellAt(hit.instanceId);
@@ -239,6 +262,7 @@ export function createBuildController({
       if (cell.shellCenter) {
         excavateStructure(world, cell.shellCenter, getMinShell());
         onChange();
+        if (onRemoved) onRemoved(cell);
       }
       return;
     }
@@ -247,6 +271,7 @@ export function createBuildController({
       if (cell.shellCenter) {
         roundStructure(world, cell.shellCenter);
         onChange();
+        if (onPlaced) onPlaced(cell);
       }
       return;
     }
@@ -270,6 +295,24 @@ export function createBuildController({
       generatePlanetoid(world, getGeneratorType(), cell.x, cell.y, cell.z, getShellCount(), canPlaceMaterial);
       if (onCellClicked) onCellClicked({ shellCenter: cellKey(cell.x, cell.y, cell.z) });
       onChange();
+      if (onPlaced) onPlaced(cell);
+      return;
+    }
+
+    // 'replace' -- RHOMBIVERSE_UIUX_BUILD_PLAN.md B1's Alter submenu
+    // (Dig/Smooth/Fill/Replace). The other three all map onto an
+    // existing mode; nothing in this codebase already does "swap one
+    // cell's material in place," so this is genuinely new, small, and
+    // deliberately mirrors recolorShell's per-cell shape (world.addCell
+    // with the same data but a new material) rather than inventing a
+    // different mechanic.
+    if (mode === 'replace') {
+      const material = getMaterial();
+      if (!canPlaceMaterial(material, cell.x, cell.y, cell.z)) return;
+      const { x, y, z, ...data } = cell;
+      world.addCell(x, y, z, { ...data, material });
+      onChange();
+      if (onPlaced) onPlaced(cell);
       return;
     }
 
@@ -304,6 +347,7 @@ export function createBuildController({
       // wouldn't show the shells you just built until a second click.
       if (onCellClicked) onCellClicked({ shellCenter: centerKey });
       onChange();
+      if (onPlaced) onPlaced(cell);
       return;
     }
 
@@ -317,6 +361,7 @@ export function createBuildController({
     if (!canPlaceMaterial(material, nx, ny, nz)) return;
     world.addCell(nx, ny, nz, { material });
     onChange();
+    if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
   }
 
   function onContextMenu(event) {
@@ -347,6 +392,122 @@ export function createBuildController({
       world.removeCell(cell.x, cell.y, cell.z);
     }
     onChange();
+    if (onRemoved) onRemoved(cell);
+  }
+
+  // Hover ghost / "intelligent ghost block" (B1): translucent preview of
+  // the next valid FCC position on plain hover; holding the button down
+  // (without enough movement to count as a drag) shows a SECOND preview
+  // one cell further out along the same face normal, previewing a
+  // two-deep placement before committing to it. Only meaningful in
+  // 'build' mode -- every other mode acts on the clicked cell itself,
+  // not a new neighbor, so there's nothing sensible to ghost-preview.
+  const HOLD_MS = 220;
+  const DRAG_MOVE_TOLERANCE = 6; // px, matches the touch long-press's own drift tolerance
+  let pointerDownPos = null;
+  let holdTimer = null;
+  let holding = false;
+  let dragging = false;
+  let lastDragCellKey = null;
+
+  function ghostCellsForHit(hit, showSecond) {
+    if (!hit || hit.instanceId === undefined) return null;
+    const cell = cellAt(hit.instanceId);
+    if (!cell) return null;
+    const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
+    const nx = cell.x + dx;
+    const ny = cell.y + dy;
+    const nz = cell.z + dz;
+    if (!isValidCell(nx, ny, nz)) return null;
+    const first = { x: nx, y: ny, z: nz, occupied: world.has(nx, ny, nz) };
+    if (!showSecond) return [first];
+    const nx2 = nx + dx;
+    const ny2 = ny + dy;
+    const nz2 = nz + dz;
+    const cells = [first];
+    if (isValidCell(nx2, ny2, nz2)) {
+      cells.push({ x: nx2, y: ny2, z: nz2, occupied: world.has(nx2, ny2, nz2) });
+    }
+    return cells;
+  }
+
+  function onPointerMove(event) {
+    const mode = getMode();
+    if (!mode || mode === 'plant') {
+      if (onHoverEnd) onHoverEnd();
+      return;
+    }
+
+    if (pointerDownPos) {
+      const moved = Math.hypot(event.clientX - pointerDownPos.x, event.clientY - pointerDownPos.y);
+      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build') {
+        dragging = true;
+        clearTimeout(holdTimer);
+        holding = false;
+      }
+    }
+
+    if (dragging) {
+      const hit = pick(event);
+      const cells = ghostCellsForHit(hit, false);
+      if (cells && !cells[0].occupied) {
+        const key = `${cells[0].x},${cells[0].y},${cells[0].z}`;
+        if (key !== lastDragCellKey) {
+          lastDragCellKey = key;
+          const material = getMaterial();
+          if (canPlaceMaterial(material, cells[0].x, cells[0].y, cells[0].z)) {
+            world.addCell(cells[0].x, cells[0].y, cells[0].z, { material });
+            onChange();
+            if (onPlaced) onPlaced(cells[0]);
+          }
+        }
+      }
+      if (onHover) onHover(cells ?? [], !!cells);
+      return;
+    }
+
+    if (mode !== 'build') {
+      if (onHoverEnd) onHoverEnd();
+      return;
+    }
+    const hit = pick(event);
+    const cells = ghostCellsForHit(hit, holding);
+    if (cells) {
+      if (onHover) onHover(cells, !cells[0].occupied);
+    } else if (onHoverEnd) {
+      onHoverEnd();
+    }
+  }
+
+  function onPointerDown(event) {
+    if (event.button !== 0) return; // left button only -- right-click is remove, handled separately
+    pointerDownPos = { x: event.clientX, y: event.clientY };
+    dragging = false;
+    lastDragCellKey = null;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => {
+      holding = true;
+      const hit = pick(event);
+      const cells = ghostCellsForHit(hit, true);
+      if (cells && onHover) onHover(cells, !cells[0].occupied);
+    }, HOLD_MS);
+  }
+
+  function onPointerUp() {
+    clearTimeout(holdTimer);
+    holding = false;
+    if (dragging) suppressNextClick = true;
+    dragging = false;
+    pointerDownPos = null;
+    lastDragCellKey = null;
+  }
+
+  function onPointerLeave() {
+    clearTimeout(holdTimer);
+    holding = false;
+    dragging = false;
+    pointerDownPos = null;
+    if (onHoverEnd) onHoverEnd();
   }
 
   // Touch support, 2026-08-13. Tap-to-build needed zero new code here --
@@ -408,6 +569,10 @@ export function createBuildController({
   renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: true });
   renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: true });
   renderer.domElement.addEventListener('touchend', onTouchEnd);
+  renderer.domElement.addEventListener('pointermove', onPointerMove);
+  renderer.domElement.addEventListener('pointerdown', onPointerDown);
+  renderer.domElement.addEventListener('pointerup', onPointerUp);
+  renderer.domElement.addEventListener('pointerleave', onPointerLeave);
 
   return function dispose() {
     renderer.domElement.removeEventListener('click', onClick);
@@ -415,6 +580,11 @@ export function createBuildController({
     renderer.domElement.removeEventListener('touchstart', onTouchStart);
     renderer.domElement.removeEventListener('touchmove', onTouchMove);
     renderer.domElement.removeEventListener('touchend', onTouchEnd);
+    renderer.domElement.removeEventListener('pointermove', onPointerMove);
+    renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+    renderer.domElement.removeEventListener('pointerup', onPointerUp);
+    renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
     clearTimeout(longPressTimer);
+    clearTimeout(holdTimer);
   };
 }

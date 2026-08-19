@@ -18,18 +18,109 @@
   <style>
     html, body { margin: 0; height: 100%; background: #05050a; overflow: hidden; }
     canvas { display: block; }
-    #controls {
+
+    /* --- B1 minimal HUD (RHOMBIVERSE_UIUX_BUILD_PLAN.md) ---
+       Default screen: wordmark, a small contextual indicator, a bottom
+       contextual prompt shown only when non-empty, and a crosshair shown
+       only while Exploring (Walk Mode). No sidebar, no paragraph status
+       text, no visible mode list -- everything else lives behind the
+       Rhombic Wheel (wheel.js) or the explicit Lab entry point below. */
+    #hud-wordmark {
+      position: fixed; top: 14px; left: 16px; z-index: 900;
+      color: #dfefff; font: 600 15px/1.2 system-ui, sans-serif;
+      letter-spacing: 0.04em; user-select: none; opacity: 0.9;
+      pointer-events: none;
+    }
+    #hud-indicator {
+      position: fixed; top: 14px; right: 54px; z-index: 900;
+      color: #bcd; font: 12px/1.4 system-ui, sans-serif;
+      text-align: right; user-select: none; pointer-events: none;
+      max-width: 45vw;
+    }
+    #hud-prompt {
+      position: fixed; left: 50%; bottom: 54px; transform: translateX(-50%);
+      z-index: 900;
+      display: none;
+      color: #eaf6ff; font: 13px/1.4 system-ui, sans-serif;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(124, 204, 255, 0.35);
+      border-radius: 6px;
+      padding: 6px 14px;
+      max-width: 80vw;
+      text-align: center;
+      user-select: none;
+    }
+    #hud-prompt.visible { display: block; }
+    #hud-crosshair {
+      position: fixed; top: 50%; left: 50%; z-index: 900;
+      width: 14px; height: 14px; margin: -7px 0 0 -7px;
+      border: 1.5px solid rgba(234, 246, 255, 0.85);
+      transform: rotate(45deg);
+      display: none;
+      pointer-events: none;
+    }
+    #hud-crosshair.visible { display: block; }
+    #hud-wheel-cue {
+      position: fixed; bottom: 14px; left: 16px; z-index: 900;
+      color: #9cd; font: 11px system-ui, sans-serif; opacity: 0.7;
+      user-select: none; pointer-events: none;
+    }
+    #lab-toggle {
+      position: fixed; top: 12px; right: 12px; z-index: 900;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      color: #ddd;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font: 14px system-ui, sans-serif;
+      cursor: pointer;
+    }
+    #lab-toggle:hover { background: rgba(255, 255, 255, 0.15); }
+
+    /* Ghost block preview -- a translucent single-cell (or two-cell,
+       while "holding") outline shown at the next valid FCC position on
+       hover in Build mode (build.js's onHover). */
+    .ghost-cell {
+      position: absolute;
+      pointer-events: none;
+    }
+
+    /* --- Advanced/Lab view ---
+       Everything that used to be the always-visible sidebar now lives
+       here, reachable only via #lab-toggle, never shown by default. The
+       inner #controls/#shells-panel sections below keep their ORIGINAL
+       ids and (mostly) original CSS -- only their outer positioning
+       changes, since they're no longer independently-fixed sidebars,
+       just scrollable sections inside one panel. */
+    #lab-panel {
+      display: none;
       position: fixed;
-      top: 12px;
-      left: 12px;
-      bottom: 12px;
+      top: 54px; right: 12px; bottom: 12px;
+      width: 320px;
+      max-width: calc(100vw - 24px);
+      background: rgba(6, 6, 12, 0.94);
+      border: 1px solid rgba(124, 204, 255, 0.3);
+      border-radius: 8px;
+      z-index: 970;
+      overflow-y: auto;
+      box-sizing: border-box;
+      padding: 10px 12px 16px;
+    }
+    #lab-panel.open { display: block; }
+    #lab-panel h2 {
+      margin: 4px 0 8px;
+      font: 700 13px system-ui, sans-serif;
+      color: #9de0ff;
+      letter-spacing: 0.03em;
+    }
+    #lab-panel h2:not(:first-child) { margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12); }
+    #lab-settings-section .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; color: #ddd; font: 12px system-ui, sans-serif; }
+    #lab-settings-section input[type="range"] { width: 130px; }
+
+    #controls {
       color: #ddd;
       font: 13px/1.4 system-ui, sans-serif;
-      background: rgba(0, 0, 0, 0.45);
-      padding: 8px 12px;
-      border-radius: 6px;
       user-select: none;
-      overflow-y: auto;
       box-sizing: border-box;
     }
     #controls input[type="number"] { width: 3em; }
@@ -49,83 +140,27 @@
     #controls button:hover, #controls .file-btn:hover { background: rgba(255, 255, 255, 0.2); }
     #controls button.mode-btn.active { background: rgba(120, 190, 255, 0.35); border-color: #7cf; }
 
-    /* Mobile/touch layout: a real, confirmed-broken problem, not a
-       hypothetical one -- on an actual phone-width viewport, #controls
-       and #shells-panel (unconstrained, desktop-sized) cover the whole
-       screen and overlap each other illegibly, leaving no way to even
-       see the 3D view, let alone tap it. Below, both panels become
-       full-screen "menu screens" reached via simple buttons (closed ->
-       controls screen -> shells screen), matching the direct request
-       for touch-button screen navigation over cramming both panels on
-       screen at once. `pointer: coarse` (present on any touch-primary
-       device) OR a narrow viewport both trigger this -- catches a phone
-       in either orientation and a tablet (iPad, which stays wider than
-       most simple max-width breakpoints but is still touch-primary)
-       alike, not just narrow windows.
-    */
-    #mobile-menu-toggle { display: none; }
-    .mobile-panel-nav { display: none; }
+    /* Lab panel is already a single scrollable overlay at any viewport
+       size (see #lab-panel above) -- on a narrow/touch viewport it just
+       widens toward full-screen rather than needing a separate two-
+       screen navigation scheme. Real touch target sizing (Apple HIG /
+       Material both recommend ~44-48px minimum) still applies whenever
+       it's open on a touch device. B7 covers the rest of mobile/touch
+       (bottom toolbar, on-screen joystick, etc.) -- out of scope here. */
     @media (pointer: coarse), (max-width: 700px) {
-      #mobile-menu-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: fixed;
-        bottom: 12px;
-        left: 12px;
-        z-index: 1000;
-        width: 48px;
-        height: 48px;
-        border-radius: 50%;
-        background: rgba(20, 20, 30, 0.85);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        color: #fff;
-        font-size: 22px;
-        line-height: 1;
-        cursor: pointer;
-      }
-      #controls, #shells-panel {
-        display: none;
-        position: fixed;
-        inset: 0;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100vw;
-        max-width: 100vw;
-        height: 100vh;
-        max-height: 100vh;
-        border-radius: 0;
-        background: rgba(8, 8, 14, 0.97);
-        font-size: 16px; /* also avoids iOS auto-zoom-on-focus for inputs below 16px */
-        z-index: 950;
-        padding: 16px 16px 90px;
-      }
-      #controls.mobile-screen-open, #shells-panel.mobile-screen-open { display: block; }
-      /* Real touch target sizing (Apple HIG / Material both recommend
-         ~44-48px minimum) -- the desktop-sized 4px/8px button padding
-         is genuinely too small to reliably tap with a finger. */
+      #lab-panel { width: calc(100vw - 24px); }
       #controls button, #controls .file-btn, #controls select, #controls input,
-      .mode-btn, .ring-recolor, .ring-remove {
+      .ring-recolor, .ring-remove {
         min-height: 40px;
         font-size: 15px;
       }
-      .mobile-panel-nav { display: flex; gap: 8px; margin-bottom: 10px; }
-      .mobile-panel-nav button { flex: 1; }
     }
 
     #shells-panel {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      width: 220px;
       color: #ddd;
       font: 13px/1.4 system-ui, sans-serif;
-      background: rgba(0, 0, 0, 0.45);
-      padding: 8px 12px;
-      border-radius: 6px;
       user-select: none;
+      margin-top: 14px;
     }
     #undo-btn {
       display: block;
@@ -397,18 +432,38 @@
 <body>
   <div id="app"></div>
   <div id="sync-warning"></div>
-  <div id="controls">
-    <div class="mobile-panel-nav">
-      <button id="mobile-close-controls" type="button">✕ Close</button>
-      <button id="mobile-goto-shells" type="button">Shells</button>
+
+  <!-- B1 minimal HUD -->
+  <div id="hud-wordmark">RHOMBIVERSE</div>
+  <div id="hud-indicator"></div>
+  <div id="hud-prompt"></div>
+  <div id="hud-crosshair"></div>
+  <div id="hud-wheel-cue">Tab / Space — Menu</div>
+  <button id="lab-toggle" type="button" title="Advanced / Lab">⚙</button>
+
+  <div id="lab-panel">
+    <h2>Settings</h2>
+    <div id="lab-settings-section">
+      <div class="row"><label for="setting-sensitivity">Look sensitivity</label><input id="setting-sensitivity" type="range" min="0.25" max="2.5" step="0.05" value="1" /></div>
+      <div class="row"><label for="setting-invert-y">Invert Y</label><input id="setting-invert-y" type="checkbox" /></div>
+      <div class="row"><label for="setting-fov">Field of view</label><input id="setting-fov" type="range" min="40" max="90" step="1" value="50" /></div>
+      <div class="row"><label for="setting-quality">Graphics quality</label>
+        <select id="setting-quality">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high" selected>High</option>
+        </select>
+      </div>
+      <div class="row"><label for="setting-volume">Volume</label><input id="setting-volume" type="range" min="0" max="1" step="0.05" value="0.5" /></div>
     </div>
-    <div class="row">
+    <h2>Advanced Building &amp; World (technical names)</h2>
+    <div id="controls">
+    <div class="row" style="display:none;">
       <button class="mode-btn active" data-mode="build" type="button">Build</button>
       <button class="mode-btn" data-mode="fill" type="button">Fill</button>
       <button class="mode-btn" data-mode="round" type="button">Round</button>
       <button class="mode-btn" data-mode="excavate" type="button">Excavate</button>
       <button class="mode-btn" data-mode="generate" type="button">Generate</button>
-      <button class="mode-btn" data-mode="report" type="button">Report</button>
       <button class="mode-btn" data-mode="plant" type="button">Plant</button>
     </div>
     <div class="row">
@@ -482,6 +537,11 @@
       <label>Hollow from shell: <input id="hollow-from" type="number" min="1" max="15" value="1" /></label>
     </div>
     <div id="mode-hint" class="hint"></div>
+    <h2>Moderation</h2>
+    <div class="row">
+      <button class="mode-btn" data-mode="report" type="button">Report Mode (flag / approve)</button>
+    </div>
+    <h2>World, Import/Export &amp; Sharing</h2>
     <hr style="border-color: rgba(255,255,255,0.15); margin: 8px 0;" />
     <div class="row">
       <label><input id="section-enable" type="checkbox" /> Section view</label>
@@ -569,15 +629,13 @@
       exact BSG/shell counts, no manual clicking needed.
     </div>
   </div>
+  <h2 style="margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12); font: 700 13px system-ui, sans-serif; color: #9de0ff;">Shells</h2>
   <div id="shells-panel">
-    <div class="mobile-panel-nav">
-      <button id="mobile-back-to-controls" type="button">← Back</button>
-    </div>
     <button id="undo-btn" type="button" disabled>Undo</button>
     <h3>Shells (click a built cell)</h3>
     <div id="ring-list"><div class="placeholder">Click a built structure to see its shells.</div></div>
   </div>
-  <button id="mobile-menu-toggle" type="button" title="Menu">☰</button>
+  </div>
   <script type="module" src="./src/render.js"></script>
   <script type="module" src="./src/welcome.js"></script>
 </body>
