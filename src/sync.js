@@ -554,3 +554,41 @@ export async function fetchGalleryWorldData(id) {
   if (error) throw error;
   return data.world_data;
 }
+
+// B6 task #42: lightweight pseudonymous player presence (display name +
+// live position) for Shared World mode. Deliberately NOT a database
+// table or row -- Supabase Realtime's own Presence feature is ephemeral,
+// per-connection state built exactly for "who's online and where,"
+// which none of this file's decay/persistence concerns (cells,
+// inventory, trades) apply to. No migration needed for this one.
+let presenceChannel = null;
+
+export function subscribeToPresence(userId, initialPayload, onSync) {
+  presenceChannel = supabase.channel('world-presence', {
+    config: { presence: { key: userId } },
+  });
+  presenceChannel.on('presence', { event: 'sync' }, () => {
+    const state = presenceChannel.presenceState();
+    const others = {};
+    for (const [key, entries] of Object.entries(state)) {
+      if (key === userId || entries.length === 0) continue;
+      others[key] = entries[entries.length - 1]; // most recent tracked payload for that key
+    }
+    onSync(others);
+  });
+  presenceChannel.subscribe(async (status) => {
+    if (status === 'SUBSCRIBED') await presenceChannel.track(initialPayload);
+  });
+  return () => {
+    supabase.removeChannel(presenceChannel);
+    presenceChannel = null;
+  };
+}
+
+// Fire-and-forget by design (matches this module's other push* functions'
+// "swallow, don't block gameplay on a flaky connection" convention) --
+// called every frame-ish while walking, so a single dropped update is
+// meaningless as long as the next one gets through.
+export function updatePresence(payload) {
+  presenceChannel?.track(payload).catch(() => {});
+}

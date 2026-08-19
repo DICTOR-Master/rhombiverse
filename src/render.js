@@ -81,6 +81,8 @@ import {
   publishToGallery,
   fetchGalleryWorlds,
   fetchGalleryWorldData,
+  subscribeToPresence,
+  updatePresence,
 } from './sync.js';
 import { computeClaim, claimFootprintWorldVertices } from './regions.js';
 import {
@@ -370,6 +372,31 @@ let myUserId = null;
 // account (one claim per verified account, per regions.js), but
 // nothing else does.
 const LOCAL_PLAYER_ID = 'local-player';
+
+// B6 task #42: lightweight pseudonymous display name, chosen once and
+// remembered per-device -- deliberately just localStorage, no account
+// system, matching the spec's own "lightweight" framing. Never sent
+// anywhere but this session's own presence broadcasts (see sync.js's
+// subscribeToPresence/updatePresence).
+const DISPLAY_NAME_KEY = 'rhombiverse-display-name';
+function loadDisplayName() {
+  try {
+    const saved = localStorage.getItem(DISPLAY_NAME_KEY);
+    if (saved) return saved;
+  } catch { /* localStorage unavailable -- fall through to the generated default */ }
+  return `Rhombinaut-${Math.floor(1000 + Math.random() * 9000)}`;
+}
+let displayName = loadDisplayName();
+
+// Other connected players' live presence (B6 task #40/#42) -- keyed by
+// their userId, refreshed wholesale on every presence sync rather than
+// diffed, since the payload is tiny and this only ever runs a few times
+// a second at most.
+let otherPlayers = {};
+let unsubscribePresence = null;
+const avatarLabelEls = new Map(); // userId -> DOM element, pooled across frames
+const INTERACT_RADIUS = 6; // world units -- close enough to trade with, same spirit as BELT_DIGGABLE_RADIUS
+let nearestInteractPartnerId = null;
 
 function handleLocalAdd(x, y, z, data) {
   if (sharedWorldActive && !applyingRemote) pushCellUpsert(x, y, z, data);
@@ -2970,13 +2997,29 @@ async function init() {
   // calls (which never touch world.setPendingTrade directly, see
   // proposeTradeUI/confirmTradeUI/cancelTradeUI below) or another
   // client's realtime echo, never a local write that could feedback-loop.
+  // Scoped to trades actually involving the currently-open partner --
+  // renderInteractPanel() rebuilds the propose form from scratch
+  // (including resetting any offer the player has already picked, see
+  // its own comment), so an unrelated trade elsewhere in the shared
+  // world updating must NOT trigger it, or it would silently wipe an
+  // in-progress selection for a completely unrelated reason.
+  function interactPanelShowsTrade(tradeData) {
+    return (
+      interactOverlayEl?.classList.contains('open') &&
+      interactPartnerId &&
+      (tradeData.playerA === interactPartnerId || tradeData.playerB === interactPartnerId)
+    );
+  }
   function applyRemoteTrade(tradeId, tradeData) {
     world.setPendingTrade(tradeId, tradeData);
     renderTradePanel();
+    if (interactPanelShowsTrade(tradeData)) renderInteractPanel();
   }
   function applyRemoteTradeClear(tradeId) {
+    const removed = world.getPendingTrades()[tradeId];
     world.removePendingTrade(tradeId);
     renderTradePanel();
+    if (removed && interactPanelShowsTrade(removed)) renderInteractPanel();
   }
 
   const sharedWorldToggle = document.getElementById('shared-world-toggle');
@@ -3184,6 +3227,12 @@ async function init() {
       .join(', ');
   }
 
+  // Rebuilt trade UI (B6 task #40): the Lab-panel form/partner-list is
+  // gone -- proposing a NEW trade now only happens via Interact (below),
+  // triggered by proximity to another player's live avatar. This
+  // simplified renderTradePanel() keeps just the pending-trades list,
+  // useful when a trade's partner has since walked away or disconnected
+  // and you want to check/cancel/confirm it without finding them again.
   function renderTradePanel() {
     const panel = document.getElementById('trade-panel');
     if (!panel) return;
@@ -3192,27 +3241,6 @@ async function init() {
       return;
     }
     panel.style.display = '';
-
-    const inventory = world.getInventory();
-    const partnerListEl = document.getElementById('trade-partner-list');
-    const partnerIds = Object.keys(inventory).filter((id) => id !== myUserId && Object.keys(inventory[id]).length > 0);
-    partnerListEl.innerHTML = '';
-    if (partnerIds.length === 0) {
-      partnerListEl.innerHTML = '<div class="placeholder">No other traders with inventory yet.</div>';
-    } else {
-      for (const id of partnerIds) {
-        const row = document.createElement('div');
-        row.className = 'trade-partner-item';
-        row.textContent = `${shortId(id)} — ${formatOffer(
-          Object.fromEntries(Object.entries(inventory[id]).map(([m, e]) => [m, e.quantity]))
-        )}`;
-        row.title = 'Click to fill in as trade partner';
-        row.addEventListener('click', () => {
-          document.getElementById('trade-partner-input').value = id;
-        });
-        partnerListEl.appendChild(row);
-      }
-    }
 
     const tradesListEl = document.getElementById('pending-trades-list');
     const trades = world.getPendingTrades();
@@ -3268,51 +3296,327 @@ async function init() {
     }
   }
 
-  const tradeOfferSelect = document.getElementById('trade-offer-material');
-  const tradeWantSelect = document.getElementById('trade-want-material');
-  for (const select of [tradeOfferSelect, tradeWantSelect]) {
-    if (!select) continue;
-    for (const [value, label] of TRADE_MATERIALS) {
-      const option = document.createElement('option');
-      option.value = value;
-      option.textContent = label;
-      select.appendChild(option);
+  // --- B6 tasks #40/#42: player presence, in-world avatars, Interact --
+
+  function currentPlayerWorldPosition() {
+    return walking && player ? player.getPosition() : camera.position;
+  }
+
+  const displayNameInput = document.getElementById('display-name-input');
+  if (displayNameInput) {
+    displayNameInput.value = displayName;
+    displayNameInput.addEventListener('change', () => {
+      const trimmed = displayNameInput.value.trim();
+      displayName = trimmed || loadDisplayName();
+      displayNameInput.value = displayName;
+      try { localStorage.setItem(DISPLAY_NAME_KEY, displayName); } catch { /* best-effort only */ }
+    });
+  }
+
+  const avatarLayerEl = document.getElementById('avatar-layer');
+  function clearAvatarLabels() {
+    avatarLayerEl.innerHTML = '';
+    avatarLabelEls.clear();
+  }
+
+  // Called every frame from animate() while Shared World is active --
+  // projects each other walking player's live position to screen space
+  // (this app already does everything else, hud-prompt/achievements/
+  // claim hints, as plain DOM overlays rather than 3D sprites, so this
+  // stays consistent with that rather than introducing a new rendering
+  // approach just for avatars).
+  const projectVec = new THREE.Vector3();
+  function updateAvatarLabels() {
+    const seen = new Set();
+    for (const [id, presence] of Object.entries(otherPlayers)) {
+      if (!presence.walking) continue; // only walking players have a meaningful in-world position, see the module-level comment on otherPlayers
+      seen.add(id);
+      projectVec.set(presence.x, presence.y, presence.z).project(camera);
+      if (projectVec.z > 1) continue; // behind the camera
+      let el = avatarLabelEls.get(id);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'avatar-label';
+        el.innerHTML = '<div class="avatar-dot"></div><div class="avatar-name"></div>';
+        avatarLayerEl.appendChild(el);
+        avatarLabelEls.set(id, el);
+      }
+      el.querySelector('.avatar-name').textContent = presence.name || shortId(id);
+      const x = (projectVec.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-projectVec.y * 0.5 + 0.5) * window.innerHeight;
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      el.style.display = x < -50 || x > window.innerWidth + 50 || y < -50 || y > window.innerHeight + 50 ? 'none' : '';
+    }
+    for (const [id, el] of avatarLabelEls) {
+      if (!seen.has(id)) {
+        el.remove();
+        avatarLabelEls.delete(id);
+      }
     }
   }
 
-  document.getElementById('propose-trade-btn')?.addEventListener('click', async () => {
-    const hint = document.getElementById('trade-propose-hint');
-    if (!sharedWorldActive || !myUserId) return;
-    const partnerId = document.getElementById('trade-partner-input').value.trim();
-    const offerMaterial = tradeOfferSelect.value;
-    const offerQty = Math.floor(Number(document.getElementById('trade-offer-qty').value));
-    const wantMaterial = tradeWantSelect.value;
-    const wantQty = Math.floor(Number(document.getElementById('trade-want-qty').value));
+  // Nearest walking player within INTERACT_RADIUS, if any -- drives both
+  // the tappable #interact-btn (touch has no equivalent for a keyboard
+  // shortcut, same gap this session already fixed for the wheel) and
+  // the 'E' key below.
+  const interactBtnEl = document.getElementById('interact-btn');
+  function updateInteractProximity() {
+    if (!sharedWorldActive || !walking || !player) {
+      nearestInteractPartnerId = null;
+      interactBtnEl.classList.remove('visible');
+      return;
+    }
+    const myPos = player.getPosition();
+    let nearestId = null;
+    let nearestDist = Infinity;
+    for (const [id, presence] of Object.entries(otherPlayers)) {
+      if (!presence.walking) continue;
+      const d = Math.hypot(presence.x - myPos.x, presence.y - myPos.y, presence.z - myPos.z);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestId = id;
+      }
+    }
+    nearestInteractPartnerId = nearestDist <= INTERACT_RADIUS ? nearestId : null;
+    interactBtnEl.classList.toggle('visible', nearestInteractPartnerId !== null && !interactOverlayEl.classList.contains('open'));
+  }
 
-    if (!partnerId || partnerId === myUserId) {
-      hint.textContent = 'Enter a trade partner\'s ID (not your own).';
-      return;
-    }
-    if (!Number.isFinite(offerQty) || offerQty <= 0 || !Number.isFinite(wantQty) || wantQty <= 0) {
-      hint.textContent = 'Quantities must be positive whole numbers.';
-      return;
-    }
-    const held = world.getInventory()[myUserId]?.[offerMaterial]?.quantity ?? 0;
-    if (held < offerQty) {
-      hint.textContent = `You only have ${held} ${offerMaterial}.`;
-      return;
-    }
+  let presenceBroadcastAccum = 0;
+  const PRESENCE_BROADCAST_INTERVAL = 0.3; // seconds -- frequent enough to feel live, far below realtime rate limits
+  function tickPresence(dt) {
+    if (!sharedWorldActive) return;
+    updateAvatarLabels();
+    updateInteractProximity();
+    presenceBroadcastAccum += dt;
+    if (presenceBroadcastAccum < PRESENCE_BROADCAST_INTERVAL) return;
+    presenceBroadcastAccum = 0;
+    const pos = currentPlayerWorldPosition();
+    updatePresence({ name: displayName, x: pos.x, y: pos.y, z: pos.z, walking });
+  }
 
+  // --- The Interact panel: two-sided drag-and-accept offer view -------
+
+  const interactOverlayEl = document.getElementById('interact-overlay');
+  const interactPartnerNameEl = document.getElementById('interact-partner-name');
+  const interactExistingEl = document.getElementById('interact-existing-trade');
+  const interactProposeFormEl = document.getElementById('interact-propose-form');
+  let interactPartnerId = null;
+  let interactGiveMaterial = null;
+  let interactGetMaterial = null;
+
+  function closeInteractPanel() {
+    interactOverlayEl.classList.remove('open');
+    interactPartnerId = null;
+  }
+  document.getElementById('interact-close').addEventListener('click', closeInteractPanel);
+
+  function findPendingTradeWith(partnerId) {
+    const trades = world.getPendingTrades();
+    for (const [id, trade] of Object.entries(trades)) {
+      const involvesMe = trade.playerA === myUserId || trade.playerB === myUserId;
+      const involvesPartner = trade.playerA === partnerId || trade.playerB === partnerId;
+      if (involvesMe && involvesPartner) return [id, trade];
+    }
+    return null;
+  }
+
+  // Pointer-based drag (not HTML5 draggable/dragstart) -- see index.html's
+  // own comment: native drag-and-drop has no touch equivalent, and this
+  // session already fixed real touch gaps elsewhere in this app. A plain
+  // click/tap (no movement) is also accepted, calling onDrop(null) so the
+  // caller can default to that chip's natural zone -- this makes the
+  // whole interaction work identically well with a mouse or a finger.
+  function makeChipDraggable(chipEl, onDrop) {
+    chipEl.addEventListener('pointerdown', (e) => {
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let dragging = false;
+      let ghost = null;
+      const onMove = (ev) => {
+        if (!dragging && Math.hypot(ev.clientX - startX, ev.clientY - startY) > 6) {
+          dragging = true;
+          ghost = chipEl.cloneNode(true);
+          ghost.classList.add('interact-chip-ghost');
+          document.body.appendChild(ghost);
+        }
+        if (dragging && ghost) {
+          ghost.style.left = `${ev.clientX}px`;
+          ghost.style.top = `${ev.clientY}px`;
+          document.querySelectorAll('.interact-dropzone').forEach((zone) => {
+            zone.classList.toggle('drag-over', zone === document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.interact-dropzone'));
+          });
+        }
+      };
+      const onUp = (ev) => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        document.querySelectorAll('.interact-dropzone').forEach((zone) => zone.classList.remove('drag-over'));
+        if (dragging && ghost) {
+          ghost.remove();
+          const zone = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.interact-dropzone');
+          onDrop(zone?.id ?? null);
+        } else {
+          onDrop(null);
+        }
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    });
+  }
+
+  function renderOfferZone(zoneId, material, maxQty, onQtyChange) {
+    const zone = document.getElementById(zoneId);
+    const content = zone.querySelector('.interact-dropzone-content');
+    if (!material) {
+      content.innerHTML = '';
+      content.textContent = 'drag or tap a material above';
+      return;
+    }
+    content.innerHTML = '';
+    const chip = document.createElement('div');
+    chip.className = 'interact-offer-chip';
+    const label = document.createElement('span');
+    label.textContent = TRADE_MATERIALS.find(([v]) => v === material)?.[1] ?? material;
+    const qtyInput = document.createElement('input');
+    qtyInput.type = 'number';
+    qtyInput.min = '1';
+    qtyInput.max = String(maxQty);
+    qtyInput.value = '1';
+    qtyInput.addEventListener('input', () => {
+      const clamped = Math.max(1, Math.min(maxQty, Math.floor(Number(qtyInput.value)) || 1));
+      qtyInput.value = String(clamped); // reflect the clamp -- typing a value outside min/max isn't blocked by the browser on its own
+      onQtyChange(clamped);
+    });
+    chip.appendChild(label);
+    chip.appendChild(qtyInput);
+    content.appendChild(chip);
+  }
+
+  let interactGiveQty = 1;
+  let interactGetQty = 1;
+  function updateSendButtonState() {
+    document.getElementById('interact-send-btn').disabled = !interactGiveMaterial || !interactGetMaterial;
+  }
+
+  function renderInteractProposeForm() {
+    const inventory = world.getInventory();
+    const myInv = inventory[myUserId] ?? {};
+    const theirInv = inventory[interactPartnerId] ?? {};
+
+    const yourStrip = document.getElementById('interact-your-materials');
+    yourStrip.innerHTML = '';
+    for (const [material, entry] of Object.entries(myInv)) {
+      if (entry.quantity <= 0) continue;
+      const chip = document.createElement('div');
+      chip.className = 'interact-chip';
+      chip.textContent = `${TRADE_MATERIALS.find(([v]) => v === material)?.[1] ?? material} ×${entry.quantity}`;
+      makeChipDraggable(chip, (zoneId) => {
+        if (zoneId === 'interact-get-zone') return; // your own material doesn't belong in "you get"
+        interactGiveMaterial = material;
+        interactGiveQty = 1;
+        renderOfferZone('interact-give-zone', material, entry.quantity, (q) => { interactGiveQty = q; });
+        updateSendButtonState();
+      });
+      yourStrip.appendChild(chip);
+    }
+    if (!yourStrip.children.length) yourStrip.innerHTML = '<div class="placeholder">You have nothing to offer yet.</div>';
+
+    const theirStrip = document.getElementById('interact-their-materials');
+    theirStrip.innerHTML = '';
+    for (const [material, entry] of Object.entries(theirInv)) {
+      if (entry.quantity <= 0) continue;
+      const chip = document.createElement('div');
+      chip.className = 'interact-chip';
+      chip.textContent = `${TRADE_MATERIALS.find(([v]) => v === material)?.[1] ?? material} ×${entry.quantity}`;
+      makeChipDraggable(chip, (zoneId) => {
+        if (zoneId === 'interact-give-zone') return; // their material doesn't belong in "you give"
+        interactGetMaterial = material;
+        interactGetQty = 1;
+        // The partner's own held quantity is a display cap only -- the
+        // trade can still ask for more than they currently hold, same
+        // as the old form allowed (proposeTrade only ever checks the
+        // PROPOSER's own side up front; resolveTrade re-checks both at
+        // the moment of resolution, per trade.js's own comment).
+        renderOfferZone('interact-get-zone', material, Math.max(entry.quantity, 999), (q) => { interactGetQty = q; });
+        updateSendButtonState();
+      });
+      theirStrip.appendChild(chip);
+    }
+    if (!theirStrip.children.length) theirStrip.innerHTML = '<div class="placeholder">Nothing known yet.</div>';
+
+    interactGiveMaterial = null;
+    interactGetMaterial = null;
+    renderOfferZone('interact-give-zone', null);
+    renderOfferZone('interact-get-zone', null);
+    updateSendButtonState();
+  }
+
+  document.getElementById('interact-send-btn').addEventListener('click', async () => {
+    const hint = document.getElementById('interact-propose-hint');
+    if (!interactGiveMaterial || !interactGetMaterial || !interactPartnerId) return;
+    const held = world.getInventory()[myUserId]?.[interactGiveMaterial]?.quantity ?? 0;
+    if (held < interactGiveQty) {
+      hint.textContent = `You only have ${held}.`;
+      return;
+    }
     const tradeId = `trade_${shortId(myUserId)}_${Date.now()}`;
-    hint.textContent = 'Proposing…';
+    hint.textContent = 'Sending…';
     try {
-      await pushTradePropose(tradeId, myUserId, { [offerMaterial]: offerQty }, partnerId, { [wantMaterial]: wantQty });
-      hint.textContent = 'Trade proposed — waiting for confirmation.';
+      await pushTradePropose(tradeId, myUserId, { [interactGiveMaterial]: interactGiveQty }, interactPartnerId, { [interactGetMaterial]: interactGetQty });
+      hint.textContent = 'Offer sent — waiting for confirmation.';
+      renderInteractPanel();
     } catch (err) {
       console.warn('Rhombiverse: propose trade failed', err);
-      hint.textContent = 'Failed to propose trade (see console) — check the partner ID is valid.';
+      hint.textContent = 'Failed to send the offer (see console).';
     }
   });
+
+  function renderInteractExistingTrade(tradeId, trade) {
+    const isA = trade.playerA === myUserId;
+    const myConfirmed = isA ? trade.confirmedA : trade.confirmedB;
+    const myOffer = isA ? trade.offerA : trade.offerB;
+    const theirOffer = isA ? trade.offerB : trade.offerA;
+    document.getElementById('interact-existing-summary').textContent =
+      `You give ${formatOffer(myOffer)} for ${formatOffer(theirOffer)}.` + (myConfirmed ? ' You have confirmed -- waiting on them.' : '');
+    const confirmBtn = document.getElementById('interact-confirm-btn');
+    confirmBtn.style.display = myConfirmed ? 'none' : '';
+    confirmBtn.onclick = async () => {
+      confirmBtn.disabled = true;
+      try { await pushTradeConfirm(tradeId, isA); }
+      catch (err) { console.warn('Rhombiverse: confirm trade failed', err); confirmBtn.disabled = false; }
+    };
+    document.getElementById('interact-cancel-btn').onclick = () => { pushTradeCancel(tradeId); closeInteractPanel(); };
+  }
+
+  function renderInteractPanel() {
+    if (!interactPartnerId) return;
+    interactPartnerNameEl.textContent = otherPlayers[interactPartnerId]?.name ?? shortId(interactPartnerId);
+    const existing = findPendingTradeWith(interactPartnerId);
+    interactExistingEl.style.display = existing ? '' : 'none';
+    interactProposeFormEl.style.display = existing ? 'none' : '';
+    if (existing) renderInteractExistingTrade(existing[0], existing[1]);
+    else renderInteractProposeForm();
+  }
+
+  function openInteractPanel(partnerId) {
+    if (!partnerId) return;
+    interactPartnerId = partnerId;
+    document.getElementById('interact-propose-hint').textContent = '';
+    renderInteractPanel();
+    interactOverlayEl.classList.add('open');
+    interactBtnEl.classList.remove('visible');
+  }
+
+  interactBtnEl.addEventListener('click', () => openInteractPanel(nearestInteractPartnerId));
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyE') return;
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if (interactOverlayEl.classList.contains('open')) { closeInteractPanel(); return; }
+    if (nearestInteractPartnerId) openInteractPanel(nearestInteractPartnerId);
+  });
+  tickPresenceFn = tickPresence;
 
   // RHOMBIVERSE_SPEC_REGIONS.md, minimal UI trigger: grants this session's
   // player one fixed-size claim in the first free slot found outward from
@@ -3439,6 +3743,12 @@ async function init() {
       rebuildAllGrowth();
       setLocalResetControlsEnabled(false);
       setClaimLandEnabled(true);
+      const startPos = currentPlayerWorldPosition();
+      unsubscribePresence = subscribeToPresence(
+        myUserId,
+        { name: displayName, x: startPos.x, y: startPos.y, z: startPos.z, walking },
+        (others) => { otherPlayers = others; }
+      );
       sharedWorldToggle.textContent = 'Disable Shared World';
       sharedWorldHint.textContent = 'Shared World: live — building here syncs to everyone in realtime.';
     } catch (err) {
@@ -3457,6 +3767,13 @@ async function init() {
       unsubscribeShared();
       unsubscribeShared = null;
     }
+    if (unsubscribePresence) {
+      unsubscribePresence();
+      unsubscribePresence = null;
+    }
+    otherPlayers = {};
+    clearAvatarLabels();
+    closeInteractPanel();
     const local = loadFromLocalStorage() ?? (await loadWorld('./data/starter-world.json'));
     world.replaceAll(local);
     onChange();
@@ -3723,6 +4040,13 @@ function onResize() {
 }
 window.addEventListener('resize', onResize);
 
+// B6 tasks #40/#42: tickPresence itself is init()-scoped (it needs
+// `world` and several panel DOM elements only created there), but
+// animate() is module-level -- bridged the same way onboardingCyborg's
+// applyPersonaChoiceFn is, a module-level slot init() fills in once
+// everything it needs actually exists.
+let tickPresenceFn = () => {};
+
 let lastFrameTime = performance.now();
 function animate() {
   requestAnimationFrame(animate);
@@ -3739,6 +4063,7 @@ function animate() {
   } else {
     controls.update();
   }
+  tickPresenceFn(dt);
   renderer.render(sculptureModeActive ? sculptureScene : scene, camera);
 }
 

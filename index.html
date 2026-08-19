@@ -608,21 +608,7 @@
     }
 
     #trade-panel h3 { margin: 10px 0 4px; font-size: 13px; opacity: 0.85; }
-    #trade-panel input[type="text"] { width: 9em; }
-    #trade-partner-list {
-      max-height: 70px;
-      overflow-y: auto;
-      margin: 2px 0 4px;
-      font-size: 11px;
-    }
-    #trade-partner-list .trade-partner-item {
-      padding: 2px 4px;
-      border-radius: 3px;
-      cursor: pointer;
-      opacity: 0.85;
-    }
-    #trade-partner-list .trade-partner-item:hover { background: rgba(255, 255, 255, 0.12); opacity: 1; }
-    #trade-partner-list .placeholder { opacity: 0.6; padding: 2px 0; }
+    #trade-panel .hint { margin: 2px 0 6px; }
     #pending-trades-list { max-height: 140px; overflow-y: auto; }
     #pending-trades-list .placeholder { opacity: 0.6; }
     #pending-trades-list .ring-item {
@@ -658,6 +644,127 @@
       flex: none;
     }
     #pending-trades-list .ring-remove:hover { background: rgba(220, 60, 60, 0.85); }
+
+    /* B6 task #42: other players' live positions in Shared World mode,
+       projected to screen space every frame (render.js) rather than
+       positioned in 3D space -- this app already leans on plain DOM
+       overlays for everything else (hud-prompt, achievements, claim
+       hints), so a name label is a projected DOM pill, not a Three.js
+       sprite/CSS2DObject, consistent with that. */
+    #avatar-layer {
+      position: fixed; inset: 0; z-index: 850;
+      pointer-events: none;
+    }
+    .avatar-label {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      display: flex; flex-direction: column; align-items: center;
+      gap: 3px;
+      font: 11px system-ui, sans-serif;
+      color: #eaf6ff;
+      white-space: nowrap;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    }
+    .avatar-label .avatar-dot {
+      width: 9px; height: 9px;
+      background: #7cf;
+      border: 1px solid #eaf6ff;
+      transform: rotate(45deg);
+      box-shadow: 0 0 6px rgba(124, 204, 255, 0.8);
+    }
+    .avatar-label .avatar-name {
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    /* B6 task #40: the in-world "Interact" trigger -- Space/E has no
+       touch equivalent (same gap this session already fixed for the
+       wheel's Tab/Space), so a tappable HUD button is the only way this
+       is reachable on a phone at all. */
+    #interact-btn {
+      display: none;
+      position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%);
+      z-index: 900;
+      color: #05050a;
+      font: 700 13px system-ui, sans-serif;
+      background: #7cf;
+      border: none;
+      border-radius: 999px;
+      padding: 8px 20px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(124, 204, 255, 0.5);
+    }
+    #interact-btn.visible { display: block; }
+    #interact-btn:hover { background: #9de0ff; }
+
+    /* Rebuilt trade UI: a two-sided drag-and-accept offer view, opened
+       via Interact rather than a permanent Lab-panel form. Pointer
+       events (not HTML5 draggable/dragstart) drive the actual dragging
+       in render.js -- native drag-and-drop has no touch equivalent at
+       all, and this session already spent real effort making sure
+       nothing in this app depends on desktop-only input. */
+    #interact-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 990;
+      align-items: center; justify-content: center;
+      background: rgba(5, 5, 10, 0.88);
+      backdrop-filter: blur(2px);
+      padding: 24px 12px;
+      box-sizing: border-box;
+    }
+    #interact-overlay.open { display: flex; }
+    #interact-card {
+      width: 100%; max-width: 560px; max-height: 84vh;
+      overflow-y: auto;
+      color: #ddd; font: 14px/1.5 system-ui, sans-serif;
+      background: rgba(15, 15, 25, 0.96);
+      border: 1px solid rgba(124, 204, 255, 0.35);
+      border-radius: 10px;
+      padding: 18px 22px 22px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+    }
+    #interact-header {
+      display: flex; align-items: center; justify-content: space-between;
+      font: 700 16px system-ui, sans-serif;
+      color: #9de0ff;
+      margin-bottom: 12px;
+    }
+    #interact-close { background: none; border: none; color: #9de0ff; cursor: pointer; font: 15px system-ui, sans-serif; }
+    #interact-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .interact-col-title { font: 700 11px system-ui, sans-serif; color: #9de0ff; margin-bottom: 4px; }
+    .interact-chip-strip { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; }
+    .interact-chip {
+      background: rgba(124, 204, 255, 0.15);
+      border: 1px solid rgba(124, 204, 255, 0.5);
+      border-radius: 5px;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+    .interact-chip:hover { background: rgba(124, 204, 255, 0.3); }
+    .interact-chip-ghost {
+      position: fixed; z-index: 1000; pointer-events: none;
+      transform: translate(-50%, -50%);
+      opacity: 0.9;
+    }
+    #interact-offer-zones { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .interact-dropzone {
+      min-height: 56px;
+      border: 1.5px dashed rgba(124, 204, 255, 0.4);
+      border-radius: 6px;
+      padding: 8px;
+      text-align: center;
+    }
+    .interact-dropzone.drag-over { border-color: #7cf; background: rgba(124, 204, 255, 0.12); }
+    .interact-dropzone-label { font: 700 11px system-ui, sans-serif; color: #9de0ff; margin-bottom: 4px; }
+    .interact-dropzone-content { font-size: 12px; opacity: 0.6; }
+    .interact-offer-chip { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; }
+    .interact-offer-chip input[type="number"] { width: 3.5em; }
+    #interact-send-btn:disabled { opacity: 0.4; cursor: default; }
+    #interact-existing-summary { margin-bottom: 8px; }
 
     #welcome-overlay {
       position: fixed;
@@ -848,6 +955,8 @@
   <div id="hud-indicator"></div>
   <div id="hud-prompt"></div>
   <div id="hud-crosshair"></div>
+  <div id="avatar-layer"></div>
+  <button id="interact-btn" type="button">Interact</button>
   <div id="sculpture-mode-banner"><span>Sculpture Mode -- isolated scratch space, nothing here is saved to the shared world</span><button id="sculpture-mode-exit" type="button">Exit to Universe</button></div>
   <div id="hud-wheel-cue" title="Tab / Space also opens this">Menu</div>
   <button id="sculpture-mode-toggle" type="button" title="Sculpture Mode: a separate, isolated scratch workspace">◆</button>
@@ -1022,25 +1131,12 @@
     <div id="belt-hint" class="hint"></div>
     <div id="inventory-hint" class="hint">Inventory: empty.</div>
     <div id="trade-panel" style="display: none">
-      <h3>Trade</h3>
-      <div class="row">
-        <label>Partner ID:
-          <input id="trade-partner-input" type="text" placeholder="paste a player's ID" />
-        </label>
-      </div>
-      <div id="trade-partner-list"></div>
-      <div class="row">
-        <label>Offer: <select id="trade-offer-material"></select></label>
-        <input id="trade-offer-qty" type="number" min="1" value="1" />
-      </div>
-      <div class="row">
-        <label>For their: <select id="trade-want-material"></select></label>
-        <input id="trade-want-qty" type="number" min="1" value="1" />
-      </div>
-      <button id="propose-trade-btn" type="button">Propose Trade</button>
-      <div id="trade-propose-hint" class="hint"></div>
       <h3>Pending Trades</h3>
+      <div class="hint">Walk up to another player and tap Interact to propose a new trade.</div>
       <div id="pending-trades-list"><div class="placeholder">No pending trades.</div></div>
+    </div>
+    <div class="row" id="display-name-row">
+      <label>Your name: <input id="display-name-input" type="text" maxlength="24" placeholder="Rhombinaut" /></label>
     </div>
     <div class="row">
       <label>Load a World:
@@ -1215,6 +1311,44 @@
        World (schema.sql's shared_worlds table) to browse/publish --
        otherwise shows a real explanatory message, same pattern as
        Sculpt/Cultivate's own Full-Cyborg gating. -->
+  <div id="interact-overlay">
+    <div id="interact-card">
+      <div id="interact-header"><span>Trade with <span id="interact-partner-name"></span></span><button id="interact-close" type="button">✕</button></div>
+
+      <div id="interact-existing-trade" style="display: none">
+        <div id="interact-existing-summary"></div>
+        <div class="row">
+          <button id="interact-confirm-btn" type="button">Confirm</button>
+          <button id="interact-cancel-btn" type="button">Cancel</button>
+        </div>
+      </div>
+
+      <div id="interact-propose-form">
+        <div id="interact-columns">
+          <div class="interact-col">
+            <div class="interact-col-title">Your materials</div>
+            <div id="interact-your-materials" class="interact-chip-strip"></div>
+          </div>
+          <div class="interact-col">
+            <div class="interact-col-title">Their materials</div>
+            <div id="interact-their-materials" class="interact-chip-strip"></div>
+          </div>
+        </div>
+        <div id="interact-offer-zones">
+          <div id="interact-give-zone" class="interact-dropzone">
+            <div class="interact-dropzone-label">You give</div>
+            <div class="interact-dropzone-content">drag or tap a material above</div>
+          </div>
+          <div id="interact-get-zone" class="interact-dropzone">
+            <div class="interact-dropzone-label">You get</div>
+            <div class="interact-dropzone-content">drag or tap a material above</div>
+          </div>
+        </div>
+        <button id="interact-send-btn" type="button" disabled>Send Offer</button>
+        <div id="interact-propose-hint" class="hint"></div>
+      </div>
+    </div>
+  </div>
   <div id="gallery-overlay">
     <div id="gallery-card">
       <div id="gallery-header"><span>Shared Worlds Gallery</span><button id="gallery-close" type="button" title="Close">✕</button></div>
