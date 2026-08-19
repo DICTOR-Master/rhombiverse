@@ -1,0 +1,43 @@
+[
+  {
+    "date": "2026-08-19",
+    "title": "The Rhombic Wheel, and everything behind it",
+    "items": [
+      "One control surface for everything: the Rhombic Wheel (Tab / Space, or tap Menu) replaces the old always-visible sidebar.",
+      "Sculpt: a real symmetry/mirror tool with Model and Chisel modes, plus a standalone Sculpture Mode scratch workspace.",
+      "Grow: Cultivate real aperiodic growth, and see the tiling a structure casts with Duality Mode.",
+      "Cyborg Mode: an optional guided walkthrough, plus real AI assistance for Sculpt/Cultivate -- bring your own API key or use the shared one, never required to play.",
+      "Achievements, World sharing via a link, a public Gallery of shared Worlds, and a sequenced first-visit tour instead of a tutorial modal.",
+      "Walk up to another player and Interact to trade -- named avatars, a lightweight pseudonymous display name, no accounts.",
+      "A pass of real mobile/touch fixes: tap-to-open the wheel, bottom-sheet tool panels, first-use hints on the icon toggles."
+    ]
+  },
+  {
+    "date": "2026-08-14",
+    "title": "Growth, evolution, and a home to explore",
+    "items": [
+      "Real aperiodic (Penrose/Ammann-rhombohedra) growth -- plant a seed and watch it unfold into a tree, shell, or crystal cluster over time.",
+      "A genome/phenotype evolution system: planted organisms reproduce, mutate, and speciate on their own.",
+      "Animals: habitats, mobility, and real herbivore/carnivore relationships.",
+      "A Showcase World -- a real continental planetoid with growth, evolved organisms, and animals already in it."
+    ]
+  },
+  {
+    "date": "2026-08-12",
+    "title": "Whole planets, gravity, and the extremes of physics",
+    "items": [
+      "Planetoid building with real radial gravity bending toward the core.",
+      "Water and ice, black holes, star systems, and supernovae -- each grounded in real physics (Schwarzschild behavior, Chandrasekhar-limit detonation, icy-moon subsurface oceans).",
+      "Shared World: opt-in realtime multiplayer, ownership claims, mining, and barter trade.",
+      "Public deploy, with the legal/safety basics (Terms, Privacy, Security) in place."
+    ]
+  },
+  {
+    "date": "2026-08-11",
+    "title": "Rhombiverse begins",
+    "items": [
+      "The first block: a rhombic dodecahedron lattice you can build outward from, face by face.",
+      "Local save/load, export/import as plain JSON."
+    ]
+  }
+]

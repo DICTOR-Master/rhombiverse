@@ -877,6 +877,70 @@
       cursor: pointer;
     }
     #about-btn:hover { background: rgba(255, 255, 255, 0.15); }
+
+    /* B7: "Replace 'Under Construction' branding with a versioned
+       'What's new' changelog panel" -- reuses #about-btn's exact shape/
+       position language, one slot to its left (the old construction-tag
+       badge used to sit here). .has-news is a small dot, not a color-only
+       signal replacement for the icon itself -- the button is always the
+       same 🕘, just gets a marker when there's something unread. */
+    #changelog-btn {
+      position: fixed;
+      bottom: 12px;
+      right: 48px;
+      z-index: 900;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      color: #ddd;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font: 13px system-ui, sans-serif;
+      cursor: pointer;
+    }
+    #changelog-btn:hover { background: rgba(255, 255, 255, 0.15); }
+    #changelog-btn.has-news::after {
+      content: "";
+      position: absolute;
+      top: -2px; right: -2px;
+      width: 8px; height: 8px;
+      background: #7cf;
+      border-radius: 50%;
+      box-shadow: 0 0 4px rgba(124, 204, 255, 0.9);
+    }
+    #changelog-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 990;
+      align-items: center; justify-content: center;
+      background: rgba(5, 5, 10, 0.88);
+      backdrop-filter: blur(2px);
+      padding: 24px 12px;
+      box-sizing: border-box;
+    }
+    #changelog-overlay.open { display: flex; }
+    #changelog-card {
+      width: 100%; max-width: 520px; max-height: 84vh;
+      overflow-y: auto;
+      color: #ddd; font: 14px/1.5 system-ui, sans-serif;
+      background: rgba(15, 15, 25, 0.96);
+      border: 1px solid rgba(124, 204, 255, 0.35);
+      border-radius: 10px;
+      padding: 18px 22px 22px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+    }
+    #changelog-header {
+      display: flex; align-items: center; justify-content: space-between;
+      font: 700 16px system-ui, sans-serif;
+      color: #9de0ff;
+      margin-bottom: 12px;
+    }
+    #changelog-close { background: none; border: none; color: #9de0ff; cursor: pointer; font: 15px system-ui, sans-serif; }
+    .changelog-entry { margin-bottom: 18px; }
+    .changelog-entry:last-child { margin-bottom: 0; }
+    .changelog-date { font: 700 11px system-ui, sans-serif; color: #9de0ff; letter-spacing: 0.03em; }
+    .changelog-title { font: 700 15px system-ui, sans-serif; color: #fff; margin: 2px 0 6px; }
+    .changelog-entry ul { margin: 0; padding-left: 20px; font-size: 13px; opacity: 0.9; }
+    .changelog-entry li { margin-bottom: 3px; }
     #sync-warning {
       display: none;
       position: fixed;
@@ -1328,5 +1392,6 @@
 
   <script type="module" src="./src/render.js"></script>
   <script type="module" src="./src/welcome.js"></script>
+  <script type="module" src="./src/changelog.js"></script>
 </body>
 </html>

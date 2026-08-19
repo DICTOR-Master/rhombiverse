@@ -35,6 +35,7 @@ import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACT
 import { playPlaceSound, playRemoveSound, playMenuSound } from './sfx.js';
 import { createRhombicWheel } from './wheel.js';
 import { createCyborgMode } from './cyborg.js';
+import { requestBYOKJson } from './byok.js';
 import {
   MIRROR_PLANES,
   createSculptureSession,
@@ -738,11 +739,91 @@ labToggleEl.addEventListener('click', () => {
   labPanelEl.classList.toggle('open');
 });
 
+// Cyborg Mode's post-walkthrough creative suggestion ("really wanted
+// cyborg modes to be able to do more than just suggest clicking on a
+// face, which is the most obvious thing to do anyway") -- the exact
+// same three-tier pattern Full-Cyborg sculpting/cultivating already use
+// (byok.js personal key -> shared AI Gateway -> local fallback), just
+// generating a short text idea instead of a structured build plan.
+// world.entries()/getSeeds()/getOrganisms() are init()-local, so the
+// same module-level bridging pattern as tickPresenceFn/
+// applyPersonaChoiceFn applies: this function exists and is passed into
+// createCyborgMode() below before init() runs, but only actually reads
+// `cyborgWorldRef` once a player clicks the button, by which point
+// init() has long since filled it in.
+let cyborgWorldRef = null;
+function buildCyborgWorldSummary() {
+  if (!cyborgWorldRef) return 'Nothing built yet.';
+  const cells = cyborgWorldRef.entries();
+  const materialCounts = {};
+  for (const cell of cells) materialCounts[cell.material] = (materialCounts[cell.material] ?? 0) + 1;
+  const materialList = Object.entries(materialCounts).map(([m, n]) => `${n} ${m}`).join(', ') || 'nothing yet';
+  const seeds = Object.values(cyborgWorldRef.getSeeds());
+  const speciesList = [...new Set(seeds.map((s) => s.species))].join(', ');
+  const organismCount = Object.keys(cyborgWorldRef.getOrganisms()).length;
+  let text = `${cells.length} blocks built (${materialList}).`;
+  text += seeds.length > 0 ? ` ${seeds.length} planted seed(s): ${speciesList}.` : ' Nothing planted yet.';
+  if (organismCount > 0) text += ` ${organismCount} living organism(s) present.`;
+  return text;
+}
+
+// Kept in sync with api/cyborg-suggest.js's own copy -- BYOK calls run
+// entirely client-side and need their own prompt text, same reasoning
+// as sculpture.js's SCULPT_SYSTEM_PROMPT/api/sculpt-intent.js split.
+const CYBORG_SUGGEST_SYSTEM_PROMPT = `You are a creative building companion for Rhombiverse, a voxel-building game where every block is a rhombic dodecahedron.
+
+Given a short description of what a player has already built, suggest ONE small, concrete, achievable next thing for them to build or plant -- something more interesting than "place another block", but still doable in a few minutes. Name a shape, direction, or technique (e.g. "try a mirrored arch to the east", "plant a conifer near your fern for a mixed grove", "hollow out the center and add windows"). Keep it under 140 characters, friendly, and specific to what they've actually built so far -- don't suggest something they've clearly already done. Never mention that you are an AI.
+
+Respond with a JSON object with exactly one field: suggestion (string, <140 chars).`;
+
+const LOCAL_CYBORG_SUGGESTIONS = [
+  'Try building a small dome and see how it looks from inside.',
+  "Plant something new near what's already grown -- see how the species interact.",
+  "Add a mirrored wing to double a shape you've already built.",
+  "Walk to the edge of what you've built and extend it in a new direction.",
+  'Try a different material for the next few blocks -- see how the color changes the feel of the shape.',
+  'Hollow out part of a solid structure and see what it looks like from inside.',
+];
+let lastLocalCyborgSuggestion = -1;
+function pickLocalCyborgSuggestion() {
+  if (LOCAL_CYBORG_SUGGESTIONS.length === 1) return LOCAL_CYBORG_SUGGESTIONS[0];
+  let i;
+  do {
+    i = Math.floor(Math.random() * LOCAL_CYBORG_SUGGESTIONS.length);
+  } while (i === lastLocalCyborgSuggestion);
+  lastLocalCyborgSuggestion = i;
+  return LOCAL_CYBORG_SUGGESTIONS[i];
+}
+
+async function getCyborgSuggestion() {
+  const summary = buildCyborgWorldSummary();
+  try {
+    const decision = await requestBYOKJson(CYBORG_SUGGEST_SYSTEM_PROMPT, summary);
+    if (decision?.suggestion) return decision.suggestion;
+  } catch (err) {
+    console.warn('Rhombiverse: personal AI key call failed for Cyborg suggestion, trying the shared AI Gateway instead', err);
+  }
+  try {
+    const res = await fetch('/api/cyborg-suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary }),
+    });
+    if (!res.ok) throw new Error(`cyborg-suggest API returned ${res.status}`);
+    const data = await res.json();
+    if (!data.suggestion) throw new Error('no suggestion in response');
+    return data.suggestion;
+  } catch (err) {
+    console.warn('Rhombiverse: Cyborg suggestion AI Gateway call failed, using a local suggestion instead', err);
+    return pickLocalCyborgSuggestion();
+  }
+}
+
 // B3: Cyborg Mode is fully self-contained (fetches its own subscript
 // JSON, listens for the rhombiverse:* events dispatched elsewhere in
 // this file, never touches world-state) -- module-level like the toggle
 // above, no init()-local dependency needed.
-const cyborgMode = createCyborgMode();
+const cyborgMode = createCyborgMode({ getSuggestion: getCyborgSuggestion });
 const cyborgToggleEl = document.getElementById('cyborg-toggle');
 cyborgToggleEl.addEventListener('click', () => {
   cyborgMode.toggle();
@@ -756,6 +837,7 @@ cyborgToggleEl.addEventListener('click', () => {
 const onboardingCyborg = createCyborgMode({
   subscriptUrl: './data/cyborg/onboarding.json',
   panelTitle: 'Welcome — a quick tour',
+  getSuggestion: getCyborgSuggestion,
 });
 
 // welcome.js's identity grid ("consider making the four personas
@@ -1053,6 +1135,7 @@ async function init() {
     onSeedSet: handleLocalSeedSet,
     onSeedClear: handleLocalSeedClear,
   });
+  cyborgWorldRef = world;
   if (isFirstVisit && world.entries().length === 0) {
     generatePlanetoid(world, 'rocky', 0, 0, 0, 2); // only reached if the Showcase World fetch above failed
   }
