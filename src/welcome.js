@@ -1,7 +1,8 @@
-// First-run welcome/entry overlay: logo, plain-language description, an
-// under-construction disclaimer, and links to the legal docs every small
-// public web app carries (TERMS.md/PRIVACY.md/SECURITY.md, already
-// written for Phase 4's public deploy -- see CLAUDE.md). Purely a DOM/
+// First-run welcome/entry overlay: logo, plain-language description, and
+// links to the legal docs every small public web app carries
+// (TERMS.md/PRIVACY.md/SECURITY.md, already written for Phase 4's public
+// deploy -- see CLAUDE.md). No "under construction" framing (dropped
+// 2026-08-19 -- undermined trust/permanence per user feedback). Purely a DOM/
 // localStorage concern, deliberately independent of render.js/world
 // state -- this can run (and the game can be dismissed into) even if
 // nothing else on the page has finished loading yet.
@@ -49,7 +50,6 @@ function overlayHtml() {
     <div id="welcome-card">
       ${logoSvg()}
       <h1>Rhombiverse</h1>
-      <div class="construction-badge">🚧 Under Construction 🚧</div>
       <p class="tagline">Explore Rhombiverse. Explore yourself.</p>
       <div class="identity-block">
         <div class="identity-prompt">Who are you here?</div>
@@ -60,12 +60,7 @@ function overlayHtml() {
           <div class="identity-item" data-persona="rhombiologist" role="button" tabindex="0"><strong>Rhombiologist</strong> -- grow real, evolving life</div>
         </div>
       </div>
-      <p class="quickstart"><strong>Tab</strong> / <strong>Space</strong> opens the Rhombic Wheel. Click a face to build, right-click to remove.</p>
-      <div class="construction-notice">
-        🚧 The future is under construction. So are you. Things may
-        change or reset -- <strong>Export JSON</strong> to keep what you
-        love. 🚧
-      </div>
+      <p class="quickstart"><strong>Tab</strong> / <strong>Space</strong> opens the Rhombic Wheel. Click a face to build, right-click to remove. Export your World anytime to keep a copy.</p>
       <label class="dont-show">
         <input type="checkbox" id="skip-intro-checkbox" />
         Don't show this again on this device
@@ -92,15 +87,6 @@ function init() {
   aboutBtn.title = 'About Rhombiverse';
   aboutBtn.textContent = 'ℹ';
   document.body.appendChild(aboutBtn);
-
-  // Persistent, low-key echo of the welcome card's own construction
-  // badge -- the disclaimer stays visible during actual play, not just
-  // on the one-time intro, without competing with the build controls.
-  const constructionTag = document.createElement('div');
-  constructionTag.id = 'construction-tag';
-  constructionTag.textContent = '🚧 Under Construction';
-  constructionTag.title = 'This world is a work in progress -- things may change or reset.';
-  document.body.appendChild(constructionTag);
 
   function show() {
     overlay.style.display = 'flex';

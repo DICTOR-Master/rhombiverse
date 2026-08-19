@@ -27,8 +27,7 @@ fitness for any particular purpose. Your browser's local storage can be
 cleared by you, your browser, or your OS at any time; export JSON
 regularly if you want to keep a build. The Shared World is likewise not
 guaranteed to be backed up, permanent, or free of resets — it is a work
-in progress and may be wiped, migrated, or taken offline without notice
-(see the "under construction" notice shown in the app itself).
+in progress and may be wiped, migrated, or taken offline without notice.
 
 ## Acceptable use
 
