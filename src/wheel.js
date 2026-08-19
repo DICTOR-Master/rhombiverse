@@ -133,6 +133,41 @@ const CSS = `
   color: #9cd; font: 11px system-ui, sans-serif; opacity: 0.75;
   margin: 2px 0;
 }
+
+/* B2: material selection is a true radial wheel of miniature rhombi
+   (not the linear strip generator/species pickers still use), with a
+   live structure-preview on hover -- see onHoverPreview below. */
+#material-wheel-overlay {
+  position: fixed; inset: 0; z-index: 986;
+  display: none;
+  align-items: center; justify-content: center;
+  background: rgba(2, 2, 6, 0.35);
+}
+#material-wheel-overlay.open { display: flex; }
+#material-wheel-root { position: relative; width: 1px; height: 1px; }
+.material-wheel-item {
+  position: absolute;
+  width: 48px; height: 48px;
+  margin: -24px 0 0 -24px;
+  border: 1.5px solid rgba(255,255,255,0.35);
+  transform: rotate(45deg);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.material-wheel-item:hover, .material-wheel-item.current {
+  transform: rotate(45deg) scale(1.25);
+  box-shadow: 0 0 12px rgba(255,255,255,0.6);
+  border-color: #fff;
+  z-index: 2;
+}
+#material-wheel-hint {
+  position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%);
+  color: #eaf6ff; font: 13px system-ui, sans-serif;
+  white-space: nowrap;
+  text-align: center;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.95);
+  z-index: 3;
+}
 `;
 
 function injectCssOnce() {
@@ -182,6 +217,14 @@ export function createRhombicWheel({
   onPrompt = () => {}, // (text) => void -- surfaces a message in the bottom HUD prompt
   onMenuSound = () => {},
   onSelectionChange = () => {}, // called after ANY leaf pick (mode/material/generator/species/repeat) -- render.js uses this to refresh the top-right HUD indicator
+  // B2: material wheel extras. getMaterialColor(value) -> CSS color
+  // string keeps MATERIAL_COLORS single-sourced in render.js rather than
+  // duplicated here. onMaterialHoverPreview/onMaterialHoverEnd drive the
+  // live structure-preview on the current ghost cell (render.js owns the
+  // THREE scene, so the actual recoloring happens there).
+  getMaterialColor = () => '#8899aa',
+  onMaterialHoverPreview = () => {},
+  onMaterialHoverEnd = () => {},
 }) {
   injectCssOnce();
 
@@ -199,6 +242,56 @@ export function createRhombicWheel({
   const pickerStrip = document.createElement('div');
   pickerStrip.id = 'wheel-picker-strip';
   document.body.appendChild(pickerStrip);
+
+  const materialWheelOverlay = document.createElement('div');
+  materialWheelOverlay.id = 'material-wheel-overlay';
+  const materialWheelRoot = document.createElement('div');
+  materialWheelRoot.id = 'material-wheel-root';
+  const materialWheelHint = document.createElement('div');
+  materialWheelHint.id = 'material-wheel-hint';
+  materialWheelRoot.appendChild(materialWheelHint);
+  materialWheelOverlay.appendChild(materialWheelRoot);
+  document.body.appendChild(materialWheelOverlay);
+
+  function closeMaterialWheel() {
+    materialWheelOverlay.classList.remove('open');
+    onMaterialHoverEnd();
+  }
+
+  function openMaterialWheel(options, onPick, currentValue) {
+    materialWheelRoot.innerHTML = '';
+    materialWheelRoot.appendChild(materialWheelHint);
+    materialWheelHint.textContent = 'Hover to preview · click to select';
+    const positions = positionsFor(options.length, 100);
+    options.forEach((opt, i) => {
+      const item = document.createElement('div');
+      item.className = 'material-wheel-item';
+      if (opt.value === currentValue) item.classList.add('current');
+      item.style.left = `${positions[i].x}px`;
+      item.style.top = `${positions[i].y}px`;
+      item.style.background = getMaterialColor(opt.value);
+      item.title = opt.label;
+      item.addEventListener('mouseenter', () => {
+        materialWheelHint.textContent = opt.label;
+        onMaterialHoverPreview(opt.value);
+      });
+      item.addEventListener('mouseleave', () => {
+        materialWheelHint.textContent = 'Hover to preview · click to select';
+        onMaterialHoverEnd();
+      });
+      item.addEventListener('click', () => {
+        onMenuSound();
+        onPick(opt.value, opt.label);
+        closeMaterialWheel();
+        onSelectionChange();
+      });
+      materialWheelRoot.appendChild(item);
+    });
+    materialWheelOverlay.classList.add('open');
+  }
+  materialWheelOverlay.addEventListener('click', (e) => {
+    if (e.target === materialWheelOverlay) closeMaterialWheel();
+  });
 
   function clearRoot() {
     root.innerHTML = '';
@@ -325,7 +418,8 @@ export function createRhombicWheel({
     if (item.kind === 'material-picker') {
       const select = document.getElementById(materialSelectId);
       const options = readSelectOptions(select);
-      openPickerStrip(options, (value) => {
+      close(); // hide the Build submenu -- the material wheel is its own full overlay
+      openMaterialWheel(options, (value) => {
         select.value = value;
         onPrompt(`Material: ${select.options[select.selectedIndex].textContent}`);
       }, select.value);
@@ -413,18 +507,26 @@ export function createRhombicWheel({
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
       e.preventDefault();
+      if (materialWheelOverlay.classList.contains('open')) {
+        closeMaterialWheel();
+        return;
+      }
       toggle();
       return;
     }
-    if (e.code === 'Escape' && isOpen()) {
-      if (pickerStrip.classList.contains('open')) {
-        closePicker();
-      } else if (level === 2) {
-        level = 1;
-        activeCategory = null;
-        renderLevel1();
-      } else {
-        close();
+    if (e.code === 'Escape') {
+      if (materialWheelOverlay.classList.contains('open')) {
+        closeMaterialWheel();
+      } else if (isOpen()) {
+        if (pickerStrip.classList.contains('open')) {
+          closePicker();
+        } else if (level === 2) {
+          level = 1;
+          activeCategory = null;
+          renderLevel1();
+        } else {
+          close();
+        }
       }
     }
   });

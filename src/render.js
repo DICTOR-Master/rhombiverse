@@ -6,6 +6,7 @@
 // World / Export / Import buttons.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell } from './lattice.js';
 import {
@@ -213,6 +214,19 @@ let player = null;
 // exitWalk are module-level (defined before init()) but still need to
 // refresh the HUD's mode/material indicator on every Explore transition.
 let refreshHudIndicator = () => {};
+
+// Module-level (not init()-local) since enterWalk/exitWalk, defined
+// before init() runs, need it too -- has no dependency on any init()
+// closure, just a DOM element and a timer.
+let hudPromptTimer = null;
+function showHudPrompt(text, ms = 4000) {
+  const el = document.getElementById('hud-prompt');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.add('visible');
+  clearTimeout(hudPromptTimer);
+  hudPromptTimer = setTimeout(() => el.classList.remove('visible'), ms);
+}
 let planetoids = {};
 // Mirrors world.getClaims(), same module-level pattern as planetoids
 // above -- gravityAt() (RHOMBIVERSE_SPEC_LOOPHOLES.md section 5) and
@@ -444,35 +458,76 @@ function updateBeltHint() {
   el.textContent = `Nearest belt: ${nearest.id} · ${nearestDist.toFixed(0)}u away.`;
 }
 
+// B2's Explore transition sequence -- HUD fade, camera settle, a gravity
+// engagement cue, and a horizon change, replacing the old instant toggle.
+// `walking` still flips true/false at the START of its respective
+// transition (build.js's getMode() already keys off it to disable
+// editing while walking/transitioning, same as before) -- only the
+// ACTUAL control handoff (player.setEnabled/requestLock, or restoring
+// OrbitControls) and the walk-toggle/hint text are delayed until the
+// sequence finishes. walkTransitioning guards against re-entry (a stray
+// pointerlockchange during the sequence, a second Explore pick, etc.).
+const SPACE_BG_COLOR = new THREE.Color(0x05050a);
+const WALK_BG_COLOR = new THREE.Color(0x0d1420); // a faint atmosphere tint stands in for "horizon change" -- this project has no separate skybox/horizon system to hook into
+const WALK_TRANSITION_MS = 550;
+let walkTransitioning = false;
+
+function animateBackground(from, to, duration, onDone) {
+  const start = performance.now();
+  function step(now) {
+    const t = Math.min(1, (now - start) / duration);
+    scene.background.copy(from).lerp(to, t);
+    if (t < 1) requestAnimationFrame(step);
+    else if (onDone) onDone();
+  }
+  requestAnimationFrame(step);
+}
+
 function enterWalk() {
-  if (!player || walking) return;
+  if (!player || walking || walkTransitioning) return;
   walking = true;
+  walkTransitioning = true;
   controls.enabled = false;
-  document.getElementById('walk-toggle').textContent = 'Exit Walk Mode (Esc)';
-  document.getElementById('walk-hint').style.display = '';
-  document.getElementById('hud-crosshair')?.classList.add('visible');
-  player.reset(camera.position);
-  player.setEnabled(true);
-  player.requestLock();
-  updateGravityInfo();
-  updateBeltHint();
-  updateEvolutionInfo();
-  refreshHudIndicator();
+  document.body.classList.add('explore-transitioning');
+  showHudPrompt('Entering Explore — gravity engaging…', WALK_TRANSITION_MS + 400);
+  animateBackground(SPACE_BG_COLOR, WALK_BG_COLOR, WALK_TRANSITION_MS);
+  setTimeout(() => {
+    document.body.classList.remove('explore-transitioning');
+    document.getElementById('walk-toggle').textContent = 'Exit Walk Mode (Esc)';
+    document.getElementById('walk-hint').style.display = '';
+    document.getElementById('hud-crosshair')?.classList.add('visible');
+    player.reset(camera.position);
+    player.setEnabled(true);
+    player.requestLock();
+    walkTransitioning = false;
+    updateGravityInfo();
+    updateBeltHint();
+    updateEvolutionInfo();
+    refreshHudIndicator();
+  }, WALK_TRANSITION_MS);
 }
 
 function exitWalk() {
-  if (!walking) return;
+  if (!walking || walkTransitioning) return;
   walking = false;
+  walkTransitioning = true;
   if (player) player.setEnabled(false);
-  controls.enabled = true;
   camera.up.set(0, 1, 0);
-  document.getElementById('walk-toggle').textContent = 'Enter Walk Mode';
-  document.getElementById('walk-hint').style.display = 'none';
+  document.body.classList.add('explore-transitioning');
+  showHudPrompt('Leaving Explore…', WALK_TRANSITION_MS + 400);
   document.getElementById('hud-crosshair')?.classList.remove('visible');
-  updateGravityInfo();
-  updateBeltHint();
-  updateEvolutionInfo();
-  refreshHudIndicator();
+  animateBackground(WALK_BG_COLOR, SPACE_BG_COLOR, WALK_TRANSITION_MS);
+  setTimeout(() => {
+    document.body.classList.remove('explore-transitioning');
+    controls.enabled = true;
+    document.getElementById('walk-toggle').textContent = 'Enter Walk Mode';
+    document.getElementById('walk-hint').style.display = 'none';
+    walkTransitioning = false;
+    updateGravityInfo();
+    updateBeltHint();
+    updateEvolutionInfo();
+    refreshHudIndicator();
+  }, WALK_TRANSITION_MS);
 }
 
 document.getElementById('walk-toggle').addEventListener('click', () => {
@@ -1260,7 +1315,46 @@ async function init() {
   function updateUndoButton() {
     const btn = document.getElementById('undo-btn');
     btn.disabled = sharedWorldActive || undoStack.length === 0;
-    btn.textContent = undoStack.length > 0 ? `Undo (${undoStack.length})` : 'Undo';
+    // B2: the icon itself no longer carries a numeric readout -- the
+    // scrub-timeline strip (renderUndoScrubStrip) is the count now.
+  }
+
+  // B2's scrub-timeline: undoStack[0] is the OLDEST kept state,
+  // undoStack[length-1] the most recent (matches the push order in
+  // onChange below). Jumping to tick i reverts to that exact state and
+  // discards everything newer than it (indices > i) -- the same
+  // "no redo past a jump" semantics a linear undo stack without redo
+  // support already implied, just now reachable directly instead of only
+  // one pop at a time.
+  function renderUndoScrubStrip() {
+    const strip = document.getElementById('undo-scrub-strip');
+    strip.innerHTML = '';
+    if (undoStack.length === 0) return;
+    const label = document.createElement('div');
+    label.className = 'scrub-label';
+    label.textContent = `${undoStack.length} step${undoStack.length === 1 ? '' : 's'} back`;
+    strip.appendChild(label);
+    undoStack.forEach((snapshot, i) => {
+      const tick = document.createElement('div');
+      tick.className = 'scrub-tick';
+      tick.title = `Jump back ${undoStack.length - i} step${undoStack.length - i === 1 ? '' : 's'}`;
+      tick.addEventListener('click', () => jumpToUndoIndex(i));
+      strip.appendChild(tick);
+    });
+  }
+
+  function jumpToUndoIndex(i) {
+    if (sharedWorldActive || i < 0 || i >= undoStack.length) return;
+    const target = undoStack[i];
+    world.replaceAll(JSON.parse(target));
+    lastSnapshot = target;
+    undoStack.length = i; // drop this state and everything newer -- it's now the live state, not a past one
+    rebuildInstances(mesh, world, currentMode === 'report');
+    saveToLocalStorage(world.toJSON());
+    updateUndoButton();
+    renderUndoScrubStrip();
+    renderRingList();
+    document.getElementById('undo-scrub-strip').classList.remove('visible');
   }
 
   // Ring list: "standard view" of the last-clicked structure's shells,
@@ -1431,6 +1525,7 @@ async function init() {
     // overwrite their real local save on the very next onChange().
     if (!sharedWorldActive) saveToLocalStorage({ ...afterJSON, planetoids });
     updateUndoButton();
+    renderUndoScrubStrip();
     renderRingList();
   }
 
@@ -1439,15 +1534,43 @@ async function init() {
   // drive sync.js's pushes, so it can't un-push a change already synced
   // to the shared table. Disabled outright while Shared World is active
   // (see updateUndoButton) rather than left to silently desync.
-  document.getElementById('undo-btn').addEventListener('click', () => {
-    if (sharedWorldActive || undoStack.length === 0) return;
-    const prev = undoStack.pop();
-    world.replaceAll(JSON.parse(prev));
-    lastSnapshot = prev;
-    rebuildInstances(mesh, world, currentMode === 'report');
-    saveToLocalStorage(world.toJSON());
-    updateUndoButton();
-    renderRingList();
+  //
+  // B2: a quick click still undoes exactly one step (jumpToUndoIndex on
+  // the last/most-recent entry, same effect the old pop()-based handler
+  // had); holding past UNDO_HOLD_MS instead reveals the scrub strip so
+  // any past state can be jumped to directly.
+  const UNDO_HOLD_MS = 220;
+  let undoHoldTimer = null;
+  let undoHeld = false;
+  const undoBtn = document.getElementById('undo-btn');
+  const undoStripEl = document.getElementById('undo-scrub-strip');
+  undoBtn.addEventListener('pointerdown', () => {
+    if (undoBtn.disabled) return;
+    undoHeld = false;
+    clearTimeout(undoHoldTimer);
+    undoHoldTimer = setTimeout(() => {
+      undoHeld = true;
+      renderUndoScrubStrip();
+      undoStripEl.classList.add('visible');
+    }, UNDO_HOLD_MS);
+  });
+  undoBtn.addEventListener('pointerup', () => {
+    clearTimeout(undoHoldTimer);
+    if (!undoHeld) {
+      jumpToUndoIndex(undoStack.length - 1);
+    }
+    undoHeld = false;
+  });
+  undoBtn.addEventListener('pointerleave', () => {
+    clearTimeout(undoHoldTimer);
+  });
+  // Clicking anywhere outside the strip closes it without acting --
+  // same "reveal on hold, dismiss on outside interaction" pattern the
+  // Rhombic Wheel's own picker strip uses.
+  document.addEventListener('pointerdown', (e) => {
+    if (undoStripEl.classList.contains('visible') && !undoStripEl.contains(e.target) && e.target !== undoBtn) {
+      undoStripEl.classList.remove('visible');
+    }
   });
   updateUndoButton();
 
@@ -1462,13 +1585,100 @@ async function init() {
     const enabled = document.getElementById('section-enable').checked;
     material.clippingPlanes = enabled ? [sectionPlane] : [];
     document.getElementById('section-controls-row').style.display = enabled ? '' : 'none';
+    document.getElementById('xray-toggle')?.classList.toggle('active', enabled);
   }
   updateSectionPlane();
   updateSectionEnabled();
   document.getElementById('section-enable').addEventListener('change', updateSectionEnabled);
   for (const id of ['section-axis', 'section-flip', 'section-pos']) {
-    document.getElementById(id).addEventListener('input', updateSectionPlane);
+    document.getElementById(id).addEventListener('input', () => {
+      updateSectionPlane();
+      syncXrayHandleToSectionPlane();
+    });
   }
+
+  // B2: X-Ray as an interactive draggable cutaway plane, not just a
+  // checkbox+slider. #section-enable/#section-axis/#section-flip/
+  // #section-pos (Lab panel, still there for precise numeric control)
+  // and this handle drive the exact same `sectionPlane` object, kept in
+  // sync both directions -- "keep all underlying mechanics... unchanged,
+  // this phase is presentation and interaction feel only" (B2's own
+  // scope line): sectionPlane/material.clippingPlanes are untouched,
+  // only how a player reaches and moves them is new.
+  const xrayHandleGeometry = new THREE.PlaneGeometry(40, 40);
+  const xrayHandleMaterial = new THREE.MeshBasicMaterial({
+    color: 0x9de0ff,
+    transparent: true,
+    opacity: 0.16,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const xrayHandle = new THREE.Mesh(xrayHandleGeometry, xrayHandleMaterial);
+  xrayHandle.visible = false;
+  scene.add(xrayHandle);
+
+  const xrayGizmo = new TransformControls(camera, renderer.domElement);
+  xrayGizmo.setMode('translate');
+  xrayGizmo.setSize(0.8);
+  xrayGizmo.visible = false;
+  xrayGizmo.enabled = false;
+  scene.add(xrayGizmo.getHelper ? xrayGizmo.getHelper() : xrayGizmo);
+  xrayGizmo.addEventListener('dragging-changed', (e) => {
+    controls.enabled = !e.value; // TransformControls/OrbitControls both want the mouse -- yield orbit while actively dragging the plane
+  });
+
+  function orientXrayHandle(axis) {
+    xrayHandle.rotation.set(0, 0, 0);
+    if (axis === 'x') xrayHandle.rotation.y = Math.PI / 2;
+    else if (axis === 'y') xrayHandle.rotation.x = Math.PI / 2;
+    // axis === 'z': PlaneGeometry's own default orientation already faces Z, no rotation needed
+    xrayGizmo.showX = axis === 'x';
+    xrayGizmo.showY = axis === 'y';
+    xrayGizmo.showZ = axis === 'z';
+  }
+
+  function syncXrayHandleToSectionPlane() {
+    if (!xrayHandle.visible) return;
+    const axis = document.getElementById('section-axis').value;
+    const pos = Number(document.getElementById('section-pos').value) || 0;
+    orientXrayHandle(axis);
+    xrayHandle.position.set(0, 0, 0);
+    xrayHandle.position[axis] = pos;
+  }
+
+  // Dragging the handle updates sectionPlane in real time -- reveals the
+  // interior as it moves through the structure, not just on release.
+  xrayGizmo.addEventListener('change', () => {
+    if (!xrayHandle.visible) return;
+    const axis = document.getElementById('section-axis').value;
+    const flip = document.getElementById('section-flip').checked;
+    const pos = xrayHandle.position[axis];
+    const axisVec = new THREE.Vector3(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0);
+    sectionPlane.setFromNormalAndCoplanarPoint(
+      flip ? axisVec.clone().negate() : axisVec,
+      axisVec.clone().multiplyScalar(pos)
+    );
+    // Keep the Lab panel's own numeric slider live too, both directions.
+    const posInput = document.getElementById('section-pos');
+    if (document.activeElement !== posInput) posInput.value = String(Math.round(pos * 10) / 10);
+  });
+
+  document.getElementById('xray-toggle')?.addEventListener('click', () => {
+    const enableCheckbox = document.getElementById('section-enable');
+    const turningOn = !enableCheckbox.checked;
+    enableCheckbox.checked = turningOn;
+    updateSectionEnabled();
+    xrayHandle.visible = turningOn;
+    xrayGizmo.visible = turningOn;
+    xrayGizmo.enabled = turningOn;
+    if (turningOn) {
+      syncXrayHandleToSectionPlane();
+      xrayGizmo.attach(xrayHandle);
+      showHudPrompt('X-Ray: drag the translucent plane through the structure.', 4000);
+    } else {
+      xrayGizmo.detach();
+    }
+  });
 
   const shellCountInput = document.getElementById('shell-count');
   const hollowFromInput = document.getElementById('hollow-from');
@@ -1543,16 +1753,6 @@ async function init() {
   }
   refreshHudIndicator = updateHudIndicator;
   materialSelect.addEventListener('change', updateHudIndicator);
-
-  let hudPromptTimer = null;
-  function showHudPrompt(text, ms = 4000) {
-    const el = document.getElementById('hud-prompt');
-    if (!el) return;
-    el.textContent = text;
-    el.classList.add('visible');
-    clearTimeout(hudPromptTimer);
-    hudPromptTimer = setTimeout(() => el.classList.remove('visible'), ms);
-  }
 
   const modeButtons = document.querySelectorAll('.mode-btn');
   modeButtons.forEach((btn) => {
@@ -1713,7 +1913,13 @@ async function init() {
     scene.add(m);
     return m;
   });
+  let lastHoverCells = null;
+  // B2: the material wheel's live structure-preview on hover recolors
+  // this same ghost instead of a separate preview object -- when set,
+  // it overrides the normal occupied/valid tint until hover ends.
+  let materialPreviewColor = null;
   function showGhost(cells) {
+    lastHoverCells = cells;
     ghostMeshes.forEach((m, i) => {
       const cell = cells[i];
       if (!cell) {
@@ -1723,10 +1929,11 @@ async function init() {
       const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z);
       m.position.set(wx, wy, wz);
       m.visible = true;
-      ghostMaterial.color.set(cell.occupied ? 0xff8866 : 0x9de0ff);
+      ghostMaterial.color.set(materialPreviewColor ?? (cell.occupied ? 0xff8866 : 0x9de0ff));
     });
   }
   function hideGhost() {
+    lastHoverCells = null;
     ghostMeshes.forEach((m) => {
       m.visible = false;
     });
@@ -1831,6 +2038,15 @@ async function init() {
     onPrompt: (text) => showHudPrompt(text),
     onMenuSound: playMenuSound,
     onSelectionChange: updateHudIndicator,
+    getMaterialColor: (value) => `#${(MATERIAL_COLORS[value] ?? MATERIAL_COLORS.base).toString(16).padStart(6, '0')}`,
+    onMaterialHoverPreview: (value) => {
+      materialPreviewColor = MATERIAL_COLORS[value] ?? MATERIAL_COLORS.base;
+      if (lastHoverCells) showGhost(lastHoverCells);
+    },
+    onMaterialHoverEnd: () => {
+      materialPreviewColor = null;
+      if (lastHoverCells) showGhost(lastHoverCells);
+    },
   });
   updateHudIndicator();
 

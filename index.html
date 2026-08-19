@@ -32,7 +32,7 @@
       pointer-events: none;
     }
     #hud-indicator {
-      position: fixed; top: 14px; right: 54px; z-index: 900;
+      position: fixed; top: 14px; right: 92px; z-index: 900;
       color: #bcd; font: 12px/1.4 system-ui, sans-serif;
       text-align: right; user-select: none; pointer-events: none;
       max-width: 45vw;
@@ -76,6 +76,34 @@
       cursor: pointer;
     }
     #lab-toggle:hover { background: rgba(255, 255, 255, 0.15); }
+    #xray-toggle {
+      position: fixed; top: 12px; right: 50px; z-index: 900;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      color: #ddd;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font: 15px system-ui, sans-serif;
+      cursor: pointer;
+    }
+    #xray-toggle:hover { background: rgba(255, 255, 255, 0.15); }
+    #xray-toggle.active { background: rgba(120, 190, 255, 0.4); border-color: #7cf; color: #fff; }
+
+    /* B2's Explore transition sequence: the HUD-fade half. #hud-prompt
+       and #hud-crosshair are deliberately excluded -- the prompt IS the
+       transition's own cue text, and the crosshair fades in/out on its
+       own timing (render.js), not this one. */
+    #hud-wordmark, #hud-indicator, #hud-wheel-cue, #lab-toggle, #xray-toggle {
+      transition: opacity 0.3s ease;
+    }
+    body.explore-transitioning #hud-wordmark,
+    body.explore-transitioning #hud-indicator,
+    body.explore-transitioning #hud-wheel-cue,
+    body.explore-transitioning #lab-toggle,
+    body.explore-transitioning #xray-toggle {
+      opacity: 0;
+      pointer-events: none;
+    }
 
     /* Ghost block preview -- a translucent single-cell (or two-cell,
        while "holding") outline shown at the next valid FCC position on
@@ -93,7 +121,6 @@
        changes, since they're no longer independently-fixed sidebars,
        just scrollable sections inside one panel. */
     #lab-panel {
-      display: none;
       position: fixed;
       top: 54px; right: 12px; bottom: 12px;
       width: 320px;
@@ -105,8 +132,25 @@
       overflow-y: auto;
       box-sizing: border-box;
       padding: 10px 12px 16px;
+      /* B2's "geometric menu transitions": a diamond-shaped reveal
+         (clip-path grows from a point at the panel's own corner, the
+         corner nearest #lab-toggle) instead of an instant display swap.
+         visibility+opacity (not display) so the clip-path transition can
+         actually play; pointer-events off while closed so the invisible-
+         but-still-laid-out panel never intercepts clicks meant for the
+         canvas underneath. */
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      clip-path: polygon(100% 0%, 100% 0%, 100% 0%, 100% 0%);
+      transition: clip-path 0.32s ease, opacity 0.22s ease;
     }
-    #lab-panel.open { display: block; }
+    #lab-panel.open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      clip-path: polygon(-40% 0%, 100% -60%, 140% 100%, 0% 160%);
+    }
     #lab-panel h2 {
       margin: 4px 0 8px;
       font: 700 13px system-ui, sans-serif;
@@ -117,6 +161,16 @@
     #lab-settings-section .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; color: #ddd; font: 12px system-ui, sans-serif; }
     #lab-settings-section input[type="range"] { width: 130px; }
 
+    /* B2 rhombic grammar, applied across the remaining (Lab panel) UI
+       surfaces the Rhombic Wheel itself doesn't cover. A literal 45deg-
+       rotated square reads fine for the wheel's short one/two-word
+       labels (B1) but goes illegible for this panel's longer button/
+       label text at this font size, so buttons here use a PARALLELOGRAM
+       (clip-path with slanted verticals) instead -- same diagonal-
+       symmetry family as a rhombus, keeps text upright and readable.
+       Every element below keeps its real underlying <button>/<select>/
+       <input> semantics; only the paint layer changes, matching B2's own
+       "presentation and interaction feel only" scope. */
     #controls {
       color: #ddd;
       font: 13px/1.4 system-ui, sans-serif;
@@ -124,7 +178,20 @@
       box-sizing: border-box;
     }
     #controls input[type="number"] { width: 3em; }
-    #controls select { font: inherit; }
+    #controls select {
+      font: inherit;
+      color: inherit;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(124, 204, 255, 0.35);
+      border-radius: 2px;
+      /* A small diamond notch on the left edge of every selector, so a
+         <select> reads as part of the same rhombic-grammar family as the
+         buttons even though clip-path on a native select risks clipping
+         its own dropdown arrow -- this is a safer, still-real touch. */
+      border-left: 10px solid transparent;
+      border-image: linear-gradient(135deg, #9de0ff 0 4px, transparent 4px) 1;
+      padding: 2px 4px;
+    }
     #controls .row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
     #controls .hint { opacity: 0.7; margin: 6px 0 0; max-width: 26em; }
     #controls .buttons { display: flex; gap: 6px; margin-top: 6px; }
@@ -133,12 +200,51 @@
       color: inherit;
       background: rgba(255, 255, 255, 0.1);
       border: 1px solid rgba(255, 255, 255, 0.25);
-      border-radius: 4px;
-      padding: 4px 8px;
+      padding: 5px 12px;
       cursor: pointer;
+      /* Parallelogram, not a rectangle -- see the comment above
+         #lab-settings-section for why this shape family over a literal
+         rotated square here. */
+      clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
     }
-    #controls button:hover, #controls .file-btn:hover { background: rgba(255, 255, 255, 0.2); }
-    #controls button.mode-btn.active { background: rgba(120, 190, 255, 0.35); border-color: #7cf; }
+    #controls button:hover, #controls .file-btn:hover {
+      /* Tessellating diamond/argyle highlight (B2's own literal
+         requirement) instead of a flat hover color. */
+      background-color: rgba(60, 110, 160, 0.5);
+      background-image:
+        repeating-linear-gradient(45deg, rgba(157,224,255,0.22) 0 5px, transparent 5px 12px),
+        repeating-linear-gradient(-45deg, rgba(157,224,255,0.22) 0 5px, transparent 5px 12px);
+      border-color: #9de0ff;
+    }
+    #controls button.mode-btn.active {
+      background-color: rgba(120, 190, 255, 0.4);
+      background-image:
+        repeating-linear-gradient(45deg, rgba(157,224,255,0.28) 0 5px, transparent 5px 12px),
+        repeating-linear-gradient(-45deg, rgba(157,224,255,0.28) 0 5px, transparent 5px 12px);
+      border-color: #7cf;
+    }
+
+    /* Diamond-shaped checkboxes (Invert Y, Section view, Flip, claim
+       destructible toggles) -- a real custom-rendered rhombus, not the
+       browser default square/rounded-square. */
+    #controls input[type="checkbox"], #lab-settings-section input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 15px; height: 15px;
+      margin: 0;
+      border: 1.5px solid rgba(124, 204, 255, 0.6);
+      background: rgba(255,255,255,0.06);
+      transform: rotate(45deg);
+      cursor: pointer;
+      display: inline-block;
+      position: relative;
+      vertical-align: middle;
+    }
+    #controls input[type="checkbox"]:checked, #lab-settings-section input[type="checkbox"]:checked {
+      background: #7cf;
+      border-color: #9de0ff;
+      box-shadow: 0 0 6px rgba(124, 204, 255, 0.7);
+    }
 
     /* Lab panel is already a single scrollable overlay at any viewport
        size (see #lab-panel above) -- on a narrow/touch viewport it just
@@ -162,19 +268,61 @@
       user-select: none;
       margin-top: 14px;
     }
+    /* B2: "replace any numeric Undo readout with a held-icon (up arrow
+       with a rotate icon) miniature scrub-timeline of past world
+       states." A quick click still undoes one step (same underlying
+       action as before); holding it down reveals #undo-scrub-strip, a
+       row of small rhombus ticks (oldest at the icon, most recent at
+       the far end -- see render.js), each jumping straight to that
+       state on click. */
+    #undo-widget { position: relative; margin-top: 6px; }
     #undo-btn {
       display: block;
-      width: 100%;
-      font: bold 14px system-ui, sans-serif;
+      width: 44px; height: 44px;
+      margin: 0 auto;
+      font: 20px system-ui, sans-serif;
       color: #fff;
       background: #b45309;
-      border: 1px solid #f59e0b;
-      border-radius: 4px;
-      padding: 8px;
+      border: 1.5px solid #f59e0b;
+      transform: rotate(45deg);
       cursor: pointer;
     }
+    #undo-btn span { display: block; transform: rotate(-45deg); }
     #undo-btn:hover:not(:disabled) { background: #d97706; }
     #undo-btn:disabled { opacity: 0.35; cursor: default; }
+    #undo-scrub-strip {
+      display: none;
+      position: absolute;
+      left: 50%;
+      top: 52px;
+      transform: translateX(-50%);
+      background: rgba(6, 6, 12, 0.96);
+      border: 1px solid rgba(124, 204, 255, 0.4);
+      border-radius: 6px;
+      padding: 8px;
+      z-index: 20;
+      max-width: 280px;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    #undo-scrub-strip.visible { display: flex; }
+    #undo-scrub-strip .scrub-tick {
+      width: 16px; height: 16px;
+      background: rgba(180, 83, 9, 0.6);
+      border: 1px solid rgba(245, 158, 11, 0.7);
+      transform: rotate(45deg);
+      cursor: pointer;
+      flex: none;
+    }
+    #undo-scrub-strip .scrub-tick:hover {
+      background: #f59e0b;
+      box-shadow: 0 0 6px rgba(245, 158, 11, 0.8);
+    }
+    #undo-scrub-strip .scrub-label {
+      width: 100%; text-align: center;
+      color: #bcd; font: 10px system-ui, sans-serif; opacity: 0.75;
+      margin-bottom: 2px;
+    }
     #shells-panel h3 { margin: 10px 0 4px; font-size: 13px; opacity: 0.85; }
     #ring-list { max-height: 460px; overflow-y: auto; }
     #ring-list svg { display: block; margin: 4px auto 8px; }
@@ -439,6 +587,7 @@
   <div id="hud-prompt"></div>
   <div id="hud-crosshair"></div>
   <div id="hud-wheel-cue">Tab / Space — Menu</div>
+  <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>
   <button id="lab-toggle" type="button" title="Advanced / Lab">⚙</button>
 
   <div id="lab-panel">
@@ -631,7 +780,10 @@
   </div>
   <h2 style="margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12); font: 700 13px system-ui, sans-serif; color: #9de0ff;">Shells</h2>
   <div id="shells-panel">
-    <button id="undo-btn" type="button" disabled>Undo</button>
+    <div id="undo-widget">
+      <button id="undo-btn" type="button" disabled title="Click: undo one step. Hold: scrub to any past state."><span>↶</span></button>
+      <div id="undo-scrub-strip"></div>
+    </div>
     <h3>Shells (click a built cell)</h3>
     <div id="ring-list"><div class="placeholder">Click a built structure to see its shells.</div></div>
   </div>
