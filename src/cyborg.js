@@ -9,7 +9,7 @@
 // removeCell or touches localStorage, satisfying B3's own "toggleable
 // off at any time with zero persistent state change to the world."
 const CSS = `
-#cyborg-panel {
+.cyborg-panel {
   position: fixed;
   left: 50%; bottom: 110px; transform: translateX(-50%);
   z-index: 940;
@@ -22,20 +22,20 @@ const CSS = `
   font: 13px/1.45 system-ui, sans-serif;
   box-shadow: 0 6px 24px rgba(0,0,0,0.5);
 }
-#cyborg-header {
+.cyborg-header {
   display: flex; align-items: center; justify-content: space-between;
   font: 700 11px system-ui, sans-serif;
   letter-spacing: 0.04em;
   color: #9de0ff;
   margin-bottom: 4px;
 }
-#cyborg-close {
+.cyborg-close {
   background: none; border: none; color: #9de0ff; cursor: pointer;
   font: 13px system-ui, sans-serif; opacity: 0.8; padding: 0 2px;
 }
-#cyborg-close:hover { opacity: 1; }
-#cyborg-instruction { color: #fff; }
-#cyborg-hint {
+.cyborg-close:hover { opacity: 1; }
+.cyborg-instruction { color: #fff; }
+.cyborg-hint {
   display: none;
   margin-top: 6px;
   padding-top: 6px;
@@ -43,7 +43,7 @@ const CSS = `
   color: #bcd;
   font-size: 12px;
 }
-#cyborg-hint.visible { display: block; }
+.cyborg-hint.visible { display: block; }
 
 /* Highlights render.js's #app (the "#viewport" the spec's own example
    subscript names -- this codebase's real 3D-viewport container has a
@@ -68,9 +68,9 @@ function injectCssOnce() {
   document.head.appendChild(style);
 }
 
-const SUCCESS_EVENTS = ['cameraRotated', 'faceHovered', 'cellPlaced'];
+const SUCCESS_EVENTS = ['cameraRotated', 'faceHovered', 'cellPlaced', 'wheelOpened', 'walkModeEntered', 'seedPlanted'];
 
-export function createCyborgMode({ subscriptUrl = './data/cyborg/first-build-session.json' } = {}) {
+export function createCyborgMode({ subscriptUrl = './data/cyborg/first-build-session.json', panelTitle = 'Cyborg Mode — Guided Walkthrough' } = {}) {
   injectCssOnce();
 
   let subscript = null;
@@ -81,17 +81,17 @@ export function createCyborgMode({ subscriptUrl = './data/cyborg/first-build-ses
   const listeners = [];
 
   const panel = document.createElement('div');
-  panel.id = 'cyborg-panel';
+  panel.className = 'cyborg-panel';
   panel.style.display = 'none';
   panel.innerHTML = `
-    <div id="cyborg-header"><span>Cyborg Mode — Guided Walkthrough</span><button id="cyborg-close" type="button" title="Turn off Cyborg Mode">✕</button></div>
-    <div id="cyborg-instruction"></div>
-    <div id="cyborg-hint"></div>
+    <div class="cyborg-header"><span>${panelTitle}</span><button class="cyborg-close" type="button" title="Turn off">✕</button></div>
+    <div class="cyborg-instruction"></div>
+    <div class="cyborg-hint"></div>
   `;
   document.body.appendChild(panel);
-  const instructionEl = panel.querySelector('#cyborg-instruction');
-  const hintEl = panel.querySelector('#cyborg-hint');
-  panel.querySelector('#cyborg-close').addEventListener('click', () => disable());
+  const instructionEl = panel.querySelector('.cyborg-instruction');
+  const hintEl = panel.querySelector('.cyborg-hint');
+  panel.querySelector('.cyborg-close').addEventListener('click', () => disable());
 
   let highlightedEl = null;
   function clearHighlight() {

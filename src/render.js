@@ -722,6 +722,30 @@ cyborgToggleEl.addEventListener('click', () => {
   cyborgToggleEl.classList.toggle('active', cyborgMode.isEnabled());
 });
 
+// B6's onboarding discovery sequence -- a second, independent Cyborg
+// Mode instance (cyborg.js supports concurrent instances precisely for
+// this) auto-started once, only on a true first visit, so it never
+// fights with the player's own manual Cyborg Mode toggle above.
+const onboardingCyborg = createCyborgMode({
+  subscriptUrl: './data/cyborg/onboarding.json',
+  panelTitle: 'Welcome — a quick tour',
+});
+
+// welcome.js's identity grid ("consider making the four personas
+// clickable... letting a new player pick 'Rhombiologist' and land with
+// the grow wheel open") dispatches this the instant a persona is
+// clicked -- which can happen before init() below has finished (welcome.js
+// is deliberately independent of this file, see its own header comment,
+// so there's no other handshake). Latched at module level so an early
+// click isn't lost; applyPersonaChoiceFn is only assigned once init()
+// has everything (the wheel, mode shims) a persona action needs.
+let pendingPersonaChoice = null;
+let applyPersonaChoiceFn = null;
+window.addEventListener('rhombiverse:personaChosen', (e) => {
+  if (applyPersonaChoiceFn) applyPersonaChoiceFn(e.detail.persona);
+  else pendingPersonaChoice = e.detail.persona;
+});
+
 // Settings inputs (Lab panel only, per B1) -- initialized from whatever
 // was last saved/defaulted in settings.js, then pushed back on any change.
 (function wireSettingsPanel() {
@@ -1009,6 +1033,7 @@ async function init() {
     saveToLocalStorage(world.toJSON());
     showHudPrompt('Loaded a shared World from your link.', 5000);
   }
+  if (isFirstVisit) onboardingCyborg.enable();
   // Declared this early so the very first rebuildInstances() call below
   // (before the mode-button UI further down even exists) can safely
   // reference it -- report mode can't be active yet at that point, but
@@ -2223,6 +2248,9 @@ async function init() {
     // separate coordinate space, see worldstate.js's own comment on why)
     // -- achievements need their own hook here too.
     toastNewAchievements(checkAchievements({ world, planetoids }));
+    // B6's onboarding discovery sequence listens for this (see
+    // data/cyborg/onboarding.json), same spirit as build.js's onPlaced.
+    window.dispatchEvent(new CustomEvent('rhombiverse:seedPlanted'));
   });
   updateModeUI();
 
@@ -2820,6 +2848,36 @@ async function init() {
     },
   });
   updateHudIndicator();
+
+  // Completes the persona grid's onboarding arc: Build is already the
+  // default state (Rhombitect needs no action beyond dismissing the
+  // overlay), the other three land the player straight into the mode/
+  // panel their persona is about -- reusing the exact same wheel-item
+  // clicks a real player would make (open() -> category leaf -> tool
+  // leaf), so this can never drift out of sync with what the wheel
+  // itself does for that same choice.
+  applyPersonaChoiceFn = (persona) => {
+    const clickWheelItem = (text) => {
+      [...document.querySelectorAll('.wheel-item')].find((el) => el.textContent.includes(text))?.click();
+    };
+    if (persona === 'rhombinaut') {
+      wheel.open();
+      clickWheelItem('Explore');
+    } else if (persona === 'rhombisculptor') {
+      wheel.open();
+      clickWheelItem('Create');
+      clickWheelItem('Sculpt');
+    } else if (persona === 'rhombiologist') {
+      wheel.open();
+      clickWheelItem('Grow');
+      clickWheelItem('Cultivate');
+    }
+    // 'rhombitect' (Build): already the default state, nothing to do.
+  };
+  if (pendingPersonaChoice) {
+    applyPersonaChoiceFn(pendingPersonaChoice);
+    pendingPersonaChoice = null;
+  }
 
   // Shared World (Phase 5): applyRemoteUpsert/Delete write an incoming
   // realtime change into the LOCAL store via the same world.addCell/

@@ -1,0 +1,46 @@
+{
+  "subscriptName": "onboarding",
+  "steps": [
+    {
+      "stepId": "first_build",
+      "instruction": "You're standing in a real, already-built World -- the Showcase World, made of the same blocks you can place. Try adding one of your own: hover a face and click (or tap it on a touch screen).",
+      "successCondition": "cellPlaced",
+      "hintAfterSeconds": 12,
+      "hint": "Any flat face works -- click or tap it to place a block there.",
+      "highlightTarget": "#app"
+    },
+    {
+      "stepId": "keep_going",
+      "instruction": "Nice. Add a few more, however you like -- there's no wrong way to build.",
+      "successCondition": "cellPlaced",
+      "hintAfterSeconds": 10,
+      "hint": "Keep clicking or tapping faces to keep adding blocks.",
+      "highlightTarget": "#app"
+    },
+    {
+      "stepId": "open_wheel",
+      "instruction": "Tab / Space -- or tap Menu, bottom-left -- opens the Rhombic Wheel. Everything you can do lives there.",
+      "successCondition": "wheelOpened",
+      "hintAfterSeconds": 10,
+      "hint": "Press Tab or Space, or tap the \"Menu\" label near the bottom-left corner.",
+      "highlightTarget": "#hud-wheel-cue"
+    },
+    {
+      "stepId": "plant_life",
+      "instruction": "This World already has real, growing life in it. Open Grow in the wheel and plant something of your own too.",
+      "successCondition": "seedPlanted",
+      "hintAfterSeconds": 14,
+      "hint": "Open the wheel, choose Grow, then click or tap a face to plant a seed there.",
+      "highlightTarget": "#app"
+    },
+    {
+      "stepId": "discover_explore",
+      "instruction": "Now walk around what's already here -- yours and everyone else's. Open the wheel and choose Explore.",
+      "successCondition": "walkModeEntered",
+      "hintAfterSeconds": 10,
+      "hint": "Open the wheel, then choose Explore.",
+      "highlightTarget": "#app"
+    }
+  ],
+  "completionMessage": "That's the whole loop -- build, discover, explore. The rest is yours."
+}

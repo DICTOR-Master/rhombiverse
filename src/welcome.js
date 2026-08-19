@@ -54,10 +54,10 @@ function overlayHtml() {
       <div class="identity-block">
         <div class="identity-prompt">Who are you here?</div>
         <div class="identity-grid">
-          <div class="identity-item"><strong>Rhombinaut</strong> -- walk your worlds</div>
-          <div class="identity-item"><strong>Rhombitect</strong> -- build whole planets</div>
-          <div class="identity-item"><strong>Rhombisculptor</strong> -- model, chisel, create</div>
-          <div class="identity-item"><strong>Rhombiologist</strong> -- grow real, evolving life</div>
+          <div class="identity-item" data-persona="rhombinaut" role="button" tabindex="0"><strong>Rhombinaut</strong> -- walk your worlds</div>
+          <div class="identity-item" data-persona="rhombitect" role="button" tabindex="0"><strong>Rhombitect</strong> -- build whole planets</div>
+          <div class="identity-item" data-persona="rhombisculptor" role="button" tabindex="0"><strong>Rhombisculptor</strong> -- model, chisel, create</div>
+          <div class="identity-item" data-persona="rhombiologist" role="button" tabindex="0"><strong>Rhombiologist</strong> -- grow real, evolving life</div>
         </div>
       </div>
       <p class="quickstart"><strong>Tab</strong> / <strong>Space</strong> opens the Rhombic Wheel. Click a face to build, right-click to remove.</p>
@@ -109,7 +109,7 @@ function init() {
     overlay.style.display = 'none';
   }
 
-  document.getElementById('enter-world-btn').addEventListener('click', () => {
+  function persistSkipChoice() {
     if (document.getElementById('skip-intro-checkbox').checked) {
       try {
         localStorage.setItem(SKIP_KEY, 'true');
@@ -117,9 +117,34 @@ function init() {
         console.warn('Rhombiverse: failed to save intro preference', err);
       }
     }
+  }
+
+  document.getElementById('enter-world-btn').addEventListener('click', () => {
+    persistSkipChoice();
     hide();
   });
   aboutBtn.addEventListener('click', show);
+
+  // "Consider making the four personas clickable... letting a new player
+  // pick 'Rhombiologist' and land with the grow wheel open would complete
+  // the onboarding arc" -- render.js (loaded independently of this file,
+  // see the header comment above) listens for this and does the actual
+  // mode/panel switching; this module only knows DOM/localStorage, never
+  // world state, so it can't do that part itself.
+  document.querySelectorAll('.identity-item').forEach((el) => {
+    const choose = () => {
+      window.dispatchEvent(new CustomEvent('rhombiverse:personaChosen', { detail: { persona: el.dataset.persona } }));
+      persistSkipChoice();
+      hide();
+    };
+    el.addEventListener('click', choose);
+    el.addEventListener('keydown', (e) => {
+      if (e.code === 'Enter' || e.code === 'Space') {
+        e.preventDefault();
+        choose();
+      }
+    });
+  });
 
   let skip = false;
   try {
