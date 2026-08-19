@@ -523,3 +523,34 @@ export function subscribeToSharedWorld({
 
   return () => supabase.removeChannel(channel);
 }
+
+// B6's public gallery (schema.sql's shared_worlds table -- run that
+// migration once before these will work; requires the same Anonymous
+// Sign-Ins setup Phase 5's own header already documents). No realtime
+// subscription here -- a gallery is browsed on demand (fetchGalleryWorlds),
+// not a live feed like cells/claims/trades.
+export async function publishToGallery(title, worldData, thumbnail) {
+  const { data, error } = await supabase
+    .from('shared_worlds')
+    .insert({ title, world_data: worldData, thumbnail })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+export async function fetchGalleryWorlds(limit = 30) {
+  const { data, error } = await supabase
+    .from('shared_worlds')
+    .select('id, title, thumbnail, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchGalleryWorldData(id) {
+  const { data, error } = await supabase.from('shared_worlds').select('world_data').eq('id', id).single();
+  if (error) throw error;
+  return data.world_data;
+}

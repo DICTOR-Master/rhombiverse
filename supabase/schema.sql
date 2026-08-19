@@ -704,4 +704,42 @@ create policy "seeds_update_any_authenticated" on public.seeds
 create policy "seeds_delete_own" on public.seeds
   for delete using (owner_id = auth.uid());
 
+-- RHOMBIVERSE_UIUX_BUILD_PLAN.md B6: "a public gallery view of
+-- showcase/community Worlds with thumbnails." Genuinely new
+-- infrastructure -- nothing in this schema could be repurposed for it
+-- (world_snapshots above is deny-all/internal-recovery-only, not
+-- player-facing). world_data holds the exact same worldshare.js
+-- "shareable slice" shape the compressed-URL sharing feature already
+-- uses (worldName/version/cells/claims/seeds/organisms/meta) -- one
+-- format for both sharing paths, just stored server-side here instead
+-- of embedded in a URL, which is also what gives a gallery entry its
+-- own short `id` instead of a long compressed blob in the address bar.
+create table public.shared_worlds (
+  id text primary key default substr(md5(random()::text || clock_timestamp()::text), 1, 10),
+  title text not null,
+  author_id uuid not null default auth.uid(),
+  world_data jsonb not null,
+  thumbnail text, -- small data: URL (PNG), captured client-side from the live canvas at publish time
+  -- Schema-ready moderation field, same "exists from day one, real
+  -- enforcement is B7" convention cells.data.status already established
+  -- (see build.js's own Report-mode comment) -- the select policy below
+  -- does NOT filter on this yet, matching that precedent exactly rather
+  -- than inventing a stricter rule this project doesn't apply anywhere
+  -- else yet.
+  status text not null default 'pending',
+  created_at timestamptz not null default now()
+);
+
+alter table public.shared_worlds enable row level security;
+
+create policy "shared_worlds_select_all" on public.shared_worlds
+  for select using (true);
+
+create policy "shared_worlds_insert_own" on public.shared_worlds
+  for insert with check (author_id = auth.uid());
+
+-- No update/delete policy at all -- INSERT-only by design, same
+-- immutable-once-created pattern as claims (a published World is a
+-- snapshot, not a live-editable record).
+
 alter publication supabase_realtime add table public.seeds;

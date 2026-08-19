@@ -78,6 +78,9 @@ import {
   pushTradeCancel,
   pushSeedSet,
   pushSeedClear,
+  publishToGallery,
+  fetchGalleryWorlds,
+  fetchGalleryWorldData,
 } from './sync.js';
 import { computeClaim, claimFootprintWorldVertices } from './regions.js';
 import {
@@ -94,6 +97,15 @@ import {
 // where every trade action goes through sync.js's server-backed
 // pushTradePropose/Confirm/Cancel instead.
 import { applyInventoryDecay } from './trade.js';
+import { checkAchievements } from './achievements.js';
+import {
+  compressionSupported,
+  encodeWorldForUrl,
+  decodeWorldFromUrl,
+  buildShareUrl,
+  getSharedWorldParam,
+  clearSharedWorldParam,
+} from './worldshare.js';
 import { GROWTH_TEMPLATES, plantSeed, applyGrowth, tileWorldVertices, pruneTile, VALID_TRIPLES, unitTileVertices } from './growth.js';
 import {
   createCultivationSession,
@@ -292,6 +304,31 @@ function showHudPrompt(text, ms = 4000) {
   clearTimeout(hudPromptTimer);
   hudPromptTimer = setTimeout(() => el.classList.remove('visible'), ms);
 }
+
+// The HUD's icon-only toggles (Duality, Sculpture Mode, Cyborg, X-Ray,
+// Lab) rely on a hover `title` for their label -- real on desktop, but
+// titles don't exist on touch at all, so a first-time tap is a total
+// guess there. Explains itself via the same toast every other hint in
+// this file already uses, once per toggle, the first time it's used
+// (hover for a mouse, tap for touch -- whichever fires first).
+const HINT_SEEN_KEY = 'rhombiverse-hud-hints-seen';
+function loadSeenHints() {
+  try { return new Set(JSON.parse(localStorage.getItem(HINT_SEEN_KEY)) || []); }
+  catch { return new Set(); }
+}
+const seenHints = loadSeenHints();
+function wireFirstUseHint(elementId, text) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const reveal = () => {
+    if (seenHints.has(elementId)) return;
+    seenHints.add(elementId);
+    localStorage.setItem(HINT_SEEN_KEY, JSON.stringify([...seenHints]));
+    showHudPrompt(text, 4500);
+  };
+  el.addEventListener('mouseenter', reveal);
+  el.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') reveal(); });
+}
 let planetoids = {};
 // Mirrors world.getClaims(), same module-level pattern as planetoids
 // above -- gravityAt() (RHOMBIVERSE_SPEC_LOOPHOLES.md section 5) and
@@ -327,6 +364,12 @@ let unsubscribeShared = null;
 // -- ownership (RHOMBIVERSE_SPEC_REGIONS.md) only means anything with a
 // real per-player identity, which local-only play doesn't have.
 let myUserId = null;
+// B6: the fallback identity for solo play everywhere a real ownerId
+// would otherwise be required (mining/inventory credit, Sculpt/
+// Cultivate sessions) -- claims still require a real Shared World
+// account (one claim per verified account, per regions.js), but
+// nothing else does.
+const LOCAL_PLAYER_ID = 'local-player';
 
 function handleLocalAdd(x, y, z, data) {
   if (sharedWorldActive && !applyingRemote) pushCellUpsert(x, y, z, data);
@@ -521,6 +564,33 @@ function updateBeltHint() {
   }
   if (!nearest) return;
   el.textContent = `Nearest belt: ${nearest.id} · ${nearestDist.toFixed(0)}u away.`;
+  checkBeltApproachTransition(nearest, nearestDist);
+}
+
+// B6: "a visible transition when approaching a mineable asteroid
+// (lattice becoming apparent, then diggable), mirroring the B2 Explore-
+// mode transition style." Reuses updateBeltHint's own already-computed
+// nearest-belt distance (no second loop) -- a real two-stage threshold
+// crossing (far -> approaching -> diggable), each firing its own toast
+// exactly once per approach, same showHudPrompt pattern B2/B3/B4/B5 all
+// already use for their own transitions.
+const BELT_APPROACH_RADIUS = 40; // "the lattice becoming apparent"
+const BELT_DIGGABLE_RADIUS = 15; // close enough to actually mine
+let beltApproachState = 'far'; // 'far' | 'approaching' | 'diggable'
+function checkBeltApproachTransition(nearest, dist) {
+  if (dist < BELT_DIGGABLE_RADIUS) {
+    if (beltApproachState !== 'diggable') {
+      showHudPrompt(`${nearest.id}: close enough to mine — right-click an asteroid cell to harvest it.`, 4200);
+    }
+    beltApproachState = 'diggable';
+  } else if (dist < BELT_APPROACH_RADIUS) {
+    if (beltApproachState === 'far') {
+      showHudPrompt(`${nearest.id} ahead — its lattice structure is becoming visible.`, 4200);
+    }
+    beltApproachState = 'approaching';
+  } else {
+    beltApproachState = 'far';
+  }
 }
 
 // B2's Explore transition sequence -- HUD fade, camera settle, a gravity
@@ -565,6 +635,7 @@ function enterWalk() {
     player.setEnabled(true);
     player.requestLock();
     walkTransitioning = false;
+    window.dispatchEvent(new CustomEvent('rhombiverse:walkModeEntered')); // B6's onboarding discovery sequence
     updateGravityInfo();
     updateBeltHint();
     updateEvolutionInfo();
@@ -871,6 +942,12 @@ function rebuildInstances(mesh, world, inReportMode = false) {
 }
 
 async function init() {
+  wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
+  wireFirstUseHint('sculpture-mode-toggle', 'Sculpture Mode: a separate, isolated scratch workspace -- nothing here touches your real World.');
+  wireFirstUseHint('cyborg-toggle', 'Cyborg Mode: a guided walkthrough, step by step.');
+  wireFirstUseHint('xray-toggle', 'X-Ray: drag a cutaway plane through the structure to see inside it.');
+  wireFirstUseHint('lab-toggle', 'Lab: advanced settings and tools live here.');
+
   // A saved build takes priority over the static seed -- that's the
   // whole point of Phase 3 (refreshing preserves the build). On a true
   // first-ever visit (no saved build) B1 calls for a small starter
@@ -879,11 +956,43 @@ async function init() {
   // Blackstar-Glassite core placed via createWorldStore's own onAdd
   // hooks, not baked into a static JSON, so it's generated below rather
   // than hand-authored into the file).
+  // B6: a ?w= link (worldshare.js) always wins -- visiting a shared
+  // link is a deliberate "show me THAT world" action, same priority a
+  // manual Load-a-World pick already has over whatever was open before.
+  const sharedParam = getSharedWorldParam();
+  let sharedWorldJSON = null;
+  if (sharedParam) {
+    try {
+      sharedWorldJSON = await decodeWorldFromUrl(sharedParam);
+    } catch (err) {
+      console.warn('Rhombiverse: failed to decode shared world link', err);
+    }
+    clearSharedWorldParam();
+  }
+
+  // A saved build takes priority over the static seed -- that's the
+  // whole point of Phase 3 (refreshing preserves the build). B6:
+  // "rebuild first-time onboarding around the existing Showcase World"
+  // -- a true first-ever visit now loads that real, pre-built world
+  // (growth/evolution/claims and all) instead of B1's bare starter
+  // planetoid, giving the discovery sequence below something real to
+  // discover. data/starter-world.json is now only a last-resort
+  // fallback if the Showcase World preset itself fails to fetch.
   const savedJSON = loadFromLocalStorage();
-  const worldJSON = savedJSON ?? (await loadWorld('./data/starter-world.json'));
-  const isFirstVisit = !savedJSON;
-  if (isFirstVisit) {
-    worldJSON.cells = {}; // drop starter-world.json's single placeholder cell -- generatePlanetoid below replaces it
+  const isFirstVisit = !sharedWorldJSON && !savedJSON;
+  let worldJSON;
+  if (sharedWorldJSON) {
+    worldJSON = sharedWorldJSON;
+  } else if (savedJSON) {
+    worldJSON = savedJSON;
+  } else {
+    try {
+      worldJSON = await loadWorld('./data/presets/showcase-world.json');
+    } catch (err) {
+      console.warn('Rhombiverse: failed to load the Showcase World for first visit, falling back to a generated starter planetoid', err);
+      worldJSON = await loadWorld('./data/starter-world.json');
+      worldJSON.cells = {};
+    }
   }
   const world = createWorldStore(worldJSON, {
     onAdd: handleLocalAdd,
@@ -893,8 +1002,12 @@ async function init() {
     onSeedSet: handleLocalSeedSet,
     onSeedClear: handleLocalSeedClear,
   });
-  if (isFirstVisit) {
-    generatePlanetoid(world, 'rocky', 0, 0, 0, 2);
+  if (isFirstVisit && world.entries().length === 0) {
+    generatePlanetoid(world, 'rocky', 0, 0, 0, 2); // only reached if the Showcase World fetch above failed
+  }
+  if (sharedWorldJSON) {
+    saveToLocalStorage(world.toJSON());
+    showHudPrompt('Loaded a shared World from your link.', 5000);
   }
   // Declared this early so the very first rebuildInstances() call below
   // (before the mode-button UI further down even exists) can safely
@@ -1576,11 +1689,13 @@ async function init() {
   function updateInventoryHint() {
     const el = document.getElementById('inventory-hint');
     if (!el) return;
-    if (!myUserId) {
-      el.textContent = 'Inventory: connect to Shared World to mine and track materials.';
-      return;
-    }
-    const mine = world.getInventory()[myUserId] ?? {};
+    // B6: "remove the Shared World requirement for solo mining/
+    // inventory" -- mining itself already worked locally (build.js's
+    // onContextMenu falls through to local mineAsteroidCell when no
+    // mineRemote is supplied); this display was the one place still
+    // gated on a real account existing. LOCAL_PLAYER_ID is the same
+    // local-identity fallback Sculpt/Cultivate sessions already use.
+    const mine = world.getInventory()[myUserId ?? LOCAL_PLAYER_ID] ?? {};
     // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 5: entries are
     // {quantity, lastUsedAt} objects now, not bare numbers.
     const parts = Object.entries(mine).map(([material, entry]) => `${material} ×${entry.quantity}`);
@@ -1627,6 +1742,30 @@ async function init() {
     updateUndoButton();
     renderUndoScrubStrip();
     renderRingList();
+    toastNewAchievements(checkAchievements({ world, planetoids }));
+  }
+
+  // B6 achievements: toasted one at a time via the existing bottom
+  // contextual-prompt/toast pattern (showHudPrompt), never a new panel.
+  // A single big world load (e.g. loading the Showcase World) can
+  // legitimately earn several at once -- queued with a short stagger so
+  // they're each actually readable instead of overwriting one another.
+  let achievementQueue = [];
+  let achievementToastTimer = null;
+  function toastNewAchievements(newlyEarned) {
+    if (newlyEarned.length === 0) return;
+    achievementQueue.push(...newlyEarned);
+    if (achievementToastTimer) return;
+    const showNext = () => {
+      const next = achievementQueue.shift();
+      if (!next) {
+        achievementToastTimer = null;
+        return;
+      }
+      showHudPrompt(`🏆 Achievement: ${next.label}`, 3800);
+      achievementToastTimer = setTimeout(showNext, 4200);
+    };
+    showNext();
   }
 
   // Undo reverts the LOCAL view only, via replaceAll -- like New World/
@@ -2074,12 +2213,16 @@ async function init() {
       // signature, since every OTHER planting path (evolving organisms/
       // animals above) is explicitly out of Cultivation's scope and
       // must stay completely unaffected.
-      world.setSeed(seedId, { ...seed, growthParameters: currentGrowthParameters(), assistanceTier: cultivateSession.assistanceTier, authorId: myUserId ?? 'local-player' });
+      world.setSeed(seedId, { ...seed, growthParameters: currentGrowthParameters(), assistanceTier: cultivateSession.assistanceTier, authorId: myUserId ?? LOCAL_PLAYER_ID });
     }
     rebuildSeedMeshes(seedId, seed);
     if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
     refreshOrganismsSnapshot(world);
     updateEvolutionInfo();
+    // Planting doesn't route through onChange() (seeds are a genuinely
+    // separate coordinate space, see worldstate.js's own comment on why)
+    // -- achievements need their own hook here too.
+    toastNewAchievements(checkAchievements({ world, planetoids }));
   });
   updateModeUI();
 
@@ -2111,7 +2254,7 @@ async function init() {
   });
 
   // --- B5: Cultivation Mode (Grow -> Cultivate) -----------------------
-  const cultivateSession = createCultivationSession(myUserId ?? 'local-player');
+  const cultivateSession = createCultivationSession(myUserId ?? LOCAL_PLAYER_ID);
 
   function currentGrowthParameters() {
     const [bx, by, bz] = document.getElementById('cultivate-directional-bias').value.split(',').map(Number);
@@ -2150,7 +2293,7 @@ async function init() {
   });
 
   document.getElementById('cultivate-suggestion-accept').addEventListener('click', () => {
-    acceptCultivationSuggestion(cultivateSession, world, myUserId ?? 'local-player');
+    acceptCultivationSuggestion(cultivateSession, world, myUserId ?? LOCAL_PLAYER_ID);
     onChange();
     renderCultivateSuggestion();
   });
@@ -2171,7 +2314,7 @@ async function init() {
       resultEl.textContent = intent.description;
       return;
     }
-    const { applied, skipped } = executeCultivationIntent(world, intent, world.getClaims(), myUserId ?? 'local-player', currentGrowthParameters());
+    const { applied, skipped } = executeCultivationIntent(world, intent, world.getClaims(), myUserId ?? LOCAL_PLAYER_ID, currentGrowthParameters());
     resultEl.textContent = `${intent.description}${intent.viaAI ? ' (AI)' : ' (local parser)'} -- ${applied.length} seed${applied.length === 1 ? '' : 's'} planted${skipped.length ? `, ${skipped.length} skipped (outside your claim)` : ''}.`;
     if (applied.length > 0) {
       refreshOrganismsSnapshot(world);
@@ -2194,7 +2337,7 @@ async function init() {
   // Sculpture Mode (B4b) enables it unconditionally, since nothing
   // there touches shared world-state.
   const FULL_CYBORG_INWORLD_ENABLED = false;
-  const sculptSession = createSculptureSession(myUserId ?? 'local-player');
+  const sculptSession = createSculptureSession(myUserId ?? LOCAL_PLAYER_ID);
   let sculptMirrorPlane = '';
   let sculptActionMode = 'add';
 
@@ -2284,7 +2427,7 @@ async function init() {
       sculptTarget.world,
       intent,
       sculptTarget.world.getClaims(),
-      myUserId ?? 'local-player',
+      myUserId ?? LOCAL_PLAYER_ID,
       material,
       sculptTarget.canPlaceMaterial
     );
@@ -2633,7 +2776,7 @@ async function init() {
     getMaterial: () => materialSelect.value,
     getGeneratorType: () => document.getElementById('generator-type-select').value,
     canPlaceMaterial,
-    getOwnerId: () => myUserId,
+    getOwnerId: () => myUserId ?? LOCAL_PLAYER_ID,
     mineRemote: (x, y, z) => {
       if (sharedWorldActive) mineAsteroidCellRemote(x, y, z);
     },
@@ -3143,6 +3286,7 @@ async function init() {
       await pushClaim(claimId, claimData);
       world.addClaim(claimId, claimData);
       refreshClaims();
+      toastNewAchievements(checkAchievements({ world, planetoids })); // claim-granting doesn't route through onChange() either
       claimHint.textContent =
         `Claimed ${claimId}: center [${claimData.center.join(', ')}], ` +
         `shell ${claimData.shellIndex}, size ${claimData.size}.`;
@@ -3284,6 +3428,120 @@ async function init() {
 
   document.getElementById('export-json').addEventListener('click', () => {
     exportWorldFile({ ...world.toJSON(), planetoids });
+  });
+
+  // B6 Shared Worlds Gallery -- requires Shared World (a real Supabase
+  // account is needed for the shared_worlds table's RLS insert policy,
+  // author_id = auth.uid()), same boundary claims already use. Requires
+  // schema.sql's shared_worlds table to actually exist server-side --
+  // if that migration hasn't been run yet, fetch/publish calls below
+  // fail cleanly into their own catch blocks with a real error message,
+  // not a crash.
+  const galleryOverlay = document.getElementById('gallery-overlay');
+  const galleryGrid = document.getElementById('gallery-grid');
+  const galleryGated = document.getElementById('gallery-gated');
+  const galleryPublishRow = document.getElementById('gallery-publish-row');
+
+  function captureThumbnail() {
+    // Downscale from the real canvas so a gallery row stays small --
+    // full-resolution screenshots would bloat every fetchGalleryWorlds()
+    // call for no visual benefit at thumbnail size.
+    const THUMB_W = 320;
+    const THUMB_H = 240;
+    const src = renderer.domElement;
+    const off = document.createElement('canvas');
+    off.width = THUMB_W;
+    off.height = THUMB_H;
+    off.getContext('2d').drawImage(src, 0, 0, src.width, src.height, 0, 0, THUMB_W, THUMB_H);
+    return off.toDataURL('image/png');
+  }
+
+  async function renderGalleryGrid() {
+    galleryGrid.innerHTML = '<div class="sculpt-hint">Loading…</div>';
+    try {
+      const worlds = await fetchGalleryWorlds();
+      galleryGrid.innerHTML = '';
+      if (worlds.length === 0) {
+        galleryGrid.innerHTML = '<div class="sculpt-hint">No Worlds published yet -- be the first.</div>';
+        return;
+      }
+      for (const w of worlds) {
+        const item = document.createElement('div');
+        item.className = 'gallery-card-item';
+        item.innerHTML = `<img src="${w.thumbnail ?? ''}" alt="" /><div class="gallery-title"></div>`;
+        item.querySelector('.gallery-title').textContent = w.title;
+        item.addEventListener('click', async () => {
+          try {
+            const data = await fetchGalleryWorldData(w.id);
+            world.replaceAll(data);
+            onChange();
+            rebuildAllGrowth();
+            galleryOverlay.classList.remove('open');
+            showHudPrompt(`Loaded "${w.title}" from the Gallery.`, 4000);
+          } catch (err) {
+            console.warn('Rhombiverse: failed to load gallery world', err);
+            showHudPrompt('Could not load that World.', 4000);
+          }
+        });
+        galleryGrid.appendChild(item);
+      }
+    } catch (err) {
+      console.warn('Rhombiverse: failed to fetch gallery', err);
+      galleryGrid.innerHTML = '<div class="sculpt-hint">Could not reach the Gallery (has the shared_worlds table been set up yet?).</div>';
+    }
+  }
+
+  document.getElementById('open-gallery')?.addEventListener('click', () => {
+    galleryOverlay.classList.add('open');
+    const usable = sharedWorldActive && myUserId;
+    galleryGated.style.display = usable ? 'none' : '';
+    galleryPublishRow.style.display = usable ? '' : 'none';
+    galleryGrid.style.display = usable ? '' : 'none';
+    if (usable) renderGalleryGrid();
+  });
+  document.getElementById('gallery-close')?.addEventListener('click', () => {
+    galleryOverlay.classList.remove('open');
+  });
+  galleryOverlay?.addEventListener('click', (e) => {
+    if (e.target === galleryOverlay) galleryOverlay.classList.remove('open');
+  });
+  document.getElementById('gallery-publish-btn')?.addEventListener('click', async () => {
+    const titleInput = document.getElementById('gallery-publish-title');
+    const hint = document.getElementById('gallery-publish-hint');
+    const title = titleInput.value.trim();
+    if (!title) {
+      hint.textContent = 'Give your World a title first.';
+      return;
+    }
+    hint.textContent = 'Publishing…';
+    try {
+      const thumbnail = captureThumbnail();
+      await publishToGallery(title, world.toJSON(), thumbnail);
+      hint.textContent = 'Published! Refreshing the gallery…';
+      titleInput.value = '';
+      renderGalleryGrid();
+    } catch (err) {
+      console.warn('Rhombiverse: gallery publish failed', err);
+      hint.textContent = 'Could not publish (has the shared_worlds table been set up yet?).';
+    }
+  });
+
+  document.getElementById('share-world')?.addEventListener('click', async () => {
+    const hint = document.getElementById('share-world-hint');
+    if (!compressionSupported()) {
+      hint.textContent = "Your browser doesn't support the compression this needs -- try a recent Chrome/Firefox/Safari.";
+      return;
+    }
+    hint.textContent = 'Compressing…';
+    try {
+      const encoded = await encodeWorldForUrl(world.toJSON());
+      const shareUrl = buildShareUrl(encoded);
+      await navigator.clipboard.writeText(shareUrl);
+      hint.textContent = `Link copied (${shareUrl.length} chars) -- paste it anywhere; opening it loads this exact World.`;
+    } catch (err) {
+      console.warn('Rhombiverse: world share failed', err);
+      hint.textContent = 'Could not create a share link for this World (it may be too large).';
+    }
   });
 
   const importInput = document.getElementById('import-json');

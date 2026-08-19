@@ -63,8 +63,10 @@
     #hud-wheel-cue {
       position: fixed; bottom: 14px; left: 16px; z-index: 900;
       color: #9cd; font: 11px system-ui, sans-serif; opacity: 0.7;
-      user-select: none; pointer-events: none;
+      user-select: none; cursor: pointer;
+      padding: 6px 4px; margin: -6px -4px; /* bumps the tap target up without moving the text */
     }
+    #hud-wheel-cue:hover { opacity: 1; }
     #lab-toggle {
       position: fixed; top: 12px; right: 12px; z-index: 900;
       width: 30px; height: 30px;
@@ -310,6 +312,54 @@
       box-shadow: 0 0 6px rgba(124, 204, 255, 0.7);
     }
 
+    /* B6 Shared Worlds Gallery -- a full-screen overlay, same dark-card
+       language as #welcome-card. */
+    #gallery-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 990;
+      align-items: center; justify-content: center;
+      background: rgba(5, 5, 10, 0.88);
+      backdrop-filter: blur(2px);
+      padding: 24px 12px;
+      box-sizing: border-box;
+    }
+    #gallery-overlay.open { display: flex; }
+    #gallery-card {
+      width: 100%; max-width: 780px; max-height: 84vh;
+      overflow-y: auto;
+      color: #ddd; font: 14px/1.5 system-ui, sans-serif;
+      background: rgba(15, 15, 25, 0.96);
+      border: 1px solid rgba(124, 204, 255, 0.35);
+      border-radius: 10px;
+      padding: 18px 22px 22px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+    }
+    #gallery-header {
+      display: flex; align-items: center; justify-content: space-between;
+      font: 700 16px system-ui, sans-serif;
+      color: #9de0ff;
+      margin-bottom: 12px;
+    }
+    #gallery-close { background: none; border: none; color: #9de0ff; cursor: pointer; font: 15px system-ui, sans-serif; }
+    #gallery-publish-row { margin-bottom: 6px; }
+    #gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .gallery-card-item {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(124, 204, 255, 0.25);
+      border-radius: 6px;
+      padding: 8px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .gallery-card-item:hover { border-color: #9de0ff; background: rgba(60, 110, 160, 0.2); }
+    .gallery-card-item img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 4px; background: #111; display: block; }
+    .gallery-card-item .gallery-title { margin-top: 6px; font-size: 12px; color: #eaf6ff; word-break: break-word; }
+
     /* B4a Sculpt panel -- same rhombic-grammar parallelogram/tessellate
        language as the Lab panel (B2), its own overlay since it's opened
        from the wheel's Create category, not the Lab entry point. */
@@ -359,6 +409,19 @@
       font: 13px/1.4 system-ui, sans-serif;
     }
     #cultivate-panel.open { display: block; }
+
+    /* Narrow viewports: these three panels are full-height sidebars
+       (top:54 to bottom:12, ~300px wide) -- fine on a desktop monitor,
+       but on a phone that's most of the screen's width AND height,
+       leaving only a sliver of tappable canvas. Dock them as a bottom
+       sheet instead so the canvas stays reachable for sculpting/
+       cultivating/lab work by touch. */
+    @media (max-width: 640px) {
+      #lab-panel, #sculpt-panel, #cultivate-panel {
+        left: 12px; right: 12px; width: auto; max-width: none;
+        top: auto; bottom: 12px; max-height: 42vh;
+      }
+    }
     #cultivate-header {
       display: flex; align-items: center; justify-content: space-between;
       font: 700 13px system-ui, sans-serif;
@@ -777,7 +840,7 @@
   <div id="hud-prompt"></div>
   <div id="hud-crosshair"></div>
   <div id="sculpture-mode-banner"><span>Sculpture Mode -- isolated scratch space, nothing here is saved to the shared world</span><button id="sculpture-mode-exit" type="button">Exit to Universe</button></div>
-  <div id="hud-wheel-cue">Tab / Space — Menu</div>
+  <div id="hud-wheel-cue" title="Tab / Space also opens this">Menu</div>
   <button id="sculpture-mode-toggle" type="button" title="Sculpture Mode: a separate, isolated scratch workspace">◆</button>
   <button id="cyborg-toggle" type="button" title="Cyborg Mode: guided walkthrough">◈</button>
   <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>
@@ -921,11 +984,16 @@
     </div>
     <div class="buttons">
       <button id="new-world" type="button">New World</button>
-      <button id="export-json" type="button">Export JSON</button>
+      <button id="export-json" type="button">Export World</button>
       <label class="file-btn">
-        Import JSON
+        Import World
         <input id="import-json" type="file" accept="application/json" hidden />
       </label>
+      <button id="share-world" type="button">Share World (copy link)</button>
+    </div>
+    <div id="share-world-hint" class="hint"></div>
+    <div class="row">
+      <button id="open-gallery" type="button">Browse Shared Worlds Gallery</button>
     </div>
     <div class="row">
       <button id="shared-world-toggle" type="button">Enable Shared World</button>
@@ -966,27 +1034,35 @@
       <div id="pending-trades-list"><div class="placeholder">No pending trades.</div></div>
     </div>
     <div class="row">
-      <label>Load preset:
+      <label>Load a World:
         <select id="preset-select">
-          <option value="">-- choose a pre-built structure --</option>
-          <option value="_diag_bare_continental">DIAG bare continental</option>
-          <option value="showcase-world">★ Showcase World (everything built together)</option>
-          <option value="rocky-planetoid">Rocky Planetoid (Large, ~5800 cells, sphere)</option>
-          <option value="ice-moon-large">Ice Moon (Large, ~5800 cells, sphere)</option>
-          <option value="gas-giant-large">Gas Giant (Large, ~5800 cells, sphere)</option>
-          <option value="ice-giant-large">Ice Giant (Large, ~5800 cells, sphere)</option>
-          <option value="arid-world-large">Arid World (Large, ~5800 cells, mostly land)</option>
-          <option value="continental-world-large">Continental World (Large, ~5800 cells, land+ocean)</option>
-          <option value="ocean-world-large">Ocean World (Large, ~5800 cells, mostly ocean)</option>
-          <option value="growth:fern-grown">Fern (Grown, Penrose/RT growth layer)</option>
-          <option value="growth:conifer-grown">Conifer (Grown, Wave 2)</option>
-          <option value="growth:nautilus-grown">Nautilus (Grown, Wave 2)</option>
+          <option value="">-- choose a World --</option>
+          <optgroup label="Showcase">
+            <option value="showcase-world">★ Showcase World (everything built together)</option>
+          </optgroup>
+          <optgroup label="Body Types">
+            <option value="rocky-planetoid">Rocky Planetoid (Large, ~5800 cells, sphere)</option>
+            <option value="ice-moon-large">Ice Moon (Large, ~5800 cells, sphere)</option>
+            <option value="gas-giant-large">Gas Giant (Large, ~5800 cells, sphere)</option>
+            <option value="ice-giant-large">Ice Giant (Large, ~5800 cells, sphere)</option>
+            <option value="arid-world-large">Arid World (Large, ~5800 cells, mostly land)</option>
+            <option value="continental-world-large">Continental World (Large, ~5800 cells, land+ocean)</option>
+            <option value="ocean-world-large">Ocean World (Large, ~5800 cells, mostly ocean)</option>
+          </optgroup>
+          <optgroup label="Grown">
+            <option value="growth:fern-grown">Fern (Grown, Penrose/RT growth layer)</option>
+            <option value="growth:conifer-grown">Conifer (Grown, Wave 2)</option>
+            <option value="growth:nautilus-grown">Nautilus (Grown, Wave 2)</option>
+          </optgroup>
+          <optgroup label="Debug">
+            <option value="_diag_bare_continental">DIAG bare continental</option>
+          </optgroup>
         </select>
       </label>
-      <button id="load-preset" type="button">Load</button>
+      <button id="load-preset" type="button">Load World</button>
     </div>
     <div class="hint">
-      Presets replace your current world with a ready-built structure --
+      Worlds replace your current world with a ready-built structure --
       exact BSG/shell counts, no manual clicking needed.
     </div>
   </div>
@@ -1124,6 +1200,23 @@
     </div>
 
     <div class="sculpt-hint">Pick a species from Create &rarr; Plant a Seed, set your growth parameters here, then click anywhere to plant with them applied.</div>
+  </div>
+
+  <!-- B6: public gallery of shared/community Worlds. Requires Shared
+       World (schema.sql's shared_worlds table) to browse/publish --
+       otherwise shows a real explanatory message, same pattern as
+       Sculpt/Cultivate's own Full-Cyborg gating. -->
+  <div id="gallery-overlay">
+    <div id="gallery-card">
+      <div id="gallery-header"><span>Shared Worlds Gallery</span><button id="gallery-close" type="button" title="Close">✕</button></div>
+      <div id="gallery-publish-row" class="sculpt-row">
+        <input id="gallery-publish-title" class="assist-nl-input" type="text" placeholder="Title this World before publishing" maxlength="80" />
+        <button class="sculpt-btn" id="gallery-publish-btn" type="button">Publish current World</button>
+      </div>
+      <div id="gallery-publish-hint" class="sculpt-hint"></div>
+      <div id="gallery-gated" class="sculpt-hint" style="display:none;">Connect to Shared World (Lab &rarr; Enable Shared World) to browse or publish Worlds.</div>
+      <div id="gallery-grid"></div>
+    </div>
   </div>
 
   <script type="module" src="./src/render.js"></script>

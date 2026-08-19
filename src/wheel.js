@@ -527,6 +527,10 @@ export function createRhombicWheel({
     activeCategory = null;
     renderLevel1();
     onMenuSound();
+    // B6's onboarding discovery sequence listens for this (see
+    // render.js/data/cyborg/onboarding.json) -- a real, generically
+    // useful signal, same spirit as build.js's onPlaced/onHover.
+    window.dispatchEvent(new CustomEvent('rhombiverse:wheelOpened'));
   }
 
   function toggle() {
@@ -540,6 +544,19 @@ export function createRhombicWheel({
 
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) close();
+  });
+
+  // Tab/Space (below) is the whole menu-entry point, and phones have no
+  // keyboard to send either -- without this, the entire wheel (and
+  // everything reachable only through it, e.g. Sculpt) is unreachable
+  // on touch. #hud-wheel-cue already sits in the HUD for exactly this
+  // purpose; it just wasn't clickable before.
+  document.getElementById('hud-wheel-cue')?.addEventListener('click', () => {
+    if (materialWheelOverlay.classList.contains('open')) {
+      closeMaterialWheel();
+      return;
+    }
+    toggle();
   });
 
   window.addEventListener('keydown', (e) => {
