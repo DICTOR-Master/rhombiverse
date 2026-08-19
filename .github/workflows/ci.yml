@@ -14,6 +14,7 @@ jobs:
     # to src/ specifically, not the repo root, so it can never affect
     # how Vercel detects/builds this project (still zero build step).
     runs-on: ubuntu-latest
+    timeout-minutes: 5 # normally ~1min -- a real hang should fail fast, not sit for GitHub's 360min default
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -27,6 +28,12 @@ jobs:
     # `python3 -m http.server`, no build step), driven the same way a
     # real player would use it.
     runs-on: ubuntu-latest
+    # Normally ~1-5min end to end; this job has hung indefinitely on
+    # GitHub's shared runners more than once (unrelated to app changes --
+    # confirmed by two consecutive hangs on a commit smoke.mjs never
+    # touches the code path of) -- fail fast instead of sitting
+    # "in_progress" for hours against GitHub's 360min default.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
