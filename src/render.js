@@ -2815,7 +2815,11 @@ async function init() {
     if (!text) return;
     resultEl.textContent = 'Thinking…';
     const origin = { x: 0, y: 0, z: 0 }; // TODO: last-hovered cell once Sculpt mode grows ghost-hover support
-    const intent = await requestFullCyborgIntent(text, origin, sculptMirrorPlane);
+    // Full-Cyborg dual-awareness: only passed when FEATURES.dualSculpture
+    // is on, so the request payload/prompt is unchanged otherwise (see
+    // requestFullCyborgIntent's own comment).
+    const dualFocusForIntent = FEATURES.dualSculpture ? dualFocusEl?.value : undefined;
+    const intent = await requestFullCyborgIntent(text, origin, sculptMirrorPlane, dualFocusForIntent);
     if (intent.unrecognized) {
       resultEl.textContent = intent.description;
       return;
@@ -3063,7 +3067,13 @@ async function init() {
 
     if (isSemiCyborg) {
       const lastCell = { ...touched[touched.length - 1], action: sculptActionMode, material };
-      updateSemiCyborgSuggestion(sculptSession, sculptTarget.world, lastCell, sculptMirrorPlane || null);
+      // Dual-awareness (gated on FEATURES.dualSculpture): pass the
+      // active Dual Focus so Semi-Cyborg can also propose completing an
+      // inscribed cube/octahedron, not just the mirror-plane heuristic.
+      // undefined when the flag is off, so behavior is byte-identical to
+      // before this task in that configuration.
+      const dualFocusForSuggestion = FEATURES.dualSculpture ? dualFocusEl?.value : undefined;
+      updateSemiCyborgSuggestion(sculptSession, sculptTarget.world, lastCell, sculptMirrorPlane || null, dualFocusForSuggestion);
       renderSculptSuggestion();
     }
   });

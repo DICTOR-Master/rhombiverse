@@ -5,6 +5,7 @@
 // Assistance Spectrum data model, symmetry mirroring, the shell-radius
 // brush, and Full-Cyborg's natural-language intent parsing/execution.
 import { cellKey, cellsInShells, isValidCell } from './lattice.js';
+import { DUAL_DIRS } from './dual.js';
 import { requestBYOKJson } from '../app/byok.js';
 
 // RHOMBIVERSE_PLAN.md's Core vs. Modules boundary (2026-08-23): claims
@@ -229,34 +230,91 @@ const RECENT_CELLS_TRACKED = 6;
 // it. Call this after every manual world mutation while assistanceTier
 // is 'semi-cyborg'; no-ops (clears pendingSuggestion) if there's nothing
 // to propose.
-export function updateSemiCyborgSuggestion(session, world, lastCell, mirrorPlaneId) {
+// `dualFocus` (additive param, default undefined -> dual-awareness
+// skipped entirely, every existing call site unaffected) is the
+// dual-awareness task's own hook: when the mirror-plane heuristic above
+// finds nothing to propose, and dual data is available (dualFocus not
+// "none"/undefined), check whether the just-edited cell sits at one of
+// its neighbor's own inscribed-cube/octahedron dual-direction positions
+// (DUAL_DIRS.cube/octa, dual.js) -- i.e. the player just built outward
+// along a real cube/octa vertex direction from an existing cell. If so,
+// propose completing that whole inscribed solid via the SAME
+// pendingSuggestion/acceptSuggestion/dismissSuggestion mechanism as the
+// mirror-plane suggestion above (reused, not a new UI system) -- this is
+// the "suggest mirroring across the inscribed cube/octahedron" behavior
+// from the dual-awareness task, expressed as "these are the still-
+// missing cells of that solid" rather than inventing a second suggestion
+// shape. Scoped to the add case only (an anchor a removed cell used to
+// complete doesn't have a stable single anchor to re-derive from) -- a
+// deliberate scope decision, not an oversight.
+function findDualAnchor(world, lastCell, dualFocus) {
+  const tryDirs = (dirs, which) => {
+    for (const [dx, dy, dz] of dirs) {
+      const ax = lastCell.x - dx, ay = lastCell.y - dy, az = lastCell.z - dz;
+      if (world.has(ax, ay, az)) return { anchor: { x: ax, y: ay, z: az }, which, dirs };
+    }
+    return null;
+  };
+  if (dualFocus === 'cube' || dualFocus === 'both') {
+    const hit = tryDirs(DUAL_DIRS.cube, 'cube');
+    if (hit) return hit;
+  }
+  if (dualFocus === 'octa' || dualFocus === 'both') {
+    const hit = tryDirs(DUAL_DIRS.octa, 'octa');
+    if (hit) return hit;
+  }
+  return null;
+}
+
+export function updateSemiCyborgSuggestion(session, world, lastCell, mirrorPlaneId, dualFocus) {
   session.pendingSuggestion = null;
-  if (session.assistanceTier !== 'semi-cyborg' || !lastCell || !mirrorPlaneId) return null;
+  if (session.assistanceTier !== 'semi-cyborg' || !lastCell) return null;
   session.recentManualCells.push(lastCell);
   if (session.recentManualCells.length > RECENT_CELLS_TRACKED) session.recentManualCells.shift();
-
-  const [mx, my, mz] = mirrorCell(mirrorPlaneId, lastCell.x, lastCell.y, lastCell.z);
-  if (mx === lastCell.x && my === lastCell.y && mz === lastCell.z) return null; // on the plane, nothing to complete
-  const mirrorExists = world.has(mx, my, mz);
   const wasAdd = lastCell.action !== 'remove';
-  // A missing mirror of a just-ADDED cell is a real gap to fill; a
-  // still-present mirror of a just-REMOVED cell is a real "you cleared
-  // one side, the other side is now asymmetric" gap in the other
-  // direction. Both read as the same "complete the symmetric feature"
-  // suggestion, just add vs. remove.
-  if (wasAdd && !mirrorExists) {
-    session.pendingSuggestion = {
-      cells: [cellKey(mx, my, mz)],
-      action: 'add',
-      reason: 'completing symmetric mirror edge',
-      material: lastCell.material,
-    };
-  } else if (!wasAdd && mirrorExists) {
-    session.pendingSuggestion = {
-      cells: [cellKey(mx, my, mz)],
-      action: 'remove',
-      reason: 'clearing the now-asymmetric mirror cell',
-    };
+
+  if (mirrorPlaneId) {
+    const [mx, my, mz] = mirrorCell(mirrorPlaneId, lastCell.x, lastCell.y, lastCell.z);
+    if (mx !== lastCell.x || my !== lastCell.y || mz !== lastCell.z) { // on the plane, nothing to complete
+      const mirrorExists = world.has(mx, my, mz);
+      // A missing mirror of a just-ADDED cell is a real gap to fill; a
+      // still-present mirror of a just-REMOVED cell is a real "you
+      // cleared one side, the other side is now asymmetric" gap in the
+      // other direction. Both read as the same "complete the symmetric
+      // feature" suggestion, just add vs. remove.
+      if (wasAdd && !mirrorExists) {
+        session.pendingSuggestion = {
+          cells: [cellKey(mx, my, mz)],
+          action: 'add',
+          reason: 'completing symmetric mirror edge',
+          material: lastCell.material,
+        };
+      } else if (!wasAdd && mirrorExists) {
+        session.pendingSuggestion = {
+          cells: [cellKey(mx, my, mz)],
+          action: 'remove',
+          reason: 'clearing the now-asymmetric mirror cell',
+        };
+      }
+    }
+  }
+
+  if (!session.pendingSuggestion && wasAdd && dualFocus && dualFocus !== 'none') {
+    const hit = findDualAnchor(world, lastCell, dualFocus);
+    if (hit) {
+      const missing = hit.dirs
+        .map(([dx, dy, dz]) => [hit.anchor.x + dx, hit.anchor.y + dy, hit.anchor.z + dz])
+        .filter(([x, y, z]) => isValidCell(x, y, z) && !world.has(x, y, z))
+        .map(([x, y, z]) => cellKey(x, y, z));
+      if (missing.length > 0) {
+        session.pendingSuggestion = {
+          cells: missing,
+          action: 'add',
+          reason: `mirroring across the inscribed ${hit.which === 'cube' ? 'cube' : 'octahedron'}`,
+          material: lastCell.material,
+        };
+      }
+    }
   }
   return session.pendingSuggestion;
 }
@@ -412,18 +470,28 @@ Respond with a JSON object with exactly these fields: shape (one of the above), 
 // only runs if the one before it is unavailable or fails -- the feature
 // works at every tier, just with more real language understanding the
 // higher up the chain it succeeds.
-export async function requestFullCyborgIntent(text, origin, mirrorPlaneId) {
+//
+// `dualFocus` (additive param, dual-awareness task): the one context
+// token that task adds to Full-Cyborg's request. render.js passes
+// `undefined` when FEATURES.dualSculpture is false, so the BYOK prompt
+// text and the /api/sculpt-intent JSON body are byte-identical to
+// before this task in that configuration -- no other existing field is
+// restructured or reordered.
+export async function requestFullCyborgIntent(text, origin, mirrorPlaneId, dualFocus) {
+  const dualContext = dualFocus !== undefined ? `\n\ndualFocus: ${dualFocus}` : '';
   try {
-    const decision = await requestBYOKJson(SCULPT_SYSTEM_PROMPT, `Player said: "${text}"`);
+    const decision = await requestBYOKJson(SCULPT_SYSTEM_PROMPT, `Player said: "${text}"${dualContext}`);
     if (decision) return decisionToIntent(decision, origin, mirrorPlaneId, true);
   } catch (err) {
     console.warn('Rhombiverse: personal AI key call failed, trying the shared AI Gateway instead', err);
   }
   try {
+    const body = { text };
+    if (dualFocus !== undefined) body.dualFocus = dualFocus;
     const res = await fetch('/api/sculpt-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`sculpt-intent API returned ${res.status}`);
     const decision = await res.json();
