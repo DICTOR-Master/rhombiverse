@@ -1190,18 +1190,20 @@
       <button id="shared-world-toggle" type="button">Enable Shared World</button>
     </div>
     <div id="shared-world-hint" class="hint">Shared World: off.</div>
-    <div class="row">
+    <div class="row" id="claim-land-row">
       <button id="claim-land-btn" type="button" disabled>Claim Rhombi-space</button>
     </div>
     <div id="claim-hint" class="hint"></div>
     <div id="claims-list"><div class="placeholder">No claims granted yet.</div></div>
-    <div class="hint">
+    <div id="asteroid-info-section">
+    <div class="hint" id="asteroid-belt-hint">
       Two asteroid belts exist far from center — mine them (right-click)
       for materials. Base Rhomb → Star-Glassite are common to rare;
       Blackstar-Glassite is rare and asteroid-only.
     </div>
     <div class="row" id="belt-nav-row"></div>
     <div id="belt-hint" class="hint"></div>
+    </div>
     <div id="inventory-hint" class="hint">Inventory: empty.</div>
     <div id="trade-panel" style="display: none">
       <h3>Pending Trades</h3>
@@ -1211,6 +1213,7 @@
     <div class="row" id="display-name-row">
       <label>Your name: <input id="display-name-input" type="text" maxlength="24" placeholder="Rhombinaut" /></label>
     </div>
+    <div id="world-presets-section">
     <div class="row">
       <label>Load a World:
         <select id="preset-select">
@@ -1242,6 +1245,7 @@
     <div class="hint">
       Worlds replace your current world with a ready-built structure --
       exact BSG/shell counts, no manual clicking needed.
+    </div>
     </div>
   </div>
   <h2 style="margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12); font: 700 13px system-ui, sans-serif; color: #9de0ff;">Shells</h2>

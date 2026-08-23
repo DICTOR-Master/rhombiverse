@@ -93,17 +93,27 @@ src/
       `isClaimProtected`, gated behind `FEATURES.economy`. Every one of
       these four modules keeps a safe inert default (no-op mining,
       "nothing is claimed") so tests and a `FEATURES`-disabled build both
-      still work. **Two things this does NOT cover**, so `mining`/
-      `economy` still don't fully disable those systems everywhere:
-      `render.js`'s own direct World-Systems usage (asteroid belt
-      seeding/regen, the claim-footprint UI) is unconditional — it's the
-      app's own orchestrator, not a Core/Geometry-Extension module, so
-      this isn't a boundary violation, just a real functional gap; and
-      `blackhole.js`/`starsystem.js`/`supernova.js`'s own imports of
-      `regions.js` are untouched (same World-Systems tier as each other,
-      not a boundary violation either, but `hazards` doesn't gate their
-      claim-checking). See `features.js`'s own header comment for the
-      exact same breakdown, kept in sync with this entry.
+      still work. Two remaining gaps this left open — `render.js`'s own
+      direct World-Systems usage (belt seeding, claim UI), and
+      `blackhole.js`/`starsystem.js`/`supernova.js`'s own un-gated
+      imports of `regions.js` and each other — were **closed 2026-08-24**:
+      `mining`/`economy`/`hazards` each now gate a real dynamic
+      `import()` inside `render.js`'s own `init()`, same pattern as
+      achievements/animals/hydrosphere/trade. Mining/hazards are pure
+      data-layer (every existing render.js call site stayed unchanged;
+      correctness comes entirely from whether the real function or an
+      inert/identity default is bound). Claims got real UI treatment
+      instead — the Claim Land button, claim boundary rendering, and the
+      World presets/Load-World picker are explicitly hidden
+      (`updateWorldPanelVisibility()`) when `FEATURES.economy` is off,
+      not just left disabled underneath a still-visible button. Sculpture
+      Mode's own scratch world additionally hides the World presets and
+      asteroid-info panels whenever it's active, independent of these
+      flags — direct feedback that "world presets shouldn't show in
+      sculpture mode and asteroids shouldn't be in background," since
+      Sculpture Mode is Core (always on) and genuinely isolated from the
+      real World. See `features.js`'s own header comment for the exact
+      same breakdown, kept in sync with this entry.
   - [x] Phase B (mostly done, 2026-08-23): every file except `render.js`
         itself physically moved (`git mv`) into the `core/` /
         `geometry-extensions/` / `game-systems/` / `app/` layout above,
@@ -130,10 +140,13 @@ src/
         `data/changelog.json` via the document's own base URL, so the
         move doesn't affect them) — all zero console errors.
   - [ ] Phase C: Add a "Pure Geometry / Full World" mode toggle on the
-        welcome screen or settings. Don't build this until Phase A's two
-        remaining gaps are closed too — a toggle that leaves belts/claim
-        UI/hazard claim-checking running regardless of the flag would be
-        misleading.
+        welcome screen or settings. Unblocked as of 2026-08-24 (Phase A's
+        two remaining gaps above are closed — every FEATURES flag is now
+        real end-to-end), but not started: still needs a real design
+        pass first — where does the toggle live, does flipping it wipe
+        an existing world's already-placed belts/claims or only affect
+        worlds created after, does the choice persist per-device or
+        per-world.
   - [ ] Phase D: Optionally publish `core/` + dual Sculpture Mode as a
         standalone reusable library/template.
 

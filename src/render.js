@@ -56,9 +56,6 @@ import {
 } from './core/sculpture.js';
 import { matchNeighborOffset } from './core/build.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid, setRegionsIntegration as setGravityRegionsIntegration } from './geometry-extensions/gravity.js';
-import { applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } from './game-systems/blackhole.js';
-import { applyStarFusion, annotateStars, canPlaceMaterial as canPlaceForStars } from './game-systems/starsystem.js';
-import { applyDetonationCheck, annotateSupernovae } from './game-systems/supernova.js';
 import { createPlayerController } from './app/player.js';
 import {
   saveToLocalStorage,
@@ -90,14 +87,6 @@ import {
   subscribeToPresence,
   updatePresence,
 } from './app/sync.js';
-import { computeClaim, claimFootprintWorldVertices, claimIdAt, isClaimProtected } from './game-systems/regions.js';
-import {
-  seedAsteroidBelts,
-  applyAsteroidRegeneration,
-  applyPopulationScaledSpawning,
-  listBelts,
-  mineAsteroidCell,
-} from './game-systems/asteroids.js';
 // proposeTrade/confirmTrade/cancelTrade (trade.js's own local-only
 // implementations) are deliberately NOT used from here -- trading
 // fundamentally needs two distinct real player identities, which local
@@ -147,6 +136,37 @@ let checkAchievements = () => [];
 let applyHydrosphere = () => {};
 let LAND_CREATURE_SPECIES, SEA_CREATURE_SPECIES, ANIMAL_TRAIT_RANGES;
 let plantAnimal, animalGenerationStepHook, reproduceFn, computeAnimalSurvivalProbability;
+// Migration Path Phase A's "two remaining gaps" (RHOMBIVERSE_PLAN.md),
+// closed 2026-08-24: render.js's OWN direct usage of mining/claims/
+// hazards joins the same flag-gated roster above -- not just the four
+// Core/Geometry-Extension modules Phase A itself already covered.
+// Mining/hazards are pure data-layer here (nothing but ticks/render-
+// loop calls reach them), so an inert no-op/identity default is the
+// whole story -- every one of the 10+ existing call sites throughout
+// this file is UNCHANGED, correctness comes entirely from which
+// function is bound. Claims are the one exception with a real UI
+// surface (Claim Land button, claim boundary rendering) -- see that
+// panel's own display:none / setClaimLandEnabled/refreshClaims guards
+// elsewhere in this file; the bindings below are still needed since
+// claimIdAt/isClaimProtected also feed the Phase A injection block
+// just below this one.
+let seedAsteroidBelts = () => {};
+let applyAsteroidRegeneration = () => {};
+let applyPopulationScaledSpawning = () => {};
+let listBelts = () => [];
+let mineAsteroidCell = () => {};
+let computeClaim = () => { throw new Error('computeClaim called with FEATURES.economy off -- the Claim Land button should be disabled/hidden, see setClaimLandEnabled'); };
+let claimFootprintWorldVertices = () => [];
+let claimIdAt = () => null;
+let isClaimProtected = () => false;
+let applyBlackHoleConsumption = () => {};
+let applyAsymptoticGeneration = () => {};
+let annotateBlackHoles = (planetoids) => planetoids;
+let applyStarFusion = () => {};
+let annotateStars = (planetoids) => planetoids;
+let canPlaceForStars = () => true;
+let applyDetonationCheck = () => {};
+let annotateSupernovae = (planetoids) => planetoids;
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -1203,18 +1223,21 @@ function rebuildInstances(mesh, world, inReportMode = false) {
 
 async function init() {
   // Feature-gated World Systems modules: loaded (or not) before anything
-  // below can reach them, per FEATURES (features.js). Only these four are
-  // actually wired to conditional loading today -- see features.js's own
-  // header comment for why mining/claims/hazards aren't yet. Awaiting
-  // every enabled import here, ahead of all wheel/event wiring below,
-  // guarantees no consumer (e.g. the evo-land/evo-sea planting branch
-  // further down, or the periodic achievements/inventory-decay/hydrosphere
-  // ticks) can ever observe one of these bindings still unresolved.
+  // below can reach them, per FEATURES (features.js). As of 2026-08-24
+  // every World Systems flag is wired to conditional loading -- mining/
+  // economy(claims)/hazards joined achievements/animals/hydrosphere/
+  // trade here, closing Migration Path Phase A's "two remaining gaps"
+  // (RHOMBIVERSE_PLAN.md). Awaiting every enabled import here, ahead of
+  // all wheel/event wiring below, guarantees no consumer (e.g. the
+  // evo-land/evo-sea planting branch further down, or the periodic
+  // achievements/inventory-decay/hydrosphere/mining/hazards ticks) can
+  // ever observe one of these bindings still unresolved.
   if (FEATURES.achievements) {
     ({ checkAchievements } = await import('./game-systems/achievements.js'));
   }
   if (FEATURES.economy) {
     ({ applyInventoryDecay } = await import('./game-systems/trade.js'));
+    ({ computeClaim, claimFootprintWorldVertices, claimIdAt, isClaimProtected } = await import('./game-systems/regions.js'));
   }
   if (FEATURES.hydrosphere) {
     ({ applyHydrosphere } = await import('./game-systems/hydrosphere.js'));
@@ -1230,18 +1253,25 @@ async function init() {
       computeAnimalSurvivalProbability,
     } = await import('./game-systems/animals.js'));
   }
+  if (FEATURES.mining) {
+    ({ seedAsteroidBelts, applyAsteroidRegeneration, applyPopulationScaledSpawning, listBelts, mineAsteroidCell } = await import('./game-systems/asteroids.js'));
+  }
+  if (FEATURES.hazards) {
+    ({ applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } = await import('./game-systems/blackhole.js'));
+    ({ applyStarFusion, annotateStars, canPlaceMaterial: canPlaceForStars } = await import('./game-systems/starsystem.js'));
+    ({ applyDetonationCheck, annotateSupernovae } = await import('./game-systems/supernova.js'));
+  }
   // RHOMBIVERSE_PLAN.md's Core vs. Modules Migration Path, Phase A
   // completion (2026-08-23): sculpture.js/worldstate.js (Core) and
   // gravity.js (a Geometry Extension) no longer statically import
   // regions.js (claims, a World System); build.js (Core) no longer
   // statically imports asteroids.js's mineAsteroidCell (mining, a World
-  // System) either. render.js already has its own separate, unrelated
-  // static dependency on both files (claim-footprint rendering, asteroid
-  // belt seeding), so there's nothing to dynamically import here -- this
-  // just injects the real functions into those four Core/Geometry-
-  // Extension modules, gated by the same flags that already gate every
-  // other World System. Skipping a wiring call leaves that module's own
-  // inert default in place (no claims exist / mining is a no-op).
+  // System) either. This just injects the real functions (now loaded
+  // just above, alongside every other World System) into those four
+  // Core/Geometry-Extension modules, gated by the same flags that
+  // already gate every other World System. Skipping a wiring call
+  // leaves that module's own inert default in place (no claims exist /
+  // mining is a no-op).
   if (FEATURES.economy) {
     setSculptureRegionsIntegration({ claimIdAt, isClaimProtected });
     setWorldstateRegionsIntegration({ claimIdAt });
@@ -3061,6 +3091,7 @@ async function init() {
       sculptureWorld.addCell(0, 0, 0, { material: 'base' });
     }
     sculptureModeActive = true;
+    updateWorldPanelVisibility();
     sculptTarget.world = sculptureWorld;
     sculptTarget.mesh = sculptureMesh;
     sculptTarget.canPlaceMaterial = permissiveCanPlaceMaterial;
@@ -3086,6 +3117,7 @@ async function init() {
     if (!sculptureModeActive) return;
     document.getElementById('duality-toggle')?.classList.contains('active') && document.getElementById('duality-toggle').click();
     sculptureModeActive = false;
+    updateWorldPanelVisibility();
     sculptTarget.world = world;
     sculptTarget.mesh = mesh;
     sculptTarget.canPlaceMaterial = canPlaceMaterial;
@@ -3326,10 +3358,13 @@ async function init() {
     },
     // Phase A completion (2026-08-23): build.js (Core) no longer
     // statically imports asteroids.js -- see the FEATURES.economy block
-    // above init()'s own end for the parallel regions.js wiring. Passing
-    // undefined when mining is disabled leaves build.js's own inert
-    // no-op default in place (mineAsteroidCell param default).
-    mineAsteroidCell: FEATURES.mining ? mineAsteroidCell : undefined,
+    // above init()'s own end for the parallel regions.js wiring. This
+    // render.js-local `mineAsteroidCell` binding (declared near
+    // applyInventoryDecay etc. above) is already the real function when
+    // FEATURES.mining is on, or its own inert no-op default otherwise --
+    // build.js's own separate default (its param default) is redundant
+    // with, not needed alongside, this one.
+    mineAsteroidCell,
     onCellClicked: (cell) => {
       focusedCenterKey = cell.shellCenter || null;
       renderRingList();
@@ -3524,6 +3559,39 @@ async function init() {
   const claimLandBtn = document.getElementById('claim-land-btn');
   const claimHint = document.getElementById('claim-hint');
   const claimsListEl = document.getElementById('claims-list');
+  // Migration Path Phase A's "two remaining gaps" (RHOMBIVERSE_PLAN.md),
+  // claims half (2026-08-23): unlike mining/hazards -- pure data-layer
+  // systems where an inert function default is enough, since nothing
+  // reaches through them but ticks/render loops -- claims have a real
+  // clickable UI surface. Leaving Claim Land enabled with FEATURES.economy
+  // off would let a player click it and see a broken "Claimed null:
+  // center [undefined]" result (regions.js's real computeClaim never
+  // loads, so the module-level binding stays its inert default). Hiding
+  // the whole panel is a coherent "claims don't exist" state instead of a
+  // half-working button -- direct instruction, confirmed over "leave the
+  // UI as-is."
+  ['claim-land-row', 'claim-hint', 'claims-list'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = FEATURES.economy ? '' : 'none';
+  });
+  // World-panel content that only makes sense for the real World: the
+  // asteroid-belt hint/nav (belt-nav-row itself already empties
+  // naturally when FEATURES.mining is off -- listBelts() returns [], see
+  // this binding's own declaration above -- but the static hint text
+  // needs an explicit hide, same reasoning as claims just above) and the
+  // World presets/Load-World picker. Direct feedback (2026-08-24):
+  // Sculpture Mode's OWN scratch world has no presets and no asteroids
+  // -- CLAUDE.md's own "a separate, isolated scratch workspace" -- so
+  // both groups must ALSO hide whenever sculptureModeActive is true,
+  // independent of the FEATURES flags (re-run from enterSculptureMode/
+  // exitSculptureMode below, not just once here at init).
+  function updateWorldPanelVisibility() {
+    const asteroidSection = document.getElementById('asteroid-info-section');
+    if (asteroidSection) asteroidSection.style.display = FEATURES.mining && !sculptureModeActive ? '' : 'none';
+    const presetsSection = document.getElementById('world-presets-section');
+    if (presetsSection) presetsSection.style.display = sculptureModeActive ? 'none' : '';
+  }
+  updateWorldPanelVisibility();
 
   // Rebuilds both the wireframe-sphere territory visuals AND the text
   // list from world.getClaims() -- called after every point claims
@@ -3540,6 +3608,15 @@ async function init() {
       child.geometry.dispose();
       child.material.dispose();
     }
+    // Clears any existing claim-boundary hulls (above) and stops --
+    // FEATURES.economy off means claims don't exist for this session,
+    // full stop, regardless of what a previously-saved world's own JSON
+    // still has stored under `claims` (that data isn't deleted, just not
+    // surfaced, same as every other FEATURES-gated system). The panel
+    // itself is already display:none (see this function's own
+    // declaration block above), so skipping the list rebuild too is
+    // just avoiding pointless DOM writes to a hidden element.
+    if (!FEATURES.economy) return;
     const claims = world.getClaims();
     currentClaims = claims;
     const ids = Object.keys(claims);
@@ -4158,7 +4235,7 @@ async function init() {
       // try block above. Re-derive the same ownership check instead of
       // fighting refreshClaims for the last word.
       claimLandBtn.disabled =
-        !sharedWorldActive || Object.values(world.getClaims()).some((c) => c.ownerId === myUserId);
+        !FEATURES.economy || !sharedWorldActive || Object.values(world.getClaims()).some((c) => c.ownerId === myUserId);
     }
   });
 
@@ -4176,10 +4253,13 @@ async function init() {
 
   // claimLandBtn is the inverse of the above -- disabled OUTSIDE Shared
   // World (ownership is meaningless in a world only you can see), enabled
-  // only while connected.
+  // only while connected. Also stays disabled whenever FEATURES.economy
+  // is off, same reasoning as this panel's own display:none above --
+  // Shared World connecting shouldn't be able to re-surface a claims UI
+  // that's supposed to not exist for this session.
   function setClaimLandEnabled(enabled) {
-    claimLandBtn.disabled = !enabled;
-    if (!enabled) claimHint.textContent = '';
+    claimLandBtn.disabled = !enabled || !FEATURES.economy;
+    if (!enabled || !FEATURES.economy) claimHint.textContent = '';
   }
 
   async function enableSharedWorld() {

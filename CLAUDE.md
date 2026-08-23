@@ -254,15 +254,19 @@ inside the boundary while coding.
   `render.js` itself is the one exception, and deliberately so — it's
   the app's own orchestrator (not yet split into a separate
   `render-core.js`/`index-orchestrator.js`, see `RHOMBIVERSE_PLAN.md`'s
-  Migration Path Phase B), so its own direct World-Systems usage (belt
-  seeding, claim-footprint UI) is expected, not a violation. Don't add a
-  *new* Core→World-Systems dependency in any of the other five files.
-- A dual cube/octahedron structure (planned as `dual.js`) is meant to be
-  part of core, not optional — treat it as load-bearing, not a feature to
-  gate behind a flag, once it exists. It doesn't exist yet: don't confuse
-  it with the existing, unrelated Duality Mode (`render.js`, ~L2172),
-  which shows the aperiodic Penrose-tiling shadow a structure casts, not
-  a cube/octahedron dual mesh.
+  Migration Path Phase B), so its own direct World-Systems usage is
+  expected, not a violation — though as of 2026-08-24 that usage is
+  ALSO flag-gated end-to-end (`FEATURES.mining`/`economy`/`hazards`),
+  closing what used to be an open gap here. Don't add a *new*
+  Core→World-Systems dependency in any of the other five files.
+- **The dual cube/octahedron structure exists now** (`src/core/dual.js`,
+  merged 2026-08-23) — it's part of core, not optional, load-bearing,
+  not gated behind a flag (`FEATURES.dualSculpture` exists but only
+  controls whether the Sculpture Mode UI for it shows, per that flag's
+  own comment). Don't confuse it with the separate, unrelated Duality
+  Mode (`render.js`, Duality toggle), which shows the aperiodic
+  Penrose-tiling shadow a structure casts, not a cube/octahedron dual
+  mesh.
 - New game-loop functionality belongs in World Systems, gated behind a
   flag in `features.js`, defaulted to `false` for anything genuinely new,
   and loaded via dynamic `import()` — not wired into core's always-on
