@@ -30,7 +30,6 @@ import {
   cellToWorld,
 } from './lattice.js';
 import { generatePlanetoid } from './planetoidgen.js';
-import { mineAsteroidCell } from './asteroids.js';
 
 // Unit-normalized neighbor directions, precomputed once. Every RD
 // instance shares the same (unrotated) orientation -- see lattice.js --
@@ -203,6 +202,13 @@ export function createBuildController({
   // local mineAsteroidCell, since inventory credit there has to be
   // server-authoritative (see sync.js's mineAsteroidCellRemote).
   mineRemote = null,
+  // RHOMBIVERSE_PLAN.md's Core vs. Modules boundary (2026-08-23): mining
+  // is a World System, so build.js (Core) must not statically import
+  // asteroids.js -- render.js injects the real mineAsteroidCell here
+  // instead, gated behind FEATURES.mining (see render.js's own
+  // createBuildController call site). Defaults to a no-op so mining-
+  // disabled or asteroid-free callers (tests) don't need to supply one.
+  mineAsteroidCell = () => {},
   // RHOMBIVERSE_UIUX_BUILD_PLAN.md B1: "intelligent ghost block" hover
   // preview and placement/removal feedback. All optional so tests and
   // any future headless caller don't need to supply them.

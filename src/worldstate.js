@@ -3,7 +3,18 @@
 // to storage (localStorage) lives in persistence.js -- this module only
 // tracks state in memory and knows how to turn it back into JSON.
 import { cellKey, parseCellKey } from './lattice.js';
-import { claimIdAt } from './regions.js';
+
+// RHOMBIVERSE_PLAN.md's Core vs. Modules boundary (2026-08-23): claims
+// are a World System, so worldstate.js (Core) must not statically
+// import regions.js. render.js supplies the real claimIdAt here via
+// setRegionsIntegration(), gated behind FEATURES.economy (see
+// render.js's own init()). Inert default (no claims exist) so
+// local-only play, tests, and claims-disabled worlds simply never
+// stamp a claimId, same as before any claim registry existed at all.
+let claimIdAt = () => null;
+export function setRegionsIntegration({ claimIdAt: claimIdAtFn }) {
+  claimIdAt = claimIdAtFn;
+}
 
 export async function loadWorld(url) {
   const res = await fetch(url);
