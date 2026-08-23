@@ -9,6 +9,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell } from './lattice.js';
+import { getDual, DUAL_DIRS, snapToDual } from './dual.js';
 import { FEATURES } from './features.js';
 import {
   generateSubLattice,
@@ -48,6 +49,9 @@ import {
   requestFullCyborgIntent,
   canFullCyborgEditAt,
   executeFullCyborgIntent,
+  applyDualSymmetry,
+  applyFullSymmetry,
+  shellBrushCells,
 } from './sculpture.js';
 import { matchNeighborOffset } from './build.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
@@ -2671,12 +2675,64 @@ async function init() {
     });
   });
 
+  // Exactly one symmetry mode is active at a time: the 6-plane mirror
+  // picker (default/fallback, whatever it already defaulted to before
+  // this task), the two dual-aware presets, or Full symmetry (48) --
+  // additive options layered on top of the existing picker, not a
+  // replacement for it, so selecting one always clears the others
+  // rather than combining silently.
+  let sculptDualPreset = ''; // '' | 'cube' | 'octa'
+  let sculptFullSymmetry = false;
+  function clearOtherSymmetrySelectors(exceptGroup) {
+    if (exceptGroup !== 'mirror') {
+      document.querySelectorAll('#sculpt-mirror-row .mirror-btn').forEach((b) => b.classList.toggle('active', b.dataset.plane === ''));
+      sculptMirrorPlane = '';
+    }
+    if (exceptGroup !== 'dual') {
+      document.querySelectorAll('#dual-symmetry-row .dual-symmetry-btn').forEach((b) => b.classList.remove('active'));
+      sculptDualPreset = '';
+    }
+    if (exceptGroup !== 'full') {
+      document.getElementById('sculpt-full-symmetry-btn')?.classList.remove('active');
+      sculptFullSymmetry = false;
+    }
+  }
+
   document.querySelectorAll('#sculpt-mirror-row .mirror-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('#sculpt-mirror-row .mirror-btn').forEach((b) => b.classList.toggle('active', b === btn));
       sculptMirrorPlane = btn.dataset.plane;
+      clearOtherSymmetrySelectors('mirror');
     });
   });
+
+  // Full symmetry (48): reuses FULL_SYMMETRY_GROUP (sculpture.js), which
+  // already existed but was never wired to any UI control before this
+  // task -- confirmed during this task's own investigation step. Not
+  // gated on FEATURES.dualSculpture (it has nothing to do with the dual
+  // cube/octahedron structure), so this row is always visible.
+  document.getElementById('sculpt-full-symmetry-btn')?.addEventListener('click', () => {
+    const btn = document.getElementById('sculpt-full-symmetry-btn');
+    const turningOn = !btn.classList.contains('active');
+    clearOtherSymmetrySelectors(turningOn ? 'full' : null);
+    btn.classList.toggle('active', turningOn);
+    sculptFullSymmetry = turningOn;
+  });
+
+  // Cube/Octa symmetry presets (gated on FEATURES.dualSculpture; the row
+  // itself is display:none via the dual-section hide above when the flag
+  // is off, so these listeners simply never fire in that configuration).
+  if (FEATURES.dualSculpture) {
+    document.querySelectorAll('#dual-symmetry-row .dual-symmetry-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const wasActive = btn.classList.contains('active');
+        const turningOn = !wasActive;
+        clearOtherSymmetrySelectors(turningOn ? 'dual' : null);
+        btn.classList.toggle('active', turningOn);
+        sculptDualPreset = turningOn ? btn.dataset.dualSymmetry : '';
+      });
+    });
+  }
 
   const sculptBrushRadiusInput = document.getElementById('sculpt-brush-radius');
 
@@ -2692,6 +2748,7 @@ async function init() {
   document.getElementById('sculpt-suggestion-accept').addEventListener('click', () => {
     acceptSculptSuggestion(sculptSession, sculptTarget.world, sculptTarget.canPlaceMaterial);
     sculptTarget.apply();
+    rebuildDualOverlay();
     renderSculptSuggestion();
   });
   document.getElementById('sculpt-suggestion-dismiss').addEventListener('click', () => {
@@ -2724,7 +2781,10 @@ async function init() {
       sculptTarget.canPlaceMaterial
     );
     resultEl.textContent = `${intent.description}${intent.viaAI ? ' (AI)' : ' (local parser)'} -- ${applied.length} cell${applied.length === 1 ? '' : 's'} placed${skipped.length ? `, ${skipped.length} skipped (outside your claim)` : ''}.`;
-    if (applied.length > 0) sculptTarget.apply();
+    if (applied.length > 0) {
+      sculptTarget.apply();
+      rebuildDualOverlay();
+    }
     input.value = '';
   });
 
@@ -2740,6 +2800,121 @@ async function init() {
     canPlaceMaterial,
     apply: onChange,
   };
+
+  // --- Dual structure (core; RHOMBIVERSE_PLAN.md "Core vs. Modules" --
+  // treated as load-bearing rather than a real feature toggle, per
+  // CLAUDE.md's own instruction; FEATURES.dualSculpture defaults true,
+  // this only actually disables anything if someone deliberately flips
+  // it for a reduced/testing configuration). Overlay/snap/shell state
+  // lives here, next to sculptTarget, since both the in-world Sculpt
+  // tool (B4a) and standalone Sculpture Mode (B4b) share this one panel
+  // and click handler via the same sculptTarget indirection.
+  const dualShowEl = document.getElementById('dual-show');
+  const dualFocusEl = document.getElementById('dual-focus');
+  const dualSnapEl = document.getElementById('dual-snap');
+  const dualShellEl = document.getElementById('dual-shell');
+  [
+    'dual-section', 'dual-toggle-row', 'dual-options-row', 'dual-symmetry-row',
+  ].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = FEATURES.dualSculpture ? '' : 'none';
+  });
+
+  let dualCubeOverlay = null;
+  let dualOctaOverlay = null;
+  function clearDualOverlay() {
+    [dualCubeOverlay, dualOctaOverlay].forEach((m) => {
+      if (!m) return;
+      m.parent?.remove(m);
+      m.geometry.dispose();
+      m.material.dispose();
+    });
+    dualCubeOverlay = null;
+    dualOctaOverlay = null;
+  }
+
+  // Per-cell dual data for whatever's currently rendered by sculptTarget
+  // -- rebuilt on every overlay refresh rather than cached, since it must
+  // stay correct across both the in-world/standalone swap and every
+  // sculpt edit; sized for Sculpture Mode's typical scratch-space cell
+  // counts, not yet optimized for a huge shared World (a real, deferred
+  // cost matching this codebase's own admitted perf-tuning pattern
+  // elsewhere -- see e.g. showcase-world's evolution.js fix in CLAUDE.md).
+  function cellDuals() {
+    return sculptTarget.world.entries().map((cell) => {
+      const [cx, cy, cz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+      const verts = rdRawVerts(SCALE).map(([x, y, z]) => [x + cx, y + cy, z + cz]);
+      return { cell, center: [cx, cy, cz], dual: getDual(verts, [cx, cy, cz]) };
+    });
+  }
+
+  function rebuildDualOverlay() {
+    clearDualOverlay();
+    const showingSolid = FEATURES.dualSculpture && dualShowEl?.checked && dualFocusEl?.value !== 'none';
+    // Desaturate/lower-opacity RD faces only while something's actually
+    // drawn -- Show Dual on with Focus "None" would otherwise dim the
+    // faces around nothing, which isn't what "the overlay reads clearly"
+    // is asking for.
+    sculptTarget.mesh.material.transparent = showingSolid;
+    sculptTarget.mesh.material.opacity = showingSolid ? 0.35 : 1;
+    if (!showingSolid) return;
+    const focus = dualFocusEl.value;
+    const cubePts = [];
+    const octaPts = [];
+    for (const { dual } of cellDuals()) {
+      if (focus === 'cube' || focus === 'both') {
+        for (const [a, b] of dual.cubeEdges) {
+          cubePts.push(new THREE.Vector3(...dual.cube[a]), new THREE.Vector3(...dual.cube[b]));
+        }
+      }
+      if (focus === 'octa' || focus === 'both') {
+        for (const [a, b] of dual.octaEdges) {
+          octaPts.push(new THREE.Vector3(...dual.octa[a]), new THREE.Vector3(...dual.octa[b]));
+        }
+      }
+    }
+    const targetScene = sculptureModeActive ? sculptureScene : scene;
+    // Cool color for the cube (3-valent) edges, warm for the octahedron
+    // (4-valent) edges -- matching this app's existing cool/warm palette
+    // pairing (glassite blues vs. garnet/ferrostone warms).
+    if (cubePts.length) {
+      const geo = new THREE.BufferGeometry().setFromPoints(cubePts);
+      dualCubeOverlay = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x7ccdff }));
+      targetScene.add(dualCubeOverlay);
+    }
+    if (octaPts.length) {
+      const geo = new THREE.BufferGeometry().setFromPoints(octaPts);
+      dualOctaOverlay = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xff9a4f }));
+      targetScene.add(dualOctaOverlay);
+    }
+  }
+
+  if (FEATURES.dualSculpture) {
+    dualShowEl?.addEventListener('change', rebuildDualOverlay);
+    dualFocusEl?.addEventListener('change', rebuildDualOverlay);
+  }
+
+  // Snap to Dual: given a raw world-space hit point and the hovered
+  // cell's own dual, nudges to the nearest dual vertex (per Dual Focus)
+  // within a small threshold -- purely a target-selection adjustment
+  // before the existing sculpt click logic runs, no new mutation path.
+  const DUAL_SNAP_THRESHOLD = SCALE * 0.35;
+  function snappedSculptTarget(hitPoint, cell) {
+    if (!FEATURES.dualSculpture || !dualSnapEl?.checked || dualFocusEl.value === 'none') return null;
+    const [cx, cy, cz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+    const verts = rdRawVerts(SCALE).map(([x, y, z]) => [x + cx, y + cy, z + cz]);
+    const dual = getDual(verts, [cx, cy, cz]);
+    const snapped = snapToDual([hitPoint.x, hitPoint.y, hitPoint.z], dual, dualFocusEl.value, DUAL_SNAP_THRESHOLD);
+    if (!snapped) return null;
+    // Snapping selects the whole inscribed solid the vertex belongs to
+    // (Phase 2, step 6) -- no separate selection concept exists anywhere
+    // else in sculpture.js/render.js to wire into (checked directly
+    // during this task's own investigation step), so this is
+    // highlight-only via the returned `which`/`cell` info; a real
+    // multi-cell selection state is a TODO, not invented here.
+    return { which: snapped.which, cell };
+  }
+
   const sculptRaycaster = new THREE.Raycaster();
   const sculptPointer = new THREE.Vector2();
   renderer.domElement.addEventListener('click', (event) => {
@@ -2753,6 +2928,28 @@ async function init() {
     const hit = hits[0];
     const cell = cellOrder[hit.instanceId];
     if (!cell) return;
+
+    // Snap to Dual (Phase 2, steps 5-6): a click landing near a 3-valent
+    // (cube) or 4-valent (octa) dual vertex selects the whole inscribed
+    // solid it belongs to. No selection-state concept exists anywhere
+    // else in sculpture.js/render.js for the order-48 mirror/symmetry
+    // tools to wire into (there is no order-48 tool wired to the UI at
+    // all -- see the investigation note above the dual-symmetry preset
+    // wiring), so this is highlight-only: it surfaces a HUD prompt and,
+    // matching the dual-awareness task's own step 4, auto-switches the
+    // active symmetry preset to match -- the player can still override
+    // manually afterward. RD placement itself stays cell/face-based (no
+    // continuous ghost-hover target exists to actually re-aim), so
+    // snapping does not relocate the placement target.
+    const dualSnap = snappedSculptTarget(hit.point, cell);
+    if (dualSnap) {
+      clearOtherSymmetrySelectors('dual');
+      sculptDualPreset = dualSnap.which;
+      document.querySelectorAll('#dual-symmetry-row .dual-symmetry-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.dualSymmetry === dualSnap.which);
+      });
+      showHudPrompt(`Snapped to the inscribed ${dualSnap.which === 'cube' ? 'cube' : 'octahedron'} -- ${dualSnap.which === 'cube' ? 'Cube' : 'Octa'} symmetry selected.`, 2500);
+    }
 
     // Model (add): the neighbor cell across the clicked face, same
     // target-selection rule Build mode uses. Chisel (remove): the
@@ -2773,15 +2970,47 @@ async function init() {
     const radius = Math.max(0, Math.min(10, Number(sculptBrushRadiusInput.value) || 0));
     const material = materialSelect.value;
     const isSemiCyborg = sculptSession.assistanceTier === 'semi-cyborg';
-    // Manual tier auto-mirrors immediately (a direct player action, same
-    // as every other consent-free build tool). Semi-Cyborg deliberately
-    // does NOT auto-mirror here -- the whole point of that tier is that
-    // completing the mirror is the AGENT's proposal, surfaced as an
-    // accept/dismiss suggestion below, not applied inline with the
-    // player's own click.
-    const touched = sculptStroke(sculptTarget.world, sculptActionMode, targetX, targetY, targetZ, radius, material, isSemiCyborg ? null : sculptMirrorPlane || null, sculptTarget.canPlaceMaterial);
+    // Dual Shell (Phase 2, step 7): the shell-radius brush walks
+    // DUAL_DIRS (per Dual Focus) instead of the normal 12-neighbor
+    // offsets -- an alternate direction set passed into the existing
+    // shellBrushCells/cellsInShells traversal (lattice.js), not a
+    // reimplementation. "Both" walks the union of both direction sets.
+    const useDualShell = FEATURES.dualSculpture && dualShellEl?.checked && dualFocusEl.value !== 'none';
+    const shellOffsets = useDualShell
+      ? (dualFocusEl.value === 'both' ? [...DUAL_DIRS.cube, ...DUAL_DIRS.octa] : DUAL_DIRS[dualFocusEl.value])
+      : undefined;
+
+    let touched;
+    if (!isSemiCyborg && sculptFullSymmetry) {
+      // Full symmetry (48): replicate through every element of
+      // FULL_SYMMETRY_GROUP instead of a single mirror plane. Reuses
+      // the shell brush's own cell list, same as the dual presets below.
+      touched = [];
+      for (const c of shellBrushCells(targetX, targetY, targetZ, radius, shellOffsets)) {
+        touched.push(...applyFullSymmetry(sculptTarget.world, sculptActionMode, c.x, c.y, c.z, material, sculptTarget.canPlaceMaterial));
+      }
+    } else if (!isSemiCyborg && sculptDualPreset) {
+      // Cube/Octa symmetry presets: replicate across the 8/6 DUAL_DIRS
+      // positions via applyDualSymmetry instead of the single mirror
+      // plane sculptStroke would otherwise apply -- reuses the shell
+      // brush's own cell list so radius/Dual Shell still behave
+      // identically to the normal path.
+      touched = [];
+      for (const c of shellBrushCells(targetX, targetY, targetZ, radius, shellOffsets)) {
+        touched.push(...applyDualSymmetry(sculptTarget.world, sculptActionMode, c.x, c.y, c.z, material, DUAL_DIRS[sculptDualPreset], sculptTarget.canPlaceMaterial));
+      }
+    } else {
+      // Manual tier auto-mirrors immediately (a direct player action,
+      // same as every other consent-free build tool). Semi-Cyborg
+      // deliberately does NOT auto-mirror here -- the whole point of
+      // that tier is that completing the mirror is the AGENT's
+      // proposal, surfaced as an accept/dismiss suggestion below, not
+      // applied inline with the player's own click.
+      touched = sculptStroke(sculptTarget.world, sculptActionMode, targetX, targetY, targetZ, radius, material, isSemiCyborg ? null : sculptMirrorPlane || null, sculptTarget.canPlaceMaterial, shellOffsets);
+    }
     if (touched.length === 0) return;
     sculptTarget.apply();
+    rebuildDualOverlay();
 
     if (isSemiCyborg) {
       const lastCell = { ...touched[touched.length - 1], action: sculptActionMode, material };
@@ -2818,6 +3047,8 @@ async function init() {
     sculptTarget.canPlaceMaterial = permissiveCanPlaceMaterial;
     sculptTarget.apply = () => rebuildInstances(sculptureMesh, sculptureWorld);
     rebuildInstances(sculptureMesh, sculptureWorld);
+    clearDualOverlay();
+    rebuildDualOverlay();
     camera.position.set(6, 5, 8);
     controls.target.set(0, 0, 0);
     // Full-Cyborg is enabled unconditionally here -- nothing in this
@@ -2840,6 +3071,8 @@ async function init() {
     sculptTarget.mesh = mesh;
     sculptTarget.canPlaceMaterial = canPlaceMaterial;
     sculptTarget.apply = onChange;
+    clearDualOverlay();
+    rebuildDualOverlay();
     camera.position.copy(savedCameraState.position);
     controls.target.copy(savedCameraState.target);
     sculptFullCyborgGated.style.display = sculptSession.assistanceTier === 'full-cyborg' && !FULL_CYBORG_INWORLD_ENABLED ? '' : 'none';

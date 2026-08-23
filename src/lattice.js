@@ -116,14 +116,20 @@ export function shellCount(n) {
 // `minShell` (default 1 = solid fill from the center) lets a caller skip
 // the innermost shells for a hollow-shell build -- still traverses them
 // for BFS correctness, just doesn't record them in the result.
-export function cellsInShells(cx, cy, cz, maxShell, minShell = 1) {
+// `offsets` (default NEIGHBOR_OFFSETS, additive param -- every existing
+// call site is unaffected) lets a caller walk a different direction
+// table instead of the normal 12-neighbor set -- e.g. dual.js's
+// DUAL_DIRS.cube/octa for Sculpture Mode's "Dual Shell" brush, which
+// grows a shell-cluster along the inscribed cube/octahedron's own
+// directions rather than face-adjacency.
+export function cellsInShells(cx, cy, cz, maxShell, minShell = 1, offsets = NEIGHBOR_OFFSETS) {
   const visited = new Set([cellKey(cx, cy, cz)]);
   let frontier = [[cx, cy, cz]];
   const result = [];
   for (let shell = 1; shell <= maxShell; shell++) {
     const next = [];
     for (const [x, y, z] of frontier) {
-      for (const [dx, dy, dz] of NEIGHBOR_OFFSETS) {
+      for (const [dx, dy, dz] of offsets) {
         const nx = x + dx;
         const ny = y + dy;
         const nz = z + dz;
