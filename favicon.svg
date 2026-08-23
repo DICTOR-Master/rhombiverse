@@ -7,50 +7,52 @@
     uses), rotated to a non-axis-aligned angle and orthographically
     projected so no vertex overlaps another on screen. See
     src/welcome.js for the same coordinates reused as the in-app logo.
+    Redrawn 2026-08-23 to a shallower/more oblique angle (rx=20 ry=40
+    rz=30) with muted, uniform-weight styling, per a direct reference image.
   -->
-  <rect x="-45" y="-45" width="90" height="90" rx="16" fill="#05050a" />
-  <g stroke="#7cf" stroke-width="2.4" stroke-linecap="round" fill="none">
-    <path d="M -29.48 20.83 L -33.10 -9.69" />
-    <path d="M -29.48 20.83 L 0.00 38.94" />
-    <path d="M -29.48 20.83 L -25.86 12.40" />
-    <path d="M -3.62 8.43 L -33.10 -9.69" />
-    <path d="M -3.62 8.43 L 0.00 38.94" />
-    <path d="M -3.62 8.43 L 25.86 -12.40" />
-    <path d="M -29.48 -18.12 L -33.10 -9.69" />
-    <path d="M -29.48 -18.12 L 0.00 -38.94" />
-    <path d="M -29.48 -18.12 L -25.86 12.40" />
-    <path d="M -3.62 -30.51 L -33.10 -9.69" />
-    <path d="M -3.62 -30.51 L 0.00 -38.94" />
-    <path d="M -3.62 -30.51 L 25.86 -12.40" />
-    <path d="M 3.62 30.51 L 33.10 9.69" />
-    <path d="M 3.62 30.51 L 0.00 38.94" />
-    <path d="M 3.62 30.51 L -25.86 12.40" />
-    <path d="M 29.48 18.12 L 33.10 9.69" />
-    <path d="M 29.48 18.12 L 0.00 38.94" />
-    <path d="M 29.48 18.12 L 25.86 -12.40" />
-    <path d="M 3.62 -8.43 L 33.10 9.69" />
-    <path d="M 3.62 -8.43 L 0.00 -38.94" />
-    <path d="M 3.62 -8.43 L -25.86 12.40" />
-    <path d="M 29.48 -20.83 L 33.10 9.69" />
-    <path d="M 29.48 -20.83 L 0.00 -38.94" />
-    <path d="M 29.48 -20.83 L 25.86 -12.40" />
+  <rect x="-45" y="-45" width="90" height="90" rx="16" fill="#10141f" />
+  <g stroke="#6fb3d9" stroke-width="1.5" stroke-linecap="round" fill="none">
+    <path d="M -20.99 25.56 L -25.83 14.91" />
+    <path d="M -20.99 25.56 L 10.88 35.97" />
+    <path d="M -20.99 25.56 L -27.03 0.23" />
+    <path d="M 6.04 25.33 L -25.83 14.91" />
+    <path d="M 6.04 25.33 L 10.88 35.97" />
+    <path d="M 6.04 25.33 L 27.03 -0.23" />
+    <path d="M -31.87 -10.41 L -25.83 14.91" />
+    <path d="M -31.87 -10.41 L -10.88 -35.97" />
+    <path d="M -31.87 -10.41 L -27.03 0.23" />
+    <path d="M -4.84 -10.64 L -25.83 14.91" />
+    <path d="M -4.84 -10.64 L -10.88 -35.97" />
+    <path d="M -4.84 -10.64 L 27.03 -0.23" />
+    <path d="M 4.84 10.64 L 25.83 -14.91" />
+    <path d="M 4.84 10.64 L 10.88 35.97" />
+    <path d="M 4.84 10.64 L -27.03 0.23" />
+    <path d="M 31.87 10.41 L 25.83 -14.91" />
+    <path d="M 31.87 10.41 L 10.88 35.97" />
+    <path d="M 31.87 10.41 L 27.03 -0.23" />
+    <path d="M -6.04 -25.33 L 25.83 -14.91" />
+    <path d="M -6.04 -25.33 L -10.88 -35.97" />
+    <path d="M -6.04 -25.33 L -27.03 0.23" />
+    <path d="M 20.99 -25.56 L 25.83 -14.91" />
+    <path d="M 20.99 -25.56 L -10.88 -35.97" />
+    <path d="M 20.99 -25.56 L 27.03 -0.23" />
   </g>
-  <g fill="#bde6ff">
-    <circle cx="-29.48" cy="20.83" r="3.4" />
-    <circle cx="-3.62" cy="8.43" r="3.4" />
-    <circle cx="-29.48" cy="-18.12" r="3.4" />
-    <circle cx="-3.62" cy="-30.51" r="3.4" />
-    <circle cx="3.62" cy="30.51" r="3.4" />
-    <circle cx="29.48" cy="18.12" r="3.4" />
-    <circle cx="3.62" cy="-8.43" r="3.4" />
-    <circle cx="29.48" cy="-20.83" r="3.4" />
+  <g fill="#9fd0ec">
+    <circle cx="-20.99" cy="25.56" r="2.6" />
+    <circle cx="6.04" cy="25.33" r="2.6" />
+    <circle cx="-31.87" cy="-10.41" r="2.6" />
+    <circle cx="-4.84" cy="-10.64" r="2.6" />
+    <circle cx="4.84" cy="10.64" r="2.6" />
+    <circle cx="31.87" cy="10.41" r="2.6" />
+    <circle cx="-6.04" cy="-25.33" r="2.6" />
+    <circle cx="20.99" cy="-25.56" r="2.6" />
   </g>
-  <g fill="#7cf">
-    <circle cx="33.10" cy="9.69" r="4.4" />
-    <circle cx="-33.10" cy="-9.69" r="4.4" />
-    <circle cx="0.00" cy="-38.94" r="4.4" />
-    <circle cx="0.00" cy="38.94" r="4.4" />
-    <circle cx="25.86" cy="-12.40" r="4.4" />
-    <circle cx="-25.86" cy="12.40" r="4.4" />
+  <g fill="#6fb3d9">
+    <circle cx="25.83" cy="-14.91" r="3.0" />
+    <circle cx="-25.83" cy="14.91" r="3.0" />
+    <circle cx="-10.88" cy="-35.97" r="3.0" />
+    <circle cx="10.88" cy="35.97" r="3.0" />
+    <circle cx="27.03" cy="-0.23" r="3.0" />
+    <circle cx="-27.03" cy="0.23" r="3.0" />
   </g>
 </svg>
