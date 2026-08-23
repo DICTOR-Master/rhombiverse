@@ -1284,11 +1284,39 @@
       <button class="sculpt-btn mirror-btn" data-plane="xz" type="button">X↔Z</button>
       <button class="sculpt-btn mirror-btn" data-plane="yz" type="button">Y↔Z</button>
     </div>
+    <div class="sculpt-row" id="sculpt-full-symmetry-row">
+      <button class="sculpt-btn full-symmetry-btn" id="sculpt-full-symmetry-btn" type="button">Full symmetry (48)</button>
+    </div>
 
     <div class="sculpt-section-label">Shell-Radius Brush</div>
     <div class="sculpt-row">
       <input id="sculpt-brush-radius" type="number" min="0" max="10" value="0" />
       <span class="sculpt-hint">0 = single cell</span>
+    </div>
+
+    <!-- Dual structure (core, gated on FEATURES.dualSculpture -- see
+         CLAUDE.md's "Core vs. Modules"). Each cell's inscribed
+         cube (3-valent RD vertices) / octahedron (4-valent RD vertices),
+         per dual.js. -->
+    <div id="dual-section" class="sculpt-section-label">Dual Structure</div>
+    <div id="dual-toggle-row" class="sculpt-row">
+      <label><input id="dual-show" type="checkbox" /> Show Dual</label>
+      <label>Focus:
+        <select id="dual-focus">
+          <option value="none">None</option>
+          <option value="cube">Cube</option>
+          <option value="octa">Octa</option>
+          <option value="both">Both</option>
+        </select>
+      </label>
+    </div>
+    <div id="dual-options-row" class="sculpt-row">
+      <label><input id="dual-snap" type="checkbox" /> Snap to Dual</label>
+      <label><input id="dual-shell" type="checkbox" /> Dual Shell</label>
+    </div>
+    <div class="sculpt-row" id="dual-symmetry-row">
+      <button class="sculpt-btn dual-symmetry-btn" data-dual-symmetry="cube" type="button">Cube symmetry</button>
+      <button class="sculpt-btn dual-symmetry-btn" data-dual-symmetry="octa" type="button">Octa symmetry</button>
     </div>
 
     <div id="sculpt-suggestion" style="display:none;">

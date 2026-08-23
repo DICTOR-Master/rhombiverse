@@ -74,9 +74,15 @@ export function mirrorCell(planeId, x, y, z) {
 // directly, not reimplemented. Returns the list of cells actually
 // touched (so a caller can also mirror them) rather than mutating
 // silently; center itself is included for radius >= 0 add actions.
-export function shellBrushCells(cx, cy, cz, radius) {
+// `offsets` (additive param, default undefined -> cellsInShells' own
+// NEIGHBOR_OFFSETS default) lets a caller pass dual.js's DUAL_DIRS.cube/
+// octa instead, for Sculpture Mode's "Dual Shell" brush -- every
+// existing call site (which omits it) is unaffected.
+export function shellBrushCells(cx, cy, cz, radius, offsets) {
   const cells = [{ x: cx, y: cy, z: cz, shell: 0 }];
-  if (radius > 0) cells.push(...cellsInShells(cx, cy, cz, radius));
+  if (radius > 0) {
+    cells.push(...(offsets ? cellsInShells(cx, cy, cz, radius, 1, offsets) : cellsInShells(cx, cy, cz, radius)));
+  }
   return cells;
 }
 
@@ -126,10 +132,77 @@ export function applySymmetricCell(world, action, x, y, z, material, mirrorPlane
 // handler calls: every cell the shell-radius brush would touch, each
 // ALSO mirrored if a plane is chosen. radius 0 degenerates to exactly
 // applySymmetricCell's own single-cell(+mirror) behavior.
-export function sculptStroke(world, action, cx, cy, cz, radius, material, mirrorPlaneId, canPlaceMaterial = () => true) {
+// `shellOffsets` (additive param) -- Sculpture Mode's "Dual Shell"
+// checkbox passes dual.js's DUAL_DIRS.cube/octa here so the brush grows
+// along the inscribed cube/octahedron's own directions instead of the
+// normal 12-neighbor shell; every existing call site (which omits it)
+// is unaffected.
+export function sculptStroke(world, action, cx, cy, cz, radius, material, mirrorPlaneId, canPlaceMaterial = () => true, shellOffsets) {
   const touched = [];
-  for (const c of shellBrushCells(cx, cy, cz, radius)) {
+  for (const c of shellBrushCells(cx, cy, cz, radius, shellOffsets)) {
     touched.push(...applySymmetricCell(world, action, c.x, c.y, c.z, material, mirrorPlaneId, canPlaceMaterial));
+  }
+  return touched;
+}
+
+// --- Dual symmetry presets (Cube/Octa) ---------------------------------
+// "Cube symmetry"/"Octa symmetry": replicate a sculpt operation across
+// the 8 cube-anchor or 6 octa-anchor positions from dual.js's DUAL_DIRS,
+// as translated copies of the target cell -- the same "apply original,
+// then apply each transformed copy" shape applySymmetricCell already
+// uses for a single mirror plane, generalized here to an arbitrary list
+// of coordinate offsets instead of one mirror function. No order-48
+// symmetry tool actually exists anywhere in this codebase's UI to
+// extend (checked directly during this task's own investigation step --
+// FULL_SYMMETRY_GROUP is exported above but never consumed; only the
+// 6-plane MIRROR_PLANES picker is wired to the UI), so this reuses
+// applySymmetricCell's per-cell apply logic rather than a nonexistent
+// 48-transform application path.
+export function applyDualSymmetry(world, action, x, y, z, material, dirs, canPlaceMaterial = () => true) {
+  const touched = [];
+  const apply = (cx, cy, cz) => {
+    if (!isValidCell(cx, cy, cz)) return;
+    if (action === 'add') {
+      if (world.has(cx, cy, cz) || !canPlaceMaterial(material, cx, cy, cz)) return;
+      world.addCell(cx, cy, cz, { material });
+    } else {
+      if (!world.has(cx, cy, cz)) return;
+      world.removeCell(cx, cy, cz);
+    }
+    touched.push({ x: cx, y: cy, z: cz });
+  };
+  apply(x, y, z);
+  for (const [dx, dy, dz] of dirs) {
+    apply(x + dx, y + dy, z + dz);
+  }
+  return touched;
+}
+
+// Full symmetry (48): replicates a sculpt operation through every
+// element of FULL_SYMMETRY_GROUP (a genuine linear map fixing the world
+// origin -- same "reflect the raw (x,y,z) coordinates" shape
+// mirrorCell/applySymmetricCell already use for the 6-plane picker, just
+// all 48 elements of Oh instead of one reflection). A cell on a
+// symmetry axis/plane maps to itself under some elements, so the orbit
+// can be smaller than 48 for that specific cell -- deduped via a Set
+// rather than assumed to always produce exactly 48 touched cells.
+export function applyFullSymmetry(world, action, x, y, z, material, canPlaceMaterial = () => true) {
+  const touched = [];
+  const seen = new Set();
+  for (const transform of FULL_SYMMETRY_GROUP) {
+    const [cx, cy, cz] = transform(x, y, z);
+    const key = cellKey(cx, cy, cz);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (!isValidCell(cx, cy, cz)) continue;
+    if (action === 'add') {
+      if (world.has(cx, cy, cz) || !canPlaceMaterial(material, cx, cy, cz)) continue;
+      world.addCell(cx, cy, cz, { material });
+    } else {
+      if (!world.has(cx, cy, cz)) continue;
+      world.removeCell(cx, cy, cz);
+    }
+    touched.push({ x: cx, y: cy, z: cz });
   }
   return touched;
 }
