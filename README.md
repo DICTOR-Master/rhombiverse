@@ -1,12 +1,17 @@
 # Rhombiverse
 
-A world built from a single honest rule: everything is made of rhombi, and
-rhombi obey two different kinds of order at once. One is a crystal — rigid,
-repeating, minable, buildable, the same everywhere you look, the geometry
-real garnet already grows in. The other is a quasicrystal — aperiodic,
-five-fold, never quite repeating, the geometry evolution already reaches for
-in flowers and shells. Nothing here is arbitrary; every shape traces back to
-real crystallography and real mathematics.
+Rhombiverse is a browser-based instrument for exploring and sculpting space
+with rhombic dodecahedra on the FCC lattice — with symmetry tools and
+optional organic growth. A dual cube/octahedron structure is planned but not
+yet implemented (see "Core vs. Modules" below).
+
+Everything is made of rhombi, and rhombi obey two different kinds of order
+at once. One is a crystal — rigid, repeating, minable, buildable, the same
+everywhere you look, the geometry real garnet already grows in. The other is
+a quasicrystal — aperiodic, five-fold, never quite repeating, the geometry
+evolution already reaches for in flowers and shells. Nothing here is
+arbitrary; every shape traces back to real crystallography and real
+mathematics.
 
 From that one rule: raise a mountain range face-by-face from a single seed
 block, fill a sphere and stand on the surface of your own planetoid with
@@ -20,6 +25,35 @@ See `RHOMBIVERSE_PLAN.md` section 6 for the full vision statement, and
 
 Play it at **[rhombiverse.vercel.app](https://rhombiverse.vercel.app)** — no
 install, no account required.
+
+## Core vs. Modules
+
+The project's true differentiator is the FCC lattice / rhombic dodecahedron
+geometry — not the game-loop systems (mining, trade, etc.) built on top of
+it. Those systems are valuable and genuinely fun, but secondary to the
+geometry itself:
+
+- **Core (always present):** lattice math (`lattice.js`), RD rendering,
+  Sculpture Mode incl. build/chisel, base world-state schema, optional
+  Shared World sync. A dual cube/octahedron structure (`dual.js`) is
+  planned for this tier but doesn't exist in the codebase yet — see
+  `RHOMBIVERSE_PLAN.md`'s "Core vs. Modules" section for the full picture.
+- **Geometry Extensions (opt-in, still shape-focused):** radial gravity &
+  planetoids (`gravity.js`, `planetoidgen.js`), Penrose/Ammann growth
+  (`growth.js`), lattice zoom (`latticezoom.js`), cultivation
+  (`cultivation.js`).
+- **World Systems (secondary, game-loop, can be disabled or
+  community-owned):** mining & resources, inventory, claims/regions
+  (`regions.js`), trade (`trade.js`), achievements (`achievements.js`),
+  animals (`animals.js`), hazards (`blackhole.js`, `supernova.js`,
+  `starsystem.js`), hydrosphere (`hydrosphere.js`). A `features.js` flag
+  registry now exists so some of these (achievements, animals, hydrosphere,
+  trade's inventory decay) load conditionally; mining, claims/regions, and
+  hazards are not yet disconnected from Core — see `RHOMBIVERSE_PLAN.md`'s
+  Migration Path for why and what's planned.
+
+A "Pure Geometry / Full World" mode toggle is planned but not yet
+implemented.
 
 ## What this is (right now)
 

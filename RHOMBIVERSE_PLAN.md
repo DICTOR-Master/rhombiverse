@@ -11,6 +11,102 @@ Rhombiverse is one **world-state**, rendered by whatever client reads it. Two sy
 
 ---
 
+## 0.5. Core vs. Modules
+
+The FCC lattice / rhombic dodecahedron geometry — and its planned dual
+cube-octahedron structure — is this project's core: what makes Rhombiverse
+Rhombiverse rather than another voxel builder. The game-loop World Systems
+(mining, trade, claims, hazards, and the rest) built on top of that geometry
+are valuable, well-built, and genuinely fun — but secondary, and meant to be
+independently extendable rather than load-bearing for the core experience.
+
+- **Core (always present):** lattice math (`lattice.js`), rendering
+  (`render.js`), build/chisel (`build.js`), Sculpture Mode (`sculpture.js`),
+  base world-state schema (`worldstate.js`), persistence (`persistence.js`),
+  optional Shared World sync (`sync.js`). A dual cube/octahedron structure
+  (`dual.js`) is planned for this tier but does not exist in the codebase
+  today — the only thing currently called "dual" in the app is Duality Mode
+  (`render.js`, ~L2172), which shows the aperiodic Penrose-tiling shadow a
+  structure casts (reusing `growth.js`'s tile geometry) — a genuinely
+  different concept from a cube/octahedron dual mesh, not a stand-in for it.
+- **Geometry Extensions (opt-in, still shape-focused):** radial gravity &
+  planetoids (`gravity.js`, `planetoidgen.js`), Penrose/Ammann growth
+  (`growth.js`), lattice zoom (`latticezoom.js`), cultivation
+  (`cultivation.js`).
+- **World Systems (secondary, game-loop, can be disabled or
+  community-owned):** mining & resources (`asteroids.js`), inventory, claims/
+  regions (`regions.js`), trade (`trade.js`), achievements
+  (`achievements.js`), animals (`animals.js`), hazards (`blackhole.js`,
+  `supernova.js`, `starsystem.js`), hydrosphere (`hydrosphere.js`).
+
+Proposed directory layout (target state — see Migration Path below for how
+the codebase gets there; nothing has been physically moved yet):
+
+```
+src/
+  core/
+    lattice.js
+    dual.js
+    render-core.js
+    build.js
+    sculpture.js
+    worldstate-core.js
+    persistence.js
+  geometry-extensions/
+    growth.js
+    cultivation.js
+    latticezoom.js
+    planetoidgen.js
+    gravity.js
+  game-systems/
+    asteroids.js
+    trade.js
+    regions.js
+    achievements.js
+    animals.js
+    evolution.js
+    hydrosphere.js
+    blackhole.js
+    starsystem.js
+    supernova.js
+  app/
+    wheel.js
+    settings.js
+    player.js
+    sync.js
+    index-orchestrator.js
+```
+
+### Migration Path
+
+- [x] Phase A (partial): `features.js` flag registry added. Fully wired for
+      `achievements`, `animals`, `hydrosphere`, and trade's inventory-decay
+      call (all four load via a flag-gated dynamic `import()`, awaited in
+      `render.js`'s `init()` before anything can reach them). **Not**
+      wired for `mining` or `hazards`, and only half-wired for `economy`:
+      `build.js` (Core) has a real, static, top-level import of
+      `asteroids.js` (`mineAsteroidCell`), and `sculpture.js` and
+      `worldstate.js` (both Core) — plus `gravity.js` (Geometry
+      Extensions) and `blackhole.js`/`starsystem.js`/`supernova.js`
+      (World Systems) — all have real, static, top-level imports of
+      `regions.js` (claims). Flag-gating `asteroids.js` or `regions.js`
+      today would either break those Core/Geometry-Extension modules at
+      load time, or (for `asteroids.js`, since `build.js`'s own import is
+      untouched) be a silent no-op. Untangling that dependency is real
+      work, not done by this phase.
+  - [ ] Phase B: Physically move files into the `core/` /
+        `geometry-extensions/` / `game-systems/` / `app/` layout above
+        (`git mv`) and fix imports. Blocked on finishing Phase A's
+        `asteroids.js`/`regions.js` untangling first — moving files
+        before that would just relocate the same cross-tier dependency,
+        not resolve it.
+  - [ ] Phase C: Add a "Pure Geometry / Full World" mode toggle on the
+        welcome screen or settings.
+  - [ ] Phase D: Optionally publish `core/` + dual Sculpture Mode as a
+        standalone reusable library/template.
+
+---
+
 ## 1. Repo Setup
 
 - Create a **private** GitHub repo named `rhombiverse`.

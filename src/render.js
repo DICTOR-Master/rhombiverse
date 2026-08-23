@@ -9,6 +9,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell } from './lattice.js';
+import { FEATURES } from './features.js';
 import {
   generateSubLattice,
   generateSubLatticeAt,
@@ -50,7 +51,6 @@ import {
 } from './sculpture.js';
 import { matchNeighborOffset } from './build.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
-import { applyHydrosphere } from './hydrosphere.js';
 import { applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } from './blackhole.js';
 import { applyStarFusion, annotateStars, canPlaceMaterial as canPlaceForStars } from './starsystem.js';
 import { applyDetonationCheck, annotateSupernovae } from './supernova.js';
@@ -99,8 +99,13 @@ import {
 // trade panel below only ever shows while Shared World is connected,
 // where every trade action goes through sync.js's server-backed
 // pushTradePropose/Confirm/Cancel instead.
-import { applyInventoryDecay } from './trade.js';
-import { checkAchievements } from './achievements.js';
+// applyInventoryDecay (trade.js), checkAchievements (achievements.js),
+// applyHydrosphere (hydrosphere.js), and the animals.js exports below are
+// intentionally NOT statically imported here -- they're the four World
+// Systems entry points that are actually flag-gated (see FEATURES in
+// features.js). They're loaded conditionally via dynamic import() inside
+// init(), awaited before the app becomes interactive, and populate the
+// module-level bindings declared just below this import block.
 import {
   compressionSupported,
   encodeWorldForUrl,
@@ -126,15 +131,16 @@ import {
   planetoidKeyFor,
   localBiomassAvailability,
 } from './evolution.js';
-import {
-  LAND_CREATURE_SPECIES,
-  SEA_CREATURE_SPECIES,
-  ANIMAL_TRAIT_RANGES,
-  plantAnimal,
-  animalGenerationStepHook,
-  reproduceFn,
-  computeAnimalSurvivalProbability,
-} from './animals.js';
+// Module-level slots for the four dynamically-loaded World Systems entry
+// points (see the comment above trade.js's old import). Safe, inert
+// defaults so any call site reached before init()'s dynamic imports
+// resolve -- or with its FEATURES flag off -- degrades quietly instead of
+// throwing on `undefined`.
+let applyInventoryDecay = () => {};
+let checkAchievements = () => [];
+let applyHydrosphere = () => {};
+let LAND_CREATURE_SPECIES, SEA_CREATURE_SPECIES, ANIMAL_TRAIT_RANGES;
+let plantAnimal, animalGenerationStepHook, reproduceFn, computeAnimalSurvivalProbability;
 
 const SCALE = 1;
 // Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
@@ -1190,6 +1196,35 @@ function rebuildInstances(mesh, world, inReportMode = false) {
 }
 
 async function init() {
+  // Feature-gated World Systems modules: loaded (or not) before anything
+  // below can reach them, per FEATURES (features.js). Only these four are
+  // actually wired to conditional loading today -- see features.js's own
+  // header comment for why mining/claims/hazards aren't yet. Awaiting
+  // every enabled import here, ahead of all wheel/event wiring below,
+  // guarantees no consumer (e.g. the evo-land/evo-sea planting branch
+  // further down, or the periodic achievements/inventory-decay/hydrosphere
+  // ticks) can ever observe one of these bindings still unresolved.
+  if (FEATURES.achievements) {
+    ({ checkAchievements } = await import('./achievements.js'));
+  }
+  if (FEATURES.economy) {
+    ({ applyInventoryDecay } = await import('./trade.js'));
+  }
+  if (FEATURES.hydrosphere) {
+    ({ applyHydrosphere } = await import('./hydrosphere.js'));
+  }
+  if (FEATURES.animals) {
+    ({
+      LAND_CREATURE_SPECIES,
+      SEA_CREATURE_SPECIES,
+      ANIMAL_TRAIT_RANGES,
+      plantAnimal,
+      animalGenerationStepHook,
+      reproduceFn,
+      computeAnimalSurvivalProbability,
+    } = await import('./animals.js'));
+  }
+
   wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
   wireFirstUseHint('sculpture-mode-toggle', 'Sculpture Mode: a separate, isolated scratch workspace -- nothing here touches your real World.');
   wireFirstUseHint('cyborg-toggle', 'Cyborg Mode: a guided walkthrough, step by step.');
@@ -2419,6 +2454,10 @@ async function init() {
       const organismId = `organism_${Date.now()}_${seedCounter}`;
       ({ seed } = plantOrganism(world, organismId, seedId, evoSpecies, genome, origin));
     } else if (species === 'evo-land' || species === 'evo-land-dino' || species === 'evo-sea') {
+      if (!FEATURES.animals) {
+        alert('Animals are currently disabled (FEATURES.animals is off).');
+        return;
+      }
       // RHOMBIVERSE_SPEC_ANIMALS.md Stage A/B: same random-within-range
       // founding genome as evo-amoeba/evo-plant above (no breeding UI),
       // plus a random-within-range animalTraits object for mobilityRange/

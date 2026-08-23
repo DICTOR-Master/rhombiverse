@@ -233,6 +233,40 @@ duplicating them.
   implying it's solved — document it as a known gap, per that spec's own
   instruction.
 
+## Core vs. Modules
+
+`RHOMBIVERSE_PLAN.md`'s "Core vs. Modules" section has the full
+architecture and Migration Path; this is the short version for staying
+inside the boundary while coding.
+
+- **Core** (`lattice.js`, `sculpture.js`, `build.js`, `render.js`,
+  `worldstate.js`, `persistence.js`) must never import from or depend on
+  World Systems modules (mining, trade, regions, achievements, animals,
+  hazards, hydrosphere). If a change to core seems to require such a
+  dependency, stop and flag it rather than adding the import. **This is
+  currently violated, not yet enforced:** `build.js` statically imports
+  `asteroids.js` (mining); `sculpture.js` and `worldstate.js` both
+  statically import `regions.js` (claims). These predate this section and
+  are tracked as Phase A/B work in `RHOMBIVERSE_PLAN.md`'s Migration Path
+  — don't add a *new* Core→World-Systems dependency on top of the
+  existing ones, and don't assume the boundary is already clean just
+  because this section states the rule.
+- A dual cube/octahedron structure (planned as `dual.js`) is meant to be
+  part of core, not optional — treat it as load-bearing, not a feature to
+  gate behind a flag, once it exists. It doesn't exist yet: don't confuse
+  it with the existing, unrelated Duality Mode (`render.js`, ~L2172),
+  which shows the aperiodic Penrose-tiling shadow a structure casts, not
+  a cube/octahedron dual mesh.
+- New game-loop functionality belongs in World Systems, gated behind a
+  flag in `features.js`, defaulted to `false` for anything genuinely new,
+  and loaded via dynamic `import()` — not wired into core's always-on
+  path. (`features.js`'s existing World Systems flags default to `true`,
+  not `false` — deliberate, since those are already-shipped live
+  features; see that file's own header comment before changing any of
+  them.)
+- Game-system PRs and modules are welcome and can be owned/maintained by
+  other contributors independent of core.
+
 ## Build order (full detail in `RHOMBIVERSE_PLAN.md` section 4)
 
 Phases 1–4 are the base game (single-player, local, becomes public/static
