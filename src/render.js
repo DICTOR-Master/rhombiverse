@@ -8,8 +8,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell } from './lattice.js';
-import { FEATURES } from './features.js';
+import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell } from './core/lattice.js';
+import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
   generateSubLatticeAt,
@@ -28,15 +28,15 @@ import {
   dominantSpecies,
   speckleCountForBiomass,
   AGGREGATE_MAX_SPECKLES,
-} from './latticezoom.js';
-import { loadWorld, createWorldStore, setRegionsIntegration as setWorldstateRegionsIntegration } from './worldstate.js';
-import { createBuildController, removeShell, recolorShell } from './build.js';
-import { generatePlanetoid } from './planetoidgen.js';
-import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR } from './settings.js';
-import { playPlaceSound, playRemoveSound, playMenuSound } from './sfx.js';
-import { createRhombicWheel } from './wheel.js';
-import { createCyborgMode } from './cyborg.js';
-import { requestBYOKJson } from './byok.js';
+} from './geometry-extensions/latticezoom.js';
+import { loadWorld, createWorldStore, setRegionsIntegration as setWorldstateRegionsIntegration } from './core/worldstate-core.js';
+import { createBuildController, removeShell, recolorShell } from './core/build.js';
+import { generatePlanetoid } from './geometry-extensions/planetoidgen.js';
+import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR } from './app/settings.js';
+import { playPlaceSound, playRemoveSound, playMenuSound } from './app/sfx.js';
+import { createRhombicWheel } from './app/wheel.js';
+import { createCyborgMode } from './app/cyborg.js';
+import { requestBYOKJson } from './app/byok.js';
 import {
   MIRROR_PLANES,
   createSculptureSession,
@@ -49,20 +49,20 @@ import {
   canFullCyborgEditAt,
   executeFullCyborgIntent,
   setRegionsIntegration as setSculptureRegionsIntegration,
-} from './sculpture.js';
-import { matchNeighborOffset } from './build.js';
-import { computePlanetoids, gravityAt, nearestPlanetoid, setRegionsIntegration as setGravityRegionsIntegration } from './gravity.js';
-import { applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } from './blackhole.js';
-import { applyStarFusion, annotateStars, canPlaceMaterial as canPlaceForStars } from './starsystem.js';
-import { applyDetonationCheck, annotateSupernovae } from './supernova.js';
-import { createPlayerController } from './player.js';
+} from './core/sculpture.js';
+import { matchNeighborOffset } from './core/build.js';
+import { computePlanetoids, gravityAt, nearestPlanetoid, setRegionsIntegration as setGravityRegionsIntegration } from './geometry-extensions/gravity.js';
+import { applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } from './game-systems/blackhole.js';
+import { applyStarFusion, annotateStars, canPlaceMaterial as canPlaceForStars } from './game-systems/starsystem.js';
+import { applyDetonationCheck, annotateSupernovae } from './game-systems/supernova.js';
+import { createPlayerController } from './app/player.js';
 import {
   saveToLocalStorage,
   loadFromLocalStorage,
   clearLocalStorage,
   exportWorldFile,
   importWorldFile,
-} from './persistence.js';
+} from './core/persistence.js';
 import {
   ensureAnonymousSession,
   loadSharedWorld,
@@ -85,15 +85,15 @@ import {
   fetchGalleryWorldData,
   subscribeToPresence,
   updatePresence,
-} from './sync.js';
-import { computeClaim, claimFootprintWorldVertices, claimIdAt, isClaimProtected } from './regions.js';
+} from './app/sync.js';
+import { computeClaim, claimFootprintWorldVertices, claimIdAt, isClaimProtected } from './game-systems/regions.js';
 import {
   seedAsteroidBelts,
   applyAsteroidRegeneration,
   applyPopulationScaledSpawning,
   listBelts,
   mineAsteroidCell,
-} from './asteroids.js';
+} from './game-systems/asteroids.js';
 // proposeTrade/confirmTrade/cancelTrade (trade.js's own local-only
 // implementations) are deliberately NOT used from here -- trading
 // fundamentally needs two distinct real player identities, which local
@@ -115,8 +115,8 @@ import {
   buildShareUrl,
   getSharedWorldParam,
   clearSharedWorldParam,
-} from './worldshare.js';
-import { GROWTH_TEMPLATES, plantSeed, applyGrowth, tileWorldVertices, pruneTile, VALID_TRIPLES, unitTileVertices } from './growth.js';
+} from './app/worldshare.js';
+import { GROWTH_TEMPLATES, plantSeed, applyGrowth, tileWorldVertices, pruneTile, VALID_TRIPLES, unitTileVertices } from './geometry-extensions/growth.js';
 import {
   createCultivationSession,
   proposeCultivationSite,
@@ -124,7 +124,7 @@ import {
   dismissCultivationSuggestion,
   requestCultivationIntent,
   executeCultivationIntent,
-} from './cultivation.js';
+} from './geometry-extensions/cultivation.js';
 import {
   GENOME_TRAIT_RANGES,
   plantOrganism,
@@ -132,7 +132,7 @@ import {
   averageTraitValue,
   planetoidKeyFor,
   localBiomassAvailability,
-} from './evolution.js';
+} from './game-systems/evolution.js';
 // Module-level slots for the four dynamically-loaded World Systems entry
 // points (see the comment above trade.js's old import). Safe, inert
 // defaults so any call site reached before init()'s dynamic imports
@@ -1207,13 +1207,13 @@ async function init() {
   // further down, or the periodic achievements/inventory-decay/hydrosphere
   // ticks) can ever observe one of these bindings still unresolved.
   if (FEATURES.achievements) {
-    ({ checkAchievements } = await import('./achievements.js'));
+    ({ checkAchievements } = await import('./game-systems/achievements.js'));
   }
   if (FEATURES.economy) {
-    ({ applyInventoryDecay } = await import('./trade.js'));
+    ({ applyInventoryDecay } = await import('./game-systems/trade.js'));
   }
   if (FEATURES.hydrosphere) {
-    ({ applyHydrosphere } = await import('./hydrosphere.js'));
+    ({ applyHydrosphere } = await import('./game-systems/hydrosphere.js'));
   }
   if (FEATURES.animals) {
     ({
@@ -1224,7 +1224,7 @@ async function init() {
       animalGenerationStepHook,
       reproduceFn,
       computeAnimalSurvivalProbability,
-    } = await import('./animals.js'));
+    } = await import('./game-systems/animals.js'));
   }
   // RHOMBIVERSE_PLAN.md's Core vs. Modules Migration Path, Phase A
   // completion (2026-08-23): sculpture.js/worldstate.js (Core) and

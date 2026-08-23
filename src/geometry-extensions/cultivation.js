@@ -9,9 +9,9 @@
 // genuinely specific to Cultivation: Semi-Cyborg's planting-site
 // suggestion and Full-Cyborg's natural-language planting.
 import { plantSeed } from './growth.js';
-import { canFullCyborgEditAt } from './sculpture.js';
-import { nearestValidCell } from './lattice.js';
-import { requestBYOKJson } from './byok.js';
+import { canFullCyborgEditAt } from '../core/sculpture.js';
+import { nearestValidCell } from '../core/lattice.js';
+import { requestBYOKJson } from '../app/byok.js';
 
 export function createCultivationSession(playerId, assistanceTier = 'manual') {
   return { playerId, assistanceTier, pendingSuggestion: null };

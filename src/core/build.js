@@ -29,7 +29,7 @@ import {
   parseCellKey,
   cellToWorld,
 } from './lattice.js';
-import { generatePlanetoid } from './planetoidgen.js';
+import { generatePlanetoid } from '../geometry-extensions/planetoidgen.js';
 
 // Unit-normalized neighbor directions, precomputed once. Every RD
 // instance shares the same (unrotated) orientation -- see lattice.js --

@@ -13,7 +13,7 @@ import {
   shellCount,
   cellsInShells,
   nearestValidCell,
-} from '../../src/lattice.js';
+} from '../../src/core/lattice.js';
 
 test('isValidCell: FCC parity (x+y+z even)', () => {
   assert.equal(isValidCell(0, 0, 0), true);

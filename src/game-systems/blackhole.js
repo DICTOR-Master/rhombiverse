@@ -24,8 +24,8 @@
 // grained, OPT-IN escape hatch for protecting specific cells of your OWN
 // build from your OWN black hole (unaffected by the authorId guard,
 // which only ever concerns OTHER players' cells).
-import { shellCount, cellKey, cellToWorld, cellsInShells } from './lattice.js';
-import { BSG_MATERIAL, findClusters, bsgClusterStats } from './gravity.js';
+import { shellCount, cellKey, cellToWorld, cellsInShells } from '../core/lattice.js';
+import { BSG_MATERIAL, findClusters, bsgClusterStats } from '../geometry-extensions/gravity.js';
 import { isClaimProtected } from './regions.js';
 
 // First-guess constants, not yet playtested -- same "flag it, don't

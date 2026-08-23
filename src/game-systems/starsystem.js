@@ -5,8 +5,8 @@
 // independent of it: a cluster can cross the (lower) star threshold
 // without ever reaching the black hole threshold, or in principle both,
 // since the spec doesn't state exclusivity between the two.
-import { cellToWorld } from './lattice.js';
-import { BSG_MATERIAL, findClusters, bsgClusterStats } from './gravity.js';
+import { cellToWorld } from '../core/lattice.js';
+import { BSG_MATERIAL, findClusters, bsgClusterStats } from '../geometry-extensions/gravity.js';
 
 // First-guess constants, not yet playtested -- same convention as every
 // other tunable in gravity.js/blackhole.js. STAR_BSG_THRESHOLD is

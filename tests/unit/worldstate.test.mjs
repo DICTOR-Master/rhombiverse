@@ -2,7 +2,7 @@
 // touch THREE or the DOM -- zero npm dependencies needed here either.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorldStore } from '../../src/worldstate.js';
+import { createWorldStore } from '../../src/core/worldstate-core.js';
 
 function emptyWorld(hooks) {
   return createWorldStore({ worldName: 'test', version: 1, cells: {} }, hooks);

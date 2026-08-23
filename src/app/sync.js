@@ -9,7 +9,7 @@
 // header note) -- RLS's cells_insert_own/cells_delete_own policies key
 // off auth.uid(), which is null for an unauthenticated client.
 import { createClient } from '@supabase/supabase-js';
-import { cellKey } from './lattice.js';
+import { cellKey } from '../core/lattice.js';
 
 const SUPABASE_URL = 'https://zuvlqvvxifuzumqeyuir.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Na_sq5Pe7VGObNCw5MnLcg_ZfWEhcJP';

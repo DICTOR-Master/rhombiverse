@@ -25,8 +25,8 @@ import {
   dominantSpecies,
   AGGREGATE_MAX_SPECKLES,
   speckleCountForBiomass,
-} from '../../src/latticezoom.js';
-import { shellCount, isValidCell, cellToWorld } from '../../src/lattice.js';
+} from '../../src/geometry-extensions/latticezoom.js';
+import { shellCount, isValidCell, cellToWorld } from '../../src/core/lattice.js';
 
 test('cumulativeCellCount: matches lattice.js\'s own shellCount(n) = 10n^2+2 formula exactly, plus the center', () => {
   assert.equal(cumulativeCellCount(0), 1);

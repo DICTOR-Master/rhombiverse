@@ -19,9 +19,9 @@
 // genome trait below maps onto exactly one of these three, or is left
 // inert in this stage (wired up by later stages per the spec's own
 // staging).
-import { growSeed, tileWorldVertices, tilesOverlap, VALID_TRIPLES, GROWTH_TICK_MS } from './growth.js';
-import { cellToWorld } from './lattice.js';
-import { computePlanetoids, nearestPlanetoid } from './gravity.js';
+import { growSeed, tileWorldVertices, tilesOverlap, VALID_TRIPLES, GROWTH_TICK_MS } from '../geometry-extensions/growth.js';
+import { cellToWorld } from '../core/lattice.js';
+import { computePlanetoids, nearestPlanetoid } from '../geometry-extensions/gravity.js';
 
 // Real, MEASURED bounds, not guessed -- verified 2026-08-13 with a
 // throwaway stress-test copy of growth.js (never committed) that

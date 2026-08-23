@@ -5,7 +5,7 @@
 // Assistance Spectrum data model, symmetry mirroring, the shell-radius
 // brush, and Full-Cyborg's natural-language intent parsing/execution.
 import { cellKey, cellsInShells, isValidCell } from './lattice.js';
-import { requestBYOKJson } from './byok.js';
+import { requestBYOKJson } from '../app/byok.js';
 
 // RHOMBIVERSE_PLAN.md's Core vs. Modules boundary (2026-08-23): claims
 // are a World System, so sculpture.js (Core) must not statically import

@@ -104,13 +104,31 @@ src/
       not a boundary violation either, but `hazards` doesn't gate their
       claim-checking). See `features.js`'s own header comment for the
       exact same breakdown, kept in sync with this entry.
-  - [ ] Phase B: Physically move files into the `core/` /
-        `geometry-extensions/` / `game-systems/` / `app/` layout above
-        (`git mv`) and fix imports. Unblocked by Phase A's Core/Geometry-
-        Extension untangling above, but not started — the two gaps noted
-        in Phase A (render.js's own usage, and the hazards trio) don't by
-        themselves block a pure file move, since neither is a Core-tier
-        static import.
+  - [x] Phase B (mostly done, 2026-08-23): every file except `render.js`
+        itself physically moved (`git mv`) into the `core/` /
+        `geometry-extensions/` / `game-systems/` / `app/` layout above,
+        with every cross-module `import`/dynamic `import()` path fixed —
+        `worldstate.js` renamed to `worldstate-core.js` per the layout
+        above along the way. Seven files this section's original draft
+        didn't name (they postdate it) were placed by judgment, not
+        left ambiguous: `features.js`/`welcome.js`/`changelog.js`/
+        `byok.js`/`cyborg.js`/`sfx.js`/`worldshare.js` all went to
+        `app/` — each is app-shell/orchestration-adjacent (DOM UI,
+        cross-cutting service, or share-link plumbing), none is
+        geometry-core logic or World-Systems game-loop content.
+        **`render.js` deliberately NOT split into `render-core.js` +
+        `index-orchestrator.js`** — at 4,347 lines with rendering and
+        app orchestration genuinely intertwined throughout (world-system
+        ticks calling into scene updates, UI handlers calling into world
+        mutation), drawing that line correctly needs its own dedicated,
+        careful pass, not a mechanical move alongside 30 other files.
+        It still lives at `src/render.js`, importing every other module
+        via its new tiered path. Verified via the full unit suite (179
+        tests) plus live browser checks: page load, build, the
+        claims/gravity dependency-injection wiring from Phase A, the
+        welcome tagline and changelog panel (both fetch
+        `data/changelog.json` via the document's own base URL, so the
+        move doesn't affect them) — all zero console errors.
   - [ ] Phase C: Add a "Pure Geometry / Full World" mode toggle on the
         welcome screen or settings. Don't build this until Phase A's two
         remaining gaps are closed too — a toggle that leaves belts/claim
@@ -240,7 +258,7 @@ World-space position = lattice coord × scale factor `s` (start `s = 1`). No rot
 - New `growth.js` module, new `seeds` key in world-state, generation via substitution/L-system rules on rhombic triacontahedron geometry.
 - Does not modify or depend on `build.js` — additive only.
 - Spec pass done: `docs/RHOMBIVERSE_SPEC_PENROSE_GROWTH.md` — real Ammann-rhombohedra/AKN-tiling geometry, verified numerically before being written down, scoped for plant/animal organic growth forms per direct instruction.
-- Wave 1 implementation done (`src/growth.js`, `amoeba`/`moss`/`fungus`/`fern`) — see CLAUDE.md's 2026-08-13 status for what was built, real findings along the way, and how it was verified. Wave 2 (larger/more complex templates) not started, per the spec's own staging.
+- Wave 1 implementation done (`src/geometry-extensions/growth.js`, `amoeba`/`moss`/`fungus`/`fern`) — see CLAUDE.md's 2026-08-13 status for what was built, real findings along the way, and how it was verified. Wave 2 (larger/more complex templates) not started, per the spec's own staging.
 
 ---
 

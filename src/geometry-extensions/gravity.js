@@ -10,7 +10,7 @@
 // Code prompt -- there is no "correction event" in this pass, so
 // Isolation/Adaptive Damping (RHOMBIVERSE_PRINCIPLES.md sections 1-2)
 // don't yet apply; revisit when the shockwave follow-up lands.
-import { NEIGHBOR_OFFSETS, cellKey, parseCellKey, cellToWorld } from './lattice.js';
+import { NEIGHBOR_OFFSETS, cellKey, parseCellKey, cellToWorld } from '../core/lattice.js';
 
 // RHOMBIVERSE_PLAN.md's Core vs. Modules boundary (2026-08-23): claims
 // are a World System, so gravity.js (a Geometry Extension) must not

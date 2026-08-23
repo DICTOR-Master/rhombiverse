@@ -1,8 +1,8 @@
 // regions.js only imports lattice.js -- zero npm dependencies.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorldStore } from '../../src/worldstate.js';
-import { computeClaim, claimBoundingRadius, claimIdAt } from '../../src/regions.js';
+import { createWorldStore } from '../../src/core/worldstate-core.js';
+import { computeClaim, claimBoundingRadius, claimIdAt } from '../../src/game-systems/regions.js';
 
 test('computeClaim: first claim lands at world center (shell 0)', () => {
   const world = createWorldStore({ worldName: 't', version: 1, cells: {} });

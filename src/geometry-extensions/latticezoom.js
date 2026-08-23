@@ -5,7 +5,7 @@
 // not invented geometry"). Per section 4 (Isolation), this module never
 // touches worldstate.js's cell schema -- it only reads `cells` and
 // produces derived, disposable rendering data.
-import { cellsInShells, shellCount, cellToWorld } from './lattice.js';
+import { cellsInShells, shellCount, cellToWorld } from '../core/lattice.js';
 
 // Real, VERIFIED derivation (not guessed) -- see this project's own
 // established convention for constants of this class ("verify against

@@ -31,20 +31,20 @@ build order:
 
 - **B1–B6** (`docs/RHOMBIVERSE_UIUX_BUILD_PLAN.md`) — DONE. Replaced the
   always-visible sidebar with the **Rhombic Wheel** radial menu
-  (`src/wheel.js`) as the single control surface; added **Sculpture
-  Mode** (`src/sculpture.js`, order-48 cubic symmetry group, Model/
+  (`src/app/wheel.js`) as the single control surface; added **Sculpture
+  Mode** (`src/core/sculpture.js`, order-48 cubic symmetry group, Model/
   Chisel, an Assistance Spectrum up to AI-assisted Full-Cyborg), **Cyborg
-  Mode** guided walkthroughs (`src/cyborg.js`, supports multiple
+  Mode** guided walkthroughs (`src/app/cyborg.js`, supports multiple
   concurrent instances — the manual toggle and the auto-started
   onboarding sequence are two separate instances), **Duality Mode**
   (reuses `growth.js`'s real Ammann-rhombohedra tile geometry, not
   separate projection math) and **Cultivation Mode**
-  (`src/cultivation.js`), **bring-your-own-AI-key** support
-  (`src/byok.js` — direct browser calls to Anthropic/OpenAI/etc., with a
+  (`src/geometry-extensions/cultivation.js`), **bring-your-own-AI-key** support
+  (`src/app/byok.js` — direct browser calls to Anthropic/OpenAI/etc., with a
   shared Vercel AI Gateway fallback in `api/` and a local keyword-parser
-  last resort), an **achievements** toast system (`src/achievements.js`),
-  **World sharing** via compressed URLs (`src/worldshare.js`) and a
-  public **Gallery** (`shared_worlds` table, `src/sync.js`), a sequenced
+  last resort), an **achievements** toast system (`src/game-systems/achievements.js`),
+  **World sharing** via compressed URLs (`src/app/worldshare.js`) and a
+  public **Gallery** (`shared_worlds` table, `src/app/sync.js`), a sequenced
   first-visit **onboarding** walkthrough that loads the real Showcase
   World and ends with a clickable persona picker on the welcome screen,
   and a rebuilt **in-world trade UI** — walk near another player (visible
@@ -57,7 +57,7 @@ build order:
   rest is the biggest remaining track (Lab view audit, accessibility
   pass, performance guardrails, OG screenshot, moderation/compliance
   scaffolding are all still open). Shipped so far: the versioned
-  "What's New" changelog panel (`src/changelog.js`,
+  "What's New" changelog panel (`src/app/changelog.js`,
   `data/changelog.json`, real dated entries) replacing the branding
   that was removed above; and real touch controls for Walk/Explore mode
   (`player.js`'s `setVirtualMove`/`setVirtualKey`/`lookBy`, an on-screen
@@ -125,14 +125,14 @@ build order:
   (genome/phenotype → reproduction/HGT/sexual selection →
   environmental selection → deterministic catch-up engine → trophic
   coupling → isolation enforcement → adaptive damping → moderation hook
-  → player-facing surface). `src/evolution.js`.
+  → player-facing surface). `src/game-systems/evolution.js`.
 - **`RHOMBIVERSE_SPEC_ANIMALS.md`** — done, all 6 stages (species/
   habitat, mobility, sexual reproduction, trophic herbivory/carnivory,
-  habitat crossover, full verification). `src/animals.js`.
+  habitat crossover, full verification). `src/game-systems/animals.js`.
 - **`RHOMBIVERSE_SPEC_LATTICE_ZOOM.md`** — done, all 6 stages (static
   sub-lattice geometry → camera-distance trigger → multi-level depth &
   blending → adaptive damping → real-organism/plant-coverage rendering
-  → landscape aggregate state). `src/latticezoom.js`, wired into
+  → landscape aggregate state). `src/geometry-extensions/latticezoom.js`, wired into
   `src/render.js`.
 - **Showcase world** — done, `data/presets/showcase-world.json` (a real
   continental planetoid with growth, evolved organisms, and animals),
@@ -203,7 +203,7 @@ duplicating them.
   cell = `(x,y,z) ∈ ℤ³` where `x+y+z` is even; 12 offsets in
   `RHOMBIVERSE_PLAN.md` section 2. Lattice propagation (hydrosphere
   permeation), shell counting, and claim allocation all walk this same
-  offset table — implement it once in `src/lattice.js`.
+  offset table — implement it once in `src/core/lattice.js`.
 - **"region" is two unrelated fields — do not conflate them.** The per-cell
   `region` field (`RHOMBIVERSE_PLAN.md` Phase 5.8) is a *moderation*
   status (`core`/`reviewed`/`open`). Ownership is a separate field,
@@ -239,18 +239,24 @@ duplicating them.
 architecture and Migration Path; this is the short version for staying
 inside the boundary while coding.
 
-- **Core** (`lattice.js`, `sculpture.js`, `build.js`, `render.js`,
-  `worldstate.js`, `persistence.js`) must never import from or depend on
-  World Systems modules (mining, trade, regions, achievements, animals,
+- **Core** (`src/core/lattice.js`, `src/core/sculpture.js`,
+  `src/core/build.js`, `src/render.js`, `src/core/worldstate-core.js`,
+  `src/core/persistence.js`) must never import from or depend on World
+  Systems modules (mining, trade, regions, achievements, animals,
   hazards, hydrosphere). If a change to core seems to require such a
-  dependency, stop and flag it rather than adding the import. **This is
-  currently violated, not yet enforced:** `build.js` statically imports
-  `asteroids.js` (mining); `sculpture.js` and `worldstate.js` both
-  statically import `regions.js` (claims). These predate this section and
-  are tracked as Phase A/B work in `RHOMBIVERSE_PLAN.md`'s Migration Path
-  — don't add a *new* Core→World-Systems dependency on top of the
-  existing ones, and don't assume the boundary is already clean just
-  because this section states the rule.
+  dependency, stop and flag it rather than adding the import. **As of
+  2026-08-23 (Migration Path Phase A) this is enforced for build.js/
+  sculpture.js/worldstate-core.js**: none of them statically import
+  `asteroids.js`/`regions.js` anymore — `render.js` injects the real
+  functions (gated behind `features.js`'s `mining`/`economy` flags) via
+  a constructor param (build.js) or each module's own
+  `setRegionsIntegration()` (sculpture.js/worldstate-core.js/gravity.js).
+  `render.js` itself is the one exception, and deliberately so — it's
+  the app's own orchestrator (not yet split into a separate
+  `render-core.js`/`index-orchestrator.js`, see `RHOMBIVERSE_PLAN.md`'s
+  Migration Path Phase B), so its own direct World-Systems usage (belt
+  seeding, claim-footprint UI) is expected, not a violation. Don't add a
+  *new* Core→World-Systems dependency in any of the other five files.
 - A dual cube/octahedron structure (planned as `dual.js`) is meant to be
   part of core, not optional — treat it as load-bearing, not a feature to
   gate behind a flag, once it exists. It doesn't exist yet: don't confuse
@@ -281,7 +287,7 @@ once deployed). Phase 5+ and the spec addenda layer on progressively:
    before this phase ships, not after.*
 5. **Shared World** (optional) — swap persistence backend to realtime sync.
    DONE, 2026-08-12 (see status above) — Supabase `public.cells` table +
-   `src/sync.js`, gated behind an opt-in toggle (local single-player play
+   `src/app/sync.js`, gated behind an opt-in toggle (local single-player play
    is still the default and fully unaffected when it's off).
 5.5. **Planetoid Building + Radial Gravity** — DONE, commit `30cd1c8` (2026-08-11,
      see status above), except crystal-growth (intentionally deferred to

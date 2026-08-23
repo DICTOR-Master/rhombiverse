@@ -14,7 +14,7 @@
 // world.cells map, same pattern as shellCenter/claimId) is enough to
 // identify which node it belongs to. `playerInventory` and the regrowth
 // queue ARE real top-level world-state, per the spec (worldstate.js).
-import { cellKey, parseCellKey, cellsInShells, isValidCell } from './lattice.js';
+import { cellKey, parseCellKey, cellsInShells, isValidCell } from '../core/lattice.js';
 
 const NODE_SHELL_RADIUS = 1; // "individual small clumps" -- 1 (center) + 12 (shell 1) = 13 cells/node
 

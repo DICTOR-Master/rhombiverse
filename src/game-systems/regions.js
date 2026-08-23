@@ -9,7 +9,7 @@
 // (0,0,0) in true 3D shell order via the same NEIGHBOR_OFFSETS/
 // shellCount(n)=10n^2+2 structure used everywhere else in this project --
 // not re-derived, reused directly from lattice.js.
-import { cellKey, cellsInShells, cellToWorld } from './lattice.js';
+import { cellKey, cellsInShells, cellToWorld } from '../core/lattice.js';
 
 // Raised from the spec's own original 2-shell example (55 cells, real
 // bounding radius ~2.8 units) to 8-shell, 2026-08-13 -- direct request

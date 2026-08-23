@@ -54,9 +54,9 @@ import {
   nextLandscapeState,
   LANDSCAPE_STATE_EMA_RATE,
   MAX_ORGANISMS_PER_PLANETOID,
-} from '../../src/evolution.js';
-import { createWorldStore } from '../../src/worldstate.js';
-import { applyGrowth } from '../../src/growth.js';
+} from '../../src/game-systems/evolution.js';
+import { createWorldStore } from '../../src/core/worldstate-core.js';
+import { applyGrowth } from '../../src/geometry-extensions/growth.js';
 
 function growToMaturity(world, organismId, maxTicks = 20) {
   let now = 0;

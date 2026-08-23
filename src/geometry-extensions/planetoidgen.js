@@ -23,7 +23,7 @@
 // RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md section 2) as the atmosphere
 // material rather than minting a new one -- same "reuse before inventing"
 // move as Star System's own Ferrostone-as-carbon-catalyst choice.
-import { cellsInShells, cellKey } from './lattice.js';
+import { cellsInShells, cellKey } from '../core/lattice.js';
 
 // bands: [[endFraction, material], ...] in ascending fraction order --
 // as simple a per-shell formula as reasonably possible: which band a

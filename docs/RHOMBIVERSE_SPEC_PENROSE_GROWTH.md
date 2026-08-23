@@ -401,7 +401,7 @@ trail (unit tests + real Playwright runs). Wave 2 not started.
 ## 11. Claude Code Prompt (copy-paste to start this addendum)
 
 > Implement Phase 6 (Penrose/RT Growth Layer) per
-> `RHOMBIVERSE_SPEC_PENROSE_GROWTH.md`. New `src/growth.js`: build the
+> `RHOMBIVERSE_SPEC_PENROSE_GROWTH.md`. New `src/geometry-extensions/growth.js`: build the
 > two Ammann rhombohedra (acute/obtuse) from the six icosahedral star
 > vectors exactly as section 2 describes, verify the golden-ratio face
 > diagonals and volume ratio directly (don't trust it unverified).

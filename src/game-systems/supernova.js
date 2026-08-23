@@ -3,8 +3,8 @@
 // new safety mechanism is invented here" (spec header) -- this file is
 // deliberately thin, leaning on blackhole.js's and starsystem.js's
 // already-built mechanics rather than duplicating them.
-import { cellKey, cellToWorld, cellsInShells } from './lattice.js';
-import { BSG_MATERIAL, findClusters, bsgClusterStats } from './gravity.js';
+import { cellKey, cellToWorld, cellsInShells } from '../core/lattice.js';
+import { BSG_MATERIAL, findClusters, bsgClusterStats } from '../geometry-extensions/gravity.js';
 import { isStar, pickCoreCell, defaultLedger, STAR_BSG_THRESHOLD } from './starsystem.js';
 import { isClaimProtected } from './regions.js';
 

@@ -268,7 +268,7 @@ sub-cells' own packing is geometrically correct (real FCC adjacency,
 scaled) and their combined volume approximately tiles the parent cell,
 before any camera-driven logic exists.
 
-New `src/latticezoom.js`, reusing `lattice.js`'s own `cellsInShells`/
+New `src/geometry-extensions/latticezoom.js`, reusing `lattice.js`'s own `cellsInShells`/
 `shellCount`/`cellToWorld` directly (no new geometry system). `SUB_SCALE_
 FACTOR` (`subScaleFactor(maxShell) = cbrt(1 / cumulativeCellCount(maxShell))`)
 is not guessed: the RD's own volume at scale 1 was verified numerically

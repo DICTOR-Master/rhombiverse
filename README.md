@@ -206,5 +206,5 @@ python3 -m http.server 8000
 
 Then open `http://localhost:8000`. Shared World mode, the AI Gateway
 fallback, and the public Gallery need real Supabase/Vercel backends
-(`src/sync.js`, `api/`) — everything else works fully offline against
+(`src/app/sync.js`, `api/`) — everything else works fully offline against
 `localStorage`.

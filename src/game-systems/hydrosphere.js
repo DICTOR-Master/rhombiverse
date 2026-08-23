@@ -8,7 +8,7 @@
 // mechanic is Ice 9.9's context-dependent liquify-and-permeate behavior
 // (section 3), which reuses the exact same cluster/BSG detection already
 // built for planetoid gravity rather than re-deriving it.
-import { findClusters, BSG_MATERIAL } from './gravity.js';
+import { findClusters, BSG_MATERIAL } from '../geometry-extensions/gravity.js';
 
 export const ICE99_MATERIAL = 'ice99';
 

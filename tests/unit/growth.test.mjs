@@ -12,8 +12,8 @@ import {
   applyGrowth,
   tileWorldVertices,
   tilesOverlap,
-} from '../../src/growth.js';
-import { createWorldStore } from '../../src/worldstate.js';
+} from '../../src/geometry-extensions/growth.js';
+import { createWorldStore } from '../../src/core/worldstate-core.js';
 
 function dot(a, b) {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];

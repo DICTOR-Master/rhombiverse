@@ -38,7 +38,7 @@ import {
   localMatureSameSpeciesCount,
   BIOMASS_SEARCH_RADIUS,
 } from './evolution.js';
-import { cellToWorld } from './lattice.js';
+import { cellToWorld } from '../core/lattice.js';
 
 export const LAND_CREATURE_SPECIES = 'landCreature';
 export const SEA_CREATURE_SPECIES = 'seaCreature';
