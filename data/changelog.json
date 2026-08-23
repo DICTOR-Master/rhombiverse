@@ -4,7 +4,8 @@
     "title": "The geometry comes first",
     "items": [
       "Rhombiverse is now explicit about what it is: an instrument for exploring and sculpting rhombic-dodecahedron space -- the FCC lattice geometry is the core, not the mining/trade/hazard systems built on top of it.",
-      "A features.js flag registry lets some of those systems (Achievements, Animals, Hydrosphere, Trade decay) load only when needed, instead of always-on."
+      "A features.js flag registry lets some of those systems (Achievements, Animals, Hydrosphere, Trade decay) load only when needed, instead of always-on.",
+      "New in Sculpture Mode: the cube and octahedron inscribed in every block, made visible and sculptable -- a Show Dual overlay, Snap to Dual, a Dual Shell brush, Cube/Octa symmetry presets, and Full symmetry (48)."
     ]
   },
   {
