@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-08-24",
+    "title": "Sculpture Mode, truly its own space",
+    "items": [
+      "Sculpture Mode no longer shows the real World's presets or asteroid-belt hints -- it's a genuinely isolated scratch space now, not just in spirit.",
+      "Cyborg Mode's AI assistance (Semi- and Full-Cyborg) is now dual-aware -- build outward along a cube or octahedron vertex and it can suggest completing that whole inscribed solid, not just a mirror-plane edge.",
+      "Claims and Load-World presets now hide cleanly when their systems are off, instead of leaving a broken button behind."
+    ]
+  },
+  {
     "date": "2026-08-23",
     "title": "The geometry comes first",
     "items": [
