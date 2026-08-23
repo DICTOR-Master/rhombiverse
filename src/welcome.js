@@ -14,47 +14,47 @@ const SKIP_KEY = 'rhombiverse-skip-intro';
 // aligned angle and orthographically projected so no vertex overlaps
 // another on screen, not generic art. Kept as a plain coordinate list
 // here (rather than re-deriving via lattice.js at runtime) since it's
-// static presentation geometry, not gameplay math. Redrawn 2026-08-23
-// (rx=20 ry=40 rz=30 around the same real cube/octa vertex set, direct
-// reference image) to a shallower, more oblique angle with muted/
-// uniform-weight styling -- less "bright icon," more technical diagram.
+// static presentation geometry, not gameplay math.
+//
+// 2026-08-23: a same-day redraw at a different rotation with explicit
+// vertex-dot circles was reverted -- direct feedback that it read as
+// "too different" from the reference image and that the dots read as
+// unwanted "explicit round nodes." Checked numerically against the
+// reference (pixel-sampled vertex positions and stroke color) and this
+// original rotation/color were already a close match; the dots (not
+// the geometry) were the actual mismatch. So: original coordinates
+// unchanged, dot circles removed, lines rely on stroke-linecap="round"
+// alone for the soft vertex look the reference has.
 const RD_EDGES = [
-  [-20.99, 25.56, -25.83, 14.91], [-20.99, 25.56, 10.88, 35.97], [-20.99, 25.56, -27.03, 0.23],
-  [6.04, 25.33, -25.83, 14.91], [6.04, 25.33, 10.88, 35.97], [6.04, 25.33, 27.03, -0.23],
-  [-31.87, -10.41, -25.83, 14.91], [-31.87, -10.41, -10.88, -35.97], [-31.87, -10.41, -27.03, 0.23],
-  [-4.84, -10.64, -25.83, 14.91], [-4.84, -10.64, -10.88, -35.97], [-4.84, -10.64, 27.03, -0.23],
-  [4.84, 10.64, 25.83, -14.91], [4.84, 10.64, 10.88, 35.97], [4.84, 10.64, -27.03, 0.23],
-  [31.87, 10.41, 25.83, -14.91], [31.87, 10.41, 10.88, 35.97], [31.87, 10.41, 27.03, -0.23],
-  [-6.04, -25.33, 25.83, -14.91], [-6.04, -25.33, -10.88, -35.97], [-6.04, -25.33, -27.03, 0.23],
-  [20.99, -25.56, 25.83, -14.91], [20.99, -25.56, -10.88, -35.97], [20.99, -25.56, 27.03, -0.23],
-];
-const RD_CUBE_VERTS = [
-  [-20.99, 25.56], [6.04, 25.33], [-31.87, -10.41], [-4.84, -10.64],
-  [4.84, 10.64], [31.87, 10.41], [-6.04, -25.33], [20.99, -25.56],
-];
-const RD_OCTA_VERTS = [
-  [25.83, -14.91], [-25.83, 14.91], [-10.88, -35.97], [10.88, 35.97], [27.03, -0.23], [-27.03, 0.23],
+  [-29.48, 20.83, -33.10, -9.69], [-29.48, 20.83, 0.00, 38.94], [-29.48, 20.83, -25.86, 12.40],
+  [-3.62, 8.43, -33.10, -9.69], [-3.62, 8.43, 0.00, 38.94], [-3.62, 8.43, 25.86, -12.40],
+  [-29.48, -18.12, -33.10, -9.69], [-29.48, -18.12, 0.00, -38.94], [-29.48, -18.12, -25.86, 12.40],
+  [-3.62, -30.51, -33.10, -9.69], [-3.62, -30.51, 0.00, -38.94], [-3.62, -30.51, 25.86, -12.40],
+  [3.62, 30.51, 33.10, 9.69], [3.62, 30.51, 0.00, 38.94], [3.62, 30.51, -25.86, 12.40],
+  [29.48, 18.12, 33.10, 9.69], [29.48, 18.12, 0.00, 38.94], [29.48, 18.12, 25.86, -12.40],
+  [3.62, -8.43, 33.10, 9.69], [3.62, -8.43, 0.00, -38.94], [3.62, -8.43, -25.86, 12.40],
+  [29.48, -20.83, 33.10, 9.69], [29.48, -20.83, 0.00, -38.94], [29.48, -20.83, 25.86, -12.40],
 ];
 
 function logoSvg() {
   const lines = RD_EDGES.map(([x1, y1, x2, y2]) => `<path d="M ${x1} ${y1} L ${x2} ${y2}" />`).join('');
-  const cubeDots = RD_CUBE_VERTS.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.6" />`).join('');
-  const octaDots = RD_OCTA_VERTS.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.0" />`).join('');
   return `
     <svg viewBox="-45 -45 90 90" width="110" height="110" role="img" aria-label="Rhombiverse logo: a wireframe rhombic dodecahedron">
-      <g stroke="#6fb3d9" stroke-width="1.0" stroke-linecap="round" fill="none">${lines}</g>
-      <g fill="#9fd0ec">${cubeDots}</g>
-      <g fill="#6fb3d9">${octaDots}</g>
+      <g stroke="#7cf" stroke-width="1.5" stroke-linecap="round" fill="none">${lines}</g>
     </svg>`;
 }
 
 // Fallback only -- shown until loadLatestUpdate() resolves, or if the
 // fetch fails outright (offline, localStorage-only dev server oddity).
 // The real tagline is always sourced from data/changelog.json's newest
-// entry (see init()), not hand-maintained here, so it can't go stale
-// the way a hardcoded line already had (2026-08-23, direct request:
-// "welcome should be based on changelog").
-const FALLBACK_TAGLINE = 'A browser-based instrument for exploring and sculpting space with rhombic dodecahedra.';
+// entry's OWN TITLE ONLY (see init()) -- not hand-maintained here, so
+// it can't go stale the way a hardcoded line already had (2026-08-23,
+// direct request: "welcome should be based on changelog"). Title only,
+// not title + lead item, per direct feedback that the first attempt
+// (which appended the item text) read as too wordy and too negatively
+// framed for a first-impression line -- the changelog panel itself is
+// still the place for that fuller, more detailed wording.
+const FALLBACK_TAGLINE = 'One shape. Everything grows from it.';
 
 function overlayHtml() {
   return `
@@ -111,10 +111,7 @@ function init() {
     if (!entry) return;
     const tagline = document.getElementById('welcome-tagline');
     if (!tagline) return;
-    const lead = entry.items?.[0] ?? '';
-    tagline.innerHTML = lead
-      ? `<strong>${entry.title}</strong> -- ${lead}`
-      : entry.title;
+    tagline.textContent = entry.title;
   });
 
   const aboutBtn = document.createElement('button');
