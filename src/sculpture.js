@@ -5,8 +5,22 @@
 // Assistance Spectrum data model, symmetry mirroring, the shell-radius
 // brush, and Full-Cyborg's natural-language intent parsing/execution.
 import { cellKey, cellsInShells, isValidCell } from './lattice.js';
-import { claimIdAt, isClaimProtected } from './regions.js';
 import { requestBYOKJson } from './byok.js';
+
+// RHOMBIVERSE_PLAN.md's Core vs. Modules boundary (2026-08-23): claims
+// are a World System, so sculpture.js (Core) must not statically import
+// regions.js. render.js supplies the real claimIdAt/isClaimProtected
+// here via setRegionsIntegration(), gated behind FEATURES.economy (see
+// render.js's own init()). Inert defaults -- no claims exist -- so
+// local-only play, tests, and mining-disabled worlds behave exactly as
+// "nothing is claimed," same permissive framing canFullCyborgEditAt's
+// own doc comment below already relies on for the no-claims-registry case.
+let claimIdAt = () => null;
+let isClaimProtected = () => false;
+export function setRegionsIntegration({ claimIdAt: claimIdAtFn, isClaimProtected: isClaimProtectedFn }) {
+  claimIdAt = claimIdAtFn;
+  isClaimProtected = isClaimProtectedFn;
+}
 
 // --- Symmetry mirroring -----------------------------------------------
 // "Reuse the lattice's existing order-48 cubic symmetry group" (B4's own

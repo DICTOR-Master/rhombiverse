@@ -11,7 +11,18 @@
 // Isolation/Adaptive Damping (RHOMBIVERSE_PRINCIPLES.md sections 1-2)
 // don't yet apply; revisit when the shockwave follow-up lands.
 import { NEIGHBOR_OFFSETS, cellKey, parseCellKey, cellToWorld } from './lattice.js';
-import { isClaimProtected } from './regions.js';
+
+// RHOMBIVERSE_PLAN.md's Core vs. Modules boundary (2026-08-23): claims
+// are a World System, so gravity.js (a Geometry Extension) must not
+// statically import regions.js. render.js supplies the real
+// isClaimProtected here via setRegionsIntegration(), gated behind
+// FEATURES.economy (see render.js's own init()). Inert default (no
+// claims exist) preserves gravityAt's own existing claims={} default
+// behavior when claims are disabled or absent.
+let isClaimProtected = () => false;
+export function setRegionsIntegration({ isClaimProtected: isClaimProtectedFn }) {
+  isClaimProtected = isClaimProtectedFn;
+}
 
 export const BSG_MATERIAL = 'blackstar-glassite';
 

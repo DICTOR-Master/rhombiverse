@@ -79,29 +79,43 @@ src/
 
 ### Migration Path
 
-- [x] Phase A (partial): `features.js` flag registry added. Fully wired for
-      `achievements`, `animals`, `hydrosphere`, and trade's inventory-decay
-      call (all four load via a flag-gated dynamic `import()`, awaited in
-      `render.js`'s `init()` before anything can reach them). **Not**
-      wired for `mining` or `hazards`, and only half-wired for `economy`:
-      `build.js` (Core) has a real, static, top-level import of
-      `asteroids.js` (`mineAsteroidCell`), and `sculpture.js` and
-      `worldstate.js` (both Core) — plus `gravity.js` (Geometry
-      Extensions) and `blackhole.js`/`starsystem.js`/`supernova.js`
-      (World Systems) — all have real, static, top-level imports of
-      `regions.js` (claims). Flag-gating `asteroids.js` or `regions.js`
-      today would either break those Core/Geometry-Extension modules at
-      load time, or (for `asteroids.js`, since `build.js`'s own import is
-      untouched) be a silent no-op. Untangling that dependency is real
-      work, not done by this phase.
+- [x] Phase A: `features.js` flag registry added, and the Core/Geometry-
+      Extension side of the untangling is now done (2026-08-23).
+      `achievements`, `animals`, `hydrosphere`, and trade's inventory-
+      decay call load via a flag-gated dynamic `import()` in `render.js`'s
+      `init()`, same as before. `build.js` (Core) no longer has a static
+      import of `asteroids.js` — `mineAsteroidCell` is now injected via a
+      constructor param on `createBuildController`, gated behind
+      `FEATURES.mining`. `sculpture.js`/`worldstate.js` (Core) and
+      `gravity.js` (Geometry Extensions) no longer have static imports of
+      `regions.js` — `render.js` calls each module's own
+      `setRegionsIntegration()` with the real `claimIdAt`/
+      `isClaimProtected`, gated behind `FEATURES.economy`. Every one of
+      these four modules keeps a safe inert default (no-op mining,
+      "nothing is claimed") so tests and a `FEATURES`-disabled build both
+      still work. **Two things this does NOT cover**, so `mining`/
+      `economy` still don't fully disable those systems everywhere:
+      `render.js`'s own direct World-Systems usage (asteroid belt
+      seeding/regen, the claim-footprint UI) is unconditional — it's the
+      app's own orchestrator, not a Core/Geometry-Extension module, so
+      this isn't a boundary violation, just a real functional gap; and
+      `blackhole.js`/`starsystem.js`/`supernova.js`'s own imports of
+      `regions.js` are untouched (same World-Systems tier as each other,
+      not a boundary violation either, but `hazards` doesn't gate their
+      claim-checking). See `features.js`'s own header comment for the
+      exact same breakdown, kept in sync with this entry.
   - [ ] Phase B: Physically move files into the `core/` /
         `geometry-extensions/` / `game-systems/` / `app/` layout above
-        (`git mv`) and fix imports. Blocked on finishing Phase A's
-        `asteroids.js`/`regions.js` untangling first — moving files
-        before that would just relocate the same cross-tier dependency,
-        not resolve it.
+        (`git mv`) and fix imports. Unblocked by Phase A's Core/Geometry-
+        Extension untangling above, but not started — the two gaps noted
+        in Phase A (render.js's own usage, and the hazards trio) don't by
+        themselves block a pure file move, since neither is a Core-tier
+        static import.
   - [ ] Phase C: Add a "Pure Geometry / Full World" mode toggle on the
-        welcome screen or settings.
+        welcome screen or settings. Don't build this until Phase A's two
+        remaining gaps are closed too — a toggle that leaves belts/claim
+        UI/hazard claim-checking running regardless of the flag would be
+        misleading.
   - [ ] Phase D: Optionally publish `core/` + dual Sculpture Mode as a
         standalone reusable library/template.
 

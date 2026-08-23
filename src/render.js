@@ -30,7 +30,7 @@ import {
   speckleCountForBiomass,
   AGGREGATE_MAX_SPECKLES,
 } from './latticezoom.js';
-import { loadWorld, createWorldStore } from './worldstate.js';
+import { loadWorld, createWorldStore, setRegionsIntegration as setWorldstateRegionsIntegration } from './worldstate.js';
 import { createBuildController, removeShell, recolorShell } from './build.js';
 import { generatePlanetoid } from './planetoidgen.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR } from './settings.js';
@@ -52,9 +52,10 @@ import {
   applyDualSymmetry,
   applyFullSymmetry,
   shellBrushCells,
+  setRegionsIntegration as setSculptureRegionsIntegration,
 } from './sculpture.js';
 import { matchNeighborOffset } from './build.js';
-import { computePlanetoids, gravityAt, nearestPlanetoid } from './gravity.js';
+import { computePlanetoids, gravityAt, nearestPlanetoid, setRegionsIntegration as setGravityRegionsIntegration } from './gravity.js';
 import { applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } from './blackhole.js';
 import { applyStarFusion, annotateStars, canPlaceMaterial as canPlaceForStars } from './starsystem.js';
 import { applyDetonationCheck, annotateSupernovae } from './supernova.js';
@@ -89,12 +90,13 @@ import {
   subscribeToPresence,
   updatePresence,
 } from './sync.js';
-import { computeClaim, claimFootprintWorldVertices } from './regions.js';
+import { computeClaim, claimFootprintWorldVertices, claimIdAt, isClaimProtected } from './regions.js';
 import {
   seedAsteroidBelts,
   applyAsteroidRegeneration,
   applyPopulationScaledSpawning,
   listBelts,
+  mineAsteroidCell,
 } from './asteroids.js';
 // proposeTrade/confirmTrade/cancelTrade (trade.js's own local-only
 // implementations) are deliberately NOT used from here -- trading
@@ -1227,6 +1229,23 @@ async function init() {
       reproduceFn,
       computeAnimalSurvivalProbability,
     } = await import('./animals.js'));
+  }
+  // RHOMBIVERSE_PLAN.md's Core vs. Modules Migration Path, Phase A
+  // completion (2026-08-23): sculpture.js/worldstate.js (Core) and
+  // gravity.js (a Geometry Extension) no longer statically import
+  // regions.js (claims, a World System); build.js (Core) no longer
+  // statically imports asteroids.js's mineAsteroidCell (mining, a World
+  // System) either. render.js already has its own separate, unrelated
+  // static dependency on both files (claim-footprint rendering, asteroid
+  // belt seeding), so there's nothing to dynamically import here -- this
+  // just injects the real functions into those four Core/Geometry-
+  // Extension modules, gated by the same flags that already gate every
+  // other World System. Skipping a wiring call leaves that module's own
+  // inert default in place (no claims exist / mining is a no-op).
+  if (FEATURES.economy) {
+    setSculptureRegionsIntegration({ claimIdAt, isClaimProtected });
+    setWorldstateRegionsIntegration({ claimIdAt });
+    setGravityRegionsIntegration({ isClaimProtected });
   }
 
   wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
@@ -3305,6 +3324,12 @@ async function init() {
     mineRemote: (x, y, z) => {
       if (sharedWorldActive) mineAsteroidCellRemote(x, y, z);
     },
+    // Phase A completion (2026-08-23): build.js (Core) no longer
+    // statically imports asteroids.js -- see the FEATURES.economy block
+    // above init()'s own end for the parallel regions.js wiring. Passing
+    // undefined when mining is disabled leaves build.js's own inert
+    // no-op default in place (mineAsteroidCell param default).
+    mineAsteroidCell: FEATURES.mining ? mineAsteroidCell : undefined,
     onCellClicked: (cell) => {
       focusedCenterKey = cell.shellCenter || null;
       renderRingList();
