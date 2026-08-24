@@ -28,9 +28,14 @@ tested and clearly described" means in practice.
 
 ## Ground rules this project actually follows
 
-- **No build step, by design.** Plain ES modules loaded via an import
-  map in `index.html` — no bundler, no `npm install` for the app itself.
-  Don't introduce one unless a real requirement forces it.
+- **No build step for local dev, by design.** Plain ES modules loaded
+  via an import map in `index.html` — no bundler, no `npm install`
+  needed to run or edit the app itself; any static file server works.
+  Production (Vercel) does run `npm run build` (`scripts/build.mjs`,
+  added 2026-08-24) to minify each `src/**/*.js` file in place for real
+  measured performance — no bundling, same module graph, doesn't
+  change local dev at all. Don't add bundling, or anything that would
+  make local dev need tooling, unless a real requirement forces it.
 - **Grounded Simplicity.** Borrow real physics/math/crystallography
   over inventing something arbitrary; prefer the simplest version that
   still works. If you're tuning a constant with no real-world anchor

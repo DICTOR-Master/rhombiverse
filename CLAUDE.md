@@ -86,8 +86,10 @@ build order:
   reasons, not one. (1) Cold JS parse/eval time genuinely grew past the
   old fixed 10s `waitForSelector` timeouts as the module graph grew
   across B1-B6 — recalibrated to 25s, a real test-maintenance fix, not
-  a bug (no build step is a deliberate project principle, so a bundler
-  was never the right fix for a test timeout). (2)
+  a bug (bundling the module graph together was never the right fix
+  for a test timeout — see `scripts/build.mjs`, added 2026-08-24, for
+  the real production perf fix this project actually took: minify each
+  file in place, no bundling, dev untouched). (2)
   `page.click('.wheel-item:has-text(...)')` reproducibly hung on one
   specific interaction, both locally and on GitHub's runners, even
   though a live diagnostic proved the DOM state was completely correct

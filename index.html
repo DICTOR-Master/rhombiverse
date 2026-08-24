@@ -1016,9 +1016,11 @@
     }
   </style>
   <!--
-    No bundler/build step by design (Grounded Simplicity, RHOMBIVERSE_PRINCIPLES.md
-    section 0) -- plain ES modules + an import map, deployable as static files
-    (GitHub Pages / Vercel, per RHOMBIVERSE_PLAN.md Phase 4) with zero build tooling.
+    Plain ES modules + an import map -- no bundling, ever (scripts/build.mjs,
+    added 2026-08-24, only minifies each src/**/*.js file in place for
+    production; the module graph/import structure is completely untouched).
+    Local dev (README.md's "Running locally") stays zero-build-step: any
+    static file server directly over this repo, exactly as before.
   -->
   <script type="importmap">
     {

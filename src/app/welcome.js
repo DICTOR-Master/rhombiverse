@@ -79,14 +79,14 @@ function overlayHtml() {
           <div class="identity-item" data-persona="rhombinaut" role="button" tabindex="0"><strong>Rhombinaut</strong> -- walk your worlds</div>
           <div class="identity-item" data-persona="rhombitect" role="button" tabindex="0"><strong>Rhombitect</strong> -- build whole planets</div>
           <div class="identity-item" data-persona="rhombisculptor" role="button" tabindex="0"><strong>Rhombisculptor</strong> -- model, chisel, create</div>
-          <div class="identity-item" data-persona="rhombiologist" role="button" tabindex="0"><strong>Rhombiologist</strong> -- grow real, evolving life</div>
+          <div class="identity-item" data-persona="rhombiologist" role="button" tabindex="0"><strong>Rhombiologist</strong> -- grow evolving lifeforms</div>
         </div>
       </div>
       <p class="quickstart">Click a face to build, right-click to remove.</p>
       <div class="mode-choice">
         <div class="mode-choice-prompt">Mode:</div>
-        <button type="button" class="mode-choice-btn" data-mode="pure" id="mode-choice-pure">Rhombeometry -- geometry only</button>
-        <button type="button" class="mode-choice-btn" data-mode="full" id="mode-choice-full">Full World -- mining, trade, hazards</button>
+        <button type="button" class="mode-choice-btn" data-mode="pure" id="mode-choice-pure">Pure Rhombeometry</button>
+        <button type="button" class="mode-choice-btn" data-mode="full" id="mode-choice-full">Full World</button>
       </div>
       <label class="dont-show">
         <input type="checkbox" id="skip-intro-checkbox" />

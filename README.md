@@ -119,7 +119,7 @@ evolution, animals, lattice zoom).
 
 ```
 rhombiverse/
-  index.html                # static entry point, Three.js via import map, no build step
+  index.html                # static entry point, Three.js via import map (no bundling; see "Running locally")
   api/                       # Vercel serverless functions (AI Gateway proxy: sculpt/cultivate/cyborg-suggest)
   src/
     lattice.js               # RD/FCC coordinate math, 12-neighbor lookup
@@ -208,3 +208,11 @@ Then open `http://localhost:8000`. Shared World mode, the AI Gateway
 fallback, and the public Gallery need real Supabase/Vercel backends
 (`src/app/sync.js`, `api/`) — everything else works fully offline against
 `localStorage`.
+
+Production (Vercel) additionally runs `npm run build` (`scripts/build.mjs`)
+before deploying — real profiling on the actual Pi 500 this app is played
+on (2026-08-24) found over half of `src/`'s JS bytes were comments, so
+esbuild minifies each file in place (no bundling, same module graph) for a
+real, measured improvement. This has no effect on local dev — the command
+above still serves raw, fully-commented source directly, zero tooling
+required.

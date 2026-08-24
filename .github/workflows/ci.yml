@@ -11,8 +11,8 @@ jobs:
     # Pure math/logic tests (lattice.js, worldstate.js, regions.js) --
     # zero npm dependencies, src/package.json's "type": "module" is the
     # only thing making plain `node --test` treat these as ESM. Scoped
-    # to src/ specifically, not the repo root, so it can never affect
-    # how Vercel detects/builds this project (still zero build step).
+    # to src/ specifically, not the repo root -- independent of the root
+    # package.json's own devDependencies (esbuild, for scripts/build.mjs).
     runs-on: ubuntu-latest
     timeout-minutes: 5 # normally ~1min -- a real hang should fail fast, not sit for GitHub's 360min default
     steps:
@@ -25,8 +25,10 @@ jobs:
   browser-smoke-test:
     # Real-browser check (Playwright) -- the actual app, served exactly
     # as README.md's own local-dev instructions describe (plain
-    # `python3 -m http.server`, no build step), driven the same way a
-    # real player would use it.
+    # `python3 -m http.server` directly over raw src/, no build step),
+    # driven the same way a real player would use it. build-check below
+    # runs this exact same test again against the minified dist/ output
+    # Vercel actually deploys -- this job is the dev-parity one.
     runs-on: ubuntu-latest
     # Normally ~1-5min end to end; this job has hung indefinitely on
     # GitHub's shared runners more than once (unrelated to app changes --
@@ -55,5 +57,43 @@ jobs:
           echo "server never came up" >&2
           exit 1
       - name: Run smoke test
+        working-directory: tests/browser
+        run: node smoke.mjs
+
+  build-check:
+    # Verifies the ACTUAL production artifact (scripts/build.mjs's
+    # minified dist/ -- what vercel.json's buildCommand produces and
+    # Vercel actually deploys), not just that esbuild's minifier didn't
+    # throw. Runs the exact same smoke test as browser-smoke-test above,
+    # against dist/ instead of raw src/, so a minification-introduced
+    # regression (unlikely, but esbuild does rename/reorder things) is
+    # caught here, before a real deploy, not after.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+      - name: Install build deps and run the build
+        run: |
+          npm install
+          npm run build
+      - name: Install Playwright
+        working-directory: tests/browser
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+      - name: Serve dist/
+        run: cd dist && python3 -m http.server 8000 &
+      - name: Wait for server
+        run: |
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8000/index.html > /dev/null && exit 0
+            sleep 0.5
+          done
+          echo "server never came up" >&2
+          exit 1
+      - name: Run smoke test against the built dist/ output
         working-directory: tests/browser
         run: node smoke.mjs
