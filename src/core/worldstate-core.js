@@ -105,6 +105,21 @@ export function createWorldStore(worldJSON, hooks = {}) {
   let seedsCache = null;
   let organismsCache = null;
   let planetoidEvolutionCache = null;
+  // Same fix, same real bug shape, applied to `cells`/entries() (found
+  // 2026-08-24 profiling the first-visit Showcase World load): entries()
+  // was the one remaining unmemoized getter of this shape, doing a full
+  // Array.from(cells.entries()).map(parseCellKey) scan on every call.
+  // evolution.js's countLocalWaterCells calls world.entries() once per
+  // organism per catch-up generation -- with MAX_CATCHUP_GENERATIONS (50)
+  // and several organisms, that's the same O(n) read repeated hundreds of
+  // times between any real cell mutation, profiled live as ~1.3s of a
+  // ~6s synchronous block (parseCellKey alone) before the page could
+  // register a single click. Invalidated by addCell/removeCell/
+  // replaceAll below, lazily rebuilt on the next entries() call --
+  // callers only ever read fields off these objects, never mutate them
+  // (checked against every real call site), so the same object is safe
+  // to hand out repeatedly between mutations.
+  let cellsEntriesCache = null;
   // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 6, 2026-08-13: per-
   // planetoid catch-up state (lastSimulated/rngState), keyed by a
   // deterministic string derived from that planetoid's own real
@@ -157,17 +172,22 @@ export function createWorldStore(worldJSON, hooks = {}) {
         stamped = { ...stamped, claimId: claimIdAt(claims, x, y, z) };
       }
       cells.set(cellKey(x, y, z), stamped);
+      cellsEntriesCache = null;
       hooks.onAdd?.(x, y, z, stamped);
     },
     removeCell(x, y, z) {
       cells.delete(cellKey(x, y, z));
+      cellsEntriesCache = null;
       hooks.onRemove?.(x, y, z);
     },
     entries() {
-      return Array.from(cells.entries()).map(([key, data]) => {
-        const [x, y, z] = parseCellKey(key);
-        return { x, y, z, ...data };
-      });
+      if (cellsEntriesCache === null) {
+        cellsEntriesCache = Array.from(cells.entries()).map(([key, data]) => {
+          const [x, y, z] = parseCellKey(key);
+          return { x, y, z, ...data };
+        });
+      }
+      return cellsEntriesCache;
     },
     // Read-only view of the claims registry -- regions.js's allocation
     // algorithm and claimIdAt() both read this to know what's already
@@ -357,6 +377,7 @@ export function createWorldStore(worldJSON, hooks = {}) {
       seedsCache = null;
       organismsCache = null;
       planetoidEvolutionCache = null;
+      cellsEntriesCache = null;
       cells.clear();
       for (const [key, data] of Object.entries(newWorldJSON.cells)) {
         cells.set(key, data);
