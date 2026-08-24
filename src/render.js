@@ -1022,6 +1022,21 @@ window.addEventListener('rhombiverse:personaChosen', (e) => {
   qualitySelect.addEventListener('change', () => updateSettings({ quality: qualitySelect.value }));
   volumeInput.addEventListener('input', () => updateSettings({ volume: Number(volumeInput.value) }));
 
+  // Migration Path Phase C (RHOMBIVERSE_PLAN.md): Rhombeometry mode.
+  // features.js reads this flag once, at module-eval time, ahead of
+  // this init() ever gating a World Systems import -- there is no live
+  // way to flip World Systems on/off mid-session, so this always
+  // reloads. Nothing is lost: the current World autosaves to
+  // localStorage the same way a manual refresh already preserves it.
+  const pureGeometryInput = document.getElementById('setting-pure-geometry');
+  const pureGeometryHint = document.getElementById('pure-geometry-hint');
+  pureGeometryInput.checked = s.pureGeometry;
+  pureGeometryInput.addEventListener('change', () => {
+    updateSettings({ pureGeometry: pureGeometryInput.checked });
+    pureGeometryHint.style.display = '';
+    setTimeout(() => window.location.reload(), 400);
+  });
+
   // Bring-Your-Own-AI-Key (mid-B5 addition) -- see byok.js's own header
   // for why this is plain fetch, not the @anthropic-ai/sdk package.
   const byokProviderSelect = document.getElementById('byok-provider');
@@ -1283,6 +1298,12 @@ async function init() {
   wireFirstUseHint('cyborg-toggle', 'Cyborg Mode: a guided walkthrough, step by step.');
   wireFirstUseHint('xray-toggle', 'X-Ray: drag a cutaway plane through the structure to see inside it.');
   wireFirstUseHint('lab-toggle', 'Lab: advanced settings and tools live here.');
+  // Moved here from the welcome card's own quickstart line (trimmed down
+  // 2026-08-24 -- it was reading as too heavy alongside the new mode
+  // choice) so each piece of guidance surfaces where it's actually
+  // relevant, not all at once up front.
+  wireFirstUseHint('hud-wheel-cue', 'Tab / Space (or tap Menu) opens the Rhombic Wheel -- build, sculpt, grow, and more, all from here.');
+  wireFirstUseHint('export-json', 'Export your World anytime to keep a copy.');
 
   // A saved build takes priority over the static seed -- that's the
   // whole point of Phase 3 (refreshing preserves the build). On a true
@@ -2694,6 +2715,15 @@ async function init() {
 
   function openSculptPanel() {
     sculptPanelEl.classList.add('open');
+    // Moved here from the welcome card's own quickstart line (trimmed
+    // down 2026-08-24) -- same one-time-toast idiom wireFirstUseHint
+    // uses elsewhere, just triggered by opening the panel instead of a
+    // hover/tap on an icon, since Sculpt is reached through the wheel.
+    if (!seenHints.has('sculpt-panel-open')) {
+      seenHints.add('sculpt-panel-open');
+      localStorage.setItem(HINT_SEEN_KEY, JSON.stringify([...seenHints]));
+      showHudPrompt('Sculpt: symmetry and mirror tools, no World required.', 4500);
+    }
   }
   function closeSculptPanel() {
     sculptPanelEl.classList.remove('open');

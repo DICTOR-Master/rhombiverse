@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-08-24",
+    "title": "Rhombeometry, right from the start",
+    "items": [
+      "A real Mode choice now exists: Rhombeometry (geometry only) or Full World (mining, trade, hazards) -- pick it on the welcome screen or flip it anytime from Lab Settings.",
+      "New visitors land in Rhombeometry by default, since the geometry comes first.",
+      "Switching modes never wipes anything -- your World's own cells, claims, and belts just sit inert while their systems are off, the same clean hide every individual system already got."
+    ]
+  },
+  {
+    "date": "2026-08-24",
     "title": "Sculpture Mode, truly its own space",
     "items": [
       "Sculpture Mode no longer shows the real World's presets or asteroid-belt hints -- it's a genuinely isolated scratch space now, not just in spirit.",

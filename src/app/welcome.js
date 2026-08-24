@@ -6,7 +6,18 @@
 // localStorage concern, deliberately independent of render.js/world
 // state -- this can run (and the game can be dismissed into) even if
 // nothing else on the page has finished loading yet.
+import { getSettings, updateSettings } from './settings.js';
+
 const SKIP_KEY = 'rhombiverse-skip-intro';
+
+// Migration Path Phase C (RHOMBIVERSE_PLAN.md): the same Rhombeometry
+// choice render.js's Lab panel exposes, offered up front here too (per
+// direct instruction -- both surfaces). settings.js is the single
+// source of truth either way; picking a different mode than what's
+// already active reloads immediately, since World Systems flags are
+// only ever read once, at features.js's own module-eval time, and this
+// overlay's own choice can otherwise race render.js's init() (loaded as
+// a separate, unordered-relative-to-this <script type="module">).
 
 // Same wireframe rhombic dodecahedron coordinates as favicon.svg --
 // this project's own voxel shape (lattice.js's rdRawVerts: 8 cube verts
@@ -71,7 +82,12 @@ function overlayHtml() {
           <div class="identity-item" data-persona="rhombiologist" role="button" tabindex="0"><strong>Rhombiologist</strong> -- grow real, evolving life</div>
         </div>
       </div>
-      <p class="quickstart"><strong>Tab</strong> / <strong>Space</strong> opens the Rhombic Wheel. Click a face to build, right-click to remove -- or open Sculpt for symmetry tools, no World required. Export your World anytime to keep a copy.</p>
+      <p class="quickstart">Click a face to build, right-click to remove.</p>
+      <div class="mode-choice">
+        <div class="mode-choice-prompt">Mode:</div>
+        <button type="button" class="mode-choice-btn" data-mode="pure" id="mode-choice-pure">Rhombeometry -- geometry only</button>
+        <button type="button" class="mode-choice-btn" data-mode="full" id="mode-choice-full">Full World -- mining, trade, hazards</button>
+      </div>
       <label class="dont-show">
         <input type="checkbox" id="skip-intro-checkbox" />
         Don't show this again on this device
@@ -113,6 +129,22 @@ function init() {
     if (!tagline) return;
     tagline.textContent = entry.title;
   });
+
+  const fullBtn = document.getElementById('mode-choice-full');
+  const pureBtn = document.getElementById('mode-choice-pure');
+  function refreshModeChoiceButtons() {
+    const isPure = getSettings().pureGeometry;
+    fullBtn.classList.toggle('active', !isPure);
+    pureBtn.classList.toggle('active', isPure);
+  }
+  refreshModeChoiceButtons();
+  function chooseMode(pureGeometry) {
+    if (getSettings().pureGeometry === pureGeometry) return;
+    updateSettings({ pureGeometry });
+    window.location.reload();
+  }
+  fullBtn.addEventListener('click', () => chooseMode(false));
+  pureBtn.addEventListener('click', () => chooseMode(true));
 
   const aboutBtn = document.createElement('button');
   aboutBtn.id = 'about-btn';

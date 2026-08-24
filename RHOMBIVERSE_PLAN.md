@@ -139,14 +139,26 @@ src/
         welcome tagline and changelog panel (both fetch
         `data/changelog.json` via the document's own base URL, so the
         move doesn't affect them) — all zero console errors.
-  - [ ] Phase C: Add a "Pure Geometry / Full World" mode toggle on the
-        welcome screen or settings. Unblocked as of 2026-08-24 (Phase A's
-        two remaining gaps above are closed — every FEATURES flag is now
-        real end-to-end), but not started: still needs a real design
-        pass first — where does the toggle live, does flipping it wipe
-        an existing world's already-placed belts/claims or only affect
-        worlds created after, does the choice persist per-device or
-        per-world.
+  - [x] Phase C: DONE, 2026-08-24. "Rhombeometry / Full World" mode
+        toggle, on both the welcome screen and Lab Settings (per direct
+        instruction — not either/or). Resolved design questions: it's a
+        single visitor-level mode (`settings.js`'s `pureGeometry`,
+        localStorage-backed, per-device), not a per-world property — the
+        2026-08-23 "geometry comes first" framing means World Systems sit
+        optionally on top of the geometry, not the reverse, so there's
+        no per-world data to carry the choice or wipe when it changes.
+        `features.js` reads it at module-eval time, forcing all six
+        World Systems flags off together when active; nothing is ever
+        wiped, since init()'s existing per-flag UI-hiding (Phase A/B)
+        already handles "system off" cleanly. Defaults to Rhombeometry
+        (not Full World) and sits first/left of Full World in the
+        welcome screen's markup — both direct instructions. Changing the
+        mode always reloads (World Systems flags are only ever read
+        once, at boot) — verified end-to-end with a real WebDriver
+        (geckodriver/Marionette) run, not just code review: default
+        mode, welcome-screen toggle, Lab panel checkbox toggle, and the
+        FEATURES-gated UI (claim-land-row) all confirmed to flip
+        correctly in both directions, real reload included.
   - [ ] Phase D: Optionally publish `core/` + dual Sculpture Mode as a
         standalone reusable library/template.
 

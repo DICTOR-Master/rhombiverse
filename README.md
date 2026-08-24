@@ -52,8 +52,8 @@ geometry itself:
   hazards are not yet disconnected from Core — see `RHOMBIVERSE_PLAN.md`'s
   Migration Path for why and what's planned.
 
-A "Pure Geometry / Full World" mode toggle is planned but not yet
-implemented.
+A "Rhombeometry / Full World" mode toggle exists (welcome screen and
+Lab Settings) — defaults to Rhombeometry, geometry-only.
 
 ## What this is (right now)
 

@@ -25,6 +25,16 @@ const DEFAULTS = {
   byokProvider: 'none',
   byokApiKey: '',
   byokModel: '',
+  // Migration Path Phase C (RHOMBIVERSE_PLAN.md): "Rhombeometry" mode --
+  // World Systems (mining/economy/achievements/animals/hazards/
+  // hydrosphere) forced off, geometry-only. Defaults to true -- direct
+  // instruction, matching "the geometry comes first" (the 2026-08-23
+  // changelog's own framing): a first-time visitor lands in Rhombeometry,
+  // not Full World, unless they choose otherwise. Read by features.js at
+  // module-eval time, before render.js's init() ever gates a single
+  // World Systems import -- so changing this needs a reload to take
+  // effect (see welcome.js/render.js's own toggle wiring).
+  pureGeometry: true,
 };
 
 function loadSaved() {

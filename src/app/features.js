@@ -1,3 +1,5 @@
+import { getSettings } from './settings.js';
+
 // Feature-flag registry, separating the geometric core (lattice, dual
 // structure, Sculpture Mode) from the game-loop "World Systems" (mining,
 // trade, claims, hazards, etc.) so the core can eventually run standalone.
@@ -56,10 +58,28 @@ export const FEATURES = {
   hydrosphere: true,
 };
 
-// A "Pure Geometry / Full World" mode toggle (RHOMBIVERSE_PLAN.md's
-// Migration Path Phase C) can now be built on top of this registry --
-// every flag is real, end-to-end, not just the module-boundary half
-// that was done as of Phase A. Not built yet: still needs its own real
-// design pass (where does the toggle live, does flipping it wipe an
-// existing world's already-placed belts/claims or only affect new
-// worlds, does it persist per-device or per-world) before adding UI.
+// Migration Path Phase C (RHOMBIVERSE_PLAN.md): "Pure Geometry / Full
+// World" is a single visitor-level mode, not a per-world property --
+// per the 2026-08-23 changelog ("the FCC lattice geometry is the core,
+// not the mining/trade/hazard systems built on top of it"), Pure
+// Geometry mode is what World Systems are OPTIONAL ON TOP OF, not a
+// separate scratch space (that's Sculpture Mode's job) and not
+// something a saved world's own data carries. Choosing it just forces
+// every World System flag above off together; the five Geometry
+// Extensions stay on either way, since those ARE the core. Persisted
+// per-device (settings.js, alongside sensitivity/quality/BYOK), read
+// here -- before render.js's init() ever awaits a single World Systems
+// import -- so the mutation below is the only place that needs to know
+// about it. Nothing is ever wiped: init()'s existing per-flag gating
+// already hides UI and no-ops backend calls cleanly when a flag is off
+// (proven per-flag by Phase A/B), so a world's own saved cells/claims/
+// belts data sits inert and untouched, not deleted, while this mode is
+// active.
+if (getSettings().pureGeometry) {
+  FEATURES.mining = false;
+  FEATURES.economy = false;
+  FEATURES.achievements = false;
+  FEATURES.animals = false;
+  FEATURES.hazards = false;
+  FEATURES.hydrosphere = false;
+}
