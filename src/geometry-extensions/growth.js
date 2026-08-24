@@ -208,7 +208,42 @@ function tileEdges(verts) {
 // re-deriving SAT math a second time (which is exactly how the
 // original bug -- see growSeed's header -- went undetected: the old
 // test only re-checked centroid equality, not real overlap).
+function centroidOf(verts) {
+  let cx = 0;
+  let cy = 0;
+  let cz = 0;
+  for (const v of verts) {
+    cx += v[0];
+    cy += v[1];
+    cz += v[2];
+  }
+  return [cx / verts.length, cy / verts.length, cz / verts.length];
+}
+
+function maxRadiusFrom(verts, center) {
+  let r = 0;
+  for (const v of verts) {
+    const d = Math.hypot(v[0] - center[0], v[1] - center[1], v[2] - center[2]);
+    if (d > r) r = d;
+  }
+  return r;
+}
+
 export function tilesOverlap(vertsA, vertsB, eps = 1e-6) {
+  // Cheap conservative pre-check before the expensive exact SAT test
+  // below: if the two tiles' bounding SPHERES don't overlap, the
+  // (smaller, convex) tiles inside them provably can't overlap either --
+  // this can only ever skip work, never change the real answer. Found
+  // live 2026-08-24 profiling growth catch-up: growSeed's own
+  // `placedVerts.some(...)` checks every new candidate against EVERY
+  // already-placed tile in a seed, so this pre-check's payoff (O(16)
+  // distance checks vs. up to 15 axes x 16 projections of exact SAT)
+  // compounds directly with total tile count during a long catch-up run.
+  const centerA = centroidOf(vertsA);
+  const centerB = centroidOf(vertsB);
+  const dist = Math.hypot(centerA[0] - centerB[0], centerA[1] - centerB[1], centerA[2] - centerB[2]);
+  if (dist > maxRadiusFrom(vertsA, centerA) + maxRadiusFrom(vertsB, centerB) + eps) return false;
+
   const [e1, e2, e3] = tileEdges(vertsA);
   const [f1, f2, f3] = tileEdges(vertsB);
   const axes = [];
