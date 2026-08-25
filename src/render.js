@@ -34,7 +34,7 @@ import { createBuildController, removeShell, recolorShell } from './core/build.j
 import { generatePlanetoid } from './geometry-extensions/planetoidgen.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR } from './app/settings.js';
 import { playPlaceSound, playRemoveSound, playMenuSound } from './app/sfx.js';
-import { createRhombicWheel } from './app/wheel.js';
+import { createWheelPickers } from './app/wheel-pickers.js';
 import { createCyborgMode } from './app/cyborg.js';
 import { requestBYOKJson } from './app/byok.js';
 import {
@@ -789,8 +789,8 @@ async function getCyborgSuggestion() {
 
 const cyborgMode = createCyborgMode({ getSuggestion: getCyborgSuggestion });
 const cyborgToggleEl = document.getElementById('cyborg-toggle');
-cyborgToggleEl.addEventListener('click', () => {
-  cyborgMode.toggle();
+cyborgToggleEl.addEventListener('click', async () => {
+  await cyborgMode.toggle();
   cyborgToggleEl.classList.toggle('active', cyborgMode.isEnabled());
 });
 
@@ -1783,9 +1783,10 @@ async function init() {
   // action createRhombicWheel3D doesn't resolve internally -- that's
   // navigateTo:<a real wheel id> and navigateHome (handled inside
   // createRhombicWheel3D itself), everything else lands here.
+  // No feature flag -- this is the sole navigation surface now (the
+  // old 2D wheel.js was removed 2026-08-25), always on, not optional.
   const rhombicWheel3DToggleBtn = document.getElementById('rhombic-wheel-3d-toggle');
-  if (rhombicWheel3DToggleBtn) rhombicWheel3DToggleBtn.style.display = FEATURES.rhombicWheel3D ? '' : 'none';
-  if (FEATURES.rhombicWheel3D) {
+  {
     const wheel3D = createRhombicWheel3D({
       onAction: (action) => {
         // openCyborg/openLab reuse the real, already-shipped toggles;
@@ -1793,9 +1794,9 @@ async function init() {
         // (X-Ray) -- see rhombic-wheel-3d-core.js's UNIVERSAL_RING
         // comment for why this isn't a clean 1:1 match. openAlmanac has
         // no existing counterpart yet and is a stub.
-        if (action === 'openCyborg') { cyborgToggleEl?.click(); return; }
-        if (action === 'openLab') { labToggleEl?.click(); return; }
-        if (action === 'openLenses') { document.getElementById('xray-toggle')?.click(); return; }
+        if (action === 'openCyborg') { wheel3D.close(); cyborgToggleEl?.click(); return; }
+        if (action === 'openLab') { wheel3D.close(); labToggleEl?.click(); return; }
+        if (action === 'openLenses') { wheel3D.close(); document.getElementById('xray-toggle')?.click(); return; }
         if (action === 'openAlmanac') { showHudPrompt('Almanac is not built yet.', 3000); return; }
         // Explore (Rhombinaut) is a single destination, not a wheel --
         // reuses the real existing action (#walk-toggle, same trigger
@@ -1846,9 +1847,27 @@ async function init() {
         // slot, not inventing one. See rhombic-wheel-3d-core.js.
         if (action === 'tool:material') {
           wheel3D.close();
-          wheel.openMaterialPicker((value, label) => showHudPrompt(`Material: ${label}`, 3000));
+          pickers.openMaterialPicker((value, label) => showHudPrompt(`Material: ${label}`, 3000));
           return;
         }
+        // Real toggle, same as the 2D wheel's own "Repeat" leaf --
+        // reuses wheel.js's toggleDragPlacement() rather than
+        // duplicating the drag-placement state/logic here.
+        if (action === 'tool:repeat') {
+          const enabled = pickers.toggleDragPlacement();
+          showHudPrompt(
+            enabled
+              ? 'Repeat armed: drag across faces to place a run of cells. Camera orbit is off while Repeat is active -- pick Rhombi-model to get it back.'
+              : 'Repeat off.',
+            4500
+          );
+          wheel3D.close();
+          return;
+        }
+        // Matches the 2D wheel's own real capability exactly -- Pattern
+        // is a "coming soon" placeholder there too, not a real feature
+        // being withheld here.
+        if (action === 'tool:pattern') { showHudPrompt('Pattern stamping is coming soon.', 3000); return; }
 
         // --- Cultivate: Growth Params is a direct match; Prune has no
         // separate mode -- it's a right-click gesture on an existing
@@ -1862,7 +1881,7 @@ async function init() {
         // order exactly. ---
         if (action === 'tool:plant') {
           wheel3D.close();
-          wheel.openSpeciesPicker((value, label) => {
+          pickers.openSpeciesPicker((value, label) => {
             clickMode('plant');
             document.getElementById('cultivate-panel')?.classList.add('open');
             showHudPrompt(`Click anywhere to plant a ${label}.`, 3500);
@@ -1896,7 +1915,7 @@ async function init() {
         // Build/Cultivate/Trade per direct user decision 2026-08-25.
         if (action === 'tool:generateBody') {
           wheel3D.close();
-          wheel.openGeneratorPicker((value, label) => {
+          pickers.openGeneratorPicker((value, label) => {
             clickMode('generate');
             showHudPrompt(`Click anywhere to grow a ${label}.`, 3500);
           });
@@ -1918,8 +1937,31 @@ async function init() {
         if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
       },
     });
-    rhombicWheel3DToggleBtn?.addEventListener('click', () => wheel3D.open('home'));
+    function toggleWheel3D() {
+      if (pickers.isAnyPickerOpen()) { pickers.closeAnyPicker(); return; }
+      if (wheel3D.isOpen) wheel3D.close();
+      else wheel3D.open('home');
+    }
+    rhombicWheel3DToggleBtn?.addEventListener('click', toggleWheel3D);
     isRhombicWheel3DOpen = () => wheel3D.isOpen;
+
+    // Reclaims Tab/Space/hud-wheel-cue from the old 2D wheel -- same
+    // entry points, now driving the sole (3D) wheel.
+    document.getElementById('hud-wheel-cue')?.addEventListener('click', toggleWheel3D);
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'Tab' && e.code !== 'Space' && e.code !== 'Escape') return;
+      // Don't hijack these when typing into a real form control (the
+      // Lab panel has plenty of <input>/<select> elements).
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      if (e.code === 'Escape') {
+        if (pickers.isAnyPickerOpen()) pickers.closeAnyPicker();
+        else if (wheel3D.isOpen) wheel3D.close();
+        return;
+      }
+      e.preventDefault();
+      toggleWheel3D();
+    });
   }
 
   const bccToggleBtn = document.getElementById('bcc-toggle');
@@ -2841,7 +2883,7 @@ async function init() {
       flashAt(cell, 0xff8866);
       playRemoveSound();
     },
-    getDragPlacementEnabled: () => wheel.isDragPlacementEnabled(),
+    getDragPlacementEnabled: () => pickers.isDragPlacementEnabled(),
     // getMode() must return 'plant', never null -- see docs/code-notes/render.md
     getMode: () => (walking ? null : currentMode),
     getShellCount,
@@ -2860,8 +2902,13 @@ async function init() {
     },
   });
 
-  // See docs/code-notes/render.md
-  const wheel = createRhombicWheel({
+  // The old 2D radial menu (wheel.js) was removed 2026-08-25 -- the
+  // Rhombic Wheel 3D is now the sole navigation surface, per direct
+  // user decision. See docs/code-notes/app/rhombic-wheel-3d.md.
+  // createWheelPickers keeps the real material/generator/species
+  // picker overlays and the drag-placement toggle alive independent of
+  // either wheel's own UI -- these are used directly by the 3D wheel.
+  const pickers = createWheelPickers({
     onModeChosen: () => {
       updateModeUI();
       rebuildInstances(mesh, world, currentMode === 'report');
@@ -2869,11 +2916,8 @@ async function init() {
     onDragPlacementChange: (enabled) => {
       controls.mouseButtons.LEFT = enabled ? null : ORBIT_LEFT_DEFAULT;
     },
-    onPrompt: (text) => showHudPrompt(text),
     onMenuSound: playMenuSound,
     onSelectionChange: updateHudIndicator,
-    onOpenSculptPanel: openSculptPanel,
-    onOpenCultivatePanel: () => document.getElementById('cultivate-panel').classList.add('open'),
     getMaterialColor: (value) => `#${(MATERIAL_COLORS[value] ?? MATERIAL_COLORS.base).toString(16).padStart(6, '0')}`,
     onMaterialHoverPreview: (value) => {
       materialPreviewColor = MATERIAL_COLORS[value] ?? MATERIAL_COLORS.base;
@@ -2887,21 +2931,21 @@ async function init() {
   updateHudIndicator();
 
   // See docs/code-notes/render.md
+  // Ported 2026-08-25 off the old 2D wheel's DOM (simulated clicks on
+  // .wheel-item text) onto the real underlying primitives directly --
+  // the same ones the Rhombic Wheel 3D itself now drives, see
+  // rhombic-wheel-3d-core.js's tool:* actions in render.js's onAction.
+  // No UI dependency at all now, 2D or 3D.
   applyPersonaChoiceFn = (persona) => {
-    const clickWheelItem = (text) => {
-      [...document.querySelectorAll('.wheel-item')].find((el) => el.textContent.includes(text))?.click();
-    };
+    const clickMode = (modeName) => document.querySelector(`.mode-btn[data-mode="${modeName}"]`)?.click();
     if (persona === 'rhombinaut') {
-      wheel.open();
-      clickWheelItem('Explore');
+      document.getElementById('walk-toggle')?.click();
     } else if (persona === 'rhombisculptor') {
-      wheel.open();
-      clickWheelItem('Create');
-      clickWheelItem('Sculpt');
+      clickMode('sculpt');
+      openSculptPanel();
     } else if (persona === 'rhombiologist') {
-      wheel.open();
-      clickWheelItem('Grow');
-      clickWheelItem('Cultivate');
+      clickMode('plant');
+      document.getElementById('cultivate-panel')?.classList.add('open');
     }
     // 'rhombitect' (Build): already the default state, nothing to do.
   };

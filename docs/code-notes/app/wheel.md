@@ -1,4 +1,21 @@
-# Notes: `src/app/wheel.js`
+# Notes: `src/app/wheel.js` (REMOVED 2026-08-25)
+
+**This file no longer exists.** `wheel.js`'s 2D radial menu was fully
+deleted 2026-08-25, replaced by the Rhombic Wheel 3D as the sole
+navigation surface -- see `docs/code-notes/app/rhombic-wheel-3d.md` for
+the current architecture, and `CLAUDE.md`'s "Current status" for the
+one-line summary. Its real picker-overlay functionality (material/
+generator/species pickers, the drag-placement toggle) survives in
+`src/app/wheel-pickers.js`, extracted out before deletion.
+
+Kept below, unmodified, as the historical record of B1's original
+design decisions -- `git log` has the removal itself; this file still
+answers "why did the 2D wheel look/work the way it did" for anyone
+tracing that history, same spirit as this project's other historical
+narrative (`RHOMBIVERSE_PLAN.md`'s own build history is never rewritten
+after the fact either).
+
+---
 
 Full design rationale/history for this file's exports, moved out of the
 source so the code itself stays lite and readable — nothing here is

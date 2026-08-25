@@ -1,21 +1,31 @@
-# Notes: `src/app/rhombic-wheel-3d-core.js`, `src/app/rhombic-wheel-3d.js`
+# Notes: `src/app/rhombic-wheel-3d-core.js`, `src/app/rhombic-wheel-3d.js`,
+# `src/app/wheel-pickers.js`
 
-Full design rationale/history for these two files, moved out of source
-per `CONTRIBUTING.md`'s "Ground rules" (see `docs/code-notes/app/
-wheel.md` for the same pattern applied to the 2D wheel).
+Full design rationale/history for these three files, moved out of
+source per `CONTRIBUTING.md`'s "Ground rules" (see `docs/code-notes/
+app/wheel.md` for the now-historical 2D wheel this replaced).
 
 ## File overview
 
-A second, parallel navigation wheel built on the real RD mesh geometry
-(Home/Construct/Build/Alter/Rhombitect/Cultivate/Trade + a single-
-source universal ring), gated behind `FEATURES.rhombicWheel3D` (turned
-on 2026-08-25 after real-browser verification of every department
-wheel and all three pickers). Deliberately does NOT touch `wheel.js`'s
-existing 2D radial menu — DICTO's stated direction (2026-08-25) is that
-this 3D wheel is
-meant to eventually *replace* `wheel.js` entirely, not stay parallel to
-it forever, but that's a later task; this one only adds the new
-surface and proves it out.
+The sole navigation surface, built on the real RD mesh geometry (Home/
+Construct/Build/Alter/Rhombitect/Cultivate/Trade + a single-source
+universal ring). No feature flag -- it's load-bearing, not optional.
+
+Built 2026-08-25 as a second, parallel wheel alongside the old 2D
+radial menu (`wheel.js`), flag-gated off by default; verified live over
+several passes that same day (every department wheel, all three
+pickers, the label-click-accuracy fix); then, per direct user decision
+the same day ("I thought I made it patently clear that the 2D wheel is
+out!"), `wheel.js` was deleted outright -- not flag-gated off, removed.
+The real material/generator/species picker overlays and the drag-
+placement toggle were extracted into `wheel-pickers.js` *before*
+deletion, specifically so this wheel's own real functionality didn't
+go down with the file it used to borrow that code from. Tab/Space/
+`#hud-wheel-cue`/Escape were reclaimed to drive this wheel directly
+(previously entirely owned by `wheel.js`'s own keydown listener), and
+the persona-onboarding flow (`applyPersonaChoiceFn`) was ported off
+simulated 2D `.wheel-item` clicks onto the same real primitives this
+wheel's own `onAction` handler drives.
 
 `rhombic-wheel-3d-core.js` is geometry/config/style only — no THREE.js,
 no DOM. `rhombic-wheel-3d.js` is the renderer: its own `THREE.Scene`/
@@ -121,6 +131,27 @@ the real cultivate panel.
 
 ## Real bugs found via testing, not code review
 
+- **`DUPLICATE_HOME_FACE` placement** (direct user directive: two faces
+  doing the same job belong in mirror-opposite positions, not adjacent
+  ones). It had been placed at `bottom|sx1sz-1` on every module wheel
+  -- verified numerically (edge-sharing check, not eyeballed) that this
+  face shares a real edge with the real Home slot (`bottom|sy-1sz-1`),
+  same as `bottom|sx-1sz-1`. The one bottom-ring face that does NOT
+  share an edge with it -- the true geometric opposite within that
+  4-face ring -- is `bottom|sy1sz-1`. Moved there on all six wheels;
+  Build's Repeat (which had that slot) swapped into the vacated one.
+- **Universal-ring actions hidden behind the wheel's own overlay**
+  (found by DICTO from real play -- "cyborg lenses so far" felt like
+  demo stubs). `openCyborg`/`openLab`/`openLenses` correctly trigger
+  the real `#cyborg-toggle`/`#lab-toggle`/`#xray-toggle` controls, but
+  none of the three closed the wheel afterward (every other real action
+  in `onAction` does). Since the wheel's overlay is `z-index: 990` and
+  none of those three panels sets a z-index at all, the real UI change
+  rendered directly, correctly, entirely hidden behind the still-open
+  wheel -- indistinguishable from nothing happening at all. Not a stub;
+  a missing `wheel3D.close()` on exactly the three actions that predate
+  this session's later close()-everywhere convention. Fixed by adding
+  it to all three, matching every other real action.
 - **Label click-accuracy** (found by DICTO from real play, not by a
   test): the DOM label for each face is deliberately rendered offset
   outward from the actual mesh (along its normal, for legibility). The

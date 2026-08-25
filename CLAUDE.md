@@ -140,17 +140,23 @@ build order:
   continental planetoid with growth, evolved organisms, and animals),
   loadable via the `#preset-select` dropdown.
 - **Rhombic Wheel 3D** (2026-08-25, `src/app/rhombic-wheel-3d-core.js`/
-  `rhombic-wheel-3d.js`) — a second, parallel navigation wheel on the
-  real RD mesh, gated behind `FEATURES.rhombicWheel3D` (turned on
-  2026-08-25 after real-browser verification of every department wheel
-  and all three pickers). Not a replacement for `wheel.js` yet — that's
-  the stated eventual direction, not done. Home/Construct/Build/Alter/
-  Rhombitect/Cultivate/Trade all real and reachable; department faces wired to
-  real actions (mode-btn clicks, the real material/species/generator
-  pickers via new exports on `wheel.js`), not placeholders, except
-  Spiral Column/Templates (genuine stubs) and Replace (discovered
-  broken in the *2D* wheel too — no implementation anywhere). Full
-  rationale: `docs/code-notes/app/rhombic-wheel-3d.md`.
+  `rhombic-wheel-3d.js`) — the sole navigation surface now, on the real
+  RD mesh. The old 2D radial menu (`wheel.js`) was fully removed the
+  same day, per direct user decision — not flag-gated, deleted. No
+  feature flag on the 3D wheel either; it's load-bearing, not optional.
+  Real material/generator/species picker overlays and the drag-
+  placement toggle survive the removal in `src/app/wheel-pickers.js`
+  (extracted out of `wheel.js` before deletion so the 3D wheel's real
+  functionality didn't depend on a file about to disappear). Tab/Space/
+  `#hud-wheel-cue`/Escape all reclaimed to drive the 3D wheel directly.
+  Home/Construct/Build/Alter/Rhombitect/Cultivate/Trade all real and
+  reachable; department faces wired to real actions (mode-btn clicks,
+  the real pickers), not placeholders, except Spiral Column/Templates
+  and Pattern (genuine stubs — Pattern matches the *old* 2D wheel's own
+  "coming soon" placeholder, not withheld functionality) and Replace
+  (discovered broken in the 2D wheel too, before it was removed — no
+  implementation anywhere). Full rationale:
+  `docs/code-notes/app/rhombic-wheel-3d.md`.
 
 Building the showcase world (2026-08-14) surfaced and fixed three real
 performance bugs in `evolution.js`/`worldstate.js` (unbounded population

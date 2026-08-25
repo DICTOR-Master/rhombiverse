@@ -74,40 +74,44 @@ async function main() {
   const afterSecondClick = await cellCount();
   assert.equal(afterSecondClick, afterFirstClick + 1, 'expected exactly one new cell from the second build click');
 
-  // Mode switching happens through the Rhombic Wheel now (B1,
-  // RHOMBIVERSE_UIUX_BUILD_PLAN.md) -- the old always-visible .mode-btn
-  // row is a hidden shim the wheel drives, not a direct click target.
-  //
-  // clickWheelItem dispatches the click directly via evaluate() rather
-  // than Playwright's own page.click() -- recalibrated 2026-08-19 after
-  // page.click('.wheel-item:has-text(...)') reproducibly hung on this
-  // exact interaction (confirmed via a live diagnostic: the DOM state
-  // was proven stable and correct at every check -- zero mutations over
-  // a 2s idle window, the target element visible/stable/unobstructed --
-  // yet Playwright's own locator/actionability engine never completed
-  // the click, even with force:true, both locally and on CI). A plain
-  // DOM .click() is functionally identical for this app (every wheel
-  // item is a plain click-listener-driven div, no drag/hover gesture
-  // involved), and sidesteps whatever CDP-level issue Playwright's own
-  // polling was hitting.
-  async function clickWheelItem(text) {
-    const clicked = await page.evaluate((label) => {
-      const el = [...document.querySelectorAll('.wheel-item')].find((e) => e.textContent.includes(label));
+  // The 2D wheel.js was removed 2026-08-25 -- the Rhombic Wheel 3D is
+  // the sole navigation surface now. Its own labels are continuously
+  // repositioned every frame by a live render loop, which reproducibly
+  // defeats Playwright's actionability/stability polling (see
+  // CLAUDE.md and docs/code-notes/app/rhombic-wheel-3d.md for two
+  // separate real incidents of this exact class of issue) -- clicking
+  // through the 3D wheel's own faces is not a reliable CI interaction.
+  // Mode switching itself is tested directly against the real
+  // underlying primitive instead (.mode-btn[data-mode=...], the same
+  // element the 3D wheel's own onAction handler drives via .click()),
+  // which is both more reliable here and a more direct test of the
+  // actual state-changing behavior, not UI theater on top of it.
+  async function clickMode(modeName) {
+    const clicked = await page.evaluate((mode) => {
+      const el = document.querySelector(`.mode-btn[data-mode="${mode}"]`);
       if (!el) return false;
       el.click();
       return true;
-    }, text);
-    assert.ok(clicked, `wheel item "${text}" should exist and be clickable`);
+    }, modeName);
+    assert.ok(clicked, `.mode-btn[data-mode="${modeName}"] should exist and be clickable`);
   }
 
-  await page.keyboard.press('Tab');
-  await clickWheelItem('Alter');
-  await clickWheelItem('Fill');
+  await clickMode('fill');
   const shellRowVisible = await page.$eval('#shell-radius-row', (el) => getComputedStyle(el).display !== 'none');
   assert.ok(shellRowVisible, 'Fill mode should reveal the shell-radius row');
+  await clickMode('build');
+
+  // Tab now opens the Rhombic Wheel 3D directly (reclaimed from the
+  // old 2D wheel) -- just confirm the overlay opens/closes, not any
+  // specific face click, for the reliability reason above.
   await page.keyboard.press('Tab');
-  await clickWheelItem('Build');
-  await clickWheelItem('Place');
+  await page.waitForTimeout(400);
+  const wheel3DOpen = await page.$eval('#rhombic-wheel-3d-overlay', (el) => el.classList.contains('open'));
+  assert.ok(wheel3DOpen, 'Tab should open the Rhombic Wheel 3D');
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(400);
+  const wheel3DClosed = await page.$eval('#rhombic-wheel-3d-overlay', (el) => !el.classList.contains('open'));
+  assert.ok(wheel3DClosed, 'Tab again should close the Rhombic Wheel 3D');
 
   if (errors.length > 0) {
     throw new Error(`Console/page errors during smoke test:\n${errors.join('\n')}`);

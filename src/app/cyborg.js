@@ -223,9 +223,15 @@ export function createCyborgMode({
     panel.style.display = 'none';
   }
 
-  function toggle() {
+  // async so a caller can await the real enabled state -- enable() is
+  // itself async (it awaits a subscript fetch on first activation, see
+  // docs/code-notes/app/cyborg.md), so a synchronous toggle() left any
+  // caller reading isEnabled() right after with a permanently stale
+  // `false` on cold start, not just a transient race -- confirmed via
+  // real testing 2026-08-25 (see rhombic-wheel-3d.md).
+  async function toggle() {
     if (enabled) disable();
-    else enable();
+    else await enable();
   }
 
   return { toggle, enable, disable, isEnabled: () => enabled };

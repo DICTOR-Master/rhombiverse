@@ -7,8 +7,8 @@
 // truth for the RD face geometry, the universal-ring content, and every
 // per-wheel face config -- resolveWheelFaces() is the one function that
 // makes it structurally impossible for a wheel to drift from the
-// universal ring. Full design rationale: docs/code-notes/app/wheel.md
-// (see the "Rhombic Wheel 3D" section) once written.
+// universal ring. Full design rationale: docs/code-notes/app/
+// rhombic-wheel-3d.md.
 //
 // Deliberately no THREE.js/DOM here -- rhombic-wheel-3d.js consumes
 // these exports and does all scene/camera/raycaster/DOM work, reusing
@@ -240,8 +240,15 @@ export const WHEEL_CONSTRUCT = {
       desc: "Dig, Smooth, and Replace." },
     "equator|sx-1sy1":  SPARE,
     "equator|sx-1sy-1": SPARE,
-    "bottom|sy1sz-1":   SPARE,
-    "bottom|sx1sz-1":   DUPLICATE_HOME_FACE,
+    // DUPLICATE_HOME_FACE sits at bottom|sy1sz-1, not bottom|sx1sz-1 --
+    // that's the one bottom-ring face that does NOT share an edge with
+    // the real Home slot (bottom|sy-1sz-1); bottom|sx1sz-1 and
+    // bottom|sx-1sz-1 both do (verified numerically, not eyeballed).
+    // Direct user directive 2026-08-25: two faces doing the same job
+    // belong in mirror-opposite positions, not adjacent ones. Applies
+    // to every wheel below with a duplicate.
+    "bottom|sy1sz-1":   DUPLICATE_HOME_FACE,
+    "bottom|sx1sz-1":   SPARE,
     "bottom|sx-1sz-1":  SPARE
   }
 };
@@ -257,9 +264,19 @@ export const WHEEL_BUILD = {
     // already exists and works, it just had nowhere to live in this
     // flow-chart-derived structure until now. See render.js's onAction.
     "equator|sx-1sy-1": { kind: "dept", label: "Material", action: "tool:material", desc: "Pick a build material." },
-    "bottom|sy1sz-1":  SPARE,
-    "bottom|sx1sz-1":  DUPLICATE_HOME_FACE,
-    "bottom|sx-1sz-1": SPARE
+    // Repeat is the 2D wheel's own real "tool-drag" leaf (drag across
+    // faces to place a run of cells) -- reused via the new
+    // toggleDragPlacement() export, same pattern as Material/Generate
+    // a Body/Species above. Pattern matches the 2D wheel's OWN real
+    // capability exactly: it's a "coming soon" placeholder there too
+    // (kind: 'placeholder'), not a real feature being ported -- added
+    // here for full flow-parity, not invented beyond what exists.
+    // DUPLICATE_HOME_FACE moved to bottom|sy1sz-1 (the one bottom-ring
+    // face not edge-adjacent to the real Home slot) -- see WHEEL_
+    // CONSTRUCT's comment above. Repeat took its old spot instead.
+    "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
+    "bottom|sx1sz-1":  { kind: "dept", label: "Repeat", action: "tool:repeat", desc: "Drag across faces to place a run of cells." },
+    "bottom|sx-1sz-1": { kind: "dept", label: "Pattern", action: "tool:pattern", desc: "Pattern stamping is coming soon." }
   }
 };
 
@@ -274,8 +291,8 @@ export const WHEEL_ALTER = {
     // today, discovered while wiring this. See render.js's onAction.
     "equator|sx-1sy1": { kind: "dept", label: "Replace", action: "tool:replace", desc: "Not built yet." },
     "equator|sx-1sy-1": SPARE,
-    "bottom|sy1sz-1":  SPARE,
-    "bottom|sx1sz-1":  DUPLICATE_HOME_FACE,
+    "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
+    "bottom|sx1sz-1":  SPARE,
     "bottom|sx-1sz-1": SPARE
   }
 };
@@ -298,8 +315,8 @@ export const WHEEL_RHOMBITECT = {
     // decision 2026-08-25 -- closer to "spawn a whole world" than
     // single-cell placement or organic growth.
     "equator|sx-1sy-1": { kind: "dept", label: "Generate a Body", action: "tool:generateBody", desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...)." },
-    "bottom|sy1sz-1":  SPARE,
-    "bottom|sx1sz-1":  DUPLICATE_HOME_FACE,
+    "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
+    "bottom|sx1sz-1":  SPARE,
     "bottom|sx-1sz-1": SPARE
   }
 };
@@ -318,8 +335,8 @@ export const WHEEL_CULTIVATE = {
     "equator|sx1sy-1": { kind: "dept", label: "Prune", action: "tool:prune", desc: "Sets Plant mode -- right-click an existing growth tile to prune it." },
     "equator|sx-1sy1": { kind: "dept", label: "Growth Params", action: "tool:growthParams", desc: "Opens the Cultivate panel's Growth Parameters section." },
     "equator|sx-1sy-1": SPARE,
-    "bottom|sy1sz-1":  SPARE,
-    "bottom|sx1sz-1":  DUPLICATE_HOME_FACE,
+    "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
+    "bottom|sx1sz-1":  SPARE,
     "bottom|sx-1sz-1": SPARE
   }
 };
@@ -337,8 +354,8 @@ export const WHEEL_TRADE = {
     "equator|sx1sy-1": { kind: "dept", label: "Accept", action: "tool:accept", desc: "Pending trades from others show up in the Lab panel." },
     "equator|sx-1sy1": { kind: "dept", label: "Inventory", action: "tool:inventory", desc: "Opens the Lab panel, where your real inventory is shown." },
     "equator|sx-1sy-1": SPARE,
-    "bottom|sy1sz-1":  SPARE,
-    "bottom|sx1sz-1":  DUPLICATE_HOME_FACE,
+    "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
+    "bottom|sx1sz-1":  SPARE,
     "bottom|sx-1sz-1": SPARE
   }
 };
