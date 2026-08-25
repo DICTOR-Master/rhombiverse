@@ -35,6 +35,7 @@ import { generatePlanetoid } from './geometry-extensions/planetoidgen.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR } from './app/settings.js';
 import { playPlaceSound, playRemoveSound, playMenuSound } from './app/sfx.js';
 import { createWheelPickers } from './app/wheel-pickers.js';
+import { createHudWheel3D } from './app/hud-wheel-3d.js';
 import { createCyborgMode } from './app/cyborg.js';
 import { requestBYOKJson } from './app/byok.js';
 import {
@@ -202,6 +203,58 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio * QUALITY_PIXEL_RATIO_FACTOR[getSettings().quality]);
 renderer.localClippingEnabled = true; // required once, globally, for any clippingPlanes to take effect
 document.getElementById('app').appendChild(renderer.domElement);
+
+// The persistent HUD wheel replacing the old 9-button icon row --
+// shares this same renderer via its own scissor sub-viewport every
+// frame (see hud-wheel-3d.js's own header comment for why: a second
+// full WebGLRenderer, always running, would make the exact perf
+// mistake this session already found and fixed for the modal wheel).
+const hudWheel = createHudWheel3D(renderer);
+
+// Touch/drag-only rotation, scoped to the wheel's own small on-screen
+// rect -- no auto-rotate, no idle timer, matching "rotates to touch
+// only, always there" exactly. Same drag-vs-click disambiguation the
+// modal wheel uses (a real click must not have moved past a small
+// threshold), same reason: a native 'click' fires after any
+// mousedown->mouseup pair regardless of movement in between.
+{
+  let hudDragging = false;
+  let hudLastPointer = null;
+  let hudDragDistance = 0;
+  const HUD_DRAG_CLICK_SUPPRESS_PX = 5;
+
+  function withinHudRect(clientX, clientY) {
+    const r = hudWheel.getRect();
+    return clientX >= r.cssX && clientX <= r.cssX + r.cssW && clientY >= r.cssY && clientY <= r.cssY + r.cssH;
+  }
+
+  window.addEventListener('pointerdown', (ev) => {
+    if (!withinHudRect(ev.clientX, ev.clientY)) return;
+    hudDragging = true;
+    hudDragDistance = 0;
+    hudLastPointer = { x: ev.clientX, y: ev.clientY };
+  });
+  window.addEventListener('pointermove', (ev) => {
+    if (!hudDragging || !hudLastPointer) return;
+    const dx = ev.clientX - hudLastPointer.x;
+    const dy = ev.clientY - hudLastPointer.y;
+    hudDragDistance += Math.hypot(dx, dy);
+    hudLastPointer = { x: ev.clientX, y: ev.clientY };
+    const qx = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), dx * 0.012);
+    const qy = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), dy * 0.012);
+    hudWheel.group.quaternion.premultiply(qx).premultiply(qy);
+  });
+  window.addEventListener('pointerup', () => { hudDragging = false; });
+  window.addEventListener('click', (ev) => {
+    if (!withinHudRect(ev.clientX, ev.clientY)) return;
+    if (hudDragDistance > HUD_DRAG_CLICK_SUPPRESS_PX) return;
+    const key = hudWheel.pickFace(ev.clientX, ev.clientY);
+    if (!key) return;
+    const entry = hudWheel.faceEntries.find((e) => e.key === key);
+    if (!entry?.data) return;
+    document.getElementById(entry.data.elId)?.click();
+  });
+}
 
 // Section view: a single cutaway clipping plane through the whole scene
 // (RHOMBIVERSE_PLAN.md doesn't cover this -- added at the user's request
@@ -3961,6 +4014,10 @@ function animate() {
   if (!isRhombicWheel3DOpen()) {
     renderer.render(sculptureModeActive ? sculptureScene : scene, camera);
   }
+  // Always renders, regardless of the modal wheel's open state -- it's
+  // a persistent HUD element, not something that should disappear
+  // while other UI is open.
+  hudWheel.render();
 }
 
 init();

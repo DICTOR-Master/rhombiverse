@@ -146,19 +146,23 @@ export function createRhombicWheel3D({
 
       const lineGeom = new THREE.BufferGeometry().setFromPoints([...verts, verts[0]]);
       const isSpare = data.kind === 'spare';
-      const lineMat = new THREE.LineBasicMaterial({
-        color: SKELETON_COLOR, transparent: true,
-        opacity: isSpare ? FACE_STYLE.outlineOpacityBaseSpare : FACE_STYLE.outlineOpacityBase,
-      });
-      // Dash pattern is the only visual differentiator for spares (per spec);
-      // three.js LineDashedMaterial needs computeLineDistances().
-      const line = isSpare
+      // Temporary duplicates (data.temporary -- DUPLICATE_HOME_FACE and
+      // every other "fills a blank until real content exists" face,
+      // see rhombic-wheel-3d-core.js) get the same dashed outline as a
+      // true spare -- signals "this is filler, not permanent" -- but
+      // stay at FULL opacity/brightness and fully clickable, unlike a
+      // real spare, since they're genuinely functional right now.
+      // Direct user request 2026-08-25.
+      const isDashed = isSpare || !!data.temporary;
+      const lineOpacity = isSpare ? FACE_STYLE.outlineOpacityBaseSpare : FACE_STYLE.outlineOpacityBase;
+      const lineMat = new THREE.LineBasicMaterial({ color: SKELETON_COLOR, transparent: true, opacity: lineOpacity });
+      const line = isDashed
         ? new THREE.Line(lineGeom, new THREE.LineDashedMaterial({
-            color: SKELETON_COLOR, transparent: true, opacity: FACE_STYLE.outlineOpacityBaseSpare,
+            color: SKELETON_COLOR, transparent: true, opacity: lineOpacity,
             dashSize: 0.15, gapSize: 0.1,
           }))
         : new THREE.Line(lineGeom, lineMat);
-      if (isSpare) line.computeLineDistances();
+      if (isDashed) line.computeLineDistances();
 
       group.add(mesh, line);
 
@@ -356,8 +360,26 @@ export function createRhombicWheel3D({
     rafId = requestAnimationFrame(tick);
   }
 
+  // Looks straight down one of the RD's 8 three-valent vertices
+  // ((1,1,1), specifically) -- the exact viewing angle where 3 real
+  // faces meet at a shared vertex and their silhouette together forms
+  // a hexagon outline, per direct user request 2026-08-25 ("the three
+  // faces should form a triangle in the hexagon outline as you first
+  // see it"). Computed exactly (axis-angle from vertex direction to
+  // the camera's +Z, converted to Euler XYZ), not eyeballed -- see
+  // rhombic-wheel-shared-renderer session notes. The equator ring has
+  // no shared 3-valent vertex among its OWN 4 faces (each of its two
+  // 3-valent vertices is shared with a top or bottom face instead, not
+  // another equator face), so this specific vertex mixes 2 universal-
+  // ring faces (Lenses, Lab) with 1 equator dept face rather than 3
+  // pure department faces -- a real structural constraint, not a
+  // missed target; still a genuinely elegant, well-composed opening
+  // view. switchWheel() deliberately does NOT reset this -- once
+  // you're actively navigating, your own rotation stays.
+  const DEFAULT_OPEN_ROTATION = { x: Math.PI / 4, y: -0.6154797086703874, z: Math.PI / 12 };
   function open(wheelId = 'home') {
     overlay.classList.add('open');
+    group.rotation.set(DEFAULT_OPEN_ROTATION.x, DEFAULT_OPEN_ROTATION.y, DEFAULT_OPEN_ROTATION.z);
     resize();
     buildWheel(wheelId);
     resetIdleTimer();

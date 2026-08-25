@@ -206,6 +206,17 @@
     #rhombic-wheel-3d-toggle:hover { background: rgba(255, 255, 255, 0.15); }
     #rhombic-wheel-3d-toggle.active { background: rgba(77, 208, 225, 0.35); border-color: #4DD0E1; color: #fff; }
 
+    /* Replaced by the persistent HUD Wheel (hud-wheel-3d.js), 2026-08-25
+       -- hidden, not removed, so every real click handler these buttons
+       already own keeps working exactly as before; the new wheel just
+       calls .click() on them programmatically, same reuse pattern as
+       every other real action in this app. */
+    #sculpture-mode-toggle, #cyborg-toggle, #xray-toggle, #duality-toggle,
+    #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle,
+    #reload-toggle, #lab-toggle {
+      display: none;
+    }
+
     /* B4b: standalone Sculpture Mode banner -- shown only while active,
        makes it unmistakable this is the isolated scratch space, not the
        shared world. */

@@ -187,7 +187,7 @@ const SPARE = { kind: "spare", label: "Spare", action: null, desc: "Reserved —
 // the actual feature rather than leaving the duplicate in place once
 // something better exists to put there.
 export const DUPLICATE_HOME_FACE = {
-  kind: "universal", label: "Home", action: "navigateHome",
+  kind: "universal", label: "Home", action: "navigateHome", temporary: true,
   desc: "Return to the Home Wheel. Duplicated here for quick access from a spare slot."
 };
 
@@ -228,8 +228,14 @@ export const WHEEL_HOME = {
       desc: "Offer, Accept, and Inventory — the resource/decay economy." },
     "bottom|sy1sz-1":   { kind: "dept", label: "Explore",    action: "navigateTo:explore",
       desc: "Rhombinaut mode — one face, one destination, identity-framed name only." },
-    "bottom|sx1sz-1":   SPARE,
-    "bottom|sx-1sz-1":  SPARE
+    // Least-adjacent-available placement (verified numerically --
+    // bottom|sx-1sz-1 is non-adjacent to equator|sx1sy1, bottom|
+    // sx1sz-1 is non-adjacent to equator|sx-1sy1), same rule applied
+    // uniformly across every wheel with a remaining blank face.
+    "bottom|sx1sz-1":   { kind: "dept", label: "Rhombivate", action: "navigateTo:cultivate", temporary: true,
+      desc: "Plant, Prune, and Growth Parameters for the organic/Penrose layer. Duplicated here for quick access from a spare slot." },
+    "bottom|sx-1sz-1":  { kind: "dept", label: "Construct", action: "navigateTo:construct", temporary: true,
+      desc: "Build and Alter modules live here. Duplicated here for quick access from a spare slot." }
   }
 };
 
@@ -251,8 +257,16 @@ export const WHEEL_CONSTRUCT = {
       desc: "Rhombi-model, Rhombi-sculpt, and Fill." },
     "equator|sx1sy-1":  { kind: "dept", label: "Alter", action: "navigateTo:alter",
       desc: "Dig, Smooth, and Replace." },
-    "equator|sx-1sy1":  SPARE,
-    "equator|sx-1sy-1": SPARE,
+    // Temporary duplicates at each real face's true geometric antipode
+    // (centroid inversion through the RD's center, verified
+    // numerically -- equator|sx-1sy1 <-> equator|sx1sy-1, equator|
+    // sx-1sy-1 <-> equator|sx1sy1) -- standing policy: a blank face
+    // duplicates its antipode's content until real content exists for
+    // it, direct user directive 2026-08-25.
+    "equator|sx-1sy1":  { kind: "dept", label: "Alter", action: "navigateTo:alter", temporary: true,
+      desc: "Dig, Smooth, and Replace. Duplicated here for quick access from a spare slot." },
+    "equator|sx-1sy-1": { kind: "dept", label: "Build", action: "navigateTo:build", temporary: true,
+      desc: "Rhombi-model, Rhombi-sculpt, and Fill. Duplicated here for quick access from a spare slot." },
     // DUPLICATE_HOME_FACE sits at bottom|sy1sz-1, not bottom|sx1sz-1 --
     // that's the one bottom-ring face that does NOT share an edge with
     // the real Home slot (bottom|sy-1sz-1); bottom|sx1sz-1 and
@@ -261,8 +275,10 @@ export const WHEEL_CONSTRUCT = {
     // belong in mirror-opposite positions, not adjacent ones. Applies
     // to every wheel below with a duplicate.
     "bottom|sy1sz-1":   DUPLICATE_HOME_FACE,
-    "bottom|sx1sz-1":   SPARE,
-    "bottom|sx-1sz-1":  SPARE
+    "bottom|sx1sz-1":   { kind: "dept", label: "Alter", action: "navigateTo:alter", temporary: true,
+      desc: "Dig, Smooth, and Replace. Duplicated here for quick access from a spare slot." },
+    "bottom|sx-1sz-1":  { kind: "dept", label: "Build", action: "navigateTo:build", temporary: true,
+      desc: "Rhombi-model, Rhombi-sculpt, and Fill. Duplicated here for quick access from a spare slot." }
   }
 };
 
@@ -303,10 +319,21 @@ export const WHEEL_ALTER = {
     // -- the 2D wheel's own Replace item is already a silent no-op
     // today, discovered while wiring this. See render.js's onAction.
     "equator|sx-1sy1": { kind: "dept", label: "Replace", action: "tool:replace", desc: "Not built yet." },
-    "equator|sx-1sy-1": SPARE,
+    // Temporary duplicate at Dig's true geometric antipode (equator|
+    // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
+    // policy: a blank face duplicates its antipode's content until
+    // real content exists for it, direct user directive 2026-08-25.
+    "equator|sx-1sy-1": { kind: "dept", label: "Dig", action: "tool:dig", temporary: true, desc: "Excavate mode -- click a cell to remove it. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
-    "bottom|sx1sz-1":  SPARE,
-    "bottom|sx-1sz-1": SPARE
+    // Least-adjacent placement duplicates Dig again; the OTHER
+    // remaining slot skips Replace on purpose -- it's a non-functional
+    // stub (see comment above), duplicating "not built yet" would just
+    // be misleading clutter, so Smooth (the other real action) fills
+    // it instead even though it's not that slot's exact antipode.
+    "bottom|sx1sz-1":  { kind: "dept", label: "Smooth", action: "tool:smooth", temporary: true,
+      desc: "Round mode -- click to smooth a corner. Duplicated here for quick access from a spare slot." },
+    "bottom|sx-1sz-1": { kind: "dept", label: "Dig", action: "tool:dig", temporary: true,
+      desc: "Excavate mode -- click a cell to remove it. Duplicated here for quick access from a spare slot." }
   }
 };
 
@@ -329,8 +356,14 @@ export const WHEEL_RHOMBITECT = {
     // single-cell placement or organic growth.
     "equator|sx-1sy-1": { kind: "dept", label: "Generate a Body", action: "tool:generateBody", desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...)." },
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
-    "bottom|sx1sz-1":  SPARE,
-    "bottom|sx-1sz-1": SPARE
+    // Least-adjacent placement duplicates Dome; the OTHER remaining
+    // slot skips Templates on purpose (a non-functional stub, same
+    // reasoning as WHEEL_ALTER skipping Replace) -- Generate a Body
+    // fills it instead.
+    "bottom|sx1sz-1":  { kind: "dept", label: "Generate a Body", action: "tool:generateBody", temporary: true,
+      desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...). Duplicated here for quick access from a spare slot." },
+    "bottom|sx-1sz-1": { kind: "dept", label: "Dome", action: "tool:dome", temporary: true,
+      desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it. Duplicated here for quick access from a spare slot." }
   }
 };
 
@@ -347,10 +380,16 @@ export const WHEEL_CULTIVATE = {
     // (see render.js's contextmenu listener / pruneTile()).
     "equator|sx1sy-1": { kind: "dept", label: "Prune", action: "tool:prune", desc: "Sets Plant mode -- right-click an existing growth tile to prune it." },
     "equator|sx-1sy1": { kind: "dept", label: "Growth Params", action: "tool:growthParams", desc: "Opens the Cultivate panel's Growth Parameters section." },
-    "equator|sx-1sy-1": SPARE,
+    // Temporary duplicate at Plant's true geometric antipode (equator|
+    // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
+    // policy: a blank face duplicates its antipode's content until
+    // real content exists for it, direct user directive 2026-08-25.
+    "equator|sx-1sy-1": { kind: "dept", label: "Plant", action: "tool:plant", temporary: true, desc: "Pick a species, then click to plant it. Opens the Cultivate panel. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
-    "bottom|sx1sz-1":  SPARE,
-    "bottom|sx-1sz-1": SPARE
+    "bottom|sx1sz-1":  { kind: "dept", label: "Growth Params", action: "tool:growthParams", temporary: true,
+      desc: "Opens the Cultivate panel's Growth Parameters section. Duplicated here for quick access from a spare slot." },
+    "bottom|sx-1sz-1": { kind: "dept", label: "Plant", action: "tool:plant", temporary: true,
+      desc: "Pick a species, then click to plant it. Opens the Cultivate panel. Duplicated here for quick access from a spare slot." }
   }
 };
 
@@ -366,10 +405,16 @@ export const WHEEL_TRADE = {
     "equator|sx1sy1":  { kind: "dept", label: "Offer", action: "tool:offer", desc: "Trades start via Interact -- walk up to another player and tap Interact." },
     "equator|sx1sy-1": { kind: "dept", label: "Accept", action: "tool:accept", desc: "Pending trades from others show up in the Lab panel." },
     "equator|sx-1sy1": { kind: "dept", label: "Inventory", action: "tool:inventory", desc: "Opens the Lab panel, where your real inventory is shown." },
-    "equator|sx-1sy-1": SPARE,
+    // Temporary duplicate at Offer's true geometric antipode (equator|
+    // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
+    // policy: a blank face duplicates its antipode's content until
+    // real content exists for it, direct user directive 2026-08-25.
+    "equator|sx-1sy-1": { kind: "dept", label: "Offer", action: "tool:offer", temporary: true, desc: "Trades start via Interact -- walk up to another player and tap Interact. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
-    "bottom|sx1sz-1":  SPARE,
-    "bottom|sx-1sz-1": SPARE
+    "bottom|sx1sz-1":  { kind: "dept", label: "Inventory", action: "tool:inventory", temporary: true,
+      desc: "Opens the Lab panel, where your real inventory is shown. Duplicated here for quick access from a spare slot." },
+    "bottom|sx-1sz-1": { kind: "dept", label: "Offer", action: "tool:offer", temporary: true,
+      desc: "Trades start via Interact -- walk up to another player and tap Interact. Duplicated here for quick access from a spare slot." }
   }
 };
 
@@ -391,10 +436,21 @@ export const WHEEL_RHOMBISIS = {
       desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...)." },
     "equator|sx-1sy1":  { kind: "dept", label: "Plant a Seed", action: "tool:plant",
       desc: "Pick a species, then click to plant it. Opens the Cultivate panel." },
-    "equator|sx-1sy-1": SPARE,
+    // Temporary duplicate at Sculpt's true geometric antipode (equator|
+    // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
+    // policy: a blank face duplicates its antipode's content until
+    // real content exists for it, direct user directive 2026-08-25.
+    "equator|sx-1sy-1": { kind: "dept", label: "Sculpt", action: "tool:rhombiSculpt", temporary: true,
+      desc: "Opens the Sculpt panel -- symmetry and mirror tools, no World required. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":   DUPLICATE_HOME_FACE,
-    "bottom|sx1sz-1":   SPARE,
-    "bottom|sx-1sz-1":  SPARE
+    // Remaining 2 bottom spares: least-adjacent-available placement
+    // (verified numerically -- bottom|sx-1sz-1 is non-adjacent to
+    // equator|sx1sy1, bottom|sx1sz-1 is non-adjacent to equator|
+    // sx-1sy1), same rule applied uniformly across every wheel.
+    "bottom|sx1sz-1":   { kind: "dept", label: "Plant a Seed", action: "tool:plant", temporary: true,
+      desc: "Pick a species, then click to plant it. Opens the Cultivate panel. Duplicated here for quick access from a spare slot." },
+    "bottom|sx-1sz-1":  { kind: "dept", label: "Sculpt", action: "tool:rhombiSculpt", temporary: true,
+      desc: "Opens the Sculpt panel -- symmetry and mirror tools, no World required. Duplicated here for quick access from a spare slot." }
   }
 };
 
