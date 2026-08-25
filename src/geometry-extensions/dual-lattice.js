@@ -84,6 +84,32 @@ export function nearestBCCPoints(fccCoord) {
   return unique;
 }
 
+// Nearest valid BCC lattice coordinate to an arbitrary (not necessarily
+// BCC-valid, not necessarily FCC-valid) continuous point -- same snap
+// technique as nearestBCCPoints' own inline `snap` (round each axis to
+// the nearest integer of a given parity, since a plain round() can land
+// on mixed parity), generalized to take any x,y,z rather than requiring
+// an FCC-valid coordinate specifically. Used to seed a single, real,
+// connected BCC lattice patch from an arbitrary reference position (e.g.
+// the camera), rather than needing an existing FCC cell to anchor to.
+export function nearestBCCCell(x, y, z) {
+  const bestForParity = (parity) => {
+    const snap = (v) => {
+      const lo = Math.floor(v);
+      const cand = [];
+      for (let k = lo - 1; k <= lo + 2; k++) {
+        if (((k % 2) + 2) % 2 === parity) cand.push(k);
+      }
+      return cand.reduce((best, c) => (Math.abs(c - v) < Math.abs(best - v) ? c : best));
+    };
+    return [snap(x), snap(y), snap(z)];
+  };
+  const evenPt = bestForParity(0);
+  const oddPt = bestForParity(1);
+  const dist2 = ([px, py, pz]) => (px - x) ** 2 + (py - y) ** 2 + (pz - z) ** 2;
+  return dist2(evenPt) <= dist2(oddPt) ? evenPt : oddPt;
+}
+
 // Standalone sanity gate: `node src/geometry-extensions/dual-lattice.js`
 if (typeof process !== 'undefined' && process.argv[1] && process.argv[1].endsWith('dual-lattice.js')) {
   const verts = truncatedOctahedronVertices(1);

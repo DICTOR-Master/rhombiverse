@@ -1,25 +1,19 @@
-// BCC dual-lattice Phase 2 (revised, nested design). No THREE/DOM
+// BCC dual-lattice Phase 2 (third revision, 2026-08-25): one real,
+// connected, globally-consistent BCC lattice sharing the FCC world's own
+// coordinate frame -- see bcc-detail-lattice.js's own header for the full
+// history of why this replaced two earlier designs. No THREE/DOM
 // dependency, mirrors latticezoom.test.mjs's own conventions.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BCC_DETAIL_MAX_SHELL,
-  BCC_DETAIL_SAFETY_MARGIN,
-  bccCellCount,
-  generateBCCSubLatticeAt,
+  BCC_LATTICE_MAX_SHELL,
+  bccShapeScaleFor,
+  generateBCCLatticePatch,
   bccDetailVertsFor,
 } from '../../src/geometry-extensions/bcc-detail-lattice.js';
-import { rdRawVerts, cellToWorld, NEIGHBOR_OFFSETS } from '../../src/core/lattice.js';
-import { BCC_NEIGHBOR_OFFSETS } from '../../src/geometry-extensions/dual-lattice.js';
+import { cellToWorld, cellsInShells } from '../../src/core/lattice.js';
+import { isBCC, BCC_NEIGHBOR_OFFSETS, nearestBCCCell } from '../../src/geometry-extensions/dual-lattice.js';
 
-// Same general SAT overlap test used to first diagnose the same-scale
-// overlap problem this file's whole design exists to avoid -- face
-// normals of both shapes (their own real neighbor-offset directions, a
-// Voronoi cell's facets are always its perpendicular bisectors toward
-// each neighbor) plus their pairwise cross products as edge axes. Extra
-// candidate axes can only find MORE true separations, never a false
-// "overlap", so this over-inclusive set is the safe direction for a
-// regression guard.
 function normalize([x, y, z]) {
   const len = Math.hypot(x, y, z);
   return len < 1e-9 ? null : [x / len, y / len, z / len];
@@ -28,11 +22,16 @@ function cross([ax, ay, az], [bx, by, bz]) {
   return [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx];
 }
 function dot([ax, ay, az], [bx, by, bz]) { return ax * bx + ay * by + az * bz; }
-const FCC_AXES = NEIGHBOR_OFFSETS.map(normalize).filter(Boolean);
 const BCC_AXES = BCC_NEIGHBOR_OFFSETS.map(normalize).filter(Boolean);
 const CROSS_AXES = [];
-for (const a of FCC_AXES) for (const b of BCC_AXES) { const n = normalize(cross(a, b)); if (n) CROSS_AXES.push(n); }
-const ALL_AXES = [...FCC_AXES, ...BCC_AXES, ...CROSS_AXES];
+for (const a of BCC_AXES) for (const b of BCC_AXES) { const n = normalize(cross(a, b)); if (n) CROSS_AXES.push(n); }
+const ALL_AXES = [...BCC_AXES, ...CROSS_AXES];
+// Same general SAT overlap test used throughout this feature's own history
+// -- real face-normal axes (a Voronoi cell's facets are always its
+// perpendicular bisectors toward each neighbor) plus their pairwise cross
+// products. Extra candidate axes can only find MORE true separations,
+// never a false "overlap", so this over-inclusive set is the safe
+// direction for a regression guard.
 function polytopesOverlap(vertsA, vertsB, eps = 1e-6) {
   for (const axis of ALL_AXES) {
     const pa = vertsA.map((v) => dot(v, axis));
@@ -42,79 +41,86 @@ function polytopesOverlap(vertsA, vertsB, eps = 1e-6) {
   return true;
 }
 
-test('bccCellCount: matches the real generated cell list length, for several shell counts', () => {
-  for (const maxShell of [0, 1, 2]) {
-    const sub = generateBCCSubLatticeAt([0, 0, 0], 1, maxShell);
-    assert.equal(sub.length, bccCellCount(maxShell));
+test('nearestBCCCell: always returns a genuinely valid BCC coordinate', () => {
+  const samples = [[0, 0, 0], [0.4, 0.4, 0.4], [3.7, -2.1, 5.9], [-1.5, -1.5, -1.5], [10.2, 0.1, -4.9]];
+  for (const [x, y, z] of samples) {
+    const [cx, cy, cz] = nearestBCCCell(x, y, z);
+    assert.ok(isBCC(cx, cy, cz), `[${cx},${cy},${cz}] from input [${x},${y},${z}] must be BCC-valid`);
   }
 });
 
-test('generateBCCSubLatticeAt: sub-cell scale grows linearly with parentScale (a pure containment ratio, not hardcoded to scale=1)', () => {
-  const sub1 = generateBCCSubLatticeAt([0, 0, 0], 1, 1);
-  const sub3 = generateBCCSubLatticeAt([0, 0, 0], 3, 1);
-  for (let i = 0; i < sub1.length; i++) {
-    assert.ok(Math.abs(sub3[i].scale - sub1[i].scale * 3) < 1e-9);
-  }
-});
-
-test('generateBCCSubLatticeAt: the center sub-cell sits at the parent\'s own real world position', () => {
-  const parentScale = 3;
-  const [px, py, pz] = cellToWorld(2, -1, 3, parentScale);
-  const sub = generateBCCSubLatticeAt([px, py, pz], parentScale, 1);
-  const center = sub.find((c) => c.shell === 0);
-  assert.deepEqual(center.worldPosition, [px, py, pz]);
-});
-
-test('generateBCCSubLatticeAt: real margin check -- every sub-cell vertex stays strictly inside the parent RD\'s own inradius sphere, with room to spare matching BCC_DETAIL_SAFETY_MARGIN', () => {
-  const parentScale = 2;
-  const parentInradius = (Math.SQRT2 / 2) * parentScale; // verified separately against a real numeric computation in bcc-detail-lattice.js
-  const sub = generateBCCSubLatticeAt([0, 0, 0], parentScale, 2);
-  let maxReach = 0;
-  for (const cell of sub) {
-    for (const v of bccDetailVertsFor(cell)) maxReach = Math.max(maxReach, Math.hypot(...v));
-  }
-  assert.ok(maxReach < parentInradius, `max sub-cell reach ${maxReach} must stay inside parent inradius ${parentInradius}`);
-  // Confirms the safety margin is actually doing real work, not degenerate (e.g. margin=1 exactly at the limit).
-  assert.ok(maxReach / parentInradius < BCC_DETAIL_SAFETY_MARGIN + 0.05);
-});
-
-// NOTE: nested sub-cells are SUPPOSED to intersect their parent's volume --
-// that's what nesting means. A disjointness (SAT) test is the wrong tool
-// here (an earlier version of this test used one and produced a false
-// "overlap" failure on a fully-contained cell). What actually matters is
-// exact CONTAINMENT: every sub-cell vertex must stay on the inside of
-// every one of the parent's own face half-spaces (the parent RD is exactly
-// the intersection of those half-spaces, so this is the precise, not
-// merely sufficient, convex-containment test).
-test('generateBCCSubLatticeAt: exact containment -- every BCC sub-cell vertex stays strictly inside every one of the parent RD\'s own face half-spaces', () => {
-  const parentScale = 1;
-  const parentCenter = [0, 0, 0];
-  const parentVerts = rdRawVerts(parentScale).map(([x, y, z]) => [x + parentCenter[0], y + parentCenter[1], z + parentCenter[2]]);
-  const parentFaceAxes = NEIGHBOR_OFFSETS.map(normalize).filter(Boolean);
-  const parentFacePlanes = parentFaceAxes.map((axis) => ({ axis, offset: Math.max(...parentVerts.map((v) => dot(v, axis))) }));
-  for (const maxShell of [0, 1, 2]) {
-    const sub = generateBCCSubLatticeAt(parentCenter, parentScale, maxShell);
-    for (const cell of sub) {
-      for (const v of bccDetailVertsFor(cell)) {
-        for (const { axis, offset } of parentFacePlanes) {
-          assert.ok(dot(v, axis) < offset + 1e-9, `maxShell=${maxShell}, cell shell=${cell.shell} [${cell.x},${cell.y},${cell.z}] has a vertex outside the parent RD's own face plane`);
+test('nearestBCCCell: really is nearest -- matches a brute-force search over a small window', () => {
+  const samples = [[0.4, 0.4, 0.4], [2.6, -1.1, 0.9], [-3.3, 2.2, 1.1]];
+  for (const [x, y, z] of samples) {
+    const got = nearestBCCCell(x, y, z);
+    let best = null, bestD = Infinity;
+    for (let ix = Math.floor(x) - 3; ix <= Math.floor(x) + 3; ix++) {
+      for (let iy = Math.floor(y) - 3; iy <= Math.floor(y) + 3; iy++) {
+        for (let iz = Math.floor(z) - 3; iz <= Math.floor(z) + 3; iz++) {
+          if (!isBCC(ix, iy, iz)) continue;
+          const d = (ix - x) ** 2 + (iy - y) ** 2 + (iz - z) ** 2;
+          if (d < bestD) { bestD = d; best = [ix, iy, iz]; }
         }
       }
     }
+    assert.deepEqual(got, best, `nearestBCCCell(${x},${y},${z}) = ${got}, brute force says ${best}`);
   }
 });
 
-test('generateBCCSubLatticeAt: real SAT check -- no two BCC sub-cells overlap each other', () => {
-  const sub = generateBCCSubLatticeAt([0, 0, 0], 1, 2);
-  const allVerts = sub.map(bccDetailVertsFor);
+test('bccShapeScaleFor: half the lattice spacing (the real, verified self-tiling ratio)', () => {
+  assert.equal(bccShapeScaleFor(1), 0.5);
+  assert.equal(bccShapeScaleFor(4), 2);
+});
+
+test('generateBCCLatticePatch: produces exactly 1 + cellsInShells(...) cells, all real BCC-valid coordinates', () => {
+  for (const maxShell of [0, 1, 2]) {
+    const patch = generateBCCLatticePatch([0, 0, 0], 1, maxShell);
+    const [cx, cy, cz] = nearestBCCCell(0, 0, 0);
+    const expectedCount = 1 + cellsInShells(cx, cy, cz, maxShell, 1, BCC_NEIGHBOR_OFFSETS).length;
+    assert.equal(patch.length, expectedCount);
+    for (const cell of patch) assert.ok(isBCC(cell.x, cell.y, cell.z));
+  }
+});
+
+test('generateBCCLatticePatch: every cell\'s world position is exactly cellToWorld(x,y,z,subScale) -- a pure function of its own coordinate, not of the seed position', () => {
+  const subScale = 2;
+  const patch = generateBCCLatticePatch([5, 5, 5], subScale, 2);
+  for (const cell of patch) {
+    assert.deepEqual(cell.worldPosition, cellToWorld(cell.x, cell.y, cell.z, subScale));
+  }
+});
+
+// The whole point of this redesign: two patches seeded from DIFFERENT
+// nearby positions must agree exactly on any coordinate they both cover --
+// real global consistency, not two independent, incompatible local
+// clusters. This is what makes adjacent FCC cells' BCC content connect
+// instead of reading as disconnected islands.
+test('generateBCCLatticePatch: two patches seeded from different nearby positions agree exactly on shared coordinates', () => {
+  const patchA = generateBCCLatticePatch([0, 0, 0], 1, 3);
+  const patchB = generateBCCLatticePatch([3, 3, 3], 1, 3);
+  const byKeyA = new Map(patchA.map((c) => [`${c.x},${c.y},${c.z}`, c]));
+  const byKeyB = new Map(patchB.map((c) => [`${c.x},${c.y},${c.z}`, c]));
+  let sharedCount = 0;
+  for (const [key, cellA] of byKeyA) {
+    const cellB = byKeyB.get(key);
+    if (!cellB) continue;
+    sharedCount++;
+    assert.deepEqual(cellA.worldPosition, cellB.worldPosition, `shared cell ${key} must have identical world position from both seeds`);
+    assert.equal(cellA.scale, cellB.scale);
+  }
+  assert.ok(sharedCount > 0, 'expected at least some real overlap between two nearby patches to actually verify consistency');
+});
+
+test('generateBCCLatticePatch: real SAT check -- no two cells in the same patch overlap each other (real self-tiling, not just non-degenerate)', () => {
+  const patch = generateBCCLatticePatch([0, 0, 0], 1, 2);
+  const allVerts = patch.map(bccDetailVertsFor);
   for (let i = 0; i < allVerts.length; i++) {
     for (let j = i + 1; j < allVerts.length; j++) {
-      assert.ok(!polytopesOverlap(allVerts[i], allVerts[j]), `sub-cells ${i} and ${j} must not overlap each other`);
+      assert.ok(!polytopesOverlap(allVerts[i], allVerts[j]), `cells ${i} and ${j} must not overlap each other`);
     }
   }
 });
 
-test('BCC_DETAIL_MAX_SHELL default is a small, real, non-degenerate value', () => {
-  assert.ok(BCC_DETAIL_MAX_SHELL >= 1);
-  assert.ok(bccCellCount(BCC_DETAIL_MAX_SHELL) > 1);
+test('BCC_LATTICE_MAX_SHELL default is a real, non-degenerate value', () => {
+  assert.ok(BCC_LATTICE_MAX_SHELL >= 1);
 });

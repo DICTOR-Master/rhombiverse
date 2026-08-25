@@ -7,7 +7,7 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell } from './core/lattice.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
-import { generateBCCSubLatticeAt, bccDetailVertsFor } from './geometry-extensions/bcc-detail-lattice.js';
+import { generateBCCLatticePatch, bccDetailVertsFor } from './geometry-extensions/bcc-detail-lattice.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -1000,6 +1000,8 @@ async function init() {
 
   wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
   wireFirstUseHint('bcc-toggle', 'BCC Lattice: a finer dual lattice nested inside your nearby cells -- a real second lattice, at a smaller scale.');
+  wireFirstUseHint('clear-world-toggle', 'Clear World: erase everything and start fresh from a single seed cell.');
+  wireFirstUseHint('reload-toggle', 'Reload: hard-refresh the app if anything looks stuck or stale.');
   wireFirstUseHint('sculpture-mode-toggle', 'Sculpture Mode: a separate, isolated scratch workspace -- nothing here touches your real World.');
   wireFirstUseHint('cyborg-toggle', 'Cyborg Mode: a guided walkthrough, step by step.');
   wireFirstUseHint('xray-toggle', 'X-Ray: drag a cutaway plane through the structure to see inside it.');
@@ -1757,28 +1759,16 @@ async function init() {
     }
   });
 
-  // BCC dual-lattice Phase 2 (revised) -- Rhombeometry-only. A multiscale
-  // master lattice: FCC/RD stays the coarse, buildable world exactly as
-  // before (untouched, always visible); BCC nests inside each nearby FCC
-  // cell as a finer sub-lattice, geometrically guaranteed to stay inside
-  // its parent's own boundary (see geometry-extensions/bcc-detail-lattice.js
-  // and its test suite for the real containment proof -- this is additive
-  // detail, not a competing same-scale structure, and never touches
-  // worldstate.
-  //
-  // BCC_DETAIL_TRIGGER_DISTANCE is deliberately its OWN constant, not
-  // SUB_LATTICE_TRIGGER_DISTANCE (4) -- that value is tuned for Lattice
-  // Zoom's ambient, continuously-refreshed zoom-in LOD reveal, not for an
-  // explicit opt-in toggle that should show something at whatever distance
-  // the camera already happens to be. The app's own default camera start
-  // (6,5,8) is ~11.18 world units from the origin -- a real, confirmed
-  // symptom (2026-08-25): reusing the tight LOD value meant the toggle
-  // silently rendered nothing at the normal default view, only appearing
-  // right after placing a brand-new cell directly in front of the camera.
-  // 12 comfortably covers that default distance; the existing
-  // MAX_NEARBY_SUBLATTICE_CELLS cap already bounds the real render cost
-  // regardless of trigger radius.
-  const BCC_DETAIL_TRIGGER_DISTANCE = 12;
+  // BCC dual-lattice Phase 2 (third revision, 2026-08-25) -- Rhombeometry-
+  // only. A real, connected, globally-consistent BCC lattice sharing the
+  // FCC world's own coordinate frame, seeded near the camera -- "a
+  // cohesive master lattice together with FCC," "mathematically
+  // consistent and interchangeable," per direct instruction. Additive to
+  // the real RD world (never touches worldstate); see
+  // geometry-extensions/bcc-detail-lattice.js for the full history of why
+  // this design replaced two earlier attempts (a same-scale overlay, then
+  // a per-cell-contained nested cluster -- both real, reasoned dead ends,
+  // not guesses).
   const bccToggleBtn = document.getElementById('bcc-toggle');
   if (bccToggleBtn) bccToggleBtn.style.display = FEATURES.bccLattice ? '' : 'none';
   let bccLatticeActive = false;
@@ -1794,18 +1784,24 @@ async function init() {
     }
     const cells = w ? w.entries() : [];
     if (cells.length === 0) return;
-    const refPos = [camera.position.x, camera.position.y, camera.position.z];
-    const parents = selectNearbyCells(cells, refPos, BCC_DETAIL_TRIGGER_DISTANCE, MAX_NEARBY_SUBLATTICE_CELLS, SCALE);
-    if (parents.length === 0) return;
+    // controls.target (the real look-at point, same convention already
+    // used elsewhere in this file, e.g. updateGravityInfo) -- NOT
+    // camera.position, which sits offset from the structure by the whole
+    // orbit distance. Real bug found via live testing (2026-08-25):
+    // seeding from camera.position put the patch off near the camera
+    // itself, not overlapping the actual visible world content.
+    const refPos = walking && player ? [player.getPosition().x, player.getPosition().y, player.getPosition().z] : [controls.target.x, controls.target.y, controls.target.z];
+    // One real, connected BCC lattice patch seeded near the camera's
+    // look-at point -- NOT derived per FCC parent cell, so it stays
+    // continuous across FCC-FCC seams (see bcc-detail-lattice.js's own
+    // header for why the earlier per-cell design read as disconnected
+    // islands).
+    const subCells = generateBCCLatticePatch(refPos, SCALE);
     const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
     const pieces = [];
-    for (const parent of parents) {
-      const parentCenter = cellToWorld(parent.x, parent.y, parent.z, SCALE);
-      const subCells = generateBCCSubLatticeAt(parentCenter, SCALE);
-      for (const sub of subCells) {
-        const verts = bccDetailVertsFor(sub).map(([x, y, z]) => new THREE.Vector3(x, y, z));
-        pieces.push(new ConvexGeometry(verts));
-      }
+    for (const sub of subCells) {
+      const verts = bccDetailVertsFor(sub).map(([x, y, z]) => new THREE.Vector3(x, y, z));
+      pieces.push(new ConvexGeometry(verts));
     }
     const merged = mergeGeometries(pieces, false);
     pieces.forEach((g) => g.dispose());
@@ -3520,7 +3516,12 @@ async function init() {
     else enableSharedWorld();
   });
 
-  document.getElementById('new-world').addEventListener('click', async () => {
+  // Shared by both the Lab panel's own "New World" button and the always-
+  // visible HUD clear-world-toggle added alongside it (2026-08-25) -- same
+  // action, a second, easier-to-find entry point for it since the Lab
+  // panel lives behind the gear icon and isn't the first thing a returning
+  // player necessarily opens.
+  async function clearWorldToNew() {
     if (!confirm('Start a new world? This clears your current build.')) return;
     clearLocalStorage();
     const fresh = await loadWorld('./data/starter-world.json');
@@ -3528,6 +3529,11 @@ async function init() {
     seedAsteroidBelts(world); // matches what a true first visit gets, see load-preset's own comment
     onChange();
     rebuildAllGrowth();
+  }
+  document.getElementById('new-world').addEventListener('click', clearWorldToNew);
+  document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);
+  document.getElementById('reload-toggle')?.addEventListener('click', () => {
+    location.reload();
   });
 
   document.getElementById('export-json').addEventListener('click', () => {

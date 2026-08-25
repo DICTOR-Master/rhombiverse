@@ -1,102 +1,58 @@
-// BCC dual-lattice Phase 2 (revised): a genuinely non-overlapping way for
-// the BCC truncated-octahedron lattice to interpenetrate the FCC/RD world --
-// nested INSIDE each parent RD cell's own volume, at a smaller scale,
-// structurally similar to latticezoom.js's own generateSubLatticeAt (same
-// isolation rule: never touches worldstate.js's cell schema) but with a
-// different scale derivation -- see below for why. Full rationale:
-// docs/code-notes/geometry-extensions/bcc-detail-lattice.md
+// BCC dual-lattice Phase 2 (second revision, 2026-08-25): ONE continuous,
+// globally-consistent BCC lattice sharing the FCC world's own coordinate
+// frame and cellToWorld transform, at BCC's own real, established
+// self-tiling scale -- not independently re-derived or re-centered per
+// FCC cell. Full rationale: docs/code-notes/geometry-extensions/
+// bcc-detail-lattice.md
 //
-// Why nested, not same-scale: two DIFFERENT lattices' full-size Voronoi
-// cells can never be simultaneously gap-free AND overlap-free everywhere
-// (a Voronoi tiling is by definition 100% space-filling, so a second
-// lattice's full-size cells always cut into the first somewhere -- proven
-// via a real SAT overlap test, not assumed).
+// Why not the earlier per-cell-nested design (kept containment margins,
+// re-centered on each parent RD): direct user feedback (2026-08-25) --
+// each cluster was strictly contained inside its own parent cell with a
+// safety margin, which deliberately kept content away from that cell's
+// own boundary. That guarantees a dead zone at every FCC-FCC seam:
+// clusters in adjacent cells never touch, even at identical scale, so it
+// read as disconnected islands rather than a cohesive lattice. Direct
+// instruction: "mathematically consistent and interchangeable" with FCC.
 //
-// Why NOT latticezoom's own volume-conservation trick: that technique
-// (shrink sub-cells so their combined volume exactly equals the parent's)
-// is only a valid containment guarantee when the sub-cells are the SAME
-// shape as the parent, recursively tiling it with the same lattice rule --
-// trivially exact because it's literally the same space-filling tiling at
-// smaller scale. It does NOT generalize to nesting a foreign shape: a
-// single BCC cell volume-matched to its parent RD still pokes outside the
-// RD's own boundary (caught by this file's own test suite, not assumed --
-// equal volume never implies containment for two different convex solids
-// sharing a center). Real fix: derive the scale from actual containment --
-// numerically compute the parent RD's inradius and the BCC sub-lattice's
-// own worst-case reach (farthest cell center + that cell's own
-// circumradius) at a unit scale, then scale down so the real reach fits
-// inside the real inradius, with an explicit safety margin.
-import { cellsInShells, cellToWorld, rdRawVerts, NEIGHBOR_OFFSETS } from '../core/lattice.js';
-import { BCC_NEIGHBOR_OFFSETS, truncatedOctahedronVertices } from './dual-lattice.js';
+// This version drops containment margins entirely -- no longer needed,
+// since the world already renders translucent while this is active
+// (render.js's own depthWrite:false fix), so visual overlap with the FCC
+// world is expected, not a defect to engineer around. Instead this
+// builds a real, BFS-connected patch of BCC lattice points using BCC's
+// own real neighbor offsets, at BCC's own real self-tiling scale (equal
+// to SCALE, the same lattice constant FCC itself uses -- "interchangeable"
+// taken literally, not a fraction of it), mirroring exactly how the FCC
+// world itself is generated (cellsInShells + real neighbor offsets, one
+// shared coordinate frame) rather than a separate, independently-derived
+// mechanism.
+import { cellsInShells, cellToWorld } from '../core/lattice.js';
+import { BCC_NEIGHBOR_OFFSETS, truncatedOctahedronVertices, nearestBCCCell } from './dual-lattice.js';
 
-export const BCC_DETAIL_MAX_SHELL = 1;
+export const BCC_LATTICE_MAX_SHELL = 1;
 
-// Leaves real clearance between the outermost BCC sub-cell and the parent's
-// own boundary -- not shaved to the exact theoretical limit, so float error
-// and any future tweak to either shape's vertex generator can't tip it into
-// overlap silently.
-export const BCC_DETAIL_SAFETY_MARGIN = 0.85;
-
-function dot([ax, ay, az], [bx, by, bz]) { return ax * bx + ay * by + az * bz; }
-function normalize([x, y, z]) {
-  const len = Math.hypot(x, y, z);
-  return len < 1e-9 ? null : [x / len, y / len, z / len];
+// Real, established self-tiling ratio (verified in dual-lattice's own
+// Phase 1 work and this module's own tests): a BCC cell at lattice
+// spacing `subScale` needs shape scale subScale/2 for its square/hex
+// faces to exactly meet its neighbors' -- not re-derived here.
+export function bccShapeScaleFor(subScale) {
+  return subScale / 2;
 }
 
-// Real, numeric inradius (center-to-nearest-face distance) of the parent
-// RD at scale=1 -- computed from rdRawVerts' own output via its real face
-// normals (NEIGHBOR_OFFSETS: a Voronoi cell's facets are always the
-// perpendicular bisectors toward each neighbor), not hand-derived.
-function rdInradiusUnit() {
-  const verts = rdRawVerts(1);
-  let inradius = Infinity;
-  for (const off of NEIGHBOR_OFFSETS) {
-    const axis = normalize(off);
-    const maxProj = Math.max(...verts.map((v) => dot(v, axis)));
-    inradius = Math.min(inradius, maxProj);
-  }
-  return inradius;
-}
-const RD_INRADIUS_UNIT = rdInradiusUnit();
-
-export function bccCellCount(maxShell = BCC_DETAIL_MAX_SHELL) {
-  // BCC_NEIGHBOR_OFFSETS mixes two edge lengths (8 body-diagonal + 6 axis),
-  // so there's no closed shellCount()-style formula the way FCC's 12
-  // same-length neighbors give -- count the real generated cells directly.
-  return 1 + cellsInShells(0, 0, 0, maxShell, 1, BCC_NEIGHBOR_OFFSETS).length;
-}
-
-// Real, numeric worst-case reach of the BCC sub-lattice at unit sub-scale
-// (subScale=1, shapeScale=0.5): the farthest any point of any sub-cell's
-// own truncated-octahedron shape gets from the shared center, in raw
-// (unscaled) units -- computed from the real generated cells and the real
-// generated shape vertices, not assumed from either shape's own formula.
-function bccWorstCaseReachUnit(localCells) {
-  let reach = 0;
-  const unitShapeVerts = truncatedOctahedronVertices(0.5);
-  for (const cell of localCells) {
-    const [cx, cy, cz] = cellToWorld(cell.x, cell.y, cell.z, 1);
-    for (const [vx, vy, vz] of unitShapeVerts) {
-      reach = Math.max(reach, Math.hypot(cx + vx, cy + vy, cz + vz));
-    }
-  }
-  return reach;
-}
-
-export function generateBCCSubLatticeAt(parentCenter, parentScale, maxShell = BCC_DETAIL_MAX_SHELL) {
-  const localCells = [{ x: 0, y: 0, z: 0, shell: 0 }, ...cellsInShells(0, 0, 0, maxShell, 1, BCC_NEIGHBOR_OFFSETS)];
-  const reachUnit = bccWorstCaseReachUnit(localCells);
-  const subScale = parentScale * (RD_INRADIUS_UNIT / reachUnit) * BCC_DETAIL_SAFETY_MARGIN;
-  const shapeScale = subScale / 2;
-  const [px, py, pz] = parentCenter;
-  return localCells.map((cell) => {
-    const [lx, ly, lz] = cellToWorld(cell.x, cell.y, cell.z, subScale);
-    return {
-      x: cell.x, y: cell.y, z: cell.z, shell: cell.shell,
-      worldPosition: [px + lx, py + ly, pz + lz],
-      scale: shapeScale,
-    };
-  });
+// Real, connected BFS patch of BCC lattice points, seeded from whichever
+// valid BCC coordinate is nearest to `nearWorldPos` (typically the
+// camera) -- NOT tied to any specific FCC parent cell, so two patches
+// generated from nearby seeds share real lattice neighbors wherever they
+// overlap, the same continuity property the FCC world itself already has.
+export function generateBCCLatticePatch(nearWorldPos, subScale, maxShell = BCC_LATTICE_MAX_SHELL) {
+  const [nx, ny, nz] = nearWorldPos.map((v) => v / subScale);
+  const [cx, cy, cz] = nearestBCCCell(nx, ny, nz);
+  const localCells = [{ x: cx, y: cy, z: cz, shell: 0 }, ...cellsInShells(cx, cy, cz, maxShell, 1, BCC_NEIGHBOR_OFFSETS)];
+  const shapeScale = bccShapeScaleFor(subScale);
+  return localCells.map((cell) => ({
+    x: cell.x, y: cell.y, z: cell.z, shell: cell.shell,
+    worldPosition: cellToWorld(cell.x, cell.y, cell.z, subScale),
+    scale: shapeScale,
+  }));
 }
 
 export function bccDetailVertsFor(cell) {
