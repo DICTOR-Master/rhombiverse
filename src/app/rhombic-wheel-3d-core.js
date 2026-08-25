@@ -200,16 +200,29 @@ export const DUPLICATE_HOME_FACE = {
 
 export const WHEEL_HOME = {
   id: "home",
-  // Home's 5th universal slot hosts a 6th department here (unassigned
-  // in the source -- mark spare, don't invent one).
-  fifthSlotOverride: { kind: "spare", label: "Open Slot", action: null,
-    desc: "The 5th Universal Ring position. On every other wheel this returns Home — here that's moot, so it hosts a 6th department instead. Unassigned in the flow chart." },
+  // Home's 5th universal slot hosts a 6th department here -- unassigned
+  // in the flow chart itself, but explicitly reserved for exactly this
+  // ("here that's moot, so it hosts a 6th department instead"). Filled
+  // 2026-08-25 with Rhombisis (see WHEEL_RHOMBISIS below), per direct
+  // user decision -- restores a unified "genesis" gesture (sculpt,
+  // generate a body, plant a seed) the flow chart's own department
+  // taxonomy had scattered across Build/Rhombitect/Cultivate by
+  // mechanism rather than by shared creative intent. Real second
+  // doorway, not new logic -- every face here reuses an action string
+  // already handled in render.js's onAction.
+  fifthSlotOverride: { kind: "dept", label: "Rhombisis", action: "navigateTo:rhombisis",
+    desc: "Sculpt, Generate a Body, Plant a Seed — every act of bringing something new into being, in one place." },
   faces: {
     "equator|sx1sy1":   { kind: "dept", label: "Construct",  action: "navigateTo:construct",
       desc: "Build and Alter modules live here." },
     "equator|sx1sy-1":  { kind: "dept", label: "Rhombitect", action: "navigateTo:rhombitect",
       desc: "Precise coordinate building — Dome, Spiral Column, Templates." },
-    "equator|sx-1sy1":  { kind: "dept", label: "Cultivate",  action: "navigateTo:cultivate",
+    // Label only -- internal id/action ("cultivate") unchanged, so
+    // #cultivate-panel and every navigateTo:cultivate reference stay
+    // exactly as they are. Deliberate departure from Flow_chart.md's
+    // own literal naming (unlike Rhombitect, which already matches
+    // the source doc) -- direct user decision, made eyes-open.
+    "equator|sx-1sy1":  { kind: "dept", label: "Rhombivate",  action: "navigateTo:cultivate",
       desc: "Plant, Prune, and Growth Parameters for the organic/Penrose layer." },
     "equator|sx-1sy-1": { kind: "dept", label: "Trade",      action: "navigateTo:trade",
       desc: "Offer, Accept, and Inventory — the resource/decay economy." },
@@ -360,7 +373,33 @@ export const WHEEL_TRADE = {
   }
 };
 
+// Rhombisis: a unified "genesis" doorway for the three real acts of
+// bringing something new into being -- sculpting, generating a body,
+// planting a seed -- which the flow chart's own department taxonomy
+// scattered across Build/Rhombitect/Cultivate by mechanism, not by
+// shared creative intent (2026-08-25, direct user decision). Every
+// action string below is already handled in render.js's onAction --
+// this wheel adds a second doorway to the exact same real behavior,
+// zero new logic, same pattern DUPLICATE_HOME_FACE already uses for a
+// single face, just for three at once.
+export const WHEEL_RHOMBISIS = {
+  id: "rhombisis",
+  faces: {
+    "equator|sx1sy1":   { kind: "dept", label: "Sculpt", action: "tool:rhombiSculpt",
+      desc: "Opens the Sculpt panel -- symmetry and mirror tools, no World required." },
+    "equator|sx1sy-1":  { kind: "dept", label: "Generate a Body", action: "tool:generateBody",
+      desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...)." },
+    "equator|sx-1sy1":  { kind: "dept", label: "Plant a Seed", action: "tool:plant",
+      desc: "Pick a species, then click to plant it. Opens the Cultivate panel." },
+    "equator|sx-1sy-1": SPARE,
+    "bottom|sy1sz-1":   DUPLICATE_HOME_FACE,
+    "bottom|sx1sz-1":   SPARE,
+    "bottom|sx-1sz-1":  SPARE
+  }
+};
+
 export const ALL_WHEELS = {
   home: WHEEL_HOME, construct: WHEEL_CONSTRUCT, build: WHEEL_BUILD, alter: WHEEL_ALTER,
-  rhombitect: WHEEL_RHOMBITECT, cultivate: WHEEL_CULTIVATE, trade: WHEEL_TRADE
+  rhombitect: WHEEL_RHOMBITECT, cultivate: WHEEL_CULTIVATE, trade: WHEEL_TRADE,
+  rhombisis: WHEEL_RHOMBISIS
 };
