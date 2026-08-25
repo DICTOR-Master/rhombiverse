@@ -526,11 +526,37 @@ export function createRhombicWheel({
     }
   });
 
+  // Exposed for the Rhombic Wheel 3D (app/rhombic-wheel-3d.js) to reuse
+  // these picker overlays directly, without going through this file's
+  // own LEVEL1/LEVEL2 radial menu -- material-wheel-overlay and
+  // wheel-picker-strip are already independent DOM overlays, not part
+  // of the 2D wheel's own visuals, so this is safe to call regardless
+  // of whether the 2D wheel is currently open. See docs/code-notes/
+  // app/wheel.md once written.
+  function openMaterialPicker(onPick) {
+    const select = document.getElementById(materialSelectId);
+    const options = readSelectOptions(select);
+    openMaterialWheel(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
+  }
+  function openSpeciesPicker(onPick) {
+    const select = document.getElementById(speciesSelectId);
+    const options = readSelectOptions(select);
+    openPickerStrip(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
+  }
+  function openGeneratorPicker(onPick) {
+    const select = document.getElementById(generatorSelectId);
+    const options = readSelectOptions(select);
+    openPickerStrip(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
+  }
+
   return {
     open,
     close,
     toggle,
     isOpen,
     isDragPlacementEnabled: () => dragPlacementEnabled,
+    openMaterialPicker,
+    openSpeciesPicker,
+    openGeneratorPicker,
   };
 }

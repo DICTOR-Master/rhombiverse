@@ -252,7 +252,11 @@ export const WHEEL_BUILD = {
     "equator|sx1sy1":  { kind: "dept", label: "Rhombi-model", action: "tool:rhombiModel", desc: "Place mode -- click a face to add a cell there." },
     "equator|sx1sy-1": { kind: "dept", label: "Rhombi-sculpt", action: "tool:rhombiSculpt", desc: "Opens the Sculpt panel -- symmetry and mirror tools, no World required." },
     "equator|sx-1sy1": { kind: "dept", label: "Fill", action: "tool:fill", desc: "Fill mode -- click to fill in a gap." },
-    "equator|sx-1sy-1": SPARE,
+    // Filling a real, already-working feature into a spare, not
+    // inventing one: the 2D wheel's material picker (openMaterialWheel)
+    // already exists and works, it just had nowhere to live in this
+    // flow-chart-derived structure until now. See render.js's onAction.
+    "equator|sx-1sy-1": { kind: "dept", label: "Material", action: "tool:material", desc: "Pick a build material." },
     "bottom|sy1sz-1":  SPARE,
     "bottom|sx1sz-1":  DUPLICATE_HOME_FACE,
     "bottom|sx-1sz-1": SPARE
@@ -286,7 +290,14 @@ export const WHEEL_RHOMBITECT = {
     "equator|sx1sy1":  { kind: "dept", label: "Dome", action: "tool:dome", desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it." },
     "equator|sx1sy-1": { kind: "dept", label: "Spiral Column", action: "tool:spiralColumn", desc: "Not built yet." },
     "equator|sx-1sy1": { kind: "dept", label: "Templates", action: "tool:templates", desc: "Not built yet." },
-    "equator|sx-1sy-1": SPARE,
+    // Filling a real, already-working feature into a spare, not
+    // inventing one: "Generate a Body" (the 2D wheel's generator-type
+    // picker) spawns a real procedural celestial body (Rocky Planetoid,
+    // Ice Moon, Gas Giant, etc. -- see #generator-type-select). Placed
+    // here rather than on Build/Cultivate/Trade per direct user
+    // decision 2026-08-25 -- closer to "spawn a whole world" than
+    // single-cell placement or organic growth.
+    "equator|sx-1sy-1": { kind: "dept", label: "Generate a Body", action: "tool:generateBody", desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...)." },
     "bottom|sy1sz-1":  SPARE,
     "bottom|sx1sz-1":  DUPLICATE_HOME_FACE,
     "bottom|sx-1sz-1": SPARE
@@ -296,7 +307,11 @@ export const WHEEL_RHOMBITECT = {
 export const WHEEL_CULTIVATE = {
   id: "cultivate",
   faces: {
-    "equator|sx1sy1":  { kind: "dept", label: "Plant", action: "tool:plant", desc: "Plant mode -- click to plant a seed, opens the Cultivate panel." },
+    // Also opens the species picker (2D wheel's "Plant a Seed") --
+    // folded in here rather than given its own face, since choosing
+    // what to plant is naturally part of the same action as choosing
+    // to plant. See render.js's onAction.
+    "equator|sx1sy1":  { kind: "dept", label: "Plant", action: "tool:plant", desc: "Pick a species, then click to plant it. Opens the Cultivate panel." },
     // Prune has no separate mode of its own -- it's a real right-click
     // gesture on an existing growth tile while already in Plant mode
     // (see render.js's contextmenu listener / pruneTile()).

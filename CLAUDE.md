@@ -139,6 +139,17 @@ build order:
 - **Showcase world** — done, `data/presets/showcase-world.json` (a real
   continental planetoid with growth, evolved organisms, and animals),
   loadable via the `#preset-select` dropdown.
+- **Rhombic Wheel 3D** (2026-08-25, `src/app/rhombic-wheel-3d-core.js`/
+  `rhombic-wheel-3d.js`) — a second, parallel navigation wheel on the
+  real RD mesh, gated behind `FEATURES.rhombicWheel3D` (off by
+  default). Not a replacement for `wheel.js` yet — that's the stated
+  eventual direction, not done. Home/Construct/Build/Alter/Rhombitect/
+  Cultivate/Trade all real and reachable; department faces wired to
+  real actions (mode-btn clicks, the real material/species/generator
+  pickers via new exports on `wheel.js`), not placeholders, except
+  Spiral Column/Templates (genuine stubs) and Replace (discovered
+  broken in the *2D* wheel too — no implementation anywhere). Full
+  rationale: `docs/code-notes/app/rhombic-wheel-3d.md`.
 
 Building the showcase world (2026-08-14) surfaced and fixed three real
 performance bugs in `evolution.js`/`worldstate.js` (unbounded population

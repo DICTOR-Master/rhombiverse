@@ -1839,14 +1839,36 @@ async function init() {
         if (action === 'tool:rhombiModel') { clickMode('build'); wheel3D.close(); return; } // "Place" mode
         if (action === 'tool:fill') { clickMode('fill'); wheel3D.close(); return; }
         if (action === 'tool:rhombiSculpt') { clickMode('sculpt'); openSculptPanel(); wheel3D.close(); return; }
+        // Reuses the 2D wheel's own material-picker overlay (a real,
+        // already-independent DOM overlay, not part of its radial
+        // LEVEL1/LEVEL2 visuals) via the openMaterialPicker export
+        // added to wheel.js -- filling a real feature into a spare
+        // slot, not inventing one. See rhombic-wheel-3d-core.js.
+        if (action === 'tool:material') {
+          wheel3D.close();
+          wheel.openMaterialPicker((value, label) => showHudPrompt(`Material: ${label}`, 3000));
+          return;
+        }
 
-        // --- Cultivate: Plant/Growth Params are direct matches;
-        // Prune has no separate mode -- it's a right-click gesture on
-        // an existing growth tile while already in 'plant' mode (see
-        // render.js's contextmenu listener calling pruneTile()), so
-        // this sets the same real mode and explains the real gesture
-        // rather than inventing a "prune mode" that doesn't exist. ---
-        if (action === 'tool:plant') { clickMode('plant'); document.getElementById('cultivate-panel')?.classList.add('open'); wheel3D.close(); return; }
+        // --- Cultivate: Growth Params is a direct match; Prune has no
+        // separate mode -- it's a right-click gesture on an existing
+        // growth tile while already in 'plant' mode (see render.js's
+        // contextmenu listener calling pruneTile()), so this sets the
+        // same real mode and explains the real gesture rather than
+        // inventing a "prune mode" that doesn't exist. Plant also opens
+        // the species picker (2D wheel's "Plant a Seed", folded in here
+        // rather than given its own face) before setting plant mode --
+        // mirrors the 2D wheel's own species-picker -> mode -> prompt
+        // order exactly. ---
+        if (action === 'tool:plant') {
+          wheel3D.close();
+          wheel.openSpeciesPicker((value, label) => {
+            clickMode('plant');
+            document.getElementById('cultivate-panel')?.classList.add('open');
+            showHudPrompt(`Click anywhere to plant a ${label}.`, 3500);
+          });
+          return;
+        }
         if (action === 'tool:prune') { clickMode('plant'); showHudPrompt('Prune: right-click an existing growth tile while in Plant mode.', 4000); wheel3D.close(); return; }
         if (action === 'tool:growthParams') { document.getElementById('cultivate-panel')?.classList.add('open'); wheel3D.close(); return; } // real "Growth Parameters" section lives in this panel
 
@@ -1867,6 +1889,19 @@ async function init() {
           return;
         }
         if (action === 'tool:spiralColumn' || action === 'tool:templates') { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
+        // Reuses the 2D wheel's generator-type picker (a real,
+        // already-independent overlay) via the openGeneratorPicker
+        // export -- mirrors the 2D wheel's own picker -> mode:'generate'
+        // -> prompt order exactly. Placed on Rhombitect rather than
+        // Build/Cultivate/Trade per direct user decision 2026-08-25.
+        if (action === 'tool:generateBody') {
+          wheel3D.close();
+          wheel.openGeneratorPicker((value, label) => {
+            clickMode('generate');
+            showHudPrompt(`Click anywhere to grow a ${label}.`, 3500);
+          });
+          return;
+        }
 
         // --- Trade: JUDGMENT CALL. Offer/Accept only exist via the
         // in-world "Interact" trigger (walk up to another player, tap
