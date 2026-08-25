@@ -875,7 +875,7 @@
       box-sizing: border-box;
     }
     #welcome-card {
-      max-width: 440px;
+      max-width: 380px;
       width: 100%;
       color: #ddd;
       font: 14px/1.5 system-ui, sans-serif;
@@ -887,49 +887,9 @@
       box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
     }
     #welcome-card svg { display: block; margin: 0 auto 4px; }
-    #welcome-card h1 { margin: 4px 0 0; font-size: 26px; color: #fff; }
-    #welcome-card .tagline { margin: 6px 0 14px; opacity: 0.8; font-style: italic; }
-    #welcome-card .identity-block { margin: 0 0 14px; }
-    #welcome-card .identity-prompt {
-      text-align: left;
-      font: 700 12px system-ui, sans-serif;
-      letter-spacing: 0.03em;
-      color: #9de0ff;
-      margin-bottom: 6px;
-    }
-    #welcome-card .identity-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px 14px;
-      text-align: left;
-    }
-    #welcome-card .identity-item {
-      font-size: 12.5px;
-      line-height: 1.35;
-      opacity: 0.9;
-      position: relative;
-      padding: 3px 4px 3px 14px;
-      margin: -3px -4px -3px 0;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background 0.15s, opacity 0.15s;
-    }
-    #welcome-card .identity-item:hover, #welcome-card .identity-item:focus-visible {
-      opacity: 1;
-      background: rgba(124, 204, 255, 0.12);
-      outline: none;
-    }
-    #welcome-card .identity-item::before {
-      content: "";
-      position: absolute;
-      left: 1px; top: 8px;
-      width: 6px; height: 6px;
-      background: #7cf;
-      transform: rotate(45deg);
-    }
-    #welcome-card .identity-item strong { color: #fff; }
-    #welcome-card .quickstart { margin: 0 0 14px; opacity: 0.85; font-size: 13px; }
-    #welcome-card .mode-choice { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; flex-wrap: wrap; }
+    #welcome-card h1 { margin: 8px 0 0; font-size: 26px; color: #fff; }
+    #welcome-card .tagline { margin: 6px 0 18px; opacity: 0.8; font-style: italic; }
+    #welcome-card .mode-choice { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 16px; flex-wrap: wrap; }
     #welcome-card .mode-choice-prompt { font: 700 12px system-ui, sans-serif; letter-spacing: 0.03em; color: #9de0ff; }
     #welcome-card .mode-choice-btn {
       font-size: 11.5px;
@@ -950,20 +910,9 @@
       gap: 6px;
       font-size: 12px;
       opacity: 0.75;
-      margin-bottom: 12px;
+      margin-bottom: 4px;
       cursor: pointer;
     }
-    #welcome-card #enter-world-btn {
-      font: bold 15px system-ui, sans-serif;
-      color: #05050a;
-      background: #7cf;
-      border: none;
-      border-radius: 6px;
-      padding: 10px 18px;
-      cursor: pointer;
-      width: 100%;
-    }
-    #welcome-card #enter-world-btn:hover { background: #9de0ff; }
     #welcome-card .legal-links {
       margin-top: 14px;
       font-size: 11px;

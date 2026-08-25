@@ -128,7 +128,7 @@ rhombiverse/
     worldstate.js             # world JSON load/save/serialize (cells, seeds, claims, organisms, inventory, trades)
     persistence.js            # localStorage backend
     wheel.js                   # the Rhombic Wheel radial menu
-    welcome.js                 # first-run overlay, persona picker
+    welcome.js                 # first-run overlay: rotating RD logo, mode choice, ENTER
     settings.js                # sensitivity/FOV/quality/volume, Lab panel state
     player.js                  # first-person walk controller
     sculpture.js               # Sculpt tool: symmetry/mirror, shell brush, Assistance Spectrum
