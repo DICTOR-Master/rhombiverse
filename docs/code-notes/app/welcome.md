@@ -95,6 +95,25 @@ translucent face. Fixed by brightening the label to a near-white
 `#eafcff`, raising the fill-opacity multiplier (0.35 → 0.55), and adding
 a stroke-width thicken-on-opacity touch to the active face's outline.
 
+Two more direct-feedback passes after the first push (still 2026-08-26):
+
+- **Two ENTER faces, not one** ("double the opportunity to enter"):
+  `ENTER_FACES` is now an array of two `prepareEnterFace()` results —
+  the original `top|sy1sz1` face and its exact geometric antipode
+  (negate every vertex; the RD is centered at the origin, so this is a
+  real antipode, not a lookup by ring/sx/sy/sz label). `logoSvg()` emits
+  one polygon+label pair per entry (`enter-face-poly-0/1`,
+  `enter-face-label-0/1`), and `startLogoSpin()`'s per-frame loop and
+  click wiring both run over the array instead of one hardcoded pair.
+  Each face still swings into view once per revolution, but with two
+  antipodal faces that's now once per half-revolution overall.
+- **Text-then-wheel layout** ("text at top and wheel in middle"):
+  `overlayHtml()` now emits `<h1>`/`.tagline` before `logoSvg()`, not
+  after — was logo-then-text. CSS margins on `#welcome-card svg`/`h1`/
+  `.tagline` in `index.html` were re-balanced for the new order (the
+  breathing room that used to sit between the logo and the h1 now sits
+  between the tagline and the logo instead).
+
 Prior history, superseded above: the old static `RD_EDGES` was drawn to
 pixel-match `favicon.svg`'s own rotation/projection (this project's own
 voxel shape, `lattice.js`'s `rdRawVerts`: 8 cube verts at radius 0.5, 6

@@ -43,29 +43,40 @@ function buildRDEdges() {
 }
 const RD_EDGES_3D = buildRDEdges();
 
-// The ENTER face -- a single rhombus doubles as the entry button, rather
-// than a separately-positioned button below the logo. Direct feedback
-// 2026-08-26: a fixed ENTER button read as "too similar to the old
-// version"; the ask was for ENTER to live ON the rotating shape itself,
-// appearing as that face swings toward the viewer. A `top`-ring face
-// (not equator) per direct feedback -- it projects as the upright,
-// vertically-aligned diamond as it approaches/leaves the logo's central
-// position (checked numerically: this specific face also hits the
-// highest peak facing-the-viewer value of all 12 faces under the fixed
-// LOGO_TILT, ~0.96 vs equator faces' ~0.78).
-const ENTER_FACE = RD_FACES.find((f) => f.ring === 'top' && f.sy === 1 && f.sz === 1);
-let enterVerts = ENTER_FACE.verts;
-const enterCentroid = centroidOf(enterVerts);
-{
+// The ENTER faces -- two antipodal rhombi double as the entry button,
+// rather than a separately-positioned button below the logo. Direct
+// feedback 2026-08-26: a fixed ENTER button read as "too similar to the
+// old version"; the ask was for ENTER to live ON the rotating shape
+// itself, appearing as a face swings toward the viewer. `top`-ring faces
+// (not equator) per direct feedback -- they project as the upright,
+// vertically-aligned diamond as they approach/leave the logo's central
+// position (checked numerically: these also hit the highest peak
+// facing-the-viewer value of all 12 faces under the fixed LOGO_TILT,
+// ~0.96 vs equator faces' ~0.78). Both true geometric antipodes (RD is
+// centered at the origin, so negating a face's own verts/centroid/normal
+// gives its exact opposite) are lit up, not just one, per direct feedback
+// ("double the opportunity to enter") -- each swings into view once per
+// half-revolution instead of once per full one.
+function prepareEnterFace(face) {
+  let verts = face.verts;
+  const centroid = centroidOf(verts);
   // Outward winding: for an origin-centered convex shape, a face's own
   // centroid vector already points outward, so a normal that agrees with
   // it is correctly wound (same technique as rhombic-wheel-3d-core.js's
   // ensureOutwardWinding, in plain arrays here since this file
   // deliberately has no THREE dependency -- see header above).
-  const n = cross(sub(enterVerts[1], enterVerts[0]), sub(enterVerts[3], enterVerts[0]));
-  if (dot(n, enterCentroid) < 0) enterVerts = enterVerts.slice().reverse();
+  let normal = cross(sub(verts[1], verts[0]), sub(verts[3], verts[0]));
+  if (dot(normal, centroid) < 0) {
+    verts = verts.slice().reverse();
+    normal = cross(sub(verts[1], verts[0]), sub(verts[3], verts[0]));
+  }
+  return { verts, centroid, normal: norm(normal) };
 }
-const ENTER_NORMAL = norm(cross(sub(enterVerts[1], enterVerts[0]), sub(enterVerts[3], enterVerts[0])));
+const TOP_ENTER_FACE = RD_FACES.find((f) => f.ring === 'top' && f.sy === 1 && f.sz === 1);
+const ENTER_FACES = [
+  prepareEnterFace(TOP_ENTER_FACE),
+  prepareEnterFace({ verts: TOP_ENTER_FACE.verts.map(([x, y, z]) => [-x, -y, -z]) }), // true antipode
+];
 
 const LOGO_SCALE = 30; // RD vertices have max norm 2 -- 30 keeps the whole shape inside the viewBox below with margin
 const LOGO_TILT = 0.5; // fixed static tilt (radians) so the auto-rotate never looks like a flat side-on view
@@ -92,31 +103,35 @@ function transform(p, angle) { return rotateY(rotateX(p, LOGO_TILT), angle); }
 
 function logoSvg() {
   const lines = RD_EDGES_3D.map((_, i) => `<line class="rd-edge" data-i="${i}" />`).join('');
-  return `
-    <svg id="welcome-logo-svg" viewBox="-70 -70 140 140" width="180" height="180" role="img" aria-label="Rhombiverse logo: a rotating wireframe rhombic dodecahedron, one face doubling as Enter">
-      <g stroke="#7cf" stroke-width="1.5" stroke-linecap="round" fill="none">${lines}</g>
-      <polygon id="enter-face-poly" fill="#7cf" fill-opacity="0" stroke="#bfe6ff" stroke-width="1.5" stroke-opacity="0" />
-      <text id="enter-face-label" x="0" y="0" text-anchor="middle" dominant-baseline="central"
+  const enterEls = ENTER_FACES.map((_, i) => `
+      <polygon id="enter-face-poly-${i}" fill="#7cf" fill-opacity="0" stroke="#bfe6ff" stroke-width="1.5" stroke-opacity="0" />
+      <text id="enter-face-label-${i}" x="0" y="0" text-anchor="middle" dominant-baseline="central"
             font-family="system-ui, sans-serif" font-weight="700" font-size="10.5" letter-spacing="0.6"
-            fill="#eafcff" fill-opacity="0">ENTER</text>
+            fill="#eafcff" fill-opacity="0">ENTER</text>`).join('');
+  return `
+    <svg id="welcome-logo-svg" viewBox="-70 -70 140 140" width="180" height="180" role="img" aria-label="Rhombiverse logo: a rotating wireframe rhombic dodecahedron, two opposite faces doubling as Enter">
+      <g stroke="#7cf" stroke-width="1.5" stroke-linecap="round" fill="none">${lines}</g>${enterEls}
     </svg>`;
 }
 
 // Recomputed every animation frame while the overlay is visible; started/
 // stopped by show()/hide() below rather than left running once dismissed.
-// `onEnterHit` fires on a click while the ENTER face is actually toward
-// the viewer -- see the module header for why ENTER lives here instead
-// of a separately-positioned button.
+// `onEnterHit` fires on a click while either ENTER face is actually
+// toward the viewer -- see the module header for why ENTER lives here
+// instead of a separately-positioned button, and for why there are two.
 function startLogoSpin(onEnterHit) {
   const svg = document.getElementById('welcome-logo-svg');
   if (!svg) return () => {};
   const edgeEls = svg.querySelectorAll('.rd-edge');
-  const poly = document.getElementById('enter-face-poly');
-  const label = document.getElementById('enter-face-label');
+  const enterEls = ENTER_FACES.map((f, i) => ({
+    face: f,
+    poly: document.getElementById(`enter-face-poly-${i}`),
+    label: document.getElementById(`enter-face-label-${i}`),
+    active: false,
+  }));
   let raf = null;
   let angle = 0;
   let pulsePhase = 0;
-  let active = false;
   let lastT = null;
 
   function frame(t) {
@@ -137,53 +152,60 @@ function startLogoSpin(onEnterHit) {
       el.setAttribute('y2', by * LOGO_SCALE);
     });
 
-    const tVerts = enterVerts.map((p) => transform(p, angle));
-    const tNormal = transform(ENTER_NORMAL, angle);
-    const tCentroid = transform(enterCentroid, angle);
-    // Orthographic drop-z projection: the viewer sits on +Z looking toward
-    // the origin, so a rotated normal's own z-component IS how much this
-    // face currently faces them (1 = dead-on, 0 = edge-on, negative = away).
-    const facing = tNormal[2];
-    // Ramped, not linear -- the face reads as "off" for most of its swing
-    // and only lights up on the final approach, instead of a faint hint
-    // the whole time it's in view.
-    const sweep = Math.max(0, Math.min(1, (facing - 0.2) / 0.6));
-    // Pulsing/breathing per direct feedback 2026-08-26 ("enter script
-    // appears and fades pulsing") -- multiplies the sweep rather than
-    // replacing it, so it only breathes while genuinely the front face,
-    // not throughout its whole approach/departure.
-    const breathe = 0.6 + 0.4 * Math.sin(pulsePhase);
-    const opacity = sweep * breathe;
+    for (const e of enterEls) {
+      const tVerts = e.face.verts.map((p) => transform(p, angle));
+      const tNormal = transform(e.face.normal, angle);
+      const tCentroid = transform(e.face.centroid, angle);
+      // Orthographic drop-z projection: the viewer sits on +Z looking
+      // toward the origin, so a rotated normal's own z-component IS how
+      // much this face currently faces them (1 = dead-on, 0 = edge-on,
+      // negative = away).
+      const facing = tNormal[2];
+      // Ramped, not linear -- the face reads as "off" for most of its
+      // swing and only lights up on the final approach, instead of a
+      // faint hint the whole time it's in view.
+      const sweep = Math.max(0, Math.min(1, (facing - 0.2) / 0.6));
+      // Pulsing/breathing per direct feedback 2026-08-26 ("enter script
+      // appears and fades pulsing") -- multiplies the sweep rather than
+      // replacing it, so it only breathes while genuinely the front
+      // face, not throughout its whole approach/departure.
+      const breathe = 0.6 + 0.4 * Math.sin(pulsePhase);
+      const opacity = sweep * breathe;
 
-    poly.setAttribute('points', tVerts.map(([x, y]) => `${x * LOGO_SCALE},${y * LOGO_SCALE}`).join(' '));
-    // Full wireframe has no hidden-line removal (every edge, front and
-    // back, is always drawn -- see buildRDEdges' header), so a subtle fill
-    // read as visual clutter rather than a clear "this face is lit up"
-    // cue; a stronger fill + a thickening stroke makes the active face
-    // unambiguous against the busier crossing lines behind/around it.
-    poly.setAttribute('fill-opacity', String(opacity * 0.55));
-    poly.setAttribute('stroke-opacity', String(opacity));
-    poly.setAttribute('stroke-width', String(1.5 + 1.5 * opacity));
-    label.setAttribute('x', String(tCentroid[0] * LOGO_SCALE));
-    label.setAttribute('y', String(tCentroid[1] * LOGO_SCALE));
-    label.setAttribute('fill-opacity', String(opacity));
+      e.poly.setAttribute('points', tVerts.map(([x, y]) => `${x * LOGO_SCALE},${y * LOGO_SCALE}`).join(' '));
+      // Full wireframe has no hidden-line removal (every edge, front and
+      // back, is always drawn -- see buildRDEdges' header), so a subtle
+      // fill read as visual clutter rather than a clear "this face is
+      // lit up" cue; a stronger fill + a thickening stroke makes the
+      // active face unambiguous against the busier crossing lines
+      // behind/around it.
+      e.poly.setAttribute('fill-opacity', String(opacity * 0.55));
+      e.poly.setAttribute('stroke-opacity', String(opacity));
+      e.poly.setAttribute('stroke-width', String(1.5 + 1.5 * opacity));
+      e.label.setAttribute('x', String(tCentroid[0] * LOGO_SCALE));
+      e.label.setAttribute('y', String(tCentroid[1] * LOGO_SCALE));
+      e.label.setAttribute('fill-opacity', String(opacity));
 
-    active = sweep > 0.35;
-    poly.style.pointerEvents = active ? 'auto' : 'none';
-    label.style.pointerEvents = active ? 'auto' : 'none';
-    poly.style.cursor = active ? 'pointer' : 'default';
-    label.style.cursor = active ? 'pointer' : 'default';
+      e.active = sweep > 0.35;
+      e.poly.style.pointerEvents = e.active ? 'auto' : 'none';
+      e.label.style.pointerEvents = e.active ? 'auto' : 'none';
+      e.poly.style.cursor = e.active ? 'pointer' : 'default';
+      e.label.style.cursor = e.active ? 'pointer' : 'default';
+    }
 
     raf = requestAnimationFrame(frame);
   }
-  function onClick() { if (active) onEnterHit(); }
-  poly.addEventListener('click', onClick);
-  label.addEventListener('click', onClick);
+  const listeners = [];
+  for (const e of enterEls) {
+    const onClick = () => { if (e.active) onEnterHit(); };
+    e.poly.addEventListener('click', onClick);
+    e.label.addEventListener('click', onClick);
+    listeners.push({ el: e.poly, onClick }, { el: e.label, onClick });
+  }
   raf = requestAnimationFrame(frame);
   return () => {
     if (raf !== null) cancelAnimationFrame(raf);
-    poly.removeEventListener('click', onClick);
-    label.removeEventListener('click', onClick);
+    listeners.forEach(({ el, onClick }) => el.removeEventListener('click', onClick));
   };
 }
 
@@ -194,9 +216,9 @@ const FALLBACK_TAGLINE = 'One shape. Everything grows from it.';
 function overlayHtml() {
   return `
     <div id="welcome-card">
-      ${logoSvg()}
       <h1>Rhombiverse</h1>
       <p class="tagline" id="welcome-tagline">${FALLBACK_TAGLINE}</p>
+      ${logoSvg()}
       <div class="mode-choice">
         <div class="mode-choice-prompt">Mode:</div>
         <button type="button" class="mode-choice-btn" data-mode="pure" id="mode-choice-pure">Pure Rhombeometry</button>
