@@ -1,9 +1,5 @@
-// Tiny WebAudio blip generator for B1's "brief... sound on placement/
-// removal" requirement (RHOMBIVERSE_UIUX_BUILD_PLAN.md). No audio assets
-// exist anywhere in this repo yet, and adding a bundler/asset pipeline
-// just for two short beeps would violate the project's own no-build-step
-// rule (CLAUDE.md) -- a couple of oscillator blips is the Grounded-
-// Simplicity-appropriate way to get real sound with zero new tooling.
+// Tiny WebAudio blip generator (no audio assets, no build step).
+// Full rationale: docs/code-notes/app/sfx.md
 import { getSettings, onSettingsChange } from './settings.js';
 
 let ctx = null;
@@ -26,9 +22,7 @@ function ensureContext() {
 function blip(freq, durationSec) {
   const audioCtx = ensureContext();
   if (!audioCtx) return;
-  // Browsers start an AudioContext 'suspended' until a user gesture --
-  // every call here already happens inside a click/contextmenu handler,
-  // so this is always safe to call, just occasionally a no-op resume.
+  // Safe to always call resume() here -- see docs/code-notes/app/sfx.md
   if (audioCtx.state === 'suspended') audioCtx.resume();
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();

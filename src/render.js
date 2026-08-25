@@ -1,9 +1,6 @@
-// Three.js scene, camera, RD mesh generation, instanced rendering.
-// Phase 1 (RHOMBIVERSE_PLAN.md section 4): renderer + lattice math, camera
-// orbit. Phase 2: wires build.js's click-to-add/remove controller onto
-// the same InstancedMesh, re-syncing it after every world-state change.
-// Phase 3: every change also saves to localStorage, and wires the New
-// World / Export / Import buttons.
+// Three.js scene, camera, RD mesh generation, instanced rendering, and most
+// app orchestration. See RHOMBIVERSE_PLAN.md section 4 for the phase history.
+// Full design rationale/history for the code below: docs/code-notes/render.md
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
@@ -87,20 +84,12 @@ import {
   subscribeToPresence,
   updatePresence,
 } from './app/sync.js';
-// proposeTrade/confirmTrade/cancelTrade (trade.js's own local-only
-// implementations) are deliberately NOT used from here -- trading
-// fundamentally needs two distinct real player identities, which local
-// single-player mode has no concept of (myUserId is null there); the
-// trade panel below only ever shows while Shared World is connected,
-// where every trade action goes through sync.js's server-backed
-// pushTradePropose/Confirm/Cancel instead.
-// applyInventoryDecay (trade.js), checkAchievements (achievements.js),
-// applyHydrosphere (hydrosphere.js), and the animals.js exports below are
-// intentionally NOT statically imported here -- they're the four World
-// Systems entry points that are actually flag-gated (see FEATURES in
-// features.js). They're loaded conditionally via dynamic import() inside
-// init(), awaited before the app becomes interactive, and populate the
-// module-level bindings declared just below this import block.
+// trade.js's proposeTrade/confirmTrade/cancelTrade are NOT imported here --
+// local play has no second player identity; sync.js's server-backed
+// versions are used instead while Shared World is connected.
+// applyInventoryDecay/checkAchievements/applyHydrosphere/animals.js's
+// exports are also not statically imported -- flag-gated (FEATURES),
+// loaded via dynamic import() in init(), see docs/code-notes/render.md.
 import {
   compressionSupported,
   encodeWorldForUrl,
@@ -126,30 +115,14 @@ import {
   planetoidKeyFor,
   localBiomassAvailability,
 } from './game-systems/evolution.js';
-// Module-level slots for the four dynamically-loaded World Systems entry
-// points (see the comment above trade.js's old import). Safe, inert
-// defaults so any call site reached before init()'s dynamic imports
-// resolve -- or with its FEATURES flag off -- degrades quietly instead of
-// throwing on `undefined`.
+// Inert defaults for the dynamically-loaded World Systems bindings above.
 let applyInventoryDecay = () => {};
 let checkAchievements = () => [];
 let applyHydrosphere = () => {};
 let LAND_CREATURE_SPECIES, SEA_CREATURE_SPECIES, ANIMAL_TRAIT_RANGES;
 let plantAnimal, animalGenerationStepHook, reproduceFn, computeAnimalSurvivalProbability;
-// Migration Path Phase A's "two remaining gaps" (RHOMBIVERSE_PLAN.md),
-// closed 2026-08-24: render.js's OWN direct usage of mining/claims/
-// hazards joins the same flag-gated roster above -- not just the four
-// Core/Geometry-Extension modules Phase A itself already covered.
-// Mining/hazards are pure data-layer here (nothing but ticks/render-
-// loop calls reach them), so an inert no-op/identity default is the
-// whole story -- every one of the 10+ existing call sites throughout
-// this file is UNCHANGED, correctness comes entirely from which
-// function is bound. Claims are the one exception with a real UI
-// surface (Claim Land button, claim boundary rendering) -- see that
-// panel's own display:none / setClaimLandEnabled/refreshClaims guards
-// elsewhere in this file; the bindings below are still needed since
-// claimIdAt/isClaimProtected also feed the Phase A injection block
-// just below this one.
+// Mining/hazards/claims inert defaults (Migration Path Phase A) -- see
+// docs/code-notes/render.md.
 let seedAsteroidBelts = () => {};
 let applyAsteroidRegeneration = () => {};
 let applyPopulationScaledSpawning = () => {};
@@ -169,29 +142,9 @@ let applyDetonationCheck = () => {};
 let annotateSupernovae = (planetoids) => planetoids;
 
 const SCALE = 1;
-// Fixed InstancedMesh capacity. Cumulative cells through shell 8 alone is
-// ~2057 (see lattice.js's shellCount); 20000 leaves headroom for several
-// shell-fills plus hand-building. Revisit for real player counts.
-const MAX_CELLS = 20000;
-// Real, enforced cap on the shell-count/hollow-from UI inputs --
-// cumulative cells through shell 15 is 12431 (1 + sum of shellCount(n)
-// for n=1..15), leaving real headroom under MAX_CELLS for hand-built
-// cells or a second structure. Previously these had inconsistent,
-// PURELY COSMETIC max= HTML attributes that didn't actually stop anyone
-// from typing past them -- a real bug (shell-count had nothing stopping
-// a request for shell 100, ~200k+ cells, far past MAX_CELLS) as well as
-// a confusing inconsistency, caught by the user.
-const MAX_SHELL = 15;
+const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
+const MAX_SHELL = 15; // enforced cap on shell-count UI inputs, see docs/code-notes/render.md
 
-// pushCellUpsert/pushCellDelete (sync.js) previously only console.warn'd
-// on failure -- fine for transient network blips, but it meant a real
-// rejection (e.g. schema.sql's cells_rate_limit trigger, added
-// 2026-08-13) would silently desync a player's view from the shared
-// world with zero visible feedback. This surfaces it without being
-// disruptive: one line, auto-hides, and re-triggering while already
-// visible just resets the hide timer rather than stacking/spamming --
-// a legitimate large Fill/Generate burst that trips the rate limit
-// could otherwise fire this dozens of times in a row.
 let syncWarningTimer = null;
 function showSyncWarning(error) {
   const el = document.getElementById('sync-warning');
@@ -374,43 +327,16 @@ let currentClaims = {};
 // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 9: mirrors
 // world.getOrganisms(), same module-level pattern as planetoids/
 // currentClaims above -- updateEvolutionInfo() lives outside init()'s
-// scope (it needs to run from the same call sites as updateGravityInfo,
-// several of which are also module-level) but the underlying `organisms`
-// registry only ever changes inside init()/onChange()/the periodic
-// catch-up tick, all of which already have `world` in scope to refresh
-// this from directly.
+// Refreshed via refreshOrganismsSnapshot -- see docs/code-notes/render.md
 let organismsSnapshot = {};
 
-// Shared World (Phase 5) state. sharedWorldActive gates both directions
-// of sync: whether local mutations get pushed (handleLocalAdd/Remove,
-// wired into createWorldStore's hooks below) and whether onChange()/the
-// Undo button are allowed to overwrite localStorage (see their own
-// guards) -- while connected, localStorage must stay frozen at whatever
-// the player's private build was, or switching back would silently lose
-// it. applyingRemote suppresses handleLocalAdd/Remove specifically while
-// a just-received remote change is being written into the local store
-// (applyRemoteUpsert/applyRemoteDelete in init()), which would otherwise
-// immediately re-push what was just received and feedback-loop with
-// every other connected client doing the same.
+// Shared World (Phase 5) state -- see docs/code-notes/render.md
 let sharedWorldActive = false;
 let applyingRemote = false;
 let unsubscribeShared = null;
-// This session's anonymous auth.uid(), captured once on enableSharedWorld
-// -- ownership (RHOMBIVERSE_SPEC_REGIONS.md) only means anything with a
-// real per-player identity, which local-only play doesn't have.
-let myUserId = null;
-// B6: the fallback identity for solo play everywhere a real ownerId
-// would otherwise be required (mining/inventory credit, Sculpt/
-// Cultivate sessions) -- claims still require a real Shared World
-// account (one claim per verified account, per regions.js), but
-// nothing else does.
-const LOCAL_PLAYER_ID = 'local-player';
+let myUserId = null; // this session's anonymous auth.uid(), set on enableSharedWorld
+const LOCAL_PLAYER_ID = 'local-player'; // B6: fallback ownerId for solo play, see notes
 
-// B6 task #42: lightweight pseudonymous display name, chosen once and
-// remembered per-device -- deliberately just localStorage, no account
-// system, matching the spec's own "lightweight" framing. Never sent
-// anywhere but this session's own presence broadcasts (see sync.js's
-// subscribeToPresence/updatePresence).
 const DISPLAY_NAME_KEY = 'rhombiverse-display-name';
 function loadDisplayName() {
   try {
@@ -421,10 +347,7 @@ function loadDisplayName() {
 }
 let displayName = loadDisplayName();
 
-// Other connected players' live presence (B6 task #40/#42) -- keyed by
-// their userId, refreshed wholesale on every presence sync rather than
-// diffed, since the payload is tiny and this only ever runs a few times
-// a second at most.
+// Other connected players' live presence (B6 task #40/#42).
 let otherPlayers = {};
 let unsubscribePresence = null;
 const avatarLabelEls = new Map(); // userId -> DOM element, pooled across frames
@@ -437,11 +360,7 @@ function handleLocalAdd(x, y, z, data) {
 function handleLocalRemove(x, y, z) {
   if (sharedWorldActive && !applyingRemote) pushCellDelete(x, y, z);
 }
-// RHOMBIVERSE_SPEC_ASTEROIDS.md section 4: same push-on-local-mutation
-// pattern as cells above, wired into worldstate.js's setRegrowthEntry/
-// removeRegrowthEntry hooks -- so ANY connected client processing a
-// pending regrowth (not just whoever originally mined the cell) pushes
-// that outcome for everyone else too.
+// Push-on-local-mutation, same pattern as cells -- see docs/code-notes/render.md
 function handleLocalRegrowthSet(key, entry) {
   if (sharedWorldActive && !applyingRemote) {
     const [x, y, z] = parseCellKey(key);
@@ -454,13 +373,7 @@ function handleLocalRegrowthClear(key) {
     pushRegrowthClear(x, y, z);
   }
 }
-// RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 10, closed 2026-08-13: same
-// push-on-local-mutation pattern as regrowth above, wired into
-// worldstate.js's setSeed/removeSeed hooks -- covers both the initial
-// Plant-mode click (plantSeed calls world.setSeed once) and every later
-// growth tick (applyGrowth calls world.setSeed again per seed that grew),
-// so a planted seed's growth is visible to every connected player over
-// time, not just a one-shot placement.
+// Push-on-local-mutation for seeds too -- see docs/code-notes/render.md
 function handleLocalSeedSet(seedId, seedData) {
   if (sharedWorldActive && !applyingRemote) pushSeedSet(seedId, seedData);
 }
@@ -468,11 +381,7 @@ function handleLocalSeedClear(seedId) {
   if (sharedWorldActive && !applyingRemote) pushSeedClear(seedId);
 }
 
-// Shown near the mode controls regardless of Build/Walk mode -- useful
-// even when nothing is active yet ("no gravity source"), so it doubles as
-// a hint for how to create one. Reads `controls.target` in Build mode (a
-// reasonable proxy for "what you're looking at") and the live player
-// position while walking.
+// See docs/code-notes/render.md
 function updateGravityInfo() {
   const el = document.getElementById('gravity-info');
   if (!el) return;
@@ -482,11 +391,6 @@ function updateGravityInfo() {
     el.textContent = 'No planetoid yet — place a Blackstar-Glassite cell to create a gravity source.';
     return;
   }
-  // Distinguishes "gravity active" from "gravity WOULD be active, but
-  // you're standing in a protected claim" -- gravityAt is the real
-  // physics function (RHOMBIVERSE_SPEC_LOOPHOLES.md section 5), so the
-  // hint reads the same source of truth player.js actually acts on
-  // rather than showing "active" for a pull that isn't really happening.
   const reallyActive = !!gravityAt(refPos, planetoids, currentClaims);
   const status = !nearest.active
     ? 'out of range (build closer to the core, or add more BSG)'
@@ -507,40 +411,15 @@ function updateGravityInfo() {
     `recommended core: ${nearest.coreShellRecommendation} shell${nearest.coreShellRecommendation === 1 ? '' : 's'}${hydro}${blackHole}${star}`;
 }
 
-// RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 9: the one call site that
-// actually drives the Stage 1-7 catch-up engine, which until now was
-// real, tested, and 100% inert in the live game (nothing called it).
-// Resolves every planetoid's own organisms independently (Stage 6's
-// isolation), returns whether anything actually changed (new offspring,
-// removed-by-selection organisms, or ordinary growth) so the caller only
-// pays for a rebuildAllGrowth() when something real happened -- same
-// "cheap no-op most ticks" shape growth.js's own applyGrowth already has.
-// Deliberately local-only for this pass: `organisms`/`planetoidEvolution`
-// have no Supabase sync path yet (unlike `seeds`, which gained one
-// earlier this session) -- flagged honestly as a known gap rather than
-// silently assumed solved, same discipline as every other deferred-sync
-// registry this project has shipped before its own sync pass existed.
+// See docs/code-notes/render.md (Stage 1-7 catch-up engine, Animals wiring)
 function resolveEvolution(world, now) {
   const organismIds = Object.keys(world.getOrganisms());
   if (organismIds.length === 0) return false;
-  // RHOMBIVERSE_SPEC_ANIMALS.md Stages B-D: all three overrides
-  // (animalGenerationStepHook -- movement + predation, reproduceFn --
-  // sexual mate-pairing, computeAnimalSurvivalProbability -- huntBias-
-  // blended herbivory/carnivory survival odds) are no-ops/pure delegates
-  // for every non-animal organism (amoeba/plant), so passing them here
-  // unconditionally is safe and correct regardless of what's actually
-  // planted -- this is the one real wiring point Animals' own mechanics
-  // needed to go live in the actual game.
   const results = resolveCatchUpForAllPlanetoids(world, organismIds, now, animalGenerationStepHook, reproduceFn, computeAnimalSurvivalProbability);
   return Object.values(results).some((r) => r.generationsResolved > 0);
 }
 
-// Refreshes organismsSnapshot with each organism's own seed origin
-// pre-attached -- keeps updateEvolutionInfo below fully self-contained
-// (reads only module-level state, same as updateGravityInfo/
-// updateBeltHint), rather than needing `world` itself in scope, which
-// isn't available to the module-level call sites (e.g. the animate()
-// render loop) this needs to run from.
+// See docs/code-notes/render.md
 function refreshOrganismsSnapshot(world) {
   const seeds = world.getSeeds();
   organismsSnapshot = Object.fromEntries(
@@ -548,15 +427,7 @@ function refreshOrganismsSnapshot(world) {
   );
 }
 
-// RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md section 9's own read-only
-// "inspect dominant traits" tool -- observation only, never a breeding/
-// culling control, per that section's explicit governing decision. Scoped
-// to whichever planetoid updateGravityInfo is already reporting on (same
-// refPos logic), so a player reads "what's evolving HERE" rather than a
-// whole-world aggregate that would blur together isolated planetoids
-// (RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md section 6's own Isolation law
-// -- a UI that averaged across planetoids would visually contradict the
-// very isolation the simulation itself enforces).
+// See docs/code-notes/render.md
 function updateEvolutionInfo() {
   const el = document.getElementById('evolution-info');
   if (!el) return;
@@ -567,9 +438,6 @@ function updateEvolutionInfo() {
     el.textContent = 'No evolving life yet — Plant an "(evolving)" species to start a real, adapting population.';
     return;
   }
-  // Same planetoid-grouping key evolution.js's own groupOrganismsByPlanetoid
-  // uses, so "here" means the exact same planetoid the catch-up engine
-  // itself resolves independently -- not re-derived a second way.
   const key = nearest ? planetoidKeyFor(nearest.centerOfMass) : null;
   const localIds = key
     ? allIds.filter((id) => {
@@ -603,11 +471,7 @@ function updateEvolutionInfo() {
     (pendingCount > 0 ? ` · ${pendingCount} pending review` : '');
 }
 
-// RHOMBIVERSE_SPEC_ASTEROIDS.md UI: belts sit 80+ units from the default
-// camera framing -- without this, a player has no way to discover or
-// reach them at all short of reading source. listBelts() is a pure
-// function of fixed constants (no world dependency), so this can be
-// module-level like updateGravityInfo, needing no world-state access.
+// See docs/code-notes/render.md
 function updateBeltHint() {
   const el = document.getElementById('belt-hint');
   if (!el) return;
@@ -627,13 +491,7 @@ function updateBeltHint() {
   checkBeltApproachTransition(nearest, nearestDist);
 }
 
-// B6: "a visible transition when approaching a mineable asteroid
-// (lattice becoming apparent, then diggable), mirroring the B2 Explore-
-// mode transition style." Reuses updateBeltHint's own already-computed
-// nearest-belt distance (no second loop) -- a real two-stage threshold
-// crossing (far -> approaching -> diggable), each firing its own toast
-// exactly once per approach, same showHudPrompt pattern B2/B3/B4/B5 all
-// already use for their own transitions.
+// B6 belt-approach transition -- see docs/code-notes/render.md
 const BELT_APPROACH_RADIUS = 40; // "the lattice becoming apparent"
 const BELT_DIGGABLE_RADIUS = 15; // close enough to actually mine
 let beltApproachState = 'far'; // 'far' | 'approaching' | 'diggable'
@@ -653,17 +511,9 @@ function checkBeltApproachTransition(nearest, dist) {
   }
 }
 
-// B2's Explore transition sequence -- HUD fade, camera settle, a gravity
-// engagement cue, and a horizon change, replacing the old instant toggle.
-// `walking` still flips true/false at the START of its respective
-// transition (build.js's getMode() already keys off it to disable
-// editing while walking/transitioning, same as before) -- only the
-// ACTUAL control handoff (player.setEnabled/requestLock, or restoring
-// OrbitControls) and the walk-toggle/hint text are delayed until the
-// sequence finishes. walkTransitioning guards against re-entry (a stray
-// pointerlockchange during the sequence, a second Explore pick, etc.).
+// B2 Explore transition sequence -- see docs/code-notes/render.md
 const SPACE_BG_COLOR = new THREE.Color(0x05050a);
-const WALK_BG_COLOR = new THREE.Color(0x0d1420); // a faint atmosphere tint stands in for "horizon change" -- this project has no separate skybox/horizon system to hook into
+const WALK_BG_COLOR = new THREE.Color(0x0d1420); // stands in for "horizon change", see notes
 const WALK_TRANSITION_MS = 550;
 let walkTransitioning = false;
 
@@ -733,24 +583,12 @@ document.getElementById('walk-toggle').addEventListener('click', () => {
   else enterWalk();
 });
 
-// Browsers exit pointer lock on their own (Esc, tab switch, etc.) without
-// going through exitWalk() -- this catches that so Walk mode's own state
-// (controls.enabled, the toggle button label) never gets out of sync with
-// the actual lock state.
+// See docs/code-notes/render.md
 document.addEventListener('pointerlockchange', () => {
   if (walking && document.pointerLockElement !== renderer.domElement) exitWalk();
 });
 
-// Mobile/touch support.
-//
-// 1. Walk Mode's touch controls (B7 mobile layout: "on-screen joystick
-//    for Explore mode"). 2026-08-13 originally hid the Lab panel's Walk
-//    Mode row entirely on touch-primary devices -- Pointer Lock + WASD
-//    has no touch equivalent, so there was nothing usable to show. That
-//    justification no longer holds now that real touch controls exist
-//    below, so the row stays visible; the wheel's own Explore category
-//    already reached Walk Mode on touch regardless (it .click()s this
-//    same button programmatically), it just wasn't usable once there.
+// Mobile/touch support -- see docs/code-notes/render.md
 const IS_TOUCH_PRIMARY = window.matchMedia('(pointer: coarse)').matches;
 
 const walkLookZoneEl = document.getElementById('walk-look-zone');
@@ -808,12 +646,7 @@ if (IS_TOUCH_PRIMARY) {
   walkJumpBtnEl.addEventListener('touchend', endJumpTouch);
   walkJumpBtnEl.addEventListener('touchcancel', endJumpTouch);
 
-  // Drag-to-look: standard mobile-FPS convention. A long-press without
-  // meaningful drag forwards as a synthetic contextmenu at the same
-  // point instead -- build.js's own onContextMenu (mining/removal) is
-  // reused exactly as-is rather than duplicated, same "replay the real
-  // event" approach already used elsewhere this session (e.g. the
-  // persona picker replaying real wheel clicks).
+  // Drag-to-look -- see docs/code-notes/render.md
   const LOOK_LONG_PRESS_MS = 500;
   const LOOK_MOVE_TOLERANCE = 12; // px
   let lookTouchId = null;
@@ -867,14 +700,6 @@ if (IS_TOUCH_PRIMARY) {
   walkLookZoneEl.addEventListener('touchcancel', endLookTouch);
 }
 
-// 2. B1 (RHOMBIVERSE_UIUX_BUILD_PLAN.md) replaced the old always-visible
-//    two-panel sidebar with one Lab panel behind an explicit #lab-toggle
-//    entry point -- superseding the mobile "closed -> controls -> shells"
-//    screen-navigation scheme this comment used to describe (that whole
-//    problem, a sidebar too wide for a phone viewport, doesn't apply to
-//    a single already-scrollable overlay). closeMobilePanels() is kept
-//    as a small alias so the mode-btn click handler further down (a
-//    genuine, unrelated existing call site) doesn't need editing.
 const labToggleEl = document.getElementById('lab-toggle');
 const labPanelEl = document.getElementById('lab-panel');
 
@@ -886,18 +711,7 @@ labToggleEl.addEventListener('click', () => {
   labPanelEl.classList.toggle('open');
 });
 
-// Cyborg Mode's post-walkthrough creative suggestion ("really wanted
-// cyborg modes to be able to do more than just suggest clicking on a
-// face, which is the most obvious thing to do anyway") -- the exact
-// same three-tier pattern Full-Cyborg sculpting/cultivating already use
-// (byok.js personal key -> shared AI Gateway -> local fallback), just
-// generating a short text idea instead of a structured build plan.
-// world.entries()/getSeeds()/getOrganisms() are init()-local, so the
-// same module-level bridging pattern as tickPresenceFn/
-// applyPersonaChoiceFn applies: this function exists and is passed into
-// createCyborgMode() below before init() runs, but only actually reads
-// `cyborgWorldRef` once a player clicks the button, by which point
-// init() has long since filled it in.
+// See docs/code-notes/render.md
 let cyborgWorldRef = null;
 function buildCyborgWorldSummary() {
   if (!cyborgWorldRef) return 'Nothing built yet.';
@@ -914,9 +728,7 @@ function buildCyborgWorldSummary() {
   return text;
 }
 
-// Kept in sync with api/cyborg-suggest.js's own copy -- BYOK calls run
-// entirely client-side and need their own prompt text, same reasoning
-// as sculpture.js's SCULPT_SYSTEM_PROMPT/api/sculpt-intent.js split.
+// Kept in sync with api/cyborg-suggest.js's own copy -- see docs/code-notes/render.md
 const CYBORG_SUGGEST_SYSTEM_PROMPT = `You are a creative building companion for Rhombiverse, a voxel-building game where every block is a rhombic dodecahedron.
 
 Given a short description of what a player has already built, suggest ONE small, concrete, achievable next thing for them to build or plant -- something more interesting than "place another block", but still doable in a few minutes. Name a shape, direction, or technique (e.g. "try a mirrored arch to the east", "plant a conifer near your fern for a mixed grove", "hollow out the center and add windows"). Keep it under 140 characters, friendly, and specific to what they've actually built so far -- don't suggest something they've clearly already done. Never mention that you are an AI.
@@ -966,10 +778,6 @@ async function getCyborgSuggestion() {
   }
 }
 
-// B3: Cyborg Mode is fully self-contained (fetches its own subscript
-// JSON, listens for the rhombiverse:* events dispatched elsewhere in
-// this file, never touches world-state) -- module-level like the toggle
-// above, no init()-local dependency needed.
 const cyborgMode = createCyborgMode({ getSuggestion: getCyborgSuggestion });
 const cyborgToggleEl = document.getElementById('cyborg-toggle');
 cyborgToggleEl.addEventListener('click', () => {
@@ -977,24 +785,14 @@ cyborgToggleEl.addEventListener('click', () => {
   cyborgToggleEl.classList.toggle('active', cyborgMode.isEnabled());
 });
 
-// B6's onboarding discovery sequence -- a second, independent Cyborg
-// Mode instance (cyborg.js supports concurrent instances precisely for
-// this) auto-started once, only on a true first visit, so it never
-// fights with the player's own manual Cyborg Mode toggle above.
+// B6 onboarding sequence -- see docs/code-notes/render.md
 const onboardingCyborg = createCyborgMode({
   subscriptUrl: './data/cyborg/onboarding.json',
   panelTitle: 'Welcome — a quick tour',
   getSuggestion: getCyborgSuggestion,
 });
 
-// welcome.js's identity grid ("consider making the four personas
-// clickable... letting a new player pick 'Rhombiologist' and land with
-// the grow wheel open") dispatches this the instant a persona is
-// clicked -- which can happen before init() below has finished (welcome.js
-// is deliberately independent of this file, see its own header comment,
-// so there's no other handshake). Latched at module level so an early
-// click isn't lost; applyPersonaChoiceFn is only assigned once init()
-// has everything (the wheel, mode shims) a persona action needs.
+// See docs/code-notes/render.md
 let pendingPersonaChoice = null;
 let applyPersonaChoiceFn = null;
 window.addEventListener('rhombiverse:personaChosen', (e) => {
@@ -1060,12 +858,7 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.2);
 sun.position.set(5, 8, 4);
 scene.add(sun);
 
-// Builds one RD's geometry via convex hull over its 14 raw vertices --
-// the JS equivalent of the scipy ConvexHull step this project family's
-// own `build_polyhedron` (dictoroids_tetraroid.py) uses for every solid.
-// Only triangulated faces are needed for rendering, not build_polyhedron's
-// merged N-gon face structure, which is a physics-layer concern this
-// project doesn't have yet.
+// See docs/code-notes/render.md
 function buildRDGeometry(scale = 1) {
   const points = rdRawVerts(scale).map(([x, y, z]) => new THREE.Vector3(x, y, z));
   const geometry = new ConvexGeometry(points);
@@ -1073,13 +866,7 @@ function buildRDGeometry(scale = 1) {
   return geometry;
 }
 
-// Base color per material (RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md's
-// Glassite family, RHOMBIVERSE_SPEC_ASTEROIDS.md's Garnet/Ferrostone,
-// RHOMBIVERSE_SPEC_WATER_ICE.md's Water/Ice 9.9). The shared
-// InstancedMesh material's own .color is left white (see init()) so
-// these show through unmodified via setColorAt -- cosmetic only for now,
-// no material has functional behavior yet (gravity/hydrosphere land in
-// Phase 5.5).
+// See docs/code-notes/render.md
 const MATERIAL_COLORS = {
   base: 0x8899aa,
   garnet: 0x8b2e2e,
@@ -1095,20 +882,12 @@ function materialColor(material) {
   return new THREE.Color(MATERIAL_COLORS[material] ?? MATERIAL_COLORS.base);
 }
 
-// RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 5: "reuse the existing
-// MATERIAL_COLORS palette... unless a real reason argues otherwise" --
-// distinguishing a planted structure's species at a glance is that real
-// reason (tile-type, acute vs. oblate, is far less useful to a player
-// than which organism they're looking at), so this is a small,
-// deliberately separate map, not a wholesale new palette.
+// See docs/code-notes/render.md
 const SPECIES_COLORS = {
   amoeba: 0x9fd8a0,
   moss: 0x4f7a3f,
   fungus: 0xd9b26b,
   fern: 0x2f6b3a,
-  // Wave 2 (2026-08-13) -- one distinct tint per template, not per
-  // category, so e.g. sapling/conifer/shrub (all species: 'plant')
-  // still read apart from each other in the 3D view.
   sapling: 0x6fae4f,
   conifer: 0x1f4a28,
   shrub: 0x7a8f3f,
@@ -1116,36 +895,15 @@ const SPECIES_COLORS = {
   scallop: 0xe0a598,
   spineling: 0xc9b896,
   'cluster-frame': 0x8a8f99,
-  // Evolution Stage 9 -- genome-driven organisms (evolution.js's own
-  // plantOrganism/reproduceAsexual/reproduceSexual), distinct from the
-  // fixed Wave-1/Wave-2 templates above: a warmer, saturated palette so
-  // an evolving structure reads as visibly different in kind, not just
-  // another named template.
   amoeba_evolved: 0x6ee7b7,
   plant_evolved: 0x86efac,
-  // RHOMBIVERSE_SPEC_ANIMALS.md -- land/sea creatures, same warmer/
-  // saturated "genome-driven" treatment as amoeba/plant above, but a
-  // distinct hue per habitat (earthy tan for land, deep teal for sea) so
-  // the two read apart at a glance in the 3D view.
   landCreature_evolved: 0xd4a574,
   seaCreature_evolved: 0x0e7490,
 };
 
-// RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 6 (Landscape Aggregate State,
-// section 6.2): a real, distinct "weathered ground" tone -- earthy brown/
-// grey, deliberately NOT one of SPECIES_COLORS' own vivid living-tissue
-// hues -- blended into the aggregate speckle layer's own color by that
-// planetoid's real landscapeState (0 = pure current-species tint, 1 =
-// fully weathered), so a location with a long sustained biological
-// history reads as visibly different from one with only current, recent
-// life, even at the same instantaneous population size.
-const LANDSCAPE_WEATHERED_COLOR = new THREE.Color(0x8b6f47);
+const LANDSCAPE_WEATHERED_COLOR = new THREE.Color(0x8b6f47); // see docs/code-notes/render.md
 
-// evolution.js's own plantOrganism deliberately namespaces the
-// underlying seed's `species` field as `organism:<species>` (see its own
-// header comment) so it can never collide with a real GROWTH_TEMPLATES
-// key -- unwrap that prefix here so an evolved organism still gets a
-// real color instead of falling through to the ?? 0xffffff default.
+// See docs/code-notes/render.md
 const ORGANISM_SEED_SPECIES_PREFIX = 'organism:';
 function speciesColor(species) {
   if (species.startsWith(ORGANISM_SEED_SPECIES_PREFIX)) {
@@ -1155,12 +913,7 @@ function speciesColor(species) {
   return new THREE.Color(SPECIES_COLORS[species] ?? 0xffffff);
 }
 
-// Tint for a cell by its shell-fill distance (lattice.js's
-// cellsInShells), so shells placed by the shift+click fill tool are
-// visually distinguishable outward. Cells with no `shell` (plain single
-// clicks, or the original seed) get white -- an identity multiplier, no
-// tint. Hue cycles per shell (0.15 turns/shell) rather than a fixed
-// palette, so it stays distinct for any shell count the UI allows.
+// See docs/code-notes/render.md
 const _shellColorCache = new Map();
 function shellTint(shell) {
   if (!shell) return new THREE.Color(1, 1, 1);
@@ -1170,21 +923,11 @@ function shellTint(shell) {
   return _shellColorCache.get(shell);
 }
 
-// Distinct tint for black-hole-generated buffer cells (RHOMBIVERSE_SPEC_
-// BLACKHOLE.md section 2) -- players need to be able to tell "auto-
-// generated containment space" apart from their own build at a glance,
-// not just via the underlying data flag.
-const GENERATED_TINT = new THREE.Color(0x2a0a30);
-
-// Final per-instance color: the cell's material color, lightly blended
-// (35%) toward its shell tint so shell rings stay visible without
-// obscuring which material a cell actually is.
+const GENERATED_TINT = new THREE.Color(0x2a0a30); // see docs/code-notes/render.md
 const FLAGGED_TINT = new THREE.Color(0xff2020);
 
+// See docs/code-notes/render.md
 function instanceColorFor(cell) {
-  // Only ever reached in Report mode (visibleCells excludes flagged/
-  // removed cells everywhere else), so a bright warning tint here is
-  // unambiguous -- it's ONLY shown to someone actively reviewing reports.
   if (cell.status === 'flagged' || cell.status === 'removed') return FLAGGED_TINT;
   if (cell.generatedByBlackHole) return GENERATED_TINT;
   const base = materialColor(cell.material);
@@ -1192,21 +935,9 @@ function instanceColorFor(cell) {
   return base.clone().lerp(shellTint(cell.shell), 0.35);
 }
 
-// instanceId -> {x, y, z, ...cellData}, refreshed on every rebuild. Read
-// by build.js's raycast controller to turn a clicked instance back into
-// lattice coordinates.
-let cellOrder = [];
+let cellOrder = []; // instanceId -> {x, y, z, ...cellData}, see docs/code-notes/render.md
 
-// Phase 5.8: flagged/removed cells are quarantined from the default view
-// -- excluded from the instance set entirely (invisible AND unclickable,
-// same technique the old onion-skin shell filter used) rather than
-// deleted, so derived mechanics (hydrosphere/black hole/etc., which read
-// world.entries() directly, not this filtered list) still see and act on
-// the true full world regardless of what's currently visible. Report
-// mode is the one exception: it needs to see (and click, to toggle back)
-// already-flagged cells to be usable at all, so it opts back into showing
-// them, distinctly tinted -- see instanceColorFor's flagged-in-Report-mode
-// branch below.
+// See docs/code-notes/render.md
 function visibleCells(world, inReportMode) {
   if (inReportMode) return world.entries();
   return world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
@@ -1224,29 +955,12 @@ function rebuildInstances(mesh, world, inReportMode = false) {
   mesh.count = cellOrder.length;
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  // InstancedMesh.raycast() only computes its bounding-sphere pre-check
-  // lazily, ONCE, then caches it forever (three.js's own source: `if
-  // (this.boundingSphere === null) this.computeBoundingSphere()`). It is
-  // never auto-invalidated when `count` grows or instances move, so
-  // without forcing a recompute here, any click outside whatever sphere
-  // happened to be cached on the first-ever raycast is silently dropped
-  // before per-instance testing even runs -- the exact cause of a real
-  // bug where only cells near the very first click's bounding sphere
-  // could ever be built.
+  // Forces a bounding-sphere recompute -- see docs/code-notes/render.md
   mesh.computeBoundingSphere();
 }
 
+// World Systems dynamic imports -- see docs/code-notes/render.md
 async function init() {
-  // Feature-gated World Systems modules: loaded (or not) before anything
-  // below can reach them, per FEATURES (features.js). As of 2026-08-24
-  // every World Systems flag is wired to conditional loading -- mining/
-  // economy(claims)/hazards joined achievements/animals/hydrosphere/
-  // trade here, closing Migration Path Phase A's "two remaining gaps"
-  // (RHOMBIVERSE_PLAN.md). Awaiting every enabled import here, ahead of
-  // all wheel/event wiring below, guarantees no consumer (e.g. the
-  // evo-land/evo-sea planting branch further down, or the periodic
-  // achievements/inventory-decay/hydrosphere/mining/hazards ticks) can
-  // ever observe one of these bindings still unresolved.
   if (FEATURES.achievements) {
     ({ checkAchievements } = await import('./game-systems/achievements.js'));
   }
@@ -1276,17 +990,7 @@ async function init() {
     ({ applyStarFusion, annotateStars, canPlaceMaterial: canPlaceForStars } = await import('./game-systems/starsystem.js'));
     ({ applyDetonationCheck, annotateSupernovae } = await import('./game-systems/supernova.js'));
   }
-  // RHOMBIVERSE_PLAN.md's Core vs. Modules Migration Path, Phase A
-  // completion (2026-08-23): sculpture.js/worldstate.js (Core) and
-  // gravity.js (a Geometry Extension) no longer statically import
-  // regions.js (claims, a World System); build.js (Core) no longer
-  // statically imports asteroids.js's mineAsteroidCell (mining, a World
-  // System) either. This just injects the real functions (now loaded
-  // just above, alongside every other World System) into those four
-  // Core/Geometry-Extension modules, gated by the same flags that
-  // already gate every other World System. Skipping a wiring call
-  // leaves that module's own inert default in place (no claims exist /
-  // mining is a no-op).
+  // Regions-integration wiring (Migration Path Phase A) -- see docs/code-notes/render.md
   if (FEATURES.economy) {
     setSculptureRegionsIntegration({ claimIdAt, isClaimProtected });
     setWorldstateRegionsIntegration({ claimIdAt });
@@ -1298,24 +1002,11 @@ async function init() {
   wireFirstUseHint('cyborg-toggle', 'Cyborg Mode: a guided walkthrough, step by step.');
   wireFirstUseHint('xray-toggle', 'X-Ray: drag a cutaway plane through the structure to see inside it.');
   wireFirstUseHint('lab-toggle', 'Lab: advanced settings and tools live here.');
-  // Moved here from the welcome card's own quickstart line (trimmed down
-  // 2026-08-24 -- it was reading as too heavy alongside the new mode
-  // choice) so each piece of guidance surfaces where it's actually
-  // relevant, not all at once up front.
+  // Moved from the welcome card's own quickstart line -- see docs/code-notes/render.md
   wireFirstUseHint('hud-wheel-cue', 'Tab / Space (or tap Menu) opens the Rhombic Wheel -- build, sculpt, grow, and more, all from here.');
   wireFirstUseHint('export-json', 'Export your World anytime to keep a copy.');
 
-  // A saved build takes priority over the static seed -- that's the
-  // whole point of Phase 3 (refreshing preserves the build). On a true
-  // first-ever visit (no saved build) B1 calls for a small starter
-  // planetoid instead of a single empty cell -- data/starter-world.json
-  // still supplies the base worldName/meta shape (a real body needs a
-  // Blackstar-Glassite core placed via createWorldStore's own onAdd
-  // hooks, not baked into a static JSON, so it's generated below rather
-  // than hand-authored into the file).
-  // B6: a ?w= link (worldshare.js) always wins -- visiting a shared
-  // link is a deliberate "show me THAT world" action, same priority a
-  // manual Load-a-World pick already has over whatever was open before.
+  // World load priority (shared link / saved / Showcase World) -- see docs/code-notes/render.md
   const sharedParam = getSharedWorldParam();
   let sharedWorldJSON = null;
   if (sharedParam) {
@@ -1327,14 +1018,6 @@ async function init() {
     clearSharedWorldParam();
   }
 
-  // A saved build takes priority over the static seed -- that's the
-  // whole point of Phase 3 (refreshing preserves the build). B6:
-  // "rebuild first-time onboarding around the existing Showcase World"
-  // -- a true first-ever visit now loads that real, pre-built world
-  // (growth/evolution/claims and all) instead of B1's bare starter
-  // planetoid, giving the discovery sequence below something real to
-  // discover. data/starter-world.json is now only a last-resort
-  // fallback if the Showcase World preset itself fails to fetch.
   const savedJSON = loadFromLocalStorage();
   const isFirstVisit = !sharedWorldJSON && !savedJSON;
   let worldJSON;
@@ -1368,10 +1051,7 @@ async function init() {
     showHudPrompt('Loaded a shared World from your link.', 5000);
   }
   if (isFirstVisit) onboardingCyborg.enable();
-  // Declared this early so the very first rebuildInstances() call below
-  // (before the mode-button UI further down even exists) can safely
-  // reference it -- report mode can't be active yet at that point, but
-  // the reference itself must not be in currentMode's temporal dead zone.
+  // Declared early -- see docs/code-notes/render.md
   let currentMode = 'build';
 
   const geometry = buildRDGeometry(SCALE);
@@ -1396,35 +1076,7 @@ async function init() {
   sculptureMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   sculptureScene.add(sculptureMesh);
 
-  // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 2: real camera-distance
-  // trigger & lifecycle, replacing Stage 1's single-hardcoded-cell demo.
-  // Real, deliberate deviation from the spec's own suggested pattern
-  // ("reusing refreshClaims's own clear-and-rebuild pattern"): claims are
-  // few, irregularly-shaped, and each needs its own real convex-hull
-  // geometry, so refreshClaims allocates/disposes a THREE.Mesh per claim
-  // every recompute. Sub-lattice cells are many, but every one is the
-  // EXACT SAME shape (one shared geometry, per Stage 1) -- the top-level
-  // `mesh` above already solves exactly this shape of problem (many
-  // identical objects, count changes over time) via a FIXED-capacity
-  // InstancedMesh with an adjustable `.count`, never allocating/disposing
-  // per recompute at all. Reusing THAT pattern here is a strictly
-  // stronger answer to this stage's own "no leaked geometry" success
-  // check than clear-and-rebuild would be: there is nothing to leak,
-  // because nothing is ever created or destroyed after this one-time
-  // allocation -- only the same buffer's contents and `.count` change.
-  //
-  // SUB_LATTICE_TRIGGER_DISTANCE (4 world units) is a real, reasoned
-  // first value, flagged as tunable per this spec's own section 10 open
-  // question ("needs real frame-cost measurement... not guessed here"):
-  // the default camera framing sits ~11.2 units from the origin (real
-  // Euclidean distance for position (6,5,8)), so 4 keeps the sub-lattice
-  // invisible at the ordinary starting view (this stage's own first
-  // success check) while comfortably reachable by zooming in, matching
-  // Stage 1's own live-verified "close zoom" screenshot distance.
-  // MAX_NEARBY_SUBLATTICE_CELLS (20) bounds worst-case cost independent
-  // of how many cells exist in the whole world -- the same "a real cap
-  // grounded in reasoned cost" discipline as MAX_CELLS/MAX_UNDO/
-  // MAX_CATCHUP_GENERATIONS elsewhere in this project.
+  // Lattice Zoom Stage 2: sub-lattice reveal setup -- see docs/code-notes/render.md
   const SUB_LATTICE_TRIGGER_DISTANCE = 4;
   const MAX_NEARBY_SUBLATTICE_CELLS = 20;
   const SUB_LATTICE_CELLS_PER_PARENT = cumulativeCellCount(SUB_LATTICE_MAX_SHELL);
@@ -1445,26 +1097,7 @@ async function init() {
   subLatticeMesh.count = 0;
   scene.add(subLatticeMesh);
 
-  // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 3 -- Multi-Level Depth &
-  // Blending, level 2 (the sub-sub-lattice, MAX_LOD_DEPTH's own second
-  // and -- per that constant's own reasoning -- last level for this
-  // pass). Same "one shared, fixed-capacity InstancedMesh" pattern as
-  // level 1 above, just hung off individual depth-1 sub-cells instead of
-  // top-level world cells. Reuses subLatticeMaterial unmodified (governing
-  // decision 3, "uniform substructure": every level repeats the exact same
-  // material, not a new color invented per depth).
-  //
-  // LEVEL2_TRIGGER_DISTANCE shrinks from the depth-1 trigger by the SAME
-  // subScaleFactor the geometry itself shrinks by (levelTriggerDistance's
-  // own doc comment) -- self-similar reveal ratio at every depth, not a
-  // second unrelated number picked freehand.
-  //
-  // MAX_NEARBY_LEVEL2_PARENTS (4): LEVEL2_TRIGGER_DISTANCE is already
-  // ~0.26x the depth-1 trigger (subScaleFactor(2) = cbrt(1/55)), so only
-  // whatever handful of depth-1 sub-cells are already extremely close to
-  // the camera can ever qualify -- a small bounded cap, same "real cap
-  // grounded in reasoned cost, not arbitrary" discipline as
-  // MAX_NEARBY_SUBLATTICE_CELLS above.
+  // Lattice Zoom Stage 3, level 2 -- see docs/code-notes/render.md
   const LEVEL2_TRIGGER_DISTANCE = levelTriggerDistance(SUB_LATTICE_TRIGGER_DISTANCE, 2, SUB_LATTICE_MAX_SHELL);
   const MAX_NEARBY_LEVEL2_PARENTS = 4;
   const level2Scale = subLatticeScale * subScaleFactor(SUB_LATTICE_MAX_SHELL);
@@ -1478,65 +1111,22 @@ async function init() {
   level2Mesh.count = 0;
   scene.add(level2Mesh);
 
-  // Blend width per level (section 3's own "not a hard pop" requirement,
-  // via latticezoom.js's blendFactor): grounded as roughly ONE cell-width
-  // of that level's own geometry -- the fade completes over about the
-  // same distance the cell itself spans, a physically meaningful zone
-  // rather than an arbitrary fraction of the trigger distance. Deeper
-  // levels shrink their own blend width by the SAME subScaleFactor as
-  // their trigger distance (levelTriggerDistance reused verbatim for
-  // this, per its own doc comment: "trigger distance and blend width are
-  // the SAME real fraction... as the geometry itself shrinks by") -- and
-  // that self-similar formula happens to make LEVEL2_BLEND_WIDTH come out
-  // exactly equal to level2Scale too, confirming the grounding holds at
-  // depth as well as at the base.
+  // Blend width per level -- see docs/code-notes/render.md
   const SUB_LATTICE_BLEND_WIDTH = subLatticeScale;
   const LEVEL2_BLEND_WIDTH = levelTriggerDistance(SUB_LATTICE_BLEND_WIDTH, 2, SUB_LATTICE_MAX_SHELL);
 
-  // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 4 (Adaptive Damping): real
-  // volatility-driven widening of this throttle, via latticezoom.js's
-  // own pure nextVolatilityScore/throttleForVolatility (the same
-  // RHOMBIVERSE_PRINCIPLES.md section 2 shape evolution.js's own
-  // volatility score already implements elsewhere in this project).
-  // subLatticeVolatilityScore/lastSubLatticeRefPos are the real per-
-  // refresh state the pure functions need; subLatticeThrottleMs itself
-  // stays a plain `let` (the self-rescheduling setTimeout loop below
-  // reads it fresh on every tick, so a widened value takes effect on the
-  // very next scheduling, no timer teardown needed).
+  // Sub-lattice throttle state -- see docs/code-notes/render.md
   let subLatticeThrottleMs = SUB_LATTICE_THROTTLE_BASE_MS;
   let subLatticeVolatilityScore = 0;
   let lastSubLatticeRefPos = null;
   let lastSubLatticeRefresh = 0;
   const subLatticeDummy = new THREE.Object3D();
 
-  // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 5 -- Ecosystem Rendering.
-  //
-  // Tier 1 (section 6.1, "a few real organisms"): each real tracked
-  // organism is FEW and IRREGULARLY SHAPED (its own real growth-tile
-  // hull, not a shared uniform cell shape), the same real content class
-  // Stage 2's own doc comment already distinguishes from the sub-lattice
-  // cells above -- so this reuses `claimGroup`'s established "clear-and-
-  // rebuild THREE.Group, real convex-hull-per-item" pattern rather than a
-  // fixed-capacity InstancedMesh, not the sub-lattice's own pattern.
+  // Lattice Zoom Stage 5 -- Ecosystem Rendering -- see docs/code-notes/render.md
   const organismMiniGroup = new THREE.Group();
   scene.add(organismMiniGroup);
-  // Bounds worst-case per-refresh cost independent of total organism
-  // count, same "real cap grounded in reasoned cost" discipline as
-  // MAX_NEARBY_SUBLATTICE_CELLS/MAX_NEARBY_LEVEL2_PARENTS above.
   const MAX_NEARBY_ORGANISMS = 20;
 
-  // Tier 2 (section 6.1, "aggregate/general layer"): NOT independently
-  // tracked per instance -- section 10's own "leaning toward instanced
-  // geometry... for a first pass," so this DOES reuse the sub-lattice's
-  // own fixed-capacity InstancedMesh + setColorAt pattern (the exact same
-  // white-base-material + per-instance-setColorAt shape the TOP-LEVEL
-  // `mesh` already uses for cell tinting, reused verbatim rather than a
-  // second color mechanism). Each revealed top-level parent gets up to
-  // AGGREGATE_MAX_SPECKLES speckles, placed at that SAME parent's own
-  // already-computed depth-1 sub-cell positions (reusing real existing
-  // geometry rather than inventing a second scattering/jitter scheme),
-  // sized deliberately smaller than a real depth-2 cell so a speckle is
-  // never mistaken for actual per-organism detail.
   const aggregateSpeckleScale = level2Scale * 0.4;
   const aggregateSpeckleGeometry = buildRDGeometry(aggregateSpeckleScale);
   const aggregateSpeckleMaterial = new THREE.MeshStandardMaterial({
@@ -1555,11 +1145,7 @@ async function init() {
   scene.add(aggregateSpeckleMesh);
   const aggregateSpeckleDummy = new THREE.Object3D();
 
-  // Writes one blended instance into `mesh` at `idx`: position at the
-  // cell's real world center, uniform SCALE set to `blend` (1 = full
-  // size, shrinking toward 0 as the cell approaches its outer fade
-  // distance) -- Stage 3's own cross-fade mechanism, a single shared
-  // helper so level 1 and level 2 apply it identically.
+  // See docs/code-notes/render.md
   function writeBlendedInstance(mesh, idx, worldPosition, blend) {
     subLatticeDummy.position.set(...worldPosition);
     subLatticeDummy.scale.setScalar(blend);
@@ -1567,17 +1153,7 @@ async function init() {
     mesh.setMatrixAt(idx, subLatticeDummy.matrix);
   }
 
-  // Stage 5, Tier 1 (section 6.1, "a few real organisms"): rebuilds the
-  // real tiny growth-structure for each real tracked organism close
-  // enough to the reference position, clear-and-rebuild same as
-  // refreshClaims (few, irregularly-shaped, real-hull-per-item content --
-  // not the sub-lattice's own many-identical-instances shape). Each
-  // organism's own EXISTING, already-correct tile geometry is reused
-  // outright (tileWorldVertices), just scaled down around its own real
-  // rooted position (seed.origin) by the SAME ratio depth-1 sub-lattice
-  // cells shrink by, times that organism's own real distance-driven
-  // blend -- so it fades in/out exactly like every other Lattice Zoom
-  // reveal, rather than a separately-tuned fade.
+  // See docs/code-notes/render.md
   function refreshOrganismMiniatures(refPos) {
     while (organismMiniGroup.children.length > 0) {
       const group = organismMiniGroup.children[0];
@@ -1617,32 +1193,11 @@ async function init() {
     }
   }
 
-  // Recomputes which built cells are near enough to the camera (or the
-  // live player position while walking) to reveal sub-lattice detail,
-  // closest-first up to the real MAX_NEARBY_SUBLATTICE_CELLS bound, and
-  // rewrites the shared InstancedMesh's own instance buffer in place --
-  // no allocation, no disposal, ever, after the one-time setup above.
-  //
-  // Stage 3: each PARENT's own real distance (already computed by
-  // selectNearbyCells/selectNearbyByWorldPosition as `.d`) drives a
-  // single uniform blend factor applied to every sub-cell that parent
-  // reveals -- a clean whole-parent fade rather than each of its own
-  // sub-cells dissolving independently, which would read as the
-  // sub-lattice partially melting rather than the parent smoothly
-  // resolving into it. Also recurses one further level (up to
-  // MAX_LOD_DEPTH): whichever depth-1 sub-cells are themselves close
-  // enough to the reference position get their own depth-2 sub-sub-
-  // lattice, generated via generateSubLatticeAt/selectNearbyByWorldPosition
-  // (the general, non-integer-coordinate cores Stage 3 added), the exact
-  // same real recursion the unit tests already proved correct.
+  // See docs/code-notes/render.md
   function refreshSubLattice() {
     const camPos = walking && player ? player.getPosition() : camera.position;
     const refPos = [camPos.x, camPos.y, camPos.z];
 
-    // Stage 4: real movement since the last refresh drives the
-    // volatility score, which drives the NEXT scheduled throttle
-    // interval -- rapid repeated scrubbing widens it, calm/slow movement
-    // decays it back toward the tight default.
     const movement = lastSubLatticeRefPos
       ? Math.hypot(refPos[0] - lastSubLatticeRefPos[0], refPos[1] - lastSubLatticeRefPos[1], refPos[2] - lastSubLatticeRefPos[2])
       : 0;
@@ -1671,16 +1226,6 @@ async function init() {
         level1Cells.push(sub);
       }
 
-      // Stage 5, Tier 2 (aggregate plant-coverage layer): real local
-      // biomass at THIS parent's own position drives how many speckles
-      // show here, placed at that same parent's own already-generated
-      // depth-1 sub-cell positions (reusing real geometry, not a second
-      // scattering scheme), tinted by whichever species is locally
-      // dominant among real nearby organisms (organism.species is never
-      // prefixed -- only its seed's species carries evolution.js's own
-      // "organism:" prefix -- so speciesColor needs that prefix added
-      // back on to reach the same _evolved color lookup normal organism
-      // rendering already uses).
       const parentWorldPos = cellToWorld(parent.x, parent.y, parent.z, SCALE);
       const biomass = localBiomassAvailability(world, parentWorldPos, Object.keys(organismsSnapshot));
       const speckleCount = Math.min(speckleCountForBiomass(biomass), subCells.length);
@@ -1692,13 +1237,6 @@ async function init() {
         });
         const dominant = dominantSpecies(nearbyForColor);
         const speckleColor = speciesColor(dominant ? `${ORGANISM_SEED_SPECIES_PREFIX}${dominant}` : 'plant');
-        // Stage 6: blend toward LANDSCAPE_WEATHERED_COLOR by however
-        // weathered/soil-built-up THIS parent's own nearest planetoid
-        // real tracked landscapeState currently is -- a real, slow,
-        // persisted signal (evolution.js's own resolveCatchUpForAllPlanetoids),
-        // not recomputed from scratch here; 0 (no tracked history yet,
-        // including planetoids with no organisms at all) leaves the
-        // speckle's pure current-species tint untouched.
         const nearestForLandscape = nearestPlanetoid({ x: parentWorldPos[0], y: parentWorldPos[1], z: parentWorldPos[2] }, planetoids);
         const landscapeState = nearestForLandscape
           ? world.getPlanetoidEvolution()[planetoidKeyFor(nearestForLandscape.centerOfMass)]?.landscapeState ?? 0
@@ -1720,13 +1258,7 @@ async function init() {
     aggregateSpeckleMesh.computeBoundingSphere();
     subLatticeMesh.count = idx;
     subLatticeMesh.instanceMatrix.needsUpdate = true;
-    // Same real bug this project already found and fixed once for the
-    // top-level mesh: InstancedMesh.raycast() lazily computes its
-    // boundingSphere ONCE and never auto-invalidates it. Not yet
-    // raycast against (governing decision 4: block-level building/
-    // mining only, sub-lattice is purely visual for this whole spec's
-    // current scope) -- cheap insurance regardless, same as Stage 1.
-    subLatticeMesh.computeBoundingSphere();
+    subLatticeMesh.computeBoundingSphere(); // see docs/code-notes/render.md
 
     let idx2 = 0;
     if (MAX_LOD_DEPTH >= 2) {
@@ -1753,9 +1285,7 @@ async function init() {
   }
   refreshSubLattice();
 
-  // Self-rescheduling throttle (not a fixed setInterval) so Stage 4's
-  // own adaptive-damping widening of `subLatticeThrottleMs` takes effect
-  // on the very next tick, with no need to clear/recreate a timer.
+  // See docs/code-notes/render.md
   function scheduleSubLatticeRefresh() {
     setTimeout(() => {
       refreshSubLattice();
@@ -1765,39 +1295,13 @@ async function init() {
   }
   scheduleSubLatticeRefresh();
 
-  // RHOMBIVERSE_SPEC_REGIONS.md territory visualization: one low-opacity
-  // mesh per claim, its exact real footprint shape (via ConvexGeometry on
-  // claimFootprintWorldVertices -- ACTUAL cell-center points, the same
-  // "real geometry, not an estimate" standard every other shape in this
-  // app already holds to) rather than tinting individual cells, since
-  // most of a claim's footprint is typically unbuilt space with no cell
-  // to tint at all. Replaced a bounding-SPHERE version, 2026-08-13, after
-  // a player noticed claim territories visually overlapping on screen
-  // even though their real footprints never do -- claimBoundingRadius
-  // (the farthest single CORNER of a claim's footprint) made a genuinely
-  // much looser sphere than the real rhombic-dodecahedron-shaped
-  // territory, which only got more visible once claims got bigger. A
-  // plain THREE.Group so the whole set can be cleared and rebuilt in one
-  // call (refreshClaims below) without tracking individual mesh
-  // references.
+  // See docs/code-notes/render.md
   const claimGroup = new THREE.Group();
   scene.add(claimGroup);
   const CLAIM_COLOR_MINE = 0x4ade80; // green -- this session's own claims
   const CLAIM_COLOR_OTHER = 0xf59e0b; // amber -- everyone else's
 
-  // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 5: additive rendering,
-  // never touches the RD `mesh`/`MAX_CELLS` system. Each of the 40 real
-  // valid direction-triples (growth.js's own VALID_TRIPLES) is a
-  // genuinely different orientation in space, not just a translated
-  // copy of one shape -- an InstancedMesh would need a per-instance
-  // rotation matrix computed against a template, real complexity for
-  // Wave 1's actual bounded scale (a handful of tiles per seed, per the
-  // spec's own low-generation-count templates). Simplicity wins here:
-  // one plain Mesh per tile (ConvexGeometry on that tile's own real
-  // world vertices, always correct regardless of orientation), grouped
-  // per seed so a whole seed's meshes can be cleared/rebuilt together.
-  // Revisit with real instancing only if actual usage ever shows this
-  // is a performance problem -- not assumed up front.
+  // See docs/code-notes/render.md
   const growthGroup = new THREE.Group();
   scene.add(growthGroup);
   const growthMeshesBySeed = new Map(); // seedId -> THREE.Group
@@ -1828,17 +1332,7 @@ async function init() {
   renderTradePanel();
   rebuildAllGrowth();
 
-  // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md section 4's own "on
-  // planetoid_load(planetoid)" -- resolve however much real time passed
-  // while nobody was here BEFORE the player sees anything, same as the
-  // spec's own pseudocode names it. Deliberately NOT run while Shared
-  // World is active (see resolveEvolution's own header): organisms/
-  // planetoidEvolution have no sync path yet, so mutating them locally
-  // against a shared view would desync exactly like Undo/New World are
-  // already guarded against. Saves unconditionally (not just when
-  // something visibly changed) whenever any organism exists, for the
-  // same real reason the periodic tick below does -- see that call
-  // site's own header for the bug this fixes.
+  // Pre-interactivity catch-up -- see docs/code-notes/render.md
   if (!sharedWorldActive && Object.keys(world.getOrganisms()).length > 0) {
     if (resolveEvolution(world, Date.now())) rebuildAllGrowth();
     saveToLocalStorage(world.toJSON());
@@ -1846,13 +1340,7 @@ async function init() {
   refreshOrganismsSnapshot(world);
   updateEvolutionInfo();
 
-  // RHOMBIVERSE_SPEC_ASTEROIDS.md UI: belts are otherwise undiscoverable
-  // (80+ units from the default camera framing, no minimap) -- one
-  // button per belt reframes the camera exactly like the initial
-  // camera.position.set(6,5,8)/controls.target.set(0,0,0) setup, just
-  // offset to the belt's own center instead of world origin. Exits Walk
-  // Mode first if active, since camera.position there is driven by
-  // player.js every frame and would immediately override this.
+  // See docs/code-notes/render.md
   const beltNavRow = document.getElementById('belt-nav-row');
   for (const belt of listBelts()) {
     const btn = document.createElement('button');
@@ -1870,16 +1358,7 @@ async function init() {
     beltNavRow.appendChild(btn);
   }
 
-  // Undo: a full-world-JSON snapshot stack, not a diff/command log --
-  // simpler to reason about correctly than tracking per-operation
-  // inverses, and every operation (build/fill/round/excavate/ring
-  // remove/New World/Import) already produces a full JSON via
-  // world.toJSON(), so this covers all of them uniformly for free.
-  // lastSnapshot always holds the state as of the END of the previous
-  // onChange -- i.e. exactly the state right before whatever mutation
-  // onChange is currently reporting -- so pushing it captures the
-  // correct "before" state without needing to hook every individual
-  // world.addCell/removeCell call site.
+  // Undo stack -- see docs/code-notes/render.md
   const undoStack = [];
   const MAX_UNDO = 20;
   let lastSnapshot = JSON.stringify(world.toJSON());
@@ -1891,13 +1370,7 @@ async function init() {
     // scrub-timeline strip (renderUndoScrubStrip) is the count now.
   }
 
-  // B2's scrub-timeline: undoStack[0] is the OLDEST kept state,
-  // undoStack[length-1] the most recent (matches the push order in
-  // onChange below). Jumping to tick i reverts to that exact state and
-  // discards everything newer than it (indices > i) -- the same
-  // "no redo past a jump" semantics a linear undo stack without redo
-  // support already implied, just now reachable directly instead of only
-  // one pop at a time.
+  // See docs/code-notes/render.md
   function renderUndoScrubStrip() {
     const strip = document.getElementById('undo-scrub-strip');
     strip.innerHTML = '';
@@ -1929,30 +1402,16 @@ async function init() {
     document.getElementById('undo-scrub-strip').classList.remove('visible');
   }
 
-  // Ring list: "standard view" of the last-clicked structure's shells,
-  // each with its own remove button -- added per direct request, to
-  // replace the onion-skin min/max number inputs (view-only, removed)
-  // with something that both shows the structure at a glance AND lets
-  // individual shells be permanently removed, safety-netted by the undo
-  // button above.
+  // Ring list -- see docs/code-notes/render.md
   let focusedCenterKey = null;
 
-  // Same hue formula as shellTint() above, so a shell's color in this 2D
-  // diagram matches its tint in the actual 3D view -- one color means
-  // the same thing everywhere, deliberately, for the "idiot proof" goal.
   function shellHue(shell) {
     return ((shell * 0.15) % 1) * 360;
   }
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
-  // Concentric-circle "bullseye" diagram: painted largest shell first so
-  // each smaller circle draws on top and covers the larger one's center,
-  // leaving only its own ring-shaped band visible -- the standard, simple
-  // way to get real donut-shaped click targets without annulus/arc path
-  // math. Kept alongside the text list below (not replacing it): a thin
-  // visual ring is easy to mis-click, so the list is the precise fallback
-  // for actually hitting one specific shell.
+  // See docs/code-notes/render.md
   function renderRingDiagram(shells, counts) {
     const size = 176;
     const cx = size / 2;
@@ -2048,15 +1507,8 @@ async function init() {
   function updateInventoryHint() {
     const el = document.getElementById('inventory-hint');
     if (!el) return;
-    // B6: "remove the Shared World requirement for solo mining/
-    // inventory" -- mining itself already worked locally (build.js's
-    // onContextMenu falls through to local mineAsteroidCell when no
-    // mineRemote is supplied); this display was the one place still
-    // gated on a real account existing. LOCAL_PLAYER_ID is the same
-    // local-identity fallback Sculpt/Cultivate sessions already use.
+    // See docs/code-notes/render.md
     const mine = world.getInventory()[myUserId ?? LOCAL_PLAYER_ID] ?? {};
-    // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 5: entries are
-    // {quantity, lastUsedAt} objects now, not bare numbers.
     const parts = Object.entries(mine).map(([material, entry]) => `${material} ×${entry.quantity}`);
     el.textContent = parts.length > 0 ? `Inventory: ${parts.join(', ')}.` : 'Inventory: empty.';
   }
@@ -2127,16 +1579,7 @@ async function init() {
     showNext();
   }
 
-  // Undo reverts the LOCAL view only, via replaceAll -- like New World/
-  // Import/Load preset, it bypasses the addCell/removeCell hooks that
-  // drive sync.js's pushes, so it can't un-push a change already synced
-  // to the shared table. Disabled outright while Shared World is active
-  // (see updateUndoButton) rather than left to silently desync.
-  //
-  // B2: a quick click still undoes exactly one step (jumpToUndoIndex on
-  // the last/most-recent entry, same effect the old pop()-based handler
-  // had); holding past UNDO_HOLD_MS instead reveals the scrub strip so
-  // any past state can be jumped to directly.
+  // See docs/code-notes/render.md
   const UNDO_HOLD_MS = 220;
   let undoHoldTimer = null;
   let undoHeld = false;
@@ -2162,9 +1605,6 @@ async function init() {
   undoBtn.addEventListener('pointerleave', () => {
     clearTimeout(undoHoldTimer);
   });
-  // Clicking anywhere outside the strip closes it without acting --
-  // same "reveal on hold, dismiss on outside interaction" pattern the
-  // Rhombic Wheel's own picker strip uses.
   document.addEventListener('pointerdown', (e) => {
     if (undoStripEl.classList.contains('visible') && !undoStripEl.contains(e.target) && e.target !== undoBtn) {
       undoStripEl.classList.remove('visible');
@@ -2172,13 +1612,7 @@ async function init() {
   });
   updateUndoButton();
 
-  // Section view (clipping plane): #section-enable toggles whether
-  // material.clippingPlanes contains sectionPlane at all, AND whether the
-  // axis/position/flip sub-controls are even shown -- no point showing
-  // controls for a feature that's currently off. The other three
-  // controls just mutate the same Plane object in place, picked up
-  // automatically by the next rendered frame (no rebuild needed --
-  // clipping is a GPU-side spatial test).
+  // See docs/code-notes/render.md
   function updateSectionEnabled() {
     const enabled = document.getElementById('section-enable').checked;
     material.clippingPlanes = enabled ? [sectionPlane] : [];
@@ -2195,14 +1629,6 @@ async function init() {
     });
   }
 
-  // B2: X-Ray as an interactive draggable cutaway plane, not just a
-  // checkbox+slider. #section-enable/#section-axis/#section-flip/
-  // #section-pos (Lab panel, still there for precise numeric control)
-  // and this handle drive the exact same `sectionPlane` object, kept in
-  // sync both directions -- "keep all underlying mechanics... unchanged,
-  // this phase is presentation and interaction feel only" (B2's own
-  // scope line): sectionPlane/material.clippingPlanes are untouched,
-  // only how a player reaches and moves them is new.
   const xrayHandleGeometry = new THREE.PlaneGeometry(40, 40);
   const xrayHandleMaterial = new THREE.MeshBasicMaterial({
     color: 0x9de0ff,
@@ -2244,8 +1670,6 @@ async function init() {
     xrayHandle.position[axis] = pos;
   }
 
-  // Dragging the handle updates sectionPlane in real time -- reveals the
-  // interior as it moves through the structure, not just on release.
   xrayGizmo.addEventListener('change', () => {
     if (!xrayHandle.visible) return;
     const axis = document.getElementById('section-axis').value;
@@ -2278,24 +1702,7 @@ async function init() {
     }
   });
 
-  // --- B5 Duality Mode --------------------------------------------
-  // "The RD lattice as a 4D hypercube shadow, the rhombic triacontahedron
-  // as a 6D hypercube shadow" -- no such cut-and-project mapping exists
-  // anywhere in this codebase or its specs (checked before writing this,
-  // same kind of gap as B4's "order-48 symmetry group" claim, but
-  // deeper: the textbook 6D construction uses the icosahedral point
-  // group, order 120, which doesn't act on this lattice's actual cubic
-  // (order-48) FCC symmetry at all -- there's no clean way to apply the
-  // literal method here). What IS real and already built: growth.js's
-  // own Ammann-rhombohedra tile geometry (STAR_DIRECTIONS/VALID_TRIPLES/
-  // unitTileVertices), a genuine quasicrystal-related construction this
-  // project already uses for its Penrose growth layer. Duality Mode
-  // reveals that SAME real geometry applied to every regular built cell
-  // instead of just grown seeds -- "display it for free" rather than
-  // inventing new projection math, per direct steer. Deterministic (same
-  // cell always picks the same real prototile triple) but not a literal
-  // verified hypercube-shadow projection -- disclosed here, not silently
-  // oversold.
+  // B5 Duality Mode -- see docs/code-notes/render.md
   let dualityModeActive = false;
   let dualityShadowMesh = null;
   function tripleForCell(x, y, z) {
@@ -2354,23 +1761,7 @@ async function init() {
 
   const getShellCount = () => Math.min(Math.max(1, Number(shellCountInput.value) || 1), MAX_SHELL);
 
-  // Mode selector: exactly one #mode-btn is "active" at a time; a plain
-  // click does whatever that mode does (build.js). Replaced an earlier
-  // modifier-key scheme (Shift/Ctrl/Ctrl+Shift+click) that became
-  // unmanageable -- see build.js's header comment for the full reasoning.
-  //
-  // Contextual UI, added because "all options seem available at same
-  // time" was a real, separate complaint even after the fill logic
-  // itself was verified correct by direct execution: each mode only
-  // shows the shell inputs it actually reads (Fill uses both; Excavate
-  // uses only "hollow from"; Round and Build use neither), and the hint
-  // line states in plain language exactly what a click currently does --
-  // so it's possible to tell whether something worked without needing
-  // devtools. Material stays visible in every mode, unlike the shell
-  // inputs: it's read by Build/Fill for what to place, AND by the ring
-  // panel's Recolor button regardless of which mode is active, so hiding
-  // it in Round/Excavate would make recoloring require a mode switch
-  // just to see the dropdown.
+  // See docs/code-notes/render.md
   const MODE_HINTS = {
     build: 'Click a face to add one cell using the selected material.',
     fill: 'Click a cell to fill shells (hollow from–radius) outward around it, approximating a sphere. A second click on the same structure grows it further.',
@@ -2394,11 +1785,7 @@ async function init() {
     updateHudIndicator();
   }
 
-  // Player-facing terminology (RHOMBIVERSE_UIUX_BUILD_PLAN.md B1's rename
-  // table) for the HUD's top-right indicator -- the Lab panel keeps the
-  // original technical labels (Generate, Excavate, Round, Walk Mode,
-  // Presets) untouched, per that same table's "outside Lab/Advanced view"
-  // scope.
+  // See docs/code-notes/render.md
   const PLAYER_FACING_MODE_LABEL = {
     build: 'Build',
     fill: 'Fill',
@@ -2433,30 +1820,12 @@ async function init() {
       currentMode = btn.dataset.mode;
       modeButtons.forEach((b) => b.classList.toggle('active', b === btn));
       updateModeUI();
-      // Entering/leaving Report mode changes which cells are visible
-      // (visibleCells) -- re-sync immediately rather than waiting for the
-      // next unrelated onChange.
       rebuildInstances(mesh, world, currentMode === 'report');
-      // Mobile screen-navigation: picking a mode is the whole reason to
-      // have opened the controls screen -- return straight to the 3D
-      // view so the next tap lands on the canvas, not a second manual
-      // "Close" tap. No-op on desktop (closeMobilePanels only affects a
-      // CSS class the desktop layout never uses).
       closeMobilePanels();
     });
   });
 
-  // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 4: Plant mode's own
-  // click handling, entirely separate from build.js's controller (see
-  // getMode's own comment above for why). Section 10's own deferral --
-  // "freestanding, fewer cross-system dependencies" -- means planting
-  // doesn't need to hit an existing cell; it raycasts against the RD
-  // mesh purely to translate a 2D click into a real 3D point (whatever
-  // surface is under the cursor), falling back to a fixed distance
-  // along the camera ray when nothing is hit (open space, or no cells
-  // built yet). A tiny outward offset along the hit normal keeps a
-  // freshly-planted seed from spawning literally inside the RD cell it
-  // was clicked on.
+  // See docs/code-notes/render.md
   const plantRaycaster = new THREE.Raycaster();
   const plantPointer = new THREE.Vector2();
   let seedCounter = 0;
@@ -2509,13 +1878,7 @@ async function init() {
     const isEvolvingSpecies =
       species === 'evo-amoeba' || species === 'evo-plant' || species === 'evo-land' || species === 'evo-land-dino' || species === 'evo-sea';
     if (isEvolvingSpecies && sharedWorldActive) {
-      // organisms/planetoidEvolution have no Supabase sync path yet
-      // (see resolveEvolution's own header) -- planting one here would
-      // sync the underlying SEED (seeds already sync) but not the
-      // organism record behind it, leaving every other client with a
-      // frozen, never-evolving tile cluster instead of a real shared
-      // organism. Blocked outright rather than shipping a silently
-      // half-synced experience.
+      // See docs/code-notes/render.md
       alert('Evolving species require local (non-Shared-World) play for now -- disable Shared World first.');
       return;
     }
@@ -2532,29 +1895,15 @@ async function init() {
         alert('Animals are currently disabled (FEATURES.animals is off).');
         return;
       }
-      // RHOMBIVERSE_SPEC_ANIMALS.md Stage A/B: same random-within-range
-      // founding genome as evo-amoeba/evo-plant above (no breeding UI),
-      // plus a random-within-range animalTraits object for mobilityRange/
-      // huntBias. plantAnimal enforces habitat validity at plant time --
-      // a land creature can't be planted on/near a liquid-permeated cell
-      // and vice versa, surfaced here as a friendly alert rather than an
-      // unhandled exception.
+      // See docs/code-notes/render.md
       const animalSpecies = species === 'evo-sea' ? SEA_CREATURE_SPECIES : LAND_CREATURE_SPECIES;
       const isDino = species === 'evo-land-dino';
       const genome = {};
       for (const [trait, [min, max]] of Object.entries(GENOME_TRAIT_RANGES)) {
-        // "Dinosaur": still a real, random genome (no hand-tuned exact
-        // numbers, no breeding UI) but biased toward the LARGE end of
-        // maturitySize specifically -- a real, grounded read (large-
-        // bodied land animals), not a special-cased new mechanic.
         genome[trait] = isDino && trait === 'maturitySize' ? max - Math.random() * (max - min) * 0.3 : min + Math.random() * (max - min);
       }
       const animalTraits = {};
       for (const [trait, [min, max]] of Object.entries(ANIMAL_TRAIT_RANGES)) {
-        // Biased toward high huntBias (carnivore) and high mobilityRange
-        // (a real predator's own mobility advantage) -- same "bias the
-        // random draw, never hand-fix a value" shape as maturitySize
-        // above, keeping this a real, still-evolvable genome.
         animalTraits[trait] = isDino ? max - Math.random() * (max - min) * 0.3 : min + Math.random() * (max - min);
       }
       const organismId = `organism_${Date.now()}_${seedCounter}`;
@@ -2570,36 +1919,19 @@ async function init() {
       }
     } else {
       seed = plantSeed(world, seedId, species, origin);
-      // B5 Cultivation Mode Manual tier: "expose the existing growth-
-      // layer's... parameters... as player-adjustable inputs at planting
-      // time" -- layered on here rather than changing plantSeed's own
-      // signature, since every OTHER planting path (evolving organisms/
-      // animals above) is explicitly out of Cultivation's scope and
-      // must stay completely unaffected.
+      // See docs/code-notes/render.md
       world.setSeed(seedId, { ...seed, growthParameters: currentGrowthParameters(), assistanceTier: cultivateSession.assistanceTier, authorId: myUserId ?? LOCAL_PLAYER_ID });
     }
     rebuildSeedMeshes(seedId, seed);
     if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
     refreshOrganismsSnapshot(world);
     updateEvolutionInfo();
-    // Planting doesn't route through onChange() (seeds are a genuinely
-    // separate coordinate space, see worldstate.js's own comment on why)
-    // -- achievements need their own hook here too.
     toastNewAchievements(checkAchievements({ world, planetoids }));
-    // B6's onboarding discovery sequence listens for this (see
-    // data/cyborg/onboarding.json), same spirit as build.js's onPlaced.
     window.dispatchEvent(new CustomEvent('rhombiverse:seedPlanted'));
   });
   updateModeUI();
 
-  // B5 Cultivation Mode: "manually pruning part of an already-grown
-  // structure should trigger the existing aperiodic fill/reroute
-  // behavior the growth system already has" -- reuses the same right-
-  // click-always-removes convention every other mode already has,
-  // scoped to Plant mode (grown tiles aren't normal world.cells, so
-  // build.js's own onContextMenu never sees them). growSeed's frontier
-  // scan already re-derives itself from seed.tiles fresh every call, so
-  // the "reroute" is genuinely free -- pruneTile is the whole mechanic.
+  // See docs/code-notes/render.md
   renderer.domElement.addEventListener('contextmenu', (event) => {
     if (currentMode !== 'plant' || walking) return;
     const rect = renderer.domElement.getBoundingClientRect();
@@ -2689,19 +2021,11 @@ async function init() {
     input.value = '';
   });
 
-  // Frost line (RHOMBIVERSE_SPEC_STAR_SYSTEM.md section 3): reads the
-  // live `planetoids` closure variable at call time (not a stale
-  // snapshot), so it always reflects whatever stars exist as of the most
-  // recent onChange.
+  // Frost line -- see docs/code-notes/render.md
   const canPlaceMaterial = (material, x, y, z) =>
     canPlaceForStars(material, x, y, z, Object.values(planetoids).filter((p) => p.isStar));
 
-  // B4a: Sculpt tool (Create -> Sculpt). Full-Cyborg stays behind this
-  // flag in the shared world until B7's moderation work is verified --
-  // per the plan's own instruction, the logic itself is fully built
-  // either way, just not reachable here while false. Standalone
-  // Sculpture Mode (B4b) enables it unconditionally, since nothing
-  // there touches shared world-state.
+  // See docs/code-notes/render.md
   const FULL_CYBORG_INWORLD_ENABLED = false;
   const sculptSession = createSculptureSession(myUserId ?? LOCAL_PLAYER_ID);
   let sculptMirrorPlane = '';
@@ -2754,12 +2078,7 @@ async function init() {
     });
   });
 
-  // Exactly one symmetry mode is active at a time: the 6-plane mirror
-  // picker (default/fallback, whatever it already defaulted to before
-  // this task), the two dual-aware presets, or Full symmetry (48) --
-  // additive options layered on top of the existing picker, not a
-  // replacement for it, so selecting one always clears the others
-  // rather than combining silently.
+  // See docs/code-notes/render.md
   let sculptDualPreset = ''; // '' | 'cube' | 'octa'
   let sculptFullSymmetry = false;
   function clearOtherSymmetrySelectors(exceptGroup) {
@@ -2785,11 +2104,6 @@ async function init() {
     });
   });
 
-  // Full symmetry (48): reuses FULL_SYMMETRY_GROUP (sculpture.js), which
-  // already existed but was never wired to any UI control before this
-  // task -- confirmed during this task's own investigation step. Not
-  // gated on FEATURES.dualSculpture (it has nothing to do with the dual
-  // cube/octahedron structure), so this row is always visible.
   document.getElementById('sculpt-full-symmetry-btn')?.addEventListener('click', () => {
     const btn = document.getElementById('sculpt-full-symmetry-btn');
     const turningOn = !btn.classList.contains('active');
@@ -2798,9 +2112,6 @@ async function init() {
     sculptFullSymmetry = turningOn;
   });
 
-  // Cube/Octa symmetry presets (gated on FEATURES.dualSculpture; the row
-  // itself is display:none via the dual-section hide above when the flag
-  // is off, so these listeners simply never fire in that configuration).
   if (FEATURES.dualSculpture) {
     document.querySelectorAll('#dual-symmetry-row .dual-symmetry-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -2835,9 +2146,6 @@ async function init() {
     renderSculptSuggestion();
   });
 
-  // Full-Cyborg (only reachable in-world once FULL_CYBORG_INWORLD_ENABLED
-  // flips true -- see the tier-button handler above, which keeps this
-  // section hidden until then).
   document.getElementById('sculpt-nl-go').addEventListener('click', async () => {
     const input = document.getElementById('sculpt-nl-input');
     const resultEl = document.getElementById('sculpt-nl-result');
@@ -2845,9 +2153,6 @@ async function init() {
     if (!text) return;
     resultEl.textContent = 'Thinking…';
     const origin = { x: 0, y: 0, z: 0 }; // TODO: last-hovered cell once Sculpt mode grows ghost-hover support
-    // Full-Cyborg dual-awareness: only passed when FEATURES.dualSculpture
-    // is on, so the request payload/prompt is unchanged otherwise (see
-    // requestFullCyborgIntent's own comment).
     const dualFocusForIntent = FEATURES.dualSculpture ? dualFocusEl?.value : undefined;
     const intent = await requestFullCyborgIntent(text, origin, sculptMirrorPlane, dualFocusForIntent);
     if (intent.unrecognized) {
@@ -2871,12 +2176,7 @@ async function init() {
     input.value = '';
   });
 
-  // Sculpt mode's own click handling (build.js has a one-line no-op for
-  // mode === 'sculpt', same shape as its Plant-mode no-op above).
-  // sculptTarget is an indirection so the SAME click handler/panel serves
-  // both B4a (in-world, targets `world`/`mesh`) and B4b (standalone,
-  // targets `sculptureWorld`/`sculptureMesh`) -- swapped by
-  // enterSculptureMode/exitSculptureMode below, never duplicated.
+  // See docs/code-notes/render.md
   const sculptTarget = {
     world,
     mesh,
@@ -2884,14 +2184,7 @@ async function init() {
     apply: onChange,
   };
 
-  // --- Dual structure (core; RHOMBIVERSE_PLAN.md "Core vs. Modules" --
-  // treated as load-bearing rather than a real feature toggle, per
-  // CLAUDE.md's own instruction; FEATURES.dualSculpture defaults true,
-  // this only actually disables anything if someone deliberately flips
-  // it for a reduced/testing configuration). Overlay/snap/shell state
-  // lives here, next to sculptTarget, since both the in-world Sculpt
-  // tool (B4a) and standalone Sculpture Mode (B4b) share this one panel
-  // and click handler via the same sculptTarget indirection.
+  // Dual structure -- see docs/code-notes/render.md
   const dualShowEl = document.getElementById('dual-show');
   const dualFocusEl = document.getElementById('dual-focus');
   const dualSnapEl = document.getElementById('dual-snap');
@@ -2916,13 +2209,7 @@ async function init() {
     dualOctaOverlay = null;
   }
 
-  // Per-cell dual data for whatever's currently rendered by sculptTarget
-  // -- rebuilt on every overlay refresh rather than cached, since it must
-  // stay correct across both the in-world/standalone swap and every
-  // sculpt edit; sized for Sculpture Mode's typical scratch-space cell
-  // counts, not yet optimized for a huge shared World (a real, deferred
-  // cost matching this codebase's own admitted perf-tuning pattern
-  // elsewhere -- see e.g. showcase-world's evolution.js fix in CLAUDE.md).
+  // See docs/code-notes/render.md
   function cellDuals() {
     return sculptTarget.world.entries().map((cell) => {
       const [cx, cy, cz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
@@ -2934,10 +2221,6 @@ async function init() {
   function rebuildDualOverlay() {
     clearDualOverlay();
     const showingSolid = FEATURES.dualSculpture && dualShowEl?.checked && dualFocusEl?.value !== 'none';
-    // Desaturate/lower-opacity RD faces only while something's actually
-    // drawn -- Show Dual on with Focus "None" would otherwise dim the
-    // faces around nothing, which isn't what "the overlay reads clearly"
-    // is asking for.
     sculptTarget.mesh.material.transparent = showingSolid;
     sculptTarget.mesh.material.opacity = showingSolid ? 0.35 : 1;
     if (!showingSolid) return;
@@ -2957,9 +2240,6 @@ async function init() {
       }
     }
     const targetScene = sculptureModeActive ? sculptureScene : scene;
-    // Cool color for the cube (3-valent) edges, warm for the octahedron
-    // (4-valent) edges -- matching this app's existing cool/warm palette
-    // pairing (glassite blues vs. garnet/ferrostone warms).
     if (cubePts.length) {
       const geo = new THREE.BufferGeometry().setFromPoints(cubePts);
       dualCubeOverlay = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x7ccdff }));
@@ -2977,10 +2257,7 @@ async function init() {
     dualFocusEl?.addEventListener('change', rebuildDualOverlay);
   }
 
-  // Snap to Dual: given a raw world-space hit point and the hovered
-  // cell's own dual, nudges to the nearest dual vertex (per Dual Focus)
-  // within a small threshold -- purely a target-selection adjustment
-  // before the existing sculpt click logic runs, no new mutation path.
+  // See docs/code-notes/render.md
   const DUAL_SNAP_THRESHOLD = SCALE * 0.35;
   function snappedSculptTarget(hitPoint, cell) {
     if (!FEATURES.dualSculpture || !dualSnapEl?.checked || dualFocusEl.value === 'none') return null;
@@ -2989,12 +2266,6 @@ async function init() {
     const dual = getDual(verts, [cx, cy, cz]);
     const snapped = snapToDual([hitPoint.x, hitPoint.y, hitPoint.z], dual, dualFocusEl.value, DUAL_SNAP_THRESHOLD);
     if (!snapped) return null;
-    // Snapping selects the whole inscribed solid the vertex belongs to
-    // (Phase 2, step 6) -- no separate selection concept exists anywhere
-    // else in sculpture.js/render.js to wire into (checked directly
-    // during this task's own investigation step), so this is
-    // highlight-only via the returned `which`/`cell` info; a real
-    // multi-cell selection state is a TODO, not invented here.
     return { which: snapped.which, cell };
   }
 
@@ -3012,18 +2283,7 @@ async function init() {
     const cell = cellOrder[hit.instanceId];
     if (!cell) return;
 
-    // Snap to Dual (Phase 2, steps 5-6): a click landing near a 3-valent
-    // (cube) or 4-valent (octa) dual vertex selects the whole inscribed
-    // solid it belongs to. No selection-state concept exists anywhere
-    // else in sculpture.js/render.js for the order-48 mirror/symmetry
-    // tools to wire into (there is no order-48 tool wired to the UI at
-    // all -- see the investigation note above the dual-symmetry preset
-    // wiring), so this is highlight-only: it surfaces a HUD prompt and,
-    // matching the dual-awareness task's own step 4, auto-switches the
-    // active symmetry preset to match -- the player can still override
-    // manually afterward. RD placement itself stays cell/face-based (no
-    // continuous ghost-hover target exists to actually re-aim), so
-    // snapping does not relocate the placement target.
+    // Snap to Dual (Phase 2, steps 5-6) -- see docs/code-notes/render.md
     const dualSnap = snappedSculptTarget(hit.point, cell);
     if (dualSnap) {
       clearOtherSymmetrySelectors('dual');
@@ -3034,10 +2294,6 @@ async function init() {
       showHudPrompt(`Snapped to the inscribed ${dualSnap.which === 'cube' ? 'cube' : 'octahedron'} -- ${dualSnap.which === 'cube' ? 'Cube' : 'Octa'} symmetry selected.`, 2500);
     }
 
-    // Model (add): the neighbor cell across the clicked face, same
-    // target-selection rule Build mode uses. Chisel (remove): the
-    // clicked cell itself, matching the tool's own "carve away what
-    // you're pointing at" framing.
     let targetX, targetY, targetZ;
     if (sculptActionMode === 'add') {
       const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
@@ -3053,42 +2309,25 @@ async function init() {
     const radius = Math.max(0, Math.min(10, Number(sculptBrushRadiusInput.value) || 0));
     const material = materialSelect.value;
     const isSemiCyborg = sculptSession.assistanceTier === 'semi-cyborg';
-    // Dual Shell (Phase 2, step 7): the shell-radius brush walks
-    // DUAL_DIRS (per Dual Focus) instead of the normal 12-neighbor
-    // offsets -- an alternate direction set passed into the existing
-    // shellBrushCells/cellsInShells traversal (lattice.js), not a
-    // reimplementation. "Both" walks the union of both direction sets.
+    // Dual Shell -- see docs/code-notes/render.md
     const useDualShell = FEATURES.dualSculpture && dualShellEl?.checked && dualFocusEl.value !== 'none';
     const shellOffsets = useDualShell
       ? (dualFocusEl.value === 'both' ? [...DUAL_DIRS.cube, ...DUAL_DIRS.octa] : DUAL_DIRS[dualFocusEl.value])
       : undefined;
 
     let touched;
+    // Symmetry application order -- see docs/code-notes/render.md
     if (!isSemiCyborg && sculptFullSymmetry) {
-      // Full symmetry (48): replicate through every element of
-      // FULL_SYMMETRY_GROUP instead of a single mirror plane. Reuses
-      // the shell brush's own cell list, same as the dual presets below.
       touched = [];
       for (const c of shellBrushCells(targetX, targetY, targetZ, radius, shellOffsets)) {
         touched.push(...applyFullSymmetry(sculptTarget.world, sculptActionMode, c.x, c.y, c.z, material, sculptTarget.canPlaceMaterial));
       }
     } else if (!isSemiCyborg && sculptDualPreset) {
-      // Cube/Octa symmetry presets: replicate across the 8/6 DUAL_DIRS
-      // positions via applyDualSymmetry instead of the single mirror
-      // plane sculptStroke would otherwise apply -- reuses the shell
-      // brush's own cell list so radius/Dual Shell still behave
-      // identically to the normal path.
       touched = [];
       for (const c of shellBrushCells(targetX, targetY, targetZ, radius, shellOffsets)) {
         touched.push(...applyDualSymmetry(sculptTarget.world, sculptActionMode, c.x, c.y, c.z, material, DUAL_DIRS[sculptDualPreset], sculptTarget.canPlaceMaterial));
       }
     } else {
-      // Manual tier auto-mirrors immediately (a direct player action,
-      // same as every other consent-free build tool). Semi-Cyborg
-      // deliberately does NOT auto-mirror here -- the whole point of
-      // that tier is that completing the mirror is the AGENT's
-      // proposal, surfaced as an accept/dismiss suggestion below, not
-      // applied inline with the player's own click.
       touched = sculptStroke(sculptTarget.world, sculptActionMode, targetX, targetY, targetZ, radius, material, isSemiCyborg ? null : sculptMirrorPlane || null, sculptTarget.canPlaceMaterial, shellOffsets);
     }
     if (touched.length === 0) return;
@@ -3097,11 +2336,6 @@ async function init() {
 
     if (isSemiCyborg) {
       const lastCell = { ...touched[touched.length - 1], action: sculptActionMode, material };
-      // Dual-awareness (gated on FEATURES.dualSculpture): pass the
-      // active Dual Focus so Semi-Cyborg can also propose completing an
-      // inscribed cube/octahedron, not just the mirror-plane heuristic.
-      // undefined when the flag is off, so behavior is byte-identical to
-      // before this task in that configuration.
       const dualFocusForSuggestion = FEATURES.dualSculpture ? dualFocusEl?.value : undefined;
       updateSemiCyborgSuggestion(sculptSession, sculptTarget.world, lastCell, sculptMirrorPlane || null, dualFocusForSuggestion);
       renderSculptSuggestion();
@@ -3116,18 +2350,12 @@ async function init() {
   function enterSculptureMode() {
     if (sculptureModeActive) return;
     if (walking) exitWalk();
-    // Duality's shadow mesh lives in whichever scene was active when it
-    // was built -- turn it off cleanly before switching scenes rather
-    // than leaving a stale shadow (and a hidden main mesh) behind.
+    // See docs/code-notes/render.md
     document.getElementById('duality-toggle')?.classList.contains('active') && document.getElementById('duality-toggle').click();
     savedCameraState.position.copy(camera.position);
     savedCameraState.target.copy(controls.target);
     if (!sculptureWorld) {
       sculptureWorld = createWorldStore({ worldName: 'Sculpture Scratch', version: 1, cells: {}, meta: {} });
-      // A completely empty world has no face to click "Model" onto at
-      // all (the same bootstrap problem B1 fixed for the main world's
-      // old single-empty-cell starter) -- one seed cell, not a whole
-      // planetoid, since this is meant to be a bare scratch space.
       sculptureWorld.addCell(0, 0, 0, { material: 'base' });
     }
     sculptureModeActive = true;
@@ -3141,9 +2369,6 @@ async function init() {
     rebuildDualOverlay();
     camera.position.set(6, 5, 8);
     controls.target.set(0, 0, 0);
-    // Full-Cyborg is enabled unconditionally here -- nothing in this
-    // scratch space writes shared world-state, so B7's moderation gate
-    // (which the in-world tier stays behind) doesn't apply.
     sculptFullCyborgGated.style.display = 'none';
     if (sculptSession.assistanceTier === 'full-cyborg') sculptFullCyborgSection.style.display = '';
     sculptureBanner.style.display = 'flex';
@@ -3181,10 +2406,7 @@ async function init() {
   document.getElementById('sculpture-mode-toggle')?.addEventListener('click', enterSculptureMode);
   document.getElementById('sculpture-mode-exit')?.addEventListener('click', exitSculptureMode);
 
-  // Export -- reuses the exact same buildRDGeometry-derived `geometry`
-  // every in-world cell already renders with (via sculptureMesh's own
-  // geometry), merged into one real BufferGeometry per active instance
-  // rather than a new from-scratch export pipeline.
+  // See docs/code-notes/render.md
   async function exportSculpture(format) {
     if (!sculptureWorld) return;
     const cells = sculptureWorld.entries();
@@ -3241,20 +2463,12 @@ async function init() {
   document.getElementById('sculpture-export-obj')?.addEventListener('click', () => exportSculpture('obj'));
   document.getElementById('sculpture-export-gltf')?.addEventListener('click', () => exportSculpture('gltf'));
 
-  // "place a copy in-world" -- the ONLY bridge back to shared world-state
-  // (B4b's own wording). A normal player-attributed placement (the
-  // player placing something they made), not a live agent write, so it
-  // doesn't need the Full-Cyborg gate either -- it's just world.addCell,
-  // the same call every manual build action already makes, offset so it
-  // doesn't land on top of whatever's already at the main world's origin.
+  // See docs/code-notes/render.md
   document.getElementById('sculpture-place-in-world')?.addEventListener('click', () => {
     if (!sculptureWorld) return;
     const cells = sculptureWorld.entries();
     if (cells.length === 0) return;
     const xs = cells.map((c) => c.x);
-    // Must be an EVEN shift -- isValidCell requires x+y+z even, and this
-    // only offsets x, so an odd offset would flip every placed cell's
-    // parity and make isValidCell reject all of them below.
     let offsetX = Math.max(...xs) - Math.min(...xs) + 6;
     if (offsetX % 2 !== 0) offsetX += 1;
     let placed = 0;
@@ -3271,13 +2485,7 @@ async function init() {
     showHudPrompt(`Placed a copy of your sculpture in-world (${placed} cells), next to the origin.`);
   });
 
-  // Ghost block preview (B1's "intelligent ghost block"): up to two
-  // translucent RD meshes, reusing the exact same geometry as the real
-  // mesh so the preview always matches the real shape exactly. Hidden by
-  // default; build.js's onHover/onHoverEnd callbacks below drive
-  // position/visibility -- render.js owns the actual THREE objects since
-  // it already owns `scene`/`geometry`, keeping build.js's own job pure
-  // raycasting/state (same separation the rest of this file already uses).
+  // See docs/code-notes/render.md
   const ghostMaterial = new THREE.MeshBasicMaterial({
     color: 0x9de0ff,
     transparent: true,
@@ -3291,9 +2499,6 @@ async function init() {
     return m;
   });
   let lastHoverCells = null;
-  // B2: the material wheel's live structure-preview on hover recolors
-  // this same ghost instead of a separate preview object -- when set,
-  // it overrides the normal occupied/valid tint until hover ends.
   let materialPreviewColor = null;
   function showGhost(cells) {
     lastHoverCells = cells;
@@ -3316,12 +2521,7 @@ async function init() {
     });
   }
 
-  // Placement/removal feedback (B1): a short outline flash at the
-  // affected cell plus a WebAudio blip (sfx.js). Reuses the same shared
-  // geometry as the ghost preview -- a wireframe wrapper via
-  // EdgesGeometry, scaled up and faded out over a fixed short duration,
-  // then disposed, so nothing here needs its own per-frame animation
-  // loop beyond a single requestAnimationFrame chain.
+  // See docs/code-notes/render.md
   function flashAt(cell, color) {
     const edges = new THREE.EdgesGeometry(geometry);
     const flashMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
@@ -3357,10 +2557,7 @@ async function init() {
     onHover: (cells, valid) => {
       if (cells && cells.length > 0) {
         showGhost(cells);
-        // B3: 'faceHovered' -- fires on any valid hovered face, not just
-        // an unoccupied one, matching the subscript step's own plain-
-        // language framing ("hover over one" of the 12 faces).
-        window.dispatchEvent(new CustomEvent('rhombiverse:faceHovered'));
+        window.dispatchEvent(new CustomEvent('rhombiverse:faceHovered')); // B3, see docs/code-notes/render.md
       } else {
         hideGhost();
       }
@@ -3376,16 +2573,7 @@ async function init() {
       playRemoveSound();
     },
     getDragPlacementEnabled: () => wheel.isDragPlacementEnabled(),
-    // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md: Plant mode's own build/place
-    // handling is in render.js (its own click listener below), never
-    // build.js -- but getMode() must still return the real 'plant'
-    // string here, not null. A real bug caught fixing this: returning
-    // null (mirroring how Walk mode disables editing entirely) also
-    // silently disabled onContextMenu's right-click removal in Plant
-    // mode, contradicting "right-click always removes the clicked
-    // cell, in every mode." build.js's own onClick has a one-line
-    // `mode === 'plant'` no-op instead, so its own unconditional build
-    // fallthrough is skipped WITHOUT also disabling removal.
+    // getMode() must return 'plant', never null -- see docs/code-notes/render.md
     getMode: () => (walking ? null : currentMode),
     getShellCount,
     getMinShell: () => Math.min(Math.max(1, Number(hollowFromInput.value) || 1), getShellCount()),
@@ -3396,37 +2584,20 @@ async function init() {
     mineRemote: (x, y, z) => {
       if (sharedWorldActive) mineAsteroidCellRemote(x, y, z);
     },
-    // Phase A completion (2026-08-23): build.js (Core) no longer
-    // statically imports asteroids.js -- see the FEATURES.economy block
-    // above init()'s own end for the parallel regions.js wiring. This
-    // render.js-local `mineAsteroidCell` binding (declared near
-    // applyInventoryDecay etc. above) is already the real function when
-    // FEATURES.mining is on, or its own inert no-op default otherwise --
-    // build.js's own separate default (its param default) is redundant
-    // with, not needed alongside, this one.
-    mineAsteroidCell,
+    mineAsteroidCell, // see docs/code-notes/render.md
     onCellClicked: (cell) => {
       focusedCenterKey = cell.shellCenter || null;
       renderRingList();
     },
   });
 
-  // Rhombic Wheel (B1) -- the one control surface all mode/material
-  // interaction is meant to go through now that the old always-visible
-  // sidebar is gone. Drives the hidden .mode-btn/#material-select/etc.
-  // shim elements directly (see wheel.js's own header for why), so this
-  // needs no further wiring into build.js's mode dispatch itself.
+  // See docs/code-notes/render.md
   const wheel = createRhombicWheel({
     onModeChosen: () => {
       updateModeUI();
       rebuildInstances(mesh, world, currentMode === 'report');
     },
     onDragPlacementChange: (enabled) => {
-      // Left-drag normally orbits the camera (OrbitControls' own
-      // default) -- while Repeat is armed, left-drag instead paints a
-      // run of cells (build.js's onPointerMove), so orbiting via that
-      // button has to yield for as long as Repeat stays selected.
-      // Right-click (remove) and middle-drag (zoom) are unaffected.
       controls.mouseButtons.LEFT = enabled ? null : ORBIT_LEFT_DEFAULT;
     },
     onPrompt: (text) => showHudPrompt(text),
@@ -3446,13 +2617,7 @@ async function init() {
   });
   updateHudIndicator();
 
-  // Completes the persona grid's onboarding arc: Build is already the
-  // default state (Rhombitect needs no action beyond dismissing the
-  // overlay), the other three land the player straight into the mode/
-  // panel their persona is about -- reusing the exact same wheel-item
-  // clicks a real player would make (open() -> category leaf -> tool
-  // leaf), so this can never drift out of sync with what the wheel
-  // itself does for that same choice.
+  // See docs/code-notes/render.md
   applyPersonaChoiceFn = (persona) => {
     const clickWheelItem = (text) => {
       [...document.querySelectorAll('.wheel-item')].find((el) => el.textContent.includes(text))?.click();
@@ -3476,14 +2641,7 @@ async function init() {
     pendingPersonaChoice = null;
   }
 
-  // Shared World (Phase 5): applyRemoteUpsert/Delete write an incoming
-  // realtime change into the LOCAL store via the same world.addCell/
-  // removeCell every other code path uses (so derived mechanics --
-  // hydrosphere, black hole, star fusion -- recompute correctly against
-  // it too, since onChange() re-runs the full apply* pipeline), guarded
-  // by applyingRemote so handleLocalAdd/Remove (registered on the store
-  // above) don't immediately push the very change that was just received
-  // back to Supabase.
+  // See docs/code-notes/render.md
   function applyRemoteUpsert(x, y, z, data) {
     applyingRemote = true;
     world.addCell(x, y, z, data);
@@ -3497,27 +2655,13 @@ async function init() {
     applyingRemote = false;
   }
 
-  // Claims have no local push-hook to suppress (unlike cells' addCell/
-  // removeCell -- see worldstate.js), so no applyingRemote guard is
-  // needed here: applying an incoming claim can never itself trigger
-  // another push. No onChange() either -- claims have no visual
-  // representation yet (no boundary rendering in this pass), and per
-  // Isolation a newly-announced claim never retroactively touches
-  // already-placed cells, so there's nothing to re-render.
+  // See docs/code-notes/render.md
   function applyRemoteClaim(claimId, claimData) {
     world.addClaim(claimId, claimData);
     refreshClaims();
   }
 
-  // RHOMBIVERSE_SPEC_ASTEROIDS.md section 4: unlike cells, setting/
-  // clearing a regrowth-queue entry is pure bookkeeping with no visual
-  // effect of its own (the actual cell reappearing/vanishing is a
-  // SEPARATE cells-table event that already triggers its own onChange
-  // via applyRemoteUpsert/applyRemoteDelete above) -- so no onChange()
-  // here, same reasoning as claims. DOES need the applyingRemote guard,
-  // unlike claims, since setRegrowthEntry/removeRegrowthEntry have real
-  // local push-hooks (handleLocalRegrowthSet/Clear) that would otherwise
-  // immediately re-push what was just received.
+  // See docs/code-notes/render.md
   function applyRemoteRegrowthSet(key, entry) {
     applyingRemote = true;
     world.setRegrowthEntry(key, entry);
@@ -3529,14 +2673,7 @@ async function init() {
     applyingRemote = false;
   }
 
-  // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 10, closed 2026-08-13:
-  // unlike regrowth entries, a seed HAS real visual geometry (its
-  // tiles), so an incoming remote seed (a fresh plant from another
-  // player, or a growth tick on a seed this session didn't plant) needs
-  // rebuildSeedMeshes, not just a silent store update. No onChange()
-  // here -- a growth-layer seed's tiles are their own separate mesh
-  // group (see rebuildSeedMeshes), not part of the RD InstancedMesh
-  // onChange() re-syncs.
+  // See docs/code-notes/render.md
   function applyRemoteSeedSet(seedId, seedData) {
     applyingRemote = true;
     world.setSeed(seedId, seedData);
@@ -3549,30 +2686,14 @@ async function init() {
     applyingRemote = false;
   }
 
-  // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md: inventory has no local push-hook
-  // (worldstate.js's setInventoryEntry is a plain setter -- Shared World
-  // inventory changes only ever originate server-side, via
-  // mine_asteroid_cell or the trade-resolution trigger, never a direct
-  // client write), so no applyingRemote guard is needed, same reasoning
-  // as claims. No onChange() either -- inventory has no 3D representation;
-  // just re-renders the panel.
+  // See docs/code-notes/render.md
   function applyRemoteInventory(ownerId, material, entry) {
     world.setInventoryEntry(ownerId, material, entry);
     updateInventoryHint();
     renderTradePanel();
   }
 
-  // Same no-guard reasoning as inventory above -- a pending trade only
-  // ever changes via this session's own pushTradePropose/Confirm/Cancel
-  // calls (which never touch world.setPendingTrade directly, see
-  // proposeTradeUI/confirmTradeUI/cancelTradeUI below) or another
-  // client's realtime echo, never a local write that could feedback-loop.
-  // Scoped to trades actually involving the currently-open partner --
-  // renderInteractPanel() rebuilds the propose form from scratch
-  // (including resetting any offer the player has already picked, see
-  // its own comment), so an unrelated trade elsewhere in the shared
-  // world updating must NOT trigger it, or it would silently wipe an
-  // in-progress selection for a completely unrelated reason.
+  // See docs/code-notes/render.md
   function interactPanelShowsTrade(tradeData) {
     return (
       interactOverlayEl?.classList.contains('open') &&
@@ -3599,32 +2720,12 @@ async function init() {
   const claimLandBtn = document.getElementById('claim-land-btn');
   const claimHint = document.getElementById('claim-hint');
   const claimsListEl = document.getElementById('claims-list');
-  // Migration Path Phase A's "two remaining gaps" (RHOMBIVERSE_PLAN.md),
-  // claims half (2026-08-23): unlike mining/hazards -- pure data-layer
-  // systems where an inert function default is enough, since nothing
-  // reaches through them but ticks/render loops -- claims have a real
-  // clickable UI surface. Leaving Claim Land enabled with FEATURES.economy
-  // off would let a player click it and see a broken "Claimed null:
-  // center [undefined]" result (regions.js's real computeClaim never
-  // loads, so the module-level binding stays its inert default). Hiding
-  // the whole panel is a coherent "claims don't exist" state instead of a
-  // half-working button -- direct instruction, confirmed over "leave the
-  // UI as-is."
+  // Claims panel visibility -- see docs/code-notes/render.md
   ['claim-land-row', 'claim-hint', 'claims-list'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.style.display = FEATURES.economy ? '' : 'none';
   });
-  // World-panel content that only makes sense for the real World: the
-  // asteroid-belt hint/nav (belt-nav-row itself already empties
-  // naturally when FEATURES.mining is off -- listBelts() returns [], see
-  // this binding's own declaration above -- but the static hint text
-  // needs an explicit hide, same reasoning as claims just above) and the
-  // World presets/Load-World picker. Direct feedback (2026-08-24):
-  // Sculpture Mode's OWN scratch world has no presets and no asteroids
-  // -- CLAUDE.md's own "a separate, isolated scratch workspace" -- so
-  // both groups must ALSO hide whenever sculptureModeActive is true,
-  // independent of the FEATURES flags (re-run from enterSculptureMode/
-  // exitSculptureMode below, not just once here at init).
+  // See docs/code-notes/render.md
   function updateWorldPanelVisibility() {
     const asteroidSection = document.getElementById('asteroid-info-section');
     if (asteroidSection) asteroidSection.style.display = FEATURES.mining && !sculptureModeActive ? '' : 'none';
@@ -3633,14 +2734,7 @@ async function init() {
   }
   updateWorldPanelVisibility();
 
-  // Rebuilds both the wireframe-sphere territory visuals AND the text
-  // list from world.getClaims() -- called after every point claims
-  // actually change (a local grant, a remote claim arriving, entering/
-  // leaving Shared World), not on every onChange(), since claims change
-  // far less often than cells do. Clearing and rebuilding the whole
-  // group each time is simpler than diffing for the handful of claims
-  // this project has ever been tested with -- revisit if that stops
-  // being true.
+  // See docs/code-notes/render.md
   function refreshClaims() {
     while (claimGroup.children.length > 0) {
       const child = claimGroup.children[0];
@@ -3648,25 +2742,11 @@ async function init() {
       child.geometry.dispose();
       child.material.dispose();
     }
-    // Clears any existing claim-boundary hulls (above) and stops --
-    // FEATURES.economy off means claims don't exist for this session,
-    // full stop, regardless of what a previously-saved world's own JSON
-    // still has stored under `claims` (that data isn't deleted, just not
-    // surfaced, same as every other FEATURES-gated system). The panel
-    // itself is already display:none (see this function's own
-    // declaration block above), so skipping the list rebuild too is
-    // just avoiding pointless DOM writes to a hidden element.
     if (!FEATURES.economy) return;
     const claims = world.getClaims();
     currentClaims = claims;
     const ids = Object.keys(claims);
 
-    // One claim per player (RHOMBIVERSE_SPEC_LOOPHOLES.md section 2) --
-    // disable the button once this session already owns one, rather than
-    // letting them click it again just to see the "already have a claim"
-    // error every time. Only touches the button while Shared World is
-    // actually active; setClaimLandEnabled(false) on disconnect already
-    // covers the other case.
     if (sharedWorldActive) {
       claimLandBtn.disabled = ids.some((id) => claims[id].ownerId === myUserId);
     }
@@ -3674,21 +2754,9 @@ async function init() {
     for (const id of ids) {
       const claim = claims[id];
       const [wx, wy, wz] = cellToWorld(...claim.center, SCALE);
-      // Footprint points are already in world space (claimFootprintWorldVertices
-      // applies SCALE itself), offset by -claim center so the resulting
-      // geometry is centered at its own local origin -- the mesh is then
-      // positioned via `.position.set`, matching how every other object
-      // in this scene is placed, rather than baking the offset into the
-      // geometry itself.
       const points = claimFootprintWorldVertices(claim, SCALE).map(([x, y, z]) => new THREE.Vector3(x - wx, y - wy, z - wz));
       const hullGeom = new ConvexGeometry(points);
       const mine = claim.ownerId === myUserId;
-      // Solid, low-opacity fill (not wireframe) -- a wireframe of an
-      // 8-shell claim's real convex hull has far more facets than the
-      // old sphere ever did and reads as visual noise; a translucent
-      // solid volume is what actually makes overlapping claims legible
-      // at a glance. DoubleSide since the camera can end up inside a
-      // large claim's own hull while walking.
       const hullMat = new THREE.MeshBasicMaterial({
         color: mine ? CLAIM_COLOR_MINE : CLAIM_COLOR_OTHER,
         transparent: true,
@@ -3717,9 +2785,6 @@ async function init() {
         `${mine ? '★ ' : ''}${id} — shell ${claim.shellIndex} — ` +
         `${mine ? 'you' : claim.ownerId.slice(0, 8)}`;
       row.appendChild(label);
-      // Only your own claims get the toggle -- RLS would silently reject
-      // an attempt on anyone else's anyway (claims_update_own), so there's
-      // no point offering a control that can only ever fail.
       if (mine) {
         const toggle = document.createElement('label');
         toggle.className = 'claim-destructible-toggle';
@@ -3749,12 +2814,7 @@ async function init() {
     }
   }
 
-  // Rebuilds ONE seed's own tile meshes from its current world-state --
-  // called after growth (not a full-world rebuild) so an idle seed's
-  // meshes are never touched just because something unrelated changed
-  // elsewhere. Disposes the previous group's geometries/materials
-  // before replacing them, same cleanup discipline refreshClaims above
-  // already uses for its own THREE objects.
+  // See docs/code-notes/render.md
   function rebuildSeedMeshes(seedId, seed) {
     const existing = growthMeshesBySeed.get(seedId);
     if (existing) {
@@ -3765,18 +2825,7 @@ async function init() {
       }
       growthMeshesBySeed.delete(seedId);
     }
-    // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md Stage 5: a real tracked organism's
-    // seed is deliberately EXCLUDED from this always-visible, full-block-
-    // scale rendering -- this is the exact "scale-mismatch problem the
-    // project owner raised" section 6.1 opens with (an amoeba/plant
-    // rendered at the same order of magnitude as a whole building block).
-    // Stage 5's own refreshOrganismMiniatures below replaces it with a
-    // correctly tiny, LOD-gated version instead, reusing this exact same
-    // real tile geometry, just scaled down and only revealed once the
-    // camera is genuinely close. Ordinary (non-organism) growth species
-    // are completely unaffected -- this only skips seeds whose species
-    // carries evolution.js's own ORGANISM_SEED_SPECIES_PREFIX.
-    if (seed.species.startsWith(ORGANISM_SEED_SPECIES_PREFIX)) return;
+    if (seed.species.startsWith(ORGANISM_SEED_SPECIES_PREFIX)) return; // see docs/code-notes/render.md
     const group = new THREE.Group();
     const color = speciesColor(seed.species);
     seed.tiles.forEach((tile, tileIndex) => {
@@ -3784,8 +2833,6 @@ async function init() {
       const geometry = new ConvexGeometry(verts);
       const material = new THREE.MeshStandardMaterial({ color, flatShading: true });
       const tileMesh = new THREE.Mesh(geometry, material);
-      // B5 Cultivation Mode: lets the prune contextmenu handler below
-      // identify exactly which seed/tile a right-click landed on.
       tileMesh.userData.seedId = seedId;
       tileMesh.userData.tileIndex = tileIndex;
       group.add(tileMesh);
@@ -3812,14 +2859,7 @@ async function init() {
     }
   }
 
-  // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 3: direct barter only,
-  // no marketplace/listings (the spec's own explicit scope limit) -- one
-  // material each side, kept deliberately simple rather than a
-  // multi-material offer basket. With no chat/DM system anywhere in this
-  // app, a trade partner has to be identified by pasting their raw
-  // player ID; the "known traders" list below (derived from the
-  // already-public player_inventory data, not a new lookup) exists
-  // purely so that isn't the ONLY way -- click a row to fill the input.
+  // See docs/code-notes/render.md
   const TRADE_MATERIALS = [
     ['base', 'Base Rhomb'],
     ['garnet', 'Garnet'],
@@ -3931,12 +2971,7 @@ async function init() {
     avatarLabelEls.clear();
   }
 
-  // Called every frame from animate() while Shared World is active --
-  // projects each other walking player's live position to screen space
-  // (this app already does everything else, hud-prompt/achievements/
-  // claim hints, as plain DOM overlays rather than 3D sprites, so this
-  // stays consistent with that rather than introducing a new rendering
-  // approach just for avatars).
+  // See docs/code-notes/render.md
   const projectVec = new THREE.Vector3();
   function updateAvatarLabels() {
     const seen = new Set();
@@ -3968,10 +3003,7 @@ async function init() {
     }
   }
 
-  // Nearest walking player within INTERACT_RADIUS, if any -- drives both
-  // the tappable #interact-btn (touch has no equivalent for a keyboard
-  // shortcut, same gap this session already fixed for the wheel) and
-  // the 'E' key below.
+  // See docs/code-notes/render.md
   const interactBtnEl = document.getElementById('interact-btn');
   function updateInteractProximity() {
     if (!sharedWorldActive || !walking || !player) {
@@ -4033,12 +3065,7 @@ async function init() {
     return null;
   }
 
-  // Pointer-based drag (not HTML5 draggable/dragstart) -- see index.html's
-  // own comment: native drag-and-drop has no touch equivalent, and this
-  // session already fixed real touch gaps elsewhere in this app. A plain
-  // click/tap (no movement) is also accepted, calling onDrop(null) so the
-  // caller can default to that chip's natural zone -- this makes the
-  // whole interaction work identically well with a mouse or a finger.
+  // See docs/code-notes/render.md
   function makeChipDraggable(chipEl, onDrop) {
     chipEl.addEventListener('pointerdown', (e) => {
       const startX = e.clientX;
@@ -4145,11 +3172,6 @@ async function init() {
         if (zoneId === 'interact-give-zone') return; // their material doesn't belong in "you give"
         interactGetMaterial = material;
         interactGetQty = 1;
-        // The partner's own held quantity is a display cap only -- the
-        // trade can still ask for more than they currently hold, same
-        // as the old form allowed (proposeTrade only ever checks the
-        // PROPOSER's own side up front; resolveTrade re-checks both at
-        // the moment of resolution, per trade.js's own comment).
         renderOfferZone('interact-get-zone', material, Math.max(entry.quantity, 999), (q) => { interactGetQty = q; });
         updateSendButtonState();
       });
@@ -4230,30 +3252,11 @@ async function init() {
   });
   tickPresenceFn = tickPresence;
 
-  // RHOMBIVERSE_SPEC_REGIONS.md, minimal UI trigger: grants this session's
-  // player one fixed-size claim in the first free slot found outward from
-  // world center. Only meaningful while Shared World is active (ownership
-  // needs a real per-player identity, and claims are pointless to protect
-  // in a world only you can ever see) -- claimLandBtn is enabled/disabled
-  // alongside the other Shared-World-only controls. Pushes to Supabase
-  // BEFORE applying locally (unlike cell edits, which apply optimistically
-  // then push) -- computeClaim is pure/non-mutating specifically so this
-  // ordering is possible, since a genuine concurrent-grant race on the
-  // same free slot needs to be caught by the server (the claims table's
-  // own primary key) before this client treats the claim as real.
+  // Claim Land button -- see docs/code-notes/render.md
   claimLandBtn.addEventListener('click', async () => {
     if (!sharedWorldActive || !myUserId) return;
     claimLandBtn.disabled = true;
     try {
-      // Search near wherever this player actually is -- their real
-      // position while walking, or wherever they're currently looking/
-      // orbiting otherwise -- rather than always world center. See
-      // findFreeSlot's own header (regions.js, 2026-08-13) for why: a
-      // fixed shared search origin gets more crowded, and thus more
-      // expensive to search past, as every player who has ever claimed
-      // land accumulates near it; a per-player origin keeps search cost
-      // flat regardless of total claims elsewhere in the (genuinely
-      // unbounded) lattice.
       const focus = walking ? camera.position : controls.target;
       const [ox, oy, oz] = nearestValidCell(focus.x / SCALE, focus.y / SCALE, focus.z / SCALE);
       const { claimId, claimData } = computeClaim(world, myUserId, undefined, { x: ox, y: oy, z: oz });
@@ -4268,23 +3271,12 @@ async function init() {
       claimHint.textContent = `Claim failed: ${err.message}`;
       console.warn('Rhombiverse: claim failed', err);
     } finally {
-      // NOT unconditionally re-enabled here -- a real bug caught live:
-      // this used to always flip back to `!sharedWorldActive` (i.e.
-      // enabled), immediately undoing refreshClaims()'s own "you already
-      // own a claim, disable the button" state set moments earlier in the
-      // try block above. Re-derive the same ownership check instead of
-      // fighting refreshClaims for the last word.
       claimLandBtn.disabled =
         !FEATURES.economy || !sharedWorldActive || Object.values(world.getClaims()).some((c) => c.ownerId === myUserId);
     }
   });
 
-  // New World / Import / Load preset all mutate via world.replaceAll(),
-  // which deliberately bypasses the addCell/removeCell sync hooks (see
-  // worldstate.js) -- a personal local-view reset must never bulk-push
-  // or bulk-delete against the shared table. Rather than let that
-  // silently desync the view from the shared world, these three controls
-  // are simply disabled for the duration of the Shared World session.
+  // See docs/code-notes/render.md
   function setLocalResetControlsEnabled(enabled) {
     newWorldBtn.disabled = !enabled;
     importInput.disabled = !enabled;
@@ -4566,90 +3558,38 @@ async function init() {
   // session) -- these presets are generated via the actual lattice math
   // (NEIGHBOR_OFFSETS-driven, not hand-derived coordinates) so they're
   // guaranteed valid, and double as reliable fixtures for future tests.
+  // See docs/code-notes/render.md
   document.getElementById('load-preset').addEventListener('click', async () => {
     const key = document.getElementById('preset-select').value;
     if (!key) return;
     if (!confirm('Load this preset? This clears your current build.')) return;
-    // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md section 4.1: growth-layer
-    // presets live in their own data/growth-presets/ directory
-    // (distinct from data/presets/*.json's planetoid presets), selected
-    // by a "growth:" prefix on the option value rather than a second
-    // dropdown -- simplest thing that works for one extra directory.
     const path = key.startsWith('growth:')
       ? `./data/growth-presets/${key.slice('growth:'.length)}.json`
       : `./data/presets/${key}.json`;
     const preset = await loadWorld(path);
     world.replaceAll(preset);
-    // Loading a World is a full replace, not additive -- any asteroid
-    // belts seeded at first visit (init()'s own unconditional
-    // seedAsteroidBelts() call) are gone the moment this fires, and
-    // this never re-seeded them, silently leaving nothing minable
-    // behind for any preset that wasn't itself authored with asteroid
-    // cells baked in (true of every Body Type preset -- planetoidgen.js
-    // never tags any). Same idempotent call enableSharedWorld() already
-    // makes -- a no-op if the loaded World already has its own asteroid
-    // cells, otherwise seeds the standard two belts.
-    seedAsteroidBelts(world);
+    seedAsteroidBelts(world); // re-seed after the full replace -- see docs/code-notes/render.md
     onChange();
     rebuildAllGrowth();
   });
 
-  // RHOMBIVERSE_SPEC_ASTEROIDS.md section 4: a mined cell should regrow
-  // as real time passes, not only on the player's next edit -- a periodic
-  // tick covers idle time between mutations. Deliberately does NOT go
-  // through onChange() (which would push a phantom undo-stack entry and
-  // re-save on every tick even when nothing regrew) -- only rebuilds
-  // instances and persists when applyAsteroidRegeneration actually
-  // changed the cell count. Regrown cells still sync to Shared World
-  // normally, since world.addCell (called inside applyAsteroidRegeneration)
-  // fires the same onAdd hook as any other cell placement.
+  // 5s idle-time tick: asteroid regrowth, inventory decay, growth, and
+  // evolution catch-up. Deliberately does NOT go through onChange() --
+  // see docs/code-notes/render.md for why, and for a real bug history
+  // on the evolution-save condition below.
   setInterval(() => {
     const before = world.entries().length;
     applyAsteroidRegeneration(world);
     applyPopulationScaledSpawning(world);
-    // RHOMBIVERSE_SPEC_TRADE_INVENTORY.md section 4: decay never changes
-    // cell count (it only touches playerInventory), so it can't be
-    // gated behind the same before/after cell-count check above -- but
-    // the inventory hint still needs to reflect it as it happens, not
-    // only after the player's next unrelated edit.
     applyInventoryDecay(world);
     updateInventoryHint();
-    // RHOMBIVERSE_SPEC_PENROSE_GROWTH.md: same "periodic tick covers
-    // idle time" reasoning as asteroid regrowth above, and the exact
-    // same "don't route through onChange()" avoidance -- but checked
-    // independently of the cells before/after comparison, since growth
-    // never touches `cells` at all (a seed's own tiles live entirely in
-    // `seeds`, per the spec's Isolation section).
     if (applyGrowth(world, Date.now())) {
       rebuildAllGrowth();
       if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
     }
-    // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md section 4: the same
-    // periodic-tick shape covers real elapsed time for organisms too --
-    // most ticks resolve zero generations (EVOLUTION_GENERATION_
-    // INTERVAL_MS is 30s, this tick is 5s) and are cheap no-ops, exactly
-    // like applyGrowth's own cooldown above. Gated off while Shared
-    // World is active for the same reason the initial on-load resolve
-    // is (see resolveEvolution's own header -- no sync path yet).
-    //
-    // Real bug caught by a live Playwright run before trusting this:
-    // resolveCatchUpForAllPlanetoids advances each planetoid's own
-    // lastSimulated/rngState bookkeeping in the LIVE in-memory world
-    // object on every call, even when zero generations resolve -- that
-    // part is correct and accumulates fine across ticks within one
-    // continuous session. But this used to only call saveToLocalStorage
-    // when resolveEvolution returned true (something visibly changed),
-    // exactly mirroring applyGrowth's own pattern above -- which is
-    // wrong here specifically, because unlike a growth seed (whose
-    // lastGrowthAt is never touched at all unless real growth happens),
-    // a brand-new planetoid's very first resolve falls back to `now` as
-    // its baseline lastSimulated and only that in-memory value ever
-    // advances it correctly afterward. A page reload before the first
-    // real generation ever resolves (up to a 30s window) would have lost
-    // that in-memory baseline entirely, silently resetting the clock.
-    // Saving on every tick that has at least one organism to track
-    // (regardless of whether this specific tick grew anything) closes
-    // that gap.
+    // Saves on every tick with >=1 organism (not just when something
+    // visibly changed) -- see docs/code-notes/render.md for the real
+    // lost-baseline bug this fixes.
     if (!sharedWorldActive && Object.keys(world.getOrganisms()).length > 0) {
       if (resolveEvolution(world, Date.now())) rebuildAllGrowth();
       saveToLocalStorage(world.toJSON());
@@ -4669,18 +3609,15 @@ function onResize() {
 }
 window.addEventListener('resize', onResize);
 
-// B6 tasks #40/#42: tickPresence itself is init()-scoped (it needs
-// `world` and several panel DOM elements only created there), but
-// animate() is module-level -- bridged the same way onboardingCyborg's
-// applyPersonaChoiceFn is, a module-level slot init() fills in once
-// everything it needs actually exists.
+// tickPresenceFn: init()-scoped logic bridged to this module-level slot --
+// see docs/code-notes/render.md.
 let tickPresenceFn = () => {};
 
 let lastFrameTime = performance.now();
 function animate() {
   requestAnimationFrame(animate);
   const now = performance.now();
-  const dt = Math.min(0.1, (now - lastFrameTime) / 1000); // clamp avoids a huge step after a tab is backgrounded
+  const dt = Math.min(0.1, (now - lastFrameTime) / 1000); // clamp avoids a huge step after a backgrounded tab regains focus
   lastFrameTime = now;
 
   if (walking && player) {

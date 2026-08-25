@@ -1,19 +1,7 @@
 // Minimal first-person "Walk" controller for planetoid surfaces --
-// RHOMBIVERSE_PLAN.md Phase 5.5's other half (gravity.js supplies the
-// physics this reads). Deliberately NOT three/addons' PointerLockControls:
-// that class hard-codes world Y as "up" in its internal Euler math, which
-// breaks the moment gravity's "up" is a radial direction instead. This
-// builds camera orientation directly from yaw/pitch plus whatever `up`
-// gravity.js reports for the player's current position each frame, so
-// walking on a curved planetoid surface re-levels correctly; flying in
-// open space (no active planetoid) falls back to world Y and behaves like
-// a simple no-clip flycam -- the "zero-gravity space between planetoids"
-// case section 4 allows for inert cells applies here too.
-//
-// Known first-pass limitation: no roll blending between two DIFFERENT
-// planetoids' gravity fields in one session (up snaps instantly at the
-// boundary) -- acceptable for now since a single-planetoid session is the
-// realistic first-playtest case; revisit if that changes.
+// RHOMBIVERSE_PLAN.md Phase 5.5's other half. Deliberately NOT
+// three/addons' PointerLockControls (hard-codes world Y as "up").
+// Full rationale/history: docs/code-notes/app/player.md
 import * as THREE from 'three';
 import { getSettings } from './settings.js';
 
@@ -37,9 +25,6 @@ export function createPlayerController({ camera, domElement, getGravity }) {
   const onKeyDown = (e) => keys.add(e.code);
   const onKeyUp = (e) => keys.delete(e.code);
 
-  // Shared by real mouse movement (pointer-lock, desktop) and the touch
-  // look-drag zone (render.js) -- same sensitivity/invert/clamp either
-  // way, just a different source of raw dx/dy.
   function applyLookDelta(dx, dy) {
     const { sensitivity, invertY } = getSettings();
     const sens = MOUSE_SENSITIVITY * sensitivity;
@@ -53,12 +38,6 @@ export function createPlayerController({ camera, domElement, getGravity }) {
     applyLookDelta(e.movementX, e.movementY);
   };
 
-  // Touch has no keyboard and mobile browsers don't support Pointer
-  // Lock the way desktop does -- render.js's on-screen joystick/look
-  // layer drives movement and look through these instead of real
-  // keyboard/mouse events. virtualMove is analog (joystick displacement,
-  // -1..1 per axis), blended additively with any real WASD input rather
-  // than replacing it, so a hybrid device with both isn't penalized.
   let virtualMove = { forward: 0, strafe: 0 };
   function setVirtualMove(forward, strafe) {
     virtualMove = { forward, strafe };
@@ -102,9 +81,6 @@ export function createPlayerController({ camera, domElement, getGravity }) {
       ? position.clone().sub(new THREE.Vector3(...gravity.centerOfMass)).normalize()
       : WORLD_UP.clone();
 
-    // Camera basis: align world-Y-up basis vectors to `up`, then apply
-    // yaw around `up` and pitch around the yaw-adjusted right axis --
-    // the standard "re-level to an arbitrary up vector" construction.
     const alignQuat = new THREE.Quaternion().setFromUnitVectors(WORLD_UP, up);
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(alignQuat).applyAxisAngle(up, yaw);
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(alignQuat).applyAxisAngle(up, yaw);
@@ -117,7 +93,7 @@ export function createPlayerController({ camera, domElement, getGravity }) {
     if (keys.has('KeyA')) moveDir.sub(right);
     moveDir.addScaledVector(forward, virtualMove.forward);
     moveDir.addScaledVector(right, virtualMove.strafe);
-    if (moveDir.lengthSq() > 1) moveDir.normalize(); // only clamp when combined input actually exceeds full speed
+    if (moveDir.lengthSq() > 1) moveDir.normalize();
 
     if (gravity) {
       velocity.addScaledVector(up, -GRAVITY_ACCEL * dt);

@@ -1,9 +1,6 @@
-// World sharing via a compressed URL (RHOMBIVERSE_UIUX_BUILD_PLAN.md
-// B6). Uses the browser's native CompressionStream/DecompressionStream
-// (gzip) -- no external compression library needed, keeping the
-// no-build-step frontend untouched, same "reuse the platform" instinct
-// as byok.js's plain-fetch choice. Widely supported in evergreen
-// browsers; feature-detected below rather than assumed.
+// World sharing via a compressed URL (RHOMBIVERSE_UIUX_BUILD_PLAN.md B6).
+// Full design rationale/history for every export below:
+// docs/code-notes/app/worldshare.md
 export function compressionSupported() {
   return typeof CompressionStream !== 'undefined' && typeof DecompressionStream !== 'undefined';
 }
@@ -33,11 +30,6 @@ async function decompressFromBase64Url(encoded) {
   return new TextDecoder().decode(buf);
 }
 
-// Only the real world data a fresh session needs to reconstruct the
-// build -- deliberately excludes bulky/regenerable-on-load fields
-// (asteroidRegrowth timers, playerInventory, pendingTrades) to keep the
-// URL as short as possible; a shared link is meant for "here's what I
-// built," not a full account-state transfer.
 function shareableSlice(worldJSON) {
   const { worldName, version, cells, claims, seeds, organisms, meta } = worldJSON;
   return { worldName, version, cells, claims, seeds, organisms, meta };
@@ -65,10 +57,6 @@ export function getSharedWorldParam() {
   return new URLSearchParams(location.search).get('w');
 }
 
-// Removes the ?w= param from the visible URL after a shared world has
-// been loaded, so refreshing the page resumes the player's OWN save
-// (already copied into localStorage by then) instead of re-importing
-// the shared link's snapshot every time.
 export function clearSharedWorldParam() {
   const url = new URL(location.href);
   url.searchParams.delete('w');

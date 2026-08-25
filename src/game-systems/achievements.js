@@ -1,11 +1,5 @@
-// Achievements/soft-goals (RHOMBIVERSE_UIUX_BUILD_PLAN.md B6). "Using
-// the existing bottom contextual-prompt element... (the 'toast'
-// pattern) rather than a new panel" -- this module owns ONLY detection
-// (pure functions over world/planetoids state already computed
-// elsewhere every onChange); render.js calls checkAchievements() and
-// feeds any newly-earned ones to its own showHudPrompt, no new UI
-// surface here at all. Earned achievements persist in localStorage so
-// the same toast doesn't repeat every session.
+// Achievements/soft-goals. Detection only -- render.js owns the toast UI.
+// Full design rationale/history: docs/code-notes/game-systems/achievements.md
 const STORAGE_KEY = 'rhombiverse-achievements';
 
 function loadEarned() {
@@ -26,9 +20,6 @@ function saveEarned(set) {
 
 let earned = loadEarned();
 
-// Each check receives {world, planetoids} -- the same two pieces of
-// state render.js's own onChange() already recomputes every call, nothing
-// new tracked. Real, cheap conditions only (no per-frame polling).
 const ACHIEVEMENTS = [
   {
     id: 'first-seed',
@@ -79,11 +70,6 @@ const ACHIEVEMENTS = [
   },
 ];
 
-// Returns an array of newly-earned {id, label} entries (usually 0 or 1,
-// but a single big world-load could legitimately satisfy several at
-// once -- callers should toast them one at a time, not all in the same
-// instant). Marks them earned immediately so a second call never
-// re-reports the same one.
 export function checkAchievements({ world, planetoids }) {
   const newlyEarned = [];
   for (const achievement of ACHIEVEMENTS) {

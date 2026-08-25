@@ -1,13 +1,6 @@
 // Cyborg Mode (RHOMBIVERSE_UIUX_BUILD_PLAN.md B3): guided onboarding
-// that narrates a "subscript" JSON (data/cyborg/*.json) -- an ordered
-// list of steps, each with a plain-language instruction, a named
-// successCondition event to wait for, and a hint shown only after
-// hintAfterSeconds elapses without success. Every real game event this
-// listens for (rhombiverse:cameraRotated/faceHovered/cellPlaced) is
-// dispatched from render.js/build.js's own existing hooks -- this
-// module only listens and narrates, it NEVER calls world.addCell/
-// removeCell or touches localStorage, satisfying B3's own "toggleable
-// off at any time with zero persistent state change to the world."
+// that narrates a "subscript" JSON (data/cyborg/*.json). Never touches
+// world state or localStorage. Full rationale: docs/code-notes/app/cyborg.md
 const CSS = `
 .cyborg-panel {
   position: fixed;
@@ -59,10 +52,7 @@ const CSS = `
 .cyborg-suggest-btn:hover { background: rgba(124, 204, 255, 0.3); }
 .cyborg-suggest-btn:disabled { opacity: 0.6; cursor: default; }
 
-/* Highlights render.js's #app (the "#viewport" the spec's own example
-   subscript names -- this codebase's real 3D-viewport container has a
-   different real id, so the shipped subscript below targets that one
-   directly rather than a placeholder selector that doesn't exist). */
+/* Highlights render.js's #app -- see docs/code-notes/app/cyborg.md */
 .cyborg-highlighted {
   outline: 3px solid #7cf;
   outline-offset: -3px;
@@ -87,13 +77,7 @@ const SUCCESS_EVENTS = ['cameraRotated', 'faceHovered', 'cellPlaced', 'wheelOpen
 export function createCyborgMode({
   subscriptUrl = './data/cyborg/first-build-session.json',
   panelTitle = 'Cyborg Mode — Guided Walkthrough',
-  // "Really wanted cyborg modes to be able to do more than just suggest
-  // clicking on a face" -- an optional async () => string, reusing the
-  // same three-tier AI pattern Full-Cyborg sculpting/cultivating already
-  // use (see render.js's getCyborgSuggestion). Still narration-only: this
-  // never touches world state itself, same as everything else here --
-  // it just gives the player a genuinely creative idea to go build
-  // themselves, once the walkthrough's own fixed steps are done.
+  // Optional async () => string -- see docs/code-notes/app/cyborg.md
   getSuggestion = null,
 } = {}) {
   injectCssOnce();
@@ -192,12 +176,7 @@ export function createCyborgMode({
     else renderStep();
   }
 
-  // "If a player performs an action out of the expected order... recognize
-  // the corresponding step's success condition whenever it fires rather
-  // than strictly enforcing sequence" -- every step's own successCondition
-  // is listened for the whole time Cyborg Mode is on, not just the
-  // current step's. A step completed early is simply skipped once
-  // advanceToNextIncomplete reaches it.
+  // Out-of-order completion: see docs/code-notes/app/cyborg.md
   function handleSuccess(conditionName) {
     if (!enabled || !subscript) return;
     const step = subscript.steps.find((s) => s.successCondition === conditionName && !completedStepIds.has(s.stepId));

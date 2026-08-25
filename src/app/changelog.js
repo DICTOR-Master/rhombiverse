@@ -1,8 +1,7 @@
-// B7 (RHOMBIVERSE_UIUX_BUILD_PLAN.md): "Replace 'Under Construction'
-// branding with a versioned 'What's new' changelog panel." The branding
-// itself was already dropped (2026-08-19, user feedback); this is the
-// replacement half. Self-contained like welcome.js -- a DOM/localStorage
-// concern only, independent of render.js/world state, own script tag.
+// Versioned "What's New" changelog panel (B7). Self-contained like
+// welcome.js -- a DOM/localStorage concern only, independent of
+// render.js/world state. Full design rationale/history:
+// docs/code-notes/app/changelog.md
 const SEEN_KEY = 'rhombiverse-changelog-seen';
 
 function panelHtml(entries) {
