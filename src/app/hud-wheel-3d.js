@@ -21,6 +21,20 @@
 // wheel would make that same mistake permanent instead of a transient
 // modal-open cost, so it shares the existing renderer/canvas instead
 // of standing up its own.
+//
+// TODO (parked 2026-08-25, not a rejected idea -- just unresolved):
+// tried attaching each symbol as a real textured plane on the rotating
+// geometry (an "engraving" rigidly parented to `group`) instead of this
+// camera-facing DOM overlay, per direct user feedback that a billboard
+// reads as "floating" detached from the object during a drag. Hit a
+// real, unexplained rendering bug -- the dark glyph fill barely showed
+// (only the light halo was visible), and it survived two ruled-out
+// hypotheses (Canvas 2D font-fallback gap: ruled out, glyphs render
+// fine standalone; FrontSide backface culling: ruled out, DoubleSide
+// didn't fix it either) without a clear root cause. Reverted to this
+// known-working DOM approach per direct user permission ("if need be
+// keep symbols floating... make a note to see if we can have them
+// fixed at some point") rather than keep guessing blind.
 import * as THREE from 'three';
 import { buildRDFaces, faceKey, ensureOutwardWinding } from './rhombic-wheel-3d-core.js';
 
@@ -36,7 +50,7 @@ const CSS = `
   position: fixed; inset: 0; pointer-events: none; z-index: 901;
 }
 .hud-wheel-3d-symbol {
-  position: absolute; transform: translate(-50%, -50%);
+  position: absolute; transform: translate(-50%, -50%) scale(var(--hw-scale, 1));
   color: #0a0a0c;
   font: 700 30px/1 system-ui, sans-serif;
   text-shadow: 0 0 3px rgba(255,255,255,0.55);
@@ -53,6 +67,21 @@ function injectCssOnce() {
   document.head.appendChild(style);
 }
 
+// A handful of these glyphs read visually smaller than the others even
+// at the same font-size -- their ink doesn't fill the em-box as fully
+// (a hollow double-diamond, a thin-stroke hexagon outline, a thin
+// circle-slash, vs. a bold filled gear/diamond). Direct user feedback
+// 2026-08-25 ("BCC lattice & cyborg mode symbols are still a bit small
+// compared to others", and "Clear World" -- referred to as "start new
+// world" -- flagged alongside them) -- per-symbol scale bump instead of
+// raising the shared base size, which would overshoot the ones that
+// already read correctly.
+const SYMBOL_SCALE = {
+  'cyborg-toggle': 1.25,
+  'bcc-toggle': 1.3,
+  'clear-world-toggle': 1.25,
+};
+
 // Symbols reused verbatim from the real buttons they replace -- same
 // established visual language, not new icons. Menu gets a distinct
 // glyph (◇ vs Cyborg's ◈) since two identical symbols on one
@@ -68,9 +97,17 @@ const HUD_FACES = {
   'top|sx1sz1':       { symbol: '◇', elId: 'rhombic-wheel-3d-toggle', title: 'Menu' },
   'top|sx-1sz1':      { symbol: '⊘', elId: 'clear-world-toggle',      title: 'Clear World' },
   'bottom|sy1sz-1':   { symbol: '↻', elId: 'reload-toggle',           title: 'Reload' },
-  // 3 spare faces (bottom|sy-1sz-1, bottom|sx1sz-1, bottom|sx-1sz-1):
-  // deliberately blank, same "reserved for later, not invented" policy
-  // as the full wheel's own SPARE faces.
+  // The 3 remaining bottom faces are temporary duplicates of an
+  // existing function at their TRUE geometric antipode (centroid
+  // inversion through the origin, verified numerically, same standing
+  // policy as the main Rhombic Wheel 3D -- "until those blank faces
+  // are filled they should serve as temporary duplicates at opposite
+  // points on the RD to their duplicates", direct user directive
+  // 2026-08-25). Each antipode pairing below was confirmed NOT
+  // edge-adjacent to the face it duplicates before being assigned.
+  'bottom|sy-1sz-1':  { symbol: '◐', elId: 'duality-toggle',          title: 'Duality', temporary: true },
+  'bottom|sx1sz-1':   { symbol: '⊘', elId: 'clear-world-toggle',      title: 'Clear World', temporary: true },
+  'bottom|sx-1sz-1':  { symbol: '◇', elId: 'rhombic-wheel-3d-toggle', title: 'Menu', temporary: true },
 };
 
 export function createHudWheel3D(renderer, { size = 144, margin = 12 } = {}) {
@@ -132,8 +169,15 @@ export function createHudWheel3D(renderer, { size = 144, margin = 12 } = {}) {
 
     // Black relief: a real outlined edge per face, giving the
     // embossed/medallion look asked for, not just a flat silver blob.
+    // Temporary duplicates get a dashed outline instead of solid --
+    // same visual language as the main Rhombic Wheel 3D's own
+    // temporary-duplicate faces, so the "this is a stand-in, not
+    // unique content" cue reads consistently across both wheels.
     const lineGeom = new THREE.BufferGeometry().setFromPoints([...verts, verts[0]]);
-    const line = new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ color: RELIEF_LINE_COLOR }));
+    const line = data?.temporary
+      ? new THREE.Line(lineGeom, new THREE.LineDashedMaterial({ color: RELIEF_LINE_COLOR, dashSize: 0.12, gapSize: 0.08 }))
+      : new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ color: RELIEF_LINE_COLOR }));
+    if (data?.temporary) line.computeLineDistances();
     group.add(line);
 
     let labelEl = null;
@@ -143,6 +187,8 @@ export function createHudWheel3D(renderer, { size = 144, margin = 12 } = {}) {
       labelEl.textContent = data.symbol;
       labelEl.title = data.title;
       labelEl.dataset.faceKey = k;
+      const scale = SYMBOL_SCALE[data.elId];
+      if (scale) labelEl.style.setProperty('--hw-scale', String(scale));
       labelsLayer.appendChild(labelEl);
     }
 
