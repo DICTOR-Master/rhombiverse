@@ -24,7 +24,11 @@
 import * as THREE from 'three';
 import { buildRDFaces, faceKey, ensureOutwardWinding } from './rhombic-wheel-3d-core.js';
 
-const SILVER = 0xb8bcc2;
+// Metallic gold, not silver -- deliberately distinct from "regular"
+// RD material colors used elsewhere (Base Rhomb etc.), per direct
+// user request 2026-08-25, so the HUD wheel reads as its own special
+// object at a glance, not just another buildable material sample.
+const GOLD = 0xd4af37;
 const RELIEF_LINE_COLOR = 0x0a0a0c;
 
 const CSS = `
@@ -34,7 +38,7 @@ const CSS = `
 .hud-wheel-3d-symbol {
   position: absolute; transform: translate(-50%, -50%);
   color: #0a0a0c;
-  font: 700 15px/1 system-ui, sans-serif;
+  font: 700 30px/1 system-ui, sans-serif;
   text-shadow: 0 0 3px rgba(255,255,255,0.55);
   pointer-events: none;
   user-select: none;
@@ -69,7 +73,7 @@ const HUD_FACES = {
   // as the full wheel's own SPARE faces.
 };
 
-export function createHudWheel3D(renderer, { size = 96, margin = 12 } = {}) {
+export function createHudWheel3D(renderer, { size = 144, margin = 12 } = {}) {
   injectCssOnce();
 
   const scene = new THREE.Scene();
@@ -85,9 +89,17 @@ export function createHudWheel3D(renderer, { size = 96, margin = 12 } = {}) {
 
   const group = new THREE.Group();
   scene.add(group);
-  // A gentle fixed tilt so more than one face reads at rest, rather
-  // than staring straight down one face's normal.
-  group.rotation.set(-0.35, 0.55, 0);
+  // Looks straight down the 4-valent vertex (2,0,0) -- computed
+  // exactly (axis-angle from vertex direction to camera, converted to
+  // Euler XYZ; -90 deg yaw around Y, confirmed numerically not
+  // eyeballed), showing Lab/X-Ray/Menu together: the three most
+  // broadly useful functions on this wheel, per direct user request
+  // 2026-08-25 ("three or four most important symbols showing face up
+  // to start"). Checked all 6 four-valent vertices' real-symbol
+  // coverage first -- two alternatives show all 4 real (no blank
+  // face), but mix in less-central actions (Clear World, BCC); this
+  // trio reads as the clearer "important" set even with one blank.
+  group.rotation.set(0, -Math.PI / 2, 0);
 
   const faceEntries = [];
   const labelsLayer = document.createElement('div');
@@ -113,7 +125,7 @@ export function createHudWheel3D(renderer, { size = 96, margin = 12 } = {}) {
     // read as a real small object sitting in the HUD, not a
     // see-through overlay.
     const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({
-      color: SILVER, metalness: 0.55, roughness: 0.35, side: THREE.DoubleSide,
+      color: GOLD, metalness: 0.75, roughness: 0.28, side: THREE.DoubleSide,
     }));
     mesh.userData.faceKey = k;
     group.add(mesh);

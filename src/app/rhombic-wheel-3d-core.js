@@ -275,10 +275,20 @@ export const WHEEL_CONSTRUCT = {
     // belong in mirror-opposite positions, not adjacent ones. Applies
     // to every wheel below with a duplicate.
     "bottom|sy1sz-1":   DUPLICATE_HOME_FACE,
-    "bottom|sx1sz-1":   { kind: "dept", label: "Alter", action: "navigateTo:alter", temporary: true,
-      desc: "Dig, Smooth, and Replace. Duplicated here for quick access from a spare slot." },
-    "bottom|sx-1sz-1":  { kind: "dept", label: "Build", action: "navigateTo:build", temporary: true,
-      desc: "Rhombi-model, Rhombi-sculpt, and Fill. Duplicated here for quick access from a spare slot." }
+    // Both remaining bottom slots reverted to genuine SPARE (2026-08-25
+    // audit fix): this wheel only has two distinct real actions (Build,
+    // Alter) and both are ALREADY doubled via their equator antipode
+    // above, which between them saturate both edge-adjacent neighbors
+    // of every bottom slot -- a 3rd copy of either can only ever land
+    // next to one of its own siblings. Confirmed via the same numeric
+    // edge-adjacency audit that first caught this bug class (see
+    // /tmp/rw3d_duplicate_adjacency_audit.mjs): "Build" was adjacent
+    // between equator|sx-1sy-1 and bottom|sx-1sz-1, "Alter" between
+    // equator|sx1sy-1 and bottom|sx1sz-1. No non-colliding real content
+    // exists for these two slots, so they stay open rather than forcing
+    // a violation of the mirror-opposite/least-adjacent duplicate rule.
+    "bottom|sx1sz-1":   SPARE,
+    "bottom|sx-1sz-1":  SPARE
   }
 };
 
@@ -325,15 +335,25 @@ export const WHEEL_ALTER = {
     // real content exists for it, direct user directive 2026-08-25.
     "equator|sx-1sy-1": { kind: "dept", label: "Dig", action: "tool:dig", temporary: true, desc: "Excavate mode -- click a cell to remove it. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
-    // Least-adjacent placement duplicates Dig again; the OTHER
-    // remaining slot skips Replace on purpose -- it's a non-functional
-    // stub (see comment above), duplicating "not built yet" would just
-    // be misleading clutter, so Smooth (the other real action) fills
-    // it instead even though it's not that slot's exact antipode.
-    "bottom|sx1sz-1":  { kind: "dept", label: "Smooth", action: "tool:smooth", temporary: true,
-      desc: "Round mode -- click to smooth a corner. Duplicated here for quick access from a spare slot." },
-    "bottom|sx-1sz-1": { kind: "dept", label: "Dig", action: "tool:dig", temporary: true,
-      desc: "Excavate mode -- click a cell to remove it. Duplicated here for quick access from a spare slot." }
+    // bottom|sx1sz-1 is edge-adjacent to Smooth's own true original
+    // (equator|sx1sy-1) -- found via a fuller re-run of the adjacency
+    // audit after the first fix pass (2026-08-25), so a Smooth
+    // duplicate can't live here. Reverted to SPARE; Smooth's duplicate
+    // moved to bottom|sx-1sz-1 below instead (confirmed non-adjacent to
+    // its original there).
+    "bottom|sx1sz-1":  SPARE,
+    // Smooth's duplicate (moved here from bottom|sx1sz-1 -- confirmed
+    // non-adjacent to equator|sx1sy-1). The OTHER remaining slot
+    // (bottom|sx1sz-1, above) skips Replace on purpose -- it's a
+    // non-functional stub (see comment above), duplicating "not built
+    // yet" would just be misleading clutter.
+    "bottom|sx-1sz-1": { kind: "dept", label: "Smooth", action: "tool:smooth", temporary: true,
+      desc: "Round mode -- click to smooth a corner. Duplicated here for quick access from a spare slot." }
+    // Note: Dig already has 2 copies (original + equator-antipode
+    // duplicate) which between them saturate both edge-adjacent
+    // neighbors of every open bottom slot here -- no 3rd copy of Dig
+    // can avoid colliding with a sibling, so it isn't force-duplicated
+    // a 3rd time.
   }
 };
 
@@ -388,8 +408,16 @@ export const WHEEL_CULTIVATE = {
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
     "bottom|sx1sz-1":  { kind: "dept", label: "Growth Params", action: "tool:growthParams", temporary: true,
       desc: "Opens the Cultivate panel's Growth Parameters section. Duplicated here for quick access from a spare slot." },
-    "bottom|sx-1sz-1": { kind: "dept", label: "Plant", action: "tool:plant", temporary: true,
-      desc: "Pick a species, then click to plant it. Opens the Cultivate panel. Duplicated here for quick access from a spare slot." }
+    // Was a 2nd Plant copy (2026-08-25 audit fix): Plant already has its
+    // true original PLUS an equator-antipode duplicate, and this bottom
+    // slot is edge-adjacent to that duplicate (equator|sx-1sy-1) -- a
+    // 3rd copy here can't avoid touching a sibling. Prune has NO
+    // existing duplicate anywhere yet and this slot is non-adjacent to
+    // Prune's true original (equator|sx1sy-1, verified numerically), so
+    // it fills the slot with genuinely new coverage instead of a
+    // colliding 3rd copy of Plant.
+    "bottom|sx-1sz-1": { kind: "dept", label: "Prune", action: "tool:prune", temporary: true,
+      desc: "Sets Plant mode -- right-click an existing growth tile to prune it. Duplicated here for quick access from a spare slot." }
   }
 };
 
@@ -413,8 +441,16 @@ export const WHEEL_TRADE = {
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
     "bottom|sx1sz-1":  { kind: "dept", label: "Inventory", action: "tool:inventory", temporary: true,
       desc: "Opens the Lab panel, where your real inventory is shown. Duplicated here for quick access from a spare slot." },
-    "bottom|sx-1sz-1": { kind: "dept", label: "Offer", action: "tool:offer", temporary: true,
-      desc: "Trades start via Interact -- walk up to another player and tap Interact. Duplicated here for quick access from a spare slot." }
+    // Was a 2nd Offer copy (2026-08-25 audit fix): Offer already has its
+    // true original PLUS an equator-antipode duplicate, and this bottom
+    // slot is edge-adjacent to that duplicate (equator|sx-1sy-1) -- a
+    // 3rd copy here can't avoid touching a sibling. Accept has NO
+    // existing duplicate anywhere yet and this slot is non-adjacent to
+    // Accept's true original (equator|sx1sy-1, verified numerically),
+    // so it fills the slot with genuinely new coverage instead of a
+    // colliding 3rd copy of Offer.
+    "bottom|sx-1sz-1": { kind: "dept", label: "Accept", action: "tool:accept", temporary: true,
+      desc: "Pending trades from others show up in the Lab panel. Duplicated here for quick access from a spare slot." }
   }
 };
 
@@ -449,8 +485,18 @@ export const WHEEL_RHOMBISIS = {
     // sx-1sy1), same rule applied uniformly across every wheel.
     "bottom|sx1sz-1":   { kind: "dept", label: "Plant a Seed", action: "tool:plant", temporary: true,
       desc: "Pick a species, then click to plant it. Opens the Cultivate panel. Duplicated here for quick access from a spare slot." },
-    "bottom|sx-1sz-1":  { kind: "dept", label: "Sculpt", action: "tool:rhombiSculpt", temporary: true,
-      desc: "Opens the Sculpt panel -- symmetry and mirror tools, no World required. Duplicated here for quick access from a spare slot." }
+    // Was a 2nd Sculpt copy -- this is the exact collision the user
+    // reported directly ("sculpt ... adjacent to their duplicates"),
+    // confirmed via numeric edge-adjacency audit (2026-08-25 fix):
+    // Sculpt already has its true original PLUS an equator-antipode
+    // duplicate, and this bottom slot is edge-adjacent to that
+    // duplicate (equator|sx-1sy-1) -- a 3rd copy here can't avoid
+    // touching a sibling. Generate a Body has NO existing duplicate
+    // anywhere yet and this slot is non-adjacent to its true original
+    // (equator|sx1sy-1, verified numerically), so it fills the slot
+    // with genuinely new coverage instead of a colliding 3rd Sculpt.
+    "bottom|sx-1sz-1":  { kind: "dept", label: "Generate a Body", action: "tool:generateBody", temporary: true,
+      desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...). Duplicated here for quick access from a spare slot." }
   }
 };
 
