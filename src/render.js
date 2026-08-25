@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell } from './core/lattice.js';
+import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { generateBCCLatticePatch, bccDetailVertsFor } from './geometry-extensions/bcc-detail-lattice.js';
 import { FEATURES } from './app/features.js';
@@ -280,6 +281,13 @@ let player = null;
 // exitWalk are module-level (defined before init()) but still need to
 // refresh the HUD's mode/material indicator on every Explore transition.
 let refreshHudIndicator = () => {};
+
+// Assigned once the Rhombic Wheel 3D is created (feature-flagged, see
+// init()). animate()'s main render loop checks this to skip its own
+// renderer.render() call while the wheel's own overlay/renderer fully
+// covers the screen -- avoids two simultaneous full-scene WebGL
+// renders every frame for a pass that's provably invisible anyway.
+let isRhombicWheel3DOpen = () => false;
 
 // Module-level (not init()-local) since enterWalk/exitWalk, defined
 // before init() runs, need it too -- has no dependency on any init()
@@ -1769,6 +1777,116 @@ async function init() {
   // this design replaced two earlier attempts (a same-scale overlay, then
   // a per-cell-contained nested cluster -- both real, reasoned dead ends,
   // not guesses).
+  // Rhombic Wheel 3D: second, parallel navigation wheel on the real RD
+  // mesh (see app/rhombic-wheel-3d.js). Flag-gated off by default;
+  // leaves the existing 2D wheel.js untouched. onAction resolves every
+  // action createRhombicWheel3D doesn't resolve internally -- that's
+  // navigateTo:<a real wheel id> and navigateHome (handled inside
+  // createRhombicWheel3D itself), everything else lands here.
+  const rhombicWheel3DToggleBtn = document.getElementById('rhombic-wheel-3d-toggle');
+  if (rhombicWheel3DToggleBtn) rhombicWheel3DToggleBtn.style.display = FEATURES.rhombicWheel3D ? '' : 'none';
+  if (FEATURES.rhombicWheel3D) {
+    const wheel3D = createRhombicWheel3D({
+      onAction: (action) => {
+        // openCyborg/openLab reuse the real, already-shipped toggles;
+        // openLenses maps to the closest existing single control
+        // (X-Ray) -- see rhombic-wheel-3d-core.js's UNIVERSAL_RING
+        // comment for why this isn't a clean 1:1 match. openAlmanac has
+        // no existing counterpart yet and is a stub.
+        if (action === 'openCyborg') { cyborgToggleEl?.click(); return; }
+        if (action === 'openLab') { labToggleEl?.click(); return; }
+        if (action === 'openLenses') { document.getElementById('xray-toggle')?.click(); return; }
+        if (action === 'openAlmanac') { showHudPrompt('Almanac is not built yet.', 3000); return; }
+        // Explore (Rhombinaut) is a single destination, not a wheel --
+        // reuses the real existing action (#walk-toggle, same trigger
+        // the 2D wheel.js's own Explore item uses), then closes this
+        // wheel since there's nothing left to navigate to here.
+        if (action === 'navigateTo:explore') {
+          document.getElementById('walk-toggle')?.click();
+          wheel3D.close();
+          return;
+        }
+        // Construct no longer needs a special case here: it's now a
+        // real (mostly-spare) wheel in ALL_WHEELS with Build and Alter
+        // as its two populated faces, so navigateTo:construct already
+        // resolves via the generic ALL_WHEELS[target] branch above,
+        // same as every other real wheel. See rhombic-wheel-3d-core.js.
+
+        // Real tool wiring below -- reuses existing, already-working
+        // primitives (mode-btn clicks, panel-open functions) rather
+        // than reimplementing anything, same pattern as Explore's
+        // #walk-toggle reuse above. Confidence varies per action; see
+        // each comment. clickMode() mirrors wheel.js's own
+        // clickModeShim(): find the real .mode-btn[data-mode=X] and
+        // click it, since that's the actual state-changing primitive
+        // both wheels should share.
+        const clickMode = (modeName) => document.querySelector(`.mode-btn[data-mode="${modeName}"]`)?.click();
+
+        // --- Alter: Dig/Smooth are direct 1:1 mode matches, high
+        // confidence. Replace is a pre-existing dead end, discovered
+        // while wiring this: wheel.js's own 2D "Replace" item calls
+        // clickModeShim('replace'), but there is no
+        // .mode-btn[data-mode="replace"] anywhere in index.html and no
+        // `currentMode === 'replace'` handling anywhere in render.js --
+        // the 2D button is already a silent no-op today. Not
+        // reproducing that silently here; flagged as not built yet
+        // instead of pretending it's wired. ---
+        if (action === 'tool:dig') { clickMode('excavate'); wheel3D.close(); return; }
+        if (action === 'tool:smooth') { clickMode('round'); wheel3D.close(); return; }
+        if (action === 'tool:replace') { showHudPrompt('Replace is not built yet (the 2D menu\'s Replace button is a pre-existing no-op too).', 4000); return; }
+
+        // --- Build: direct matches, high confidence ---
+        if (action === 'tool:rhombiModel') { clickMode('build'); wheel3D.close(); return; } // "Place" mode
+        if (action === 'tool:fill') { clickMode('fill'); wheel3D.close(); return; }
+        if (action === 'tool:rhombiSculpt') { clickMode('sculpt'); openSculptPanel(); wheel3D.close(); return; }
+
+        // --- Cultivate: Plant/Growth Params are direct matches;
+        // Prune has no separate mode -- it's a right-click gesture on
+        // an existing growth tile while already in 'plant' mode (see
+        // render.js's contextmenu listener calling pruneTile()), so
+        // this sets the same real mode and explains the real gesture
+        // rather than inventing a "prune mode" that doesn't exist. ---
+        if (action === 'tool:plant') { clickMode('plant'); document.getElementById('cultivate-panel')?.classList.add('open'); wheel3D.close(); return; }
+        if (action === 'tool:prune') { clickMode('plant'); showHudPrompt('Prune: right-click an existing growth tile while in Plant mode.', 4000); wheel3D.close(); return; }
+        if (action === 'tool:growthParams') { document.getElementById('cultivate-panel')?.classList.add('open'); wheel3D.close(); return; } // real "Growth Parameters" section lives in this panel
+
+        // --- Rhombitect: JUDGMENT CALL. "Dome" is a real sculpt-panel
+        // NL shape keyword (src/core/sculpture.js's shape parser
+        // recognizes "dome"); prefilling it is a real, grounded action,
+        // not invented, but was never a documented 1-click wheel
+        // action before now. Spiral Column and Templates have no
+        // backing mechanic anywhere in the codebase -- genuine stubs,
+        // not a wiring gap. ---
+        if (action === 'tool:dome') {
+          clickMode('sculpt');
+          openSculptPanel();
+          const input = document.getElementById('sculpt-nl-input');
+          if (input) input.value = 'dome';
+          showHudPrompt('Dome shape ready in the Sculpt panel -- press Go to build it.', 4000);
+          wheel3D.close();
+          return;
+        }
+        if (action === 'tool:spiralColumn' || action === 'tool:templates') { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
+
+        // --- Trade: JUDGMENT CALL. Offer/Accept only exist via the
+        // in-world "Interact" trigger (walk up to another player, tap
+        // Interact) -- see index.html's #interact-btn and render.js's
+        // Interact panel comments -- there is no menu-driven way to
+        // start one, so these open the Lab panel (where #trade-panel's
+        // pending-trades list and #inventory-hint both really live)
+        // and explain the real mechanism, rather than pretending a
+        // direct action exists. ---
+        if (action === 'tool:offer') { labToggleEl?.click(); showHudPrompt('Trades start via Interact: walk up to another player and tap Interact to propose one.', 4500); wheel3D.close(); return; }
+        if (action === 'tool:accept') { labToggleEl?.click(); showHudPrompt('Pending trades from other players show up in the Lab panel -- walk up and tap Interact to respond.', 4500); wheel3D.close(); return; }
+        if (action === 'tool:inventory') { labToggleEl?.click(); wheel3D.close(); return; } // real inventory line lives in the Lab panel
+
+        if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
+      },
+    });
+    rhombicWheel3DToggleBtn?.addEventListener('click', () => wheel3D.open('home'));
+    isRhombicWheel3DOpen = () => wheel3D.isOpen;
+  }
+
   const bccToggleBtn = document.getElementById('bcc-toggle');
   if (bccToggleBtn) bccToggleBtn.style.display = FEATURES.bccLattice ? '' : 'none';
   let bccLatticeActive = false;
@@ -3756,7 +3874,14 @@ function animate() {
     controls.update();
   }
   tickPresenceFn(dt);
-  renderer.render(sculptureModeActive ? sculptureScene : scene, camera);
+  // Skip the (otherwise fully-hidden) world render while the Rhombic
+  // Wheel 3D is open -- its own overlay/renderer covers the whole
+  // screen, so this pass would be pure wasted GPU work every frame.
+  // Everything else above (presence ticking, controls damping) still
+  // runs -- only the render call itself is skipped.
+  if (!isRhombicWheel3DOpen()) {
+    renderer.render(sculptureModeActive ? sculptureScene : scene, camera);
+  }
 }
 
 init();

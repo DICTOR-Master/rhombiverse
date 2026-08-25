@@ -15,6 +15,11 @@ export const FEATURES = {
   // inside the existing RD world, never touches world state -- see
   // geometry-extensions/bcc-detail-lattice.md.
   bccLattice: false,
+  // Rhombic Wheel 3D: a second, parallel navigation wheel built on the
+  // real RD mesh (Home/Build/Alter/Rhombitect/Cultivate/Trade + universal
+  // ring), alongside the existing 2D wheel.js -- not a replacement for
+  // it. See app/rhombic-wheel-3d.js. Off by default until verified.
+  rhombicWheel3D: false,
 
   // World Systems — secondary, game-loop, safe to disable, wired end-to-end.
   mining: true,

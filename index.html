@@ -193,6 +193,18 @@
     #reload-toggle { right: 278px; }
     #clear-world-toggle:hover, #reload-toggle:hover { background: rgba(255, 255, 255, 0.15); }
     #clear-world-toggle:hover { border-color: #ff6b6b; }
+    #rhombic-wheel-3d-toggle {
+      position: fixed; top: 12px; right: 316px; z-index: 900;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      color: #ddd;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font: 13px system-ui, sans-serif;
+      cursor: pointer;
+    }
+    #rhombic-wheel-3d-toggle:hover { background: rgba(255, 255, 255, 0.15); }
+    #rhombic-wheel-3d-toggle.active { background: rgba(77, 208, 225, 0.35); border-color: #4DD0E1; color: #fff; }
 
     /* B4b: standalone Sculpture Mode banner -- shown only while active,
        makes it unmistakable this is the isolated scratch space, not the
@@ -224,7 +236,7 @@
        and #hud-crosshair are deliberately excluded -- the prompt IS the
        transition's own cue text, and the crosshair fades in/out on its
        own timing (render.js), not this one. */
-    #hud-wordmark, #hud-indicator, #hud-wheel-cue, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #bcc-toggle, #clear-world-toggle, #reload-toggle {
+    #hud-wordmark, #hud-indicator, #hud-wheel-cue, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle {
       transition: opacity 0.3s ease;
     }
     body.explore-transitioning #hud-wordmark,
@@ -236,6 +248,7 @@
     body.explore-transitioning #sculpture-mode-toggle,
     body.explore-transitioning #duality-toggle,
     body.explore-transitioning #bcc-toggle,
+    body.explore-transitioning #rhombic-wheel-3d-toggle,
     body.explore-transitioning #clear-world-toggle,
     body.explore-transitioning #reload-toggle {
       opacity: 0;
@@ -1082,6 +1095,7 @@
   <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>
   <button id="duality-toggle" type="button" title="Duality: view this structure's aperiodic shadow">◐</button>
   <button id="bcc-toggle" type="button" title="BCC Lattice: view the nested dual body-centered-cubic detail lattice (Rhombeometry only)">⬡</button>
+  <button id="rhombic-wheel-3d-toggle" type="button" title="Rhombic Wheel 3D: navigate departments via the real RD mesh (experimental)">◈³</button>
   <button id="clear-world-toggle" type="button" title="Clear World: erase everything and start fresh">⊘</button>
   <button id="reload-toggle" type="button" title="Reload: hard-refresh the app (use if something looks stuck/stale)">↻</button>
   <button id="lab-toggle" type="button" title="Advanced / Lab">⚙</button>
