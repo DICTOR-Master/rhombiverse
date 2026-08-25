@@ -1764,13 +1764,26 @@ async function init() {
   // its parent's own boundary (see geometry-extensions/bcc-detail-lattice.js
   // and its test suite for the real containment proof -- this is additive
   // detail, not a competing same-scale structure, and never touches
-  // worldstate. Reuses Lattice Zoom's own already-tuned nearby-cell bounds
-  // (SUB_LATTICE_TRIGGER_DISTANCE / MAX_NEARBY_SUBLATTICE_CELLS) rather than
-  // inventing new ones.
+  // worldstate.
+  //
+  // BCC_DETAIL_TRIGGER_DISTANCE is deliberately its OWN constant, not
+  // SUB_LATTICE_TRIGGER_DISTANCE (4) -- that value is tuned for Lattice
+  // Zoom's ambient, continuously-refreshed zoom-in LOD reveal, not for an
+  // explicit opt-in toggle that should show something at whatever distance
+  // the camera already happens to be. The app's own default camera start
+  // (6,5,8) is ~11.18 world units from the origin -- a real, confirmed
+  // symptom (2026-08-25): reusing the tight LOD value meant the toggle
+  // silently rendered nothing at the normal default view, only appearing
+  // right after placing a brand-new cell directly in front of the camera.
+  // 12 comfortably covers that default distance; the existing
+  // MAX_NEARBY_SUBLATTICE_CELLS cap already bounds the real render cost
+  // regardless of trigger radius.
+  const BCC_DETAIL_TRIGGER_DISTANCE = 12;
   const bccToggleBtn = document.getElementById('bcc-toggle');
   if (bccToggleBtn) bccToggleBtn.style.display = FEATURES.bccLattice ? '' : 'none';
   let bccLatticeActive = false;
   let bccLatticeMesh = null;
+  let bccRefreshTimer = null;
   async function rebuildBCCLatticeDetail() {
     const { world: w, scene: s } = activeWorldTriple();
     if (bccLatticeMesh) {
@@ -1782,7 +1795,7 @@ async function init() {
     const cells = w ? w.entries() : [];
     if (cells.length === 0) return;
     const refPos = [camera.position.x, camera.position.y, camera.position.z];
-    const parents = selectNearbyCells(cells, refPos, SUB_LATTICE_TRIGGER_DISTANCE, MAX_NEARBY_SUBLATTICE_CELLS, SCALE);
+    const parents = selectNearbyCells(cells, refPos, BCC_DETAIL_TRIGGER_DISTANCE, MAX_NEARBY_SUBLATTICE_CELLS, SCALE);
     if (parents.length === 0) return;
     const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
     const pieces = [];
@@ -1797,22 +1810,68 @@ async function init() {
     const merged = mergeGeometries(pieces, false);
     pieces.forEach((g) => g.dispose());
     bccLatticeMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
-      color: 0x78c8ff, flatShading: true, metalness: 0.1, roughness: 0.6,
+      color: 0x39ff88, emissive: 0x39ff88, emissiveIntensity: 0.7, flatShading: true, metalness: 0.1, roughness: 0.6,
     }));
     s.add(bccLatticeMesh);
   }
+  // Live re-triggering while active -- mirrors Lattice Zoom's own
+  // scheduleSubLatticeRefresh throttled-loop pattern, reusing the same
+  // adaptive-damping throttle functions, so BCC detail keeps following the
+  // camera instead of freezing at whatever position it was toggled on at.
+  function scheduleBCCRefresh() {
+    bccRefreshTimer = setTimeout(async () => {
+      if (!bccLatticeActive) return;
+      try {
+        await rebuildBCCLatticeDetail();
+      } catch (err) {
+        console.error('[BCC refresh error]', err);
+      }
+      scheduleBCCRefresh();
+    }, SUB_LATTICE_THROTTLE_BASE_MS);
+  }
+  // Nested detail sitting entirely inside an opaque parent cell is
+  // invisible from outside by construction -- real symptom found via live
+  // testing (2026-08-25): the mesh built correctly (confirmed via direct
+  // instrumentation) but never showed up on screen except once, by
+  // accident, when the camera happened to be clipped inside a freshly
+  // placed, still-open cell. Real fix: make the world semi-transparent
+  // while the toggle is active, the same "temporarily change how the main
+  // mesh renders" move Duality Mode already makes (there: fully hidden;
+  // here: see-through, since unlike Duality this detail is meant to be
+  // seen alongside the real world, not instead of it) -- restored exactly
+  // on toggle-off.
   bccToggleBtn?.addEventListener('click', async () => {
     bccLatticeActive = !bccLatticeActive;
     bccToggleBtn.classList.toggle('active', bccLatticeActive);
+    const activeMesh = sculptureModeActive ? sculptureMesh : mesh;
     if (bccLatticeActive) {
-      showHudPrompt('BCC Lattice: the finer dual lattice nested inside your nearby RD cells (a client-side detail render only -- your world is untouched).', 5000);
+      activeMesh.material.transparent = true;
+      activeMesh.material.opacity = 0.35;
+      // transparent alone still writes to the depth buffer -- real bug
+      // found via live testing (2026-08-25): the nested BCC mesh built
+      // correctly every time but was silently depth-culled by its own
+      // "see-through" parent, which still fully occluded anything behind
+      // it despite LOOKING translucent. depthWrite:false is the standard
+      // fix for a translucent object that must not block what's behind it.
+      activeMesh.material.depthWrite = false;
+      activeMesh.material.needsUpdate = true; // transparent's blend-state change needs a real program recompile, not just the opacity value
+      showHudPrompt('BCC Lattice: the finer dual lattice nested inside your nearby RD cells (a client-side detail render only -- your world is untouched). Your world is shown translucent so you can see it.', 6000);
       await rebuildBCCLatticeDetail();
-    } else if (bccLatticeMesh) {
-      const { scene: s } = activeWorldTriple();
-      s.remove(bccLatticeMesh);
-      bccLatticeMesh.geometry.dispose();
-      bccLatticeMesh.material.dispose();
-      bccLatticeMesh = null;
+      scheduleBCCRefresh();
+    } else {
+      activeMesh.material.transparent = false;
+      activeMesh.material.opacity = 1;
+      activeMesh.material.depthWrite = true;
+      activeMesh.material.needsUpdate = true;
+      if (bccRefreshTimer) clearTimeout(bccRefreshTimer);
+      bccRefreshTimer = null;
+      if (bccLatticeMesh) {
+        const { scene: s } = activeWorldTriple();
+        s.remove(bccLatticeMesh);
+        bccLatticeMesh.geometry.dispose();
+        bccLatticeMesh.material.dispose();
+        bccLatticeMesh = null;
+      }
     }
   });
 
