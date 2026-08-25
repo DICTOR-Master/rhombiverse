@@ -8,9 +8,11 @@ wheel.md` for the same pattern applied to the 2D wheel).
 
 A second, parallel navigation wheel built on the real RD mesh geometry
 (Home/Construct/Build/Alter/Rhombitect/Cultivate/Trade + a single-
-source universal ring), gated behind `FEATURES.rhombicWheel3D` (off by
-default). Deliberately does NOT touch `wheel.js`'s existing 2D radial
-menu — DICTO's stated direction (2026-08-25) is that this 3D wheel is
+source universal ring), gated behind `FEATURES.rhombicWheel3D` (turned
+on 2026-08-25 after real-browser verification of every department
+wheel and all three pickers). Deliberately does NOT touch `wheel.js`'s
+existing 2D radial menu — DICTO's stated direction (2026-08-25) is that
+this 3D wheel is
 meant to eventually *replace* `wheel.js` entirely, not stay parallel to
 it forever, but that's a later task; this one only adds the new
 surface and proves it out.

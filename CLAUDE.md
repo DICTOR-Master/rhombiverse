@@ -141,10 +141,11 @@ build order:
   loadable via the `#preset-select` dropdown.
 - **Rhombic Wheel 3D** (2026-08-25, `src/app/rhombic-wheel-3d-core.js`/
   `rhombic-wheel-3d.js`) — a second, parallel navigation wheel on the
-  real RD mesh, gated behind `FEATURES.rhombicWheel3D` (off by
-  default). Not a replacement for `wheel.js` yet — that's the stated
-  eventual direction, not done. Home/Construct/Build/Alter/Rhombitect/
-  Cultivate/Trade all real and reachable; department faces wired to
+  real RD mesh, gated behind `FEATURES.rhombicWheel3D` (turned on
+  2026-08-25 after real-browser verification of every department wheel
+  and all three pickers). Not a replacement for `wheel.js` yet — that's
+  the stated eventual direction, not done. Home/Construct/Build/Alter/
+  Rhombitect/Cultivate/Trade all real and reachable; department faces wired to
   real actions (mode-btn clicks, the real material/species/generator
   pickers via new exports on `wheel.js`), not placeholders, except
   Spiral Column/Templates (genuine stubs) and Replace (discovered

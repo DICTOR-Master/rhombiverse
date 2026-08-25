@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-08-25",
+    "title": "The wheel becomes the shape",
+    "items": [
+      "A new toggle in the top-right opens the Rhombic Wheel in 3D -- navigate Build, Alter, Rhombitect, Cultivate, and Trade on the real rhombic-dodecahedron shape itself, not a flat menu.",
+      "Every department does real things -- pick a material, generate a celestial body, choose a species to plant, dig, smooth, fill, sculpt -- right alongside the existing wheel, not replacing it yet.",
+      "Lenses, Cyborg, Lab Settings, and the Almanac are reachable from every wheel, in the exact same spot every time."
+    ]
+  },
+  {
+    "date": "2026-08-25",
     "title": "A second lattice, and an easy reset",
     "items": [
       "New BCC Lattice toggle (Rhombeometry mode) shows a real, connected finer lattice running through your build -- a client-side view only, your World stays untouched.",
