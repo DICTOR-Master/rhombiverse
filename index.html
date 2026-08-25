@@ -167,6 +167,18 @@
     }
     #duality-toggle:hover { background: rgba(255, 255, 255, 0.15); }
     #duality-toggle.active { background: rgba(200, 140, 255, 0.4); border-color: #c88cff; color: #fff; }
+    #bcc-toggle {
+      position: fixed; top: 12px; right: 202px; z-index: 900;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      color: #ddd;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font: 15px system-ui, sans-serif;
+      cursor: pointer;
+    }
+    #bcc-toggle:hover { background: rgba(255, 255, 255, 0.15); }
+    #bcc-toggle.active { background: rgba(120, 200, 255, 0.4); border-color: #78c8ff; color: #fff; }
 
     /* B4b: standalone Sculpture Mode banner -- shown only while active,
        makes it unmistakable this is the isolated scratch space, not the
@@ -198,7 +210,7 @@
        and #hud-crosshair are deliberately excluded -- the prompt IS the
        transition's own cue text, and the crosshair fades in/out on its
        own timing (render.js), not this one. */
-    #hud-wordmark, #hud-indicator, #hud-wheel-cue, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle {
+    #hud-wordmark, #hud-indicator, #hud-wheel-cue, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #bcc-toggle {
       transition: opacity 0.3s ease;
     }
     body.explore-transitioning #hud-wordmark,
@@ -208,7 +220,8 @@
     body.explore-transitioning #xray-toggle,
     body.explore-transitioning #cyborg-toggle,
     body.explore-transitioning #sculpture-mode-toggle,
-    body.explore-transitioning #duality-toggle {
+    body.explore-transitioning #duality-toggle,
+    body.explore-transitioning #bcc-toggle {
       opacity: 0;
       pointer-events: none;
     }
@@ -1052,6 +1065,7 @@
   <button id="cyborg-toggle" type="button" title="Cyborg Mode: guided walkthrough">◈</button>
   <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>
   <button id="duality-toggle" type="button" title="Duality: view this structure's aperiodic shadow">◐</button>
+  <button id="bcc-toggle" type="button" title="BCC Lattice: view the nested dual body-centered-cubic detail lattice (Rhombeometry only)">⬡</button>
   <button id="lab-toggle" type="button" title="Advanced / Lab">⚙</button>
 
   <div id="lab-panel">

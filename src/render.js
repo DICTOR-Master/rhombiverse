@@ -7,6 +7,7 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell } from './core/lattice.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
+import { generateBCCSubLatticeAt, bccDetailVertsFor } from './geometry-extensions/bcc-detail-lattice.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -998,6 +999,7 @@ async function init() {
   }
 
   wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
+  wireFirstUseHint('bcc-toggle', 'BCC Lattice: a finer dual lattice nested inside your nearby cells -- a real second lattice, at a smaller scale.');
   wireFirstUseHint('sculpture-mode-toggle', 'Sculpture Mode: a separate, isolated scratch workspace -- nothing here touches your real World.');
   wireFirstUseHint('cyborg-toggle', 'Cyborg Mode: a guided walkthrough, step by step.');
   wireFirstUseHint('xray-toggle', 'X-Ray: drag a cutaway plane through the structure to see inside it.');
@@ -1752,6 +1754,65 @@ async function init() {
       dualityShadowMesh.geometry.dispose();
       dualityShadowMesh.material.dispose();
       dualityShadowMesh = null;
+    }
+  });
+
+  // BCC dual-lattice Phase 2 (revised) -- Rhombeometry-only. A multiscale
+  // master lattice: FCC/RD stays the coarse, buildable world exactly as
+  // before (untouched, always visible); BCC nests inside each nearby FCC
+  // cell as a finer sub-lattice, geometrically guaranteed to stay inside
+  // its parent's own boundary (see geometry-extensions/bcc-detail-lattice.js
+  // and its test suite for the real containment proof -- this is additive
+  // detail, not a competing same-scale structure, and never touches
+  // worldstate. Reuses Lattice Zoom's own already-tuned nearby-cell bounds
+  // (SUB_LATTICE_TRIGGER_DISTANCE / MAX_NEARBY_SUBLATTICE_CELLS) rather than
+  // inventing new ones.
+  const bccToggleBtn = document.getElementById('bcc-toggle');
+  if (bccToggleBtn) bccToggleBtn.style.display = FEATURES.bccLattice ? '' : 'none';
+  let bccLatticeActive = false;
+  let bccLatticeMesh = null;
+  async function rebuildBCCLatticeDetail() {
+    const { world: w, scene: s } = activeWorldTriple();
+    if (bccLatticeMesh) {
+      s.remove(bccLatticeMesh);
+      bccLatticeMesh.geometry.dispose();
+      bccLatticeMesh.material.dispose();
+      bccLatticeMesh = null;
+    }
+    const cells = w ? w.entries() : [];
+    if (cells.length === 0) return;
+    const refPos = [camera.position.x, camera.position.y, camera.position.z];
+    const parents = selectNearbyCells(cells, refPos, SUB_LATTICE_TRIGGER_DISTANCE, MAX_NEARBY_SUBLATTICE_CELLS, SCALE);
+    if (parents.length === 0) return;
+    const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
+    const pieces = [];
+    for (const parent of parents) {
+      const parentCenter = cellToWorld(parent.x, parent.y, parent.z, SCALE);
+      const subCells = generateBCCSubLatticeAt(parentCenter, SCALE);
+      for (const sub of subCells) {
+        const verts = bccDetailVertsFor(sub).map(([x, y, z]) => new THREE.Vector3(x, y, z));
+        pieces.push(new ConvexGeometry(verts));
+      }
+    }
+    const merged = mergeGeometries(pieces, false);
+    pieces.forEach((g) => g.dispose());
+    bccLatticeMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
+      color: 0x78c8ff, flatShading: true, metalness: 0.1, roughness: 0.6,
+    }));
+    s.add(bccLatticeMesh);
+  }
+  bccToggleBtn?.addEventListener('click', async () => {
+    bccLatticeActive = !bccLatticeActive;
+    bccToggleBtn.classList.toggle('active', bccLatticeActive);
+    if (bccLatticeActive) {
+      showHudPrompt('BCC Lattice: the finer dual lattice nested inside your nearby RD cells (a client-side detail render only -- your world is untouched).', 5000);
+      await rebuildBCCLatticeDetail();
+    } else if (bccLatticeMesh) {
+      const { scene: s } = activeWorldTriple();
+      s.remove(bccLatticeMesh);
+      bccLatticeMesh.geometry.dispose();
+      bccLatticeMesh.material.dispose();
+      bccLatticeMesh = null;
     }
   });
 

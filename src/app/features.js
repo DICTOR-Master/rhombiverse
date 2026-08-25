@@ -11,6 +11,10 @@ export const FEATURES = {
   cultivation: true,
   latticeZoom: true,
   gravity: true,
+  // BCC dual-lattice Phase 2: Rhombeometry-only, a nested detail lattice
+  // inside the existing RD world, never touches world state -- see
+  // geometry-extensions/bcc-detail-lattice.md.
+  bccLattice: false,
 
   // World Systems — secondary, game-loop, safe to disable, wired end-to-end.
   mining: true,
@@ -30,4 +34,5 @@ if (getSettings().pureGeometry) {
   FEATURES.animals = false;
   FEATURES.hazards = false;
   FEATURES.hydrosphere = false;
+  FEATURES.bccLattice = true;
 }
