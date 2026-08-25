@@ -1,5 +1,13 @@
 [
   {
+    "date": "2026-08-25",
+    "title": "A second lattice, and an easy reset",
+    "items": [
+      "New BCC Lattice toggle (Rhombeometry mode) shows a real, connected finer lattice running through your build -- a client-side view only, your World stays untouched.",
+      "Clear World and Reload are now always-visible HUD buttons, instead of buried in Lab Settings."
+    ]
+  },
+  {
     "date": "2026-08-24",
     "title": "Rhombeometry, right from the start",
     "items": [
