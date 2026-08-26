@@ -8,8 +8,6 @@
 // radial menu's own visuals), so extracting them changes nothing about
 // how they look or behave, only where the code that drives them lives.
 
-import { MARKS } from './wheel-icons.js';
-
 function positionsFor(count, radius) {
   const positions = [];
   for (let i = 0; i < count; i++) {
@@ -116,47 +114,12 @@ const CSS = `
   z-index: 3;
 }
 
-/* Piece picker (direct instruction 2026-08-26 -- "look like the wheel
-   static at a position where four diamond faces form a square, same
-   color size and orientation as the real RD, the menu one not the
-   HUD"). Not an approximation: these 4 polygons are the exact
-   orthographic projection of the 4 real rhombic faces that share one of
-   the RD's own 4-valent vertices (buildRDFaces(), rhombic-wheel-3d-
-   core.js), viewed straight down that shared vertex's own axis -- same
-   SKELETON_COLOR (#4DD0E1) wireframe/fill the main wheel's own faces
-   use, not the HUD wheel's gold. See docs/code-notes/app/wheel-pickers.md
-   for the real vertex-sharing computation this is built from. */
-#piece-cluster-overlay {
-  position: fixed; inset: 0; z-index: 986;
-  display: none; align-items: center; justify-content: center;
-  background: rgba(2, 2, 6, 0.35);
-}
-#piece-cluster-overlay.open { display: flex; }
-#piece-cluster-root { position: relative; }
-#piece-cluster-svg { width: 220px; height: 220px; overflow: visible; }
-.piece-face-poly {
-  fill: rgba(77, 208, 225, 0.14);
-  stroke: #4DD0E1;
-  stroke-width: 1.5;
-  cursor: pointer;
-  transition: fill 0.15s ease, stroke 0.15s ease;
-}
-.piece-face:hover .piece-face-poly, .piece-face.current .piece-face-poly {
-  fill: rgba(77, 208, 225, 0.38);
-  stroke: #9de0ff;
-}
-.piece-face-icon { color: #9de0ff; pointer-events: none; }
-.piece-face-label {
-  fill: #eaf6ff; font: 700 9px system-ui, sans-serif; text-anchor: middle;
-  text-transform: uppercase; letter-spacing: 0.5px;
-  opacity: 0; transition: opacity 0.15s ease; pointer-events: none;
-}
-.piece-face:hover .piece-face-label { opacity: 1; }
-#piece-cluster-hint {
-  position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
-  color: #eaf6ff; font: 13px system-ui, sans-serif; white-space: nowrap;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.95);
-}
+/* Piece picker: real WebGL mini-render now (app/piece-cluster-3d.js),
+   not CSS/SVG here -- a flat SVG version (first attempt, 2026-08-26)
+   read as "easily distinguishable from the real wheel" once actually
+   compared against a real wheel screenshot; no flat-CSS tuning can
+   produce genuine perspective/lighting. See that file's own header and
+   docs/code-notes/app/wheel-pickers.md for the geometry/history. */
 `;
 
 function injectCssOnce() {
@@ -180,6 +143,10 @@ export function createWheelPickers({
   getMaterialColor = () => '#8899aa',
   onMaterialHoverPreview = () => {},
   onMaterialHoverEnd = () => {},
+  // Real WebGL mini-render for the Piece picker (app/piece-cluster-3d.js)
+  // -- created in render.js since only it has the shared WebGLRenderer
+  // this needs; this file just wires onPick/open/close through to it.
+  pieceCluster3D = null,
 } = {}) {
   injectCssOnce();
 
@@ -239,73 +206,16 @@ export function createWheelPickers({
     if (e.target === materialWheelOverlay) closeMaterialWheel();
   });
 
-  // --- Piece picker: 4 real rhombic faces meeting at a shared vertex ---
-  // Coordinates are the exact orthographic projection (drop the shared
-  // axis) of buildRDFaces()'s own 4 faces that touch one of the RD's
-  // 4-valent apex vertices, e.g. (2,0,0) -- verified directly, not
-  // derived by eye. See docs/code-notes/app/wheel-pickers.md for the
-  // real computation and which 12 faces it came from.
-  const PIECE_FACE_LAYOUT = {
-    rd: { points: '0,0 25,-25 50,0 25,25', centroid: [25, 0] },
-    cube: { points: '0,0 25,25 0,50 -25,25', centroid: [0, 25] },
-    pyramid: { points: '0,0 -25,-25 -50,0 -25,25', centroid: [-25, 0] },
-    to: { points: '0,0 25,-25 0,-50 -25,-25', centroid: [0, -25] },
-  };
-  const PIECE_MARK_KEYS = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', to: 'pieceTO' };
-
-  const pieceClusterOverlay = document.createElement('div');
-  pieceClusterOverlay.id = 'piece-cluster-overlay';
-  const pieceClusterRoot = document.createElement('div');
-  pieceClusterRoot.id = 'piece-cluster-root';
-  const pieceClusterHint = document.createElement('div');
-  pieceClusterHint.id = 'piece-cluster-hint';
-  pieceClusterHint.textContent = 'Pick a piece';
-  pieceClusterRoot.appendChild(pieceClusterHint);
-  const pieceClusterSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  pieceClusterSvg.id = 'piece-cluster-svg';
-  pieceClusterSvg.setAttribute('viewBox', '-58 -58 116 116');
-  pieceClusterRoot.appendChild(pieceClusterSvg);
-  pieceClusterOverlay.appendChild(pieceClusterRoot);
-  document.body.appendChild(pieceClusterOverlay);
-
-  function closePieceCluster() {
-    pieceClusterOverlay.classList.remove('open');
-  }
-
-  function openPieceCluster(options, onPick, currentValue) {
-    pieceClusterSvg.innerHTML = '';
-    for (const opt of options) {
-      const layout = PIECE_FACE_LAYOUT[opt.value];
-      if (!layout) continue; // defensive -- every real piece-type value has a layout slot
-      const markKey = PIECE_MARK_KEYS[opt.value];
-      const [cx, cy] = layout.centroid;
-      // Label sits further out from center than the icon, along the same
-      // outward direction (each face's centroid is already exactly on
-      // its own outward axis here) -- clear of the icon, still inside
-      // the face's own outer point.
-      const dist = Math.hypot(cx, cy) || 1;
-      const lx = (cx / dist) * 40;
-      const ly = (cy / dist) * 40;
-      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      g.setAttribute('class', `piece-face${opt.value === currentValue ? ' current' : ''}`);
-      g.setAttribute('tabindex', '0');
-      g.innerHTML = `
-        <polygon class="piece-face-poly" points="${layout.points}"></polygon>
-        <g class="piece-face-icon" transform="translate(${cx},${cy}) scale(0.34)">${MARKS[markKey] ?? ''}</g>
-        <text class="piece-face-label" x="${lx}" y="${ly}" dominant-baseline="central">${opt.label.split(' (')[0]}</text>`;
-      g.addEventListener('click', () => {
-        onMenuSound();
-        onPick(opt.value, opt.label);
-        closePieceCluster();
-        onSelectionChange();
-      });
-      pieceClusterSvg.appendChild(g);
-    }
-    pieceClusterOverlay.classList.add('open');
-  }
-  pieceClusterOverlay.addEventListener('click', (e) => {
-    if (e.target === pieceClusterOverlay) closePieceCluster();
-  });
+  // --- Piece picker: real mini 3D render (app/piece-cluster-3d.js) ---
+  // Direct live comparison against a real wheel screenshot found the
+  // first version here (a flat SVG, still described in docs/code-notes/
+  // app/wheel-pickers.md for the real vertex-sharing geometry it used)
+  // "easily distinguishable from the real wheel" -- no genuine
+  // perspective/lighting a flat SVG can produce. pieceCluster3D (passed
+  // in, since only render.js has the shared WebGLRenderer this needs)
+  // replaces it with a real WebGL render sharing that same computed
+  // geometry; openPieceTypePicker below wires its own onPick fresh on
+  // every open, same as this file's other pickers.
 
   function closePicker() {
     pickerStrip.classList.remove('open');
@@ -355,7 +265,7 @@ export function createWheelPickers({
   window.addEventListener('keydown', (e) => {
     if (e.code !== 'Escape') return;
     if (materialWheelOverlay.classList.contains('open')) closeMaterialWheel();
-    else if (pieceClusterOverlay.classList.contains('open')) closePieceCluster();
+    else if (pieceCluster3D?.isOpen) pieceCluster3D.close();
     else if (pickerStrip.classList.contains('open')) closePicker();
   });
 
@@ -384,13 +294,20 @@ export function createWheelPickers({
     const options = readSelectOptions(select);
     openPickerStrip(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
   }
-  // Piece-tier picker (RD/Cube/Pyramid/TO): its own real 4-face cluster
-  // widget (openPieceCluster above), not the generic strip -- direct
-  // instruction 2026-08-26, see that widget's own header comment.
+  // Piece-tier picker (RD/Cube/Pyramid/TO): the real 3D cluster widget
+  // (app/piece-cluster-3d.js), not the generic strip -- see this file's
+  // own comment above pieceCluster3D's use for why.
   function openPieceTypePicker(onPick) {
+    if (!pieceCluster3D) return; // defensive -- render.js always passes it, but never assume a caller-supplied dependency
     const select = document.getElementById(pieceTypeSelectId);
-    const options = readSelectOptions(select);
-    openPieceCluster(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
+    pieceCluster3D.setOnPick((value, label) => {
+      onMenuSound();
+      select.value = value;
+      pieceCluster3D.close();
+      onPick?.(value, label);
+      onSelectionChange();
+    });
+    pieceCluster3D.open(select.value);
   }
   function toggleDragPlacement() {
     dragPlacementEnabled = !dragPlacementEnabled;
@@ -410,7 +327,7 @@ export function createWheelPickers({
     // For a caller (the 3D wheel's Tab/Space/HUD-cue handling) that
     // wants to close whichever of these is open before doing anything
     // else, same UX the old 2D wheel had for its own Tab/Space handler.
-    isAnyPickerOpen: () => materialWheelOverlay.classList.contains('open') || pieceClusterOverlay.classList.contains('open') || pickerStrip.classList.contains('open'),
-    closeAnyPicker: () => { closeMaterialWheel(); closePieceCluster(); closePicker(); },
+    isAnyPickerOpen: () => materialWheelOverlay.classList.contains('open') || !!pieceCluster3D?.isOpen || pickerStrip.classList.contains('open'),
+    closeAnyPicker: () => { closeMaterialWheel(); pieceCluster3D?.close(); closePicker(); },
   };
 }

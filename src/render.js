@@ -39,6 +39,7 @@ import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACT
 import { playPlaceSound, playRemoveSound, playMenuSound } from './app/sfx.js';
 import { createWheelPickers } from './app/wheel-pickers.js';
 import { createHudWheel3D } from './app/hud-wheel-3d.js';
+import { createPieceCluster3D } from './app/piece-cluster-3d.js';
 import { createCyborgMode } from './app/cyborg.js';
 import { requestBYOKJson } from './app/byok.js';
 import {
@@ -215,6 +216,7 @@ document.getElementById('app').appendChild(renderer.domElement);
 // full WebGLRenderer, always running, would make the exact perf
 // mistake this session already found and fixed for the modal wheel).
 const hudWheel = createHudWheel3D(renderer);
+const pieceCluster3D = createPieceCluster3D(renderer);
 
 // Touch/drag-only rotation, scoped to the wheel's own small on-screen
 // rect -- no auto-rotate, no idle timer, matching "rotates to touch
@@ -3276,6 +3278,7 @@ async function init() {
   // picker overlays and the drag-placement toggle alive independent of
   // either wheel's own UI -- these are used directly by the 3D wheel.
   const pickers = createWheelPickers({
+    pieceCluster3D,
     onModeChosen: () => {
       updateModeUI();
       rebuildInstances(mesh, world, currentMode === 'report');
@@ -4338,6 +4341,11 @@ function animate() {
   // a persistent HUD element, not something that should disappear
   // while other UI is open.
   hudWheel.render();
+  // Piece picker's own real mini-render -- .render() is a no-op unless
+  // it's actually open (see app/piece-cluster-3d.js), same "call every
+  // frame, let the widget gate its own work" pattern as hudWheel.render()
+  // above, just without the "always on" part.
+  pieceCluster3D.render();
 }
 
 init();

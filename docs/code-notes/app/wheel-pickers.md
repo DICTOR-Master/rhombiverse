@@ -6,6 +6,19 @@ source so the code itself stays lite and readable. See `CONTRIBUTING.md`'s
 
 ## Piece picker: real RD geometry, not an approximation
 
+**Superseded same day**: the flat-SVG widget this section originally
+described (built in `wheel-pickers.js` itself) is gone -- direct live
+comparison against a real wheel screenshot found it "easily
+distinguishable from the real wheel" (no genuine perspective/lighting a
+flat SVG can produce). Replaced with a real WebGL mini-render,
+`app/piece-cluster-3d.js` -- see that file's own header for the
+rendering side of the story. The geometry derivation below is still
+exactly how the real 4 faces/vertex were found, and that same insight
+(which 4 of the 12 `buildRDFaces()` faces share a 4-valent vertex) is
+what the new widget's fixed rotation and face selection are built from
+too -- kept here as the one real source of that computation, cross-
+referenced rather than re-derived a third time.
+
 Direct instruction, 2026-08-26, after two earlier misreads (a flat
 picker-strip, then a plain 2x2 CSS grid of rotated squares): "I want it
 to look like it is the wheel static at a position where four diamond
@@ -31,8 +44,8 @@ bottom sx=1 sz=-1  [[2,0,0],[1,1,-1],[0,0,-2],[1,-1,-1]]
 shared vertex's own axis" is a plain orthographic drop of the X
 coordinate — no camera math needed, just project each vertex to `(y,
 -z)` (the negation keeps +Z appearing up on screen, matching a normal
-top-is-up reading). Scaled by 25, that gives the 4 polygons hard-coded
-in `PIECE_FACE_LAYOUT`:
+top-is-up reading). Scaled by 25, that gave the 4 polygons the old flat
+SVG widget hard-coded (its own `PIECE_FACE_LAYOUT`, since removed):
 
 ```
 right/rd:      0,0  25,-25  50,0   25,25
@@ -47,27 +60,23 @@ i.e. they form an exact square (a "diamond" the way the instruction used
 the word) when the 4 faces are placed together. That square is the
 actual, computed silhouette of "4 real rhombic faces meeting at one of
 the RD's own 4-valent vertices, viewed head-on" — not a shape chosen to
-look like one.
+look like one. The new WebGL widget doesn't need these flat 2D
+coordinates at all (a real camera does the projection now) — it reuses
+`hud-wheel-3d.js`'s own already-verified rotation for this exact vertex
+(`group.rotation.set(0, -Math.PI/2, 0)`) instead, but it's the same 4
+faces (`equator|sx1sy1` / `equator|sx1sy-1` / `top|sx1sz1` /
+`bottom|sx1sz-1`) this computation found.
 
-Which piece tier (rd/cube/pyramid/to) sits on which of the 4 computed
-positions is arbitrary (no semantic reason ties, say, "Cube" to the
-bottom slot specifically) — the geometry only fixes that there are 4
-congruent rhombi meeting at a center forming a square, not which label
-goes where.
+Which piece tier (rd/cube/pyramid/to) sits on which of the 4 positions
+is arbitrary (no semantic reason ties, say, "Cube" to one slot
+specifically) — the geometry only fixes that there are 4 congruent
+rhombi meeting at a center forming a square, not which label goes where.
 
 Color: `#4DD0E1` (`SKELETON_COLOR`, `rhombic-wheel-3d-core.js`) — the
 MAIN Rhombic Wheel 3D's own wireframe cyan, not the small persistent HUD
 wheel's gold (`hud-wheel-3d.js`'s `GOLD = 0xd4af37`) — direct
 clarification the two were being confused ("the menu one not the HUD").
-
-Each face's own icon (`MARKS.pieceRD`/`pieceCube`/`piecePyramid`/
-`pieceTO`, `wheel-icons.js`) is the RAW mark content (no `iconFrame()`
-wrapper) placed at that face's centroid and scaled down — the rhombus
-itself is the frame here, a second hexagon/circle border around the
-icon would be redundant. The label reveals on hover only, positioned
-further out from center than the icon along the same outward radius (so
-it never overlaps the icon), matching the main wheel's own reveal-on-
-touch convention rather than inventing a new one.
+Still true of the WebGL widget's own material.
 
 ## Everything else in this file
 
