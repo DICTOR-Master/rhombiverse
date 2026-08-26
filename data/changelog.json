@@ -1,6 +1,17 @@
 [
   {
     "date": "2026-08-26",
+    "title": "Every Piece, One Set of Buttons",
+    "items": [
+      "New Pyramid piece: shave individual pyramids off a placed block, or add them back one at a time -- real texture and detail no whole-block tool could reach before.",
+      "New Cube piece: place a bare block with no pyramids at all, a lighter starting shape to build up from scratch with the Pyramid piece above.",
+      "Add and Remove are universal now -- one pair of buttons for RD, Cube, Pyramid, and the BCC Truncated Octahedron, switched with a single Piece picker instead of six separate buttons that did overlapping jobs under different names.",
+      "Touch: tap to Add, hold to Remove -- works the same way across every piece type now.",
+      "Wheel symbols sit exactly centered on their own face at any angle, and their labels no longer hide under your touching hand."
+    ]
+  },
+  {
+    "date": "2026-08-26",
     "title": "True to Form",
     "items": [
       "BCC Build (Rhombeometry, Lab panel): place real, saved cells on the dual body-centered-cubic lattice alongside your normal World -- click a face to extend it, or a face of your own build to start one nearby. The two lattices are free to overlap where they meet, on purpose, so they read as one joined structure.",
