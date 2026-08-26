@@ -75,6 +75,15 @@ export const MARKS = {
     <polygon points="16,-8 32,-8 32,8 16,8" ${THIN}/>
     <polygon points="0,15 8,31 -8,31" ${THIN}/>
     <polygon points="${octPts(9, -24, 0)}" ${THIN}/>`,
+  // Same 4 shapes as pieceType above, each on its own -- for the Piece
+  // picker's own strip items (direct instruction 2026-08-26: reskin the
+  // picker to read as part of the wheel's own visual language, not a
+  // flat, disconnected 2D popup). Centered/full-size rather than
+  // clustered small, since each stands alone in its own frame here.
+  pieceRD: `<polygon points="${hexPts(30)}" ${THIN}/>`,
+  pieceCube: `<polygon points="-24,-24 24,-24 24,24 -24,24" ${THIN}/>`,
+  piecePyramid: `<polygon points="0,-28 27,14 -27,14" ${THIN}/>`,
+  pieceTO: `<polygon points="${octPts(28)}" ${THIN}/>`,
   // Fill: "+" shown across three hexagons.
   fill: `
     <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>

@@ -8,6 +8,8 @@
 // radial menu's own visuals), so extracting them changes nothing about
 // how they look or behave, only where the code that drives them lives.
 
+import { MARKS } from './wheel-icons.js';
+
 function positionsFor(count, radius) {
   const positions = [];
   for (let i = 0; i < count; i++) {
@@ -42,20 +44,40 @@ const CSS = `
   padding: 0 12px;
 }
 #wheel-picker-strip.open { display: flex; }
+/* Direct instruction 2026-08-26: read as part of the wheel's own
+   faceted/wireframe visual language, not a flat, disconnected 2D popup
+   -- same SKELETON_COLOR (#4DD0E1, rhombic-wheel-3d-core.js) wireframe
+   treatment and a real diagonal light gradient across the rotated
+   square, suggesting a lit rhombic facet instead of a solid-fill tile. */
 .wheel-picker-item {
   min-width: 56px; height: 56px; padding: 0 6px;
-  background: rgba(20, 22, 34, 0.92);
-  border: 1px solid rgba(124, 204, 255, 0.55);
+  background: linear-gradient(135deg, rgba(77, 208, 225, 0.22), rgba(10, 12, 20, 0.92) 60%);
+  border: 1.5px solid rgba(77, 208, 225, 0.55);
+  box-shadow: 0 0 10px rgba(77, 208, 225, 0.15), inset 0 0 14px rgba(77, 208, 225, 0.08);
   transform: rotate(45deg);
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.wheel-picker-item:hover { background: rgba(60, 110, 160, 0.55); border-color: #9de0ff; }
+.wheel-picker-item:hover {
+  background: linear-gradient(135deg, rgba(77, 208, 225, 0.4), rgba(30, 45, 60, 0.92) 60%);
+  border-color: #9de0ff;
+  box-shadow: 0 0 16px rgba(157, 224, 255, 0.35), inset 0 0 14px rgba(77, 208, 225, 0.15);
+}
+.wheel-picker-item.current { border-color: #9de0ff; box-shadow: 0 0 16px rgba(157, 224, 255, 0.45), inset 0 0 14px rgba(77, 208, 225, 0.2); }
 .wheel-picker-item span {
   transform: rotate(-45deg);
   color: #eaf6ff; font: 600 10px/1.15 system-ui, sans-serif; text-align: center;
   max-width: 64px;
 }
+/* Piece picker's own real shape icons (RD/Cube/Pyramid/TO, wheel-icons.js
+   pieceRD/pieceCube/piecePyramid/pieceTO) -- same iconFrame() hexagon-
+   wireframe treatment the real wheel faces use, sized down to share the
+   tile with its label instead of replacing it. */
+.wheel-picker-item.has-icon { gap: 0; }
+.wheel-picker-icon { transform: rotate(-45deg); width: 30px; height: 30px; color: #9de0ff; }
+.wheel-picker-icon svg { display: block; width: 100%; height: 100%; }
+.wheel-picker-item.has-icon span { font-size: 8px; max-width: 52px; }
 .wheel-picker-group-label {
   width: 100%; text-align: center;
   color: #9cd; font: 11px system-ui, sans-serif; opacity: 0.75;
@@ -92,6 +114,48 @@ const CSS = `
   text-align: center;
   text-shadow: 0 1px 4px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.95);
   z-index: 3;
+}
+
+/* Piece picker (direct instruction 2026-08-26 -- "look like the wheel
+   static at a position where four diamond faces form a square, same
+   color size and orientation as the real RD, the menu one not the
+   HUD"). Not an approximation: these 4 polygons are the exact
+   orthographic projection of the 4 real rhombic faces that share one of
+   the RD's own 4-valent vertices (buildRDFaces(), rhombic-wheel-3d-
+   core.js), viewed straight down that shared vertex's own axis -- same
+   SKELETON_COLOR (#4DD0E1) wireframe/fill the main wheel's own faces
+   use, not the HUD wheel's gold. See docs/code-notes/app/wheel-pickers.md
+   for the real vertex-sharing computation this is built from. */
+#piece-cluster-overlay {
+  position: fixed; inset: 0; z-index: 986;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(2, 2, 6, 0.35);
+}
+#piece-cluster-overlay.open { display: flex; }
+#piece-cluster-root { position: relative; }
+#piece-cluster-svg { width: 220px; height: 220px; overflow: visible; }
+.piece-face-poly {
+  fill: rgba(77, 208, 225, 0.14);
+  stroke: #4DD0E1;
+  stroke-width: 1.5;
+  cursor: pointer;
+  transition: fill 0.15s ease, stroke 0.15s ease;
+}
+.piece-face:hover .piece-face-poly, .piece-face.current .piece-face-poly {
+  fill: rgba(77, 208, 225, 0.38);
+  stroke: #9de0ff;
+}
+.piece-face-icon { color: #9de0ff; pointer-events: none; }
+.piece-face-label {
+  fill: #eaf6ff; font: 700 9px system-ui, sans-serif; text-anchor: middle;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  opacity: 0; transition: opacity 0.15s ease; pointer-events: none;
+}
+.piece-face:hover .piece-face-label { opacity: 1; }
+#piece-cluster-hint {
+  position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
+  color: #eaf6ff; font: 13px system-ui, sans-serif; white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.95);
 }
 `;
 
@@ -175,6 +239,74 @@ export function createWheelPickers({
     if (e.target === materialWheelOverlay) closeMaterialWheel();
   });
 
+  // --- Piece picker: 4 real rhombic faces meeting at a shared vertex ---
+  // Coordinates are the exact orthographic projection (drop the shared
+  // axis) of buildRDFaces()'s own 4 faces that touch one of the RD's
+  // 4-valent apex vertices, e.g. (2,0,0) -- verified directly, not
+  // derived by eye. See docs/code-notes/app/wheel-pickers.md for the
+  // real computation and which 12 faces it came from.
+  const PIECE_FACE_LAYOUT = {
+    rd: { points: '0,0 25,-25 50,0 25,25', centroid: [25, 0] },
+    cube: { points: '0,0 25,25 0,50 -25,25', centroid: [0, 25] },
+    pyramid: { points: '0,0 -25,-25 -50,0 -25,25', centroid: [-25, 0] },
+    to: { points: '0,0 25,-25 0,-50 -25,-25', centroid: [0, -25] },
+  };
+  const PIECE_MARK_KEYS = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', to: 'pieceTO' };
+
+  const pieceClusterOverlay = document.createElement('div');
+  pieceClusterOverlay.id = 'piece-cluster-overlay';
+  const pieceClusterRoot = document.createElement('div');
+  pieceClusterRoot.id = 'piece-cluster-root';
+  const pieceClusterHint = document.createElement('div');
+  pieceClusterHint.id = 'piece-cluster-hint';
+  pieceClusterHint.textContent = 'Pick a piece';
+  pieceClusterRoot.appendChild(pieceClusterHint);
+  const pieceClusterSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  pieceClusterSvg.id = 'piece-cluster-svg';
+  pieceClusterSvg.setAttribute('viewBox', '-58 -58 116 116');
+  pieceClusterRoot.appendChild(pieceClusterSvg);
+  pieceClusterOverlay.appendChild(pieceClusterRoot);
+  document.body.appendChild(pieceClusterOverlay);
+
+  function closePieceCluster() {
+    pieceClusterOverlay.classList.remove('open');
+  }
+
+  function openPieceCluster(options, onPick, currentValue) {
+    pieceClusterSvg.innerHTML = '';
+    for (const opt of options) {
+      const layout = PIECE_FACE_LAYOUT[opt.value];
+      if (!layout) continue; // defensive -- every real piece-type value has a layout slot
+      const markKey = PIECE_MARK_KEYS[opt.value];
+      const [cx, cy] = layout.centroid;
+      // Label sits further out from center than the icon, along the same
+      // outward direction (each face's centroid is already exactly on
+      // its own outward axis here) -- clear of the icon, still inside
+      // the face's own outer point.
+      const dist = Math.hypot(cx, cy) || 1;
+      const lx = (cx / dist) * 40;
+      const ly = (cy / dist) * 40;
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('class', `piece-face${opt.value === currentValue ? ' current' : ''}`);
+      g.setAttribute('tabindex', '0');
+      g.innerHTML = `
+        <polygon class="piece-face-poly" points="${layout.points}"></polygon>
+        <g class="piece-face-icon" transform="translate(${cx},${cy}) scale(0.34)">${MARKS[markKey] ?? ''}</g>
+        <text class="piece-face-label" x="${lx}" y="${ly}" dominant-baseline="central">${opt.label.split(' (')[0]}</text>`;
+      g.addEventListener('click', () => {
+        onMenuSound();
+        onPick(opt.value, opt.label);
+        closePieceCluster();
+        onSelectionChange();
+      });
+      pieceClusterSvg.appendChild(g);
+    }
+    pieceClusterOverlay.classList.add('open');
+  }
+  pieceClusterOverlay.addEventListener('click', (e) => {
+    if (e.target === pieceClusterOverlay) closePieceCluster();
+  });
+
   function closePicker() {
     pickerStrip.classList.remove('open');
     pickerStrip.innerHTML = '';
@@ -196,7 +328,14 @@ export function createWheelPickers({
       const item = document.createElement('div');
       item.className = 'wheel-picker-item';
       item.tabIndex = 0;
-      if (opt.value === currentValue) item.style.borderColor = '#9de0ff';
+      if (opt.value === currentValue) item.classList.add('current');
+      if (opt.icon) {
+        item.classList.add('has-icon');
+        const iconEl = document.createElement('span');
+        iconEl.className = 'wheel-picker-icon';
+        iconEl.innerHTML = opt.icon;
+        item.appendChild(iconEl);
+      }
       const span = document.createElement('span');
       span.textContent = opt.label;
       item.appendChild(span);
@@ -211,11 +350,12 @@ export function createWheelPickers({
     pickerStrip.classList.add('open');
   }
 
-  // Own Escape handling for these two overlays -- independent of
-  // whatever else (the 3D wheel, a panel) might also listen for Escape.
+  // Own Escape handling for these overlays -- independent of whatever
+  // else (the 3D wheel, a panel) might also listen for Escape.
   window.addEventListener('keydown', (e) => {
     if (e.code !== 'Escape') return;
     if (materialWheelOverlay.classList.contains('open')) closeMaterialWheel();
+    else if (pieceClusterOverlay.classList.contains('open')) closePieceCluster();
     else if (pickerStrip.classList.contains('open')) closePicker();
   });
 
@@ -244,12 +384,13 @@ export function createWheelPickers({
     const options = readSelectOptions(select);
     openPickerStrip(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
   }
-  // Piece-tier picker (RD/Cube/Pyramid), direct instruction 2026-08-26 --
-  // same mechanism as Generator/Species above, nothing new needed.
+  // Piece-tier picker (RD/Cube/Pyramid/TO): its own real 4-face cluster
+  // widget (openPieceCluster above), not the generic strip -- direct
+  // instruction 2026-08-26, see that widget's own header comment.
   function openPieceTypePicker(onPick) {
     const select = document.getElementById(pieceTypeSelectId);
     const options = readSelectOptions(select);
-    openPickerStrip(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
+    openPieceCluster(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
   }
   function toggleDragPlacement() {
     dragPlacementEnabled = !dragPlacementEnabled;
@@ -269,7 +410,7 @@ export function createWheelPickers({
     // For a caller (the 3D wheel's Tab/Space/HUD-cue handling) that
     // wants to close whichever of these is open before doing anything
     // else, same UX the old 2D wheel had for its own Tab/Space handler.
-    isAnyPickerOpen: () => materialWheelOverlay.classList.contains('open') || pickerStrip.classList.contains('open'),
-    closeAnyPicker: () => { closeMaterialWheel(); closePicker(); },
+    isAnyPickerOpen: () => materialWheelOverlay.classList.contains('open') || pieceClusterOverlay.classList.contains('open') || pickerStrip.classList.contains('open'),
+    closeAnyPicker: () => { closeMaterialWheel(); closePieceCluster(); closePicker(); },
   };
 }
