@@ -41,6 +41,35 @@ const ACTION_TO_MARK = {
   openLenses: 'lenses',
   openAlmanac: 'almanac',
   openCyborg: 'cyborg',
+  // 2026-08-26 second pass -- see wheel-icons.js for full design notes
+  // on each of these (not in the spec's own table, resolved here).
+  'tool:material': 'material',
+  'tool:repeat': 'repeat',
+  'tool:pattern': 'pattern',
+  'tool:generateBody': 'generateBody',
+  'tool:plant': 'plant',
+  'tool:growthParams': 'growthParams',
+  'tool:prune': 'prune',
+  'tool:offer': 'offer',
+  'tool:accept': 'accept',
+  'tool:inventory': 'inventory',
+  // Build/Alter department-nav faces reuse their own wheel's primary
+  // tool icon -- the face is a doorway into that wheel, so its first/
+  // defining action doubles as a preview of what's inside, rather than
+  // inventing two more marks for "leads to the Rhombi-model wheel" /
+  // "leads to the Dig wheel."
+  'navigateTo:build': 'rhombiModel',
+  'navigateTo:alter': 'dig',
+  // Construct has no tool of its own (pure routing hub, see its own
+  // real code comment in rhombic-wheel-3d-core.js) -- gets a dedicated
+  // mark instead of reusing either child's.
+  'navigateTo:construct': 'construct',
+  // Universal ring (every wheel): Lab/Settings and Home.
+  openLab: 'lab',
+  navigateHome: 'home',
+  // BCC Build: same mark as the HUD wheel's own icon, now on the main
+  // wheel too.
+  'tool:bccBuild': 'bccBuild',
 };
 // Reveal timing (spec section 3): explicitly left tunable by the spec
 // itself ("needs real testing on touch devices"), not a fixed value --

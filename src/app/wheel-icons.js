@@ -132,4 +132,99 @@ export const MARKS = {
   // HUD wheel's own existing glyph (◈) verbatim, one symbol/one purpose,
   // rather than either of the spec's original two candidate directions.
   cyborg: `<text x="0" y="11" font-size="44" text-anchor="middle" fill="currentColor">◈</text>`,
+
+  // --- 2026-08-26 second pass: the actions the spec's own table never
+  // resolved. Not in RHOMBIVERSE_SPEC_ICON_SYSTEM.md itself -- designed
+  // here, grounded in what each action actually does, same hexagon/
+  // rhombus vocabulary, same inset-not-retraced-edges lesson from the
+  // rhombitect/symmetryMirror fixes above. See wheel-icons.md.
+
+  // Material: the frame hexagon split into 3 filled wedges (a swatch /
+  // choice-of-fill), inset from the frame's own outline so the wedge
+  // boundaries read as real divisions, not more hexagon edges.
+  material: `
+    <polygon points="0,0 0,-40 34.64,-20 34.64,20" fill="currentColor" opacity="0.75"/>
+    <polygon points="0,0 34.64,20 0,40 -34.64,20" fill="currentColor" opacity="0.4"/>
+    <polygon points="0,0 -34.64,20 -34.64,-20 0,-40" fill="none" stroke="currentColor" stroke-width="2"/>`,
+  // Repeat: three small hexagons (same layout as Fill) with a
+  // directional arrow instead of Fill's "+" -- shares Fill's "acts
+  // across three cells" language, distinguishes the drag GESTURE from
+  // Fill's result.
+  repeat: `
+    <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>
+    <polygon points="${hexPts(16, 0, 0)}" ${THIN}/>
+    <polygon points="${hexPts(16, 26, 0)}" ${THIN}/>
+    <path d="M-30,0 H26 M18,-8 L26,0 L18,8" ${STROKE}/>`,
+  // Pattern: hexagon (the frame's own) with a small repeating dot-grid
+  // inside -- a stamp.
+  pattern: `
+    <circle cx="-14" cy="-14" r="4" fill="currentColor"/><circle cx="0" cy="-14" r="4" fill="currentColor"/><circle cx="14" cy="-14" r="4" fill="currentColor"/>
+    <circle cx="-14" cy="0" r="4" fill="currentColor"/><circle cx="0" cy="0" r="4" fill="currentColor"/><circle cx="14" cy="0" r="4" fill="currentColor"/>
+    <circle cx="-14" cy="14" r="4" fill="currentColor"/><circle cx="0" cy="14" r="4" fill="currentColor"/><circle cx="14" cy="14" r="4" fill="currentColor"/>`,
+  // Generate a Body: a filled circle (a body/orb) centered in the frame
+  // hexagon -- as literal as this vocabulary allows for "spawn a
+  // celestial body."
+  generateBody: `<circle cx="0" cy="0" r="20" fill="currentColor"/>`,
+  // Plant: Rhombivate's own creased-rhombus, plus a small filled seed
+  // dot at its base -- related to Rhombivate (same department, same
+  // "growing thing" language) but a distinct, more specific mark, not a
+  // duplicate of the department's own icon.
+  plant: `
+    <polygon points="${rhombusPts(30, 40)}" ${THIN}/>
+    <path d="M0,-20 Q6,0 0,20" ${THIN}/>
+    <circle cx="0" cy="20" r="5" fill="currentColor"/>`,
+  // Growth Params: three vertical bars of different heights (adjustable
+  // parameters) -- deliberately not a dial/slider (outside this
+  // project's hex/rhombus vocabulary), a bar-height comparison is real
+  // grounded geometry instead.
+  growthParams: `<path d="M-18,14 V-6 M0,14 V-18 M18,14 V2" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>`,
+  // Prune: the same creased rhombus as Plant/Rhombivate, with a cut mark
+  // (a short crossing line) at one point -- trimming.
+  prune: `
+    <polygon points="${rhombusPts(30, 40)}" ${THIN}/>
+    <path d="M0,-20 Q6,0 0,20" ${THIN}/>
+    <path d="M-8,4 L8,-4" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`,
+  // Offer: single rhombus with an outward arrow -- giving something away.
+  offer: `
+    <polygon points="${rhombusPts(26, 34)}" ${THIN}/>
+    <path d="M8,0 H30 M22,-7 L30,0 L22,7" ${STROKE}/>`,
+  // Accept: single rhombus with an inward arrow -- taking something in.
+  accept: `
+    <polygon points="${rhombusPts(26, 34)}" ${THIN}/>
+    <path d="M30,0 H8 M16,-7 L8,0 L16,7" ${STROKE}/>`,
+  // Inventory: hexagon (the frame's own) with a small 2x2 grid of filled
+  // squares -- stored items.
+  inventory: `
+    <rect x="-16" y="-16" width="12" height="12" fill="currentColor"/>
+    <rect x="4" y="-16" width="12" height="12" fill="currentColor"/>
+    <rect x="-16" y="4" width="12" height="12" fill="currentColor"/>
+    <rect x="4" y="4" width="12" height="12" fill="currentColor"/>`,
+  // Construct: a pure routing hub with no tool of its own (its own code
+  // comment: "not a full wheel with its own faces... routes directly to
+  // Build or Alter") -- a hexagon split in half, echoing Build's "+" on
+  // one side and Alter's "-" on the other, rather than an arbitrary new
+  // symbol for something that's genuinely just a choice between two
+  // already-iconified things.
+  construct: `
+    <path d="M0,-46 V46" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <path d="M-13,-13 V13 M-19,0 H-7" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+    <path d="M7,0 H19" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.85"/>`,
+
+  // --- Universal-ring gaps (appear on every wheel, not spec-resolved) ---
+  // Lab / Settings: resolved by the same live cross-walk logic as Cyborg
+  // -- already has a real shipped icon (⚙, the HUD's lab-toggle), reuse
+  // verbatim rather than invent a competing hex/rhombus mark for it.
+  lab: `<text x="0" y="11" font-size="40" text-anchor="middle" fill="currentColor">⚙</text>`,
+  // Home: a single solid hexagon at dead center, nothing else -- the
+  // "origin point" every wheel descends from. Deliberately distinct from
+  // Rhombisis (a central hexagon WITH rays to satellites): Home has no
+  // rays, just the anchor itself.
+  home: `<polygon points="${hexPts(20)}" fill="currentColor"/>`,
+  // BCC Build: the SAME real geometry as the HUD wheel's own icon
+  // (hud-wheel-3d.js) -- the truncated octahedron's silhouette down a
+  // square-face axis, scaled into this mark's coordinate space. One
+  // symbol, one purpose, same shape everywhere it appears.
+  bccBuild: `
+    <polygon points="-30,-15 -15,-30 15,-30 30,-15 30,15 15,30 -15,30 -30,15" ${THIN}/>
+    <polygon points="0,-15 15,0 0,15 -15,0" ${THIN}/>`,
 };
