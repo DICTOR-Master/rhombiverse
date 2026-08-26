@@ -102,3 +102,15 @@ cell's own other data spread back in — no `worldstate-core.js` change
 needed. No-ops (returns `null`) on removing an already-absent pyramid or
 adding an already-present one, both real cases a player's click can hit
 (e.g. Pyramid-model clicked on a face that already has its pyramid).
+
+**Real live report traced to exactly this, 2026-08-26**: "I select one
+of shapes tap screen nothing happens." Reproduced with a genuine
+`page.touchscreen.tap()` against production (not the manually-dispatched
+synthetic `click` the earlier touch verification used, which papered
+over this) — Add+Pyramid on a fresh, full block silently no-ops, and
+every freshly-placed block IS full, so picking the Pyramid piece tier
+and tapping any existing block is the very first thing a new player
+tries and the very first thing that goes silent. The no-op itself was
+never a bug; the silence was. `core/build.js`'s new `onPieceNoOp`
+callback (wired in `render.js` to a real `showHudPrompt`) gives the
+player the actual reason instead of nothing.

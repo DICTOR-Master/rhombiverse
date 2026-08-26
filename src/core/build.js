@@ -161,6 +161,14 @@ export function createBuildController({
   onHoverEnd = null,
   onPlaced = null,
   onRemoved = null,
+  // Direct live report, 2026-08-26 ("I select one of shapes tap screen
+  // nothing happens"): the Pyramid piece tier's Add/Remove no-ops are
+  // real and correct (nothing missing to add on a full block; nothing
+  // there to remove on a bare spot) -- every freshly-placed block is
+  // full, so this is the very first thing a player picking Pyramid tries
+  // on any existing block. (action: 'add' | 'remove') => void, so the
+  // caller can surface a real "nothing to do" prompt instead of silence.
+  onPieceNoOp = null,
   getDragPlacementEnabled = () => false,
 }) {
   const raycaster = new THREE.Raycaster();
@@ -355,9 +363,14 @@ export function createBuildController({
     if (mode === 'chisel') {
       if (getPieceType() === 'pyramid') {
         const axisKey = resolveClickedPyramidAxis(hit, cell);
-        if (!axisKey) return;
+        if (!axisKey) { if (onPieceNoOp) onPieceNoOp('remove'); return; }
         const result = applyPyramidEdit(world, 'remove', cell.x, cell.y, cell.z, axisKey);
-        if (!result) return; // no-op: that pyramid's already gone
+        // No-op: that pyramid's already gone. A direct live report ("I
+        // select one of shapes tap screen nothing happens") turned out to
+        // be exactly this -- Remove on an already-bare spot is silently
+        // correct, but felt broken with zero feedback. onPieceNoOp gives
+        // the player something, see render.js's own wiring.
+        if (!result) { if (onPieceNoOp) onPieceNoOp('remove'); return; }
         onChange();
         if (onRemoved) onRemoved(cell);
         return;
@@ -377,9 +390,13 @@ export function createBuildController({
     // per core/pyramid.js).
     if (getPieceType() === 'pyramid') {
       const axisKey = resolveClickedPyramidAxis(hit, cell);
-      if (!axisKey) return;
+      if (!axisKey) { if (onPieceNoOp) onPieceNoOp('add'); return; }
       const result = applyPyramidEdit(world, 'add', cell.x, cell.y, cell.z, axisKey);
-      if (!result) return; // no-op: that pyramid's already there
+      // No-op: that pyramid's already there -- true of every freshly
+      // placed (full) block, so this is the very first thing a player
+      // picking Pyramid tries on any existing block. See the 'chisel'
+      // branch above for the live report this traces back to.
+      if (!result) { if (onPieceNoOp) onPieceNoOp('add'); return; }
       onChange();
       if (onPlaced) onPlaced(cell);
       return;
@@ -450,9 +467,9 @@ export function createBuildController({
       // as it always has regardless of whatever piece tier is selected.
       if (mode === 'build' && getPieceType() === 'pyramid') {
         const axisKey = resolveClickedPyramidAxis(hit, cell);
-        if (!axisKey) return;
+        if (!axisKey) { if (onPieceNoOp) onPieceNoOp('remove'); return; }
         const result = applyPyramidEdit(world, 'remove', cell.x, cell.y, cell.z, axisKey);
-        if (!result) return; // no-op: that pyramid's already gone
+        if (!result) { if (onPieceNoOp) onPieceNoOp('remove'); return; } // no-op: that pyramid's already gone
       } else {
         world.removeCell(cell.x, cell.y, cell.z);
       }

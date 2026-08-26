@@ -3171,6 +3171,19 @@ async function init() {
       flashAt(cell, 0xff8866);
       playRemoveSound();
     },
+    // Direct live report 2026-08-26: the Pyramid piece tier's no-ops
+    // (add on an already-full block, remove on an already-bare spot)
+    // were real and correct but silent -- see core/build.js's own note
+    // on onPieceNoOp for why this is the very first thing a new player
+    // hits.
+    onPieceNoOp: (action) => {
+      showHudPrompt(
+        action === 'add'
+          ? "That pyramid's already there -- try a face you've removed one from, or switch Piece to Cube/RD to place a whole new block."
+          : "No pyramid there to remove -- that face is already a flat cube.",
+        3500
+      );
+    },
     getDragPlacementEnabled: () => pickers.isDragPlacementEnabled(),
     // getMode() must return 'plant', never null -- see docs/code-notes/render.md
     getMode: () => (walking ? null : currentMode),
