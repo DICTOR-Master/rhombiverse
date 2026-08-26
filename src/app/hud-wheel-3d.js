@@ -106,7 +106,25 @@ const HUD_FACES = {
   // 2026-08-25). Each antipode pairing below was confirmed NOT
   // edge-adjacent to the face it duplicates before being assigned.
   'bottom|sy-1sz-1':  { symbol: '◐', elId: 'duality-toggle',          title: 'Duality', temporary: true },
-  'bottom|sx1sz-1':   { symbol: '⊘', elId: 'clear-world-toggle',      title: 'Clear World', temporary: true },
+  // 2026-08-26 direct instruction: this slot's Clear World duplicate
+  // (a confirm()-gated destructive action -- arguably doesn't even
+  // WANT a quick-access shortcut) replaced with real new content, BCC
+  // Build, rather than another copy. Clear World keeps its own true
+  // original face (top|sx-1sz1) untouched. See core/bcc-build.md.
+  //
+  // Real SVG glyph, not a Unicode stand-in: the truncated octahedron
+  // viewed straight down a square-face axis, verified against
+  // truncatedOctahedronVertices (not eyeballed) -- 8 outer points at
+  // radius sqrt(5) (the hexagonal faces' silhouette) form the octagon,
+  // 4 inner points at radius 1 (the near square face itself) form the
+  // centered square. One-symbol-one-purpose: deliberately distinct from
+  // 'BCC Lattice' (top|sy-1sz1)'s bare ⬡ -- same shape family, but this
+  // is real placement, that's a live preview, and they're different
+  // functions.
+  'bottom|sx1sz-1':   {
+    svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><polygon points="-2,-1 -1,-2 1,-2 2,-1 2,1 1,2 -1,2 -2,1" fill="none" stroke="currentColor" stroke-width="0.28" stroke-linejoin="round"/><polygon points="0,-1 1,0 0,1 -1,0" fill="none" stroke="currentColor" stroke-width="0.28" stroke-linejoin="round"/></svg>',
+    elId: 'bcc-build-toggle', title: 'BCC Build',
+  },
   'bottom|sx-1sz-1':  { symbol: '◇', elId: 'rhombic-wheel-3d-toggle', title: 'Menu', temporary: true },
 };
 
@@ -184,7 +202,13 @@ export function createHudWheel3D(renderer, { size = 144, margin = 12 } = {}) {
     if (data) {
       labelEl = document.createElement('div');
       labelEl.className = 'hud-wheel-3d-symbol';
-      labelEl.textContent = data.symbol;
+      // Real inline SVG for faces that carry one (`data.svg`) instead of
+      // a single Unicode character -- everything else on this wheel is
+      // still a plain glyph via textContent, this is the one exception,
+      // for a shape (the truncated octahedron's real silhouette) with no
+      // reasonable single-character stand-in. See core/bcc-build.md.
+      if (data.svg) labelEl.innerHTML = data.svg;
+      else labelEl.textContent = data.symbol;
       labelEl.title = data.title;
       labelEl.dataset.faceKey = k;
       const scale = SYMBOL_SCALE[data.elId];

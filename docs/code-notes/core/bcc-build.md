@@ -200,13 +200,77 @@ entry points are safe regardless of which one a future change touches.
 A separate, standalone spec (`RHOMBIVERSE_SPEC_ICON_SYSTEM.md`, outside
 this repo as of 2026-08-26) exists for replacing every wheel-face label
 with a real geometry-native symbol + reveal-on-touch, but the *live*
-wheel implementation is still plain text labels only (`rw3d-label`
+main-wheel implementation is still plain text labels only (`rw3d-label`
 elements, `textContent = data.label`) -- confirmed by reading
-`rhombic-wheel-3d.js` directly, not assumed. BCC Build's own face uses a
-plain text label for now, matching every other face as they actually
-are today. A real, numerically-verified candidate glyph exists for
-whenever that system gets scoped: viewed straight down one of the
-truncated octahedron's square-face axes, the silhouette is an exact
-octagon (8 vertices at radius √5) with a smaller square dead center (4
-vertices at radius 1, the near square face itself) -- checked directly
-against `truncatedOctahedronVertices`, not eyeballed.
+`rhombic-wheel-3d.js` directly, not assumed. BCC Build's own MAIN-wheel
+face uses a plain text label for now, matching every other face there as
+they actually are today; the full icon-system overhaul (frame,
+reveal-on-touch, the rest of its resolved mark set) is scoped as its own
+separate task, not started.
+
+The octagon-with-inner-square glyph itself, though, IS implemented and
+shipped -- on the HUD mini-wheel (`hud-wheel-3d.js`), which turned out to
+have its own real duplicate slots too (same policy as the main wheel:
+`temporary: true` faces re-showing an existing function at a second
+position, direct instruction 2026-08-26 to use them where a genuinely
+new function exists to fill one). Replaced the Clear World duplicate at
+`bottom|sx1sz-1` -- a confirm()-gated destructive action, arguably one
+that shouldn't have an extra quick-access shortcut anyway; Clear World
+keeps its own true original face (`top|sx-1sz1`) untouched.
+
+That HUD wheel's label system was plain-Unicode-character-only before
+this (`labelEl.textContent = data.symbol`) -- no shape with the
+octagon's fidelity has a reasonable single-character stand-in, so
+`hud-wheel-3d.js` now also accepts a `data.svg` field (real inline SVG,
+`innerHTML` instead of `textContent`) as a per-face opt-in; every other
+face is untouched, still plain-character `textContent`. The SVG's own
+two `<polygon>`s use the exact angle-sorted vertex coordinates from
+`truncatedOctahedronVertices`'s own square-face-axis projection (8
+outer points at radius √5, 4 inner points at radius 1) -- drawn from the
+real numbers, not a generic octagon+square approximation. Verified live
+(Playwright): real `<svg>` with 2 `<polygon>` children present in the
+DOM, correct `title`, the underlying `#bcc-build-toggle` button (now a
+real `id`, was class-only before) still switches `currentMode` to `bcc`
+via the same `elId`-driven `.click()` dispatch every other HUD face
+already uses.
+
+## Icon-system scoping notes (for whenever that separate task starts)
+
+Cross-walked the live HUD's existing 9 icons (⚙ ⛶ ◈ ◆ ◐ ⬡ ⊘ ↻ ◇) against
+`RHOMBIVERSE_SPEC_ICON_SYSTEM.md`'s section 4 resolved-marks table, per
+that spec's own section 5 item 1 requirement. Findings, direct
+instruction on how to apply them: **keep the HUD wheel's existing icons
+as authoritative in any conflict; one symbol per purpose, never two
+symbols for the same thing.**
+
+- **Cyborg's "unresolved" icon (section 5 item 4) is resolved**: it
+  already has a real shipped icon, ◈ (`equator|sx-1sy1` on the HUD
+  wheel). Whenever the main wheel gets real icons, Cyborg's face there
+  should reuse ◈ too, not either of the spec's two original candidate
+  marks (diamond-based / target-brackets) -- same concept, same symbol,
+  everywhere.
+- **Section 4's table barely overlaps the HUD wheel's own icon set** --
+  it's built for the MAIN wheel's department/tool faces. Of the 9 HUD
+  icons, only Duality has a matching row (nested black/white diamonds,
+  diagonally opposite) -- a different, more complex mark than the HUD's
+  current plain ◐. Duality isn't a face on any current main-department
+  wheel either, so that resolved mark has nowhere to go yet regardless.
+- **Remnants list** (real, resolved-or-considered marks not being acted
+  on now -- revisit only if a case is made that they're genuinely
+  clearer than what's shipped):
+  - Duality's nested-diamond mark (parked -- no current face to put it
+    on, HUD's ◐ stays as-is).
+  - The shared hexagon-in-circle FRAME (section 2) sitting alongside the
+    HUD's own bare ⬡ meaning "BCC Lattice preview" specifically -- a
+    soft, non-blocking tension (the frame is explicitly a neutral
+    container per the spec's own text, not a claimed meaning), worth a
+    real look once the main wheel's icons actually exist and can be
+    seen side-by-side with the HUD's.
+  - Shell Brush / Symmetry Mirror (section 4's two "(modifier)" rows):
+    checked live -- `shellBrushCells`/`applyShellBrush` are real,
+    wired functions, but "Symmetry Mirror" only exists today as a plain
+    `.sculpt-section-label` text heading inside the Sculpt panel, not an
+    icon-bearing control; Shell Brush has no dedicated UI element at all
+    yet distinct from the shell-radius controls already in that panel.
+    Whether these two get real icon-bearing controls at all is a
+    separate, prior question to the icon system itself.
