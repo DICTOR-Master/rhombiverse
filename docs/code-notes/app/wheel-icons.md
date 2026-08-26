@@ -147,6 +147,25 @@ Spiral Column, and Templates -- all three genuine unbuilt-feature stubs,
 left as plain text per the spec's own suggested default (section 5 item
 2), not an oversight.
 
+## Real bug fixed after going live and actually looking (2026-08-26)
+
+Direct report: "symbols aren't centred on faces." Real cause, found via
+`getBoundingClientRect()` diagnostics, not guessed: `.rw3d-label`
+(the positioned element the JS centers via `translate(-50%,-50%)`) had
+always relied on an absolutely-positioned block's *implicit*
+shrink-to-fit width. `.has-icon`'s own `display: flex` had been quietly
+supplying that shrink-wrap as a side effect; removing it (this file's
+own docs above once described `.has-icon` as `display:flex`, since
+corrected) left the label as a plain block box, which stretched to the
+full overlay width (measured: 1000px, the whole viewport) -- so the
+centering transform centered *that*, not the icon, visibly dragging
+every icon away from its true face anchor. Fixed by giving `.rw3d-label`
+an explicit `width: max-content` -- shrink-to-fit is no longer implicit/
+accidental. Also enlarged the icon itself per direct follow-up
+instruction ("icons enlarge, not wheel"): 30px -> 52px, wheel geometry
+itself untouched. Verified via the same `getBoundingClientRect()` check:
+icon center and label center now match exactly, at every face checked.
+
 ## Real remaining gap, for whenever this continues
 
 Dome/Spiral Column/Templates' own marks, if ever wanted (not currently

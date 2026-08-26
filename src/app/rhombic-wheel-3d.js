@@ -87,6 +87,7 @@ const CSS = `
 #rhombic-wheel-3d-labels { position: absolute; inset: 0; pointer-events: none; }
 .rw3d-label {
   position: absolute; transform: translate(-50%, -50%);
+  width: max-content; /* explicit shrink-to-fit -- see .has-icon's own comment for why this can't be left implicit */
   color: ${SKELETON_COLOR};
   font-family: ${LABEL_STYLE.fontFamily};
   font-weight: ${LABEL_STYLE.fontWeight};
@@ -106,10 +107,20 @@ const CSS = `
    opacity multiplies with the parent .rw3d-label's own facing-driven
    opacity (updateLabelsAndFaceVisuals()), so text only ever shows once
    the icon itself is already visible enough to be worth reading. */
-.rw3d-label.has-icon { display: flex; align-items: center; gap: 8px; }
-.rw3d-label-icon { display: block; width: 30px; height: 30px; }
+/* .has-icon is NOT display:flex -- a flex row's own box (icon + gap +
+   text) is what gets centered by the parent .rw3d-label's translate(-50%,
+   -50%), so a hidden-but-still-laid-out text child (opacity alone doesn't
+   remove it from flow) was pulling that centering point off the icon
+   itself, visibly off-center from the real face anchor. The icon is the
+   only thing establishing .rw3d-label's box now; the text is taken out
+   of flow entirely (position:absolute) and anchored to the icon's own
+   right edge, so it can never affect centering, revealed or not. */
+.rw3d-label.has-icon { position: relative; }
+.rw3d-label-icon { display: block; width: 52px; height: 52px; }
 .rw3d-label-icon svg { display: block; width: 100%; height: 100%; }
 .rw3d-label-text {
+  position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
+  margin-left: 8px;
   opacity: 0; transition: opacity 0.15s ease;
   font-size: ${LABEL_STYLE.fontSizeBase};
 }
