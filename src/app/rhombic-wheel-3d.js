@@ -377,8 +377,13 @@ export function createRhombicWheel3D({
       // visible there. Spares are handled separately via the CSS rule.
       e.labelEl.style.pointerEvents = (!e.isSpare && e._labelOpacity > 0.2) ? 'auto' : 'none';
 
+      // Push distance along the face normal, pulling the label/icon in
+      // toward the surface -- was 0.35, direct instruction 2026-08-26
+      // ("a little closer to surface without breaking it"). Checked at
+      // both the default 3-face opening view and a rotated ~6-face view:
+      // no clipping into the mesh, no overlap between adjacent icons.
       const worldCentroid = e.centroid.clone().applyQuaternion(group.quaternion)
-        .add(worldNormal.clone().multiplyScalar(0.35));
+        .add(worldNormal.clone().multiplyScalar(0.24));
       const pos = screenPosFor(worldCentroid);
       e.labelEl.style.left = `${pos.x}px`;
       e.labelEl.style.top = `${pos.y}px`;
