@@ -217,33 +217,43 @@ export function createBuildController({
   // direction. Remove only ever acts on an actual TO -- there's nothing
   // to remove from an FCC hit under this piece tier.
   function handleToClick(hit, mode) {
+    const action = mode === 'build' ? 'add' : 'remove';
     if (mode === 'build') {
       let nx, ny, nz;
       if (hit.object === bccMesh) {
-        if (hit.instanceId === undefined) return;
+        if (hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
         const bccCell = bccCellAt(hit.instanceId);
-        if (!bccCell) return;
+        if (!bccCell) { if (onPieceNoOp) onPieceNoOp(action); return; }
         const [dx, dy, dz] = matchBCCNeighborOffset(hit.face.normal);
         nx = bccCell.x + dx;
         ny = bccCell.y + dy;
         nz = bccCell.z + dz;
       } else {
         const fccCell = cellAt(hit);
-        if (!fccCell) return;
+        if (!fccCell) { if (onPieceNoOp) onPieceNoOp(action); return; }
         const n = hit.face.normal;
         [nx, ny, nz] = nearestBCCCell(fccCell.x + n.x, fccCell.y + n.y, fccCell.z + n.z);
       }
-      if (bccWorld.has(nx, ny, nz)) return;
+      // No-op: a TO already sits there -- reachable by tapping the same
+      // spot twice, or an already-dense cluster. Same class of "silent
+      // and correct, but reads as broken" bug the Pyramid tier had (see
+      // that tier's own onPieceNoOp note above); TO's own live audit
+      // caught it here before a report came in, not after.
+      if (bccWorld.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
       const material = getMaterial();
       bccWorld.addCell(nx, ny, nz, { material });
       onBCCChange();
       if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
       return;
     }
-    // mode === 'chisel' (Remove)
-    if (hit.object !== bccMesh || hit.instanceId === undefined) return;
+    // mode === 'chisel' (Remove). This is the single MOST likely of every
+    // Pyramid/TO no-op to actually get hit: Remove+TO on any of the
+    // mostly-RD world (which is most of what's actually on screen) always
+    // silently did nothing before onPieceNoOp existed, since there's no
+    // TO to remove from an FCC hit under this piece tier.
+    if (hit.object !== bccMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
     const bccCell = bccCellAt(hit.instanceId);
-    if (!bccCell) return;
+    if (!bccCell) { if (onPieceNoOp) onPieceNoOp(action); return; }
     bccWorld.removeCell(bccCell.x, bccCell.y, bccCell.z);
     onBCCChange();
     if (onRemoved) onRemoved(bccCell);

@@ -3176,13 +3176,24 @@ async function init() {
     // were real and correct but silent -- see core/build.js's own note
     // on onPieceNoOp for why this is the very first thing a new player
     // hits.
+    // Piece-tier-aware: the TO tier's own no-ops (audited in, not
+    // reported live) turned out to be the same "silent and correct, but
+    // reads as broken" issue the Pyramid tier's live report caught --
+    // most likely one being Remove+TO tapped on ordinary (non-TO) world
+    // geometry, since most of what's actually on screen is RD, not TO.
     onPieceNoOp: (action) => {
-      showHudPrompt(
-        action === 'add'
-          ? "That pyramid's already there -- try a face you've removed one from, or switch Piece to Cube/RD to place a whole new block."
-          : "No pyramid there to remove -- that face is already a flat cube.",
-        3500
-      );
+      const piece = document.getElementById('piece-type-select')?.value;
+      const messages = {
+        pyramid: {
+          add: "That pyramid's already there -- try a face you've removed one from, or switch Piece to Cube/RD to place a whole new block.",
+          remove: 'No pyramid there to remove -- that face is already a flat cube.',
+        },
+        to: {
+          add: 'A Truncated Octahedron is already there.',
+          remove: "No Truncated Octahedron there to remove -- Remove+TO only clears an actual TO, not the RD world around it. Tap directly on one you've placed.",
+        },
+      };
+      showHudPrompt(messages[piece]?.[action] ?? 'Nothing to do there.', 3500);
     },
     getDragPlacementEnabled: () => pickers.isDragPlacementEnabled(),
     // getMode() must return 'plant', never null -- see docs/code-notes/render.md
