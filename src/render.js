@@ -2195,10 +2195,27 @@ async function init() {
         if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
       },
     });
+    // Direct instruction 2026-08-26: "there should always automatically
+    // be 1 cell because you open cell place menu." Real gap found live --
+    // every whole-cell Add mode (RD/Cube/TO) places a NEW cell adjacent
+    // to a face you click, so a genuinely empty world (reachable by
+    // simply removing the last cell -- nothing currently stops that) has
+    // no face for anything to click, and clicking anywhere silently does
+    // nothing forever after, unrecoverable except via Clear World/Reload.
+    // The single real fix point: wheel3D.open() is the only place the
+    // wheel/build menu ever actually opens (every other wheel3D call in
+    // this file is .close()), so seeding here guarantees a real cell
+    // exists before the player can reach any Add/Remove tool at all.
+    function seedIfWorldEmpty() {
+      if (world.entries().length === 0) {
+        world.addCell(0, 0, 0, { material: materialSelect.value });
+        onChange();
+      }
+    }
     function toggleWheel3D() {
       if (pickers.isAnyPickerOpen()) { pickers.closeAnyPicker(); return; }
       if (wheel3D.isOpen) wheel3D.close();
-      else wheel3D.open('home');
+      else { seedIfWorldEmpty(); wheel3D.open('home'); }
     }
     rhombicWheel3DToggleBtn?.addEventListener('click', toggleWheel3D);
     isRhombicWheel3DOpen = () => wheel3D.isOpen;
