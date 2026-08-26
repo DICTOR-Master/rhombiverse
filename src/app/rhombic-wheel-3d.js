@@ -75,19 +75,6 @@ const ACTION_TO_MARK = {
 // itself ("needs real testing on touch devices"), not a fixed value --
 // this is a reasonable starting point, not a final answer.
 const REVEAL_HOLD_MS = 350;
-// TEMPORARY kill-switch, 2026-08-26: direct instruction to fall back to
-// a known-safe state (plain text labels, exactly as before any of
-// today's icon work) after a live report of icons "floating all over
-// the place" that could not be reproduced in extensive local testing
-// (every wheel checked, every face boxW:52/offBy:0, single-click
-// navigation verified correct) -- most likely a stale-cached-JS or
-// environment mismatch rather than a live defect in this code, but
-// "return to a functional state until you can work out the bug" is
-// unambiguous, so acted on directly rather than argued with. Flip back
-// to `true` once the real live environment is confirmed and the icons
-// are confirmed correct there too, not just in this session's own
-// Playwright checks. See docs/code-notes/app/wheel-icons.md.
-const ICON_SYSTEM_ENABLED = false;
 
 const CSS = `
 #rhombic-wheel-3d-overlay {
@@ -127,8 +114,22 @@ const CSS = `
    itself, visibly off-center from the real face anchor. The icon is the
    only thing establishing .rw3d-label's box now; the text is taken out
    of flow entirely (position:absolute) and anchored to the icon's own
-   right edge, so it can never affect centering, revealed or not. */
-.rw3d-label.has-icon { position: relative; }
+   right edge, so it can never affect centering, revealed or not.
+   Real regression found 2026-08-26 via getBoundingClientRect() diffed
+   against every face, not just a couple: this rule used to also set
+   position: relative (so .rw3d-label-text's own position:absolute had
+   something to anchor to) -- but .rw3d-label.has-icon outranks the
+   base .rw3d-label { position: absolute } on specificity, so it was
+   silently overriding it. That turned every icon-bearing label from a
+   positioned box (top/left = real screen coordinates) into a normal-flow
+   block that stacks under its DOM siblings, with top/left then applied
+   as a RELATIVE offset from that stacked position -- drift compounded by
+   about one icon-height per face in DOM order (0, 52, 104, 156px, ...),
+   identical at every viewport size tested (desktop through phone), which
+   is exactly the "floating all over the place" live report and why it
+   read as if centering assumed a much taller container. No position
+   override needed here: position: absolute (already inherited) is
+   itself a valid positioned ancestor for the text child. */
 .rw3d-label-icon { display: block; width: 52px; height: 52px; }
 .rw3d-label-icon svg { display: block; width: 100%; height: 100%; }
 .rw3d-label-text {
@@ -272,7 +273,7 @@ export function createRhombicWheel3D({
       // touch word; everything else keeps the plain text label exactly
       // as before -- see that map's own header for why (spec leaves
       // several real actions genuinely unresolved; not guessing here).
-      const markKey = ICON_SYSTEM_ENABLED ? ACTION_TO_MARK[data.action] : null;
+      const markKey = ACTION_TO_MARK[data.action];
       if (markKey && MARKS[markKey]) {
         labelEl.classList.add('has-icon');
         const iconEl = document.createElement('span');

@@ -166,6 +166,50 @@ instruction ("icons enlarge, not wheel"): 30px -> 52px, wheel geometry
 itself untouched. Verified via the same `getBoundingClientRect()` check:
 icon center and label center now match exactly, at every face checked.
 
+## Second real bug: that fix's own regression (2026-08-26, same day)
+
+The fix above added `.rw3d-label.has-icon { position: relative; }` so
+`.rw3d-label-text`'s `position: absolute; left: 100%` had something to
+anchor to. That shipped, then a live report came back: icons "floating
+all over the place." Local testing right after the fix (every wheel
+checked, every face `boxW:52 offBy:0`) couldn't reproduce it, so the
+icon system was disabled behind a kill-switch (`ICON_SYSTEM_ENABLED =
+false`) rather than argue with an unverified live report -- "return to
+a functional state until you can work out the bug" was a direct,
+unambiguous instruction.
+
+Real cause, found by finally diffing `getBoundingClientRect()` against
+**every** face at once (not spot-checking a couple, which is exactly
+why the first pass's own local testing missed it): `.rw3d-label.has-icon`
+(two classes) outranks the base `.rw3d-label { position: absolute }`
+(one class) on specificity, so `position: relative` was silently
+overriding it on every icon-bearing label. That turns the label from a
+positioned box -- `top`/`left` = real screen coordinates relative to
+`#rhombic-wheel-3d-labels` -- into a normal-flow block that stacks
+under its own DOM siblings, with `top`/`left` then applied as a
+*relative* offset on top of that stacked position. The drift compounds
+by about one icon-height (52px) per face in DOM order: the first face
+built lands dead-on (offset 0), the last of 12 lands ~572px off. This
+is identical at every viewport size (checked desktop through phone) --
+it has nothing to do with actual wheel/screen dimensions, which is why
+"stale cache" or "environment mismatch" was the wrong lead, and why
+checking only the first face or two in local testing produced
+`offBy:0` even though the bug was real and present the whole time.
+
+Fix: drop the `position: relative` override entirely. `position:
+absolute` (already inherited from the base rule) is itself a valid
+positioned ancestor for `.rw3d-label-text` -- `relative` was never
+needed. Re-verified via the same `getBoundingClientRect()` diff, this
+time against all 12 home-wheel faces at once, at both a desktop and a
+phone viewport size: every face lands at offset 0. `ICON_SYSTEM_ENABLED`
+kill-switch removed (was explicitly temporary) now that the real defect
+is fixed, not routed around.
+
+**Lesson for next time a "can't reproduce" live report comes in**: diff
+*every* instance of the affected element in one pass, not the first
+couple found by hand -- an offset that compounds with DOM order is
+exactly the kind of bug spot-checking will miss while it's still real.
+
 ## Real remaining gap, for whenever this continues
 
 Dome/Spiral Column/Templates' own marks, if ever wanted (not currently
