@@ -28,6 +28,19 @@ export function rdRawVerts(s = 1) {
 // separately -- if rdRawVerts ever changes, this stays correct for free.
 // PYRAMID_AXES matches OCTA_VERTS' own fixed order (+x,-x,+y,-y,+z,-z), so
 // apexRaw[i] below is guaranteed to be the correct apex for PYRAMID_AXES[i].
+//
+// Relationship to dual.js's getDual(): genuinely the same 8+6 split of the
+// same 14 vertices (getDual's own "cube"/"octa" are exactly this
+// function's `cube` and the union of every pyramid's own `apex`) -- but
+// serving a different purpose (getDual treats them as two INSCRIBED
+// SOLIDS for symmetry-snapping/Duality Mode; this treats them as the
+// actual structural cube-plus-6-separate-pyramids decomposition, grouping
+// which 4 cube corners form each individual pyramid's own base, which
+// getDual has no need to compute). Not literally unified: dual.js already
+// imports FROM this file (NEIGHBOR_OFFSETS), so this file importing
+// getDual back would be a circular dependency. dual.js's own DUAL_DIRS is
+// a wholly separate, unrelated concept from either -- lattice-INDEX
+// offsets to OTHER cells, not a split of any one cell's own vertices.
 export const PYRAMID_AXES = ['x+', 'x-', 'y+', 'y-', 'z+', 'z-'];
 
 export function pyramidPieces(s = 1) {

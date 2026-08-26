@@ -27,10 +27,15 @@ import { iconFrame, MARKS } from './wheel-icons.js';
 // Build/Alter department-nav faces themselves) have no resolved row.
 // See docs/code-notes/app/wheel-icons.md for the full gap list.
 const ACTION_TO_MARK = {
-  'tool:rhombiModel': 'rhombiModel',
-  'tool:rhombiSculpt': 'rhombiSculpt',
-  'tool:pyramidModel': 'pyramidModel',
-  'tool:pyramidSculpt': 'pyramidSculpt',
+  // Universal Add/Remove + Piece picker (direct instruction 2026-08-26,
+  // retiring the earlier separate Rhombi-/Pyramid-/Cube- model/sculpt
+  // marks). 'tool:symmetry' reuses the existing `symmetryMirror` modifier
+  // mark below (a real match for what that panel actually does) rather
+  // than the old generic "-" now spoken for by 'tool:remove'.
+  'tool:add': 'add',
+  'tool:remove': 'remove',
+  'tool:symmetry': 'symmetryMirror',
+  'tool:pieceType': 'pieceType',
   'tool:fill': 'fill',
   'tool:dig': 'dig',
   'tool:smooth': 'smooth',
@@ -60,7 +65,7 @@ const ACTION_TO_MARK = {
   // defining action doubles as a preview of what's inside, rather than
   // inventing two more marks for "leads to the Rhombi-model wheel" /
   // "leads to the Dig wheel."
-  'navigateTo:build': 'rhombiModel',
+  'navigateTo:build': 'add',
   'navigateTo:alter': 'dig',
   // Construct has no tool of its own (pure routing hub, see its own
   // real code comment in rhombic-wheel-3d-core.js) -- gets a dedicated

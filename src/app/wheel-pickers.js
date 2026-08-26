@@ -108,6 +108,7 @@ export function createWheelPickers({
   materialSelectId = 'material-select',
   generatorSelectId = 'generator-type-select',
   speciesSelectId = 'species-select',
+  pieceTypeSelectId = 'piece-type-select',
   onModeChosen = () => {},
   onDragPlacementChange = () => {},
   onMenuSound = () => {},
@@ -243,6 +244,13 @@ export function createWheelPickers({
     const options = readSelectOptions(select);
     openPickerStrip(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
   }
+  // Piece-tier picker (RD/Cube/Pyramid), direct instruction 2026-08-26 --
+  // same mechanism as Generator/Species above, nothing new needed.
+  function openPieceTypePicker(onPick) {
+    const select = document.getElementById(pieceTypeSelectId);
+    const options = readSelectOptions(select);
+    openPickerStrip(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
+  }
   function toggleDragPlacement() {
     dragPlacementEnabled = !dragPlacementEnabled;
     onDragPlacementChange(dragPlacementEnabled);
@@ -255,6 +263,7 @@ export function createWheelPickers({
     openMaterialPicker,
     openSpeciesPicker,
     openGeneratorPicker,
+    openPieceTypePicker,
     toggleDragPlacement,
     isDragPlacementEnabled: () => dragPlacementEnabled,
     // For a caller (the 3D wheel's Tab/Space/HUD-cue handling) that

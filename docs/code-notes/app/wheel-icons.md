@@ -210,6 +210,27 @@ is fixed, not routed around.
 couple found by hand -- an offset that compounds with DOM order is
 exactly the kind of bug spot-checking will miss while it's still real.
 
+## Universal Add/Remove + Piece picker (2026-08-26, same day)
+
+`RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md`'s own follow-up: what shipped first
+as three separate model/sculpt pairs (Rhombi-/Pyramid-/Cube-, 6 marks)
+got consolidated same-day into one universal Add + Remove pair, piece-
+tier-aware via a new Piece picker (see `docs/code-notes/render.md`'s
+Pyramid Sub-Cell section for the full redesign story). `rhombiModel`/
+`rhombiSculpt` were renamed to `add`/`remove` in place -- the "+"/"-"
+marks were already generic enough that no new geometry was needed, just
+a new meaning attached. `pyramidModel`/`pyramidSculpt`/`cubeModel`/
+`cubeSculpt` (the square-pyramid-net and isometric-cube marks) are gone
+-- their wheel faces no longer exist, so keeping unreferenced marks
+around would just be dead code. A new `pieceType` mark (a small hexagon,
+cube, and pyramid-net side by side) represents the picker itself --
+literal, matching this file's own vocabulary, rather than an abstract
+symbol for "pick a tier." `tool:symmetry` (the renamed rich brush/mirror
+panel, was `tool:rhombiSculpt`) reuses the existing `symmetryMirror`
+modifier mark instead of `remove` -- a real match for what that panel
+does, and frees `remove` to mean the new plain click-to-remove action
+without the two reading as the same thing.
+
 ## Real remaining gap, for whenever this continues
 
 Dome/Spiral Column/Templates' own marks, if ever wanted (not currently

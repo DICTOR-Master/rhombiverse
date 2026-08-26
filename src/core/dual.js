@@ -1,5 +1,17 @@
 // Dual cube/octahedron structure inscribed in each RD (core, not
 // optional). Full design rationale/history: docs/code-notes/core/dual.md
+//
+// Relationship to lattice.js's pyramidPieces() (RHOMBIVERSE_SPEC_PYRAMID_
+// SUBCELL.md): getDual() below does the same 8-cube/6-octa split of the
+// same 14 rdRawVerts() points that pyramidPieces() does, for a different
+// purpose -- this file treats them as two INSCRIBED SOLIDS (symmetry
+// snapping via snapToDual, Duality Mode's Penrose-shadow projection);
+// pyramidPieces() treats them as the real structural cube-plus-6-separate-
+// pyramids decomposition a placed cell can be edited at. Not unified into
+// one function: this file already imports NEIGHBOR_OFFSETS FROM
+// lattice.js, so lattice.js importing back from here would cycle. DUAL_
+// DIRS below is a separate, unrelated concept from either -- lattice-
+// INDEX offsets to OTHER cells, not a split of one cell's own vertices.
 import { NEIGHBOR_OFFSETS } from './lattice.js';
 
 export const CUBE_EDGES = [

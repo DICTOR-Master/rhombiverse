@@ -1107,8 +1107,7 @@
       <button class="mode-btn" data-mode="generate" type="button">Generate</button>
       <button class="mode-btn" data-mode="plant" type="button">Plant</button>
       <button class="mode-btn" data-mode="sculpt" type="button">Sculpt</button>
-      <button class="mode-btn" data-mode="pyramidModel" type="button">Pyramid-model</button>
-      <button class="mode-btn" data-mode="pyramidSculpt" type="button">Pyramid-sculpt</button>
+      <button class="mode-btn" data-mode="chisel" type="button">Remove</button>
     </div>
     <div class="row">
       <button id="walk-toggle" type="button">Enter Walk Mode</button>
@@ -1130,6 +1129,15 @@
           <option value="blackstar-glassite">Blackstar-Glassite</option>
           <option value="ice99">Ice 9.9</option>
           <option value="water">Water</option>
+        </select>
+      </label>
+    </div>
+    <div id="piece-type-row" class="row">
+      <label>Piece:
+        <select id="piece-type-select">
+          <option value="rd">RD (full block)</option>
+          <option value="cube">Cube (bare)</option>
+          <option value="pyramid">Pyramid</option>
         </select>
       </label>
     </div>

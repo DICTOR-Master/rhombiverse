@@ -47,34 +47,23 @@ const THIN = 'stroke="currentColor" stroke-width="2" fill="none"';
 
 // --- Marks, one per resolved concept in the spec's section 4 table ---
 export const MARKS = {
-  // Rhombi-model (add): "+" inside one hexagon (the frame's own).
-  rhombiModel: `<path d="M0,-18 V18 M-18,0 H18" ${STROKE}/>`,
-  // Rhombi-sculpt / Remove (shared): "-" inside one hexagon.
-  rhombiSculpt: `<path d="M-18,0 H18" ${STROKE}/>`,
-  // Pyramid-model / Pyramid-sculpt (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md
-  // section 4): a real square-pyramid NET -- a square (the cube) with one
-  // triangle folded out on each edge (the 4 visible sides of one pyramid,
-  // its base flush against that cube edge) -- a genuinely different shape
-  // family from the hexagon/rhombus marks above, so the finer pyramid tier
-  // reads as a different scale at a glance. Reuses the duality-pair fill
-  // convention (filled = "black", outline = "white") the same way the
-  // `duality` mark below does, but literally on the mechanic itself: the
-  // cube stays solid either way (it's never removed), only the triangles
-  // (pyramids) differ -- complete outlines for model/add, dashed/gapped
-  // outlines for sculpt/remove, matching the spec's own "solid/complete"
-  // vs "gaps/incomplete" wording exactly.
-  pyramidModel: `
-    <polygon points="-12,-12 12,-12 12,12 -12,12" ${THIN}/>
-    <polygon points="-12,-12 12,-12 0,-38" ${THIN}/>
-    <polygon points="12,-12 12,12 38,0" ${THIN}/>
-    <polygon points="12,12 -12,12 0,38" ${THIN}/>
-    <polygon points="-12,12 -12,-12 -38,0" ${THIN}/>`,
-  pyramidSculpt: `
-    <polygon points="-12,-12 12,-12 12,12 -12,12" fill="currentColor"/>
-    <polygon points="-12,-12 12,-12 0,-38" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
-    <polygon points="12,-12 12,12 38,0" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
-    <polygon points="12,12 -12,12 0,38" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
-    <polygon points="-12,12 -12,-12 -38,0" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>`,
+  // Add / Remove (universal, direct instruction 2026-08-26 -- retired the
+  // separate Rhombi-/Pyramid-/Cube- model/sculpt buttons in favor of ONE
+  // pair, piece-tier-aware via the new `pieceType` picker below). "+"/"-"
+  // inside one hexagon (the frame's own) -- generic enough already that
+  // no new icon was needed, just a new meaning attached to the same mark.
+  add: `<path d="M0,-18 V18 M-18,0 H18" ${STROKE}/>`,
+  remove: `<path d="M-18,0 H18" ${STROKE}/>`,
+  // Piece picker (RD / Cube / Pyramid): three small versions of each
+  // tier's own real shape side by side -- a hexagon (RD), a plain
+  // isometric cube (bare, no pyramids), and a square-pyramid net --
+  // literal, matching this file's own vocabulary, not a new abstract
+  // symbol for "pick a tier."
+  pieceType: `
+    <polygon points="${hexPts(11, -28, 6)}" ${THIN}/>
+    <polygon points="0,-14 9,-8 9,4 0,10 -9,4 -9,-8" ${THIN}/>
+    <polygon points="28,10 28,-2 21,-8 15,-2 15,10" ${THIN}/>
+    <polygon points="21,-8 28,-14 15,-14" ${THIN}/>`,
   // Fill: "+" shown across three hexagons.
   fill: `
     <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>

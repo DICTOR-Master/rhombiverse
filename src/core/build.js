@@ -12,7 +12,9 @@ import {
   cellKey,
   parseCellKey,
   cellToWorld,
+  pyramidPieces,
 } from './lattice.js';
+import { applyPyramidEdit, resolvePyramidAxisForHit } from './pyramid.js';
 import { generatePlanetoid } from '../geometry-extensions/planetoidgen.js';
 
 const NEIGHBOR_DIRECTIONS = NEIGHBOR_OFFSETS.map(
@@ -128,6 +130,12 @@ export function createBuildController({
   getMinShell,
   getMaterial,
   getGeneratorType,
+  // Piece tier (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md, direct follow-up
+  // 2026-08-26): 'rd' (default) | 'cube' | 'pyramid' -- what the
+  // universal Add/Remove actions (mode 'build'/'chisel' below) operate
+  // on. Everything else (Fill/Dig/Round/Replace/Generate/Report) stays
+  // RD-only, scoped deliberately -- not asked for beyond Add/Remove.
+  getPieceType = () => 'rd',
   onCellClicked,
   canPlaceMaterial = () => true,
   getOwnerId = () => null,
@@ -151,6 +159,20 @@ export function createBuildController({
     return hits.length > 0 ? hits[0] : null;
   }
 
+  // Which of the clicked cell's own 6 pyramids a hit landed on -- shared
+  // by both the 'pyramid' piece-tier Add and Remove branches below. See
+  // core/pyramid.md for the full derivation.
+  function resolveClickedPyramidAxis(hit, cell) {
+    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z);
+    const n = hit.face.normal;
+    return resolvePyramidAxisForHit({
+      localNormal: [n.x, n.y, n.z],
+      localPoint: [hit.point.x - wx, hit.point.y - wy, hit.point.z - wz],
+      neighborOffset: matchNeighborOffset(n),
+      pieces: pyramidPieces(),
+    });
+  }
+
   // Suppressed after a drag-placement gesture so the browser's own
   // post-drag synthetic 'click' doesn't ALSO place a cell at the
   // release point.
@@ -171,7 +193,6 @@ export function createBuildController({
     if (mode === 'plant') return; // Plant mode's click handling lives in render.js
     if (mode === 'sculpt') return; // Sculpt mode's click handling lives in render.js/sculpture.js
     if (mode === 'bcc') return; // BCC mode's click handling lives in core/bcc-build.js
-    if (mode === 'pyramidModel' || mode === 'pyramidSculpt') return; // Pyramid mode's click handling lives in render.js/core/pyramid.js
 
     if (onCellClicked) onCellClicked(cell);
 
@@ -247,7 +268,46 @@ export function createBuildController({
       return;
     }
 
-    // mode === 'build' (default)
+    // Remove ("chisel" internally -- 'sculpt' was already taken by the
+    // rich brush/mirror/symmetry panel, a genuinely different tool, see
+    // render.js's dispatch). Direct follow-up 2026-08-26: a plain,
+    // dedicated "click a piece, it's gone" mode, piece-tier-aware --
+    // right-click (onContextMenu below) already removes a whole cell in
+    // every mode, but had no discoverable left-click/button equivalent,
+    // and neither right-click nor any existing mode could remove just
+    // one pyramid.
+    if (mode === 'chisel') {
+      if (getPieceType() === 'pyramid') {
+        const axisKey = resolveClickedPyramidAxis(hit, cell);
+        if (!axisKey) return;
+        const result = applyPyramidEdit(world, 'remove', cell.x, cell.y, cell.z, axisKey);
+        if (!result) return; // no-op: that pyramid's already gone
+        onChange();
+        if (onRemoved) onRemoved(cell);
+        return;
+      }
+      // 'rd' and 'cube' both just mean "this whole cell" -- removal is
+      // removal regardless of what was actually there.
+      world.removeCell(cell.x, cell.y, cell.z);
+      onChange();
+      if (onRemoved) onRemoved(cell);
+      return;
+    }
+
+    // mode === 'build' (default) -- the universal Add action, piece-tier
+    // aware. 'pyramid' operates on the CLICKED cell itself (no new cell
+    // placed); 'rd'/'cube' place a new adjacent cell, same as always,
+    // just with or without pyramids: 0 explicitly set (absent means FULL
+    // per core/pyramid.js).
+    if (getPieceType() === 'pyramid') {
+      const axisKey = resolveClickedPyramidAxis(hit, cell);
+      if (!axisKey) return;
+      const result = applyPyramidEdit(world, 'add', cell.x, cell.y, cell.z, axisKey);
+      if (!result) return; // no-op: that pyramid's already there
+      onChange();
+      if (onPlaced) onPlaced(cell);
+      return;
+    }
     const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
     const nx = cell.x + dx;
     const ny = cell.y + dy;
@@ -255,7 +315,8 @@ export function createBuildController({
     const material = getMaterial();
     if (!isValidCell(nx, ny, nz) || world.has(nx, ny, nz)) return;
     if (!canPlaceMaterial(material, nx, ny, nz)) return;
-    world.addCell(nx, ny, nz, { material });
+    const data = getPieceType() === 'cube' ? { material, pyramids: 0 } : { material };
+    world.addCell(nx, ny, nz, data);
     onChange();
     if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
   }
@@ -283,7 +344,27 @@ export function createBuildController({
       // e.g. Walk mode active (falsy) -- general editing stays disabled.
       // 'bcc' -- BCC mode's own right-click removal lives in core/bcc-build.js.
       if (!mode || mode === 'bcc') return;
-      world.removeCell(cell.x, cell.y, cell.z);
+      // Add's own quick Remove gesture (direct instruction 2026-08-26,
+      // for touch: tap to Add, long-press to Remove -- long-press is
+      // already wired to synthesize this exact event, see onTouchStart
+      // below): while actively in Add mode with the Pyramid piece tier
+      // selected, right-click/long-press removes just that one pyramid,
+      // matching what the dedicated Remove button would do for the same
+      // piece tier, instead of always deleting the whole cell. Every
+      // other mode/piece-tier combination keeps this function's own
+      // long-standing universal contract unchanged -- "always removes
+      // the clicked cell, in every mode" (this file's own header) --
+      // deliberately not generalized further than the Add/Remove pair
+      // itself, so e.g. long-pressing in Fill mode still behaves exactly
+      // as it always has regardless of whatever piece tier is selected.
+      if (mode === 'build' && getPieceType() === 'pyramid') {
+        const axisKey = resolveClickedPyramidAxis(hit, cell);
+        if (!axisKey) return;
+        const result = applyPyramidEdit(world, 'remove', cell.x, cell.y, cell.z, axisKey);
+        if (!result) return; // no-op: that pyramid's already gone
+      } else {
+        world.removeCell(cell.x, cell.y, cell.z);
+      }
     }
     onChange();
     if (onRemoved) onRemoved(cell);
@@ -330,7 +411,10 @@ export function createBuildController({
 
     if (pointerDownPos) {
       const moved = Math.hypot(event.clientX - pointerDownPos.x, event.clientY - pointerDownPos.y);
-      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build') {
+      // Drag-placement (Repeat) doesn't apply to the 'pyramid' piece tier
+      // -- same reason as the ghost preview below, it's not neighbor
+      // placement. 'rd'/'cube' both still drag normally.
+      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && getPieceType() !== 'pyramid') {
         dragging = true;
         clearTimeout(holdTimer);
         holding = false;
@@ -346,7 +430,8 @@ export function createBuildController({
           lastDragCellKey = key;
           const material = getMaterial();
           if (canPlaceMaterial(material, cells[0].x, cells[0].y, cells[0].z)) {
-            world.addCell(cells[0].x, cells[0].y, cells[0].z, { material });
+            const data = getPieceType() === 'cube' ? { material, pyramids: 0 } : { material };
+            world.addCell(cells[0].x, cells[0].y, cells[0].z, data);
             onChange();
             if (onPlaced) onPlaced(cells[0]);
           }
@@ -356,7 +441,11 @@ export function createBuildController({
       return;
     }
 
-    if (mode !== 'build') {
+    // 'pyramid' piece-tier Add doesn't place a new adjacent cell (it
+    // edits the clicked cell's own pyramids), so the "next valid FCC
+    // position" ghost preview below -- which assumes neighbor placement
+    // -- doesn't apply there. 'rd'/'cube' both still use it identically.
+    if (mode !== 'build' || getPieceType() === 'pyramid') {
       if (onHoverEnd) onHoverEnd();
       return;
     }

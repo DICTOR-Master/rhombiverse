@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces } from './core/lattice.js';
-import { FULL_PYRAMIDS, effectivePyramids, presentAxisKeys, applyPyramidEdit, resolvePyramidAxisForHit } from './core/pyramid.js';
+import { FULL_PYRAMIDS, presentAxisKeys } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { generateBCCLatticePatch, bccDetailVertsFor, bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
@@ -2053,15 +2053,31 @@ async function init() {
         if (action === 'tool:replace') { showHudPrompt('Replace is not built yet (the 2D menu\'s Replace button is a pre-existing no-op too).', 4000); return; }
 
         // --- Build: direct matches, high confidence ---
-        if (action === 'tool:rhombiModel') { clickMode('build'); wheel3D.close(); return; } // "Place" mode
+        // Universal Add/Remove, direct instruction 2026-08-26: retires the
+        // separate Rhombi-model/Pyramid-model/Cube-model (and their own
+        // -sculpt counterparts) as distinct buttons -- ONE Add and ONE
+        // Remove, both piece-tier-aware via the new Piece picker below
+        // (core/build.js's getPieceType()). 'build'/'chisel' are the
+        // internal mode strings (unchanged/new respectively); the LABELS
+        // are the generic ones now. Was "Rhombi-model" (tool:rhombiModel).
+        if (action === 'tool:add') { clickMode('build'); wheel3D.close(); return; }
         if (action === 'tool:fill') { clickMode('fill'); wheel3D.close(); return; }
-        if (action === 'tool:rhombiSculpt') { clickMode('sculpt'); openSculptPanel(); wheel3D.close(); return; }
-        // Pyramid Sub-Cell (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md): click a
-        // placed cell's face to remove (Pyramid-sculpt) or, on an already-
-        // partial cell, re-add (Pyramid-model) one of its 6 pyramids --
-        // see the pyramidRaycaster click handler above for the real logic.
-        if (action === 'tool:pyramidModel') { clickMode('pyramidModel'); wheel3D.close(); return; }
-        if (action === 'tool:pyramidSculpt') { clickMode('pyramidSculpt'); wheel3D.close(); return; }
+        // Was "Rhombi-sculpt" (tool:rhombiSculpt) -- same rich brush/
+        // mirror/symmetry panel as always, just renamed so it doesn't
+        // read as a same-job-different-name twin of the new plain Remove
+        // action below (that confusion was the whole point of this pass).
+        if (action === 'tool:symmetry') { clickMode('sculpt'); openSculptPanel(); wheel3D.close(); return; }
+        // New: a plain "click a piece, it's gone" action -- piece-tier
+        // aware (RD/Cube = the whole cell, Pyramid = just that one
+        // pyramid). Real logic in core/build.js's 'chisel' mode.
+        if (action === 'tool:remove') { clickMode('chisel'); wheel3D.close(); return; }
+        // Piece-tier picker (RD/Cube/Pyramid) -- same openPickerStrip
+        // mechanism Species/Generator already use, see wheel-pickers.js.
+        if (action === 'tool:pieceType') {
+          wheel3D.close();
+          pickers.openPieceTypePicker((value, label) => showHudPrompt(`Piece: ${label}`, 3000));
+          return;
+        }
         // Reuses the 2D wheel's own material-picker overlay (a real,
         // already-independent DOM overlay, not part of its radial
         // LEVEL1/LEVEL2 visuals) via the openMaterialPicker export
@@ -2345,7 +2361,16 @@ async function init() {
 
   // See docs/code-notes/render.md
   const PLAYER_FACING_MODE_LABEL = {
-    build: 'Build',
+    // 'build'/'chisel'/'sculpt' are internal mode strings kept for
+    // minimal disruption (see core/build.js) -- their player-facing
+    // labels are the universal "Add"/"Remove"/"Symmetry" now (direct
+    // instruction 2026-08-26, retiring the Rhombi-/Pyramid-/Cube-
+    // specific names). 'chisel' was previously missing here entirely and
+    // fell through to the raw internal string -- caught live, not just
+    // reasoned about, via a real HUD screenshot.
+    build: 'Add',
+    chisel: 'Remove',
+    sculpt: 'Symmetry',
     fill: 'Fill',
     round: 'Smooth',
     excavate: 'Dig',
@@ -2901,56 +2926,6 @@ async function init() {
     }
   });
 
-  // --- Pyramid Sub-Cell (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md) ------------
-  // Access method (spec section 3, deliberately open there): reuses the
-  // SAME single build-scene + mode-select mechanism already used for 7
-  // other whole-block tools (build/fill/excavate/round/generate/replace/
-  // report) -- two new `currentMode` values, exactly like Rhombi-model/
-  // Rhombi-sculpt's own existing 'build'/'sculpt' pair -- rather than
-  // either of the spec's own two listed options verbatim. Neither actually
-  // fit as well as this once checked directly: `latticezoom.js`'s "zoom"
-  // is a genuinely different concept (generating a smaller NEW sub-lattice
-  // of cells for organic-growth LOD, not editing an already-placed cell's
-  // own real 7-piece structure), so routing through it would need just as
-  // much new code as this; a whole separate scene+camera mode (Sculpture
-  // Mode's own architecture) is real extra weight this tool doesn't need.
-  // Full derivation of the hit-resolution algorithm below: core/pyramid.js
-  // and docs/code-notes/core/pyramid.md.
-  const pyramidRaycaster = new THREE.Raycaster();
-  const pyramidPointer = new THREE.Vector2();
-  renderer.domElement.addEventListener('click', (event) => {
-    if (walking) return;
-    const action = currentMode === 'pyramidModel' ? 'add' : currentMode === 'pyramidSculpt' ? 'remove' : null;
-    if (!action) return;
-    const rect = renderer.domElement.getBoundingClientRect();
-    pyramidPointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    pyramidPointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    pyramidRaycaster.setFromCamera(pyramidPointer, camera);
-    const hits = pyramidRaycaster.intersectObjects([mesh, partialCellGroup], true);
-    if (hits.length === 0) return;
-    const hit = hits[0];
-    const cell = hit.instanceId !== undefined
-      ? cellOrder[hit.instanceId]
-      : partialCellMeshes.get(hit.object?.userData?.cellKey)?.cell;
-    if (!cell) return;
-
-    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
-    const n = hit.face.normal;
-    const axisKey = resolvePyramidAxisForHit({
-      localNormal: [n.x, n.y, n.z],
-      localPoint: [hit.point.x - wx, hit.point.y - wy, hit.point.z - wz],
-      neighborOffset: matchNeighborOffset(n),
-      pieces: pyramidPieces(SCALE),
-    });
-    if (!axisKey) return;
-
-    const result = applyPyramidEdit(world, action, cell.x, cell.y, cell.z, axisKey);
-    if (!result) return; // no-op: e.g. Pyramid-model clicked on a pyramid that's already there
-    onChange();
-    flashAt(cell, action === 'remove' ? 0xff8866 : 0x9de0ff);
-    if (action === 'remove') playRemoveSound(); else playPlaceSound();
-  });
-
   // --- B4b: standalone Sculpture Mode ---------------------------------
   const permissiveCanPlaceMaterial = () => true; // no frost-line stars exist in a bare scratch lattice
   const sculptureBanner = document.getElementById('sculpture-mode-banner');
@@ -3194,6 +3169,7 @@ async function init() {
     getMinShell: () => Math.min(Math.max(1, Number(hollowFromInput.value) || 1), getShellCount()),
     getMaterial: () => materialSelect.value,
     getGeneratorType: () => document.getElementById('generator-type-select').value,
+    getPieceType: () => document.getElementById('piece-type-select').value,
     canPlaceMaterial,
     getOwnerId: () => myUserId ?? LOCAL_PLAYER_ID,
     mineRemote: (x, y, z) => {

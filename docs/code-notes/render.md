@@ -1614,27 +1614,65 @@ baseline entirely, silently resetting the clock. Saving on every tick
 that has at least one organism to track (regardless of whether this
 specific tick grew anything) closes that gap.
 
-## Pyramid Sub-Cell (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md)
+## Pyramid Sub-Cell (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md) + universal Add/Remove
 
 Full geometry/hit-resolution derivation: `core/pyramid.md`. This section
 covers the render-architecture and access-method decisions specific to
-this file.
+this file, including a real same-day redesign worth understanding in
+order, not just the final state.
 
-**Access method (spec section 3, left genuinely open there)**: two new
-`currentMode` values, `pyramidModel`/`pyramidSculpt`, wired through the
-exact same single build-scene + mode-button mechanism already used for
-the 7 other whole-block tools (build/fill/excavate/round/generate/
-replace/report) — mirroring Rhombi-model/Rhombi-sculpt's own existing
-'build'/'sculpt' pair. Neither of the spec's own two listed options (reuse
-`latticezoom.js`'s "zoom", or a whole separate scene+camera mode like
-Sculpture Mode) survived checking directly: `latticezoom.js`'s "zoom" is
-a genuinely different concept (generating a smaller NEW sub-lattice of
-cells for organic-growth LOD, not editing an already-placed cell's own
-real 7-piece structure) — routing through it would need just as much new
-code as this did, for no real benefit. A whole separate scene+camera mode
-is real extra weight (Sculpture Mode's own architecture) this tool
-doesn't need, given the existing mode-button mechanism already does
-exactly this job for 7 other tools.
+**v1 access method (spec section 3, left genuinely open there), since
+superseded**: the first version shipped two new `currentMode` values,
+`pyramidModel`/`pyramidSculpt`, with their own standalone raycaster/click
+handler here in render.js, wired through the same mode-button mechanism
+as the 7 other whole-block tools — mirroring Rhombi-model/Rhombi-sculpt's
+own 'build'/'sculpt' pair as a THIRD parallel pair, alongside a similarly
+separate Cube-model/Cube-sculpt pair added right after. Neither of the
+spec's own two listed section-3 options (reuse `latticezoom.js`'s "zoom",
+or a whole separate scene+camera mode like Sculpture Mode) survived
+checking directly: `latticezoom.js`'s "zoom" is a genuinely different
+concept (generating a smaller NEW sub-lattice of cells for organic-growth
+LOD); a whole separate scene+camera mode is real extra weight this tool
+doesn't need. That reasoning held up — but direct instruction the same
+day (2026-08-26) went a step further: SIX separate buttons (Rhombi-/
+Pyramid-/Cube- × model/sculpt) was itself the wrong shape, the exact
+"same job, different name" clutter flagged in an earlier audit of this
+wheel. Retired in favor of what's described below.
+
+**Current design: ONE universal Add + ONE universal Remove, piece-tier
+aware**. A new "Piece" picker (RD / Cube / Pyramid — `#piece-type-select`,
+`wheel-pickers.js`'s `openPieceTypePicker`, same `openPickerStrip`
+mechanism Species/Generator already use) says what Add/Remove operate on;
+`core/build.js`'s `getPieceType()` reads it. The existing 'build' mode
+(labeled "Add" now, was "Rhombi-model") and a new 'chisel' mode (labeled
+"Remove" — 'sculpt' was already taken by the rich brush/mirror/symmetry
+panel, itself relabeled "Symmetry" so it stops reading as a twin of plain
+Remove) both branch on piece tier: RD places/removes a full block (the
+original, unchanged behavior); Cube places/removes a bare block
+(`pyramids: 0` explicit — absent means FULL, see core/pyramid.md); Pyramid
+doesn't touch a NEW cell at all, it resolves which of the CLICKED cell's
+own 6 pyramids was hit (`resolveClickedPyramidAxis`, using
+`resolvePyramidAxisForHit` from core/pyramid.js) and adds/removes just
+that one. The standalone pyramid raycaster this file used to have is
+gone — that resolution now lives in `core/build.js` itself, reachable
+from the universal 'build'/'chisel' modes, not a separate click handler.
+
+**Touch: tap Add, long-press Remove — direct instruction, and already
+half-built**. `core/build.js`'s existing long-press-synthesizes-
+`onContextMenu` touch handling (predates this feature entirely) already
+gave tap→Add / hold→Remove for free once 'build' mode's own onClick was
+piece-tier aware. The one real gap: `onContextMenu` had always meant
+"delete the whole cell, unconditionally, in every mode" (its own header's
+long-standing contract) — extended so that specifically while `mode ===
+'build'` AND the Pyramid piece tier is selected, it removes just that one
+pyramid instead, matching what the dedicated Remove button would do for
+the same tier. Deliberately NOT generalized to every mode — long-pressing
+in Fill mode, for instance, still deletes the whole cell regardless of
+whatever piece tier happens to be selected, unchanged from before.
+Verified with real synthesized `TouchEvent`s (touchstart/touchend, past
+and under `LONG_PRESS_MS`) on an emulated iPad, not just reasoned about:
+long-press correctly stripped one pyramid, the following short tap
+correctly re-added it.
 
 **Why a mixed render architecture (InstancedMesh + individual meshes)**:
 `InstancedMesh` requires every instance to share one exact `BufferGeometry`
@@ -1664,27 +1702,33 @@ Mesh has no `instanceId` (InstancedMesh-only), `cellAt` now receives the
 whole hit and resolves either via `cellOrder[hit.instanceId]` or via
 `partialCellMeshes.get(hit.object.userData.cellKey)`.
 
-**Pyramid-model only ever needs to see partial cells, never the shared
+**Add-as-Pyramid only ever needs to see partial cells, never the shared
 InstancedMesh**: a fully-intact cell has no flat/missing pyramid face to
 click "add" on in the first place (whole-block placement always places a
-full RD) — a cell only ever becomes eligible for Pyramid-model after a
-prior Pyramid-sculpt removed something from it. Pyramid-sculpt (remove)
-does need to see both — most cells clicked for removal are still full
-InstancedMesh instances.
+full RD) — a cell only ever becomes eligible for Add-as-Pyramid after a
+prior Remove-as-Pyramid removed something from it. Remove-as-Pyramid does
+need to see both — most cells clicked for removal are still full
+InstancedMesh instances. This falls out for free from `cellAt(hit)`
+already resolving either case generically; no special-casing needed
+beyond what the mixed render architecture already requires.
 
 **Real verification**: pure logic (`pyramidPieces`, the bitmask helpers,
 both branches of `resolvePyramidAxisForHit`, a real `applyPyramidEdit`
 round-trip through `createWorldStore`) checked directly in a real browser
-via dynamic `import()`, not just reasoned about. Then a full real-click
-end-to-end pass: seed a world with one cell via `localStorage`, real
-`page.mouse.click()` in Pyramid-sculpt mode removes a pyramid (confirmed
-both via the saved world JSON AND a screenshot showing a visibly different
-facet), the same screen point in Pyramid-model mode re-adds it (screenshot
-pixel-matches the original full-RD shape again). Both new wheel faces
-(`WHEEL_BUILD`'s `bottom|sy1sz-1`, replacing its old `DUPLICATE_HOME_FACE`
-per that face type's own documented policy; `WHEEL_ALTER`'s genuine open
-`bottom|sx1sz-1` `SPARE`) checked live too — real icon markup present and
-`has-icon`-classed on both, zero console/page errors throughout.
+via dynamic `import()`, not just reasoned about. Then real-click
+end-to-end passes at each stage of the redesign: seed a world with one
+cell via `localStorage`, remove a pyramid (confirmed both via the saved
+world JSON AND a screenshot showing a visibly different facet), re-add it
+at the same screen point (screenshot pixel-matches the original full-RD
+shape again); Add/Remove exercised against all 3 piece tiers (RD/Cube/
+Pyramid) including the no-op cases (adding an already-present pyramid,
+removing an already-absent one); the new wheel faces' icon markup
+checked live (`has-icon`-classed, real SVG content, non-invisible);
+zero console/page errors throughout every pass. A real HUD-indicator
+screenshot caught one live gap directly (`chisel` had no entry in
+`PLAYER_FACING_MODE_LABEL`, so it fell through to showing the raw
+internal mode string instead of "Remove") — fixed, not just reasoned
+past.
 
 ## `animate()` / `tickPresenceFn`
 

@@ -254,9 +254,9 @@ export const WHEEL_CONSTRUCT = {
   id: "construct",
   faces: {
     "equator|sx1sy1":   { kind: "dept", label: "Build", action: "navigateTo:build",
-      desc: "Rhombi-model, Rhombi-sculpt, and Fill." },
+      desc: "Add, Symmetry, Fill, and Piece." },
     "equator|sx1sy-1":  { kind: "dept", label: "Alter", action: "navigateTo:alter",
-      desc: "Dig, Smooth, and Replace." },
+      desc: "Dig, Smooth, Replace, and Remove." },
     // Temporary duplicates at each real face's true geometric antipode
     // (centroid inversion through the RD's center, verified
     // numerically -- equator|sx-1sy1 <-> equator|sx1sy-1, equator|
@@ -264,9 +264,9 @@ export const WHEEL_CONSTRUCT = {
     // duplicates its antipode's content until real content exists for
     // it, direct user directive 2026-08-25.
     "equator|sx-1sy1":  { kind: "dept", label: "Alter", action: "navigateTo:alter", temporary: true,
-      desc: "Dig, Smooth, and Replace. Duplicated here for quick access from a spare slot." },
+      desc: "Dig, Smooth, Replace, and Remove. Duplicated here for quick access from a spare slot." },
     "equator|sx-1sy-1": { kind: "dept", label: "Build", action: "navigateTo:build", temporary: true,
-      desc: "Rhombi-model, Rhombi-sculpt, and Fill. Duplicated here for quick access from a spare slot." },
+      desc: "Add, Symmetry, Fill, and Piece. Duplicated here for quick access from a spare slot." },
     // DUPLICATE_HOME_FACE sits at bottom|sy1sz-1, not bottom|sx1sz-1 --
     // that's the one bottom-ring face that does NOT share an edge with
     // the real Home slot (bottom|sy-1sz-1); bottom|sx1sz-1 and
@@ -295,14 +295,35 @@ export const WHEEL_CONSTRUCT = {
 export const WHEEL_BUILD = {
   id: "build",
   faces: {
-    "equator|sx1sy1":  { kind: "dept", label: "Rhombi-model", action: "tool:rhombiModel", desc: "Place mode -- click a face to add a cell there." },
-    "equator|sx1sy-1": { kind: "dept", label: "Rhombi-sculpt", action: "tool:rhombiSculpt", desc: "Opens the Sculpt panel -- symmetry and mirror tools, no World required." },
+    // Universal Add/Remove + Piece picker (direct instruction 2026-08-26):
+    // retires Rhombi-model/Pyramid-model/Cube-model as separate buttons --
+    // ONE Add, piece-tier-aware via the new Piece picker below
+    // (core/build.js's getPieceType(): RD/Cube/Pyramid). Was "Rhombi-
+    // model" (tool:rhombiModel).
+    "equator|sx1sy1":  { kind: "dept", label: "Add", action: "tool:add", desc: "Click a face to add a piece there -- see Piece for which kind (RD / Cube / Pyramid)." },
+    // Renamed from "Rhombi-sculpt" so it no longer reads as a same-job-
+    // different-name twin of the new plain "Remove" (WHEEL_ALTER) --
+    // this one still opens the full rich panel (symmetry/mirror/brush),
+    // a genuinely different, richer tool. Same action string/mechanism.
+    "equator|sx1sy-1": { kind: "dept", label: "Symmetry", action: "tool:symmetry", desc: "Opens the Symmetry panel -- brush, mirror, and symmetry tools, no World required." },
     "equator|sx-1sy1": { kind: "dept", label: "Fill", action: "tool:fill", desc: "Fill mode -- click to fill in a gap." },
     // Filling a real, already-working feature into a spare, not
     // inventing one: the 2D wheel's material picker (openMaterialWheel)
     // already exists and works, it just had nowhere to live in this
     // flow-chart-derived structure until now. See render.js's onAction.
     "equator|sx-1sy-1": { kind: "dept", label: "Material", action: "tool:material", desc: "Pick a build material." },
+    // Piece picker (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md follow-up,
+    // 2026-08-26): what Add/Remove operate on -- RD (a full block),
+    // Cube (bare, no pyramids), or Pyramid (edit one pyramid on an
+    // already-placed cell). Same openPickerStrip mechanism as Species/
+    // Generator (wheel-pickers.js). Replaces the DUPLICATE_HOME_FACE that
+    // used to live here, per this file's own stated policy on that face
+    // type ("as real tools get built out... replace the relevant
+    // DUPLICATE_HOME_FACE with the actual feature"). Home is still always
+    // reachable via the 5th slot (bottom|sy-1sz-1, injected on every
+    // non-Home wheel), so nothing is stranded.
+    "bottom|sy1sz-1":  { kind: "dept", label: "Piece", action: "tool:pieceType",
+      desc: "Choose what Add/Remove operate on: RD (full block), Cube (bare), or Pyramid (one piece of an existing cell)." },
     // Repeat is the 2D wheel's own real "tool-drag" leaf (drag across
     // faces to place a run of cells) -- reused via the new
     // toggleDragPlacement() export, same pattern as Material/Generate
@@ -310,14 +331,6 @@ export const WHEEL_BUILD = {
     // capability exactly: it's a "coming soon" placeholder there too
     // (kind: 'placeholder'), not a real feature being ported -- added
     // here for full flow-parity, not invented beyond what exists.
-    // Pyramid-model (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md), replacing the
-    // DUPLICATE_HOME_FACE that used to live here -- per this file's own
-    // stated policy on that face type ("as real tools get built out...
-    // replace the relevant DUPLICATE_HOME_FACE with the actual feature").
-    // Home is still always reachable via the 5th slot (bottom|sy-1sz-1,
-    // injected on every non-Home wheel), so nothing is stranded.
-    "bottom|sy1sz-1":  { kind: "dept", label: "Pyramid-model", action: "tool:pyramidModel",
-      desc: "Finer-grained Build: re-add one of an already-partial cell's missing pyramids." },
     "bottom|sx1sz-1":  { kind: "dept", label: "Repeat", action: "tool:repeat", desc: "Drag across faces to place a run of cells." },
     "bottom|sx-1sz-1": { kind: "dept", label: "Pattern", action: "tool:pattern", desc: "Pattern stamping is coming soon." }
   }
@@ -339,22 +352,23 @@ export const WHEEL_ALTER = {
     // real content exists for it, direct user directive 2026-08-25.
     "equator|sx-1sy-1": { kind: "dept", label: "Dig", action: "tool:dig", temporary: true, desc: "Excavate mode -- click a cell to remove it. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
-    // Pyramid-sculpt (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md) fills what was
-    // a genuine SPARE here (not a duplicate -- the adjacency-to-Smooth
-    // concern noted below only ever applied to a Smooth duplicate, not to
-    // real new distinct content). Alter/"remove" is Pyramid-sculpt's own
-    // natural department, mirroring how Dig is Rhombi-sculpt's whole-
-    // block-tier counterpart; Pyramid-model lives in WHEEL_BUILD instead
-    // (Build had no free slot without displacing a DUPLICATE_HOME_FACE,
-    // which is exactly what that face type is FOR -- see WHEEL_BUILD).
+    // Universal Remove (direct instruction 2026-08-26, retiring the
+    // earlier separate Cube-sculpt/Pyramid-sculpt buttons): a plain
+    // "click a piece, it's gone" action, piece-tier-aware via WHEEL_
+    // BUILD's Piece picker (RD/Cube = the whole cell; Pyramid = just
+    // that one pyramid). Fills what was a genuine SPARE here (not a
+    // duplicate -- the adjacency-to-Smooth concern noted below only ever
+    // applied to a Smooth duplicate, not to real new distinct content).
+    // Alter/"remove" is its natural department, mirroring how Dig is
+    // Rhombi-model's whole-block-tier counterpart.
     // bottom|sx1sz-1 was reverted to SPARE from a Smooth duplicate
     // because it's edge-adjacent to Smooth's own true original
     // (equator|sx1sy-1) -- found via a fuller re-run of the adjacency
     // audit after the first fix pass (2026-08-25). That adjacency rule
     // is specifically about DUPLICATES of an existing face, so it does
-    // not block placing genuinely new content (Pyramid-sculpt) here.
-    "bottom|sx1sz-1":  { kind: "dept", label: "Pyramid-sculpt", action: "tool:pyramidSculpt",
-      desc: "Finer-grained Alter: remove one of a placed cell's 6 pyramids, exposing a flat cube face." },
+    // not block placing genuinely new content (Remove) here.
+    "bottom|sx1sz-1":  { kind: "dept", label: "Remove", action: "tool:remove",
+      desc: "Click a piece to remove it -- see Piece (Build wheel) for which kind (RD / Cube / Pyramid)." },
     // Smooth's duplicate (moved here from bottom|sx1sz-1 -- confirmed
     // non-adjacent to equator|sx1sy-1). The OTHER remaining slot
     // (bottom|sx1sz-1, above) skips Replace on purpose -- it's a
@@ -479,18 +493,21 @@ export const WHEEL_TRADE = {
 export const WHEEL_RHOMBISIS = {
   id: "rhombisis",
   faces: {
-    "equator|sx1sy1":   { kind: "dept", label: "Sculpt", action: "tool:rhombiSculpt",
-      desc: "Opens the Sculpt panel -- symmetry and mirror tools, no World required." },
+    // Relabeled from "Sculpt" (2026-08-26, same universal-actions pass
+    // that renamed WHEEL_BUILD's own copy) -- same action/mechanism, just
+    // no longer sharing a label with the new plain Remove action.
+    "equator|sx1sy1":   { kind: "dept", label: "Symmetry", action: "tool:symmetry",
+      desc: "Opens the Symmetry panel -- brush, mirror, and symmetry tools, no World required." },
     "equator|sx1sy-1":  { kind: "dept", label: "Generate a Body", action: "tool:generateBody",
       desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...)." },
     "equator|sx-1sy1":  { kind: "dept", label: "Plant a Seed", action: "tool:plant",
       desc: "Pick a species, then click to plant it. Opens the Cultivate panel." },
-    // Temporary duplicate at Sculpt's true geometric antipode (equator|
+    // Temporary duplicate at Symmetry's true geometric antipode (equator|
     // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
     // policy: a blank face duplicates its antipode's content until
     // real content exists for it, direct user directive 2026-08-25.
-    "equator|sx-1sy-1": { kind: "dept", label: "Sculpt", action: "tool:rhombiSculpt", temporary: true,
-      desc: "Opens the Sculpt panel -- symmetry and mirror tools, no World required. Duplicated here for quick access from a spare slot." },
+    "equator|sx-1sy-1": { kind: "dept", label: "Symmetry", action: "tool:symmetry", temporary: true,
+      desc: "Opens the Symmetry panel -- brush, mirror, and symmetry tools, no World required. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":   DUPLICATE_HOME_FACE,
     // Remaining 2 bottom spares: least-adjacent-available placement
     // (verified numerically -- bottom|sx-1sz-1 is non-adjacent to
