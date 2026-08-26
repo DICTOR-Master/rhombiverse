@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-08-26",
+    "title": "True to Form",
+    "items": [
+      "BCC Build (Rhombeometry, Lab panel): place real, saved cells on the dual body-centered-cubic lattice alongside your normal World -- click a face to extend it, or a face of your own build to start one nearby. The two lattices are free to overlap where they meet, on purpose, so they read as one joined structure.",
+      "The welcome screen is a large rotating wireframe rhombic dodecahedron now, with ENTER living right on the shape itself -- two of its own faces light up as they turn to face you.",
+      "Your view now picks up exactly where you left it on your next visit, instead of resetting to the same default spot every time."
+    ]
+  },
+  {
     "date": "2026-08-25",
     "title": "One wheel, everywhere",
     "items": [

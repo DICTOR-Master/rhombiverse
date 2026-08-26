@@ -163,6 +163,7 @@ export function createBuildController({
     if (!mode) return; // e.g. Walk mode active -- editing is disabled while walking
     if (mode === 'plant') return; // Plant mode's click handling lives in render.js
     if (mode === 'sculpt') return; // Sculpt mode's click handling lives in render.js/sculpture.js
+    if (mode === 'bcc') return; // BCC mode's click handling lives in core/bcc-build.js
 
     if (onCellClicked) onCellClicked(cell);
 
@@ -270,7 +271,10 @@ export function createBuildController({
     if (cell.asteroidNodeId) {
       mineAsteroidCell(world, cell, getOwnerId());
     } else {
-      if (!getMode()) return; // e.g. Walk mode active -- general editing stays disabled
+      const mode = getMode();
+      // e.g. Walk mode active (falsy) -- general editing stays disabled.
+      // 'bcc' -- BCC mode's own right-click removal lives in core/bcc-build.js.
+      if (!mode || mode === 'bcc') return;
       world.removeCell(cell.x, cell.y, cell.z);
     }
     onChange();

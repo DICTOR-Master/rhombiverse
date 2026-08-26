@@ -125,10 +125,12 @@ rhombiverse/
     lattice.js               # RD/FCC coordinate math, 12-neighbor lookup
     render.js                 # Three.js scene, per-frame loop, most UI wiring
     build.js                   # placement/removal, face-picking, mouse+touch input
+    bcc-build.js                # BCC dual-lattice build: same face-click mechanic, own store/mesh
     worldstate.js             # world JSON load/save/serialize (cells, seeds, claims, organisms, inventory, trades)
     persistence.js            # localStorage backend
     wheel.js                   # the Rhombic Wheel radial menu
     welcome.js                 # first-run overlay: rotating RD logo, mode choice, ENTER
+    camera-persistence.js       # orbit camera position/target survive a reload
     settings.js                # sensitivity/FOV/quality/volume, Lab panel state
     player.js                  # first-person walk controller
     sculpture.js               # Sculpt tool: symmetry/mirror, shell brush, Assistance Spectrum

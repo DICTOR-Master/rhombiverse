@@ -8,7 +8,9 @@ import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell } from './core/lattice.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
-import { generateBCCLatticePatch, bccDetailVertsFor } from './geometry-extensions/bcc-detail-lattice.js';
+import { generateBCCLatticePatch, bccDetailVertsFor, bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
+import { truncatedOctahedronVertices } from './geometry-extensions/dual-lattice.js';
+import { createBCCBuildController } from './core/bcc-build.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -57,12 +59,14 @@ import {
 import { matchNeighborOffset } from './core/build.js';
 import { computePlanetoids, gravityAt, nearestPlanetoid, setRegionsIntegration as setGravityRegionsIntegration } from './geometry-extensions/gravity.js';
 import { createPlayerController } from './app/player.js';
+import { saveCameraState, loadCameraState } from './app/camera-persistence.js';
 import {
   saveToLocalStorage,
   loadFromLocalStorage,
   clearLocalStorage,
   exportWorldFile,
   importWorldFile,
+  BCC_STORAGE_KEY,
 } from './core/persistence.js';
 import {
   ensureAnonymousSession,
@@ -290,6 +294,41 @@ controls.rotateSpeed = getSettings().sensitivity;
 // Right-click is reserved for block removal (build.js), not camera pan.
 controls.mouseButtons.RIGHT = null;
 const ORBIT_LEFT_DEFAULT = controls.mouseButtons.LEFT;
+
+// Resume the view where it was left last session, instead of always
+// resetting to the fixed default spawn -- fixes a real bug this fed
+// into: the BCC dual-lattice preview (bcc-detail-lattice.js) seeds
+// itself from controls.target (see rebuildBCCLatticeDetail's own
+// refPos), so with no restore here, toggling BCC back on next session
+// always reseeded from the DEFAULT (0,0,0) view rather than wherever you
+// were actually standing/looking when you last built against it -- the
+// two would drift apart with no way to tell why. Doesn't touch
+// scheduleBCCRefresh's deliberate live camera-follow while BCC stays
+// toggled on within a session -- that's a separate, already-requested
+// behavior (see that function's own header) and this doesn't change it.
+{
+  const savedCam = loadCameraState();
+  if (savedCam) {
+    camera.position.set(...savedCam.position);
+    controls.target.set(...savedCam.target);
+    controls.update();
+  }
+}
+// Saved on a real interaction boundary (OrbitControls' own 'end' event,
+// not 'change' -- 'change' fires every frame mid-drag, 'end' once per
+// gesture), a low-frequency fallback interval (covers walk-mode
+// movement, which never fires OrbitControls events), and beforeunload
+// as a last-moment safety net. Skips Sculpture Mode's own temporary
+// scratch-space camera (see enterSculptureMode's own savedCameraState)
+// -- that view has nothing to do with the main world and would
+// otherwise clobber the real saved position with a scratch-space one.
+function persistCameraState() {
+  if (sculptureModeActive) return;
+  saveCameraState(camera.position, controls.target);
+}
+controls.addEventListener('end', persistCameraState);
+window.addEventListener('beforeunload', persistCameraState);
+setInterval(persistCameraState, 3000);
 
 // B3 (Cyborg Mode, RHOMBIVERSE_UIUX_BUILD_PLAN.md): the 'cameraRotated'
 // success-condition event a first-build-session subscript step listens
@@ -928,6 +967,17 @@ function buildRDGeometry(scale = 1) {
   return geometry;
 }
 
+// BCC dual-lattice build (core/bcc-build.md): the truncated octahedron,
+// same recipe as buildRDGeometry above -- one shared base geometry,
+// instanced per placed cell, not a merged mesh rebuilt from scratch like
+// the ephemeral preview (bcc-detail-lattice.js) uses.
+function buildBCCGeometry(scale) {
+  const points = truncatedOctahedronVertices(scale).map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  const geometry = new ConvexGeometry(points);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 // See docs/code-notes/render.md
 const MATERIAL_COLORS = {
   base: 0x8899aa,
@@ -1019,6 +1069,28 @@ function rebuildInstances(mesh, world, inReportMode = false) {
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   // Forces a bounding-sphere recompute -- see docs/code-notes/render.md
   mesh.computeBoundingSphere();
+}
+
+// BCC dual-lattice build's own instance list -- deliberately a SEPARATE
+// module-level array from cellOrder above, not a second call into
+// rebuildInstances() reusing it: rebuildInstances() overwrites the
+// shared `cellOrder` variable that the main FCC build controller's own
+// cellAt(instanceId) callback reads, so routing BCC cells through it
+// would corrupt the main world's own hit-testing. See core/bcc-build.md.
+let bccCellOrder = []; // instanceId -> {x, y, z, ...cellData}
+function rebuildBCCInstances(bccMesh, bccWorld) {
+  bccCellOrder = bccWorld.entries();
+  const m = new THREE.Matrix4();
+  bccCellOrder.forEach((cell, i) => {
+    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+    m.makeTranslation(wx, wy, wz);
+    bccMesh.setMatrixAt(i, m);
+    bccMesh.setColorAt(i, instanceColorFor(cell));
+  });
+  bccMesh.count = bccCellOrder.length;
+  bccMesh.instanceMatrix.needsUpdate = true;
+  if (bccMesh.instanceColor) bccMesh.instanceColor.needsUpdate = true;
+  bccMesh.computeBoundingSphere();
 }
 
 // World Systems dynamic imports -- see docs/code-notes/render.md
@@ -1119,6 +1191,16 @@ async function init() {
   // Declared early -- see docs/code-notes/render.md
   let currentMode = 'build';
 
+  // BCC dual-lattice build: a second, independent world store, own
+  // localStorage key (BCC_STORAGE_KEY), no relation to Shared World/
+  // shared-link loading or the Showcase World fallback above -- always
+  // starts empty on a true first visit. Rhombeometry-only (gated by the
+  // 'bcc' mode-btn's own display toggle below), so it never needs the
+  // World Systems hooks (regrowth/seeds/etc) the main world's store has.
+  // See core/bcc-build.md.
+  const bccSavedJSON = loadFromLocalStorage(BCC_STORAGE_KEY);
+  const bccWorld = createWorldStore(bccSavedJSON ?? { worldName: 'BCC Lattice', version: 1, cells: {}, meta: {} });
+
   const geometry = buildRDGeometry(SCALE);
   // White base color: actual per-cell color comes entirely from
   // setColorAt (instanceColorFor) via the multiplicative USE_INSTANCING_
@@ -1133,6 +1215,16 @@ async function init() {
   const mesh = new THREE.InstancedMesh(geometry, material, MAX_CELLS);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(mesh);
+
+  // BCC dual-lattice build: its own InstancedMesh (truncated-octahedron
+  // geometry, not RD) and own material clone -- same MATERIAL_COLORS
+  // palette as the main world (no separate material system, no tint;
+  // direct instruction 2026-08-26), just a different base shape.
+  const bccGeometry = buildBCCGeometry(bccShapeScaleFor(SCALE));
+  const bccMesh = new THREE.InstancedMesh(bccGeometry, material.clone(), MAX_CELLS);
+  bccMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(bccMesh);
+  rebuildBCCInstances(bccMesh, bccWorld);
 
   // B4b's standalone mesh -- same geometry/material recipe as the main
   // world's (a real sculpture should look identical either place), own
@@ -2019,6 +2111,10 @@ async function init() {
 
   const bccToggleBtn = document.getElementById('bcc-toggle');
   if (bccToggleBtn) bccToggleBtn.style.display = FEATURES.bccLattice ? '' : 'none';
+  // Real BCC cell placement (core/bcc-build.md) -- same Rhombeometry-only
+  // gating as the preview toggle above.
+  const bccBuildRow = document.getElementById('bcc-build-row');
+  if (bccBuildRow) bccBuildRow.style.display = FEATURES.bccLattice ? '' : 'none';
   let bccLatticeActive = false;
   let bccLatticeMesh = null;
   let bccRefreshTimer = null;
@@ -2135,6 +2231,7 @@ async function init() {
     report: 'Shows flagged/removed cells (normally hidden) in red. Click one to flag it, click a flagged one to approve it back.',
     plant: 'Click anywhere to plant a seed of the chosen species. Left alone, it grows on its own over real time.',
     sculpt: 'Model (add) onto a face, or Chisel (subtract) a clicked cell -- see the Sculpt panel for tier/mirror/brush.',
+    bcc: 'Click a face of an existing BCC cell to extend it, or a face of your normal World to start one nearby. Right-click removes a BCC cell. Overlap with your normal World is expected -- it\'s how the two lattices join.',
   };
   function updateModeUI() {
     const showRadius = currentMode === 'fill' || currentMode === 'generate';
@@ -2159,6 +2256,7 @@ async function init() {
     replace: 'Replace',
     report: 'Report',
     plant: 'Plant',
+    bcc: 'BCC Build',
   };
   function updateHudIndicator() {
     const el = document.getElementById('hud-indicator');
@@ -2953,6 +3051,30 @@ async function init() {
       focusedCenterKey = cell.shellCenter || null;
       renderRingList();
     },
+  });
+
+  // BCC dual-lattice build: own change handler, deliberately NOT the main
+  // world's onChange() -- that pipeline is entirely World Systems
+  // machinery (asteroid regen, hydrosphere, achievements, undo stack...)
+  // that's off in Rhombeometry mode anyway, the only mode this build ever
+  // runs in. Mirrors how Sculpture Mode's own sculptTarget.apply is a
+  // small dedicated rebuild, not a reuse of onChange(). See core/
+  // bcc-build.md.
+  function onBCCChange() {
+    rebuildBCCInstances(bccMesh, bccWorld);
+    saveToLocalStorage(bccWorld.toJSON(), BCC_STORAGE_KEY);
+  }
+  createBCCBuildController({
+    renderer,
+    camera,
+    fccMesh: mesh,
+    bccMesh,
+    fccCellAt: (instanceId) => cellOrder[instanceId],
+    bccCellAt: (instanceId) => bccCellOrder[instanceId],
+    bccWorld,
+    onChange: onBCCChange,
+    getMaterial: () => materialSelect.value,
+    isActive: () => !walking && currentMode === 'bcc',
   });
 
   // The old 2D radial menu (wheel.js) was removed 2026-08-25 -- the
@@ -3779,6 +3901,12 @@ async function init() {
     seedAsteroidBelts(world); // matches what a true first visit gets, see load-preset's own comment
     onChange();
     rebuildAllGrowth();
+    // BCC dual-lattice build: a real second world store, so a "fresh
+    // start" needs to clear it too, not just the main one -- see
+    // core/bcc-build.md.
+    clearLocalStorage(BCC_STORAGE_KEY);
+    bccWorld.replaceAll({ worldName: 'BCC Lattice', version: 1, cells: {}, meta: {} });
+    onBCCChange();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);
