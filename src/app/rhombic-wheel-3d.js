@@ -140,8 +140,13 @@ const CSS = `
 .rw3d-label-icon { display: block; width: 52px; height: 52px; }
 .rw3d-label-icon svg { display: block; width: 100%; height: 100%; }
 .rw3d-label-text {
-  position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
-  margin-left: 8px;
+  /* Above the icon, not to its right (direct instruction 2026-08-26):
+     on touch, the touching hand/thumb naturally covers the area right of
+     and below the touch point, hiding a label anchored there right when
+     it reveals. Above keeps it clear of the hand for a right-handed
+     touch the same way it already is for a mouse hover. */
+  position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
+  margin-bottom: 8px;
   opacity: 0; transition: opacity 0.15s ease;
   font-size: ${LABEL_STYLE.fontSizeBase};
 }
@@ -377,16 +382,27 @@ export function createRhombicWheel3D({
       // visible there. Spares are handled separately via the CSS rule.
       e.labelEl.style.pointerEvents = (!e.isSpare && e._labelOpacity > 0.2) ? 'auto' : 'none';
 
-      // Push distance along the face normal, pulling the label/icon in
-      // toward the surface -- was 0.35, direct instruction 2026-08-26
-      // ("a little closer to surface without breaking it"). Checked at
-      // both the default 3-face opening view and a rotated ~6-face view:
-      // no clipping into the mesh, no overlap between adjacent icons.
-      const worldCentroid = e.centroid.clone().applyQuaternion(group.quaternion)
-        .add(worldNormal.clone().multiplyScalar(0.24));
-      const pos = screenPosFor(worldCentroid);
-      e.labelEl.style.left = `${pos.x}px`;
-      e.labelEl.style.top = `${pos.y}px`;
+      // The label's screen position is the average of its face's own 4
+      // vertices, each projected to screen space individually -- the
+      // real visual center of the rendered quad, at any viewing angle.
+      // Not the old approach (a 3D centroid + a fixed push along the face
+      // normal, retuned three times same-day -- 0.35, 0.24, 0.14 -- and
+      // still wrong): pushing along a 3D normal moves the point off the
+      // face's own plane, and for a face viewed at an oblique angle that
+      // normal is nearly parallel to the screen, so even a small 3D push
+      // causes a large apparent 2D shift -- confirmed live at a 5-visible-
+      // face rotation (several faces half in/half out of their rhombus)
+      // AND, per direct follow-up, even the plain 3-/4-face views were
+      // never quite centered either, since ANY nonzero push drifts away
+      // from center as soon as the face isn't perfectly square-on.
+      // Averaging the 4 already-projected vertices has no such failure
+      // mode -- it's computed directly from the actual rendered shape,
+      // not a 3D heuristic that assumes a symmetric, face-on view.
+      const screenVerts = e.verts.map((v) => screenPosFor(v.clone().applyQuaternion(group.quaternion)));
+      const avgX = screenVerts.reduce((sum, p) => sum + p.x, 0) / screenVerts.length;
+      const avgY = screenVerts.reduce((sum, p) => sum + p.y, 0) / screenVerts.length;
+      e.labelEl.style.left = `${avgX}px`;
+      e.labelEl.style.top = `${avgY}px`;
       e.labelEl.style.fontSize = isSelect ? LABEL_STYLE.fontSizeSelected : LABEL_STYLE.fontSizeBase;
 
       const fillTarget = FACE_STYLE.fillOpacityBase
