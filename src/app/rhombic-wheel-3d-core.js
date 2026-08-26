@@ -310,10 +310,14 @@ export const WHEEL_BUILD = {
     // capability exactly: it's a "coming soon" placeholder there too
     // (kind: 'placeholder'), not a real feature being ported -- added
     // here for full flow-parity, not invented beyond what exists.
-    // DUPLICATE_HOME_FACE moved to bottom|sy1sz-1 (the one bottom-ring
-    // face not edge-adjacent to the real Home slot) -- see WHEEL_
-    // CONSTRUCT's comment above. Repeat took its old spot instead.
-    "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
+    // Pyramid-model (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md), replacing the
+    // DUPLICATE_HOME_FACE that used to live here -- per this file's own
+    // stated policy on that face type ("as real tools get built out...
+    // replace the relevant DUPLICATE_HOME_FACE with the actual feature").
+    // Home is still always reachable via the 5th slot (bottom|sy-1sz-1,
+    // injected on every non-Home wheel), so nothing is stranded.
+    "bottom|sy1sz-1":  { kind: "dept", label: "Pyramid-model", action: "tool:pyramidModel",
+      desc: "Finer-grained Build: re-add one of an already-partial cell's missing pyramids." },
     "bottom|sx1sz-1":  { kind: "dept", label: "Repeat", action: "tool:repeat", desc: "Drag across faces to place a run of cells." },
     "bottom|sx-1sz-1": { kind: "dept", label: "Pattern", action: "tool:pattern", desc: "Pattern stamping is coming soon." }
   }
@@ -335,13 +339,22 @@ export const WHEEL_ALTER = {
     // real content exists for it, direct user directive 2026-08-25.
     "equator|sx-1sy-1": { kind: "dept", label: "Dig", action: "tool:dig", temporary: true, desc: "Excavate mode -- click a cell to remove it. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
-    // bottom|sx1sz-1 is edge-adjacent to Smooth's own true original
+    // Pyramid-sculpt (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md) fills what was
+    // a genuine SPARE here (not a duplicate -- the adjacency-to-Smooth
+    // concern noted below only ever applied to a Smooth duplicate, not to
+    // real new distinct content). Alter/"remove" is Pyramid-sculpt's own
+    // natural department, mirroring how Dig is Rhombi-sculpt's whole-
+    // block-tier counterpart; Pyramid-model lives in WHEEL_BUILD instead
+    // (Build had no free slot without displacing a DUPLICATE_HOME_FACE,
+    // which is exactly what that face type is FOR -- see WHEEL_BUILD).
+    // bottom|sx1sz-1 was reverted to SPARE from a Smooth duplicate
+    // because it's edge-adjacent to Smooth's own true original
     // (equator|sx1sy-1) -- found via a fuller re-run of the adjacency
-    // audit after the first fix pass (2026-08-25), so a Smooth
-    // duplicate can't live here. Reverted to SPARE; Smooth's duplicate
-    // moved to bottom|sx-1sz-1 below instead (confirmed non-adjacent to
-    // its original there).
-    "bottom|sx1sz-1":  SPARE,
+    // audit after the first fix pass (2026-08-25). That adjacency rule
+    // is specifically about DUPLICATES of an existing face, so it does
+    // not block placing genuinely new content (Pyramid-sculpt) here.
+    "bottom|sx1sz-1":  { kind: "dept", label: "Pyramid-sculpt", action: "tool:pyramidSculpt",
+      desc: "Finer-grained Alter: remove one of a placed cell's 6 pyramids, exposing a flat cube face." },
     // Smooth's duplicate (moved here from bottom|sx1sz-1 -- confirmed
     // non-adjacent to equator|sx1sy-1). The OTHER remaining slot
     // (bottom|sx1sz-1, above) skips Replace on purpose -- it's a

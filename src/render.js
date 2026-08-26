@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell } from './core/lattice.js';
+import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces } from './core/lattice.js';
+import { FULL_PYRAMIDS, effectivePyramids, presentAxisKeys, applyPyramidEdit, resolvePyramidAxisForHit } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { generateBCCLatticePatch, bccDetailVertsFor, bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
@@ -1051,8 +1052,19 @@ let cellOrder = []; // instanceId -> {x, y, z, ...cellData}, see docs/code-notes
 
 // See docs/code-notes/render.md
 function visibleCells(world, inReportMode) {
-  if (inReportMode) return world.entries();
-  return world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
+  const base = inReportMode ? world.entries() : world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
+  // Pyramid Sub-Cell (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md, docs/code-notes/
+  // core/pyramid.md): a partial cell can't be an instance of the shared
+  // InstancedMesh -- InstancedMesh requires every instance to share the
+  // exact same BufferGeometry, and a partial cell's real shape (cube +
+  // some subset of its 6 pyramids) genuinely differs per cell. It gets its
+  // own individual Mesh instead (rebuildPartialCellMeshes below), so it's
+  // excluded here to avoid double-rendering the same cell twice.
+  return base.filter((c) => !isPartialCell(c));
+}
+
+function isPartialCell(cell) {
+  return cell.pyramids !== undefined && cell.pyramids !== FULL_PYRAMIDS;
 }
 
 function rebuildInstances(mesh, world, inReportMode = false) {
@@ -1069,6 +1081,65 @@ function rebuildInstances(mesh, world, inReportMode = false) {
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   // Forces a bounding-sphere recompute -- see docs/code-notes/render.md
   mesh.computeBoundingSphere();
+  rebuildPartialCellMeshes(world, inReportMode);
+}
+
+// Pyramid Sub-Cell: one individual Mesh per partial cell, kept in its own
+// group (raycast target for both Pyramid mode's own controller and, via
+// extraPickTargets, the regular whole-cell build/report/fill/etc. tools --
+// see core/build.md and core/pyramid.md for why a shared InstancedMesh
+// can't represent these). Same material recipe as the main InstancedMesh's
+// `material` (white base), just with an explicit per-mesh color instead of
+// per-instance color -- a lone Mesh has no instance-color channel to use.
+const partialCellGroup = new THREE.Group();
+scene.add(partialCellGroup);
+const partialCellMeshes = new Map(); // cellKey string -> { mesh, cell }
+
+function buildPartialCellGeometry(pyramids) {
+  const pieces = pyramidPieces(SCALE);
+  const points = [...pieces.cube, ...presentAxisKeys(pyramids).map((k) => pieces.pyramids[k].apex)]
+    .map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  const geometry = new ConvexGeometry(points);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function rebuildPartialCellMeshes(world, inReportMode = false) {
+  const source = inReportMode ? world.entries() : world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
+  const wanted = new Map();
+  for (const cell of source) {
+    if (isPartialCell(cell)) wanted.set(cellKey(cell.x, cell.y, cell.z), cell);
+  }
+  for (const [key, entry] of partialCellMeshes) {
+    if (!wanted.has(key)) {
+      partialCellGroup.remove(entry.mesh);
+      entry.mesh.geometry.dispose();
+      entry.mesh.material.dispose();
+      partialCellMeshes.delete(key);
+    }
+  }
+  for (const [key, cell] of wanted) {
+    const existing = partialCellMeshes.get(key);
+    if (existing && existing.cell.pyramids === cell.pyramids && existing.cell.material === cell.material
+        && existing.cell.status === cell.status && existing.cell.shell === cell.shell) {
+      existing.cell = cell; // cheap fields (e.g. shellCenter) may still have changed
+      continue;
+    }
+    if (existing) {
+      partialCellGroup.remove(existing.mesh);
+      existing.mesh.geometry.dispose();
+      existing.mesh.material.dispose();
+    }
+    const geom = buildPartialCellGeometry(cell.pyramids);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
+    mat.color.copy(instanceColorFor(cell));
+    const m = new THREE.Mesh(geom, mat);
+    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+    m.position.set(wx, wy, wz);
+    m.userData.cellKey = key;
+    partialCellGroup.add(m);
+    partialCellMeshes.set(key, { mesh: m, cell });
+  }
 }
 
 // BCC dual-lattice build's own instance list -- deliberately a SEPARATE
@@ -1985,6 +2056,12 @@ async function init() {
         if (action === 'tool:rhombiModel') { clickMode('build'); wheel3D.close(); return; } // "Place" mode
         if (action === 'tool:fill') { clickMode('fill'); wheel3D.close(); return; }
         if (action === 'tool:rhombiSculpt') { clickMode('sculpt'); openSculptPanel(); wheel3D.close(); return; }
+        // Pyramid Sub-Cell (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md): click a
+        // placed cell's face to remove (Pyramid-sculpt) or, on an already-
+        // partial cell, re-add (Pyramid-model) one of its 6 pyramids --
+        // see the pyramidRaycaster click handler above for the real logic.
+        if (action === 'tool:pyramidModel') { clickMode('pyramidModel'); wheel3D.close(); return; }
+        if (action === 'tool:pyramidSculpt') { clickMode('pyramidSculpt'); wheel3D.close(); return; }
         // Reuses the 2D wheel's own material-picker overlay (a real,
         // already-independent DOM overlay, not part of its radial
         // LEVEL1/LEVEL2 visuals) via the openMaterialPicker export
@@ -2824,6 +2901,56 @@ async function init() {
     }
   });
 
+  // --- Pyramid Sub-Cell (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md) ------------
+  // Access method (spec section 3, deliberately open there): reuses the
+  // SAME single build-scene + mode-select mechanism already used for 7
+  // other whole-block tools (build/fill/excavate/round/generate/replace/
+  // report) -- two new `currentMode` values, exactly like Rhombi-model/
+  // Rhombi-sculpt's own existing 'build'/'sculpt' pair -- rather than
+  // either of the spec's own two listed options verbatim. Neither actually
+  // fit as well as this once checked directly: `latticezoom.js`'s "zoom"
+  // is a genuinely different concept (generating a smaller NEW sub-lattice
+  // of cells for organic-growth LOD, not editing an already-placed cell's
+  // own real 7-piece structure), so routing through it would need just as
+  // much new code as this; a whole separate scene+camera mode (Sculpture
+  // Mode's own architecture) is real extra weight this tool doesn't need.
+  // Full derivation of the hit-resolution algorithm below: core/pyramid.js
+  // and docs/code-notes/core/pyramid.md.
+  const pyramidRaycaster = new THREE.Raycaster();
+  const pyramidPointer = new THREE.Vector2();
+  renderer.domElement.addEventListener('click', (event) => {
+    if (walking) return;
+    const action = currentMode === 'pyramidModel' ? 'add' : currentMode === 'pyramidSculpt' ? 'remove' : null;
+    if (!action) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    pyramidPointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pyramidPointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    pyramidRaycaster.setFromCamera(pyramidPointer, camera);
+    const hits = pyramidRaycaster.intersectObjects([mesh, partialCellGroup], true);
+    if (hits.length === 0) return;
+    const hit = hits[0];
+    const cell = hit.instanceId !== undefined
+      ? cellOrder[hit.instanceId]
+      : partialCellMeshes.get(hit.object?.userData?.cellKey)?.cell;
+    if (!cell) return;
+
+    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+    const n = hit.face.normal;
+    const axisKey = resolvePyramidAxisForHit({
+      localNormal: [n.x, n.y, n.z],
+      localPoint: [hit.point.x - wx, hit.point.y - wy, hit.point.z - wz],
+      neighborOffset: matchNeighborOffset(n),
+      pieces: pyramidPieces(SCALE),
+    });
+    if (!axisKey) return;
+
+    const result = applyPyramidEdit(world, action, cell.x, cell.y, cell.z, axisKey);
+    if (!result) return; // no-op: e.g. Pyramid-model clicked on a pyramid that's already there
+    onChange();
+    flashAt(cell, action === 'remove' ? 0xff8866 : 0x9de0ff);
+    if (action === 'remove') playRemoveSound(); else playPlaceSound();
+  });
+
   // --- B4b: standalone Sculpture Mode ---------------------------------
   const permissiveCanPlaceMaterial = () => true; // no frost-line stars exist in a bare scratch lattice
   const sculptureBanner = document.getElementById('sculpture-mode-banner');
@@ -3033,7 +3160,13 @@ async function init() {
     renderer,
     camera,
     mesh,
-    cellAt: (instanceId) => cellOrder[instanceId],
+    extraPickTargets: [partialCellGroup],
+    // Pyramid Sub-Cell: a hit on a partial cell's own individual Mesh has
+    // no instanceId (that's InstancedMesh-only) -- resolve it via the
+    // hit object's own userData.cellKey instead. See core/pyramid.md.
+    cellAt: (hit) => (hit.instanceId !== undefined
+      ? cellOrder[hit.instanceId]
+      : (partialCellMeshes.get(hit.object?.userData?.cellKey)?.cell ?? null)),
     world,
     onChange,
     onHover: (cells, valid) => {

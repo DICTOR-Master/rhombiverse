@@ -20,6 +20,30 @@ export function rdRawVerts(s = 1) {
   ];
 }
 
+// RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md section 2: an RD decomposes exactly
+// into a cube plus 6 square pyramids, one erected on each cube face. This
+// derives that decomposition FROM rdRawVerts() (the same 14 points already
+// used to build the whole-block render/collision geometry, via
+// buildRDGeometry() in render.js) rather than recomputing vertex math
+// separately -- if rdRawVerts ever changes, this stays correct for free.
+// PYRAMID_AXES matches OCTA_VERTS' own fixed order (+x,-x,+y,-y,+z,-z), so
+// apexRaw[i] below is guaranteed to be the correct apex for PYRAMID_AXES[i].
+export const PYRAMID_AXES = ['x+', 'x-', 'y+', 'y-', 'z+', 'z-'];
+
+export function pyramidPieces(s = 1) {
+  const verts = rdRawVerts(s);
+  const cube = verts.slice(0, 8);
+  const apexRaw = verts.slice(8, 14);
+  const pyramids = {};
+  PYRAMID_AXES.forEach((axisKey, i) => {
+    const axisIndex = i < 2 ? 0 : i < 4 ? 1 : 2;
+    const sign = i % 2 === 0 ? 1 : -1;
+    const base = cube.filter((v) => Math.sign(v[axisIndex]) === sign);
+    pyramids[axisKey] = { base, apex: apexRaw[i] };
+  });
+  return { cube, pyramids };
+}
+
 export const NEIGHBOR_OFFSETS = [
   [1, 1, 0], [1, -1, 0], [-1, 1, 0], [-1, -1, 0],
   [1, 0, 1], [1, 0, -1], [-1, 0, 1], [-1, 0, -1],

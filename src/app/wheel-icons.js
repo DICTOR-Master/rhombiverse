@@ -51,6 +51,30 @@ export const MARKS = {
   rhombiModel: `<path d="M0,-18 V18 M-18,0 H18" ${STROKE}/>`,
   // Rhombi-sculpt / Remove (shared): "-" inside one hexagon.
   rhombiSculpt: `<path d="M-18,0 H18" ${STROKE}/>`,
+  // Pyramid-model / Pyramid-sculpt (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md
+  // section 4): a real square-pyramid NET -- a square (the cube) with one
+  // triangle folded out on each edge (the 4 visible sides of one pyramid,
+  // its base flush against that cube edge) -- a genuinely different shape
+  // family from the hexagon/rhombus marks above, so the finer pyramid tier
+  // reads as a different scale at a glance. Reuses the duality-pair fill
+  // convention (filled = "black", outline = "white") the same way the
+  // `duality` mark below does, but literally on the mechanic itself: the
+  // cube stays solid either way (it's never removed), only the triangles
+  // (pyramids) differ -- complete outlines for model/add, dashed/gapped
+  // outlines for sculpt/remove, matching the spec's own "solid/complete"
+  // vs "gaps/incomplete" wording exactly.
+  pyramidModel: `
+    <polygon points="-12,-12 12,-12 12,12 -12,12" ${THIN}/>
+    <polygon points="-12,-12 12,-12 0,-38" ${THIN}/>
+    <polygon points="12,-12 12,12 38,0" ${THIN}/>
+    <polygon points="12,12 -12,12 0,38" ${THIN}/>
+    <polygon points="-12,12 -12,-12 -38,0" ${THIN}/>`,
+  pyramidSculpt: `
+    <polygon points="-12,-12 12,-12 12,12 -12,12" fill="currentColor"/>
+    <polygon points="-12,-12 12,-12 0,-38" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
+    <polygon points="12,-12 12,12 38,0" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
+    <polygon points="12,12 -12,12 0,38" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
+    <polygon points="-12,12 -12,-12 -38,0" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>`,
   // Fill: "+" shown across three hexagons.
   fill: `
     <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>

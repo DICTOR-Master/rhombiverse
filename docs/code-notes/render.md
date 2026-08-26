@@ -1614,6 +1614,78 @@ baseline entirely, silently resetting the clock. Saving on every tick
 that has at least one organism to track (regardless of whether this
 specific tick grew anything) closes that gap.
 
+## Pyramid Sub-Cell (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md)
+
+Full geometry/hit-resolution derivation: `core/pyramid.md`. This section
+covers the render-architecture and access-method decisions specific to
+this file.
+
+**Access method (spec section 3, left genuinely open there)**: two new
+`currentMode` values, `pyramidModel`/`pyramidSculpt`, wired through the
+exact same single build-scene + mode-button mechanism already used for
+the 7 other whole-block tools (build/fill/excavate/round/generate/
+replace/report) — mirroring Rhombi-model/Rhombi-sculpt's own existing
+'build'/'sculpt' pair. Neither of the spec's own two listed options (reuse
+`latticezoom.js`'s "zoom", or a whole separate scene+camera mode like
+Sculpture Mode) survived checking directly: `latticezoom.js`'s "zoom" is
+a genuinely different concept (generating a smaller NEW sub-lattice of
+cells for organic-growth LOD, not editing an already-placed cell's own
+real 7-piece structure) — routing through it would need just as much new
+code as this did, for no real benefit. A whole separate scene+camera mode
+is real extra weight (Sculpture Mode's own architecture) this tool
+doesn't need, given the existing mode-button mechanism already does
+exactly this job for 7 other tools.
+
+**Why a mixed render architecture (InstancedMesh + individual meshes)**:
+`InstancedMesh` requires every instance to share one exact `BufferGeometry`
+— fine for the pre-existing case (every cell is a full, identical RD), but
+a cell missing one or more pyramids has a genuinely different shape.
+`isPartialCell`/`visibleCells` exclude any cell with a non-full
+`pyramids` value from the shared `mesh` (the main InstancedMesh);
+`rebuildPartialCellMeshes` (folded into `rebuildInstances` itself, so
+every one of that function's existing 7 call sites gets this for free
+with zero extra wiring) gives each partial cell its own individual
+`THREE.Mesh`, geometry built by feeding `ConvexGeometry` the cube's 8
+points plus only the currently-present apexes (`pyramidPieces` +
+`presentAxisKeys`) — always convex and always exactly right, since the
+convex hull of ANY subset of a convex polytope's vertices is itself
+convex; no custom face/triangle bookkeeping needed for the mesh itself.
+Kept in their own `partialCellGroup`, disposed (geometry + material) and
+removed the moment a cell either gets deleted entirely or returns to full.
+
+**Why `core/build.js`'s `cellAt` callback changed from `(instanceId) =>`
+to `(hit) =>`**: build.js's own header promises "Right-click always
+removes the clicked cell, in every mode" — a partial cell needs to keep
+working with that (and with fill/excavate/round/generate/report/replace),
+not just with Pyramid mode's own raycaster. `extraPickTargets` (defaults
+to `[]`, so every OTHER caller of `createBuildController` is unaffected)
+lets `pick()` raycast `partialCellGroup` too; since a hit on an individual
+Mesh has no `instanceId` (InstancedMesh-only), `cellAt` now receives the
+whole hit and resolves either via `cellOrder[hit.instanceId]` or via
+`partialCellMeshes.get(hit.object.userData.cellKey)`.
+
+**Pyramid-model only ever needs to see partial cells, never the shared
+InstancedMesh**: a fully-intact cell has no flat/missing pyramid face to
+click "add" on in the first place (whole-block placement always places a
+full RD) — a cell only ever becomes eligible for Pyramid-model after a
+prior Pyramid-sculpt removed something from it. Pyramid-sculpt (remove)
+does need to see both — most cells clicked for removal are still full
+InstancedMesh instances.
+
+**Real verification**: pure logic (`pyramidPieces`, the bitmask helpers,
+both branches of `resolvePyramidAxisForHit`, a real `applyPyramidEdit`
+round-trip through `createWorldStore`) checked directly in a real browser
+via dynamic `import()`, not just reasoned about. Then a full real-click
+end-to-end pass: seed a world with one cell via `localStorage`, real
+`page.mouse.click()` in Pyramid-sculpt mode removes a pyramid (confirmed
+both via the saved world JSON AND a screenshot showing a visibly different
+facet), the same screen point in Pyramid-model mode re-adds it (screenshot
+pixel-matches the original full-RD shape again). Both new wheel faces
+(`WHEEL_BUILD`'s `bottom|sy1sz-1`, replacing its old `DUPLICATE_HOME_FACE`
+per that face type's own documented policy; `WHEEL_ALTER`'s genuine open
+`bottom|sx1sz-1` `SPARE`) checked live too — real icon markup present and
+`has-icon`-classed on both, zero console/page errors throughout.
+
 ## `animate()` / `tickPresenceFn`
 
 B6 tasks #40/#42: `tickPresenceFn` itself is `init()`-scoped (it needs

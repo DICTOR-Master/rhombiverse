@@ -29,6 +29,8 @@ import { iconFrame, MARKS } from './wheel-icons.js';
 const ACTION_TO_MARK = {
   'tool:rhombiModel': 'rhombiModel',
   'tool:rhombiSculpt': 'rhombiSculpt',
+  'tool:pyramidModel': 'pyramidModel',
+  'tool:pyramidSculpt': 'pyramidSculpt',
   'tool:fill': 'fill',
   'tool:dig': 'dig',
   'tool:smooth': 'smooth',

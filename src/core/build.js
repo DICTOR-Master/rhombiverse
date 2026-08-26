@@ -113,6 +113,13 @@ export function createBuildController({
   renderer,
   camera,
   mesh,
+  // Pyramid Sub-Cell (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md): a partial cell
+  // (one with a pyramid removed) is rendered as its own individual Mesh,
+  // not an instance of the shared `mesh` -- so every whole-cell tool here
+  // needs to see it too, not just Pyramid mode's own raycaster in
+  // render.js. Defaults to none so every other caller of this controller
+  // (unaffected by the pyramid feature) needs no change.
+  extraPickTargets = [],
   cellAt,
   world,
   onChange,
@@ -140,7 +147,7 @@ export function createBuildController({
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObject(mesh);
+    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -155,8 +162,8 @@ export function createBuildController({
       return;
     }
     const hit = pick(event);
-    if (!hit || hit.instanceId === undefined) return;
-    const cell = cellAt(hit.instanceId);
+    if (!hit) return;
+    const cell = cellAt(hit);
     if (!cell) return;
 
     const mode = getMode();
@@ -164,6 +171,7 @@ export function createBuildController({
     if (mode === 'plant') return; // Plant mode's click handling lives in render.js
     if (mode === 'sculpt') return; // Sculpt mode's click handling lives in render.js/sculpture.js
     if (mode === 'bcc') return; // BCC mode's click handling lives in core/bcc-build.js
+    if (mode === 'pyramidModel' || mode === 'pyramidSculpt') return; // Pyramid mode's click handling lives in render.js/core/pyramid.js
 
     if (onCellClicked) onCellClicked(cell);
 
@@ -255,8 +263,8 @@ export function createBuildController({
   function onContextMenu(event) {
     event.preventDefault();
     const hit = pick(event);
-    if (!hit || hit.instanceId === undefined) return;
-    const cell = cellAt(hit.instanceId);
+    if (!hit) return;
+    const cell = cellAt(hit);
     if (!cell) return;
     // Mining is checked BEFORE the getMode() gate, deliberately -- harvesting
     // an asteroid cell is allowed regardless of mode, walking included; only
@@ -293,8 +301,8 @@ export function createBuildController({
   let lastDragCellKey = null;
 
   function ghostCellsForHit(hit, showSecond) {
-    if (!hit || hit.instanceId === undefined) return null;
-    const cell = cellAt(hit.instanceId);
+    if (!hit) return null;
+    const cell = cellAt(hit);
     if (!cell) return null;
     const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
     const nx = cell.x + dx;
