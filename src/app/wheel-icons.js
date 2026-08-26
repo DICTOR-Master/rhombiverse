@@ -28,6 +28,14 @@ function rhombusPts(w, h, cx = 0, cy = 0) {
     .map(([x, y]) => `${(cx + x).toFixed(2)},${(cy + y).toFixed(2)}`)
     .join(' ');
 }
+function octPts(R, cx = 0, cy = 0, startDeg = -90) {
+  return [0, 1, 2, 3, 4, 5, 6, 7]
+    .map((i) => {
+      const a = (startDeg + 45 * i) * D2R;
+      return `${(cx + R * Math.cos(a)).toFixed(2)},${(cy + R * Math.sin(a)).toFixed(2)}`;
+    })
+    .join(' ');
+}
 
 const FRAME_R = 46; // frame circle/hexagon radius; viewBox is -50..50
 
@@ -54,16 +62,19 @@ export const MARKS = {
   // no new icon was needed, just a new meaning attached to the same mark.
   add: `<path d="M0,-18 V18 M-18,0 H18" ${STROKE}/>`,
   remove: `<path d="M-18,0 H18" ${STROKE}/>`,
-  // Piece picker (RD / Cube / Pyramid): three small versions of each
-  // tier's own real shape side by side -- a hexagon (RD), a plain
-  // isometric cube (bare, no pyramids), and a square-pyramid net --
-  // literal, matching this file's own vocabulary, not a new abstract
-  // symbol for "pick a tier."
+  // Piece picker (RD / Cube / Pyramid / TO): a small version of each
+  // tier's own real shape -- a hexagon (RD), a square (Cube), a triangle
+  // (Pyramid), an octagon (TO) -- literal, matching this file's own
+  // vocabulary, not a new abstract symbol for "pick a tier." Direct
+  // instruction 2026-08-26: clustered in four around a shared center
+  // (same layout `almanac` below already uses for its own four diamonds)
+  // rather than spread out, so switching between tiers reads as moving
+  // between neighbors, not hopping across the icon.
   pieceType: `
-    <polygon points="${hexPts(11, -28, 6)}" ${THIN}/>
-    <polygon points="0,-14 9,-8 9,4 0,10 -9,4 -9,-8" ${THIN}/>
-    <polygon points="28,10 28,-2 21,-8 15,-2 15,10" ${THIN}/>
-    <polygon points="21,-8 28,-14 15,-14" ${THIN}/>`,
+    <polygon points="${hexPts(9, 0, -24)}" ${THIN}/>
+    <polygon points="16,-8 32,-8 32,8 16,8" ${THIN}/>
+    <polygon points="0,15 8,31 -8,31" ${THIN}/>
+    <polygon points="${octPts(9, -24, 0)}" ${THIN}/>`,
   // Fill: "+" shown across three hexagons.
   fill: `
     <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>

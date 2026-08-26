@@ -2228,6 +2228,15 @@ async function init() {
   // gating as the preview toggle above.
   const bccBuildRow = document.getElementById('bcc-build-row');
   if (bccBuildRow) bccBuildRow.style.display = FEATURES.bccLattice ? '' : 'none';
+  // Piece picker's TO option (core/build.js's handleToClick) -- same
+  // Rhombeometry-only gating as the rest of BCC's own UI. A disabled
+  // option can't be selected via the <select> itself; getPieceType()
+  // reading 'to' at all already implies this feature is on.
+  const pieceTypeToOption = document.getElementById('piece-type-to-option');
+  if (pieceTypeToOption) {
+    pieceTypeToOption.disabled = !FEATURES.bccLattice;
+    pieceTypeToOption.hidden = !FEATURES.bccLattice;
+  }
   let bccLatticeActive = false;
   let bccLatticeMesh = null;
   let bccRefreshTimer = null;
@@ -3170,6 +3179,19 @@ async function init() {
     getMaterial: () => materialSelect.value,
     getGeneratorType: () => document.getElementById('generator-type-select').value,
     getPieceType: () => document.getElementById('piece-type-select').value,
+    // TO ("adopted family member", direct instruction 2026-08-26): lets
+    // the universal Add/Remove actions ALSO target the separate BCC
+    // dual-lattice world, reusing its own bootstrap-vs-extend logic
+    // (core/bcc-build.js) via core/build.js's handleToClick -- not a
+    // pretense that a truncated octahedron is a piece of the same RD
+    // decomposition RD/Cube/Pyramid are. bccWorld/bccMesh always exist
+    // regardless of FEATURES.bccLattice (see their own construction
+    // above); the Piece picker's own 'to' option is what's actually
+    // feature-gated (below), so no separate guard is needed here.
+    bccWorld,
+    bccMesh,
+    bccCellAt: (instanceId) => bccCellOrder[instanceId],
+    onBCCChange,
     canPlaceMaterial,
     getOwnerId: () => myUserId ?? LOCAL_PLAYER_ID,
     mineRemote: (x, y, z) => {

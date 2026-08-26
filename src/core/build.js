@@ -16,6 +16,8 @@ import {
 } from './lattice.js';
 import { applyPyramidEdit, resolvePyramidAxisForHit } from './pyramid.js';
 import { generatePlanetoid } from '../geometry-extensions/planetoidgen.js';
+import { nearestBCCCell } from '../geometry-extensions/dual-lattice.js';
+import { matchBCCNeighborOffset } from './bcc-build.js';
 
 const NEIGHBOR_DIRECTIONS = NEIGHBOR_OFFSETS.map(
   ([x, y, z]) => new THREE.Vector3(x, y, z).normalize()
@@ -131,11 +133,25 @@ export function createBuildController({
   getMaterial,
   getGeneratorType,
   // Piece tier (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md, direct follow-up
-  // 2026-08-26): 'rd' (default) | 'cube' | 'pyramid' -- what the
+  // 2026-08-26): 'rd' (default) | 'cube' | 'pyramid' | 'to' -- what the
   // universal Add/Remove actions (mode 'build'/'chisel' below) operate
   // on. Everything else (Fill/Dig/Round/Replace/Generate/Report) stays
   // RD-only, scoped deliberately -- not asked for beyond Add/Remove.
   getPieceType = () => 'rd',
+  // TO ("adopted family member", direct instruction 2026-08-26): the
+  // truncated octahedron lives on a genuinely different lattice
+  // (BCC_NEIGHBOR_OFFSETS, its own bccWorld store) -- NOT a piece of the
+  // same RD decomposition RD/Cube/Pyramid are. The Piece picker including
+  // it doesn't pretend otherwise; it just means Add/Remove can ALSO
+  // target this other real, already-working build system, reusing its
+  // own bootstrap-vs-extend logic (core/bcc-build.js) rather than
+  // reimplementing it. All optional/no-op by default so every other
+  // caller of this controller (BCC feature off, or a context with no BCC
+  // world at all) needs no change.
+  bccWorld = null,
+  bccMesh = null,
+  bccCellAt = () => null,
+  onBCCChange = () => {},
   onCellClicked,
   canPlaceMaterial = () => true,
   getOwnerId = () => null,
@@ -155,7 +171,13 @@ export function createBuildController({
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets], true);
+    // bccMesh only enters the raycast when the Piece picker is actually
+    // set to 'to' -- otherwise a BCC cell visually in front of an FCC one
+    // (overlap between the two lattices is expected, see core/bcc-build.md)
+    // would silently steal clicks meant for the FCC world in every OTHER
+    // piece tier.
+    const bccTargets = bccMesh && getPieceType() === 'to' ? [bccMesh] : [];
+    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -178,6 +200,47 @@ export function createBuildController({
   // release point.
   let suppressNextClick = false;
 
+  // TO piece tier: reuses core/bcc-build.js's own bootstrap-vs-extend
+  // logic exactly (see that file for the full explanation) rather than
+  // reimplementing it -- click an existing TO to extend the BCC lattice
+  // along one of its own 14 neighbor directions; click FCC/partial-cell
+  // geometry instead (piece tier is 'to' but the hit landed elsewhere) to
+  // seed the nearest real BCC lattice point in that face's outward
+  // direction. Remove only ever acts on an actual TO -- there's nothing
+  // to remove from an FCC hit under this piece tier.
+  function handleToClick(hit, mode) {
+    if (mode === 'build') {
+      let nx, ny, nz;
+      if (hit.object === bccMesh) {
+        if (hit.instanceId === undefined) return;
+        const bccCell = bccCellAt(hit.instanceId);
+        if (!bccCell) return;
+        const [dx, dy, dz] = matchBCCNeighborOffset(hit.face.normal);
+        nx = bccCell.x + dx;
+        ny = bccCell.y + dy;
+        nz = bccCell.z + dz;
+      } else {
+        const fccCell = cellAt(hit);
+        if (!fccCell) return;
+        const n = hit.face.normal;
+        [nx, ny, nz] = nearestBCCCell(fccCell.x + n.x, fccCell.y + n.y, fccCell.z + n.z);
+      }
+      if (bccWorld.has(nx, ny, nz)) return;
+      const material = getMaterial();
+      bccWorld.addCell(nx, ny, nz, { material });
+      onBCCChange();
+      if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
+      return;
+    }
+    // mode === 'chisel' (Remove)
+    if (hit.object !== bccMesh || hit.instanceId === undefined) return;
+    const bccCell = bccCellAt(hit.instanceId);
+    if (!bccCell) return;
+    bccWorld.removeCell(bccCell.x, bccCell.y, bccCell.z);
+    onBCCChange();
+    if (onRemoved) onRemoved(bccCell);
+  }
+
   function onClick(event) {
     if (suppressNextClick) {
       suppressNextClick = false;
@@ -185,11 +248,24 @@ export function createBuildController({
     }
     const hit = pick(event);
     if (!hit) return;
-    const cell = cellAt(hit);
-    if (!cell) return;
 
     const mode = getMode();
     if (!mode) return; // e.g. Walk mode active -- editing is disabled while walking
+
+    // Routed BEFORE the generic cellAt() resolution below, which only
+    // knows the FCC world's own cellOrder/partialCellMeshes -- a bccMesh
+    // hit's instanceId indexes a completely different instance array and
+    // must never be looked up there. Only reachable via the universal
+    // Add/Remove modes ('build'/'chisel') and only when bccWorld/bccMesh
+    // were actually supplied (both null by default, see this
+    // controller's own params) -- every other caller is unaffected.
+    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'to' && bccWorld && bccMesh) {
+      handleToClick(hit, mode);
+      return;
+    }
+
+    const cell = cellAt(hit);
+    if (!cell) return;
     if (mode === 'plant') return; // Plant mode's click handling lives in render.js
     if (mode === 'sculpt') return; // Sculpt mode's click handling lives in render.js/sculpture.js
     if (mode === 'bcc') return; // BCC mode's click handling lives in core/bcc-build.js
@@ -325,6 +401,22 @@ export function createBuildController({
     event.preventDefault();
     const hit = pick(event);
     if (!hit) return;
+    const mode = getMode();
+
+    // TO piece tier: same reasoning as onClick's own handleToClick gate
+    // above -- routed BEFORE the generic cellAt() resolution, which
+    // doesn't know bccMesh's own instance-id space, and before the
+    // mining check below (a TO is never an asteroid node).
+    if (mode === 'build' && getPieceType() === 'to' && bccWorld && bccMesh) {
+      if (hit.object !== bccMesh || hit.instanceId === undefined) return;
+      const bccCell = bccCellAt(hit.instanceId);
+      if (!bccCell) return;
+      bccWorld.removeCell(bccCell.x, bccCell.y, bccCell.z);
+      onBCCChange();
+      if (onRemoved) onRemoved(bccCell);
+      return;
+    }
+
     const cell = cellAt(hit);
     if (!cell) return;
     // Mining is checked BEFORE the getMode() gate, deliberately -- harvesting
@@ -340,7 +432,6 @@ export function createBuildController({
     if (cell.asteroidNodeId) {
       mineAsteroidCell(world, cell, getOwnerId());
     } else {
-      const mode = getMode();
       // e.g. Walk mode active (falsy) -- general editing stays disabled.
       // 'bcc' -- BCC mode's own right-click removal lives in core/bcc-build.js.
       if (!mode || mode === 'bcc') return;
@@ -411,10 +502,10 @@ export function createBuildController({
 
     if (pointerDownPos) {
       const moved = Math.hypot(event.clientX - pointerDownPos.x, event.clientY - pointerDownPos.y);
-      // Drag-placement (Repeat) doesn't apply to the 'pyramid' piece tier
-      // -- same reason as the ghost preview below, it's not neighbor
-      // placement. 'rd'/'cube' both still drag normally.
-      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && getPieceType() !== 'pyramid') {
+      // Drag-placement (Repeat) doesn't apply to the 'pyramid' or 'to'
+      // piece tiers -- same reason as the ghost preview below, neither is
+      // simple neighbor placement. 'rd'/'cube' both still drag normally.
+      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && !['pyramid', 'to'].includes(getPieceType())) {
         dragging = true;
         clearTimeout(holdTimer);
         holding = false;
@@ -442,10 +533,12 @@ export function createBuildController({
     }
 
     // 'pyramid' piece-tier Add doesn't place a new adjacent cell (it
-    // edits the clicked cell's own pyramids), so the "next valid FCC
-    // position" ghost preview below -- which assumes neighbor placement
-    // -- doesn't apply there. 'rd'/'cube' both still use it identically.
-    if (mode !== 'build' || getPieceType() === 'pyramid') {
+    // edits the clicked cell's own pyramids); 'to' places into a
+    // genuinely different world/lattice (bccWorld) via its own bootstrap-
+    // vs-extend logic -- neither fits the "next valid FCC position" ghost
+    // preview below, which assumes plain FCC neighbor placement. 'rd'/
+    // 'cube' both still use it identically.
+    if (mode !== 'build' || ['pyramid', 'to'].includes(getPieceType())) {
       if (onHoverEnd) onHoverEnd();
       return;
     }

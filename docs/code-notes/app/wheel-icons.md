@@ -222,14 +222,54 @@ marks were already generic enough that no new geometry was needed, just
 a new meaning attached. `pyramidModel`/`pyramidSculpt`/`cubeModel`/
 `cubeSculpt` (the square-pyramid-net and isometric-cube marks) are gone
 -- their wheel faces no longer exist, so keeping unreferenced marks
-around would just be dead code. A new `pieceType` mark (a small hexagon,
-cube, and pyramid-net side by side) represents the picker itself --
-literal, matching this file's own vocabulary, rather than an abstract
+around would just be dead code. A new `pieceType` mark represents the
+picker itself -- literal small shapes (originally a hexagon/cube/
+pyramid-net row, see the TO section below for the current 4-shape
+version), matching this file's own vocabulary rather than an abstract
 symbol for "pick a tier." `tool:symmetry` (the renamed rich brush/mirror
 panel, was `tool:rhombiSculpt`) reuses the existing `symmetryMirror`
 modifier mark instead of `remove` -- a real match for what that panel
 does, and frees `remove` to mean the new plain click-to-remove action
 without the two reading as the same thing.
+
+## TO joins the Piece picker as a 4th tier (2026-08-26, same day)
+
+Direct instruction, framed explicitly as "adopted family member, not
+pretending to be blood" -- RD/Cube/Pyramid share being different amounts
+of the SAME RD's 14-vertex decomposition (`core/pyramid.md`); a truncated
+octahedron genuinely isn't that, it lives on the separate BCC dual
+lattice (`core/bcc-build.md`). The Piece picker including it doesn't
+claim otherwise -- it's honestly just "what Add/Remove currently
+produce," and one of the four happens to route to a different world/mesh
+under the hood (`core/build.js`'s `handleToClick`, reusing BCC's own
+existing bootstrap-vs-extend logic rather than reimplementing it).
+Real wiring cost was moderate, not "too hard": bccWorld/bccMesh/
+bccCellAt/onBCCChange threaded into `createBuildController` as
+optional/no-op-by-default params (every other caller unaffected), plus
+one real correctness fix -- a BCC-mesh hit's `instanceId` indexes a
+completely different instance array than the FCC world's own `cellOrder`,
+so both `onClick` and `onContextMenu` had to check `hit.object ===
+bccMesh` and route to `bccCellAt`/`bccWorld` BEFORE ever calling the
+generic FCC `cellAt()`, not after -- an easy one-line-later bug to miss.
+Gated behind `FEATURES.bccLattice` (same Rhombeometry-only condition as
+the rest of BCC's own UI) via the `<option>` element's own `disabled`/
+`hidden`, not a separate guard in build.js -- `getPieceType()` simply
+never returns `'to'` when the option can't be selected.
+
+`pieceType`'s own mark updated to a real 4-shape cluster -- hexagon
+(RD), square (Cube), triangle (Pyramid), octagon (TO) -- arranged at the
+four cardinal positions around a shared center, the exact same layout
+`almanac` below already uses for its own four diamonds (`octPts`, a new
+sibling to `hexPts`, added for the TO shape). Direct instruction: tight
+and centered rather than spread out, "so switching between tiers reads
+as moving between neighbors." Separately, "on the full-size wheel" turned
+out to already be solved -- `pickers.openPieceTypePicker()` (same
+`openPickerStrip` mechanism Species/Generator use) already lays all four
+real options out as one adjacent cluster of strip items the instant the
+Piece face is clicked, no wheel renavigation needed between them.
+Verified live with a real click through Home -> Construct -> Build ->
+Piece and a screenshot of the resulting strip, not assumed from reading
+the picker code.
 
 ## Real remaining gap, for whenever this continues
 

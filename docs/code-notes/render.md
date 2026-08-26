@@ -1730,6 +1730,18 @@ screenshot caught one live gap directly (`chisel` had no entry in
 internal mode string instead of "Remove") — fixed, not just reasoned
 past.
 
+**TO joins as a 4th Piece tier (2026-08-26, same day)**: full story in
+`docs/code-notes/app/wheel-icons.md`'s own TO section. In short --
+`bccWorld`/`bccMesh`/`bccCellAt`/`onBCCChange` are now threaded into the
+SAME `createBuildController` call this section already documents, all
+optional/no-op by default; `core/build.js`'s `handleToClick` reuses
+`core/bcc-build.js`'s own bootstrap-vs-extend logic rather than
+reimplementing it. The one real correctness hazard: a `bccMesh` hit's
+`instanceId` indexes a completely different instance array than
+`cellOrder`, so both `onClick` and `onContextMenu` check `hit.object ===
+bccMesh` and route to `bccCellAt`/`bccWorld` BEFORE the generic FCC
+`cellAt()` call, not after.
+
 ## `animate()` / `tickPresenceFn`
 
 B6 tasks #40/#42: `tickPresenceFn` itself is `init()`-scoped (it needs
