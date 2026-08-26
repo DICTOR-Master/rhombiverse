@@ -75,6 +75,19 @@ const ACTION_TO_MARK = {
 // itself ("needs real testing on touch devices"), not a fixed value --
 // this is a reasonable starting point, not a final answer.
 const REVEAL_HOLD_MS = 350;
+// TEMPORARY kill-switch, 2026-08-26: direct instruction to fall back to
+// a known-safe state (plain text labels, exactly as before any of
+// today's icon work) after a live report of icons "floating all over
+// the place" that could not be reproduced in extensive local testing
+// (every wheel checked, every face boxW:52/offBy:0, single-click
+// navigation verified correct) -- most likely a stale-cached-JS or
+// environment mismatch rather than a live defect in this code, but
+// "return to a functional state until you can work out the bug" is
+// unambiguous, so acted on directly rather than argued with. Flip back
+// to `true` once the real live environment is confirmed and the icons
+// are confirmed correct there too, not just in this session's own
+// Playwright checks. See docs/code-notes/app/wheel-icons.md.
+const ICON_SYSTEM_ENABLED = false;
 
 const CSS = `
 #rhombic-wheel-3d-overlay {
@@ -259,7 +272,7 @@ export function createRhombicWheel3D({
       // touch word; everything else keeps the plain text label exactly
       // as before -- see that map's own header for why (spec leaves
       // several real actions genuinely unresolved; not guessing here).
-      const markKey = ACTION_TO_MARK[data.action];
+      const markKey = ICON_SYSTEM_ENABLED ? ACTION_TO_MARK[data.action] : null;
       if (markKey && MARKS[markKey]) {
         labelEl.classList.add('has-icon');
         const iconEl = document.createElement('span');
