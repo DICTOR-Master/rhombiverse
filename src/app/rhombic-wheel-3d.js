@@ -15,6 +15,37 @@ import {
   SKELETON_COLOR, FACE_STYLE, computeLabelVisibility, LABEL_STYLE,
   resolveWheelFaces, ALL_WHEELS,
 } from './rhombic-wheel-3d-core.js';
+import { iconFrame, MARKS } from './wheel-icons.js';
+
+// Icon System (RHOMBIVERSE_SPEC_ICON_SYSTEM.md): only actions the spec's
+// section 4 table (or the live cross-walk's Cyborg resolution) actually
+// resolves get a real mark -- every other face keeps its existing plain
+// text label exactly as today. Deliberately NOT a guess-to-fill-every-
+// face table: the spec explicitly says not to guess silently, and
+// several real actions (tool:material, tool:repeat, tool:generateBody,
+// tool:offer/accept/inventory, tool:plant/growthParams/prune, and the
+// Build/Alter department-nav faces themselves) have no resolved row.
+// See docs/code-notes/app/wheel-icons.md for the full gap list.
+const ACTION_TO_MARK = {
+  'tool:rhombiModel': 'rhombiModel',
+  'tool:rhombiSculpt': 'rhombiSculpt',
+  'tool:fill': 'fill',
+  'tool:dig': 'dig',
+  'tool:smooth': 'smooth',
+  'tool:replace': 'replace',
+  'navigateTo:trade': 'trade',
+  'navigateTo:rhombitect': 'rhombitect',
+  'navigateTo:cultivate': 'rhombivate',
+  'navigateTo:rhombisis': 'rhombisis',
+  'navigateTo:explore': 'explore',
+  openLenses: 'lenses',
+  openAlmanac: 'almanac',
+  openCyborg: 'cyborg',
+};
+// Reveal timing (spec section 3): explicitly left tunable by the spec
+// itself ("needs real testing on touch devices"), not a fixed value --
+// this is a reasonable starting point, not a final answer.
+const REVEAL_HOLD_MS = 350;
 
 const CSS = `
 #rhombic-wheel-3d-overlay {
@@ -40,6 +71,20 @@ const CSS = `
   opacity: 0;
 }
 .rw3d-label.spare { color: #7fa; opacity: 0 !important; pointer-events: none; cursor: default; }
+/* Icon System (RHOMBIVERSE_SPEC_ICON_SYSTEM.md section 3): resting state
+   is symbol-only; the text word is a separate child, hidden until
+   .reveal (hover on desktop, hold on touch -- see REVEAL_HOLD_MS). Its
+   opacity multiplies with the parent .rw3d-label's own facing-driven
+   opacity (updateLabelsAndFaceVisuals()), so text only ever shows once
+   the icon itself is already visible enough to be worth reading. */
+.rw3d-label.has-icon { display: flex; align-items: center; gap: 8px; }
+.rw3d-label-icon { display: block; width: 30px; height: 30px; }
+.rw3d-label-icon svg { display: block; width: 100%; height: 100%; }
+.rw3d-label-text {
+  opacity: 0; transition: opacity 0.15s ease;
+  font-size: ${LABEL_STYLE.fontSizeBase};
+}
+.rw3d-label.reveal .rw3d-label-text { opacity: 1; }
 #rhombic-wheel-3d-panel {
   position: absolute; right: 24px; top: 50%; transform: translateY(-50%);
   width: 260px; padding: 16px;
@@ -169,14 +214,50 @@ export function createRhombicWheel3D({
       const labelEl = document.createElement('div');
       labelEl.className = 'rw3d-label' + (isSpare ? ' spare' : '');
       labelEl.dataset.faceKey = key;
-      labelEl.textContent = data.label;
+      // Icon System (RHOMBIVERSE_SPEC_ICON_SYSTEM.md): only actions
+      // ACTION_TO_MARK actually resolves get a real icon + reveal-on-
+      // touch word; everything else keeps the plain text label exactly
+      // as before -- see that map's own header for why (spec leaves
+      // several real actions genuinely unresolved; not guessing here).
+      const markKey = ACTION_TO_MARK[data.action];
+      if (markKey && MARKS[markKey]) {
+        labelEl.classList.add('has-icon');
+        const iconEl = document.createElement('span');
+        iconEl.className = 'rw3d-label-icon';
+        iconEl.innerHTML = iconFrame(MARKS[markKey], { title: data.label });
+        const textEl = document.createElement('span');
+        textEl.className = 'rw3d-label-text';
+        textEl.textContent = data.label;
+        labelEl.append(iconEl, textEl);
+      } else {
+        labelEl.textContent = data.label;
+      }
       // The label itself is a real, independent click target -- not
       // just a visual annotation over the mesh -- since the mesh's
       // true footprint doesn't reliably extend out to where the label
       // is drawn. startDrag() lets a drag that begins on a label still
       // orbit the wheel; the click handler mirrors the canvas's own
       // drag-suppression check and hit-kind guard.
-      labelEl.addEventListener('pointerdown', (ev) => startDrag(ev.clientX, ev.clientY));
+      let revealTimer = null;
+      labelEl.addEventListener('pointerdown', (ev) => {
+        startDrag(ev.clientX, ev.clientY);
+        // Reveal-on-touch (spec section 3): no hover equivalent on
+        // touch, so a hold threshold stands in for it -- mirrors
+        // core/build.js's own HOLD_MS pattern for the same reason. A
+        // normal quick tap still activates immediately via the existing
+        // click handler below, unaffected by this timer.
+        if (ev.pointerType === 'touch') {
+          clearTimeout(revealTimer);
+          revealTimer = setTimeout(() => labelEl.classList.add('reveal'), REVEAL_HOLD_MS);
+        }
+      });
+      labelEl.addEventListener('pointerup', () => { clearTimeout(revealTimer); labelEl.classList.remove('reveal'); });
+      labelEl.addEventListener('pointercancel', () => { clearTimeout(revealTimer); labelEl.classList.remove('reveal'); });
+      // Desktop hover -- pointerenter/leave also fire for touch in most
+      // browsers, but only after pointerdown, so this never fights with
+      // the hold-timer above; touch's own reveal is handled there.
+      labelEl.addEventListener('pointerenter', (ev) => { if (ev.pointerType !== 'touch') labelEl.classList.add('reveal'); });
+      labelEl.addEventListener('pointerleave', (ev) => { if (ev.pointerType !== 'touch') labelEl.classList.remove('reveal'); });
       labelEl.addEventListener('click', () => {
         if (dragDistance > DRAG_CLICK_SUPPRESS_PX) return;
         selectFace(key);
