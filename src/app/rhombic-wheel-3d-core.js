@@ -485,18 +485,15 @@ export const WHEEL_RHOMBISIS = {
     // sx-1sy1), same rule applied uniformly across every wheel.
     "bottom|sx1sz-1":   { kind: "dept", label: "Plant a Seed", action: "tool:plant", temporary: true,
       desc: "Pick a species, then click to plant it. Opens the Cultivate panel. Duplicated here for quick access from a spare slot." },
-    // Was a 2nd Sculpt copy -- this is the exact collision the user
-    // reported directly ("sculpt ... adjacent to their duplicates"),
-    // confirmed via numeric edge-adjacency audit (2026-08-25 fix):
-    // Sculpt already has its true original PLUS an equator-antipode
-    // duplicate, and this bottom slot is edge-adjacent to that
-    // duplicate (equator|sx-1sy-1) -- a 3rd copy here can't avoid
-    // touching a sibling. Generate a Body has NO existing duplicate
-    // anywhere yet and this slot is non-adjacent to its true original
-    // (equator|sx1sy-1, verified numerically), so it fills the slot
-    // with genuinely new coverage instead of a colliding 3rd Sculpt.
-    "bottom|sx-1sz-1":  { kind: "dept", label: "Generate a Body", action: "tool:generateBody", temporary: true,
-      desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...). Duplicated here for quick access from a spare slot." }
+    // 2026-08-26 direct instruction: this slot's Generate a Body
+    // duplicate (a 3rd copy of a function with no existing duplicate
+    // problem -- Generate a Body is also reachable via WHEEL_
+    // RHOMBITECT's own copy) replaced with BCC Build, real new content
+    // rather than another quick-access copy. "A fourth way to bring
+    // something new into being," alongside this wheel's Sculpt/
+    // Generate a Body/Plant a Seed. See core/bcc-build.md.
+    "bottom|sx-1sz-1":  { kind: "dept", label: "BCC Build", action: "tool:bccBuild",
+      desc: "Place cells on the dual body-centered-cubic lattice, alongside your normal World (Rhombeometry only)." }
   }
 };
 

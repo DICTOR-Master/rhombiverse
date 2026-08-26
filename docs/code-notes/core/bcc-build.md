@@ -162,3 +162,51 @@ left-click on that cell's own face extends it via a real
 preserves placed cells (round-tripped through the real
 `BCC_STORAGE_KEY`, not just an in-memory object). Zero console/page
 errors through the whole sequence.
+
+## Wheel entry point (`rhombic-wheel-3d-core.js`, `render.js`'s `onAction`)
+
+Added after live use surfaced a real gap: the only way in was a Lab-
+panel button, with no equally-direct way out (every other mode lives on
+a wheel face; this one didn't). Checked the actual claim first, since
+"every wheel face is full" turned out to be wrong in general even
+though it's true of `WHEEL_BUILD` specifically (all 7 of its assignable
+faces already hold distinct real content, confirmed by reading the
+whole config, not assumed) -- several OTHER wheels carry real
+`temporary: true` duplicate faces (a second, quick-access copy of a
+function that already has a true original elsewhere on the same wheel).
+
+Landed on `WHEEL_RHOMBISIS`'s `bottom|sx-1sz-1` -- direct instruction --
+replacing its Generate a Body duplicate (Generate a Body keeps its true
+original face on this wheel, plus a separate copy on `WHEEL_RHOMBITECT`,
+so losing this one quick-access copy costs nothing real) with actual new
+content: BCC Build. Fits the wheel's own stated theme ("Sculpt, Generate
+a Body, Plant a Seed -- every act of bringing something new into
+being") as a fourth way to bring something new into being, not a
+mismatched addition.
+
+`onAction`'s new `tool:bccBuild` handler reuses the exact same
+`clickMode(modeName)` shim every other wheel action already uses to
+flip `currentMode` -- no new wiring pattern. Adds one thing none of the
+existing BCC entry points had: an explicit `FEATURES.bccLattice` check
+before switching modes, since a wheel is reachable regardless of
+Rhombeometry/Full Game World state (the Lab-panel button's own row is at
+least CSS-hidden outside Rhombeometry, which happened to make its
+absence low-risk by accident, not by an actual guard) -- ported the same
+check into `createBCCBuildController`'s own `isActive()` too, so both
+entry points are safe regardless of which one a future change touches.
+
+## Icon system (parked, not started)
+
+A separate, standalone spec (`RHOMBIVERSE_SPEC_ICON_SYSTEM.md`, outside
+this repo as of 2026-08-26) exists for replacing every wheel-face label
+with a real geometry-native symbol + reveal-on-touch, but the *live*
+wheel implementation is still plain text labels only (`rw3d-label`
+elements, `textContent = data.label`) -- confirmed by reading
+`rhombic-wheel-3d.js` directly, not assumed. BCC Build's own face uses a
+plain text label for now, matching every other face as they actually
+are today. A real, numerically-verified candidate glyph exists for
+whenever that system gets scoped: viewed straight down one of the
+truncated octahedron's square-face axes, the silhouette is an exact
+octagon (8 vertices at radius √5) with a smaller square dead center (4
+vertices at radius 1, the near square face itself) -- checked directly
+against `truncatedOctahedronVertices`, not eyeballed.

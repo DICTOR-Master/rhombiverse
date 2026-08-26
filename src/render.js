@@ -2036,6 +2036,26 @@ async function init() {
         if (action === 'tool:prune') { clickMode('plant'); showHudPrompt('Prune: right-click an existing growth tile while in Plant mode.', 4000); wheel3D.close(); return; }
         if (action === 'tool:growthParams') { document.getElementById('cultivate-panel')?.classList.add('open'); wheel3D.close(); return; } // real "Growth Parameters" section lives in this panel
 
+        // --- Rhombisis: BCC Build (core/bcc-build.md), replacing WHEEL_
+        // RHOMBISIS's own Generate a Body duplicate at bottom|sx-1sz-1,
+        // 2026-08-26 direct instruction -- "a fourth way to bring
+        // something new into being" alongside Sculpt/Generate/Plant.
+        // Same clickMode() shim as every other tool face; the
+        // FEATURES.bccLattice check is defense-in-depth so this wheel
+        // face can't put a Full Game World session into BCC mode even
+        // though the underlying .mode-btn itself would technically
+        // still accept the click (it's just hidden by CSS there).
+        if (action === 'tool:bccBuild') {
+          wheel3D.close();
+          if (!FEATURES.bccLattice) {
+            showHudPrompt('BCC Build is Rhombeometry-only -- switch modes in the Lab panel first.', 4000);
+            return;
+          }
+          clickMode('bcc');
+          showHudPrompt('BCC Build: click a face to place a BCC lattice cell (or a face of your normal World to start one nearby). Right-click removes.', 4500);
+          return;
+        }
+
         // --- Rhombitect: JUDGMENT CALL. "Dome" is a real sculpt-panel
         // NL shape keyword (src/core/sculpture.js's shape parser
         // recognizes "dome"); prefilling it is a real, grounded action,
@@ -3074,7 +3094,7 @@ async function init() {
     bccWorld,
     onChange: onBCCChange,
     getMaterial: () => materialSelect.value,
-    isActive: () => !walking && currentMode === 'bcc',
+    isActive: () => !walking && currentMode === 'bcc' && FEATURES.bccLattice,
   });
 
   // The old 2D radial menu (wheel.js) was removed 2026-08-25 -- the
