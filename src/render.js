@@ -1266,6 +1266,17 @@ async function init() {
     worldJSON = sharedWorldJSON;
   } else if (savedJSON) {
     worldJSON = savedJSON;
+  } else if (getSettings().pureGeometry) {
+    // Rhombeometry's first-visit experience is geometry-only, full stop --
+    // no pre-built World, no game-flavored tour (both of those are Full
+    // Game World content, see onboardingCyborg.enable() below). Direct
+    // user decision 2026-08-28: the mode choice on the welcome screen
+    // ("geometry comes first") was silently undone the moment the world
+    // itself loaded, since this branch used to run unconditionally
+    // regardless of pureGeometry -- every first-time Rhombeometry visitor
+    // was actually dropped into the same Showcase World + tour as Full
+    // Game World, no different first look at all.
+    worldJSON = await loadWorld('./data/starter-world.json');
   } else {
     try {
       worldJSON = await loadWorld('./data/presets/showcase-world.json');
@@ -1291,7 +1302,14 @@ async function init() {
     saveToLocalStorage(world.toJSON());
     showHudPrompt('Loaded a shared World from your link.', 5000);
   }
-  if (isFirstVisit) onboardingCyborg.enable();
+  // Every step of this tour narrates Full Game World content (an
+  // "already-built World," pre-seeded "growing life", Explore framed as
+  // walking around "yours and everyone else's") -- none of it true for
+  // Rhombeometry's actual first-visit world (a single blank cell, no
+  // organisms, no other players). Direct user decision 2026-08-28: no
+  // tour at all for a first-time Rhombeometry visitor, rather than
+  // narrating content that isn't there.
+  if (isFirstVisit && !getSettings().pureGeometry) onboardingCyborg.enable();
   // Declared early -- see docs/code-notes/render.md
   let currentMode = 'build';
 
