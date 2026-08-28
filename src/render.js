@@ -10,7 +10,7 @@ import { FULL_PYRAMIDS, presentAxisKeys } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { generateBCCLatticePatch, bccDetailVertsFor, bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
-import { truncatedOctahedronVertices } from './geometry-extensions/dual-lattice.js';
+import { truncatedOctahedronVertices, nearestBCCPoints } from './geometry-extensions/dual-lattice.js';
 import { createBCCBuildController } from './core/bcc-build.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { FEATURES } from './app/features.js';
@@ -2280,6 +2280,14 @@ async function init() {
   // gating as the preview toggle above.
   const bccBuildRow = document.getElementById('bcc-build-row');
   if (bccBuildRow) bccBuildRow.style.display = FEATURES.bccLattice ? '' : 'none';
+  // Dualize preview (reframe Stage 3): same Rhombeometry-only gating as
+  // the rest of the BCC/TO family -- Lab-panel entry point rather than a
+  // wheel face, same precedent as BCC Build's own original placement
+  // ("every wheel face is already allocated," core/bcc-build.md) -- a
+  // wheel face can follow later once a commit path exists to make it a
+  // more central tool, per that same precedent's own trajectory.
+  const dualizeRow = document.getElementById('dualize-row');
+  if (dualizeRow) dualizeRow.style.display = FEATURES.bccLattice ? '' : 'none';
   // Piece picker's TO option (core/build.js's handleToClick) -- same
   // Rhombeometry-only gating as the rest of BCC's own UI. A disabled
   // option can't be selected via the <select> itself; getPieceType()
@@ -2449,9 +2457,10 @@ async function init() {
     plant: 'Click anywhere to plant a seed of the chosen species. Left alone, it grows on its own over real time.',
     sculpt: 'Model (add) onto a face, or Chisel (subtract) a clicked cell -- see the Sculpt panel for tier/mirror/brush.',
     bcc: 'Click a face of an existing BCC cell to extend it, or a face of your normal World to start one nearby. Right-click removes a BCC cell. Overlap with your normal World is expected -- it\'s how the two lattices join.',
+    dualize: 'Click an existing structure to preview its region (radius = Shell fill radius) reinterpreted through the dual BCC/truncated-octahedron lattice. View-only -- nothing is written to your World.',
   };
   function updateModeUI() {
-    const showRadius = currentMode === 'fill' || currentMode === 'generate';
+    const showRadius = currentMode === 'fill' || currentMode === 'generate' || currentMode === 'dualize';
     const showHollowFrom = currentMode === 'fill' || currentMode === 'excavate';
     const showGenerator = currentMode === 'generate';
     const showSpecies = currentMode === 'plant';
@@ -2483,6 +2492,7 @@ async function init() {
     report: 'Report',
     plant: 'Plant',
     bcc: 'BCC Build',
+    dualize: 'Dualize Preview',
   };
   function updateHudIndicator() {
     const el = document.getElementById('hud-indicator');
@@ -2507,6 +2517,10 @@ async function init() {
     btn.addEventListener('click', () => {
       currentMode = btn.dataset.mode;
       modeButtons.forEach((b) => b.classList.toggle('active', b === btn));
+      // Dualize preview (reframe Stage 3) is click-driven, not a toggle --
+      // leaving it visible after switching to an unrelated mode would be
+      // a stale, orphaned overlay of your last-previewed region.
+      if (currentMode !== 'dualize') clearDualizePreview();
       updateModeUI();
       rebuildInstances(mesh, world, currentMode === 'report');
       closeMobilePanels();
@@ -2637,6 +2651,94 @@ async function init() {
       if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
       showHudPrompt('Pruned -- the growth layer will fill the gap back in on its own.');
     }
+  });
+
+  // --- Dualize (reframe Stage 3): view-only FCC<->BCC region
+  // reinterpretation. Reuses shellBrushCells (Shell Brush's own region-
+  // selection primitive, core/sculpture.js) for "player-selected region"
+  // and nearestBCCPoints (dual-lattice.js -- unwired since the earlier
+  // BCC task's own Phase 3 stretch scope) for the actual FCC->BCC math;
+  // no new geometry math invented here. Always targets the real World's
+  // own mesh/scene/cellOrder, never Sculpture Mode's separate scratch
+  // scene -- deliberately out of scope for this pass, not an oversight.
+  // View-only by design: never calls world.addCell/removeCell. Whether/
+  // how to commit a dualized region into the world-state schema is an
+  // open question this pass deliberately does not answer -- see the
+  // commit message for the real options and why none was picked yet.
+  let dualizePreviewMesh = null;
+  let dualizePreviewEdges = null;
+  function clearDualizePreview() {
+    if (dualizePreviewMesh) {
+      scene.remove(dualizePreviewMesh);
+      dualizePreviewMesh.geometry.dispose();
+      dualizePreviewMesh.material.dispose();
+      dualizePreviewMesh = null;
+    }
+    if (dualizePreviewEdges) {
+      scene.remove(dualizePreviewEdges);
+      dualizePreviewEdges.geometry.dispose();
+      dualizePreviewEdges.material.dispose();
+      dualizePreviewEdges = null;
+    }
+  }
+  async function rebuildDualizePreview(cx, cy, cz, radius) {
+    clearDualizePreview();
+    const regionCells = shellBrushCells(cx, cy, cz, radius).filter((c) => world.has(c.x, c.y, c.z));
+    if (regionCells.length === 0) {
+      showHudPrompt('Dualize: no built cells in that region -- click an existing structure.', 4000);
+      return;
+    }
+    // Dedup across the WHOLE region, not per-cell -- nearby FCC cells'
+    // nearest-BCC-point sets overlap heavily, and a real reinterpretation
+    // of "the same enclosed space" is one set of BCC cells, not a bag
+    // with repeats.
+    const bccPoints = new Map(); // "x,y,z" -> [x,y,z]
+    for (const c of regionCells) {
+      for (const p of nearestBCCPoints([c.x, c.y, c.z])) {
+        bccPoints.set(p.join(','), p);
+      }
+    }
+    const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
+    // Same real, established self-tiling scale as the existing BCC
+    // preview/BCC Build features (bccShapeScaleFor(SCALE)) -- "mathematically
+    // consistent and interchangeable" with FCC, not re-derived here.
+    const shapeScale = bccShapeScaleFor(SCALE);
+    const pieces = [];
+    for (const [bx, by, bz] of bccPoints.values()) {
+      const [wx, wy, wz] = cellToWorld(bx, by, bz, SCALE);
+      const verts = truncatedOctahedronVertices(shapeScale).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
+      pieces.push(new ConvexGeometry(verts));
+    }
+    const merged = mergeGeometries(pieces, false);
+    pieces.forEach((g) => g.dispose());
+    // Color + wireframe pairing (SKELETON_COLOR + real edge overlay),
+    // same reused convention as both-differentiated lattice view mode --
+    // not a new visual language for "this is a dual-lattice preview."
+    dualizePreviewMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
+      color: SKELETON_COLOR, emissive: SKELETON_COLOR, emissiveIntensity: 0.6, flatShading: true,
+      transparent: true, opacity: 0.55, metalness: 0.1, roughness: 0.6,
+    }));
+    scene.add(dualizePreviewMesh);
+    dualizePreviewEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({ color: 0xffffff }));
+    scene.add(dualizePreviewEdges);
+    showHudPrompt(
+      `Dualize preview: ${regionCells.length} FCC cell${regionCells.length === 1 ? '' : 's'} -> ${bccPoints.size} BCC/TO cell${bccPoints.size === 1 ? '' : 's'} (view-only -- nothing written to your World).`,
+      6000,
+    );
+  }
+  const dualizeRaycaster = new THREE.Raycaster();
+  const dualizePointer = new THREE.Vector2();
+  renderer.domElement.addEventListener('click', async (event) => {
+    if (currentMode !== 'dualize' || walking) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    dualizePointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    dualizePointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    dualizeRaycaster.setFromCamera(dualizePointer, camera);
+    const hits = dualizeRaycaster.intersectObject(mesh);
+    if (hits.length === 0 || hits[0].instanceId === undefined) return;
+    const cell = cellOrder[hits[0].instanceId];
+    if (!cell) return;
+    await rebuildDualizePreview(cell.x, cell.y, cell.z, getShellCount());
   });
 
   // --- B5: Cultivation Mode (Grow -> Cultivate) -----------------------
