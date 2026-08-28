@@ -1061,6 +1061,13 @@ function buildBCCGeometry(scale) {
 }
 
 // See docs/code-notes/render.md
+// emerald/gold added 2026-08-29, direct request -- buildable colors
+// only (deliberately NOT wired into asteroids.js's YIELD_WEIGHTS,
+// trade.js's FREE_THRESHOLDS, TRADE_MATERIALS, or planetoidgen.js's
+// body recipes -- those are real tunable economy-balance constants,
+// not something to invent numbers for without being asked). gold
+// reuses hud-wheel-3d.js's own GOLD constant (0xd4af37) verbatim for
+// visual consistency with the one other "gold" already in this app.
 const MATERIAL_COLORS = {
   base: 0x8899aa,
   garnet: 0x8b2e2e,
@@ -1070,6 +1077,8 @@ const MATERIAL_COLORS = {
   'blackstar-glassite': 0x1a1a22,
   ice99: 0xd8f0ff,
   water: 0x2e6f9e,
+  emerald: 0x50c878,
+  gold: 0xd4af37,
 };
 
 function materialColor(material) {
