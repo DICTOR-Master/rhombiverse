@@ -30,7 +30,7 @@
 // wheel-pickers.md for that computation).
 import * as THREE from 'three';
 import { buildRDFaces, faceKey, ensureOutwardWinding, SKELETON_COLOR, FACE_STYLE } from './rhombic-wheel-3d-core.js';
-import { MARKS } from './wheel-icons.js';
+import { MARKS, iconFrame } from './wheel-icons.js';
 
 const PIECE_FACE_DATA = {
   'equator|sx1sy1': { value: 'rd', markKey: 'pieceRD', label: 'RD' },
@@ -151,8 +151,15 @@ export function createPieceCluster3D(renderer, { size = 280 } = {}) {
       labelEl = document.createElement('div');
       labelEl.className = 'piece-cluster-3d-label';
       labelEl.dataset.value = data.value;
+      // Real bug found live (2026-08-28): MARKS entries are bare <polygon>
+      // fragments meant to sit INSIDE an <svg> (see wheel-icons.js's own
+      // iconFrame(), used everywhere else a MARKS value is rendered) --
+      // injecting one directly into a plain <span> via innerHTML produces
+      // no visible shape at all, since a <polygon> outside an SVG context
+      // isn't valid markup to parse. Every other picker in this codebase
+      // already wraps MARKS values in iconFrame(); this one just missed it.
       labelEl.innerHTML = `
-        <span class="piece-cluster-3d-icon">${MARKS[data.markKey] ?? ''}</span>
+        <span class="piece-cluster-3d-icon">${iconFrame(MARKS[data.markKey] ?? '', { title: data.label })}</span>
         <span class="piece-cluster-3d-text">${data.label}</span>`;
       labelsLayer.appendChild(labelEl);
     }
