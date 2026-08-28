@@ -5,12 +5,12 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces } from './core/lattice.js';
+import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells } from './core/lattice.js';
 import { FULL_PYRAMIDS, presentAxisKeys } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { generateBCCLatticePatch, bccDetailVertsFor, bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
-import { truncatedOctahedronVertices, nearestBCCPoints } from './geometry-extensions/dual-lattice.js';
+import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS } from './geometry-extensions/dual-lattice.js';
 import { createBCCBuildController } from './core/bcc-build.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { FEATURES } from './app/features.js';
@@ -2524,7 +2524,7 @@ async function init() {
     plant: 'Click anywhere to plant a seed of the chosen species. Left alone, it grows on its own over real time.',
     sculpt: 'Model (add) onto a face, or Chisel (subtract) a clicked cell -- see the Sculpt panel for tier/mirror/brush.',
     bcc: 'Click a face of an existing BCC cell to extend it, or a face of your normal World to start one nearby. Right-click removes a BCC cell. Overlap with your normal World is expected -- it\'s how the two lattices join.',
-    dualize: 'Click an existing structure to preview its region (radius = Shell fill radius) reinterpreted through the dual BCC/truncated-octahedron lattice. View-only -- nothing is written to your World.',
+    dualize: 'Click an existing structure (FCC or a real placed BCC/TO cell) to preview its region (radius = Shell fill radius) reinterpreted through the other lattice. View-only -- nothing is written to your World.',
   };
   function updateModeUI() {
     const showRadius = currentMode === 'fill' || currentMode === 'generate' || currentMode === 'dualize';
@@ -2753,33 +2753,66 @@ async function init() {
       dualizePreviewEdges = null;
     }
   }
-  async function rebuildDualizePreview(cx, cy, cz, radius) {
+  // Bidirectional (reframe follow-up, 2026-08-28, direct user question:
+  // "shouldn't dualize preview show opposite lattice to current picker
+  // shape?"): reacts to whichever real lattice you actually clicked, via
+  // the raycast hit itself -- not the Piece picker's own current
+  // selection, which can be stale relative to what's actually on screen
+  // (e.g. still set to TO after clicking an FCC cell). Reuses
+  // nearestFCCPoints (dual-lattice.js) for the new BCC->FCC direction,
+  // verified numerically before being wired in here -- see that
+  // function's own header for the real, confirmed asymmetry (an
+  // all-even BCC point is already FCC-valid; an all-odd one has 6
+  // equidistant FCC neighbors, not a single nearest one).
+  async function rebuildDualizePreview(sourceLattice, cx, cy, cz, radius) {
     clearDualizePreview();
-    const regionCells = shellBrushCells(cx, cy, cz, radius).filter((c) => world.has(c.x, c.y, c.z));
+    const isFcc = sourceLattice === 'fcc';
+    const sourceLabel = isFcc ? 'FCC' : 'BCC/TO';
+    const targetLabel = isFcc ? 'BCC/TO' : 'FCC';
+    // BCC-side region selection reuses cellsInShells with BCC's own
+    // neighbor offsets -- the exact same "shell radius around a center"
+    // primitive shellBrushCells already wraps for FCC, just handed a
+    // different offset table, not a separately-invented mechanism.
+    const regionCells = isFcc
+      ? shellBrushCells(cx, cy, cz, radius).filter((c) => world.has(c.x, c.y, c.z))
+      : [{ x: cx, y: cy, z: cz, shell: 0 }, ...cellsInShells(cx, cy, cz, radius, 1, BCC_NEIGHBOR_OFFSETS)]
+          .filter((c) => bccWorld.has(c.x, c.y, c.z));
     if (regionCells.length === 0) {
-      showHudPrompt('Dualize: no built cells in that region -- click an existing structure.', 4000);
+      showHudPrompt(`Dualize: no built ${sourceLabel} cells in that region -- click an existing structure.`, 4000);
       return;
     }
-    // Dedup across the WHOLE region, not per-cell -- nearby FCC cells'
-    // nearest-BCC-point sets overlap heavily, and a real reinterpretation
-    // of "the same enclosed space" is one set of BCC cells, not a bag
+    // Dedup across the WHOLE region, not per-cell -- nearby source cells'
+    // nearest-dual-point sets overlap heavily, and a real reinterpretation
+    // of "the same enclosed space" is one set of dual cells, not a bag
     // with repeats.
-    const bccPoints = new Map(); // "x,y,z" -> [x,y,z]
+    const targetPoints = new Map(); // "x,y,z" -> [x,y,z]
     for (const c of regionCells) {
-      for (const p of nearestBCCPoints([c.x, c.y, c.z])) {
-        bccPoints.set(p.join(','), p);
-      }
+      const pts = isFcc ? nearestBCCPoints([c.x, c.y, c.z]) : nearestFCCPoints([c.x, c.y, c.z]);
+      for (const p of pts) targetPoints.set(p.join(','), p);
     }
     const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
-    // Same real, established self-tiling scale as the existing BCC
-    // preview/BCC Build features (bccShapeScaleFor(SCALE)) -- "mathematically
-    // consistent and interchangeable" with FCC, not re-derived here.
-    const shapeScale = bccShapeScaleFor(SCALE);
     const pieces = [];
-    for (const [bx, by, bz] of bccPoints.values()) {
-      const [wx, wy, wz] = cellToWorld(bx, by, bz, SCALE);
-      const verts = truncatedOctahedronVertices(shapeScale).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
-      pieces.push(new ConvexGeometry(verts));
+    if (isFcc) {
+      // Same real, established self-tiling scale as the existing BCC
+      // preview/BCC Build features (bccShapeScaleFor(SCALE)) --
+      // "mathematically consistent and interchangeable" with FCC, not
+      // re-derived here.
+      const shapeScale = bccShapeScaleFor(SCALE);
+      for (const [bx, by, bz] of targetPoints.values()) {
+        const [wx, wy, wz] = cellToWorld(bx, by, bz, SCALE);
+        const verts = truncatedOctahedronVertices(shapeScale).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
+        pieces.push(new ConvexGeometry(verts));
+      }
+    } else {
+      // Reverse direction previews as real RD shapes, at the same SCALE
+      // every FCC cell in the actual World already uses -- reuses
+      // rdRawVerts exactly as the real build/render path does, no new
+      // geometry invented for this direction either.
+      for (const [fx, fy, fz] of targetPoints.values()) {
+        const [wx, wy, wz] = cellToWorld(fx, fy, fz, SCALE);
+        const verts = rdRawVerts(SCALE).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
+        pieces.push(new ConvexGeometry(verts));
+      }
     }
     const merged = mergeGeometries(pieces, false);
     pieces.forEach((g) => g.dispose());
@@ -2794,7 +2827,7 @@ async function init() {
     dualizePreviewEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({ color: 0xffffff }));
     scene.add(dualizePreviewEdges);
     showHudPrompt(
-      `Dualize preview: ${regionCells.length} FCC cell${regionCells.length === 1 ? '' : 's'} -> ${bccPoints.size} BCC/TO cell${bccPoints.size === 1 ? '' : 's'} (view-only -- nothing written to your World).`,
+      `Dualize preview: ${regionCells.length} ${sourceLabel} cell${regionCells.length === 1 ? '' : 's'} -> ${targetPoints.size} ${targetLabel} cell${targetPoints.size === 1 ? '' : 's'} (view-only -- nothing written to your World).`,
       6000,
     );
   }
@@ -2806,11 +2839,16 @@ async function init() {
     dualizePointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     dualizePointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     dualizeRaycaster.setFromCamera(dualizePointer, camera);
-    const hits = dualizeRaycaster.intersectObject(mesh);
+    // Raycast both real lattices, closest hit wins -- same pattern
+    // core/bcc-build.js's own TO-piece click handling already uses to
+    // let one click react correctly to whichever real structure is
+    // actually there.
+    const hits = dualizeRaycaster.intersectObjects([mesh, bccMesh]);
     if (hits.length === 0 || hits[0].instanceId === undefined) return;
-    const cell = cellOrder[hits[0].instanceId];
+    const hitBcc = hits[0].object === bccMesh;
+    const cell = hitBcc ? bccCellOrder[hits[0].instanceId] : cellOrder[hits[0].instanceId];
     if (!cell) return;
-    await rebuildDualizePreview(cell.x, cell.y, cell.z, getShellCount());
+    await rebuildDualizePreview(hitBcc ? 'bcc' : 'fcc', cell.x, cell.y, cell.z, getShellCount());
   });
 
   // --- B5: Cultivation Mode (Grow -> Cultivate) -----------------------

@@ -84,6 +84,30 @@ export function nearestBCCPoints(fccCoord) {
   return unique;
 }
 
+// Nearest FCC lattice point(s) to a BCC coordinate -- the reverse of
+// nearestBCCPoints above, added for Dualize's reverse direction
+// (dualizing a region you selected on the BCC/TO lattice back onto
+// FCC/RD). Genuinely asymmetric with the forward direction, verified
+// numerically before wiring this into any UI (see the exhaustive check
+// this was validated against): a BCC point with all-even coordinates
+// is already a valid FCC point too (isValidCell's x+y+z-even constraint
+// is satisfied automatically -- the real, documented overlap between
+// the two lattices' "even" families, see core/bcc-build.md), so its
+// nearest FCC point is itself, distance 0. A BCC point with all-odd
+// coordinates sums to odd, so it's never itself FCC-valid -- flipping
+// any ONE axis by +-1 fixes the parity, and by symmetry all 6 such
+// single-axis flips land at exactly distance 1, genuinely equally near
+// (not an arbitrary tie-break).
+export function nearestFCCPoints(bccCoord) {
+  const [x, y, z] = bccCoord;
+  if ((x + y + z) % 2 === 0) return [[x, y, z]];
+  return [
+    [x + 1, y, z], [x - 1, y, z],
+    [x, y + 1, z], [x, y - 1, z],
+    [x, y, z + 1], [x, y, z - 1],
+  ];
+}
+
 // Nearest valid BCC lattice coordinate to an arbitrary (not necessarily
 // BCC-valid, not necessarily FCC-valid) continuous point -- same snap
 // technique as nearestBCCPoints' own inline `snap` (round each axis to
@@ -124,5 +148,19 @@ if (typeof process !== 'undefined' && process.argv[1] && process.argv[1].endsWit
     '(2,0,0) all-even -> true': isBCC(2, 0, 0),
   });
   console.log(`BCC_NEIGHBOR_OFFSETS length: ${BCC_NEIGHBOR_OFFSETS.length} (expected 14).`);
+  // nearestFCCPoints: exhaustive check over a real range, not spot-checked --
+  // every BCC point's returned candidate(s) must actually be valid FCC points.
+  const isValidFCC = (x, y, z) => (x + y + z) % 2 === 0;
+  let fccDualOk = true;
+  for (let x = -4; x <= 4; x++) for (let y = -4; y <= 4; y++) for (let z = -4; z <= 4; z++) {
+    if (!isBCC(x, y, z)) continue;
+    for (const [cx, cy, cz] of nearestFCCPoints([x, y, z])) {
+      if (!isValidFCC(cx, cy, cz)) fccDualOk = false;
+    }
+  }
+  console.log('nearestFCCPoints: every candidate over [-4,4]^3 BCC points is FCC-valid ->', fccDualOk);
+  if (!fccDualOk) throw new Error('nearestFCCPoints produced an invalid FCC candidate');
+  console.log('nearestFCCPoints((2,0,0)) [all-even, already FCC] ->', nearestFCCPoints([2, 0, 0]));
+  console.log('nearestFCCPoints((1,1,1)) [all-odd, 6 equidistant neighbors] ->', nearestFCCPoints([1, 1, 1]));
   console.log('OK');
 }
