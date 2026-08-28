@@ -428,7 +428,8 @@ let walking = false;
 let player = null;
 // Assigned inside init() once updateHudIndicator exists there -- enterWalk/
 // exitWalk are module-level (defined before init()) but still need to
-// refresh the HUD's mode/material indicator on every Explore transition.
+// refresh the bottom-left quick-select Piece/Material icons on every
+// Explore transition.
 let refreshHudIndicator = () => {};
 
 // Assigned once the Rhombic Wheel 3D is created (feature-flagged, see
@@ -2690,28 +2691,6 @@ async function init() {
     updateHudIndicator();
   }
 
-  // See docs/code-notes/render.md
-  const PLAYER_FACING_MODE_LABEL = {
-    // 'build'/'chisel'/'sculpt' are internal mode strings kept for
-    // minimal disruption (see core/build.js) -- their player-facing
-    // labels are the universal "Add"/"Remove"/"Symmetry" now (direct
-    // instruction 2026-08-26, retiring the Rhombi-/Pyramid-/Cube-
-    // specific names). 'chisel' was previously missing here entirely and
-    // fell through to the raw internal string -- caught live, not just
-    // reasoned about, via a real HUD screenshot.
-    build: 'Add',
-    chisel: 'Remove',
-    sculpt: 'Symmetry',
-    fill: 'Fill',
-    round: 'Smooth',
-    excavate: 'Dig',
-    generate: 'Create',
-    replace: 'Replace',
-    report: 'Report',
-    plant: 'Plant',
-    bcc: 'BCC Build',
-    dualize: 'Dualize Preview',
-  };
   // Maps core/build.js's own getPieceType() values to their matching
   // MARKS entry -- same shape vocabulary the Piece wheel faces
   // themselves use (wheel-icons.js), so the quick-select icon below is
@@ -2735,21 +2714,16 @@ async function init() {
       quickMaterialEl.innerHTML = iconFrame(swatchMark(hex), { title: 'Material' });
     }
   }
+  // Was also a top-right "Mode · Material" text readout (#hud-indicator)
+  // -- removed 2026-08-29, direct instruction: redundant with the
+  // bottom-left quick-select icons above, which already show current
+  // Piece/Material at a glance (and, unlike this text ever did, are
+  // tappable to change them). Kept the function/name since every mode-
+  // change call site in this file already calls it (via
+  // refreshHudIndicator) to keep the quick-select icons in sync --
+  // that's its real remaining job now.
   function updateHudIndicator() {
     updateQuickSelect();
-    const el = document.getElementById('hud-indicator');
-    if (!el) return;
-    if (walking) {
-      el.textContent = 'Exploring';
-      return;
-    }
-    if (sculptureModeActive) {
-      el.textContent = 'Sculpture Mode (standalone)';
-      return;
-    }
-    const modeLabel = PLAYER_FACING_MODE_LABEL[currentMode] ?? currentMode;
-    const materialLabel = materialSelect.options[materialSelect.selectedIndex]?.textContent ?? '';
-    el.textContent = `${modeLabel} · ${materialLabel}`;
   }
   refreshHudIndicator = updateHudIndicator;
   materialSelect.addEventListener('change', updateHudIndicator);

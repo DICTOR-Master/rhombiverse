@@ -50,12 +50,6 @@
       letter-spacing: 0.04em; user-select: none; opacity: 0.9;
       pointer-events: none;
     }
-    #hud-indicator {
-      position: fixed; top: 14px; right: 206px; z-index: 900;
-      color: #bcd; font: 12px/1.4 system-ui, sans-serif;
-      text-align: right; user-select: none; pointer-events: none;
-      max-width: 45vw;
-    }
     /* Performance guardrail (reframe Stage 6): optional, off by default
        (setting-fps-meter) -- the auto-degrade safety net it's attached to
        runs regardless of whether this is shown. */
@@ -296,11 +290,10 @@
        and #hud-crosshair are deliberately excluded -- the prompt IS the
        transition's own cue text, and the crosshair fades in/out on its
        own timing (render.js), not this one. */
-    #hud-wordmark, #hud-indicator, #hud-wheel-cue, #hud-quick-shape, #hud-quick-material, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle {
+    #hud-wordmark, #hud-wheel-cue, #hud-quick-shape, #hud-quick-material, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle {
       transition: opacity 0.3s ease;
     }
     body.explore-transitioning #hud-wordmark,
-    body.explore-transitioning #hud-indicator,
     body.explore-transitioning #hud-wheel-cue,
     body.explore-transitioning #hud-quick-shape,
     body.explore-transitioning #hud-quick-material,
@@ -1091,7 +1084,6 @@
 
   <!-- B1 minimal HUD -->
   <div id="hud-wordmark">RHOMBIVERSE</div>
-  <div id="hud-indicator"></div>
   <div id="fps-meter"></div>
   <div id="hud-prompt"></div>
   <div id="hud-crosshair"></div>
