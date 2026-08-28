@@ -1,6 +1,14 @@
 [
   {
     "date": "2026-08-28",
+    "title": "Where the Two Lattices Meet",
+    "items": [
+      "New Interpenetrating Lattice preview (Rhombeometry, Lab panel): shows real BCC/truncated-octahedron cells nested exactly inside your own build, wherever a cell sits at a coordinate that can host one -- each RD's 6 sharp vertices meet a TO's 6 square-face centers exactly.",
+      "View-only -- nothing is written to your World."
+    ]
+  },
+  {
+    "date": "2026-08-28",
     "title": "Dualize Works Both Ways Now",
     "items": [
       "Dualize Preview now reacts to whichever lattice you actually click -- click an FCC structure to preview it as BCC/TO, or click a real placed BCC/TO cell (from BCC Build) to preview it back as FCC.",
