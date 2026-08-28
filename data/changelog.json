@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-08-28",
+    "title": "Real Cells, Not Just a Preview",
+    "items": [
+      "Two new real, placeable pieces (Piece picker, Rhombeometry): Disphenoid and Octahedron Site -- the genuine BCC interstitial-site tessellation (the same octahedral/tetrahedral geometry carbon actually sits in inside iron), not a view-only overlay.",
+      "Disphenoid places one at a time; Octahedron Site places the 4-disphenoid bundle they combine into in one click. Both grow by clicking an existing one's own face, same as every other piece type.",
+      "Builds freely on top of your FCC and BCC worlds -- overlap between all three lattices is expected, not prevented."
+    ]
+  },
+  {
+    "date": "2026-08-28",
     "title": "Where the Two Lattices Meet",
     "items": [
       "New Interpenetrating Lattice preview (Rhombeometry, Lab panel): shows real BCC/truncated-octahedron cells nested exactly inside your own build, wherever a cell sits at a coordinate that can host one -- each RD's 6 sharp vertices meet a TO's 6 square-face centers exactly.",

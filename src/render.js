@@ -12,6 +12,7 @@ import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { generateBCCLatticePatch, bccDetailVertsFor, bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
 import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS, isBCC } from './geometry-extensions/dual-lattice.js';
 import { createBCCBuildController } from './core/bcc-build.js';
+import { createInterstitialStore } from './core/interstitial-build.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { FEATURES } from './app/features.js';
 import {
@@ -70,6 +71,7 @@ import {
   exportWorldFile,
   importWorldFile,
   BCC_STORAGE_KEY,
+  INTERSTITIAL_STORAGE_KEY,
 } from './core/persistence.js';
 import {
   ensureAnonymousSession,
@@ -1211,6 +1213,46 @@ function rebuildPartialCellMeshes(world, inReportMode = false) {
 // cellAt(instanceId) callback reads, so routing BCC cells through it
 // would corrupt the main world's own hit-testing. See core/bcc-build.md.
 let bccCellOrder = []; // instanceId -> {x, y, z, ...cellData}
+// Interstitial-lattice build: one real Mesh per disphenoid cell, same
+// pattern as partialCellGroup/partialCellMeshes above and for the same
+// reason (each cell's own geometry is genuinely different from its
+// neighbors', not a shared instanced template). Baked directly from the
+// cell's own absolute world-space vertices (mesh.position stays at
+// origin) since a disphenoid has no single natural "cell center" the way
+// RD/TO's cellToWorld(x,y,z) gives one.
+const interstitialGroup = new THREE.Group();
+scene.add(interstitialGroup);
+const interstitialMeshes = new Map(); // disphenoid key -> Mesh
+
+function buildInterstitialGeometry(verts, subScale) {
+  const points = verts.map(([x, y, z]) => new THREE.Vector3(x * subScale, y * subScale, z * subScale));
+  const geometry = new ConvexGeometry(points);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function rebuildInterstitialMeshes(store) {
+  const wanted = new Map(store.entries().map((c) => [c.key, c]));
+  for (const [key, mesh] of interstitialMeshes) {
+    if (!wanted.has(key)) {
+      interstitialGroup.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+      interstitialMeshes.delete(key);
+    }
+  }
+  for (const [key, cell] of wanted) {
+    if (interstitialMeshes.has(key)) continue;
+    const geom = buildInterstitialGeometry(cell.verts, SCALE);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
+    mat.color.copy(instanceColorFor(cell));
+    const m = new THREE.Mesh(geom, mat);
+    m.userData.key = key;
+    interstitialGroup.add(m);
+    interstitialMeshes.set(key, m);
+  }
+}
+
 function rebuildBCCInstances(bccMesh, bccWorld) {
   bccCellOrder = bccWorld.entries();
   const m = new THREE.Matrix4();
@@ -1376,6 +1418,18 @@ async function init() {
   bccMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(bccMesh);
   rebuildBCCInstances(bccMesh, bccWorld);
+
+  // Interstitial-lattice build: a third, independent store (own
+  // localStorage key, INTERSTITIAL_STORAGE_KEY) -- see core/
+  // interstitial-build.md. Each disphenoid has its own unique
+  // orientation (not related to its neighbors by translation the way
+  // RD/TO cells are), so this can't use InstancedMesh like the two
+  // meshes above; rebuildInterstitialMeshes (below) renders one real
+  // Mesh per cell, the same pattern partialCellGroup already uses for
+  // pyramid-shaved RD cells.
+  const interstitialSavedJSON = loadFromLocalStorage(INTERSTITIAL_STORAGE_KEY);
+  const interstitialStore = createInterstitialStore(interstitialSavedJSON);
+  rebuildInterstitialMeshes(interstitialStore);
 
   // B4b's standalone mesh -- same geometry/material recipe as the main
   // world's (a real sculpture should look identical either place), own
@@ -2347,6 +2401,14 @@ async function init() {
   if (pieceTypeToOption) {
     pieceTypeToOption.disabled = !FEATURES.bccLattice;
     pieceTypeToOption.hidden = !FEATURES.bccLattice;
+  }
+  // Same gating for the interstitial-lattice piece tiers.
+  for (const id of ['piece-type-ioct-option', 'piece-type-idis-option']) {
+    const opt = document.getElementById(id);
+    if (opt) {
+      opt.disabled = !FEATURES.bccLattice;
+      opt.hidden = !FEATURES.bccLattice;
+    }
   }
   // Lens Parity (reframe Stage 1): five view modes over the same two
   // renderables the original boolean BCC-preview toggle already drove --
@@ -3583,6 +3645,14 @@ async function init() {
           add: 'A Truncated Octahedron is already there.',
           remove: "No Truncated Octahedron there to remove -- Remove+TO only clears an actual TO, not the RD world around it. Tap directly on one you've placed.",
         },
+        idis: {
+          add: "That disphenoid's already there.",
+          remove: 'No disphenoid there to remove -- tap directly on one from the interstitial lattice.',
+        },
+        ioct: {
+          add: 'That octahedron site is already complete there.',
+          remove: 'No octahedron site there to remove -- tap directly on one of its own disphenoids.',
+        },
       };
       showHudPrompt(messages[piece]?.[action] ?? 'Nothing to do there.', 3500);
     },
@@ -3607,6 +3677,9 @@ async function init() {
     bccMesh,
     bccCellAt: (instanceId) => bccCellOrder[instanceId],
     onBCCChange,
+    interstitialStore,
+    interstitialGroup,
+    onInterstitialChange,
     canPlaceMaterial,
     getOwnerId: () => myUserId ?? LOCAL_PLAYER_ID,
     mineRemote: (x, y, z) => {
@@ -3629,6 +3702,13 @@ async function init() {
   function onBCCChange() {
     rebuildBCCInstances(bccMesh, bccWorld);
     saveToLocalStorage(bccWorld.toJSON(), BCC_STORAGE_KEY);
+  }
+
+  // Interstitial-lattice build: own change handler, same reasoning as
+  // onBCCChange above (Rhombeometry-only, no World Systems pipeline).
+  function onInterstitialChange() {
+    rebuildInterstitialMeshes(interstitialStore);
+    saveToLocalStorage(interstitialStore.toJSON(), INTERSTITIAL_STORAGE_KEY);
   }
   createBCCBuildController({
     renderer,
@@ -4474,6 +4554,11 @@ async function init() {
     clearLocalStorage(BCC_STORAGE_KEY);
     bccWorld.replaceAll({ worldName: 'BCC Lattice', version: 1, cells: {}, meta: {} });
     onBCCChange();
+    // Interstitial-lattice build: a third real store, same "fresh start
+    // clears it too" reasoning as BCC above.
+    clearLocalStorage(INTERSTITIAL_STORAGE_KEY);
+    interstitialStore.replaceAll({ worldName: 'Interstitial Lattice', version: 1, cells: {} });
+    onInterstitialChange();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

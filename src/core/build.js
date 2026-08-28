@@ -18,6 +18,14 @@ import { applyPyramidEdit, resolvePyramidAxisForHit } from './pyramid.js';
 import { generatePlanetoid } from '../geometry-extensions/planetoidgen.js';
 import { nearestBCCCell } from '../geometry-extensions/dual-lattice.js';
 import { matchBCCNeighborOffset } from './bcc-build.js';
+import {
+  bootstrapDisphenoid,
+  disphenoidKey,
+  disphenoidNeighborAcrossFace,
+  resolveFaceForHit,
+  axisEdgeOfFace,
+  octahedronDisphenoids,
+} from '../geometry-extensions/interstitial-lattice.js';
 
 const NEIGHBOR_DIRECTIONS = NEIGHBOR_OFFSETS.map(
   ([x, y, z]) => new THREE.Vector3(x, y, z).normalize()
@@ -152,6 +160,14 @@ export function createBuildController({
   bccMesh = null,
   bccCellAt = () => null,
   onBCCChange = () => {},
+  // Interstitial-lattice ("ioct"/"idis" piece tiers, core/interstitial-
+  // build.md): same "adopted family member" reasoning as the TO params
+  // above -- a genuinely different lattice (the BCC Delaunay/interstitial
+  // tessellation, not the BCC Voronoi one TO comes from), own store, all
+  // optional/no-op by default.
+  interstitialStore = null,
+  interstitialGroup = null,
+  onInterstitialChange = () => {},
   onCellClicked,
   canPlaceMaterial = () => true,
   getOwnerId = () => null,
@@ -185,7 +201,12 @@ export function createBuildController({
     // would silently steal clicks meant for the FCC world in every OTHER
     // piece tier.
     const bccTargets = bccMesh && getPieceType() === 'to' ? [bccMesh] : [];
-    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets], true);
+    // Same reasoning: interstitialGroup only enters the raycast under
+    // its own piece tiers, for the same "don't steal clicks from other
+    // tiers" reason as bccTargets above.
+    const pieceType = getPieceType();
+    const interstitialTargets = interstitialGroup && (pieceType === 'ioct' || pieceType === 'idis') ? [interstitialGroup] : [];
+    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...interstitialTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -259,6 +280,81 @@ export function createBuildController({
     if (onRemoved) onRemoved(bccCell);
   }
 
+  // Interstitial-lattice piece tiers ('idis': one disphenoid at a time,
+  // 'ioct': the 4-disphenoid octahedron bundle they combine into -- see
+  // interstitial-lattice.md). Same bootstrap-vs-extend shape as
+  // handleToClick above: click an existing disphenoid's face to grow via
+  // the real reflection rule, or click FCC/BCC geometry instead to seed
+  // the nearest real BCC lattice point nearby. Never checked against
+  // FCC/BCC/each-other for overlap -- direct instruction (2026-08-28):
+  // overlapping builds across all these lattices are meant to be
+  // possible, same as TO already allows against FCC.
+  function addDisphenoids(vertsList, material) {
+    let added = 0;
+    for (const verts of vertsList) {
+      const key = disphenoidKey(verts);
+      if (interstitialStore.has(key)) continue;
+      interstitialStore.addDisphenoid(verts, { material });
+      added++;
+    }
+    return added;
+  }
+
+  function handleInterstitialClick(hit, mode, pieceType) {
+    const action = mode === 'build' ? 'add' : 'remove';
+    if (mode === 'build') {
+      const material = getMaterial();
+      if (hit.object.parent === interstitialGroup) {
+        const key = hit.object.userData.key;
+        const cell = interstitialStore.get(key);
+        if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        const n = hit.face.normal;
+        const excludeIdx = resolveFaceForHit(cell.verts, [n.x, n.y, n.z]);
+        let addedCount;
+        if (pieceType === 'idis') {
+          const neighbor = disphenoidNeighborAcrossFace(cell.verts, excludeIdx);
+          addedCount = addDisphenoids([neighbor], material);
+        } else {
+          const edge = axisEdgeOfFace(cell.verts, excludeIdx);
+          addedCount = addDisphenoids(octahedronDisphenoids(edge.anchor, edge.axisOffset), material);
+        }
+        if (addedCount === 0) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        onInterstitialChange();
+        if (onPlaced) onPlaced({ material });
+        return;
+      }
+      // Bootstrap: seed near whichever real FCC or BCC cell was hit.
+      let anchorCell, n;
+      if (hit.object === bccMesh) { anchorCell = bccCellAt(hit.instanceId); n = hit.face.normal; }
+      else { anchorCell = cellAt(hit); n = hit.face.normal; }
+      if (!anchorCell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const [ax, ay, az] = nearestBCCCell(anchorCell.x + n.x, anchorCell.y + n.y, anchorCell.z + n.z);
+      const addedCount = pieceType === 'idis'
+        ? addDisphenoids([bootstrapDisphenoid([ax, ay, az])], material)
+        : addDisphenoids(octahedronDisphenoids([ax, ay, az], [2, 0, 0]), material);
+      if (addedCount === 0) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      onInterstitialChange();
+      if (onPlaced) onPlaced({ x: ax, y: ay, z: az, material });
+      return;
+    }
+    // mode === 'chisel' (Remove)
+    if (hit.object.parent !== interstitialGroup || !hit.object.userData.key) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const cell = interstitialStore.get(hit.object.userData.key);
+    if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    if (pieceType === 'idis') {
+      interstitialStore.removeDisphenoid(hit.object.userData.key);
+    } else {
+      const n = hit.face.normal;
+      const excludeIdx = resolveFaceForHit(cell.verts, [n.x, n.y, n.z]);
+      const edge = axisEdgeOfFace(cell.verts, excludeIdx);
+      for (const verts of octahedronDisphenoids(edge.anchor, edge.axisOffset)) {
+        interstitialStore.removeDisphenoid(disphenoidKey(verts));
+      }
+    }
+    onInterstitialChange();
+    if (onRemoved) onRemoved(cell);
+  }
+
   function onClick(event) {
     if (suppressNextClick) {
       suppressNextClick = false;
@@ -279,6 +375,12 @@ export function createBuildController({
     // controller's own params) -- every other caller is unaffected.
     if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'to' && bccWorld && bccMesh) {
       handleToClick(hit, mode);
+      return;
+    }
+    // Same reasoning, for the interstitial-lattice piece tiers.
+    const pieceTypeForInterstitial = getPieceType();
+    if ((mode === 'build' || mode === 'chisel') && (pieceTypeForInterstitial === 'ioct' || pieceTypeForInterstitial === 'idis') && interstitialStore && interstitialGroup) {
+      handleInterstitialClick(hit, mode, pieceTypeForInterstitial);
       return;
     }
 
@@ -444,6 +546,12 @@ export function createBuildController({
       if (onRemoved) onRemoved(bccCell);
       return;
     }
+    // Same reasoning, for the interstitial-lattice piece tiers.
+    const pieceTypeForInterstitialRemove = getPieceType();
+    if (mode === 'build' && (pieceTypeForInterstitialRemove === 'ioct' || pieceTypeForInterstitialRemove === 'idis') && interstitialStore && interstitialGroup) {
+      handleInterstitialClick(hit, 'chisel', pieceTypeForInterstitialRemove);
+      return;
+    }
 
     const cell = cellAt(hit);
     if (!cell) return;
@@ -535,7 +643,7 @@ export function createBuildController({
       // Drag-placement (Repeat) doesn't apply to the 'pyramid' or 'to'
       // piece tiers -- same reason as the ghost preview below, neither is
       // simple neighbor placement. 'rd'/'cube' both still drag normally.
-      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && !['pyramid', 'to'].includes(getPieceType())) {
+      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && !['pyramid', 'to', 'ioct', 'idis'].includes(getPieceType())) {
         dragging = true;
         clearTimeout(holdTimer);
         holding = false;
@@ -568,7 +676,7 @@ export function createBuildController({
     // vs-extend logic -- neither fits the "next valid FCC position" ghost
     // preview below, which assumes plain FCC neighbor placement. 'rd'/
     // 'cube' both still use it identically.
-    if (mode !== 'build' || ['pyramid', 'to'].includes(getPieceType())) {
+    if (mode !== 'build' || ['pyramid', 'to', 'ioct', 'idis'].includes(getPieceType())) {
       if (onHoverEnd) onHoverEnd();
       return;
     }

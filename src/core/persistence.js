@@ -10,6 +10,11 @@ const STORAGE_KEY = 'rhombiverse-world';
 // and none of them can accidentally clobber it either.
 export const BCC_STORAGE_KEY = 'rhombiverse-bcc-world';
 
+// Interstitial-lattice build (geometry-extensions/interstitial-lattice.md):
+// same reasoning as BCC_STORAGE_KEY above -- a third, independent store,
+// own key, untouched by every existing FCC/BCC save/load/clear call site.
+export const INTERSTITIAL_STORAGE_KEY = 'rhombiverse-interstitial-world';
+
 export function saveToLocalStorage(worldJSON, key = STORAGE_KEY) {
   try {
     localStorage.setItem(key, JSON.stringify(worldJSON));
