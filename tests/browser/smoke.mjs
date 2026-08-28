@@ -39,7 +39,16 @@ async function main() {
   // and this is a no-build-step app by design, so shrinking the module
   // graph via a bundler isn't the right fix for a test timeout).
   await page.waitForSelector('#welcome-overlay', { state: 'visible', timeout: 25000 });
-  await page.click('#enter-world-btn');
+  // Real, stale-selector CI break found and fixed 2026-08-29: '#enter-
+  // world-btn' hasn't existed since the 2026-08-26 welcome-screen
+  // redesign (rotating RD logo, two live ENTER faces) -- every CI run
+  // since has been failing on this exact line, unnoticed. welcome.js's
+  // own ENTER faces are only clickable while animated to face the
+  // viewer, so its own header comment already documents the reliable
+  // path: "a literal Enter keypress ... is the reliable path when it's
+  // mid-swing." Use that same real, intended fallback here instead of a
+  // fragile click on geometry that's only sometimes actionable.
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(500);
   const overlayDisplay = await page.$eval('#welcome-overlay', (el) => getComputedStyle(el).display);
   assert.equal(overlayDisplay, 'none', 'welcome overlay should hide after Enter');
