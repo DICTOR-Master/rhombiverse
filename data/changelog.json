@@ -1,6 +1,14 @@
 [
   {
     "date": "2026-08-28",
+    "title": "Dualize Works Both Ways Now",
+    "items": [
+      "Dualize Preview now reacts to whichever lattice you actually click -- click an FCC structure to preview it as BCC/TO, or click a real placed BCC/TO cell (from BCC Build) to preview it back as FCC.",
+      "Still view-only both ways -- nothing is written to your World either direction."
+    ]
+  },
+  {
+    "date": "2026-08-28",
     "title": "Small Fixes, Real Polish",
     "items": [
       "Fixed: switching the dual-lattice view mode quickly could leave a stale preview on screen even after choosing FCC only.",
