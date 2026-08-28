@@ -12,6 +12,7 @@ import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { generateBCCLatticePatch, bccDetailVertsFor, bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
 import { truncatedOctahedronVertices } from './geometry-extensions/dual-lattice.js';
 import { createBCCBuildController } from './core/bcc-build.js';
+import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -1205,7 +1206,7 @@ async function init() {
   }
 
   wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
-  wireFirstUseHint('bcc-toggle', 'BCC Lattice: a finer dual lattice nested inside your nearby cells -- a real second lattice, at a smaller scale.');
+  wireFirstUseHint('bcc-toggle', 'Lattice View: click to cycle five lenses on your World and its dual BCC/truncated-octahedron lattice -- FCC only, TO only, both differentiated, FCC ghosted, or TO ghosted.');
   wireFirstUseHint('clear-world-toggle', 'Clear World: erase everything and start fresh from a single seed cell.');
   wireFirstUseHint('reload-toggle', 'Reload: hard-refresh the app if anything looks stuck or stale.');
   wireFirstUseHint('sculpture-mode-toggle', 'Sculpture Mode: a separate, isolated scratch workspace -- nothing here touches your real World.');
@@ -2256,9 +2257,27 @@ async function init() {
     pieceTypeToOption.disabled = !FEATURES.bccLattice;
     pieceTypeToOption.hidden = !FEATURES.bccLattice;
   }
-  let bccLatticeActive = false;
+  // Lens Parity (reframe Stage 1): five view modes over the same two
+  // renderables the original boolean BCC-preview toggle already drove --
+  // the active FCC world mesh, and this dual BCC/TO lattice preview mesh.
+  // Deliberately NOT touching bcc-build.js's separate, always-on `bccMesh`
+  // (the player's own real, placed BCC/TO world) -- that's a structurally
+  // different feature (persistent world-state vs. this camera-following,
+  // non-persistent preview) that the reframe brief's five-mode matrix was
+  // never scoped against.
+  const LATTICE_VIEW_MODES = ['fcc-only', 'to-only', 'both-differentiated', 'fcc-ghost', 'to-ghost'];
+  const LATTICE_VIEW_MODE_INFO = {
+    'fcc-only': { fccOpacity: 1, label: 'FCC only -- the dual lattice preview is hidden.' },
+    'to-only': { fccOpacity: 0, label: 'TO only -- your World is hidden, showing only the dual BCC/truncated-octahedron lattice preview.' },
+    'both-differentiated': { fccOpacity: 1, label: 'Both, differentiated -- World and dual lattice shown together at full opacity, in distinct colors and fill styles.' },
+    'fcc-ghost': { fccOpacity: 0.3, label: 'FCC ghost -- your World faded so the dual lattice preview stands out.' },
+    'to-ghost': { fccOpacity: 0.35, label: 'TO ghost -- the dual lattice preview shown against your faded World.' },
+  };
+  let latticeViewMode = 'fcc-only';
   let bccLatticeMesh = null;
+  let bccLatticeEdges = null; // wireframe overlay, only used in both-differentiated
   let bccRefreshTimer = null;
+  let bccRefreshLoopActive = false;
   async function rebuildBCCLatticeDetail() {
     const { world: w, scene: s } = activeWorldTriple();
     if (bccLatticeMesh) {
@@ -2267,6 +2286,13 @@ async function init() {
       bccLatticeMesh.material.dispose();
       bccLatticeMesh = null;
     }
+    if (bccLatticeEdges) {
+      s.remove(bccLatticeEdges);
+      bccLatticeEdges.geometry.dispose();
+      bccLatticeEdges.material.dispose();
+      bccLatticeEdges = null;
+    }
+    if (latticeViewMode === 'fcc-only') return;
     const cells = w ? w.entries() : [];
     if (cells.length === 0) return;
     // controls.target (the real look-at point, same convention already
@@ -2290,10 +2316,23 @@ async function init() {
     }
     const merged = mergeGeometries(pieces, false);
     pieces.forEach((g) => g.dispose());
+    // 'both-differentiated' pairs a distinct color with a distinct fill
+    // style -- a real wireframe edge overlay -- rather than color alone,
+    // reusing SKELETON_COLOR, this project's own existing "translucent
+    // fill + line outline" convention (rhombic-wheel-3d-core.js's wheel
+    // faces / piece-cluster-3d.js), instead of inventing a new
+    // colorblind-safe pairing from scratch. Every other mode keeps the
+    // preview's original plain green, unchanged.
+    const differentiated = latticeViewMode === 'both-differentiated';
+    const toColor = differentiated ? SKELETON_COLOR : 0x39ff88;
     bccLatticeMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
-      color: 0x39ff88, emissive: 0x39ff88, emissiveIntensity: 0.7, flatShading: true, metalness: 0.1, roughness: 0.6,
+      color: toColor, emissive: toColor, emissiveIntensity: 0.7, flatShading: true, metalness: 0.1, roughness: 0.6,
     }));
     s.add(bccLatticeMesh);
+    if (differentiated) {
+      bccLatticeEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({ color: 0xffffff }));
+      s.add(bccLatticeEdges);
+    }
   }
   // Live re-triggering while active -- mirrors Lattice Zoom's own
   // scheduleSubLatticeRefresh throttled-loop pattern, reusing the same
@@ -2301,7 +2340,7 @@ async function init() {
   // camera instead of freezing at whatever position it was toggled on at.
   function scheduleBCCRefresh() {
     bccRefreshTimer = setTimeout(async () => {
-      if (!bccLatticeActive) return;
+      if (latticeViewMode === 'fcc-only') { bccRefreshLoopActive = false; return; }
       try {
         await rebuildBCCLatticeDetail();
       } catch (err) {
@@ -2316,42 +2355,47 @@ async function init() {
   // instrumentation) but never showed up on screen except once, by
   // accident, when the camera happened to be clipped inside a freshly
   // placed, still-open cell. Real fix: make the world semi-transparent
-  // while the toggle is active, the same "temporarily change how the main
-  // mesh renders" move Duality Mode already makes (there: fully hidden;
-  // here: see-through, since unlike Duality this detail is meant to be
-  // seen alongside the real world, not instead of it) -- restored exactly
-  // on toggle-off.
+  // whenever the FCC side of the current lens isn't at full opacity, the
+  // same "temporarily change how the main mesh renders" move Duality Mode
+  // already makes (there: fully hidden; here: see-through/hidden-via-
+  // opacity, since unlike Duality this preview is meant to be seen
+  // alongside -- or, in to-only, instead of -- the real world, using
+  // opacity rather than `.visible` so raycasting/build clicks are
+  // unaffected either way) -- restored exactly when the lens returns to
+  // fcc-only.
   bccToggleBtn?.addEventListener('click', async () => {
-    bccLatticeActive = !bccLatticeActive;
-    bccToggleBtn.classList.toggle('active', bccLatticeActive);
+    const currentIdx = LATTICE_VIEW_MODES.indexOf(latticeViewMode);
+    latticeViewMode = LATTICE_VIEW_MODES[(currentIdx + 1) % LATTICE_VIEW_MODES.length];
+    bccToggleBtn.classList.toggle('active', latticeViewMode !== 'fcc-only');
     const activeMesh = sculptureModeActive ? sculptureMesh : mesh;
-    if (bccLatticeActive) {
+    const { fccOpacity, label } = LATTICE_VIEW_MODE_INFO[latticeViewMode];
+    if (fccOpacity < 1) {
       activeMesh.material.transparent = true;
-      activeMesh.material.opacity = 0.35;
+      activeMesh.material.opacity = fccOpacity;
       // transparent alone still writes to the depth buffer -- real bug
-      // found via live testing (2026-08-25): the nested BCC mesh built
-      // correctly every time but was silently depth-culled by its own
-      // "see-through" parent, which still fully occluded anything behind
-      // it despite LOOKING translucent. depthWrite:false is the standard
-      // fix for a translucent object that must not block what's behind it.
+      // found via live testing (2026-08-25): a see-through (or fully
+      // invisible-but-still-opaque-to-depth) parent still fully occludes
+      // anything behind it despite LOOKING translucent. depthWrite:false
+      // is the standard fix for a translucent object that must not block
+      // what's behind it.
       activeMesh.material.depthWrite = false;
-      activeMesh.material.needsUpdate = true; // transparent's blend-state change needs a real program recompile, not just the opacity value
-      showHudPrompt('BCC Lattice: the finer dual lattice nested inside your nearby RD cells (a client-side detail render only -- your world is untouched). Your world is shown translucent so you can see it.', 6000);
-      await rebuildBCCLatticeDetail();
-      scheduleBCCRefresh();
     } else {
       activeMesh.material.transparent = false;
       activeMesh.material.opacity = 1;
       activeMesh.material.depthWrite = true;
-      activeMesh.material.needsUpdate = true;
+    }
+    activeMesh.material.needsUpdate = true; // transparent's blend-state change needs a real program recompile, not just the opacity value
+    showHudPrompt(`Lattice View: ${label}`, 4500);
+    if (latticeViewMode === 'fcc-only') {
       if (bccRefreshTimer) clearTimeout(bccRefreshTimer);
       bccRefreshTimer = null;
-      if (bccLatticeMesh) {
-        const { scene: s } = activeWorldTriple();
-        s.remove(bccLatticeMesh);
-        bccLatticeMesh.geometry.dispose();
-        bccLatticeMesh.material.dispose();
-        bccLatticeMesh = null;
+      bccRefreshLoopActive = false;
+      await rebuildBCCLatticeDetail(); // clears any existing preview mesh/edges
+    } else {
+      await rebuildBCCLatticeDetail();
+      if (!bccRefreshLoopActive) {
+        bccRefreshLoopActive = true;
+        scheduleBCCRefresh();
       }
     }
   });
