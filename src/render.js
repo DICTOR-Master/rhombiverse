@@ -2918,6 +2918,7 @@ async function init() {
   // equidistant FCC neighbors, not a single nearest one).
   async function rebuildDualizePreview(sourceLattice, cx, cy, cz, radius) {
     clearDualizePreview();
+    if (interpenetrateActive) deactivateInterpenetrate(); // mutual exclusion -- see its own comment
     const isFcc = sourceLattice === 'fcc';
     const sourceLabel = isFcc ? 'FCC' : 'BCC/TO';
     const targetLabel = isFcc ? 'BCC/TO' : 'FCC';
@@ -3040,6 +3041,21 @@ async function init() {
       interpenetrateEdges = null;
     }
   }
+  // Also resets the toggle's own 'active' state, unlike
+  // clearInterpenetratePreview() alone -- used wherever something ELSE
+  // (Dualize) is about to show its own overlapping translucent preview.
+  // Real bug found from a direct report 2026-08-29 ("in lab it seems to
+  // be possible to have [Interpenetrate] on at same time as Dualize" --
+  // both previews use the exact same SKELETON_COLOR translucent-fill +
+  // white-edge styling, unrelated and never mutually cleared, so having
+  // both up at once read as one preview showing "two different colors"
+  // from the overlapping transparency, not two actually-differently-
+  // colored materials).
+  function deactivateInterpenetrate() {
+    interpenetrateActive = false;
+    document.getElementById('interpenetrate-toggle')?.classList.remove('active');
+    clearInterpenetratePreview();
+  }
   // Returns whether it actually built a visible preview -- the click
   // handler below uses this to correct the toggle's own 'active' state
   // when it doesn't (a real bug found live 2026-08-29: a World with no
@@ -3049,6 +3065,7 @@ async function init() {
   // cells here yet").
   async function rebuildInterpenetratePreview() {
     clearInterpenetratePreview();
+    clearDualizePreview(); // mutual exclusion -- see deactivateInterpenetrate's own comment
     const coLocatable = world.entries().filter((c) => isBCC(c.x, c.y, c.z));
     if (coLocatable.length === 0) {
       showHudPrompt('Interpenetrating Lattice: no built cells at a coordinate that can host a co-located BCC/TO cell (needs all-even x,y,z) -- try a larger structure.', 5000);
