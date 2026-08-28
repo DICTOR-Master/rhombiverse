@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-08-28",
+    "title": "Every Piece, Visible",
+    "items": [
+      "Fixed: the Piece picker (Build -> Piece) was showing its wireframe diamond net with no icons at all -- RD, Cube, Pyramid, and Truncated Octahedron now all show their real shape icon in their own diamond, as intended."
+    ]
+  },
+  {
+    "date": "2026-08-28",
     "title": "Steady Under Load",
     "items": [
       "New optional FPS meter in the Lab panel (off by default) shows your real frame rate.",
