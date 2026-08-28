@@ -1,5 +1,30 @@
 [
   {
+    "date": "2026-08-29",
+    "title": "New Colors to Build With",
+    "items": [
+      "Two new buildable materials: Emerald and Gold, right alongside Base Rhomb and the rest in the Material picker."
+    ]
+  },
+  {
+    "date": "2026-08-29",
+    "title": "Know What You're Holding",
+    "items": [
+      "Fixed: Home and Piece > RD used the same plain hexagon icon on the wheel, easy to mix up at a glance. Home is now a clear \"H\" in its own hexagon.",
+      "Fixed: Material's own wheel icon (three same-color wedges) was hard to identify or remember. It's now three real material-colored swatches instead.",
+      "Material is now also a choice right on the Piece wheel, not just over on Build -- pick your shape and color in the same place.",
+      "Picking a shape no longer closes the wheel straight away, so you can pick a Material right after without reopening anything.",
+      "New: two small icons next to Menu always show your current Piece and Material. Tap either to jump straight back to that picker."
+    ]
+  },
+  {
+    "date": "2026-08-29",
+    "title": "Steady as You Rotate",
+    "items": [
+      "Fixed: on iPad/iPhone, dragging to rotate the corner HUD wheel could also spin your whole World's camera along with it. Rotating the HUD wheel now only moves the HUD wheel."
+    ]
+  },
+  {
     "date": "2026-08-28",
     "title": "Straight to the Point",
     "items": [
