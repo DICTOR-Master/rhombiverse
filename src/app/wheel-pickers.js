@@ -114,12 +114,15 @@ const CSS = `
   z-index: 3;
 }
 
-/* Piece picker: real WebGL mini-render now (app/piece-cluster-3d.js),
-   not CSS/SVG here -- a flat SVG version (first attempt, 2026-08-26)
-   read as "easily distinguishable from the real wheel" once actually
-   compared against a real wheel screenshot; no flat-CSS tuning can
-   produce genuine perspective/lighting. See that file's own header and
-   docs/code-notes/app/wheel-pickers.md for the geometry/history. */
+/* Piece picker: no CSS/overlay of its own here at all, as of 2026-08-28 --
+   Piece is a real WHEEL_PIECE layer on the main Rhombic Wheel itself
+   (rhombic-wheel-3d-core.js), navigated to and picked from the same way
+   as every other department. Went through two earlier standalone
+   attempts first (a flat SVG, then a real WebGL mini-render in the
+   now-deleted app/piece-cluster-3d.js) before landing here -- both read
+   as a second, lesser navigation surface once actually compared
+   against the real wheel. See docs/code-notes/app/wheel-pickers.md for
+   that history. */
 `;
 
 function injectCssOnce() {
@@ -135,7 +138,6 @@ export function createWheelPickers({
   materialSelectId = 'material-select',
   generatorSelectId = 'generator-type-select',
   speciesSelectId = 'species-select',
-  pieceTypeSelectId = 'piece-type-select',
   onModeChosen = () => {},
   onDragPlacementChange = () => {},
   onMenuSound = () => {},
@@ -143,10 +145,6 @@ export function createWheelPickers({
   getMaterialColor = () => '#8899aa',
   onMaterialHoverPreview = () => {},
   onMaterialHoverEnd = () => {},
-  // Real WebGL mini-render for the Piece picker (app/piece-cluster-3d.js)
-  // -- created in render.js since only it has the shared WebGLRenderer
-  // this needs; this file just wires onPick/open/close through to it.
-  pieceCluster3D = null,
 } = {}) {
   injectCssOnce();
 
@@ -206,16 +204,13 @@ export function createWheelPickers({
     if (e.target === materialWheelOverlay) closeMaterialWheel();
   });
 
-  // --- Piece picker: real mini 3D render (app/piece-cluster-3d.js) ---
-  // Direct live comparison against a real wheel screenshot found the
-  // first version here (a flat SVG, still described in docs/code-notes/
-  // app/wheel-pickers.md for the real vertex-sharing geometry it used)
-  // "easily distinguishable from the real wheel" -- no genuine
-  // perspective/lighting a flat SVG can produce. pieceCluster3D (passed
-  // in, since only render.js has the shared WebGLRenderer this needs)
-  // replaces it with a real WebGL render sharing that same computed
-  // geometry; openPieceTypePicker below wires its own onPick fresh on
-  // every open, same as this file's other pickers.
+  // Piece picker: was a real mini 3D render here (app/piece-cluster-3d.js,
+  // itself a replacement for an even earlier flat SVG version). Retired
+  // 2026-08-28 -- with 6 real piece tiers now, direct feedback was to
+  // use "the same main real wheel" instead of a bespoke second scene:
+  // Piece is a real WHEEL_PIECE layer on the actual Rhombic Wheel now
+  // (rhombic-wheel-3d-core.js), navigated to and picked from exactly
+  // like every other department, no picker function needed here at all.
 
   function closePicker() {
     pickerStrip.classList.remove('open');
@@ -265,7 +260,6 @@ export function createWheelPickers({
   window.addEventListener('keydown', (e) => {
     if (e.code !== 'Escape') return;
     if (materialWheelOverlay.classList.contains('open')) closeMaterialWheel();
-    else if (pieceCluster3D?.isOpen) pieceCluster3D.close();
     else if (pickerStrip.classList.contains('open')) closePicker();
   });
 
@@ -294,21 +288,6 @@ export function createWheelPickers({
     const options = readSelectOptions(select);
     openPickerStrip(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
   }
-  // Piece-tier picker (RD/Cube/Pyramid/TO): the real 3D cluster widget
-  // (app/piece-cluster-3d.js), not the generic strip -- see this file's
-  // own comment above pieceCluster3D's use for why.
-  function openPieceTypePicker(onPick) {
-    if (!pieceCluster3D) return; // defensive -- render.js always passes it, but never assume a caller-supplied dependency
-    const select = document.getElementById(pieceTypeSelectId);
-    pieceCluster3D.setOnPick((value, label) => {
-      onMenuSound();
-      select.value = value;
-      pieceCluster3D.close();
-      onPick?.(value, label);
-      onSelectionChange();
-    });
-    pieceCluster3D.open(select.value);
-  }
   function toggleDragPlacement() {
     dragPlacementEnabled = !dragPlacementEnabled;
     onDragPlacementChange(dragPlacementEnabled);
@@ -321,13 +300,12 @@ export function createWheelPickers({
     openMaterialPicker,
     openSpeciesPicker,
     openGeneratorPicker,
-    openPieceTypePicker,
     toggleDragPlacement,
     isDragPlacementEnabled: () => dragPlacementEnabled,
     // For a caller (the 3D wheel's Tab/Space/HUD-cue handling) that
     // wants to close whichever of these is open before doing anything
     // else, same UX the old 2D wheel had for its own Tab/Space handler.
-    isAnyPickerOpen: () => materialWheelOverlay.classList.contains('open') || !!pieceCluster3D?.isOpen || pickerStrip.classList.contains('open'),
-    closeAnyPicker: () => { closeMaterialWheel(); pieceCluster3D?.close(); closePicker(); },
+    isAnyPickerOpen: () => materialWheelOverlay.classList.contains('open') || pickerStrip.classList.contains('open'),
+    closeAnyPicker: () => { closeMaterialWheel(); closePicker(); },
   };
 }

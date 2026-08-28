@@ -37,6 +37,45 @@ function octPts(R, cx = 0, cy = 0, startDeg = -90) {
     .join(' ');
 }
 
+// Mini shape generators, each a small (radius R, centered at cx,cy)
+// version of a piece tier's own real full-size mark (pieceRD/pieceCube/
+// piecePyramid/pieceTO/pieceOctaSite/pieceDisphenoid below) -- used by
+// clusterIcon() to build a "N small real shapes around a shared center"
+// glyph. Kept separate from the full-size marks (not literally the same
+// function called at 2 radii) since a couple of the full-size marks
+// have their own bespoke proportions (e.g. pieceRD is filled, not
+// outlined) that don't miniaturize cleanly as a pure scale-down.
+const THIN_1 = 'stroke="currentColor" stroke-width="1.4" fill="none"';
+function miniHex(R, cx, cy) { return `<polygon points="${hexPts(R, cx, cy)}" fill="currentColor"/>`; }
+function miniSquare(R, cx, cy) {
+  return `<polygon points="${cx - R},${cy - R} ${cx + R},${cy - R} ${cx + R},${cy + R} ${cx - R},${cy + R}" ${THIN_1}/>`;
+}
+function miniTriangle(R, cx, cy) {
+  return `<polygon points="${cx},${cy - R} ${cx + R},${cy + R * 0.55} ${cx - R},${cy + R * 0.55}" ${THIN_1}/>`;
+}
+function miniOct(R, cx, cy) { return `<polygon points="${octPts(R, cx, cy)}" ${THIN_1}/>`; }
+function miniKite(R, cx, cy) {
+  return `<polygon points="${cx},${cy - R} ${cx + R * 0.6},${cy} ${cx},${cy + R} ${cx - R * 0.6},${cy}" ${THIN_1}/>`;
+}
+function miniTet(R, cx, cy) {
+  const top = `${cx},${cy - R}`, bl = `${cx - R * 0.87},${cy + R * 0.6}`, br = `${cx + R * 0.87},${cy + R * 0.6}`;
+  const inner = `${cx},${cy + R * 0.15}`;
+  return `<polygon points="${top} ${br} ${bl}" ${THIN_1}/><path d="M${top} L${inner} M${bl} L${inner} M${br} L${inner}" stroke="currentColor" stroke-width="1" opacity="0.7"/>`;
+}
+
+// Arranges any number of mini shapes evenly around a shared center --
+// the "hexagons (well, clusters) can grow" helper: adding a 7th piece
+// tier later means adding one more shapeFn to the array passed in, not
+// hand-picking new coordinates. Used for pieceType below; general
+// enough to reuse for any future N-item cluster glyph.
+function clusterIcon(shapeFns, { R = 24, shapeR = 9, startDeg = -90 } = {}) {
+  const n = shapeFns.length;
+  return shapeFns.map((fn, i) => {
+    const a = (startDeg + (360 / n) * i) * D2R;
+    return fn(shapeR, R * Math.cos(a), R * Math.sin(a));
+  }).join('\n    ');
+}
+
 const FRAME_R = 46; // frame circle/hexagon radius; viewBox is -50..50
 
 // The frame itself: circle + the universal hexagon outline. `inner` is
@@ -62,19 +101,18 @@ export const MARKS = {
   // no new icon was needed, just a new meaning attached to the same mark.
   add: `<path d="M0,-18 V18 M-18,0 H18" ${STROKE}/>`,
   remove: `<path d="M-18,0 H18" ${STROKE}/>`,
-  // Piece picker (RD / Cube / Pyramid / TO): a small version of each
-  // tier's own real shape -- a hexagon (RD), a square (Cube), a triangle
-  // (Pyramid), an octagon (TO) -- literal, matching this file's own
-  // vocabulary, not a new abstract symbol for "pick a tier." Direct
-  // instruction 2026-08-26: clustered in four around a shared center
-  // (same layout `almanac` below already uses for its own four diamonds)
-  // rather than spread out, so switching between tiers reads as moving
-  // between neighbors, not hopping across the icon.
-  pieceType: `
-    <polygon points="${hexPts(9, 0, -24)}" ${THIN}/>
-    <polygon points="16,-8 32,-8 32,8 16,8" ${THIN}/>
-    <polygon points="0,15 8,31 -8,31" ${THIN}/>
-    <polygon points="${octPts(9, -24, 0)}" ${THIN}/>`,
+  // Piece picker (RD / Cube / Pyramid / TO / Octahedron Site /
+  // Disphenoid): a small version of each tier's own real shape --
+  // literal, matching this file's own vocabulary, not a new abstract
+  // symbol for "pick a tier." Direct instruction 2026-08-26: clustered
+  // around a shared center (same layout `almanac` below already uses
+  // for its own four diamonds) rather than spread out, so switching
+  // between tiers reads as moving between neighbors, not hopping across
+  // the icon. Grew from 4 to 6 shapes 2026-08-28 when the BCC
+  // interstitial-lattice tiers were added -- via clusterIcon() (see its
+  // own comment above), not by hand-placing 2 more coordinates, so the
+  // NEXT tier this grows to won't need hand-placing either.
+  pieceType: clusterIcon([miniHex, miniSquare, miniTriangle, miniOct, miniKite, miniTet]),
   // Same 4 shapes as pieceType above, each on its own -- for the Piece
   // picker's own strip items (direct instruction 2026-08-26: reskin the
   // picker to read as part of the wheel's own visual language, not a

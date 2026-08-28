@@ -212,6 +212,32 @@ export function applyWorkspaceModeGate(resolvedFaces, workspaceMode) {
   return gated;
 }
 
+// BCC Lattice feature gate (added 2026-08-28, WHEEL_PIECE): the 3 BCC/
+// interstitial piece tiers only mean anything when FEATURES.bccLattice
+// is on (Rhombeometry mode) -- Full Game World has no BCC/interstitial
+// worlds to place them into at all. Deliberately a SEPARATE gate from
+// applyWorkspaceModeGate above -- that one is model-vs-world workspace
+// (an orthogonal axis, gates tool:bccBuild for a different reason), not
+// Rhombeometry-vs-Full-Game-World. Takes a plain boolean, not FEATURES
+// itself, so this module stays free of any global-state import (same
+// reasoning applyWorkspaceModeGate already follows for workspaceMode).
+const BCC_LATTICE_ONLY_FACE_ACTIONS = new Set([
+  "tool:pieceType:to",
+  "tool:pieceType:ioct",
+  "tool:pieceType:idis",
+]);
+export function applyBCCLatticeGate(resolvedFaces, bccLatticeEnabled) {
+  if (bccLatticeEnabled) return resolvedFaces;
+  const gated = { ...resolvedFaces };
+  for (const [key, data] of Object.entries(resolvedFaces)) {
+    if (data.action && BCC_LATTICE_ONLY_FACE_ACTIONS.has(data.action)) {
+      gated[key] = { kind: "spare", label: data.label, action: null,
+        desc: `${data.label} needs the BCC Lattice feature (Rhombeometry mode) — switch there to use it.` };
+    }
+  }
+  return gated;
+}
+
 const SPARE = { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." };
 
 // Blank/unassigned slots don't have to be dead ends -- duplicating a
@@ -352,15 +378,24 @@ export const WHEEL_BUILD = {
     // Piece picker (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md follow-up,
     // 2026-08-26): what Add/Remove operate on -- RD (a full block),
     // Cube (bare, no pyramids), or Pyramid (edit one pyramid on an
-    // already-placed cell). Same openPickerStrip mechanism as Species/
-    // Generator (wheel-pickers.js). Replaces the DUPLICATE_HOME_FACE that
-    // used to live here, per this file's own stated policy on that face
-    // type ("as real tools get built out... replace the relevant
+    // already-placed cell). Replaces the DUPLICATE_HOME_FACE that used
+    // to live here, per this file's own stated policy on that face type
+    // ("as real tools get built out... replace the relevant
     // DUPLICATE_HOME_FACE with the actual feature"). Home is still always
     // reachable via the 5th slot (bottom|sy-1sz-1, injected on every
     // non-Home wheel), so nothing is stranded.
-    "bottom|sy1sz-1":  { kind: "dept", label: "Piece", action: "tool:pieceType",
-      desc: "Choose what Add/Remove operate on: RD (full block), Cube (bare), or Pyramid (one piece of an existing cell)." },
+    //
+    // Was a separate mini 3D widget (piece-cluster-3d.js), retired
+    // 2026-08-28: with 6 real piece tiers now (RD/Cube/Pyramid/TO/
+    // Octahedron Site/Disphenoid) that widget needed either a second
+    // fixed camera angle or an artificial flip animation to show them
+    // all -- direct feedback: use "the same main real wheel" instead,
+    // the same way every other multi-option department already works
+    // (navigateTo: a real WHEEL_PIECE layer, discovered by the wheel's
+    // own genuine drag-rotation, not a bespoke second scene). See
+    // WHEEL_PIECE below.
+    "bottom|sy1sz-1":  { kind: "dept", label: "Piece", action: "navigateTo:piece",
+      desc: "Choose what Add/Remove operate on: RD, Cube, Pyramid, Truncated Octahedron, Octahedron Site, or Disphenoid." },
     // Repeat is the 2D wheel's own real "tool-drag" leaf (drag across
     // faces to place a run of cells) -- reused via the new
     // toggleDragPlacement() export, same pattern as Material/Generate
@@ -370,6 +405,29 @@ export const WHEEL_BUILD = {
     // here for full flow-parity, not invented beyond what exists.
     "bottom|sx1sz-1":  { kind: "dept", label: "Repeat", action: "tool:repeat", desc: "Drag across faces to place a run of cells." },
     "bottom|sx-1sz-1": { kind: "dept", label: "Pattern", action: "tool:pattern", desc: "Pattern stamping is coming soon." }
+  }
+};
+
+// Piece (added 2026-08-28, replacing the separate piece-cluster-3d.js
+// widget -- see WHEEL_BUILD's own comment above for the full reasoning).
+// Exactly 6 real piece tiers exist and exactly 6 non-reserved,
+// non-universal face slots are available on any wheel (4 equator + 3
+// bottom, since bottom|sy-1sz-1 is always the injected 5th/Home slot) --
+// so, unusually for this file, every real slot here is genuine content,
+// no SPARE and no temporary duplicate needed. Terminal actions
+// ("tool:pieceType:<value>"), not further navigateTo: hops -- picking a
+// piece sets core/build.js's own getPieceType() value and returns, the
+// same as every other terminal tool: action in this file.
+export const WHEEL_PIECE = {
+  id: "piece",
+  faces: {
+    "equator|sx1sy1":   { kind: "dept", label: "RD", action: "tool:pieceType:rd", desc: "A full block -- cube plus all 6 pyramids." },
+    "equator|sx1sy-1":  { kind: "dept", label: "Cube", action: "tool:pieceType:cube", desc: "A bare block, no pyramids -- build up from here with the Pyramid tier." },
+    "equator|sx-1sy1":  { kind: "dept", label: "Pyramid", action: "tool:pieceType:pyramid", desc: "Add or remove one pyramid on an already-placed cell." },
+    "equator|sx-1sy-1": { kind: "dept", label: "TO", action: "tool:pieceType:to", desc: "Truncated Octahedron -- the BCC lattice's own real space-filling cell." },
+    "bottom|sy1sz-1":   { kind: "dept", label: "Octahedron Site", action: "tool:pieceType:ioct", desc: "BCC interstitial lattice: places the 4-disphenoid bundle a flattened octahedron site combines into." },
+    "bottom|sx1sz-1":   { kind: "dept", label: "Disphenoid", action: "tool:pieceType:idis", desc: "BCC interstitial lattice: one tetragonal disphenoid at a time." },
+    "bottom|sx-1sz-1":  SPARE
   }
 };
 
@@ -567,5 +625,5 @@ export const WHEEL_RHOMBISIS = {
 export const ALL_WHEELS = {
   home: WHEEL_HOME, construct: WHEEL_CONSTRUCT, build: WHEEL_BUILD, alter: WHEEL_ALTER,
   rhombitect: WHEEL_RHOMBITECT, cultivate: WHEEL_CULTIVATE, trade: WHEEL_TRADE,
-  rhombisis: WHEEL_RHOMBISIS
+  rhombisis: WHEEL_RHOMBISIS, piece: WHEEL_PIECE
 };

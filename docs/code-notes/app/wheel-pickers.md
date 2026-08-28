@@ -6,7 +6,26 @@ source so the code itself stays lite and readable. See `CONTRIBUTING.md`'s
 
 ## Piece picker: real RD geometry, not an approximation
 
-**Superseded same day**: the flat-SVG widget this section originally
+**Superseded again, 2026-08-28**: `app/piece-cluster-3d.js` (the real
+WebGL mini-render this section describes below) is also gone now. With
+6 real piece tiers instead of 4 (the BCC interstitial-lattice tiers,
+Disphenoid/Octahedron Site), that widget needed either a second fixed
+camera angle or an artificial flip animation to show them all -- direct
+feedback was to use "the same main real wheel" instead of a bespoke
+second scene. Piece is a real `WHEEL_PIECE` layer on the actual Rhombic
+Wheel now (`rhombic-wheel-3d-core.js`), navigated to and picked from
+exactly like every other department (Trade, Cultivate, ...) -- no
+picker function in this file at all anymore. See `docs/code-notes/app/
+rhombic-wheel-3d-core.md` and `docs/code-notes/app/piece-cluster-3d.md`
+(that file's own now-historical rationale) for the fuller story. The
+face/vertex geometry insight below (which 4 of the 12 `buildRDFaces()`
+faces share a 4-valent vertex) is unrelated to WHEEL_PIECE, which uses
+the wheel's own regular department-navigation faces, not a bespoke
+vertex-cluster view -- kept here purely as historical record now, not
+load-bearing for anything current.
+
+**Superseded same day** (original note, now itself superseded above):
+the flat-SVG widget this section originally
 described (built in `wheel-pickers.js` itself) is gone -- direct live
 comparison against a real wheel screenshot found it "easily
 distinguishable from the real wheel" (no genuine perspective/lighting a

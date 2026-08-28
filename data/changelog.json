@@ -6,7 +6,7 @@
       "Two new real, placeable pieces (Piece picker, Rhombeometry): Disphenoid and Octahedron Site -- the genuine BCC interstitial-site tessellation (the same octahedral/tetrahedral geometry carbon actually sits in inside iron), not a view-only overlay.",
       "Disphenoid places one at a time; Octahedron Site places the 4-disphenoid bundle they combine into in one click. Both grow by clicking an existing one's own face, same as every other piece type.",
       "Builds freely on top of your FCC and BCC worlds -- overlap between all three lattices is expected, not prevented.",
-      "The 3D Piece picker now reaches all 6 pieces, not just the original 4 -- a small rotate control turns it to a second real set of RD faces for Disphenoid and Octahedron Site, the same translucent 3D style as every other piece."
+      "Piece is a real destination on the main Rhombic Wheel now, not a separate popup -- open it the same way as any other department (Build > Piece) to reach all 6 pieces (RD, Cube, Pyramid, Truncated Octahedron, Octahedron Site, Disphenoid) by rotating the one real wheel, same as everywhere else in the game."
     ]
   },
   {

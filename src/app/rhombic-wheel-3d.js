@@ -13,9 +13,10 @@ import * as THREE from 'three';
 import {
   buildRDFaces, faceKey, ensureOutwardWinding,
   SKELETON_COLOR, FACE_STYLE, computeLabelVisibility, LABEL_STYLE,
-  resolveWheelFaces, ALL_WHEELS, applyWorkspaceModeGate,
+  resolveWheelFaces, ALL_WHEELS, applyWorkspaceModeGate, applyBCCLatticeGate,
 } from './rhombic-wheel-3d-core.js';
 import { iconFrame, MARKS } from './wheel-icons.js';
+import { FEATURES } from './features.js';
 
 // Icon System (RHOMBIVERSE_SPEC_ICON_SYSTEM.md): only actions the spec's
 // section 4 table (or the live cross-walk's Cyborg resolution) actually
@@ -35,7 +36,20 @@ const ACTION_TO_MARK = {
   'tool:add': 'add',
   'tool:remove': 'remove',
   'tool:symmetry': 'symmetryMirror',
-  'tool:pieceType': 'pieceType',
+  // Piece: the doorway face (WHEEL_BUILD's own "Piece") shows the
+  // clustered-shapes mark as a preview of what's inside, same pattern
+  // as navigateTo:build/alter below; each of the 6 real tiers inside
+  // WHEEL_PIECE gets its own real shape mark instead (added 2026-08-28,
+  // replacing the old bare 'tool:pieceType' -- that action string no
+  // longer exists on its own now that Piece is a real wheel, not a
+  // picker overlay).
+  'navigateTo:piece': 'pieceType',
+  'tool:pieceType:rd': 'pieceRD',
+  'tool:pieceType:cube': 'pieceCube',
+  'tool:pieceType:pyramid': 'piecePyramid',
+  'tool:pieceType:to': 'pieceTO',
+  'tool:pieceType:ioct': 'pieceOctaSite',
+  'tool:pieceType:idis': 'pieceDisphenoid',
   'tool:fill': 'fill',
   'tool:dig': 'dig',
   'tool:smooth': 'smooth',
@@ -233,7 +247,10 @@ export function createRhombicWheel3D({
     if (!wheelConfig) throw new Error(`Unknown Rhombic Wheel 3D id "${wheelId}"`);
     clearFaces();
     currentWheelId = wheelId;
-    const resolved = applyWorkspaceModeGate(resolveWheelFaces(wheelConfig), getWorkspaceMode?.() ?? 'world');
+    const resolved = applyBCCLatticeGate(
+      applyWorkspaceModeGate(resolveWheelFaces(wheelConfig), getWorkspaceMode?.() ?? 'world'),
+      FEATURES.bccLattice
+    );
     for (const face of buildRDFaces()) {
       const key = faceKey(face);
       const data = resolved[key];
