@@ -37,6 +37,16 @@
       text-align: right; user-select: none; pointer-events: none;
       max-width: 45vw;
     }
+    /* Performance guardrail (reframe Stage 6): optional, off by default
+       (setting-fps-meter) -- the auto-degrade safety net it's attached to
+       runs regardless of whether this is shown. */
+    #fps-meter {
+      display: none;
+      position: fixed; top: 34px; right: 206px; z-index: 900;
+      color: #9de0ff; font: 11px/1.4 ui-monospace, monospace;
+      text-align: right; user-select: none; pointer-events: none;
+    }
+    #fps-meter.visible { display: block; }
     #hud-prompt {
       position: fixed; left: 50%; bottom: 54px; transform: translateX(-50%);
       z-index: 900;
@@ -1041,6 +1051,7 @@
   <!-- B1 minimal HUD -->
   <div id="hud-wordmark">RHOMBIVERSE</div>
   <div id="hud-indicator"></div>
+  <div id="fps-meter"></div>
   <div id="hud-prompt"></div>
   <div id="hud-crosshair"></div>
   <div id="walk-look-zone"></div>
@@ -1073,6 +1084,7 @@
           <option value="high" selected>High</option>
         </select>
       </div>
+      <div class="row"><label for="setting-fps-meter">Show FPS meter</label><input id="setting-fps-meter" type="checkbox" /></div>
       <div class="row"><label for="setting-volume">Volume</label><input id="setting-volume" type="range" min="0" max="1" step="0.05" value="0.5" /></div>
       <div class="row"><label for="setting-pure-geometry">Rhombeometry (geometry only, no mining/trade/hazards)</label><input id="setting-pure-geometry" type="checkbox" /></div>
       <div id="pure-geometry-hint" class="sculpt-hint" style="display:none;">Reloading now to apply -- your World is saved automatically, nothing is lost.</div>

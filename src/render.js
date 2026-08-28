@@ -36,7 +36,7 @@ import {
 import { loadWorld, createWorldStore, setRegionsIntegration as setWorldstateRegionsIntegration } from './core/worldstate-core.js';
 import { createBuildController, removeShell, recolorShell } from './core/build.js';
 import { generatePlanetoid } from './geometry-extensions/planetoidgen.js';
-import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR } from './app/settings.js';
+import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR, QUALITY_LEVELS_ASCENDING } from './app/settings.js';
 import { playPlaceSound, playRemoveSound, playMenuSound } from './app/sfx.js';
 import { createWheelPickers } from './app/wheel-pickers.js';
 import { createHudWheel3D } from './app/hud-wheel-3d.js';
@@ -153,6 +153,23 @@ let annotateSupernovae = (planetoids) => planetoids;
 
 const SCALE = 1;
 const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
+
+// Performance guardrail (reframe Stage 6): warn before loading a World
+// large enough to risk a real slowdown on lower-power hardware (this
+// app is played on a Raspberry Pi) -- not a hard block, just a heads-up
+// with a chance to back out, matching the confirm()-gated pattern
+// already used for every other destructive world-replace action here.
+// Well above realistic normal use (the built-in Showcase World is 459
+// cells) but with real headroom below MAX_CELLS, so it only fires for
+// genuinely oversized imports/presets, not everyday structures.
+const LARGE_WORLD_CELL_WARNING_THRESHOLD = 5000;
+function confirmLargeWorldLoad(worldJSON) {
+  const cellCount = Object.keys(worldJSON.cells ?? {}).length;
+  if (cellCount <= LARGE_WORLD_CELL_WARNING_THRESHOLD) return true;
+  return confirm(
+    `This World has ${cellCount.toLocaleString()} cells, which may run slowly on lower-power devices. Load it anyway?`
+  );
+}
 const MAX_SHELL = 15; // enforced cap on shell-count UI inputs, see docs/code-notes/render.md
 
 let syncWarningTimer = null;
@@ -221,6 +238,7 @@ camera.position.set(6, 5, 8);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio * QUALITY_PIXEL_RATIO_FACTOR[getSettings().quality]);
+document.getElementById('fps-meter')?.classList.toggle('visible', getSettings().showFPSMeter);
 renderer.localClippingEnabled = true; // required once, globally, for any clippingPlanes to take effect
 document.getElementById('app').appendChild(renderer.domElement);
 
@@ -378,6 +396,7 @@ onSettingsChange((s) => {
   camera.updateProjectionMatrix();
   controls.rotateSpeed = s.sensitivity;
   renderer.setPixelRatio(window.devicePixelRatio * QUALITY_PIXEL_RATIO_FACTOR[s.quality]);
+  document.getElementById('fps-meter')?.classList.toggle('visible', s.showFPSMeter);
 });
 
 // Walk mode (RHOMBIVERSE_PLAN.md Phase 5.5) state, module-level since
@@ -937,6 +956,14 @@ window.addEventListener('rhombiverse:personaChosen', (e) => {
   fovInput.addEventListener('input', () => updateSettings({ fov: Number(fovInput.value) }));
   qualitySelect.addEventListener('change', () => updateSettings({ quality: qualitySelect.value }));
   volumeInput.addEventListener('input', () => updateSettings({ volume: Number(volumeInput.value) }));
+
+  // Performance guardrail (reframe Stage 6): the meter's own visibility
+  // is opt-in; applied live via the onSettingsChange subscriber below
+  // (same pattern as pixel ratio), not just here, so it also reflects a
+  // setting change from any other future entry point.
+  const fpsMeterInput = document.getElementById('setting-fps-meter');
+  fpsMeterInput.checked = s.showFPSMeter;
+  fpsMeterInput.addEventListener('change', () => updateSettings({ showFPSMeter: fpsMeterInput.checked }));
 
   // Migration Path Phase C (RHOMBIVERSE_PLAN.md): Rhombeometry mode.
   // features.js reads this flag once, at module-eval time, ahead of
@@ -4435,6 +4462,7 @@ async function init() {
     if (!file) return;
     try {
       const parsed = await importWorldFile(file);
+      if (!confirmLargeWorldLoad(parsed)) return;
       world.replaceAll(parsed);
       seedAsteroidBelts(world); // see load-preset's own comment
       onChange();
@@ -4467,6 +4495,7 @@ async function init() {
       ? `./data/growth-presets/${key.slice('growth:'.length)}.json`
       : `./data/presets/${key}.json`;
     const preset = await loadWorld(path);
+    if (!confirmLargeWorldLoad(preset)) return;
     world.replaceAll(preset);
     seedAsteroidBelts(world); // re-seed after the full replace -- see docs/code-notes/render.md
     onChange();
@@ -4526,11 +4555,54 @@ window.addEventListener('resize', onResize);
 let tickPresenceFn = () => {};
 
 let lastFrameTime = performance.now();
+
+// Performance guardrail (reframe Stage 6): FPS meter + auto-degrade.
+// Sampled once per second, not every frame -- a per-frame instant
+// reading is too noisy to display or act on. Auto-degrade runs
+// regardless of whether the meter itself is visible -- it's a safety
+// net, not something you have to opt into to benefit from (matches the
+// original B7 ask: "automatic quality/pixel-ratio reduction before
+// content is dropped under load"). Real absolute FPS numbers depend
+// entirely on the device this runs on -- this is self-calibrating
+// (reacts to whatever the real hardware reports), unlike trying to
+// guess a "safe" world size in advance.
+const FPS_SAMPLE_MS = 1000;
+const FPS_DEGRADE_THRESHOLD = 24;
+const FPS_SUSTAINED_LOW_SAMPLES = 5; // ~5 consecutive low samples before acting -- avoids reacting to one bad second
+const FPS_DEGRADE_COOLDOWN_MS = 15000; // lets a new quality level actually take effect before checking again
+let fpsFrameCount = 0;
+let fpsSampleWindowStart = performance.now();
+let lowFPSSampleStreak = 0;
+let lastDegradeAt = 0;
+
 function animate() {
   requestAnimationFrame(animate);
   const now = performance.now();
   const dt = Math.min(0.1, (now - lastFrameTime) / 1000); // clamp avoids a huge step after a backgrounded tab regains focus
   lastFrameTime = now;
+
+  fpsFrameCount++;
+  if (now - fpsSampleWindowStart >= FPS_SAMPLE_MS) {
+    const fps = (fpsFrameCount / (now - fpsSampleWindowStart)) * 1000;
+    fpsFrameCount = 0;
+    fpsSampleWindowStart = now;
+    const meterEl = document.getElementById('fps-meter');
+    if (meterEl) meterEl.textContent = `${fps.toFixed(0)} FPS`;
+
+    lowFPSSampleStreak = fps < FPS_DEGRADE_THRESHOLD ? lowFPSSampleStreak + 1 : 0;
+    const currentLevelIdx = QUALITY_LEVELS_ASCENDING.indexOf(getSettings().quality);
+    if (
+      lowFPSSampleStreak >= FPS_SUSTAINED_LOW_SAMPLES &&
+      currentLevelIdx > 0 &&
+      now - lastDegradeAt > FPS_DEGRADE_COOLDOWN_MS
+    ) {
+      const nextLevel = QUALITY_LEVELS_ASCENDING[currentLevelIdx - 1];
+      updateSettings({ quality: nextLevel });
+      lastDegradeAt = now;
+      lowFPSSampleStreak = 0;
+      showHudPrompt(`Performance: frame rate has been low, so graphics quality was automatically reduced to ${nextLevel}. Change it back anytime in Settings.`, 6000);
+    }
+  }
 
   if (walking && player) {
     player.update(dt);

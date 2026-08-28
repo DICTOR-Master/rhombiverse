@@ -8,12 +8,22 @@ export const QUALITY_PIXEL_RATIO_FACTOR = {
   high: 1,
 };
 
+// Ordered lowest -> highest, for the auto-degrade guardrail (reframe
+// Stage 6) to step down one level at a time -- see render.js's own
+// sustained-low-FPS check.
+export const QUALITY_LEVELS_ASCENDING = ['low', 'medium', 'high'];
+
 const DEFAULTS = {
   sensitivity: 1,
   invertY: false,
   fov: 50,
   quality: 'high',
   volume: 0.5,
+  // Performance guardrail (reframe Stage 6): the meter itself is opt-in
+  // ("optional FPS meter"), but the auto-degrade safety net it's
+  // attached to runs regardless of whether the meter is shown -- see
+  // render.js's animate().
+  showFPSMeter: false,
   // Bring-Your-Own-AI-Key: key/model live ONLY here (this visitor's own
   // localStorage), never sent to this site's server -- see byok.js and
   // the companion doc.
