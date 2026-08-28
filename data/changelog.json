@@ -3,7 +3,9 @@
     "date": "2026-08-28",
     "title": "Every Piece, Visible",
     "items": [
-      "Fixed: the Piece picker (Build -> Piece) was showing its wireframe diamond net with no icons at all -- RD, Cube, Pyramid, and Truncated Octahedron now all show their real shape icon in their own diamond, as intended."
+      "Fixed: the Piece picker (Build -> Piece) was showing its wireframe diamond net with no icons at all -- RD, Cube, Pyramid, and Truncated Octahedron now all show their real shape icon in their own diamond, as intended.",
+      "Fixed: RD's own icon blended into its frame and read as blank -- it's a clear solid shape now.",
+      "Fixed: all 4 icons sat slightly above center in their diamond -- they're precisely centered now."
     ]
   },
   {
