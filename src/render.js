@@ -10,7 +10,7 @@ import { FULL_PYRAMIDS, presentAxisKeys } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { generateBCCLatticePatch, bccDetailVertsFor, bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
-import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS } from './geometry-extensions/dual-lattice.js';
+import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS, isBCC } from './geometry-extensions/dual-lattice.js';
 import { createBCCBuildController } from './core/bcc-build.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { FEATURES } from './app/features.js';
@@ -2335,6 +2335,10 @@ async function init() {
   // more central tool, per that same precedent's own trajectory.
   const dualizeRow = document.getElementById('dualize-row');
   if (dualizeRow) dualizeRow.style.display = FEATURES.bccLattice ? '' : 'none';
+  // Interpenetrating Lattice preview: same Rhombeometry-only gating and
+  // Lab-panel placement precedent as the rest of the BCC/TO family.
+  const interpenetrateRow = document.getElementById('interpenetrate-row');
+  if (interpenetrateRow) interpenetrateRow.style.display = FEATURES.bccLattice ? '' : 'none';
   // Piece picker's TO option (core/build.js's handleToClick) -- same
   // Rhombeometry-only gating as the rest of BCC's own UI. A disabled
   // option can't be selected via the <select> itself; getPieceType()
@@ -2849,6 +2853,86 @@ async function init() {
     const cell = hitBcc ? bccCellOrder[hits[0].instanceId] : cellOrder[hits[0].instanceId];
     if (!cell) return;
     await rebuildDualizePreview(hitBcc ? 'bcc' : 'fcc', cell.x, cell.y, cell.z, getShellCount());
+  });
+
+  // --- Interpenetrating Lattice preview (direct user request 2026-08-28,
+  // after a feasibility check against this exact codebase) --------------
+  // Real, verified geometric fact this feature is built on, not an
+  // approximation: a BCC/TO cell placed at the SAME coordinate as an FCC
+  // cell has its 6 square-face centers land EXACTLY on that FCC cell's
+  // RD's own 6 sharp (4-valent) vertices, using the SAME
+  // bccShapeScaleFor(SCALE) self-tiling scale this project already
+  // established for a different reason (tangent contact between
+  // neighboring BCC cells) -- confirmed by direct numeric computation
+  // against rdRawVerts/truncatedOctahedronVertices before any of this
+  // was written, not assumed. Real constraint that comes with it: only
+  // FCC cells whose coordinates are ALSO valid BCC points (all-same-
+  // parity) can host a co-located BCC cell -- which, for any FCC-valid
+  // (x+y+z even) coordinate, means exactly the all-even sub-family (the
+  // all-odd BCC family always sums to odd, so it's never FCC-valid to
+  // begin with). isBCC() alone is a sufficient filter over real FCC
+  // cells for exactly this reason -- no separate "all-even" check
+  // needed. View-only, like every other lens/preview in this app:
+  // scans the real World's own cells once per toggle, never writes to
+  // bccWorld.
+  let interpenetrateActive = false;
+  let interpenetrateMesh = null;
+  let interpenetrateEdges = null;
+  function clearInterpenetratePreview() {
+    if (interpenetrateMesh) {
+      scene.remove(interpenetrateMesh);
+      interpenetrateMesh.geometry.dispose();
+      interpenetrateMesh.material.dispose();
+      interpenetrateMesh = null;
+    }
+    if (interpenetrateEdges) {
+      scene.remove(interpenetrateEdges);
+      interpenetrateEdges.geometry.dispose();
+      interpenetrateEdges.material.dispose();
+      interpenetrateEdges = null;
+    }
+  }
+  async function rebuildInterpenetratePreview() {
+    clearInterpenetratePreview();
+    const coLocatable = world.entries().filter((c) => isBCC(c.x, c.y, c.z));
+    if (coLocatable.length === 0) {
+      showHudPrompt('Interpenetrating Lattice: no built cells at a coordinate that can host a co-located BCC/TO cell (needs all-even x,y,z) -- try a larger structure.', 5000);
+      return;
+    }
+    const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
+    const shapeScale = bccShapeScaleFor(SCALE);
+    const pieces = [];
+    for (const c of coLocatable) {
+      const [wx, wy, wz] = cellToWorld(c.x, c.y, c.z, SCALE);
+      const verts = truncatedOctahedronVertices(shapeScale).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
+      pieces.push(new ConvexGeometry(verts));
+    }
+    const merged = mergeGeometries(pieces, false);
+    pieces.forEach((g) => g.dispose());
+    // Same color + wireframe pairing convention as every other dual-
+    // lattice preview in this app (Lens Parity's both-differentiated,
+    // Dualize) -- not a new visual language for "this is a preview."
+    interpenetrateMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
+      color: SKELETON_COLOR, emissive: SKELETON_COLOR, emissiveIntensity: 0.6, flatShading: true,
+      transparent: true, opacity: 0.55, metalness: 0.1, roughness: 0.6,
+    }));
+    scene.add(interpenetrateMesh);
+    interpenetrateEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({ color: 0xffffff }));
+    scene.add(interpenetrateEdges);
+    showHudPrompt(
+      `Interpenetrating Lattice: ${coLocatable.length} of your World's cells sit at a co-locatable coordinate -- each RD's 6 sharp vertices exactly meet a TO's 6 square-face centers (view-only -- nothing written to your World).`,
+      6500,
+    );
+  }
+  document.getElementById('interpenetrate-toggle')?.addEventListener('click', async () => {
+    interpenetrateActive = !interpenetrateActive;
+    document.getElementById('interpenetrate-toggle').classList.toggle('active', interpenetrateActive);
+    if (interpenetrateActive) {
+      await rebuildInterpenetratePreview();
+    } else {
+      clearInterpenetratePreview();
+      showHudPrompt('Interpenetrating Lattice preview hidden.', 3000);
+    }
   });
 
   // --- B5: Cultivation Mode (Grow -> Cultivate) -----------------------
