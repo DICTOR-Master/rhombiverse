@@ -78,6 +78,18 @@ function clusterIcon(shapeFns, { R = 24, shapeR = 9, startDeg = -90 } = {}) {
 
 const FRAME_R = 46; // frame circle/hexagon radius; viewBox is -50..50
 
+// Home mark's own hexagon (see MARKS.home below). First attempt reused
+// the hexagon's own two vertical side edges as the H's uprights
+// directly (they exist for free at x = ±R*cos(30deg)) -- rendered and
+// rejected live: at a regular hexagon's own proportions those edges are
+// short and far apart (the hexagon's widest point), so a crossbar
+// between them read as a hexagon sliced in half, not a letter. A real,
+// separately-proportioned H (narrower, taller) sized to sit inside the
+// hexagon reads correctly instead.
+const HOME_HEX_R = 28;
+const HOME_H_HALF_W = 14;
+const HOME_H_HALF_H = 16;
+
 // The frame itself: circle + the universal hexagon outline. `inner` is
 // the concept-specific mark, drawn on top, sharing the same coordinate
 // space (all marks below are authored in this same -50..50 space).
@@ -305,11 +317,17 @@ export const MARKS = {
   // -- already has a real shipped icon (⚙, the HUD's lab-toggle), reuse
   // verbatim rather than invent a competing hex/rhombus mark for it.
   lab: `<text x="0" y="11" font-size="40" text-anchor="middle" fill="currentColor">⚙</text>`,
-  // Home: a single solid hexagon at dead center, nothing else -- the
-  // "origin point" every wheel descends from. Deliberately distinct from
-  // Rhombisis (a central hexagon WITH rays to satellites): Home has no
-  // rays, just the anchor itself.
-  home: `<polygon points="${hexPts(20)}" fill="currentColor"/>`,
+  // Home: a literal "H" (two uprights + a crossbar, see HOME_HEX_R/
+  // HOME_H_HALF_W/HOME_H_HALF_H above) centered inside an outline
+  // hexagon -- "H" for Home. Was a plain solid hexagon before; direct
+  // user report 2026-08-29 that it read as near-identical to Piece/RD's
+  // own solid hexagon (MARKS.pieceRD) fixed by giving Home a real,
+  // literal distinguishing mark instead of just varying size/fill.
+  // Deliberately still distinct from Rhombisis (a central hexagon WITH
+  // rays to satellites) -- Home has no rays, and unlike both Rhombisis
+  // and pieceRD, Home's hexagon is now outline (not filled), the anchor
+  // itself rather than a piece sample.
+  home: `<polygon points="${hexPts(HOME_HEX_R)}" ${THIN}/><path d="M-${HOME_H_HALF_W},-${HOME_H_HALF_H} V${HOME_H_HALF_H} M${HOME_H_HALF_W},-${HOME_H_HALF_H} V${HOME_H_HALF_H} M-${HOME_H_HALF_W},0 H${HOME_H_HALF_W}" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>`,
   // BCC Build: the SAME real geometry as the HUD wheel's own icon
   // (hud-wheel-3d.js) -- the truncated octahedron's silhouette down a
   // square-face axis, scaled into this mark's coordinate space. One
