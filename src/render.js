@@ -3040,12 +3040,19 @@ async function init() {
       interpenetrateEdges = null;
     }
   }
+  // Returns whether it actually built a visible preview -- the click
+  // handler below uses this to correct the toggle's own 'active' state
+  // when it doesn't (a real bug found live 2026-08-29: a World with no
+  // co-locatable cells nearby left the button showing 'active' with
+  // NOTHING rendered and no persisting explanation past the 5s toast,
+  // reading as "the feature doesn't work" rather than "no eligible
+  // cells here yet").
   async function rebuildInterpenetratePreview() {
     clearInterpenetratePreview();
     const coLocatable = world.entries().filter((c) => isBCC(c.x, c.y, c.z));
     if (coLocatable.length === 0) {
       showHudPrompt('Interpenetrating Lattice: no built cells at a coordinate that can host a co-located BCC/TO cell (needs all-even x,y,z) -- try a larger structure.', 5000);
-      return;
+      return false;
     }
     const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
     const shapeScale = bccShapeScaleFor(SCALE);
@@ -3071,12 +3078,18 @@ async function init() {
       `Interpenetrating Lattice: ${coLocatable.length} of your World's cells sit at a co-locatable coordinate -- each RD's 6 sharp vertices exactly meet a TO's 6 square-face centers (view-only -- nothing written to your World).`,
       6500,
     );
+    return true;
   }
   document.getElementById('interpenetrate-toggle')?.addEventListener('click', async () => {
     interpenetrateActive = !interpenetrateActive;
-    document.getElementById('interpenetrate-toggle').classList.toggle('active', interpenetrateActive);
+    const toggleBtn = document.getElementById('interpenetrate-toggle');
+    toggleBtn.classList.toggle('active', interpenetrateActive);
     if (interpenetrateActive) {
-      await rebuildInterpenetratePreview();
+      const shown = await rebuildInterpenetratePreview();
+      if (!shown) {
+        interpenetrateActive = false;
+        toggleBtn.classList.remove('active');
+      }
     } else {
       clearInterpenetratePreview();
       showHudPrompt('Interpenetrating Lattice preview hidden.', 3000);
