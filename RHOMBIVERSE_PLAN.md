@@ -312,6 +312,21 @@ It's less a building game than a small, coherent universe of shape — one where
 
 ---
 
+## 7. Icebox (reframe Stage 9, 2026-08-28)
+
+**A third lattice or geometry system beyond FCC/RD and BCC/TO is explicitly out of scope.** Not a technical limitation — a recorded decision. The reframe brief's own conclusion, after actually working through what a third geometry would be *for*: "there probably isn't [a need for one], and that's good news."
+
+Two things already built this session cover what a third geometry proposal would typically be reaching for:
+
+- **Dualize** (Stage 3, `docs/RHOMBIVERSE_PLAN.md`'s own Migration Path / see commit history) — reinterpreting an existing region through the *other* lattice already gives a second way to look at the same structure, without needing a third coordinate system to get it.
+- **The Crystal Core vs. Quasicrystal Shell test** (Stage 0, `docs/RHOMBIVERSE_PRINCIPLES.md` section 5 — **still flagged proposed, not yet confirmed** as of this writing) — a proposed feature that fits neither "ordered lattice" nor "aperiodic growth" gets iceboxed rather than forced into either, which already gives new geometric ideas somewhere to land other than "invent a third system."
+
+**Binding rule for future proposals:** before considering a new geometric primitive, check it against both of the above — does Dualize already express the same idea by reinterpreting existing structure, and does it actually fail Stage 0's ordered-vs-aperiodic test (once that test is confirmed) rather than just sounding novel. Only a proposal that clears both hurdles is worth a real design pass.
+
+**This is a decision, not a permanent ban.** Revisit if a concrete, currently-unforeseen need arises — a real use case Dualize and the Core/Shell split genuinely can't cover — not just because a new geometry sounds interesting in the abstract.
+
+---
+
 ## 8. Deferred / Not Yet Decided
 - Exact RD material/texture style.
 - Auth/accounts for shared-world phase.
