@@ -2661,10 +2661,15 @@ async function init() {
   // no new geometry math invented here. Always targets the real World's
   // own mesh/scene/cellOrder, never Sculpture Mode's separate scratch
   // scene -- deliberately out of scope for this pass, not an oversight.
-  // View-only by design: never calls world.addCell/removeCell. Whether/
-  // how to commit a dualized region into the world-state schema is an
-  // open question this pass deliberately does not answer -- see the
-  // commit message for the real options and why none was picked yet.
+  // View-only by design: never calls world.addCell/removeCell. Commit-
+  // path decision (2026-08-28, direct user decision): committed dualized
+  // cells will live in the existing bccWorld/BCC_STORAGE_KEY store (same
+  // one BCC Build's real placed cells already use), reusing that
+  // schema/rendering/persistence rather than a new store or the main
+  // `cells` map (rejected -- see core/bcc-build.md's own coordinate-
+  // collision reasoning). Still open, not yet implemented: whether
+  // committed cells need a provenance flag (e.g. generatedBy/
+  // sourceRegion) to stay distinguishable from hand-placed BCC cells.
   let dualizePreviewMesh = null;
   let dualizePreviewEdges = null;
   function clearDualizePreview() {
