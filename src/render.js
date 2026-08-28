@@ -247,7 +247,9 @@ document.getElementById('app').appendChild(renderer.domElement);
 // frame (see hud-wheel-3d.js's own header comment for why: a second
 // full WebGLRenderer, always running, would make the exact perf
 // mistake this session already found and fixed for the modal wheel).
-const hudWheel = createHudWheel3D(renderer);
+const hudWheel = createHudWheel3D(renderer, {
+  getBackgroundColor: () => (sculptureModeActive ? sculptureScene.background : scene.background),
+});
 const pieceCluster3D = createPieceCluster3D(renderer);
 
 // Touch/drag-only rotation, scoped to the wheel's own small on-screen
@@ -2361,9 +2363,23 @@ async function init() {
   let latticeViewMode = 'fcc-only';
   let bccLatticeMesh = null;
   let bccLatticeEdges = null; // wireframe overlay, only used in both-differentiated
+  // Real bug found live (2026-08-28): rebuildBCCLatticeDetail() is called
+  // from two places that can overlap -- a click AND the recurring 250ms
+  // refresh timer (scheduleBCCRefresh) -- and only checked latticeViewMode
+  // once, at the very start. A call already in flight when the player
+  // switched modes (e.g. to fcc-only) would finish its own async work
+  // (the dynamic import below) AFTER the newer call had already cleared
+  // the scene, and re-add a mesh for a mode that no longer applies --
+  // reproduced by cycling the lens quickly enough for a stale in-flight
+  // refresh to land after a mode-switching click. Guarded the standard
+  // way: a generation counter, bumped at the start of every call; if a
+  // newer call has started by the time this one's await resolves, this
+  // one discards its own result instead of touching the scene.
+  let bccLatticeGeneration = 0;
   let bccRefreshTimer = null;
   let bccRefreshLoopActive = false;
   async function rebuildBCCLatticeDetail() {
+    const myGeneration = ++bccLatticeGeneration;
     const { world: w, scene: s } = activeWorldTriple();
     if (bccLatticeMesh) {
       s.remove(bccLatticeMesh);
@@ -2394,6 +2410,12 @@ async function init() {
     // islands).
     const subCells = generateBCCLatticePatch(refPos, SCALE);
     const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
+    // A newer call (a later click, or the recurring refresh timer) may
+    // have started and already handled the scene while this one was
+    // awaiting the import above -- discard this stale result instead of
+    // clobbering that newer state or adding a mesh for a mode that may
+    // no longer be current.
+    if (myGeneration !== bccLatticeGeneration) return;
     const pieces = [];
     for (const sub of subCells) {
       const verts = bccDetailVertsFor(sub).map(([x, y, z]) => new THREE.Vector3(x, y, z));

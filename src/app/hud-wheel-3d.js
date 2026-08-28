@@ -128,7 +128,7 @@ const HUD_FACES = {
   'bottom|sx-1sz-1':  { symbol: '◇', elId: 'rhombic-wheel-3d-toggle', title: 'Menu', temporary: true },
 };
 
-export function createHudWheel3D(renderer, { size = 144, margin = 12 } = {}) {
+export function createHudWheel3D(renderer, { size = 144, margin = 12, getBackgroundColor } = {}) {
   injectCssOnce();
 
   const scene = new THREE.Scene();
@@ -154,7 +154,7 @@ export function createHudWheel3D(renderer, { size = 144, margin = 12 } = {}) {
   // coverage first -- two alternatives show all 4 real (no blank
   // face), but mix in less-central actions (Clear World, BCC); this
   // trio reads as the clearer "important" set even with one blank.
-  group.rotation.set(0, -Math.PI / 2, 0);
+  group.rotation.set(0.35, -Math.PI / 2, 0);
 
   const faceEntries = [];
   const labelsLayer = document.createElement('div');
@@ -242,6 +242,19 @@ export function createHudWheel3D(renderer, { size = 144, margin = 12 } = {}) {
   window.addEventListener('resize', updateRect);
 
   const fullSize = new THREE.Vector2();
+  // Real bug found live (2026-08-28): this scene has no .background of
+  // its own, so a full clear here falls back to the renderer's own
+  // clear color -- plain black by default, regardless of whatever the
+  // real world scene's own background actually is. Normally close
+  // enough to invisible against the main scene's own near-black
+  // background, but any lighter/different background reveals it as a
+  // stark, flat square, breaking the "floating gem" illusion this
+  // corner widget is going for. Fixed by explicitly clearing to
+  // whatever the real scene's background actually is for this one
+  // draw, then restoring the renderer's own clear color right after --
+  // same save/restore discipline this function already applies to the
+  // viewport below.
+  const prevClearColor = new THREE.Color();
   function render() {
     updateRect();
     camera.aspect = 1;
@@ -249,7 +262,17 @@ export function createHudWheel3D(renderer, { size = 144, margin = 12 } = {}) {
     renderer.setScissorTest(true);
     renderer.setViewport(rect.x, rect.y, rect.w, rect.h);
     renderer.setScissor(rect.x, rect.y, rect.w, rect.h);
+    const bg = getBackgroundColor?.();
+    let prevAlpha;
+    if (bg !== undefined) {
+      renderer.getClearColor(prevClearColor);
+      prevAlpha = renderer.getClearAlpha();
+      renderer.setClearColor(bg, 1);
+    }
     renderer.render(scene, camera);
+    if (bg !== undefined) {
+      renderer.setClearColor(prevClearColor, prevAlpha);
+    }
     renderer.setScissorTest(false);
     // Critical: restore the full-canvas viewport, or the main scene's
     // next render() call would inherit this small leftover viewport

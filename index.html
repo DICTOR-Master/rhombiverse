@@ -16,7 +16,26 @@
   <meta name="twitter:description" content="A tiny universe made of magic diamond blocks -- build, grow planets, and walk around what you make." />
   <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   <style>
-    html, body { margin: 0; height: 100%; background: #05050a; overflow: hidden; }
+    html, body {
+      margin: 0; height: 100%; background: #05050a; overflow: hidden;
+      /* Real bug reported live (2026-08-28, iPhone/iPad): touching the
+         screen brought up iOS's native text-selection/Copy callout,
+         since nothing here ever disabled it -- this is an app you touch
+         to build in, not a page of text. -webkit-touch-callout is the
+         iOS-specific property (user-select alone doesn't suppress the
+         callout menu there); the -webkit-/plain user-select pair
+         covers the general "don't let text selection start" case
+         everywhere else touch-and-drag already means something else
+         (orbiting the camera, building, the wheel). Real inputs (BYOK
+         key, import/export) get selection back explicitly below. */
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    input, textarea, select {
+      -webkit-user-select: text; user-select: text;
+      -webkit-touch-callout: default;
+    }
     canvas { display: block; }
 
     /* --- B1 minimal HUD (RHOMBIVERSE_UIUX_BUILD_PLAN.md) ---
