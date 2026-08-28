@@ -138,6 +138,26 @@
       padding: 6px 4px; margin: -6px -4px; /* bumps the tap target up without moving the text */
     }
     #hud-wheel-cue:hover { opacity: 1; }
+    /* Quick-select: the CURRENTLY active Piece/Material, always visible
+       next to Menu rather than only shown as a fading toast -- direct
+       request 2026-08-29 ("a little hexagon icon of each... stay open
+       at bottom next to menu"). Tapping either reopens straight to
+       where that value gets changed (Piece wheel / Material picker),
+       not back through Home -- see render.js's updateQuickSelect(). */
+    #hud-quick-shape, #hud-quick-material {
+      position: fixed; bottom: 8px; z-index: 900;
+      width: 36px; height: 36px;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 6px;
+      color: #9cd;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0; cursor: pointer;
+    }
+    #hud-quick-shape svg, #hud-quick-material svg { width: 24px; height: 24px; }
+    #hud-quick-shape:hover, #hud-quick-material:hover { background: rgba(255, 255, 255, 0.15); }
+    #hud-quick-shape { left: 64px; }
+    #hud-quick-material { left: 106px; }
     #lab-toggle {
       position: fixed; top: 12px; right: 12px; z-index: 900;
       width: 30px; height: 30px;
@@ -276,12 +296,14 @@
        and #hud-crosshair are deliberately excluded -- the prompt IS the
        transition's own cue text, and the crosshair fades in/out on its
        own timing (render.js), not this one. */
-    #hud-wordmark, #hud-indicator, #hud-wheel-cue, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle {
+    #hud-wordmark, #hud-indicator, #hud-wheel-cue, #hud-quick-shape, #hud-quick-material, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle {
       transition: opacity 0.3s ease;
     }
     body.explore-transitioning #hud-wordmark,
     body.explore-transitioning #hud-indicator,
     body.explore-transitioning #hud-wheel-cue,
+    body.explore-transitioning #hud-quick-shape,
+    body.explore-transitioning #hud-quick-material,
     body.explore-transitioning #lab-toggle,
     body.explore-transitioning #xray-toggle,
     body.explore-transitioning #cyborg-toggle,
@@ -1080,6 +1102,8 @@
   <button id="interact-btn" type="button">Interact</button>
   <div id="sculpture-mode-banner"><span>Sculpture Mode -- isolated scratch space, nothing here is saved to the shared world</span><button id="sculpture-mode-exit" type="button">Exit to Universe</button></div>
   <div id="hud-wheel-cue" title="Tab / Space also opens this">Menu</div>
+  <button id="hud-quick-shape" type="button" title="Shape (tap to change)"></button>
+  <button id="hud-quick-material" type="button" title="Material (tap to change)"></button>
   <button id="sculpture-mode-toggle" type="button" title="Sculpture Mode: a separate, isolated scratch workspace">◆</button>
   <button id="cyborg-toggle" type="button" title="Cyborg Mode: guided walkthrough">◈</button>
   <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>

@@ -41,6 +41,7 @@ import { generatePlanetoid } from './geometry-extensions/planetoidgen.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR, QUALITY_LEVELS_ASCENDING } from './app/settings.js';
 import { playPlaceSound, playRemoveSound, playMenuSound } from './app/sfx.js';
 import { createWheelPickers } from './app/wheel-pickers.js';
+import { MARKS, iconFrame, swatchMark } from './app/wheel-icons.js';
 import { createHudWheel3D } from './app/hud-wheel-3d.js';
 import { createCyborgMode } from './app/cyborg.js';
 import { requestBYOKJson } from './app/byok.js';
@@ -2245,16 +2246,21 @@ async function init() {
         // piece-cluster-3d.js widget/pickers.openPieceTypePicker
         // 2026-08-28 -- direct feedback was to use "the same main real
         // wheel" for this instead of a bespoke second scene. Picking a
-        // piece here works exactly like every other terminal tool:
-        // action in this file (set state, confirm, close) rather than
-        // opening anything further.
+        // piece here used to close the wheel like every other terminal
+        // tool: action in this file -- changed 2026-08-29, direct
+        // request: shape and Material should be pickable "close
+        // together," so this ONE terminal action deliberately stays
+        // open instead of closing (Material now lives on this same
+        // WHEEL_PIECE screen, see rhombic-wheel-3d-core.js) rather than
+        // forcing a re-open just to reach it right after. Material's
+        // own handler below still closes the wheel -- that's the real
+        // hand-off point, to the separate color-swatch overlay.
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
           const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Octahedron Site', idis: 'Disphenoid' };
           document.getElementById('piece-type-select').value = value;
           updateHudIndicator();
           showHudPrompt(`Piece: ${PIECE_LABELS[value] ?? value}`, 3000);
-          wheel3D.close();
           return;
         }
         // Reuses the 2D wheel's own material-picker overlay (a real,
@@ -2416,6 +2422,32 @@ async function init() {
       }
       e.preventDefault();
       toggleWheel3D();
+    });
+
+    // Bottom-left quick-select icons (their own innerHTML is refreshed
+    // further down, near updateHudIndicator) reopen straight to where
+    // that value gets changed -- the real Piece wheel screen / the real
+    // Material picker overlay -- not back through Home, matching the
+    // direct request's own "reopens at selection" wording. Wired here,
+    // via a fresh getElementById rather than the outer quickShapeEl/
+    // quickMaterialEl consts, since wheel3D/toggleWheel3D/
+    // seedIfWorldEmpty only exist in THIS block's own scope, and those
+    // outer consts are declared LATER in init() -- referencing them here
+    // would read them before their own initializer line has run (a real
+    // TDZ crash hit live: "Cannot access 'quickShapeEl' before
+    // initialization"). pickers, unlike quickShapeEl/quickMaterialEl, is
+    // only ever touched inside the deferred click callback body below
+    // (never synchronously at registration time), so it's fine to
+    // reference even though createWheelPickers itself runs later still --
+    // same pattern this block's own onAction callback already relies on.
+    document.getElementById('hud-quick-shape')?.addEventListener('click', () => {
+      if (pickers.isAnyPickerOpen()) pickers.closeAnyPicker();
+      seedIfWorldEmpty();
+      wheel3D.open('piece');
+    });
+    document.getElementById('hud-quick-material')?.addEventListener('click', () => {
+      if (wheel3D.isOpen) wheel3D.close();
+      pickers.openMaterialPicker((value, label) => showHudPrompt(`Material: ${label}`, 3000));
     });
   }
 
@@ -2671,7 +2703,31 @@ async function init() {
     bcc: 'BCC Build',
     dualize: 'Dualize Preview',
   };
+  // Maps core/build.js's own getPieceType() values to their matching
+  // MARKS entry -- same shape vocabulary the Piece wheel faces
+  // themselves use (wheel-icons.js), so the quick-select icon below is
+  // never a second, competing symbol for the same shape.
+  const PIECE_MARK_KEY = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', to: 'pieceTO', ioct: 'pieceOctaSite', idis: 'pieceDisphenoid' };
+  const quickShapeEl = document.getElementById('hud-quick-shape');
+  const quickMaterialEl = document.getElementById('hud-quick-material');
+  // Bottom-left quick-select: always-visible current Piece/Material,
+  // direct request 2026-08-29 ("a little hexagon icon of each... stay
+  // open at bottom next to menu") -- unlike updateHudIndicator's own
+  // text readout below, these two stay accurate through Walk/Sculpture
+  // Mode too (the underlying value doesn't change either), so this runs
+  // unconditionally rather than sharing those early returns.
+  function updateQuickSelect() {
+    if (quickShapeEl) {
+      const pieceValue = document.getElementById('piece-type-select').value;
+      quickShapeEl.innerHTML = iconFrame(MARKS[PIECE_MARK_KEY[pieceValue]] ?? MARKS.pieceRD, { title: 'Shape' });
+    }
+    if (quickMaterialEl) {
+      const hex = `#${materialColor(materialSelect.value).getHexString()}`;
+      quickMaterialEl.innerHTML = iconFrame(swatchMark(hex), { title: 'Material' });
+    }
+  }
   function updateHudIndicator() {
+    updateQuickSelect();
     const el = document.getElementById('hud-indicator');
     if (!el) return;
     if (walking) {
@@ -2688,6 +2744,9 @@ async function init() {
   }
   refreshHudIndicator = updateHudIndicator;
   materialSelect.addEventListener('change', updateHudIndicator);
+  // quickShapeEl/quickMaterialEl's own click handlers are wired up above,
+  // inside the wheel3D block (they need wheel3D/toggleWheel3D/
+  // seedIfWorldEmpty, which only exist in that block's own scope).
 
   const modeButtons = document.querySelectorAll('.mode-btn');
   modeButtons.forEach((btn) => {

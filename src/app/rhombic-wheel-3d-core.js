@@ -427,7 +427,15 @@ export const WHEEL_PIECE = {
     "equator|sx-1sy-1": { kind: "dept", label: "TO", action: "tool:pieceType:to", desc: "Truncated Octahedron -- the BCC lattice's own real space-filling cell." },
     "bottom|sy1sz-1":   { kind: "dept", label: "Octahedron Site", action: "tool:pieceType:ioct", desc: "BCC interstitial lattice: places the 4-disphenoid bundle a flattened octahedron site combines into." },
     "bottom|sx1sz-1":   { kind: "dept", label: "Disphenoid", action: "tool:pieceType:idis", desc: "BCC interstitial lattice: one tetragonal disphenoid at a time." },
-    "bottom|sx-1sz-1":  SPARE
+    // Material, reachable here too (also still on WHEEL_BUILD's own
+    // equator, unchanged) -- direct user request 2026-08-29 to be able
+    // to pick shape and material "close together," i.e. on the same
+    // screen rather than two separate wheel navigations. A deliberate
+    // permanent second access point, not a temporary placeholder (see
+    // this file's own established pattern of filling a real SPARE with
+    // a real already-working feature, same as how Material first got
+    // added to WHEEL_BUILD and Remove to WHEEL_ALTER).
+    "bottom|sx-1sz-1":  { kind: "dept", label: "Material", action: "tool:material", desc: "Pick a build material." },
   }
 };
 
