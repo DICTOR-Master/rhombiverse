@@ -406,12 +406,34 @@ export function createRhombicWheel3D({
       e.labelEl.style.top = `${avgY}px`;
       e.labelEl.style.fontSize = isSelect ? LABEL_STYLE.fontSizeSelected : LABEL_STYLE.fontSizeBase;
 
+      // Real bug found live (2026-08-28): every face rendered at the
+      // exact same flat brightness regardless of viewing angle --
+      // MeshBasicMaterial ignores lighting entirely, and this scene only
+      // has an AmbientLight anyway (no directional light to create real
+      // per-face contrast even for a lit material). The whole wheel read
+      // as a flat 2D hexagon as a result, independent of rotation angle
+      // (confirmed: DEFAULT_OPEN_ROTATION already has real tilt on all
+      // three axes -- the flatness wasn't the angle, it was the shading).
+      // Fixed with a real depth cue, cheaply: reuse the SAME `facing`
+      // value already computed above for label visibility to shade each
+      // face -- more toward the camera reads brighter, a grazing angle
+      // reads dimmer, the same visual effect real directional lighting
+      // would produce, without touching the established translucent
+      // material or adding lights that could clash with it.
+      // Additive, not multiplicative: fillOpacityBase (0.05) is already
+      // so low that even a 0-1 multiplier barely moves it -- confirmed
+      // live, a first attempt at this fix was imperceptible on screen.
+      // An additive boost creates real, visible contrast between a
+      // camera-facing fill and a grazing one regardless of how low the
+      // starting base is.
+      const shade = Math.max(0, facing);
       const fillTarget = FACE_STYLE.fillOpacityBase
         + (isHover ? FACE_STYLE.fillOpacityHoverBump : 0)
-        + (isSelect ? FACE_STYLE.fillOpacitySelectBump : 0);
+        + (isSelect ? FACE_STYLE.fillOpacitySelectBump : 0)
+        + shade * 0.22;
       e.mesh.material.opacity = fillTarget;
       const outlineBase = e.isSpare ? FACE_STYLE.outlineOpacityBaseSpare : FACE_STYLE.outlineOpacityBase;
-      e.line.material.opacity = outlineBase + ((isHover || isSelect) ? FACE_STYLE.outlineOpacityBump : 0);
+      e.line.material.opacity = outlineBase + ((isHover || isSelect) ? FACE_STYLE.outlineOpacityBump : 0) + shade * 0.2;
       const pop = isSelect ? FACE_STYLE.popOutSelect : isHover ? FACE_STYLE.popOutHover : 0;
       const popVec = e.normal.clone().multiplyScalar(pop);
       e.mesh.position.copy(popVec);
@@ -540,7 +562,18 @@ export function createRhombicWheel3D({
   // missed target; still a genuinely elegant, well-composed opening
   // view. switchWheel() deliberately does NOT reset this -- once
   // you're actively navigating, your own rotation stays.
-  const DEFAULT_OPEN_ROTATION = { x: Math.PI / 4, y: -0.6154797086703874, z: Math.PI / 12 };
+  // Real bug found live (2026-08-28): at the exact original angle
+  // (y: -0.6154797086703874), several edges converge on the shared
+  // central vertex with near-perfect radial symmetry in the 2D
+  // projection -- the classic "cube corner reads as a flat hexagon"
+  // ambiguous-figure illusion (confirmed: auto-rotation immediately
+  // resolves it, so the geometry itself was never actually flat, only
+  // this one exact static alignment read that way). Nudged y away from
+  // that exact value so the resting pose is never shown at the
+  // perfectly-symmetric angle, without changing which faces are
+  // prominent (still the same three departments, just no longer
+  // dead-on).
+  const DEFAULT_OPEN_ROTATION = { x: Math.PI / 4, y: -0.6154797086703874 + 0.16, z: Math.PI / 12 };
   function open(wheelId = 'home') {
     overlay.classList.add('open');
     group.rotation.set(DEFAULT_OPEN_ROTATION.x, DEFAULT_OPEN_ROTATION.y, DEFAULT_OPEN_ROTATION.z);
