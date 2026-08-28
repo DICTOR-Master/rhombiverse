@@ -158,7 +158,16 @@ src/
         (geckodriver/Marionette) run, not just code review: default
         mode, welcome-screen toggle, Lab panel checkbox toggle, and the
         FEATURES-gated UI (claim-land-row) all confirmed to flip
-        correctly in both directions, real reload included.
+        correctly in both directions, real reload included. **Cross-
+        referenced 2026-08-28**: the reframe implementation plan's Stage
+        8 ("Game Systems Containment") asked for a player-facing
+        Playground/Survival Demo mode that sets all World Systems flags
+        true for a session, leaving the default at false — this is
+        already exactly what Rhombeometry/Full Game World does (Full
+        Game World = all six flags true; Rhombeometry, the actual
+        session default, = all six false), just under different names.
+        Direct user decision: nothing new built for Stage 8, this
+        satisfies it as-is.
   - [ ] Phase D: Optionally publish `core/` + dual Sculpture Mode as a
         standalone reusable library/template.
 
