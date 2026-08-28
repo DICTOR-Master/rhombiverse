@@ -1,6 +1,16 @@
 [
   {
     "date": "2026-08-28",
+    "title": "Small Fixes, Real Polish",
+    "items": [
+      "Fixed: switching the dual-lattice view mode quickly could leave a stale preview on screen even after choosing FCC only.",
+      "Fixed: the corner HUD wheel's own background could mismatch the World behind it -- it now always matches exactly.",
+      "Fixed: the corner HUD wheel looked flat when still -- it now reads as a real 3D shape at rest, not just while spinning.",
+      "Fixed: touching the screen on iPhone/iPad could bring up text-selection/Copy -- disabled everywhere except real text fields (like your own AI key)."
+    ]
+  },
+  {
+    "date": "2026-08-28",
     "title": "Every Piece, Visible",
     "items": [
       "Fixed: the Piece picker (Build -> Piece) was showing its wireframe diamond net with no icons at all -- RD, Cube, Pyramid, and Truncated Octahedron now all show their real shape icon in their own diamond, as intended.",
