@@ -263,6 +263,7 @@ const hudWheel = createHudWheel3D(renderer, {
   let hudDragging = false;
   let hudLastPointer = null;
   let hudDragDistance = 0;
+  let controlsEnabledBeforeHudDrag = true;
   const HUD_DRAG_CLICK_SUPPRESS_PX = 5;
 
   function withinHudRect(clientX, clientY) {
@@ -270,11 +271,24 @@ const hudWheel = createHudWheel3D(renderer, {
     return clientX >= r.cssX && clientX <= r.cssX + r.cssW && clientY >= r.cssY && clientY <= r.cssY + r.cssH;
   }
 
+  // A drag starting on the HUD wheel's own on-screen rect also lands on
+  // OrbitControls (bound to the same canvas underneath) since these are
+  // separate listeners on the same event, not a delegated one -- with
+  // nothing here to yield the mouse, both the widget AND the real camera
+  // rotated in lockstep on every drag (found live on iPad/iPhone touch,
+  // reproduced with a synthetic touch-pointer drag over the HUD rect;
+  // the underlying cause -- two independent listeners on one event -- is
+  // not touch-specific, same "yield the mouse" pattern already used for
+  // the X-Ray TransformControls drag below). Saving/restoring the PRIOR
+  // enabled state (not hardcoding true) avoids fighting whatever set it,
+  // e.g. Walk Mode's own controls.enabled = false while walking.
   window.addEventListener('pointerdown', (ev) => {
     if (!withinHudRect(ev.clientX, ev.clientY)) return;
     hudDragging = true;
     hudDragDistance = 0;
     hudLastPointer = { x: ev.clientX, y: ev.clientY };
+    controlsEnabledBeforeHudDrag = controls.enabled;
+    controls.enabled = false;
   });
   window.addEventListener('pointermove', (ev) => {
     if (!hudDragging || !hudLastPointer) return;
@@ -286,7 +300,10 @@ const hudWheel = createHudWheel3D(renderer, {
     const qy = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), dy * 0.012);
     hudWheel.group.quaternion.premultiply(qx).premultiply(qy);
   });
-  window.addEventListener('pointerup', () => { hudDragging = false; });
+  window.addEventListener('pointerup', () => {
+    if (hudDragging) controls.enabled = controlsEnabledBeforeHudDrag;
+    hudDragging = false;
+  });
   window.addEventListener('click', (ev) => {
     if (!withinHudRect(ev.clientX, ev.clientY)) return;
     if (hudDragDistance > HUD_DRAG_CLICK_SUPPRESS_PX) return;
