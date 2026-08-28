@@ -45,15 +45,27 @@ const CSS = `
 }
 #piece-cluster-3d-labels.open { display: block; }
 .piece-cluster-3d-label {
-  position: absolute; transform: translate(-50%, -50%);
+  position: absolute;
   pointer-events: auto; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center;
   opacity: 0; transition: opacity 0.15s ease;
 }
-.piece-cluster-3d-icon { width: 44px; height: 44px; color: #4DD0E1; }
+/* Icon and text are each independently centered on the label's own
+   (left, top) anchor point -- NOT a flex column centered as one block.
+   Real bug found live (2026-08-28): centering the icon+text stack as a
+   single unit put the icon itself systematically ~9-10px above each
+   face's true projected centroid (the text underneath pulled the
+   whole stack's center down), on all 4 faces alike. Decoupling them
+   means the icon's own center lands exactly on the true centroid,
+   with the text simply anchored below it, not sharing its transform. */
+.piece-cluster-3d-icon {
+  position: absolute; left: 0; top: 0; transform: translate(-50%, -50%);
+  width: 44px; height: 44px; color: #4DD0E1;
+}
 .piece-cluster-3d-icon svg { width: 100%; height: 100%; display: block; }
 .piece-cluster-3d-text {
-  margin-top: 4px; color: #eaf6ff; font: 700 11px system-ui, sans-serif;
+  position: absolute; left: 0; top: 26px; transform: translateX(-50%);
+  white-space: nowrap;
+  color: #eaf6ff; font: 700 11px system-ui, sans-serif;
   text-transform: uppercase; letter-spacing: 0.5px;
   opacity: 0; transition: opacity 0.15s ease;
   text-shadow: 0 1px 4px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.9);

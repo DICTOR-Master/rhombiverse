@@ -80,7 +80,15 @@ export const MARKS = {
   // picker to read as part of the wheel's own visual language, not a
   // flat, disconnected 2D popup). Centered/full-size rather than
   // clustered small, since each stands alone in its own frame here.
-  pieceRD: `<polygon points="${hexPts(30)}" ${THIN}/>`,
+  // A same-orientation outline hexagon here would violate this file's
+  // own documented rule (see header): it'd be nearly indistinguishable
+  // from the frame's own hexagon (R=46 vs R=30, both outline-only, same
+  // rotation), reading as "no mark at all" in a picker where RD needs
+  // to stand out next to Cube/Pyramid/TO's own clearly-different
+  // shapes. Real bug found live (2026-08-28): that's exactly what the
+  // old `hexPts(30)` outline did. Fixed the same way `home`'s own
+  // single-hexagon mark already solves this (filled, not outlined).
+  pieceRD: `<polygon points="${hexPts(22)}" fill="currentColor"/>`,
   pieceCube: `<polygon points="-24,-24 24,-24 24,24 -24,24" ${THIN}/>`,
   piecePyramid: `<polygon points="0,-28 27,14 -27,14" ${THIN}/>`,
   pieceTO: `<polygon points="${octPts(28)}" ${THIN}/>`,
