@@ -197,6 +197,19 @@ let sculptureModeActive = false;
 let sculptureWorld = null; // created lazily, first time Sculpture Mode is entered
 let sculptureMesh = null; // created inside init(), once geometry/material exist
 
+// Model vs. World Separation (reframe Stage 2): a live, in-session toggle
+// over the SAME data -- not a new file/schema (RHOMBIVERSE_PLAN.md's
+// "world is data" rule) and not the reload-requiring pureGeometry/
+// Rhombeometry setting (that's a session-startup choice of which SYSTEMS
+// exist at all; this is a live pause on the ones that do). Default
+// 'world' preserves today's always-simulating behavior unchanged for
+// anyone who never touches the new toggle.
+let workspaceMode = 'world';
+// Bridges init()-scoped wheel3D.refresh() out to wireSettingsPanel()'s IIFE
+// below, which runs at module-eval time before init() (and wheel3D) exist --
+// same pattern as tickPresenceFn further down this file.
+let refreshWheel3D = () => {};
+
 const camera = new THREE.PerspectiveCamera(
   getSettings().fov,
   window.innerWidth / window.innerHeight,
@@ -938,6 +951,23 @@ window.addEventListener('rhombiverse:personaChosen', (e) => {
     updateSettings({ pureGeometry: pureGeometryInput.checked });
     pureGeometryHint.style.display = '';
     setTimeout(() => window.location.reload(), 400);
+  });
+
+  // Model vs. World Separation (reframe Stage 2): unlike pureGeometry
+  // above, this is a live, no-reload toggle -- workspaceMode is read
+  // fresh by the 5s simulation tick (see init()'s setInterval) on its
+  // very next firing, not just at module-eval time.
+  const workspaceModeInput = document.getElementById('setting-workspace-mode');
+  workspaceModeInput.checked = workspaceMode === 'model';
+  workspaceModeInput.addEventListener('change', () => {
+    workspaceMode = workspaceModeInput.checked ? 'model' : 'world';
+    refreshWheel3D();
+    showHudPrompt(
+      workspaceMode === 'model'
+        ? 'Model workspace: simulation frozen (growth, ecosystem/animal catch-up, asteroid regrowth, inventory decay all paused). Geometry and material tools stay available.'
+        : 'World workspace: simulation resumed.',
+      5000,
+    );
   });
 
   // Bring-Your-Own-AI-Key (mid-B5 addition) -- see byok.js's own header
@@ -2007,6 +2037,7 @@ async function init() {
   const rhombicWheel3DToggleBtn = document.getElementById('rhombic-wheel-3d-toggle');
   {
     const wheel3D = createRhombicWheel3D({
+      getWorkspaceMode: () => workspaceMode,
       onAction: (action) => {
         // openCyborg/openLab reuse the real, already-shipped toggles;
         // openLenses maps to the closest existing single control
@@ -2198,6 +2229,7 @@ async function init() {
         if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
       },
     });
+    refreshWheel3D = () => wheel3D.refresh();
     // Direct instruction 2026-08-26: "there should always automatically
     // be 1 cell because you open cell place menu." Real gap found live --
     // every whole-cell Add mode (RD/Cube/TO) places a NEW cell adjacent
@@ -4321,6 +4353,18 @@ async function init() {
   // see docs/code-notes/render.md for why, and for a real bug history
   // on the evolution-save condition below.
   setInterval(() => {
+    // Model vs. World Separation (reframe Stage 2): this tick IS "all
+    // time-based and agent-based simulation" for the whole app -- every
+    // World System with a clock (asteroid regrowth, inventory decay,
+    // growth, ecosystem/animal catch-up) funnels through this single
+    // interval, nothing else runs on a timer. Freezing model mode here,
+    // as one early return, is exhaustive rather than freezing each
+    // sub-system individually and risking missing one. Does NOT freeze
+    // hydrosphere/black-hole/star/supernova checks -- those are reactive
+    // (re-evaluated on onChange(), i.e. player action, not elapsed time)
+    // and out of this stage's scope, which named growth/ecosystem/animal
+    // specifically.
+    if (workspaceMode !== 'world') return;
     const before = world.entries().length;
     applyAsteroidRegeneration(world);
     applyPopulationScaledSpawning(world);

@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import {
   buildRDFaces, faceKey, ensureOutwardWinding,
   SKELETON_COLOR, FACE_STYLE, computeLabelVisibility, LABEL_STYLE,
-  resolveWheelFaces, ALL_WHEELS,
+  resolveWheelFaces, ALL_WHEELS, applyWorkspaceModeGate,
 } from './rhombic-wheel-3d-core.js';
 import { iconFrame, MARKS } from './wheel-icons.js';
 
@@ -177,6 +177,7 @@ function injectCssOnce() {
 
 export function createRhombicWheel3D({
   onAction, // (actionString) => void -- caller resolves navigateHome/navigateTo:x/tool:x/openLenses/etc.
+  getWorkspaceMode, // () => 'model' | 'world' -- read fresh on every build, not snapshotted at construction (reframe Stage 2)
 } = {}) {
   injectCssOnce();
 
@@ -232,7 +233,7 @@ export function createRhombicWheel3D({
     if (!wheelConfig) throw new Error(`Unknown Rhombic Wheel 3D id "${wheelId}"`);
     clearFaces();
     currentWheelId = wheelId;
-    const resolved = resolveWheelFaces(wheelConfig);
+    const resolved = applyWorkspaceModeGate(resolveWheelFaces(wheelConfig), getWorkspaceMode?.() ?? 'world');
     for (const face of buildRDFaces()) {
       const key = faceKey(face);
       const data = resolved[key];
@@ -562,5 +563,11 @@ export function createRhombicWheel3D({
     // while this wheel's own overlay/renderer covers the whole screen --
     // see render.js's animate().
     get isOpen() { return overlay.classList.contains('open'); },
+    // Model vs. World Separation (reframe Stage 2): re-resolves the
+    // currently-displayed wheel's faces against the live workspaceMode.
+    // buildWheel() only runs on navigation (switchWheel), so a mode flip
+    // while sitting on an already-open wheel needs this explicit nudge
+    // to be reflected immediately rather than on the next navigation.
+    refresh() { if (currentWheelId) buildWheel(currentWheelId); },
   };
 }

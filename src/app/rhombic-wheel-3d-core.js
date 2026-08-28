@@ -175,6 +175,43 @@ export function resolveWheelFaces(wheelConfig) {
   return faces;
 }
 
+// Model vs. World Separation (reframe Stage 2, direct user decision
+// 2026-08-28): split by static vs. dynamic -- anything that grows,
+// decays, or moves on its own needs live simulation to mean anything,
+// so it's locked out while workspaceMode is 'model'. Construct,
+// Rhombitect, and Rhombisis's Symmetry/Generate-a-Body stay available
+// in both modes (pure geometry, no clock involved). Action-keyed (not
+// face-key-keyed) so every existing "temporary duplicate" face sharing
+// one of these actions (e.g. Home's own bottom|sx1sz-1 Rhombivate
+// duplicate) is gated for free, with no separate list to keep in sync.
+const WORLD_ONLY_FACE_ACTIONS = new Set([
+  "navigateTo:cultivate", // Rhombivate -- Plant/Prune/Growth Parameters
+  "navigateTo:trade",     // Trade -- Offer/Accept/Inventory, the decay economy
+  "navigateTo:explore",   // Explore -- grouped with the dynamic side per the reframe brief's own "Grow/Explore/Simulate"
+  "tool:plant",           // Rhombisis's Plant a Seed
+  "tool:bccBuild",        // Rhombisis's BCC Build
+]);
+
+// Applied after resolveWheelFaces(), never before -- operates on the
+// full 12-key resolved map so it also reaches the universal ring/5th
+// slot uniformly (none of those actions are in the gated set today, but
+// this stays correct if that ever changes). Locked faces keep their
+// real label (so the wheel still reads as "there, just unavailable
+// right now" rather than a bare mystery Spare) but are re-kinded to
+// "spare" -- the existing, already-correct non-clickable/dashed/dimmed
+// treatment, reused rather than inventing a second disabled-face style.
+export function applyWorkspaceModeGate(resolvedFaces, workspaceMode) {
+  if (workspaceMode !== "model") return resolvedFaces;
+  const gated = { ...resolvedFaces };
+  for (const [key, data] of Object.entries(resolvedFaces)) {
+    if (data.action && WORLD_ONLY_FACE_ACTIONS.has(data.action)) {
+      gated[key] = { kind: "spare", label: data.label, action: null,
+        desc: `${data.label} needs World workspace mode (Lab panel) — switch there to use it.` };
+    }
+  }
+  return gated;
+}
+
 const SPARE = { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." };
 
 // Blank/unassigned slots don't have to be dead ends -- duplicating a
