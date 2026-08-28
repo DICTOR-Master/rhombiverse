@@ -4583,6 +4583,24 @@ async function init() {
   // player necessarily opens.
   async function clearWorldToNew() {
     if (!confirm('Start a new world? This clears your current build.')) return;
+    // Real report, 2026-08-29: "still have zero cells" after Clear World
+    // -- reproduced directly. The data-level fix (onChange()'s own
+    // never-empty invariant) was already correct, but this function
+    // never recentered the camera, so if it had drifted away from the
+    // origin (building/exploring elsewhere, then the SAVED camera state
+    // carrying that forward), the one real starter cell existed but sat
+    // completely off-screen and unclickable -- looks and feels exactly
+    // like zero even though it isn't. Same reasoning as
+    // enterSculptureMode's own camera.position.set(6,5,8)/controls.
+    // target.set(0,0,0) reset. Exits Walk mode first if active, since a
+    // walking player's camera is driven by the player controller every
+    // frame, not by controls.target directly -- the orbit reset alone
+    // wouldn't be visible until Walk mode itself is off.
+    if (walking) document.getElementById('walk-toggle')?.click();
+    camera.position.set(6, 5, 8);
+    controls.target.set(0, 0, 0);
+    controls.update();
+    saveCameraState(camera.position, controls.target);
     clearLocalStorage();
     const fresh = await loadWorld('./data/starter-world.json');
     world.replaceAll(fresh);

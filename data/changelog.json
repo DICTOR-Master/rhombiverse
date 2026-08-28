@@ -4,7 +4,8 @@
     "title": "Never Truly Empty",
     "items": [
       "Fixed: removing your very last cell used to leave your World with nothing left to click -- Add had no face to place against, a genuine dead end. Your World now always keeps at least one real cell, restored automatically the instant it would otherwise hit zero, so there's always something to build forward from.",
-      "Same fix for BCC Build and the interstitial lattice (Octahedron Site / Disphenoid) -- whichever one you're working in always keeps at least one real piece to build forward from too."
+      "Same fix for BCC Build and the interstitial lattice (Octahedron Site / Disphenoid) -- whichever one you're working in always keeps at least one real piece to build forward from too.",
+      "Fixed: Clear World left that one real cell exactly where it always is, but never brought your camera/view back to it -- if you'd wandered off elsewhere first, the cell existed but sat off-screen, unreachable, indistinguishable from actually being stuck. Clear World now resets your view (and exits Walk mode if it was on) to look straight at it every time."
     ]
   },
   {
