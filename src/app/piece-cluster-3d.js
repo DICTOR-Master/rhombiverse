@@ -13,30 +13,46 @@
 // file's own header. Unlike the HUD wheel (always-on, corner-anchored,
 // gold/opaque, freely rotatable), this one is: centered on screen,
 // SKELETON_COLOR translucent wireframe (the MAIN wheel's own material
-// style -- "the menu one not the HUD", direct clarification), a FIXED
-// rotation (no drag -- it never needs to rotate, all 4 relevant faces
-// are already visible at once), and only rendered/listened-to while the
-// Piece picker is actually open.
+// style -- "the menu one not the HUD", direct clarification), and only
+// rendered/listened-to while the Piece picker is actually open.
 //
-// Rotation and which 4 faces: group.rotation.set(0, -Math.PI/2, 0) is
-// hud-wheel-3d.js's OWN already-verified "looks straight down the
-// 4-valent vertex (2,0,0)" rotation (see that file's comment -- exact
-// axis-angle math, not eyeballed) -- reused here rather than re-derived,
-// since it's the same real vertex-view this widget needs. The 4 faces
-// that share that vertex are exactly hud-wheel-3d.js's own
-// 'equator|sx1sy1' / 'equator|sx1sy-1' / 'top|sx1sz1' / 'bottom|sx1sz-1'
-// (independently confirmed via a real script enumerating buildRDFaces()
-// and searching for shared vertices -- see docs/code-notes/app/
-// wheel-pickers.md for that computation).
+// Two real vertex views, not one (added 2026-08-28, interstitial-lattice
+// piece tiers): originally a single FIXED rotation was enough -- exactly
+// 4 real faces meet at one 4-valent RD vertex, matching the 4 piece
+// tiers that existed then. Adding 2 more tiers broke that 1:1 fit; a
+// flat CSS-positioned "satellite" pair was tried first and reverted on
+// direct feedback ("not flat... a new wheel") -- it silently reintroduced
+// exactly the "reads as fake" problem this whole widget exists to avoid.
+// The real fix, verified computationally (a headless script enumerated
+// every one of the RD's 6 four-valent vertices and which faces meet at
+// each): the CURRENT vertex (2,0,0) and its ANTIPODAL vertex (-2,0,0)
+// share ZERO faces (verified -- their two 4-face sets are completely
+// disjoint, as central symmetry guarantees for antipodal RD vertices),
+// so a second real, equally-valid 4-face view exists just by rotating
+// group.rotation.y from -PI/2 to +PI/2 (the sign-flip is not
+// coincidental: rotating -x to face the camera instead of +x is exactly
+// that flip). A single view showing all 6 faces at once does NOT exist
+// on this polyhedron -- also checked directly (a 3-fold body-diagonal
+// view only brings 3 faces to a comparable facing value, not 6) -- so
+// this is a real two-state ROTATING wheel (click the flip control),
+// not a single magic angle.
 import * as THREE from 'three';
 import { buildRDFaces, faceKey, ensureOutwardWinding, SKELETON_COLOR, FACE_STYLE } from './rhombic-wheel-3d-core.js';
 import { MARKS, iconFrame } from './wheel-icons.js';
 
+// Two real vertex views: index 0 is the original (2,0,0) vertex's own 4
+// faces (RD/Cube/Pyramid/TO); index 1 is the antipodal (-2,0,0) vertex's
+// -- of its own 4 real faces, 2 host the new interstitial tiers and the
+// other 2 stay non-interactive context, the same treatment the other 8
+// faces already get at view 0.
+const ROTATIONS = [-Math.PI / 2, Math.PI / 2];
 const PIECE_FACE_DATA = {
-  'equator|sx1sy1': { value: 'rd', markKey: 'pieceRD', label: 'RD' },
-  'equator|sx1sy-1': { value: 'cube', markKey: 'pieceCube', label: 'Cube' },
-  'top|sx1sz1': { value: 'pyramid', markKey: 'piecePyramid', label: 'Pyramid' },
-  'bottom|sx1sz-1': { value: 'to', markKey: 'pieceTO', label: 'TO' },
+  'equator|sx1sy1': { value: 'rd', markKey: 'pieceRD', label: 'RD', view: 0 },
+  'equator|sx1sy-1': { value: 'cube', markKey: 'pieceCube', label: 'Cube', view: 0 },
+  'top|sx1sz1': { value: 'pyramid', markKey: 'piecePyramid', label: 'Pyramid', view: 0 },
+  'bottom|sx1sz-1': { value: 'to', markKey: 'pieceTO', label: 'TO', view: 0 },
+  'top|sx-1sz1': { value: 'idis', markKey: 'pieceDisphenoid', label: 'Disphenoid', view: 1 },
+  'bottom|sx-1sz-1': { value: 'ioct', markKey: 'pieceOctaSite', label: 'Octa Site', view: 1 },
 };
 
 const CSS = `
@@ -79,6 +95,15 @@ const CSS = `
   text-shadow: 0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.9);
   pointer-events: none;
 }
+#piece-cluster-3d-flip {
+  position: fixed; transform: translate(0, -50%);
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(20, 24, 32, 0.55); border: 1.5px solid rgba(234, 246, 255, 0.4);
+  color: #eaf6ff; cursor: pointer; pointer-events: auto;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+#piece-cluster-3d-flip:hover { background: rgba(77, 208, 225, 0.25); border-color: #4DD0E1; }
 `;
 
 function injectCssOnce() {
@@ -109,7 +134,10 @@ export function createPieceCluster3D(renderer, { size = 280 } = {}) {
 
   const group = new THREE.Group();
   scene.add(group);
-  group.rotation.set(0, -Math.PI / 2, 0);
+  let viewIndex = 0;
+  let currentRotY = ROTATIONS[0];
+  let targetRotY = ROTATIONS[0];
+  group.rotation.set(0, currentRotY, 0);
 
   const faceEntries = [];
   const labelsLayer = document.createElement('div');
@@ -119,6 +147,18 @@ export function createPieceCluster3D(renderer, { size = 280 } = {}) {
   hint.id = 'piece-cluster-3d-hint';
   hint.textContent = 'Pick a piece';
   labelsLayer.appendChild(hint);
+
+  // Flip control: the only way to reach view 1's 2 tiers (Octa Site /
+  // Disphenoid) -- a small rotate-arrow button, not another RD face,
+  // since it isn't itself a pickable piece. Animated (render()'s own
+  // lerp toward targetRotY), so it reads as the wheel actually turning,
+  // not an instant cut.
+  const flipBtn = document.createElement('button');
+  flipBtn.id = 'piece-cluster-3d-flip';
+  flipBtn.type = 'button';
+  flipBtn.title = 'Rotate to see more piece types';
+  flipBtn.innerHTML = '<svg viewBox="-12 -12 24 24" width="22" height="22"><path d="M8,-6 A9,9 0 1 1 -8,-6 M8,-6 L8,1 M8,-6 L1,-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  labelsLayer.appendChild(flipBtn);
 
   for (const face of buildRDFaces()) {
     const k = faceKey(face);
@@ -204,6 +244,12 @@ export function createPieceCluster3D(renderer, { size = 280 } = {}) {
   const fullSize = new THREE.Vector2();
   function render() {
     if (!isOpen) return;
+    // Simple per-call lerp toward the target rotation (flip()/open()
+    // below set targetRotY) -- this widget is only ever rendered while
+    // open, at the main scene's own frame rate, so a fixed factor reads
+    // as a smooth, quick snap rather than a literal instant jump.
+    currentRotY += (targetRotY - currentRotY) * 0.2;
+    group.rotation.y = currentRotY;
     updateRect();
     camera.aspect = 1;
     camera.updateProjectionMatrix();
@@ -232,6 +278,8 @@ export function createPieceCluster3D(renderer, { size = 280 } = {}) {
 
     hint.style.left = `${rect.cssX + rect.cssW / 2}px`;
     hint.style.top = `${rect.cssY - 24}px`;
+    flipBtn.style.left = `${rect.cssX + rect.cssW + 18}px`;
+    flipBtn.style.top = `${rect.cssY + rect.cssH / 2}px`;
 
     for (const e of faceEntries) {
       if (!e.labelEl) continue;
@@ -256,11 +304,28 @@ export function createPieceCluster3D(renderer, { size = 280 } = {}) {
     }
   }
 
+  function flip() {
+    viewIndex = 1 - viewIndex;
+    targetRotY = ROTATIONS[viewIndex];
+  }
+  flipBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // don't let this bubble into the "click outside closes" handler below
+    flip();
+  });
+
   function open(currentValue) {
     isOpen = true;
     labelsLayer.classList.add('open');
     updateRect();
     setCurrent(currentValue);
+    // Land on whichever view actually contains the currently-selected
+    // tier, so re-opening the picker on e.g. Disphenoid doesn't require
+    // an extra flip just to see your own current selection highlighted.
+    const currentEntry = faceEntries.find((f) => f.data?.value === currentValue);
+    viewIndex = currentEntry?.data?.view ?? 0;
+    targetRotY = ROTATIONS[viewIndex];
+    currentRotY = targetRotY; // snap instantly on open, no animated flip
+    group.rotation.y = currentRotY;
   }
   function close() {
     isOpen = false;

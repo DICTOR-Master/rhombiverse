@@ -92,6 +92,17 @@ export const MARKS = {
   pieceCube: `<polygon points="-24,-24 24,-24 24,24 -24,24" ${THIN}/>`,
   piecePyramid: `<polygon points="0,-28 27,14 -27,14" ${THIN}/>`,
   pieceTO: `<polygon points="${octPts(28)}" ${THIN}/>`,
+  // Octahedron Site / Disphenoid (BCC interstitial-site tessellation,
+  // added 2026-08-28): literal shapes again, matching this file's own
+  // rule -- a tall kite/diamond with a horizontal midline for the
+  // flattened octahedron (2 close apexes top/bottom, 4-point equatorial
+  // "ring" the midline stands in for -- distinct from Cube's square and
+  // TO's regular octagon), and a wireframe (not flat-outline) triangle
+  // for the disphenoid -- an interior vertex with 3 lines to the outer
+  // triangle's own corners, the standard way to draw a tetrahedron in
+  // 2D, deliberately different from Pyramid's plain flat-outline triangle.
+  pieceOctaSite: `<polygon points="0,-32 20,0 0,32 -20,0" ${THIN}/><path d="M-20,0 H20" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
+  pieceDisphenoid: `<polygon points="0,-30 26,20 -26,20" ${THIN}/><path d="M0,-30 L0,4 M-26,20 L0,4 M26,20 L0,4" stroke="currentColor" stroke-width="1.5"/>`,
   // Fill: "+" shown across three hexagons.
   fill: `
     <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>
