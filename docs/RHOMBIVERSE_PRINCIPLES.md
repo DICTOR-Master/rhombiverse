@@ -82,6 +82,25 @@ A system with only isolation is safe but can stay noisy forever within its own b
 
 ---
 
+## 5. Crystal Core vs. Quasicrystal Shell (The Quasicrystal Principle)
+
+> **⚠ PROPOSED — awaiting confirmation from the project owner.** This section is a draft, modeled on sections 0–2's format at the reframe brief's request. It is not yet a binding law and must not be used to gate any feature or roadmap-stage decision until confirmed. Nothing else in this document currently references it.
+
+**Law (proposed):** every feature belongs to exactly one of two regimes, and which one determines how it's allowed to behave.
+
+- **Crystal Core** — deterministic, player-authored, ordered-lattice behavior: build, dualize, sculpt. The FCC/RD lattice and its BCC/truncated-octahedron dual live here. Always-on; a given world-state always resolves to the same rendered result for the same inputs.
+- **Quasicrystal Shell** — generative, aperiodic, unpredictable-by-design behavior: the Penrose/Ammann growth layer. Additive and opt-in; it may legitimately surprise the player, because unpredictability is the point rather than a defect.
+
+**The test itself:** for a proposed feature, ask whether it behaves like an ordered lattice (repeatable, player-directed, resolves the same way twice) or like aperiodic growth (generative, meant to vary, not fully player-directed). A feature that clearly reads as one or the other belongs in that regime. **A feature that fits neither is iceboxed** — not forced into Core for convenience, and not forced into the Shell just because it isn't deterministic. This is the same discipline as [[Grounded Simplicity]]'s "only invent when both real-world and simplicity answers are genuinely no" — the default action for an ambiguous fit is to defer, not to force a home.
+
+**Relationship to the existing three principles:** this isn't a fourth independent law — it's [[Grounded Simplicity]] applied one level up, at the scope of "which regime does an entire feature belong to" rather than "how is this one mechanic built." A feature correctly sorted into Core still owes Isolation a blast radius and Adaptive Damping a tolerance curve if it has a correction mechanism; sorting doesn't exempt anything downstream.
+
+**Worked precedent, already consistent with this test even though it predates it:** the existing Duality Mode (`render.js` Duality Mode, ~L2172) shows the aperiodic Penrose-tiling shadow a Core structure casts — it reads as Shell (aperiodic, generative shadow) built on top of Core (a deterministic lattice structure), not a blend that muddies the line. The planned `dual.js` cube/octahedron structure and the BCC/truncated-octahedron dual-lattice work are both Core — every operation on them (dualize, transform, view) is deterministic and repeatable given the same input region.
+
+**Binding rule for future specs (once confirmed):** a new spec must state which regime it belongs to, or state explicitly that it's iceboxed pending that determination. A spec that mixes both regimes in one mechanic without a clear seam between them (the way Duality Mode keeps Core geometry and Shell shadow as two distinct, separately-computed things) should be treated as a design smell worth pausing on, per this document's existing pattern of flagging things "worth pausing on" (see section 6's closing binding rule).
+
+---
+
 ## 6. Rhythm, Harmony & Change (Experiential Principles)
 
 The three principles above (0–2) are mechanical laws — how any given subsystem must be built. These three are how a *well-built* system should actually feel to play in, and they are deliberately interdependent, not separate rules to satisfy individually:
