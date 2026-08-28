@@ -1,6 +1,14 @@
 [
   {
     "date": "2026-08-28",
+    "title": "Never Truly Empty",
+    "items": [
+      "Fixed: removing your very last cell used to leave your World with nothing left to click -- Add had no face to place against, a genuine dead end. Your World now always keeps at least one real cell, restored automatically the instant it would otherwise hit zero, so there's always something to build forward from.",
+      "Same fix for BCC Build and the interstitial lattice (Octahedron Site / Disphenoid) -- whichever one you're working in always keeps at least one real piece to build forward from too."
+    ]
+  },
+  {
+    "date": "2026-08-28",
     "title": "Real Cells, Not Just a Preview",
     "items": [
       "Two new real, placeable pieces (Piece picker, Rhombeometry): Disphenoid and Octahedron Site -- the genuine BCC interstitial-site tessellation (the same octahedral/tetrahedral geometry carbon actually sits in inside iron), not a view-only overlay.",

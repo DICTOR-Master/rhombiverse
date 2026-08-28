@@ -13,6 +13,7 @@ import { generateBCCLatticePatch, bccDetailVertsFor, bccShapeScaleFor } from './
 import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS, isBCC } from './geometry-extensions/dual-lattice.js';
 import { createBCCBuildController } from './core/bcc-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
+import { bootstrapDisphenoid } from './geometry-extensions/interstitial-lattice.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { FEATURES } from './app/features.js';
 import {
@@ -1874,6 +1875,24 @@ async function init() {
   }
 
   function onChange() {
+    // Invariant (direct instruction, 2026-08-29): the world must never
+    // reach zero cells. With nothing left to click a face of, Add has no
+    // way to place anything ever again -- a genuine dead end, found live
+    // (right-clicking the single starter cell leaves exactly this
+    // state). onChange() is the one real choke point every world-
+    // mutating path already runs through (Add/Remove/Fill/Dig/Round/
+    // Excavate/Report/Clear World/Load/Import/undo/...), so enforcing it
+    // here holds regardless of which of them caused the count to drop,
+    // not just the dedicated Clear World button (which already happened
+    // to be fine, since it always reloads the real 1-cell starter file).
+    // Skipped during Shared World: that world is server-authoritative,
+    // and unilaterally inserting a local-only cell here would desync
+    // from the real multiplayer state rather than fix anything -- same
+    // reasoning as the existing sharedWorldActive guard on the save call
+    // below.
+    if (!sharedWorldActive && world.entries().length === 0) {
+      world.addCell(0, 0, 0, { material: 'base' });
+    }
     applyAsteroidRegeneration(world);
     applyPopulationScaledSpawning(world);
     // Shared World: inventory is server-authoritative now (schema.sql's
@@ -3708,6 +3727,14 @@ async function init() {
   // small dedicated rebuild, not a reuse of onChange(). See core/
   // bcc-build.md.
   function onBCCChange() {
+    // Same "never truly empty" invariant as the main world's own
+    // onChange() -- direct instruction, 2026-08-29: applies to every
+    // lattice, not just the FCC one. (0,0,0) is a real, always-valid BCC
+    // lattice point (isBCC: all-even), so this restores exactly the
+    // same kind of real, buildable anchor a fresh BCC Build starts from.
+    if (bccWorld.entries().length === 0) {
+      bccWorld.addCell(0, 0, 0, { material: 'base' });
+    }
     rebuildBCCInstances(bccMesh, bccWorld);
     saveToLocalStorage(bccWorld.toJSON(), BCC_STORAGE_KEY);
   }
@@ -3715,6 +3742,13 @@ async function init() {
   // Interstitial-lattice build: own change handler, same reasoning as
   // onBCCChange above (Rhombeometry-only, no World Systems pipeline).
   function onInterstitialChange() {
+    // Same invariant again -- bootstrapDisphenoid([0,0,0]) is the exact
+    // same canonical anchor disphenoid every fresh interstitial build
+    // already starts from (interstitial-lattice.js's own sanity gate
+    // uses this same anchor), not a special case invented here.
+    if (interstitialStore.entries().length === 0) {
+      interstitialStore.addDisphenoid(bootstrapDisphenoid([0, 0, 0]), { material: 'base' });
+    }
     rebuildInterstitialMeshes(interstitialStore);
     saveToLocalStorage(interstitialStore.toJSON(), INTERSTITIAL_STORAGE_KEY);
   }
