@@ -468,8 +468,21 @@ export function createRhombicWheel3D({
   }
 
   function switchWheel(wheelId) {
-    // Preserve camera/rotation state -- rebuild faces in place, don't
-    // touch group.quaternion or camera.
+    // Real report, 2026-08-29: navigating into a department (e.g. Build
+    // -> Piece) used to preserve whatever rotation was active the
+    // instant its trigger face was clicked -- reproduced directly: that
+    // face is often only just barely front-facing (opacity a hair above
+    // the visibility threshold, since a drag stops the moment it becomes
+    // clickable at all), so the SAME raw rotation applied to the new
+    // wheel's own different face geometry regularly lands on a near
+    // edge-on view where nothing is clearly visible, requiring an extra
+    // drag just to see the department you already chose. Reset to the
+    // exact same DEFAULT_OPEN_ROTATION every fresh wheel-open already
+    // uses (real, already-verified: 3 real faces land clearly visible)
+    // so every navigateTo: transition lands you looking straight at the
+    // new department's own primary content, not wherever the click
+    // happened to leave the wheel facing.
+    group.rotation.set(DEFAULT_OPEN_ROTATION.x, DEFAULT_OPEN_ROTATION.y, DEFAULT_OPEN_ROTATION.z);
     buildWheel(wheelId);
   }
 
@@ -577,8 +590,11 @@ export function createRhombicWheel3D({
   // ring faces (Lenses, Lab) with 1 equator dept face rather than 3
   // pure department faces -- a real structural constraint, not a
   // missed target; still a genuinely elegant, well-composed opening
-  // view. switchWheel() deliberately does NOT reset this -- once
-  // you're actively navigating, your own rotation stays.
+  // view. switchWheel() now resets to this same rotation on every
+  // navigateTo: transition too (changed 2026-08-29, direct report -- see
+  // switchWheel's own comment for why the earlier "leave your rotation
+  // alone while navigating" choice regularly landed on a near-invisible
+  // edge-on view of the department you'd just chosen).
   // Real bug found live (2026-08-28): at the exact original angle
   // (y: -0.6154797086703874), several edges converge on the shared
   // central vertex with near-perfect radial symmetry in the 2D

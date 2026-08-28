@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-08-28",
+    "title": "Straight to the Point",
+    "items": [
+      "Fixed: opening a department on the Rhombic Wheel (Build > Piece, or any other) used to leave the wheel exactly as rotated as it was when you clicked -- often an edge-on view where nothing in the new department was actually visible yet, needing an extra drag just to see what you'd chosen. Every department now opens facing you clearly, the same clean view the wheel itself opens with."
+    ]
+  },
+  {
+    "date": "2026-08-28",
     "title": "Never Truly Empty",
     "items": [
       "Fixed: removing your very last cell used to leave your World with nothing left to click -- Add had no face to place against, a genuine dead end. Your World now always keeps at least one real cell, restored automatically the instant it would otherwise hit zero, so there's always something to build forward from.",
