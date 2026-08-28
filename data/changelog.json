@@ -1,5 +1,47 @@
 [
   {
+    "date": "2026-08-28",
+    "title": "Steady Under Load",
+    "items": [
+      "New optional FPS meter in the Lab panel (off by default) shows your real frame rate.",
+      "Graphics quality now steps itself down automatically if your frame rate stays low for a few seconds -- and you can always turn it back up yourself in Settings.",
+      "Importing or loading a very large World now warns you first, since it may run slowly on lower-power devices."
+    ]
+  },
+  {
+    "date": "2026-08-28",
+    "title": "A Truly Blank Canvas",
+    "items": [
+      "First-time Rhombeometry visitors now land on a single cell in empty space, not the pre-built Showcase World and its guided tour -- geometry really does come first now.",
+      "Full Game World's first visit is unchanged."
+    ]
+  },
+  {
+    "date": "2026-08-28",
+    "title": "Dualize: See Your Build the Other Way",
+    "items": [
+      "New Dualize Preview (Rhombeometry, Lab panel): click any structure you've built to preview it reinterpreted through the dual body-centered-cubic lattice -- your own build, seen through the other order.",
+      "View-only for now -- nothing is written to your World, just a real overlay you can look at and clear."
+    ]
+  },
+  {
+    "date": "2026-08-28",
+    "title": "A Still Place to Build",
+    "items": [
+      "New Model workspace setting (Lab panel): freezes growth, ecosystem catch-up, asteroid regrowth, and inventory decay so nothing moves on its own while you work -- geometry and material tools stay fully available.",
+      "The Rhombic Wheel reacts live: Model workspace quiets Rhombivate, Trade, Explore, Plant a Seed, and BCC Build, leaving Construct, Rhombitect, and the rest of Rhombisis front and center.",
+      "Switch back to World workspace anytime -- nothing is lost, everything just picks back up."
+    ]
+  },
+  {
+    "date": "2026-08-28",
+    "title": "Five Lenses on Your Lattice",
+    "items": [
+      "The BCC Lattice toggle now cycles through five real views instead of one: FCC only, the dual lattice only, both together in distinct colors, or either one ghosted behind the other.",
+      "Seeing both lattices together now uses a real color-and-outline pairing, not color alone."
+    ]
+  },
+  {
     "date": "2026-08-26",
     "title": "Every Piece, One Set of Buttons",
     "items": [
