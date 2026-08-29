@@ -2442,12 +2442,28 @@ async function init() {
         // --- Piece: Cuboctahedron Build (core/cubocta-build.js), the RD
         // lattice's own dual shape -- 2026-08-29, freed onto Piece's
         // top|sy1sz1 slot by dropping Lenses from the universal ring.
-        // Same shim/gate pattern as tool:bccBuild above (defense-in-depth
-        // Rhombeometry-only check, even though #cubocta-build-toggle is
-        // already hidden by CSS in Full Game World).
+        // Same Rhombeometry-only defense-in-depth check as tool:bccBuild
+        // (even though #cubocta-build-toggle is already hidden by CSS in
+        // Full Game World).
+        //
+        // 2026-08-29 SAME-DAY FIX, real bug caught live: this used to
+        // close the wheel immediately (BCC Build's own pattern), unlike
+        // every OTHER face on this wheel (tool:pieceType:*), which all
+        // deliberately stay open so Material can be picked right after.
+        // Direct report: "exactly the same bug in every way I described"
+        // -- i.e. the wheel not reopening for Material, the quick-select
+        // icon never updating -- once every other Piece option got fixed
+        // to behave consistently, Cuboctahedron sitting on the SAME
+        // wheel but behaving differently just reads as still-broken.
+        // Fixed to match: stays open (Material reachable immediately,
+        // same tap-empty-space-to-dismiss gesture as everything else on
+        // this wheel), and updateHudIndicator() (called via clickMode's
+        // own mode-btn handler) now shows a real Cuboctahedron icon on
+        // the bottom-left quick-select while this mode is active -- see
+        // updateQuickSelect()'s own header comment.
         if (action === 'tool:cuboctaBuild') {
-          wheel3D.close();
           if (!FEATURES.bccLattice) {
+            wheel3D.close();
             showHudPrompt('Cuboctahedron Build is Rhombeometry-only -- switch modes in the Lab panel first.', 4000);
             return;
           }
@@ -2941,8 +2957,19 @@ async function init() {
   // unconditionally rather than sharing those early returns.
   function updateQuickSelect() {
     if (quickShapeEl) {
-      const pieceValue = document.getElementById('piece-type-select').value;
-      quickShapeEl.innerHTML = iconFrame(MARKS[PIECE_MARK_KEY[pieceValue]] ?? MARKS.pieceRD, { title: 'Shape' });
+      // Cuboctahedron Build (currentMode === 'cubocta') isn't a
+      // piece-type value at all -- it's its own mode, same as BCC Build
+      // -- so it was invisible to this icon entirely: picking it left
+      // the quick-select showing whatever piece type was selected
+      // before, with zero feedback that anything had changed. Direct
+      // report 2026-08-29 ("the picker symbol at bottom doesnt change").
+      // Checked first, ahead of the plain piece-type lookup below.
+      if (currentMode === 'cubocta') {
+        quickShapeEl.innerHTML = iconFrame(MARKS.cuboctahedron, { title: 'Shape' });
+      } else {
+        const pieceValue = document.getElementById('piece-type-select').value;
+        quickShapeEl.innerHTML = iconFrame(MARKS[PIECE_MARK_KEY[pieceValue]] ?? MARKS.pieceRD, { title: 'Shape' });
+      }
     }
     if (quickMaterialEl) {
       const hex = `#${materialColor(materialSelect.value).getHexString()}`;
