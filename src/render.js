@@ -2740,8 +2740,13 @@ async function init() {
       // picks a different "winner" essentially at random each frame.
       // polygonOffset nudges this mesh's rasterized depth slightly
       // toward the camera so it deterministically wins, eliminating the
-      // fight instead of just hiding it.
-      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+      // fight instead of just hiding it. Bumped -4 -> -8 (2026-08-29,
+      // still reported after the first pass) for extra margin -- this
+      // dev environment's own GPU/depth-buffer precision couldn't be
+      // matched exactly to whatever DICTO's real device uses, and a
+      // coarser depth buffer needs a proportionally larger offset to
+      // reliably separate a tie.
+      polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8,
       // Follow-up report, still visible while actually orbiting the
       // camera (a static-frame diff alone didn't catch this): adjacent
       // cells' own overlay pieces can overlap each other too, not just
@@ -3100,7 +3105,7 @@ async function init() {
       // its own comments) -- Dualize's preview genuinely touches real
       // built geometry at real contact points too, and can self-overlap
       // across adjacent region cells the same way.
-      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+      polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8,
       depthWrite: false,
     }));
     scene.add(dualizePreviewMesh);
