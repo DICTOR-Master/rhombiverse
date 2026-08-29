@@ -1,6 +1,22 @@
 [
   {
     "date": "2026-08-29",
+    "title": "Cuboctahedron on the Piece Wheel",
+    "items": [
+      "Cuboctahedron Build now has its own real seat on the Piece picker wheel -- click a face of your normal World to place one, or near a point of an existing one to grow toward that neighbor.",
+      "Made room by retiring \"Lenses\" from the shared universal ring across every wheel -- X-Ray is still one tap away via the corner HUD wheel and the Lab panel."
+    ]
+  },
+  {
+    "date": "2026-08-29",
+    "title": "A Second Lattice, Point to Point",
+    "items": [
+      "New: Cuboctahedron Build (Rhombeometry mode) -- a real, persistent world of vertex-pointed cuboctahedra sitting alongside your normal Rhombic Dodecahedron World, the RD lattice's own dual shape.",
+      "Cuboctahedron also joins Lattice View's set of preview lenses, and the corner HUD wheel's Lattice View face now reflects whichever mode is currently active."
+    ]
+  },
+  {
+    "date": "2026-08-29",
     "title": "Smoother, Steadier Rendering",
     "items": [
       "Fixed: overlapping translucent surfaces in Lattice View and Dualize Preview could flicker/shimmer against your real World and against each other, most visible together with X-Ray. A real rendering issue, now resolved."
