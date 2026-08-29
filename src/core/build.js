@@ -389,6 +389,7 @@ export function createBuildController({
     if (mode === 'plant') return; // Plant mode's click handling lives in render.js
     if (mode === 'sculpt') return; // Sculpt mode's click handling lives in render.js/sculpture.js
     if (mode === 'bcc') return; // BCC mode's click handling lives in core/bcc-build.js
+    if (mode === 'cubocta') return; // Cuboctahedron Build's click handling lives in core/cubocta-build.js
     if (mode === 'dualize') return; // Dualize mode's click handling lives in render.js (reframe Stage 3)
 
     if (onCellClicked) onCellClicked(cell);
@@ -570,9 +571,10 @@ export function createBuildController({
     } else {
       // e.g. Walk mode active (falsy) -- general editing stays disabled.
       // 'bcc' -- BCC mode's own right-click removal lives in core/bcc-build.js.
+      // 'cubocta' -- same, lives in core/cubocta-build.js.
       // 'dualize' -- view-only (reframe Stage 3): right-click must not
       // delete the clicked cell, same reasoning as every other read-only mode.
-      if (!mode || mode === 'bcc' || mode === 'dualize') return;
+      if (!mode || mode === 'bcc' || mode === 'cubocta' || mode === 'dualize') return;
       // Add's own quick Remove gesture (direct instruction 2026-08-26,
       // for touch: tap to Add, long-press to Remove -- long-press is
       // already wired to synthesize this exact event, see onTouchStart
