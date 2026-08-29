@@ -2742,6 +2742,20 @@ async function init() {
       // toward the camera so it deterministically wins, eliminating the
       // fight instead of just hiding it.
       polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+      // Follow-up report, still visible while actually orbiting the
+      // camera (a static-frame diff alone didn't catch this): adjacent
+      // cells' own overlay pieces can overlap each other too, not just
+      // the real world -- a SINGLE mesh's own internal triangles still
+      // depth-test/write against each other, so two overlapping
+      // translucent pieces drawn in front of each other from different
+      // angles produced a shifting double-layered "ghost" patch as the
+      // view rotated. depthWrite:false is the exact same fix already
+      // established elsewhere in this file for a translucent preview
+      // mesh (X-Ray's own opacity-fade code, see updateSectionEnabled's
+      // history) -- the overlay still tests against the real world's
+      // own depth buffer (correct occlusion), it just stops writing
+      // depth values of its own for its own triangles to fight over.
+      depthWrite: false,
     }));
     s.add(latticeQuickViewMesh);
     latticeQuickViewEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({ color: 0xffffff }));
@@ -3083,9 +3097,11 @@ async function init() {
       color: SKELETON_COLOR, emissive: SKELETON_COLOR, emissiveIntensity: 0.6, flatShading: true,
       transparent: true, opacity: 0.55, metalness: 0.1, roughness: 0.6,
       // Same real z-fighting fix as Lattice Quick-View's own mesh (see
-      // its own comment) -- Dualize's preview genuinely touches real
-      // built geometry at real contact points too.
+      // its own comments) -- Dualize's preview genuinely touches real
+      // built geometry at real contact points too, and can self-overlap
+      // across adjacent region cells the same way.
       polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+      depthWrite: false,
     }));
     scene.add(dualizePreviewMesh);
     dualizePreviewEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({ color: 0xffffff }));
