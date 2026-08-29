@@ -2350,6 +2350,20 @@ async function init() {
           const value = action.slice('tool:pieceType:'.length);
           const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Octahedron Site', idis: 'Disphenoid' };
           document.getElementById('piece-type-select').value = value;
+          // Real bug, caught live 2026-08-29: picking a piece type here
+          // only ever updated the <select> value -- it never touched
+          // currentMode. A player who'd entered some OTHER mode first
+          // (most commonly Cuboctahedron/BCC Build, now trivially easy
+          // to reach from this same wheel) stayed stuck there: the piece
+          // indicator and this HUD prompt both said the pick worked, but
+          // every subsequent World click kept routing to whichever build
+          // mode was still active, not the intended Add -- "not even
+          // letting me place RD" was this, not a placement-logic bug.
+          // 'build'/'chisel' (Add/Remove) are both genuinely piece-type-
+          // aware -- e.g. Remove + Pyramid removes just one pyramid -- so
+          // those are left alone; anything else falls back to plain Add,
+          // since picking what to place only makes sense there.
+          if (currentMode !== 'build' && currentMode !== 'chisel') clickMode('build');
           updateHudIndicator();
           showHudPrompt(`Piece: ${PIECE_LABELS[value] ?? value}`, 3000);
           return;

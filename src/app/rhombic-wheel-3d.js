@@ -576,7 +576,19 @@ export function createRhombicWheel3D({
   renderer.domElement.addEventListener('click', (ev) => {
     if (dragDistance > DRAG_CLICK_SUPPRESS_PX) return;
     const key = pickFace(ev.clientX, ev.clientY);
-    if (key) selectFace(key);
+    if (key) { selectFace(key); return; }
+    // Real gap, caught live 2026-08-29: picking a piece type deliberately
+    // keeps this wheel open (so Material can be picked right after, see
+    // WHEEL_PIECE's own onAction comment) -- but the wheel's own canvas
+    // fills the whole screen, so the very next tap a player makes,
+    // expecting it to reach the World underneath, silently lands on
+    // empty wheel background and does nothing instead. The only way back
+    // was the small "x" in the corner, easy to miss -- "not even letting
+    // me place RD" traced back to exactly this. A tap on genuinely empty
+    // background (no face under it, and not a drag) now closes the wheel,
+    // the same tap-outside-to-dismiss gesture most modal UI already uses
+    // -- tapping an actual face (including Material) is unaffected.
+    close();
   });
   closeBtn.addEventListener('click', () => close());
   window.addEventListener('resize', () => { if (overlay.classList.contains('open')) resize(); });
