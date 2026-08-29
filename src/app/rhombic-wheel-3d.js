@@ -59,7 +59,6 @@ const ACTION_TO_MARK = {
   'navigateTo:cultivate': 'rhombivate',
   'navigateTo:rhombisis': 'rhombisis',
   'navigateTo:explore': 'explore',
-  openLenses: 'lenses',
   openAlmanac: 'almanac',
   openCyborg: 'cyborg',
   // 2026-08-26 second pass -- see wheel-icons.js for full design notes
@@ -91,6 +90,9 @@ const ACTION_TO_MARK = {
   // BCC Build: same mark as the HUD wheel's own icon, now on the main
   // wheel too.
   'tool:bccBuild': 'bccBuild',
+  // Cuboctahedron Build (Piece, 2026-08-29): reuses the same pinwheel
+  // mark Lattice Quick-View already uses for this shape.
+  'tool:cuboctaBuild': 'cuboctahedron',
 };
 // Reveal timing (spec section 3): explicitly left tunable by the spec
 // itself ("needs real testing on touch devices"), not a fixed value --
@@ -190,7 +192,7 @@ function injectCssOnce() {
 }
 
 export function createRhombicWheel3D({
-  onAction, // (actionString) => void -- caller resolves navigateHome/navigateTo:x/tool:x/openLenses/etc.
+  onAction, // (actionString) => void -- caller resolves navigateHome/navigateTo:x/tool:x/openLab/etc.
   getWorkspaceMode, // () => 'model' | 'world' -- read fresh on every build, not snapshotted at construction (reframe Stage 2)
 } = {}) {
   injectCssOnce();

@@ -2266,14 +2266,14 @@ async function init() {
     const wheel3D = createRhombicWheel3D({
       getWorkspaceMode: () => workspaceMode,
       onAction: (action) => {
-        // openCyborg/openLab reuse the real, already-shipped toggles;
-        // openLenses maps to the closest existing single control
-        // (X-Ray) -- see rhombic-wheel-3d-core.js's UNIVERSAL_RING
-        // comment for why this isn't a clean 1:1 match. openAlmanac has
-        // no existing counterpart yet and is a stub.
+        // openCyborg/openLab reuse the real, already-shipped toggles.
+        // openAlmanac has no existing counterpart yet and is a stub.
+        // (openLenses/X-Ray was dropped from the universal ring
+        // 2026-08-29 -- X-Ray stays reachable via the corner HUD wheel's
+        // own #xray-toggle face and the Lab panel, so no wheel face
+        // routes to it here any more.)
         if (action === 'openCyborg') { wheel3D.close(); cyborgToggleEl?.click(); return; }
         if (action === 'openLab') { wheel3D.close(); labToggleEl?.click(); return; }
-        if (action === 'openLenses') { wheel3D.close(); document.getElementById('xray-toggle')?.click(); return; }
         if (action === 'openAlmanac') { showHudPrompt('Almanac is not built yet.', 3000); return; }
         // Explore (Rhombinaut) is a single destination, not a wheel --
         // reuses the real existing action (#walk-toggle, same trigger
@@ -2422,6 +2422,23 @@ async function init() {
           }
           clickMode('bcc');
           showHudPrompt('BCC Build: click a face to place a BCC lattice cell (or a face of your normal World to start one nearby). Right-click removes.', 4500);
+          return;
+        }
+
+        // --- Piece: Cuboctahedron Build (core/cubocta-build.js), the RD
+        // lattice's own dual shape -- 2026-08-29, freed onto Piece's
+        // top|sy1sz1 slot by dropping Lenses from the universal ring.
+        // Same shim/gate pattern as tool:bccBuild above (defense-in-depth
+        // Rhombeometry-only check, even though #cubocta-build-toggle is
+        // already hidden by CSS in Full Game World).
+        if (action === 'tool:cuboctaBuild') {
+          wheel3D.close();
+          if (!FEATURES.bccLattice) {
+            showHudPrompt('Cuboctahedron Build is Rhombeometry-only -- switch modes in the Lab panel first.', 4000);
+            return;
+          }
+          clickMode('cubocta');
+          showHudPrompt('Cuboctahedron Build: click a face of your normal World to place a cuboctahedron there, or near a POINT of an existing one to grow toward that neighbor. Right-click removes.', 4500);
           return;
         }
 

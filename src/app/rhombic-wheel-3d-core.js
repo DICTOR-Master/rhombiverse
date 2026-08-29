@@ -132,14 +132,17 @@ export const LABEL_STYLE = {
 //
 // Action mapping to real, already-shipped UI (see Phase 0/1 report):
 // openCyborg -> #cyborg-toggle, openLab -> #lab-toggle already exist
-// and do the described thing. openLenses is mapped to the closest
-// existing single control, #xray-toggle (X-Ray is one of the three
-// "lenses" named in the doc; Math/Polyhedral-Morph lenses don't exist
-// yet as separate controls) -- flagged as a judgment call, not a 1:1
-// match. openAlmanac has no existing counterpart and is a stub.
+// and do the described thing. openAlmanac has no existing counterpart
+// and is a stub.
+//
+// 2026-08-29: "Lenses" (openLenses / X-Ray) was dropped from this ring
+// on direct instruction ("lenses are amply catered for now so can come
+// off universal ring") -- X-Ray is already reachable from the corner
+// HUD wheel and the Lab panel, so the universal-ring seat was
+// redundant. Its freed key (top|sy1sz1) is no longer auto-injected;
+// every wheel below now declares that key itself -- real content
+// where one exists (Piece -> Cuboctahedron), SPARE everywhere else.
 export const UNIVERSAL_RING = {
-  "top|sy1sz1":  { kind: "universal", label: "Lenses",         action: "openLenses",
-                   desc: "X-Ray / Math / Polyhedral Morph lenses — view-only overlays, available from anywhere." },
   "top|sy-1sz1": { kind: "universal", label: "Cyborg",         action: "openCyborg",
                    desc: "Assistance Spectrum controls — Manual, Semi-Cyborg, Full-Cyborg tiers." },
   "top|sx1sz1":  { kind: "universal", label: "Lab / Settings", action: "openLab",
@@ -190,6 +193,7 @@ const WORLD_ONLY_FACE_ACTIONS = new Set([
   "navigateTo:explore",   // Explore -- grouped with the dynamic side per the reframe brief's own "Grow/Explore/Simulate"
   "tool:plant",           // Rhombisis's Plant a Seed
   "tool:bccBuild",        // Rhombisis's BCC Build
+  "tool:cuboctaBuild",    // Piece's Cuboctahedron Build
 ]);
 
 // Applied after resolveWheelFaces(), never before -- operates on the
@@ -298,7 +302,12 @@ export const WHEEL_HOME = {
     "bottom|sx1sz-1":   { kind: "dept", label: "Rhombivate", action: "navigateTo:cultivate", temporary: true,
       desc: "Plant, Prune, and Growth Parameters for the organic/Penrose layer. Duplicated here for quick access from a spare slot." },
     "bottom|sx-1sz-1":  { kind: "dept", label: "Construct", action: "navigateTo:construct", temporary: true,
-      desc: "Build and Alter modules live here. Duplicated here for quick access from a spare slot." }
+      desc: "Build and Alter modules live here. Duplicated here for quick access from a spare slot." },
+    // top|sy1sz1 freed up 2026-08-29 (Lenses dropped from the universal
+    // ring). No non-colliding real or duplicate content identified for
+    // Home yet -- left as a genuine SPARE, same as this file's standing
+    // convention elsewhere.
+    "top|sy1sz1":       SPARE
   }
 };
 
@@ -351,7 +360,10 @@ export const WHEEL_CONSTRUCT = {
     // exists for these two slots, so they stay open rather than forcing
     // a violation of the mirror-opposite/least-adjacent duplicate rule.
     "bottom|sx1sz-1":   SPARE,
-    "bottom|sx-1sz-1":  SPARE
+    "bottom|sx-1sz-1":  SPARE,
+    // top|sy1sz1 freed up 2026-08-29 (Lenses dropped from the universal
+    // ring). No non-colliding content for this routing wheel -- SPARE.
+    "top|sy1sz1":       SPARE
   }
 };
 
@@ -404,20 +416,28 @@ export const WHEEL_BUILD = {
     // (kind: 'placeholder'), not a real feature being ported -- added
     // here for full flow-parity, not invented beyond what exists.
     "bottom|sx1sz-1":  { kind: "dept", label: "Repeat", action: "tool:repeat", desc: "Drag across faces to place a run of cells." },
-    "bottom|sx-1sz-1": { kind: "dept", label: "Pattern", action: "tool:pattern", desc: "Pattern stamping is coming soon." }
+    "bottom|sx-1sz-1": { kind: "dept", label: "Pattern", action: "tool:pattern", desc: "Pattern stamping is coming soon." },
+    // top|sy1sz1 freed up 2026-08-29 (Lenses dropped from the universal
+    // ring). SPARE -- Material and Piece already both live on this wheel.
+    "top|sy1sz1":      SPARE
   }
 };
 
 // Piece (added 2026-08-28, replacing the separate piece-cluster-3d.js
 // widget -- see WHEEL_BUILD's own comment above for the full reasoning).
-// Exactly 6 real piece tiers exist and exactly 6 non-reserved,
-// non-universal face slots are available on any wheel (4 equator + 3
-// bottom, since bottom|sy-1sz-1 is always the injected 5th/Home slot) --
-// so, unusually for this file, every real slot here is genuine content,
-// no SPARE and no temporary duplicate needed. Terminal actions
-// ("tool:pieceType:<value>"), not further navigateTo: hops -- picking a
-// piece sets core/build.js's own getPieceType() value and returns, the
-// same as every other terminal tool: action in this file.
+// Originally exactly 6 real piece tiers filled the 6 available
+// non-reserved, non-universal slots (4 equator + 3 bottom) with no
+// SPARE or duplicate needed. 2026-08-29: Cuboctahedron Build (a real,
+// separate persistent-World system, same shape as BCC Build -- see
+// core/cubocta-build.js) needed a 7th seat and this wheel was already
+// completely full, so "Lenses" was dropped from the shared universal
+// ring entirely (direct instruction: "lenses are amply catered for now
+// so can come off universal ring" -- X-Ray/Lenses is already reachable
+// via the corner HUD wheel and the Lab panel). That freed top|sy1sz1
+// for real content here. Not a "tool:pieceType:*" terminal like its
+// siblings -- Cuboctahedron Build is its own click-to-place/grow mode
+// (like BCC Build on WHEEL_RHOMBISIS), so it uses the matching
+// "tool:cuboctaBuild" action instead.
 export const WHEEL_PIECE = {
   id: "piece",
   faces: {
@@ -436,6 +456,8 @@ export const WHEEL_PIECE = {
     // a real already-working feature, same as how Material first got
     // added to WHEEL_BUILD and Remove to WHEEL_ALTER).
     "bottom|sx-1sz-1":  { kind: "dept", label: "Material", action: "tool:material", desc: "Pick a build material." },
+    "top|sy1sz1":       { kind: "dept", label: "Cuboctahedron", action: "tool:cuboctaBuild",
+      desc: "Place cells on the RD lattice's dual -- vertex-pointed cuboctahedra -- alongside your normal World (Rhombeometry only)." },
   }
 };
 
@@ -478,12 +500,15 @@ export const WHEEL_ALTER = {
     // non-functional stub (see comment above), duplicating "not built
     // yet" would just be misleading clutter.
     "bottom|sx-1sz-1": { kind: "dept", label: "Smooth", action: "tool:smooth", temporary: true,
-      desc: "Round mode -- click to smooth a corner. Duplicated here for quick access from a spare slot." }
+      desc: "Round mode -- click to smooth a corner. Duplicated here for quick access from a spare slot." },
     // Note: Dig already has 2 copies (original + equator-antipode
     // duplicate) which between them saturate both edge-adjacent
     // neighbors of every open bottom slot here -- no 3rd copy of Dig
     // can avoid colliding with a sibling, so it isn't force-duplicated
     // a 3rd time.
+    // top|sy1sz1 freed up 2026-08-29 (Lenses dropped from the universal
+    // ring). SPARE -- no non-colliding real or duplicate content found.
+    "top|sy1sz1":      SPARE
   }
 };
 
@@ -513,7 +538,10 @@ export const WHEEL_RHOMBITECT = {
     "bottom|sx1sz-1":  { kind: "dept", label: "Generate a Body", action: "tool:generateBody", temporary: true,
       desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...). Duplicated here for quick access from a spare slot." },
     "bottom|sx-1sz-1": { kind: "dept", label: "Dome", action: "tool:dome", temporary: true,
-      desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it. Duplicated here for quick access from a spare slot." }
+      desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it. Duplicated here for quick access from a spare slot." },
+    // top|sy1sz1 freed up 2026-08-29 (Lenses dropped from the universal
+    // ring). SPARE -- no non-colliding real or duplicate content found.
+    "top|sy1sz1":      SPARE
   }
 };
 
@@ -547,7 +575,10 @@ export const WHEEL_CULTIVATE = {
     // it fills the slot with genuinely new coverage instead of a
     // colliding 3rd copy of Plant.
     "bottom|sx-1sz-1": { kind: "dept", label: "Prune", action: "tool:prune", temporary: true,
-      desc: "Sets Plant mode -- right-click an existing growth tile to prune it. Duplicated here for quick access from a spare slot." }
+      desc: "Sets Plant mode -- right-click an existing growth tile to prune it. Duplicated here for quick access from a spare slot." },
+    // top|sy1sz1 freed up 2026-08-29 (Lenses dropped from the universal
+    // ring). SPARE -- no non-colliding real or duplicate content found.
+    "top|sy1sz1":      SPARE
   }
 };
 
@@ -580,7 +611,10 @@ export const WHEEL_TRADE = {
     // so it fills the slot with genuinely new coverage instead of a
     // colliding 3rd copy of Offer.
     "bottom|sx-1sz-1": { kind: "dept", label: "Accept", action: "tool:accept", temporary: true,
-      desc: "Pending trades from others show up in the Lab panel. Duplicated here for quick access from a spare slot." }
+      desc: "Pending trades from others show up in the Lab panel. Duplicated here for quick access from a spare slot." },
+    // top|sy1sz1 freed up 2026-08-29 (Lenses dropped from the universal
+    // ring). SPARE -- no non-colliding real or duplicate content found.
+    "top|sy1sz1":      SPARE
   }
 };
 
@@ -626,7 +660,11 @@ export const WHEEL_RHOMBISIS = {
     // something new into being," alongside this wheel's Sculpt/
     // Generate a Body/Plant a Seed. See core/bcc-build.md.
     "bottom|sx-1sz-1":  { kind: "dept", label: "BCC Build", action: "tool:bccBuild",
-      desc: "Place cells on the dual body-centered-cubic lattice, alongside your normal World (Rhombeometry only)." }
+      desc: "Place cells on the dual body-centered-cubic lattice, alongside your normal World (Rhombeometry only)." },
+    // top|sy1sz1 freed up 2026-08-29 (Lenses dropped from the universal
+    // ring). SPARE -- BCC Build already covers this wheel's own "4th
+    // genesis" slot; no further non-colliding content found.
+    "top|sy1sz1":       SPARE
   }
 };
 
