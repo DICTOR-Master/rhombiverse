@@ -2461,6 +2461,14 @@ async function init() {
         // own mode-btn handler) now shows a real Cuboctahedron icon on
         // the bottom-left quick-select while this mode is active -- see
         // updateQuickSelect()'s own header comment.
+        //
+        // Toast shortened to match tool:pieceType:*'s own "Piece: <X>"
+        // format exactly -- direct instruction ("it will just say CO
+        // like RD does"). The longer click/grow/right-click-removes
+        // explanation this toast used to carry isn't lost -- it's
+        // MODE_HINTS.cubocta above, already shown persistently in the
+        // Lab panel's mode-hint line the whole time this mode is active,
+        // the same place every other mode's own instructions live.
         if (action === 'tool:cuboctaBuild') {
           if (!FEATURES.bccLattice) {
             wheel3D.close();
@@ -2468,7 +2476,7 @@ async function init() {
             return;
           }
           clickMode('cubocta');
-          showHudPrompt('Cuboctahedron Build: click a face of your normal World to place a cuboctahedron there, or near a POINT of an existing one to grow toward that neighbor. Right-click removes.', 4500);
+          showHudPrompt('Piece: CO', 3000);
           return;
         }
 

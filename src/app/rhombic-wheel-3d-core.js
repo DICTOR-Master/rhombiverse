@@ -471,9 +471,13 @@ export const WHEEL_PIECE = {
     // siblings -- it's its own click-to-place/grow mode (like BCC Build
     // on WHEEL_RHOMBISIS), so it uses the matching "tool:cuboctaBuild"
     // action instead. Deliberately NOT on the always-visible top ring --
-    // see this wheel's own header comment above.
-    "bottom|sx-1sz-1":  { kind: "dept", label: "Cuboctahedron", action: "tool:cuboctaBuild",
-      desc: "Place cells on the RD lattice's dual -- vertex-pointed cuboctahedra -- alongside your normal World (Rhombeometry only)." },
+    // see this wheel's own header comment above. Label shortened to "CO"
+    // 2026-08-29, direct instruction ("just say CO like RD does") --
+    // matches this wheel's own existing abbreviation convention (RD,
+    // TO), the full word still appears in desc below and the detail
+    // panel that opens on selection.
+    "bottom|sx-1sz-1":  { kind: "dept", label: "CO", action: "tool:cuboctaBuild",
+      desc: "Cuboctahedron -- place cells on the RD lattice's dual, vertex-pointed cuboctahedra, alongside your normal World (Rhombeometry only)." },
     // Material, reachable here too (also still on WHEEL_BUILD's own
     // equator, unchanged) -- direct user request 2026-08-29 to be able
     // to pick shape and material "close together," i.e. on the same
