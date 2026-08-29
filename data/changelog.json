@@ -1,6 +1,36 @@
 [
   {
     "date": "2026-08-29",
+    "title": "Smoother, Steadier Rendering",
+    "items": [
+      "Fixed: overlapping translucent surfaces in Lattice View and Dualize Preview could flicker/shimmer against your real World and against each other, most visible together with X-Ray. A real rendering issue, now resolved."
+    ]
+  },
+  {
+    "date": "2026-08-29",
+    "title": "X-Ray, All the Way Through",
+    "items": [
+      "Fixed: X-Ray's cross-section used to skip BCC, Octahedron Site, Disphenoid, and Pyramid pieces entirely -- added after X-Ray itself, they never respected the cutaway plane. X-Ray now cuts cleanly through everything you've built."
+    ]
+  },
+  {
+    "date": "2026-08-29",
+    "title": "One Lens for Every Shape",
+    "items": [
+      "New Lattice View: a third icon next to Menu, bottom-left, cycling through a real preview lens for every Piece type -- RD, Cube, and Pyramid shown on your own built World, then BCC/TO, Octahedron Site, and Disphenoid, then Off.",
+      "Replaces the old BCC-only lens and the standalone Interpenetrating Lattice Preview, both retired -- this one covers everything they did and more, across your whole structure rather than just nearby."
+    ]
+  },
+  {
+    "date": "2026-08-29",
+    "title": "A Cleaner HUD",
+    "items": [
+      "Removed the top-right \"Mode · Material\" text -- redundant now that the bottom-left quick-select icons already show your current Piece/Material at a glance.",
+      "The Lab panel now has its own close (✕) button, matching every other panel."
+    ]
+  },
+  {
+    "date": "2026-08-29",
     "title": "New Colors to Build With",
     "items": [
       "Two new buildable materials: Emerald and Gold, right alongside Base Rhomb and the rest in the Material picker."
