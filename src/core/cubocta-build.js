@@ -135,10 +135,52 @@ export function createCuboctaBuildController({
     onChange();
   }
 
+  // Touch long-press -> removal, real bug caught live 2026-08-29
+  // ("having problem removing CO by long touch... cant remove any at
+  // all"): core/build.js's OWN long-press timer, on the exact same
+  // canvas element, calls ITS OWN local onContextMenu directly (a plain
+  // function call, not a dispatched event) and then calls
+  // event.preventDefault() on touchend specifically to stop the browser
+  // from ALSO firing a native 'contextmenu' event afterward -- so the
+  // genuine 'contextmenu' DOM event this controller's own listener above
+  // depends on never arrives on touch at all, regardless of mode. Same
+  // long-press-timer pattern build.js already uses, duplicated here
+  // (not imported/shared) since it's a real DOM/timer concern tied to
+  // this controller's own onContextMenu closure, not pure logic.
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let longPressTimer = null;
+  const LONG_PRESS_MS = 500;
+  const LONG_PRESS_MOVE_TOLERANCE = 12;
+  function onTouchStart(event) {
+    if (!isActive() || event.touches.length !== 1) { clearTimeout(longPressTimer); return; }
+    const t = event.touches[0];
+    touchStartX = t.clientX;
+    touchStartY = t.clientY;
+    clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(() => {
+      onContextMenu({ preventDefault: () => {}, clientX: touchStartX, clientY: touchStartY });
+    }, LONG_PRESS_MS);
+  }
+  function onTouchMove(event) {
+    if (event.touches.length !== 1) { clearTimeout(longPressTimer); return; }
+    const t = event.touches[0];
+    const moved = Math.hypot(t.clientX - touchStartX, t.clientY - touchStartY);
+    if (moved > LONG_PRESS_MOVE_TOLERANCE) clearTimeout(longPressTimer);
+  }
+  function onTouchEnd() { clearTimeout(longPressTimer); }
+
   renderer.domElement.addEventListener('click', onClick);
   renderer.domElement.addEventListener('contextmenu', onContextMenu);
+  renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: true });
+  renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: true });
+  renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: true });
   return function dispose() {
     renderer.domElement.removeEventListener('click', onClick);
     renderer.domElement.removeEventListener('contextmenu', onContextMenu);
+    renderer.domElement.removeEventListener('touchstart', onTouchStart);
+    renderer.domElement.removeEventListener('touchmove', onTouchMove);
+    renderer.domElement.removeEventListener('touchend', onTouchEnd);
+    clearTimeout(longPressTimer);
   };
 }

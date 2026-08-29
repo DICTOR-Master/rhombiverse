@@ -1499,6 +1499,25 @@ async function init() {
   const cuboctaGeometry = buildCuboctaGeometry(SCALE);
   const cuboctaMesh = new THREE.InstancedMesh(cuboctaGeometry, material.clone(), MAX_CELLS);
   cuboctaMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  // Real z-fighting, caught live 2026-08-29 ("epileptic triggering
+  // patterning" -- a genuine dotted/speckled artifact, confirmed via a
+  // real multi-cell cluster screenshot, not a false alarm): a
+  // cuboctahedron's own vertices sit EXACTLY at its host cell's shared
+  // rhombic-face midpoint with each of its 12 real neighbors (core/
+  // lattice.js's cuboctahedronVertices() -- half of NEIGHBOR_OFFSETS,
+  // by construction). Wherever a neighbor cell actually exists there,
+  // the cuboctahedron's own facets run coincident with that neighbor's
+  // real RD face right at the touching vertex -- the exact depth-buffer
+  // tie that produces this project's own established z-fighting
+  // signature (same root cause, same fix, as the Lattice Quick-View/
+  // Dualize preview flicker fixed earlier this session -- see that
+  // fix's own polygonOffset comment). Not a preview/translucent overlay
+  // this time -- real, opaque, permanently-placed geometry -- so this
+  // needed applying directly to cuboctaMesh's own material, not just
+  // the preview overlay materials that already had it.
+  cuboctaMesh.material.polygonOffset = true;
+  cuboctaMesh.material.polygonOffsetFactor = -8;
+  cuboctaMesh.material.polygonOffsetUnits = -8;
   scene.add(cuboctaMesh);
   rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld);
 
