@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells } from './core/lattice.js';
+import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices } from './core/lattice.js';
 import { FULL_PYRAMIDS, presentAxisKeys } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
@@ -2562,17 +2562,18 @@ async function init() {
   // Site/Disphenoid cells) -- those are structurally different features
   // (persistent world-state) from this re-rendering, non-persistent
   // preview.
-  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'bcc', 'octa', 'disphenoid'];
+  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'cubocta', 'bcc', 'octa', 'disphenoid'];
   const LATTICE_QUICK_VIEW_LABELS = {
     off: 'Off.',
     rd: 'RD -- every built cell shown as a complete block.',
     cube: 'Cube -- every built cell shown bare, pyramids hidden.',
     pyramid: "Pyramid -- every built cell's cube and 6 pyramid facets shown as separate pieces.",
+    cubocta: 'Cuboctahedron -- every built cell shown as the real coordination shape reaching to its 12 neighbors.',
     bcc: 'BCC/TO -- every co-locatable built cell shown as its dual truncated octahedron.',
     octa: 'Octahedron Site -- every co-locatable built cell shown as one octahedron bundle.',
     disphenoid: 'Disphenoid -- every co-locatable built cell shown as one disphenoid.',
   };
-  const LATTICE_QUICK_VIEW_MARK_KEY = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', bcc: 'pieceTO', octa: 'pieceOctaSite', disphenoid: 'pieceDisphenoid' };
+  const LATTICE_QUICK_VIEW_MARK_KEY = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', disphenoid: 'pieceDisphenoid' };
   // Fixed axis for octahedron/disphenoid coverage -- matches core/
   // build.js's own bootstrap default for a fresh 'ioct' placement; a
   // representative single orientation per anchor is enough for a
@@ -2702,6 +2703,18 @@ async function init() {
     const cells = w ? w.entries() : [];
     if (isFccFamily) {
       for (const cell of cells) pieces.push(...fccQuickViewPieces(cell, latticeQuickViewMode));
+    } else if (latticeQuickViewMode === 'cubocta') {
+      // Cuboctahedron is native to the SAME FCC lattice as world.entries()
+      // itself (its 12 vertices are exactly NEIGHBOR_OFFSETS -- see
+      // core/lattice.js's own cuboctahedronVertices) -- unlike the BCC-
+      // family modes below, no cross-lattice nearest-point conversion is
+      // needed, one real shape per real cell, same as the FCC-family
+      // modes above.
+      for (const cell of cells) {
+        const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+        const verts = cuboctahedronVertices(SCALE).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
+        pieces.push(new ConvexGeometry(verts));
+      }
     } else {
       // BCC-family modes: nearest BCC dual point(s) for EVERY real cell
       // (not just cells that already happen to sit exactly on a BCC

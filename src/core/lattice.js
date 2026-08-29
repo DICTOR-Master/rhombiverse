@@ -72,6 +72,35 @@ export function neighbors(x, y, z) {
   return NEIGHBOR_OFFSETS.map(([dx, dy, dz]) => [x + dx, y + dy, z + dz]);
 }
 
+// Cuboctahedron: the real FCC "coordination shape" -- the convex hull of
+// a lattice point's 12 nearest neighbors, i.e. NEIGHBOR_OFFSETS itself
+// used as a real polyhedron's vertices rather than just adjacency deltas.
+// RD's own Archimedean dual, the direct FCC-side analog of how the
+// truncated octahedron already serves BCC (dual-lattice.js) -- unlike
+// TO, this needed no new derivation: NEIGHBOR_OFFSETS' 12 vectors are
+// exactly the standard (±1,±1,0)-permutation cuboctahedron vertex set,
+// confirmed numerically before this was written (all 12 equidistant
+// from center, exactly 24 equal-length edges among them, every vertex
+// degree 4, Euler's formula giving the real 8-triangle+6-square face
+// count -- see docs/code-notes/core/lattice.md).
+//
+// Scale: HALF of NEIGHBOR_OFFSETS, not the raw neighbor-distance vectors
+// -- also verified numerically (a real support-function check across all
+// 12 axes, zero excess) before use: at this scale, a cuboctahedron's own
+// vertex touches each real neighbor's midpoint exactly, with NO other
+// vertex projecting farther in that direction, so cuboctahedra centered
+// on adjacent lattice points can only ever touch at that single shared
+// vertex -- never overlap in volume, the same "kiss without overlapping"
+// property bccShapeScaleFor already establishes for BCC/TO.
+export function cuboctahedronShapeScaleFor(s = 1) {
+  return s * 0.5;
+}
+
+export function cuboctahedronVertices(s = 1) {
+  const scale = cuboctahedronShapeScaleFor(s);
+  return NEIGHBOR_OFFSETS.map(([x, y, z]) => [x * scale, y * scale, z * scale]);
+}
+
 export function nearestValidCell(x, y, z) {
   const rx = Math.round(x);
   const ry = Math.round(y);

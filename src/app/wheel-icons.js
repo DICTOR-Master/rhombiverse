@@ -342,6 +342,21 @@ export const MARKS = {
   bccBuild: `
     <polygon points="-30,-15 -15,-30 15,-30 30,-15 30,15 15,30 -15,30 -30,15" ${THIN}/>
     <polygon points="0,-15 15,0 0,15 -15,0" ${THIN}/>`,
+  // Cuboctahedron (Lattice Quick-View, added 2026-08-29): a real
+  // silhouette, not an arbitrary glyph -- viewed down one of its own
+  // 3-fold axes, a cuboctahedron's outline IS a regular hexagon (same
+  // hexPts(32) shape pieceRD's own solid hexagon uses, but that one is
+  // fully filled with no internal division -- here 3 alternating
+  // "slices" are filled and 3 left empty, a real nod to the shape's
+  // own 3.4.3.4 vertex figure: alternating triangular and square
+  // facets around every vertex). Deliberately distinct from both
+  // pieceRD (solid, no pinwheel) and pieceTO (octPts(28), a different
+  // vertex count/silhouette entirely).
+  cuboctahedron: `
+    <polygon points="0,-32 27.71,-16 27.71,16 0,32 -27.71,16 -27.71,-16" ${THIN}/>
+    <polygon points="0,0 0,-32 27.71,-16" fill="currentColor" opacity="0.55"/>
+    <polygon points="0,0 27.71,16 0,32" fill="currentColor" opacity="0.55"/>
+    <polygon points="0,0 -27.71,16 -27.71,-16" fill="currentColor" opacity="0.55"/>`,
 };
 
 // One filled hexagon in a given real color -- for the bottom-left
