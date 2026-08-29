@@ -138,7 +138,7 @@
        at bottom next to menu"). Tapping either reopens straight to
        where that value gets changed (Piece wheel / Material picker),
        not back through Home -- see render.js's updateQuickSelect(). */
-    #hud-quick-shape, #hud-quick-material {
+    #hud-quick-shape, #hud-quick-material, #hud-quick-lattice-view {
       position: fixed; bottom: 8px; z-index: 900;
       width: 36px; height: 36px;
       background: rgba(0, 0, 0, 0.45);
@@ -148,10 +148,19 @@
       display: flex; align-items: center; justify-content: center;
       padding: 0; cursor: pointer;
     }
-    #hud-quick-shape svg, #hud-quick-material svg { width: 24px; height: 24px; }
-    #hud-quick-shape:hover, #hud-quick-material:hover { background: rgba(255, 255, 255, 0.15); }
+    #hud-quick-shape svg, #hud-quick-material svg, #hud-quick-lattice-view svg { width: 24px; height: 24px; }
+    #hud-quick-shape:hover, #hud-quick-material:hover, #hud-quick-lattice-view:hover { background: rgba(255, 255, 255, 0.15); }
     #hud-quick-shape { left: 64px; }
     #hud-quick-material { left: 106px; }
+    /* Lattice View quick-select: third bottom-left icon, direct request
+       2026-08-29 ("a third square at the bottom left going through all
+       options including off") -- cycles the SAME underlying state as
+       the corner HUD wheel's own "BCC Lattice" face (render.js's
+       cycleLatticeQuickView), just a second, more-visible access point.
+       Rhombeometry-only, matching every other BCC/interstitial-lattice
+       control (see FEATURES.bccLattice gating in render.js). */
+    #hud-quick-lattice-view { left: 148px; }
+    #hud-quick-lattice-view.active { border-color: #39ff88; background: rgba(57, 255, 136, 0.18); }
     #lab-toggle {
       position: fixed; top: 12px; right: 12px; z-index: 900;
       width: 30px; height: 30px;
@@ -290,13 +299,14 @@
        and #hud-crosshair are deliberately excluded -- the prompt IS the
        transition's own cue text, and the crosshair fades in/out on its
        own timing (render.js), not this one. */
-    #hud-wordmark, #hud-wheel-cue, #hud-quick-shape, #hud-quick-material, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle {
+    #hud-wordmark, #hud-wheel-cue, #hud-quick-shape, #hud-quick-material, #hud-quick-lattice-view, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle {
       transition: opacity 0.3s ease;
     }
     body.explore-transitioning #hud-wordmark,
     body.explore-transitioning #hud-wheel-cue,
     body.explore-transitioning #hud-quick-shape,
     body.explore-transitioning #hud-quick-material,
+    body.explore-transitioning #hud-quick-lattice-view,
     body.explore-transitioning #lab-toggle,
     body.explore-transitioning #xray-toggle,
     body.explore-transitioning #cyborg-toggle,
@@ -1104,6 +1114,7 @@
   <div id="hud-wheel-cue" title="Tab / Space also opens this">Menu</div>
   <button id="hud-quick-shape" type="button" title="Shape (tap to change)"></button>
   <button id="hud-quick-material" type="button" title="Material (tap to change)"></button>
+  <button id="hud-quick-lattice-view" type="button" title="Lattice View (tap to cycle)"></button>
   <button id="sculpture-mode-toggle" type="button" title="Sculpture Mode: a separate, isolated scratch workspace">◆</button>
   <button id="cyborg-toggle" type="button" title="Cyborg Mode: guided walkthrough">◈</button>
   <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>

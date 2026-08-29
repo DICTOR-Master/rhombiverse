@@ -10,6 +10,7 @@ import { FULL_PYRAMIDS, presentAxisKeys } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { generateBCCLatticePatch, bccDetailVertsFor, bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
+import { generateDisphenoidPatch, generateOctahedronPatch } from './geometry-extensions/interstitial-detail-lattice.js';
 import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS, isBCC } from './geometry-extensions/dual-lattice.js';
 import { createBCCBuildController } from './core/bcc-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
@@ -354,14 +355,15 @@ const ORBIT_LEFT_DEFAULT = controls.mouseButtons.LEFT;
 // Resume the view where it was left last session, instead of always
 // resetting to the fixed default spawn -- fixes a real bug this fed
 // into: the BCC dual-lattice preview (bcc-detail-lattice.js) seeds
-// itself from controls.target (see rebuildBCCLatticeDetail's own
+// itself from controls.target (see rebuildLatticeQuickView's own
 // refPos), so with no restore here, toggling BCC back on next session
 // always reseeded from the DEFAULT (0,0,0) view rather than wherever you
 // were actually standing/looking when you last built against it -- the
 // two would drift apart with no way to tell why. Doesn't touch
-// scheduleBCCRefresh's deliberate live camera-follow while BCC stays
-// toggled on within a session -- that's a separate, already-requested
-// behavior (see that function's own header) and this doesn't change it.
+// scheduleLatticeQuickViewRefresh's deliberate live camera-follow while
+// a hypothetical-lattice mode stays active within a session -- that's a
+// separate, already-requested behavior (see that function's own header)
+// and this doesn't change it.
 {
   const savedCam = loadCameraState();
   if (savedCam) {
@@ -1342,7 +1344,7 @@ async function init() {
   }
 
   wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
-  wireFirstUseHint('bcc-toggle', 'Lattice View: click to cycle five lenses on your World and its dual BCC/truncated-octahedron lattice -- FCC only, TO only, both differentiated, FCC ghosted, or TO ghosted.');
+  wireFirstUseHint('bcc-toggle', 'Lattice View: click to cycle a preview lens through every Piece type -- RD, Cube, Pyramid (shown on your real World), then BCC/TO, Octahedron Site, and Disphenoid (a hypothetical patch near you), then Off.');
   wireFirstUseHint('clear-world-toggle', 'Clear World: erase everything and start fresh from a single seed cell.');
   wireFirstUseHint('reload-toggle', 'Reload: hard-refresh the app if anything looks stuck or stale.');
   wireFirstUseHint('sculpture-mode-toggle', 'Sculpture Mode: a separate, isolated scratch workspace -- nothing here touches your real World.');
@@ -1945,6 +1947,12 @@ async function init() {
     applyStarFusion(world);
     applyDetonationCheck(world);
     rebuildInstances(mesh, world, currentMode === 'report');
+    // Keep an active FCC-family Lattice Quick-View (rd/cube/pyramid) in
+    // sync with your real World -- unlike the hypothetical bcc/octa/
+    // disphenoid modes (camera-follow refresh, see
+    // scheduleLatticeQuickViewRefresh), these modes re-render your own
+    // cells, so a build/remove while one is active should update it too.
+    if (['rd', 'cube', 'pyramid'].includes(latticeQuickViewMode)) rebuildLatticeQuickView();
     planetoids = computePlanetoids(world);
     planetoids = annotateBlackHoles(planetoids, world);
     planetoids = annotateStars(planetoids, world);
@@ -2471,6 +2479,11 @@ async function init() {
 
   const bccToggleBtn = document.getElementById('bcc-toggle');
   if (bccToggleBtn) bccToggleBtn.style.display = FEATURES.bccLattice ? '' : 'none';
+  // Bottom-left Lattice View quick-select icon -- same Rhombeometry-only
+  // gating as the corner HUD wheel's own "BCC Lattice" face, since it
+  // drives the exact same underlying cycle (see cycleLatticeQuickView).
+  const hudQuickLatticeViewEl = document.getElementById('hud-quick-lattice-view');
+  if (hudQuickLatticeViewEl) hudQuickLatticeViewEl.style.display = FEATURES.bccLattice ? '' : 'none';
   // Real BCC cell placement (core/bcc-build.md) -- same Rhombeometry-only
   // gating as the preview toggle above.
   const bccBuildRow = document.getElementById('bcc-build-row');
@@ -2504,168 +2517,189 @@ async function init() {
       opt.hidden = !FEATURES.bccLattice;
     }
   }
-  // Lens Parity (reframe Stage 1): five view modes over the same two
-  // renderables the original boolean BCC-preview toggle already drove --
-  // the active FCC world mesh, and this dual BCC/TO lattice preview mesh.
-  // Deliberately NOT touching bcc-build.js's separate, always-on `bccMesh`
-  // (the player's own real, placed BCC/TO world) -- that's a structurally
-  // different feature (persistent world-state vs. this camera-following,
-  // non-persistent preview) that the reframe brief's five-mode matrix was
-  // never scoped against.
-  const LATTICE_VIEW_MODES = ['fcc-only', 'to-only', 'both-differentiated', 'fcc-ghost', 'to-ghost'];
-  const LATTICE_VIEW_MODE_INFO = {
-    'fcc-only': { fccOpacity: 1, label: 'FCC only -- the dual lattice preview is hidden.' },
-    'to-only': { fccOpacity: 0, label: 'TO only -- your World is hidden, showing only the dual BCC/truncated-octahedron lattice preview.' },
-    'both-differentiated': { fccOpacity: 1, label: 'Both, differentiated -- World and dual lattice shown together at full opacity, in distinct colors and fill styles.' },
-    'fcc-ghost': { fccOpacity: 0.3, label: 'FCC ghost -- your World faded so the dual lattice preview stands out.' },
-    'to-ghost': { fccOpacity: 0.35, label: 'TO ghost -- the dual lattice preview shown against your faded World.' },
+  // Lattice Quick-View (generalizes the old "Lens Parity" system,
+  // 2-lattices/5-modes, into one cycle across ALL SIX Piece-picker
+  // types -- direct request 2026-08-29: "the lattice view button on
+  // the HUD with positions for all lattices," clarified afterward to a
+  // single control cycling through every option including Off, not a
+  // picker with independent per-type toggles. Two real families:
+  // - 'rd'/'cube'/'pyramid': RE-RENDERS your real built World's own
+  //   cells (not a hypothetical nearby patch) as a forced canonical
+  //   shape -- 'rd' shows every cell as a complete block regardless of
+  //   its own partial-pyramid state, 'cube' shows every cell bare, and
+  //   'pyramid' shows the cube plus all 6 pyramid facets as separate
+  //   convex pieces (not one re-hulled shape) so the decomposition
+  //   itself becomes visible in the merged edges. Rebuilt on every
+  //   onChange(), not camera-following -- this is about your structure,
+  //   not a nearby hypothetical.
+  // - 'bcc'/'octa'/'disphenoid': the same "hypothetical lattice near
+  //   you" camera-following preview the old system already had for
+  //   BCC/TO, generalized to the interstitial lattice too via
+  //   geometry-extensions/interstitial-detail-lattice.js's new patch
+  //   generators (the same real growth math core/build.js's own click-
+  //   to-place path already uses).
+  // Deliberately NOT touching bcc-build.js's separate, always-on
+  // `bccMesh` (the player's own real, placed BCC/TO world) or
+  // interstitialStore (the player's own real placed Octahedron
+  // Site/Disphenoid cells) -- those are structurally different features
+  // (persistent world-state) from this camera-following/re-rendering,
+  // non-persistent preview.
+  // Dropped the old system's per-mode ghost/opacity-fade sub-variants
+  // (5 modes over 2 lattices -> 1 canonical treatment per type across
+  // 6): not needed for correctness -- these overlays are all full FCC-
+  // scale ("mathematically consistent and interchangeable" per bcc-
+  // detail-lattice.js's own header), never miniature/nested-inside-one-
+  // cell the way the old opacity-fade fix specifically addressed, so
+  // they read fine poking out of real geometry unaided, same as
+  // Dualize/Interpenetrate already do.
+  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'bcc', 'octa', 'disphenoid'];
+  const LATTICE_QUICK_VIEW_LABELS = {
+    off: 'Off.',
+    rd: 'RD -- every built cell shown as a complete block.',
+    cube: 'Cube -- every built cell shown bare, pyramids hidden.',
+    pyramid: "Pyramid -- every built cell's cube and 6 pyramid facets shown as separate pieces.",
+    bcc: 'BCC/TO -- the dual truncated-octahedron lattice near you.',
+    octa: 'Octahedron Site -- the BCC interstitial octahedron sites near you.',
+    disphenoid: 'Disphenoid -- the BCC interstitial disphenoid tessellation near you.',
   };
-  let latticeViewMode = 'fcc-only';
-  let bccLatticeMesh = null;
-  let bccLatticeEdges = null; // wireframe overlay, only used in both-differentiated
-  // Real bug found live (2026-08-28): rebuildBCCLatticeDetail() is called
-  // from two places that can overlap -- a click AND the recurring 250ms
-  // refresh timer (scheduleBCCRefresh) -- and only checked latticeViewMode
-  // once, at the very start. A call already in flight when the player
-  // switched modes (e.g. to fcc-only) would finish its own async work
-  // (the dynamic import below) AFTER the newer call had already cleared
-  // the scene, and re-add a mesh for a mode that no longer applies --
-  // reproduced by cycling the lens quickly enough for a stale in-flight
-  // refresh to land after a mode-switching click. Guarded the standard
-  // way: a generation counter, bumped at the start of every call; if a
-  // newer call has started by the time this one's await resolves, this
-  // one discards its own result instead of touching the scene.
-  let bccLatticeGeneration = 0;
-  let bccRefreshTimer = null;
-  let bccRefreshLoopActive = false;
-  async function rebuildBCCLatticeDetail() {
-    const myGeneration = ++bccLatticeGeneration;
+  const LATTICE_QUICK_VIEW_MARK_KEY = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', bcc: 'pieceTO', octa: 'pieceOctaSite', disphenoid: 'pieceDisphenoid' };
+  const LATTICE_QUICK_VIEW_HYPOTHETICAL_MODES = ['bcc', 'octa', 'disphenoid'];
+  let latticeQuickViewMode = 'off';
+  let latticeQuickViewMesh = null;
+  let latticeQuickViewEdges = null;
+  // Real bug the old system already hit and fixed live (2026-08-28),
+  // same guard needed here: rebuildLatticeQuickView() can be called from
+  // two places that overlap (a click AND the recurring refresh timer
+  // below) -- a generation counter, bumped at the start of every call,
+  // lets a call whose own await resolves AFTER a newer call already
+  // started discard its stale result instead of touching the scene.
+  let latticeQuickViewGeneration = 0;
+  let latticeQuickViewRefreshTimer = null;
+  let latticeQuickViewRefreshActive = false;
+
+  function clearLatticeQuickView() {
+    if (latticeQuickViewMesh) {
+      latticeQuickViewMesh.parent?.remove(latticeQuickViewMesh);
+      latticeQuickViewMesh.geometry.dispose();
+      latticeQuickViewMesh.material.dispose();
+      latticeQuickViewMesh = null;
+    }
+    if (latticeQuickViewEdges) {
+      latticeQuickViewEdges.parent?.remove(latticeQuickViewEdges);
+      latticeQuickViewEdges.geometry.dispose();
+      latticeQuickViewEdges.material.dispose();
+      latticeQuickViewEdges = null;
+    }
+  }
+
+  // FCC-family modes: real per-piece convex geometries kept SEPARATE
+  // (not one big re-hulled shape) so their internal seams survive into
+  // the merged EdgesGeometry -- needed for 'pyramid' mode to actually
+  // show the 6-facet decomposition, not just the outer RD silhouette a
+  // single convex hull over all points would collapse down to.
+  function fccQuickViewPieces(cell, mode) {
+    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+    const shift = (pts) => pts.map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
+    if (mode === 'rd') return [new ConvexGeometry(shift(rdRawVerts(SCALE)))];
+    const { cube, pyramids } = pyramidPieces(SCALE);
+    if (mode === 'cube') return [new ConvexGeometry(shift(cube))];
+    const pieces = [new ConvexGeometry(shift(cube))];
+    for (const axisKey of Object.keys(pyramids)) {
+      const { base, apex } = pyramids[axisKey];
+      pieces.push(new ConvexGeometry(shift([...base, apex])));
+    }
+    return pieces;
+  }
+
+  async function rebuildLatticeQuickView() {
+    const myGeneration = ++latticeQuickViewGeneration;
+    clearLatticeQuickView();
+    if (latticeQuickViewMode === 'off') return;
     const { world: w, scene: s } = activeWorldTriple();
-    if (bccLatticeMesh) {
-      s.remove(bccLatticeMesh);
-      bccLatticeMesh.geometry.dispose();
-      bccLatticeMesh.material.dispose();
-      bccLatticeMesh = null;
-    }
-    if (bccLatticeEdges) {
-      s.remove(bccLatticeEdges);
-      bccLatticeEdges.geometry.dispose();
-      bccLatticeEdges.material.dispose();
-      bccLatticeEdges = null;
-    }
-    if (latticeViewMode === 'fcc-only') return;
-    const cells = w ? w.entries() : [];
-    if (cells.length === 0) return;
-    // controls.target (the real look-at point, same convention already
-    // used elsewhere in this file, e.g. updateGravityInfo) -- NOT
-    // camera.position, which sits offset from the structure by the whole
-    // orbit distance. Real bug found via live testing (2026-08-25):
-    // seeding from camera.position put the patch off near the camera
-    // itself, not overlapping the actual visible world content.
-    const refPos = walking && player ? [player.getPosition().x, player.getPosition().y, player.getPosition().z] : [controls.target.x, controls.target.y, controls.target.z];
-    // One real, connected BCC lattice patch seeded near the camera's
-    // look-at point -- NOT derived per FCC parent cell, so it stays
-    // continuous across FCC-FCC seams (see bcc-detail-lattice.js's own
-    // header for why the earlier per-cell design read as disconnected
-    // islands).
-    const subCells = generateBCCLatticePatch(refPos, SCALE);
     const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
     // A newer call (a later click, or the recurring refresh timer) may
     // have started and already handled the scene while this one was
     // awaiting the import above -- discard this stale result instead of
     // clobbering that newer state or adding a mesh for a mode that may
     // no longer be current.
-    if (myGeneration !== bccLatticeGeneration) return;
+    if (myGeneration !== latticeQuickViewGeneration) return;
+
     const pieces = [];
-    for (const sub of subCells) {
-      const verts = bccDetailVertsFor(sub).map(([x, y, z]) => new THREE.Vector3(x, y, z));
-      pieces.push(new ConvexGeometry(verts));
+    if (latticeQuickViewMode === 'rd' || latticeQuickViewMode === 'cube' || latticeQuickViewMode === 'pyramid') {
+      for (const cell of (w ? w.entries() : [])) pieces.push(...fccQuickViewPieces(cell, latticeQuickViewMode));
+    } else {
+      // controls.target (the real look-at point, same convention already
+      // used elsewhere in this file, e.g. updateGravityInfo) -- NOT
+      // camera.position, which sits offset from the structure by the
+      // whole orbit distance (real bug found via live testing of the old
+      // BCC-only version of this, 2026-08-25: seeding from camera.
+      // position put the patch off near the camera itself, not
+      // overlapping the actual visible world content).
+      const refPos = walking && player
+        ? [player.getPosition().x, player.getPosition().y, player.getPosition().z]
+        : [controls.target.x, controls.target.y, controls.target.z];
+      if (latticeQuickViewMode === 'bcc') {
+        for (const sub of generateBCCLatticePatch(refPos, SCALE)) {
+          pieces.push(new ConvexGeometry(bccDetailVertsFor(sub).map(([x, y, z]) => new THREE.Vector3(x, y, z))));
+        }
+      } else {
+        const patch = latticeQuickViewMode === 'octa' ? generateOctahedronPatch(refPos, SCALE) : generateDisphenoidPatch(refPos, SCALE);
+        for (const verts of patch) pieces.push(new ConvexGeometry(verts.map(([x, y, z]) => new THREE.Vector3(x, y, z))));
+      }
     }
+    if (pieces.length === 0) return;
     const merged = mergeGeometries(pieces, false);
     pieces.forEach((g) => g.dispose());
-    // 'both-differentiated' pairs a distinct color with a distinct fill
-    // style -- a real wireframe edge overlay -- rather than color alone,
-    // reusing SKELETON_COLOR, this project's own existing "translucent
-    // fill + line outline" convention (rhombic-wheel-3d-core.js's wheel
-    // faces / piece-cluster-3d.js), instead of inventing a new
-    // colorblind-safe pairing from scratch. Every other mode keeps the
-    // preview's original plain green, unchanged.
-    const differentiated = latticeViewMode === 'both-differentiated';
-    const toColor = differentiated ? SKELETON_COLOR : 0x39ff88;
-    bccLatticeMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
-      color: toColor, emissive: toColor, emissiveIntensity: 0.7, flatShading: true, metalness: 0.1, roughness: 0.6,
+    latticeQuickViewMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
+      color: SKELETON_COLOR, emissive: SKELETON_COLOR, emissiveIntensity: 0.6, flatShading: true,
+      transparent: true, opacity: 0.55, metalness: 0.1, roughness: 0.6,
     }));
-    s.add(bccLatticeMesh);
-    if (differentiated) {
-      bccLatticeEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({ color: 0xffffff }));
-      s.add(bccLatticeEdges);
-    }
+    s.add(latticeQuickViewMesh);
+    latticeQuickViewEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({ color: 0xffffff }));
+    s.add(latticeQuickViewEdges);
   }
-  // Live re-triggering while active -- mirrors Lattice Zoom's own
-  // scheduleSubLatticeRefresh throttled-loop pattern, reusing the same
-  // adaptive-damping throttle functions, so BCC detail keeps following the
-  // camera instead of freezing at whatever position it was toggled on at.
-  function scheduleBCCRefresh() {
-    bccRefreshTimer = setTimeout(async () => {
-      if (latticeViewMode === 'fcc-only') { bccRefreshLoopActive = false; return; }
+  // Live re-triggering while active, hypothetical-lattice modes only
+  // ('bcc'/'octa'/'disphenoid' -- the FCC-family modes are tied to your
+  // real World's own cells, refreshed via onChange() instead, not the
+  // camera) -- mirrors Lattice Zoom's own scheduleSubLatticeRefresh
+  // throttled-loop pattern, so the preview keeps following the camera
+  // instead of freezing at whatever position it was toggled on at.
+  function scheduleLatticeQuickViewRefresh() {
+    latticeQuickViewRefreshTimer = setTimeout(async () => {
+      if (!LATTICE_QUICK_VIEW_HYPOTHETICAL_MODES.includes(latticeQuickViewMode)) { latticeQuickViewRefreshActive = false; return; }
       try {
-        await rebuildBCCLatticeDetail();
+        await rebuildLatticeQuickView();
       } catch (err) {
-        console.error('[BCC refresh error]', err);
+        console.error('[Lattice Quick-View refresh error]', err);
       }
-      scheduleBCCRefresh();
+      scheduleLatticeQuickViewRefresh();
     }, SUB_LATTICE_THROTTLE_BASE_MS);
   }
-  // Nested detail sitting entirely inside an opaque parent cell is
-  // invisible from outside by construction -- real symptom found via live
-  // testing (2026-08-25): the mesh built correctly (confirmed via direct
-  // instrumentation) but never showed up on screen except once, by
-  // accident, when the camera happened to be clipped inside a freshly
-  // placed, still-open cell. Real fix: make the world semi-transparent
-  // whenever the FCC side of the current lens isn't at full opacity, the
-  // same "temporarily change how the main mesh renders" move Duality Mode
-  // already makes (there: fully hidden; here: see-through/hidden-via-
-  // opacity, since unlike Duality this preview is meant to be seen
-  // alongside -- or, in to-only, instead of -- the real world, using
-  // opacity rather than `.visible` so raycasting/build clicks are
-  // unaffected either way) -- restored exactly when the lens returns to
-  // fcc-only.
-  bccToggleBtn?.addEventListener('click', async () => {
-    const currentIdx = LATTICE_VIEW_MODES.indexOf(latticeViewMode);
-    latticeViewMode = LATTICE_VIEW_MODES[(currentIdx + 1) % LATTICE_VIEW_MODES.length];
-    bccToggleBtn.classList.toggle('active', latticeViewMode !== 'fcc-only');
-    const activeMesh = sculptureModeActive ? sculptureMesh : mesh;
-    const { fccOpacity, label } = LATTICE_VIEW_MODE_INFO[latticeViewMode];
-    if (fccOpacity < 1) {
-      activeMesh.material.transparent = true;
-      activeMesh.material.opacity = fccOpacity;
-      // transparent alone still writes to the depth buffer -- real bug
-      // found via live testing (2026-08-25): a see-through (or fully
-      // invisible-but-still-opaque-to-depth) parent still fully occludes
-      // anything behind it despite LOOKING translucent. depthWrite:false
-      // is the standard fix for a translucent object that must not block
-      // what's behind it.
-      activeMesh.material.depthWrite = false;
-    } else {
-      activeMesh.material.transparent = false;
-      activeMesh.material.opacity = 1;
-      activeMesh.material.depthWrite = true;
+  function updateLatticeQuickViewIcon() {
+    const el = document.getElementById('hud-quick-lattice-view');
+    if (!el) return;
+    const markKey = LATTICE_QUICK_VIEW_MARK_KEY[latticeQuickViewMode];
+    el.innerHTML = iconFrame(markKey ? MARKS[markKey] : '', { title: `Lattice View: ${latticeQuickViewMode === 'off' ? 'Off' : latticeQuickViewMode}` });
+  }
+  async function cycleLatticeQuickView() {
+    const currentIdx = LATTICE_QUICK_VIEW_MODES.indexOf(latticeQuickViewMode);
+    latticeQuickViewMode = LATTICE_QUICK_VIEW_MODES[(currentIdx + 1) % LATTICE_QUICK_VIEW_MODES.length];
+    const isOn = latticeQuickViewMode !== 'off';
+    bccToggleBtn?.classList.toggle('active', isOn);
+    document.getElementById('hud-quick-lattice-view')?.classList.toggle('active', isOn);
+    updateLatticeQuickViewIcon();
+    showHudPrompt(`Lattice View: ${LATTICE_QUICK_VIEW_LABELS[latticeQuickViewMode]}`, 4500);
+    if (latticeQuickViewRefreshTimer) { clearTimeout(latticeQuickViewRefreshTimer); latticeQuickViewRefreshTimer = null; }
+    latticeQuickViewRefreshActive = false;
+    await rebuildLatticeQuickView();
+    if (LATTICE_QUICK_VIEW_HYPOTHETICAL_MODES.includes(latticeQuickViewMode)) {
+      latticeQuickViewRefreshActive = true;
+      scheduleLatticeQuickViewRefresh();
     }
-    activeMesh.material.needsUpdate = true; // transparent's blend-state change needs a real program recompile, not just the opacity value
-    showHudPrompt(`Lattice View: ${label}`, 4500);
-    if (latticeViewMode === 'fcc-only') {
-      if (bccRefreshTimer) clearTimeout(bccRefreshTimer);
-      bccRefreshTimer = null;
-      bccRefreshLoopActive = false;
-      await rebuildBCCLatticeDetail(); // clears any existing preview mesh/edges
-    } else {
-      await rebuildBCCLatticeDetail();
-      if (!bccRefreshLoopActive) {
-        bccRefreshLoopActive = true;
-        scheduleBCCRefresh();
-      }
-    }
-  });
+  }
+  bccToggleBtn?.addEventListener('click', cycleLatticeQuickView);
+  document.getElementById('hud-quick-lattice-view')?.addEventListener('click', cycleLatticeQuickView);
+  updateLatticeQuickViewIcon();
 
   const shellCountInput = document.getElementById('shell-count');
   const hollowFromInput = document.getElementById('hollow-from');
