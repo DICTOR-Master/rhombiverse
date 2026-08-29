@@ -13,6 +13,7 @@ import {
   parseCellKey,
   cellToWorld,
   pyramidPieces,
+  PYRAMID_AXES,
 } from './lattice.js';
 import {
   applyPyramidEdit,
@@ -21,6 +22,9 @@ import {
   bootstrapPyramidCell,
   addCubeToCell,
   hasCube,
+  hasPyramid,
+  effectivePyramids,
+  nearestPyramidAxis,
 } from './pyramid.js';
 import { generatePlanetoid } from '../geometry-extensions/planetoidgen.js';
 import { nearestBCCCell } from '../geometry-extensions/dual-lattice.js';
@@ -510,6 +514,38 @@ export function createBuildController({
     // just with or without pyramids: 0 explicitly set (absent means FULL
     // per core/pyramid.js).
     if (getPieceType() === 'pyramid') {
+      // Cube-less cells (core/pyramid.js's hasCube()) have no flat
+      // "missing pyramid" cube face to click the normal way -- their
+      // own PRESENT pyramids are the only clickable geometry (see
+      // render.js's buildPyramidOnlyMeshes for why). Real bug caught
+      // live 2026-08-29 ("cant form RDs" / "have to have spaces"):
+      // every click on an existing cube-less cell's own pyramid fell
+      // straight through resolveClickedPyramidAxis into "already
+      // present" -> bootstrap-a-new-neighbor below, since there was
+      // never a genuinely missing axis's own geometry to land on
+      // directly -- a cube-less cell could gain its FIRST pyramid but
+      // never a second one of its own; every further click just grew a
+      // separate cell elsewhere. Fixed: if the clicked cell is
+      // cube-less and still has any axis missing, always complete THAT
+      // SAME cell first -- whichever missing axis's apex is closest to
+      // the click wins, checked across all 6 (not just the 2 sharing
+      // one rhombic face, which only means something for a cube-having
+      // cell's own real rhombic geometry). Falls through to the normal
+      // resolution below only once the cell has nothing left to add.
+      if (!hasCube(cell)) {
+        const missing = PYRAMID_AXES.filter((k) => !hasPyramid(effectivePyramids(cell), k));
+        if (missing.length > 0) {
+          const [cwx, cwy, cwz] = cellToWorld(cell.x, cell.y, cell.z);
+          const localPoint = [hit.point.x - cwx, hit.point.y - cwy, hit.point.z - cwz];
+          const fillAxisKey = nearestPyramidAxis(localPoint, missing, pyramidPieces());
+          const fillResult = applyPyramidEdit(world, 'add', cell.x, cell.y, cell.z, fillAxisKey);
+          if (fillResult) {
+            onChange();
+            if (onPlaced) onPlaced(cell);
+            return;
+          }
+        }
+      }
       const axisKey = resolveClickedPyramidAxis(hit, cell);
       if (!axisKey) { if (onPieceNoOp) onPieceNoOp('add'); return; }
       const result = applyPyramidEdit(world, 'add', cell.x, cell.y, cell.z, axisKey);
