@@ -2902,9 +2902,26 @@ async function init() {
       // own depth buffer (correct occlusion), it just stops writing
       // depth values of its own for its own triangles to fight over.
       depthWrite: false,
+      // Real report 2026-08-29 ("lattice view of CO only sows slight
+      // lines of buried ones"): unlike every other mode, 'cubocta'
+      // previews a shape that's genuinely SMALLER than, and sits at the
+      // exact SAME coordinate as, the real opaque cell already there
+      // (RD/Cube/Pyramid preview AT that cell's own real scale/shape,
+      // so there's nothing to be buried under; BCC/Octahedron/
+      // Disphenoid sit at separate dual-lattice points, not nested
+      // inside a same-coordinate opaque cell either) -- so with normal
+      // depth-testing, the real RD cell in front almost entirely hides
+      // its own cuboctahedron preview, leaving only the thin slivers
+      // where the two surfaces' edges happen to graze. A "quick view of
+      // the lattice" should stay visible regardless of what's drawn in
+      // front of it, the same as every other mode already effectively
+      // is at their own scale -- depthTest off only for this one mode.
+      depthTest: latticeQuickViewMode !== 'cubocta',
     }));
     s.add(latticeQuickViewMesh);
-    latticeQuickViewEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({ color: 0xffffff }));
+    latticeQuickViewEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({
+      color: 0xffffff, depthTest: latticeQuickViewMode !== 'cubocta',
+    }));
     s.add(latticeQuickViewEdges);
     syncLatticeQuickViewActiveState(true);
   }
