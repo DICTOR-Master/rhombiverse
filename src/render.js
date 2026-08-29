@@ -12,6 +12,7 @@ import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
 import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS } from './geometry-extensions/dual-lattice.js';
 import { createBCCBuildController } from './core/bcc-build.js';
+import { createCuboctaBuildController } from './core/cubocta-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
 import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
@@ -73,6 +74,7 @@ import {
   importWorldFile,
   BCC_STORAGE_KEY,
   INTERSTITIAL_STORAGE_KEY,
+  CUBOCTA_STORAGE_KEY,
 } from './core/persistence.js';
 import {
   ensureAnonymousSession,
@@ -1070,6 +1072,14 @@ function buildBCCGeometry(scale) {
   return geometry;
 }
 
+// Same recipe again, for real placed Cuboctahedron Build cells.
+function buildCuboctaGeometry(scale) {
+  const points = cuboctahedronVertices(scale).map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  const geometry = new ConvexGeometry(points);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 // See docs/code-notes/render.md
 // emerald/gold added 2026-08-29, direct request -- buildable colors
 // only (deliberately NOT wired into asteroids.js's YIELD_WEIGHTS,
@@ -1249,6 +1259,7 @@ function rebuildPartialCellMeshes(world, inReportMode = false) {
 // cellAt(instanceId) callback reads, so routing BCC cells through it
 // would corrupt the main world's own hit-testing. See core/bcc-build.md.
 let bccCellOrder = []; // instanceId -> {x, y, z, ...cellData}
+let cuboctaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 // Interstitial-lattice build: one real Mesh per disphenoid cell, same
 // pattern as partialCellGroup/partialCellMeshes above and for the same
 // reason (each cell's own geometry is genuinely different from its
@@ -1302,6 +1313,23 @@ function rebuildBCCInstances(bccMesh, bccWorld) {
   bccMesh.instanceMatrix.needsUpdate = true;
   if (bccMesh.instanceColor) bccMesh.instanceColor.needsUpdate = true;
   bccMesh.computeBoundingSphere();
+}
+
+// Real placed Cuboctahedron Build cells -- same instancing pattern as
+// rebuildBCCInstances above, own separate cell order/mesh.
+function rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld) {
+  cuboctaCellOrder = cuboctaWorld.entries();
+  const m = new THREE.Matrix4();
+  cuboctaCellOrder.forEach((cell, i) => {
+    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+    m.makeTranslation(wx, wy, wz);
+    cuboctaMesh.setMatrixAt(i, m);
+    cuboctaMesh.setColorAt(i, instanceColorFor(cell));
+  });
+  cuboctaMesh.count = cuboctaCellOrder.length;
+  cuboctaMesh.instanceMatrix.needsUpdate = true;
+  if (cuboctaMesh.instanceColor) cuboctaMesh.instanceColor.needsUpdate = true;
+  cuboctaMesh.computeBoundingSphere();
 }
 
 // World Systems dynamic imports -- see docs/code-notes/render.md
@@ -1430,6 +1458,12 @@ async function init() {
   const bccSavedJSON = loadFromLocalStorage(BCC_STORAGE_KEY);
   const bccWorld = createWorldStore(bccSavedJSON ?? { worldName: 'BCC Lattice', version: 1, cells: {}, meta: {} });
 
+  // Cuboctahedron Build: a fourth, independent store (own localStorage
+  // key, CUBOCTA_STORAGE_KEY), same reasoning as bccWorld/interstitial
+  // above -- Rhombeometry-only, no World Systems hooks needed.
+  const cuboctaSavedJSON = loadFromLocalStorage(CUBOCTA_STORAGE_KEY);
+  const cuboctaWorld = createWorldStore(cuboctaSavedJSON ?? { worldName: 'Cuboctahedron Lattice', version: 1, cells: {}, meta: {} });
+
   const geometry = buildRDGeometry(SCALE);
   // White base color: actual per-cell color comes entirely from
   // setColorAt (instanceColorFor) via the multiplicative USE_INSTANCING_
@@ -1454,6 +1488,19 @@ async function init() {
   bccMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(bccMesh);
   rebuildBCCInstances(bccMesh, bccWorld);
+
+  // Cuboctahedron Build: its own InstancedMesh (cuboctahedron geometry),
+  // same "own material clone, same MATERIAL_COLORS palette" pattern as
+  // bccMesh above -- cuboctahedronVertices(SCALE) already applies the
+  // real, verified half-scale internally (see core/lattice.js's own
+  // header), so real placed cells touch their real neighbors without
+  // overlapping, the same property Lattice Quick-View's own 'cubocta'
+  // preview mode relies on.
+  const cuboctaGeometry = buildCuboctaGeometry(SCALE);
+  const cuboctaMesh = new THREE.InstancedMesh(cuboctaGeometry, material.clone(), MAX_CELLS);
+  cuboctaMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(cuboctaMesh);
+  rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld);
 
   // Interstitial-lattice build: a third, independent store (own
   // localStorage key, INTERSTITIAL_STORAGE_KEY) -- see core/
@@ -2054,6 +2101,7 @@ async function init() {
     const planes = enabled ? [sectionPlane] : [];
     material.clippingPlanes = planes;
     bccMesh.material.clippingPlanes = planes;
+    cuboctaMesh.material.clippingPlanes = planes;
     for (const { mesh } of partialCellMeshes.values()) mesh.material.clippingPlanes = planes;
     for (const mesh of interstitialMeshes.values()) mesh.material.clippingPlanes = planes;
     document.getElementById('section-controls-row').style.display = enabled ? '' : 'none';
@@ -2505,6 +2553,12 @@ async function init() {
   // gating as the preview toggle above.
   const bccBuildRow = document.getElementById('bcc-build-row');
   if (bccBuildRow) bccBuildRow.style.display = FEATURES.bccLattice ? '' : 'none';
+  // Real Cuboctahedron cell placement -- same Rhombeometry-only gating,
+  // same Lab-panel entry-point precedent as BCC Build's own ("every
+  // wheel face is already allocated," core/bcc-build.md) rather than a
+  // wheel face.
+  const cuboctaBuildRow = document.getElementById('cubocta-build-row');
+  if (cuboctaBuildRow) cuboctaBuildRow.style.display = FEATURES.bccLattice ? '' : 'none';
   // Dualize preview (reframe Stage 3): same Rhombeometry-only gating as
   // the rest of the BCC/TO family -- Lab-panel entry point rather than a
   // wheel face, same precedent as BCC Build's own original placement
@@ -2825,6 +2879,7 @@ async function init() {
     plant: 'Click anywhere to plant a seed of the chosen species. Left alone, it grows on its own over real time.',
     sculpt: 'Model (add) onto a face, or Chisel (subtract) a clicked cell -- see the Sculpt panel for tier/mirror/brush.',
     bcc: 'Click a face of an existing BCC cell to extend it, or a face of your normal World to start one nearby. Right-click removes a BCC cell. Overlap with your normal World is expected -- it\'s how the two lattices join.',
+    cubocta: 'Click a face of your normal World to place a cuboctahedron there, or near a POINT of an existing one to grow toward that neighbor. Right-click removes one. Overlap with your normal World is expected.',
     dualize: 'Click an existing structure (FCC or a real placed BCC/TO cell) to preview its region (radius = Shell fill radius) reinterpreted through the other lattice. View-only -- nothing is written to your World.',
   };
   function updateModeUI() {
@@ -3909,6 +3964,29 @@ async function init() {
     isActive: () => !walking && currentMode === 'bcc' && FEATURES.bccLattice,
   });
 
+  // Cuboctahedron Build: own change handler, same "never truly empty"
+  // reasoning as onBCCChange/onInterstitialChange above.
+  function onCuboctaChange() {
+    if (cuboctaWorld.entries().length === 0) {
+      cuboctaWorld.addCell(0, 0, 0, { material: 'base' });
+    }
+    rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld);
+    updateSectionEnabled(); // keeps cuboctaMesh's own material in sync with X-Ray -- see that function's own header
+    saveToLocalStorage(cuboctaWorld.toJSON(), CUBOCTA_STORAGE_KEY);
+  }
+  createCuboctaBuildController({
+    renderer,
+    camera,
+    fccMesh: mesh,
+    cuboctaMesh,
+    fccCellAt: (instanceId) => cellOrder[instanceId],
+    cuboctaCellAt: (instanceId) => cuboctaCellOrder[instanceId],
+    cuboctaWorld,
+    onChange: onCuboctaChange,
+    getMaterial: () => materialSelect.value,
+    isActive: () => !walking && currentMode === 'cubocta' && FEATURES.bccLattice,
+  });
+
   // The old 2D radial menu (wheel.js) was removed 2026-08-25 -- the
   // Rhombic Wheel 3D is now the sole navigation surface, per direct
   // user decision. See docs/code-notes/app/rhombic-wheel-3d.md.
@@ -4762,6 +4840,11 @@ async function init() {
     clearLocalStorage(INTERSTITIAL_STORAGE_KEY);
     interstitialStore.replaceAll({ worldName: 'Interstitial Lattice', version: 1, cells: {} });
     onInterstitialChange();
+    // Cuboctahedron Build: a fourth real store, same "fresh start clears
+    // it too" reasoning as BCC/interstitial above.
+    clearLocalStorage(CUBOCTA_STORAGE_KEY);
+    cuboctaWorld.replaceAll({ worldName: 'Cuboctahedron Lattice', version: 1, cells: {} });
+    onCuboctaChange();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

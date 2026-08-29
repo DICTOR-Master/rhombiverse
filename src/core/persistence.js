@@ -15,6 +15,11 @@ export const BCC_STORAGE_KEY = 'rhombiverse-bcc-world';
 // own key, untouched by every existing FCC/BCC save/load/clear call site.
 export const INTERSTITIAL_STORAGE_KEY = 'rhombiverse-interstitial-world';
 
+// Cuboctahedron build (core/cubocta-build.js): same reasoning again -- a
+// fourth independent store, own key, untouched by every existing
+// FCC/BCC/interstitial save/load/clear call site.
+export const CUBOCTA_STORAGE_KEY = 'rhombiverse-cubocta-world';
+
 export function saveToLocalStorage(worldJSON, key = STORAGE_KEY) {
   try {
     localStorage.setItem(key, JSON.stringify(worldJSON));
