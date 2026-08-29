@@ -433,11 +433,31 @@ export const WHEEL_BUILD = {
 // completely full, so "Lenses" was dropped from the shared universal
 // ring entirely (direct instruction: "lenses are amply catered for now
 // so can come off universal ring" -- X-Ray/Lenses is already reachable
-// via the corner HUD wheel and the Lab panel). That freed top|sy1sz1
-// for real content here. Not a "tool:pieceType:*" terminal like its
-// siblings -- Cuboctahedron Build is its own click-to-place/grow mode
-// (like BCC Build on WHEEL_RHOMBISIS), so it uses the matching
-// "tool:cuboctaBuild" action instead.
+// via the corner HUD wheel and the Lab panel). That freed top|sy1sz1.
+//
+// 2026-08-29 SAME-DAY FIX, real bug caught live: top|sy1sz1 (along with
+// equator|sx1sy1 and top|sx1sz1) is one of only THREE faces visible/
+// clickable at every wheel's default opening rotation (confirmed live:
+// every other face sits at opacity 0 / pointer-events:none until the
+// player rotates) -- true structurally for every wheel, which is
+// exactly why this slot always held the low-consequence universal
+// "Lenses" before. Putting Cuboctahedron Build there instead meant an
+// early, un-rotated tap near the top of a freshly-opened Piece wheel
+// silently switched the whole app into a different BUILD MODE (not
+// just a different piece-type selection) -- every subsequent World
+// click then routed to Cuboctahedron Build instead of the intended
+// piece placement, which is what actually broke Material/Cube/
+// Disphenoid taps ("dispenses cuboctahedra"/"cube placement
+// interfering"/"disphenoid wont place" were all downstream symptoms of
+// the SAME accidental mode-switch, not three separate bugs). Fixed by
+// swapping Cuboctahedron and Material's positions: Material (a
+// terminal, non-mode-switching action, closes cleanly back to the
+// normal Add flow) now sits at the always-visible top|sy1sz1 -- an
+// improvement on the original "close together" request, since it's
+// reachable with zero rotation -- and Cuboctahedron Build (a real mode
+// switch, same category as BCC Build) moved to bottom|sx-1sz-1,
+// requiring a deliberate rotation first, same as BCC Build's own
+// placement on WHEEL_RHOMBISIS.
 export const WHEEL_PIECE = {
   id: "piece",
   faces: {
@@ -447,6 +467,13 @@ export const WHEEL_PIECE = {
     "equator|sx-1sy-1": { kind: "dept", label: "TO", action: "tool:pieceType:to", desc: "Truncated Octahedron -- the BCC lattice's own real space-filling cell." },
     "bottom|sy1sz-1":   { kind: "dept", label: "Octahedron Site", action: "tool:pieceType:ioct", desc: "BCC interstitial lattice: places the 4-disphenoid bundle a flattened octahedron site combines into." },
     "bottom|sx1sz-1":   { kind: "dept", label: "Disphenoid", action: "tool:pieceType:idis", desc: "BCC interstitial lattice: one tetragonal disphenoid at a time." },
+    // Cuboctahedron Build: not a "tool:pieceType:*" terminal like its
+    // siblings -- it's its own click-to-place/grow mode (like BCC Build
+    // on WHEEL_RHOMBISIS), so it uses the matching "tool:cuboctaBuild"
+    // action instead. Deliberately NOT on the always-visible top ring --
+    // see this wheel's own header comment above.
+    "bottom|sx-1sz-1":  { kind: "dept", label: "Cuboctahedron", action: "tool:cuboctaBuild",
+      desc: "Place cells on the RD lattice's dual -- vertex-pointed cuboctahedra -- alongside your normal World (Rhombeometry only)." },
     // Material, reachable here too (also still on WHEEL_BUILD's own
     // equator, unchanged) -- direct user request 2026-08-29 to be able
     // to pick shape and material "close together," i.e. on the same
@@ -454,10 +481,9 @@ export const WHEEL_PIECE = {
     // permanent second access point, not a temporary placeholder (see
     // this file's own established pattern of filling a real SPARE with
     // a real already-working feature, same as how Material first got
-    // added to WHEEL_BUILD and Remove to WHEEL_ALTER).
-    "bottom|sx-1sz-1":  { kind: "dept", label: "Material", action: "tool:material", desc: "Pick a build material." },
-    "top|sy1sz1":       { kind: "dept", label: "Cuboctahedron", action: "tool:cuboctaBuild",
-      desc: "Place cells on the RD lattice's dual -- vertex-pointed cuboctahedra -- alongside your normal World (Rhombeometry only)." },
+    // added to WHEEL_BUILD and Remove to WHEEL_ALTER). Placed on the
+    // always-visible top|sy1sz1 -- see this wheel's own header comment.
+    "top|sy1sz1":       { kind: "dept", label: "Material", action: "tool:material", desc: "Pick a build material." },
   }
 };
 

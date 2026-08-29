@@ -173,6 +173,17 @@ const CSS = `
   background: rgba(10, 12, 20, 0.85); border: 1px solid rgba(77, 208, 225, 0.5);
   color: #eaf6ff; font: 13px system-ui, sans-serif;
   display: none;
+  /* Real bug, caught live 2026-08-29: on a narrow/mobile viewport this
+     fixed 260px-wide panel covers a large chunk of the wheel and can sit
+     directly on top of OTHER faces (e.g. Material, right after picking a
+     Piece type that deliberately keeps the wheel open so Material can be
+     tapped next) -- silently stealing the very follow-up tap the "stay
+     open" design exists to enable. The panel is read-only (title +
+     description text, no buttons or links of its own -- the real close
+     control is the separate sibling #rhombic-wheel-3d-close), so it's
+     safe to let clicks pass straight through it to whatever face is
+     actually underneath. */
+  pointer-events: none;
 }
 #rhombic-wheel-3d-panel.open { display: block; }
 #rhombic-wheel-3d-panel h3 { margin: 0 0 8px; color: ${SKELETON_COLOR}; }
