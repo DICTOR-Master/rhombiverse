@@ -1946,6 +1946,7 @@ async function init() {
     applyStarFusion(world);
     applyDetonationCheck(world);
     rebuildInstances(mesh, world, currentMode === 'report');
+    updateSectionEnabled(); // keeps newly created partial-cell (Pyramid) mesh materials in sync with X-Ray -- see that function's own header
     // Keep an active Lattice Quick-View in sync with your real World --
     // every mode now re-renders your own cells (see
     // rebuildLatticeQuickView's own header), so a build/remove while one
@@ -2034,9 +2035,27 @@ async function init() {
   updateUndoButton();
 
   // See docs/code-notes/render.md
+  // Real report 2026-08-29: X-Ray's cross-section left most of a real
+  // structure uncut -- BCC/Octahedron Site/Disphenoid pieces (added
+  // well after X-Ray itself) never respected the section plane at all.
+  // Root cause: bccMesh's own material is a ONE-TIME `material.clone()`
+  // made at startup (cloning doesn't keep clippingPlanes linked to the
+  // original -- a later reassignment here never reaches it), and both
+  // partial-cell (Pyramid sub-cell) and interstitial (Octahedron Site/
+  // Disphenoid) meshes get a BRAND NEW MeshStandardMaterial every time
+  // one is created, with clippingPlanes never set at all. Fixed by
+  // reapplying to every one of these here too, and calling this
+  // function (idempotent, cheap) from onChange()/onBCCChange()/
+  // onInterstitialChange() as well as the checkbox toggle, so freshly
+  // created materials pick up the CURRENT clip state immediately
+  // instead of only whenever the user next happens to re-toggle X-Ray.
   function updateSectionEnabled() {
     const enabled = document.getElementById('section-enable').checked;
-    material.clippingPlanes = enabled ? [sectionPlane] : [];
+    const planes = enabled ? [sectionPlane] : [];
+    material.clippingPlanes = planes;
+    bccMesh.material.clippingPlanes = planes;
+    for (const { mesh } of partialCellMeshes.values()) mesh.material.clippingPlanes = planes;
+    for (const mesh of interstitialMeshes.values()) mesh.material.clippingPlanes = planes;
     document.getElementById('section-controls-row').style.display = enabled ? '' : 'none';
     document.getElementById('xray-toggle')?.classList.toggle('active', enabled);
   }
@@ -3787,6 +3806,7 @@ async function init() {
       bccWorld.addCell(0, 0, 0, { material: 'base' });
     }
     rebuildBCCInstances(bccMesh, bccWorld);
+    updateSectionEnabled(); // keeps bccMesh's own material in sync with X-Ray -- see that function's own header
     saveToLocalStorage(bccWorld.toJSON(), BCC_STORAGE_KEY);
   }
 
@@ -3801,6 +3821,7 @@ async function init() {
       interstitialStore.addDisphenoid(bootstrapDisphenoid([0, 0, 0]), { material: 'base' });
     }
     rebuildInterstitialMeshes(interstitialStore);
+    updateSectionEnabled(); // keeps newly created interstitial mesh materials in sync with X-Ray -- see that function's own header
     saveToLocalStorage(interstitialStore.toJSON(), INTERSTITIAL_STORAGE_KEY);
   }
   createBCCBuildController({
