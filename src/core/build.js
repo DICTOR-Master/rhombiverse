@@ -14,7 +14,14 @@ import {
   cellToWorld,
   pyramidPieces,
 } from './lattice.js';
-import { applyPyramidEdit, resolvePyramidAxisForHit } from './pyramid.js';
+import {
+  applyPyramidEdit,
+  resolvePyramidAxisForHit,
+  resolveBootstrapPyramidAxis,
+  bootstrapPyramidCell,
+  addCubeToCell,
+  hasCube,
+} from './pyramid.js';
 import { generatePlanetoid } from '../geometry-extensions/planetoidgen.js';
 import { nearestBCCCell } from '../geometry-extensions/dual-lattice.js';
 import { matchBCCNeighborOffset } from './bcc-build.js';
@@ -510,7 +517,51 @@ export function createBuildController({
       // placed (full) block, so this is the very first thing a player
       // picking Pyramid tries on any existing block. See the 'chisel'
       // branch above for the live report this traces back to.
-      if (!result) { if (onPieceNoOp) onPieceNoOp('add'); return; }
+      //
+      // "Pyramid without a cube" (direct instruction 2026-08-29): rather
+      // than just no-op here, check whether the real FCC neighbor beyond
+      // the clicked face is empty -- if so, a single cube-less pyramid
+      // can grow there instead, reaching back toward the cell you
+      // clicked. This is the ONLY place that check runs (not a separate
+      // mode/piece tier): it only ever fires on the exact click that
+      // would otherwise be a pure no-op, so it never changes what
+      // happens when there genuinely IS a pyramid still to add.
+      if (!result) {
+        const neighborOffset = matchNeighborOffset(hit.face.normal);
+        const bnx = cell.x + neighborOffset[0];
+        const bny = cell.y + neighborOffset[1];
+        const bnz = cell.z + neighborOffset[2];
+        if (isValidCell(bnx, bny, bnz) && !world.has(bnx, bny, bnz)) {
+          const [nwx, nwy, nwz] = cellToWorld(bnx, bny, bnz);
+          const newAxisKey = resolveBootstrapPyramidAxis({
+            localPointFromNewCell: [hit.point.x - nwx, hit.point.y - nwy, hit.point.z - nwz],
+            neighborOffsetFromClickedToNew: neighborOffset,
+            pieces: pyramidPieces(),
+          });
+          if (newAxisKey) {
+            const material = getMaterial();
+            if (canPlaceMaterial(material, bnx, bny, bnz)) {
+              bootstrapPyramidCell(world, bnx, bny, bnz, newAxisKey, material);
+              onChange();
+              if (onPlaced) onPlaced({ x: bnx, y: bny, z: bnz, material });
+              return;
+            }
+          }
+        }
+        if (onPieceNoOp) onPieceNoOp('add');
+        return;
+      }
+      onChange();
+      if (onPlaced) onPlaced(cell);
+      return;
+    }
+    // Piece=Cube directly on an existing cube-less cell (see core/
+    // pyramid.js's hasCube()): add the cube to THAT SAME cell in place,
+    // keeping whatever pyramids are already there untouched, rather than
+    // the default "always bootstrap a new adjacent cell" behavior below
+    // -- direct instruction 2026-08-29 ("but can be added is important").
+    if (getPieceType() === 'cube' && !hasCube(cell)) {
+      addCubeToCell(world, cell.x, cell.y, cell.z);
       onChange();
       if (onPlaced) onPlaced(cell);
       return;

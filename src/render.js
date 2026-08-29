@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices } from './core/lattice.js';
-import { FULL_PYRAMIDS, presentAxisKeys } from './core/pyramid.js';
+import { FULL_PYRAMIDS, presentAxisKeys, hasCube, effectivePyramids } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
@@ -1174,7 +1174,10 @@ function visibleCells(world, inReportMode) {
 }
 
 function isPartialCell(cell) {
-  return cell.pyramids !== undefined && cell.pyramids !== FULL_PYRAMIDS;
+  // cube === false (see core/pyramid.js's hasCube()) always needs the
+  // per-cell mesh path -- a cube-less cell can never be a plain
+  // InstancedMesh instance regardless of its own pyramids bitmask.
+  return cell.cube === false || (cell.pyramids !== undefined && cell.pyramids !== FULL_PYRAMIDS);
 }
 
 function rebuildInstances(mesh, world, inReportMode = false) {
@@ -1214,6 +1217,65 @@ function buildPartialCellGeometry(pyramids) {
   return geometry;
 }
 
+// "Pyramid without a cube" (direct instruction 2026-08-29): a cube-less
+// cell can't reuse buildPartialCellGeometry's own single-ConvexGeometry
+// approach -- that function's correctness depends on the cube's own 8
+// points anchoring the hull (any subset of pyramid apexes only ever adds
+// an outward bump, never changes the hull elsewhere). With no cube,
+// TWO OR MORE present pyramids sharing a cube edge would instead hull
+// together into one merged wedge (their bases' shared corners bridge
+// them), not two visually separate spikes. Each present pyramid gets
+// its own small standalone Mesh instead -- always correct regardless of
+// how many are present, and simpler than reasoning about which subsets
+// stay separate.
+function buildPyramidOnlyMeshes(cell, color) {
+  const pieces = pyramidPieces(SCALE);
+  const meshes = [];
+  for (const axisKey of presentAxisKeys(effectivePyramids(cell))) {
+    const { base, apex } = pieces.pyramids[axisKey];
+    const points = [...base, apex].map(([x, y, z]) => new THREE.Vector3(x, y, z));
+    const geometry = new ConvexGeometry(points);
+    geometry.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
+    mat.color.copy(color);
+    meshes.push(new THREE.Mesh(geometry, mat));
+  }
+  return meshes;
+}
+
+function disposePartialCellObject3D(object3D) {
+  if (object3D.isGroup) {
+    for (const child of object3D.children) {
+      child.geometry.dispose();
+      child.material.dispose();
+    }
+  } else {
+    object3D.geometry.dispose();
+    object3D.material.dispose();
+  }
+}
+
+function buildPartialCellObject3D(cell, key) {
+  let object3D;
+  if (!hasCube(cell)) {
+    const group = new THREE.Group();
+    for (const mesh of buildPyramidOnlyMeshes(cell, instanceColorFor(cell))) {
+      mesh.userData.cellKey = key;
+      group.add(mesh);
+    }
+    object3D = group;
+  } else {
+    const geom = buildPartialCellGeometry(effectivePyramids(cell));
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
+    mat.color.copy(instanceColorFor(cell));
+    object3D = new THREE.Mesh(geom, mat);
+  }
+  const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+  object3D.position.set(wx, wy, wz);
+  object3D.userData.cellKey = key;
+  return object3D;
+}
+
 function rebuildPartialCellMeshes(world, inReportMode = false) {
   const source = inReportMode ? world.entries() : world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
   const wanted = new Map();
@@ -1223,32 +1285,25 @@ function rebuildPartialCellMeshes(world, inReportMode = false) {
   for (const [key, entry] of partialCellMeshes) {
     if (!wanted.has(key)) {
       partialCellGroup.remove(entry.mesh);
-      entry.mesh.geometry.dispose();
-      entry.mesh.material.dispose();
+      disposePartialCellObject3D(entry.mesh);
       partialCellMeshes.delete(key);
     }
   }
   for (const [key, cell] of wanted) {
     const existing = partialCellMeshes.get(key);
-    if (existing && existing.cell.pyramids === cell.pyramids && existing.cell.material === cell.material
+    if (existing && existing.cell.pyramids === cell.pyramids && existing.cell.cube === cell.cube
+        && existing.cell.material === cell.material
         && existing.cell.status === cell.status && existing.cell.shell === cell.shell) {
       existing.cell = cell; // cheap fields (e.g. shellCenter) may still have changed
       continue;
     }
     if (existing) {
       partialCellGroup.remove(existing.mesh);
-      existing.mesh.geometry.dispose();
-      existing.mesh.material.dispose();
+      disposePartialCellObject3D(existing.mesh);
     }
-    const geom = buildPartialCellGeometry(cell.pyramids);
-    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
-    mat.color.copy(instanceColorFor(cell));
-    const m = new THREE.Mesh(geom, mat);
-    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
-    m.position.set(wx, wy, wz);
-    m.userData.cellKey = key;
-    partialCellGroup.add(m);
-    partialCellMeshes.set(key, { mesh: m, cell });
+    const object3D = buildPartialCellObject3D(cell, key);
+    partialCellGroup.add(object3D);
+    partialCellMeshes.set(key, { mesh: object3D, cell });
   }
 }
 
@@ -2121,7 +2176,14 @@ async function init() {
     material.clippingPlanes = planes;
     bccMesh.material.clippingPlanes = planes;
     cuboctaMesh.material.clippingPlanes = planes;
-    for (const { mesh } of partialCellMeshes.values()) mesh.material.clippingPlanes = planes;
+    // Cube-less cells (see core/pyramid.js's hasCube()) render as a
+    // Group of separate pyramid meshes rather than one Mesh -- see
+    // disposePartialCellObject3D's own header for why -- so a Group's
+    // own children each need the clippingPlanes update individually.
+    for (const { mesh } of partialCellMeshes.values()) {
+      if (mesh.isGroup) { for (const child of mesh.children) child.material.clippingPlanes = planes; }
+      else mesh.material.clippingPlanes = planes;
+    }
     for (const mesh of interstitialMeshes.values()) mesh.material.clippingPlanes = planes;
     document.getElementById('section-controls-row').style.display = enabled ? '' : 'none';
     document.getElementById('xray-toggle')?.classList.toggle('active', enabled);
