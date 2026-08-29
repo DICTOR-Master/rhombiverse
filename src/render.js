@@ -2780,11 +2780,21 @@ async function init() {
     s.add(latticeQuickViewEdges);
     syncLatticeQuickViewActiveState(true);
   }
+  // Corner HUD wheel's own "BCC Lattice" face (hud-wheel-3d.js) --
+  // found once and cached, same reuse as the bottom-left icon's own
+  // markKey lookup below, since faceEntries never changes after
+  // createHudWheel3D() builds it once at startup.
+  const hudLatticeFaceEntry = hudWheel.faceEntries.find((e) => e.data?.elId === 'bcc-toggle');
   function updateLatticeQuickViewIcon() {
-    const el = document.getElementById('hud-quick-lattice-view');
-    if (!el) return;
     const markKey = LATTICE_QUICK_VIEW_MARK_KEY[latticeQuickViewMode];
-    el.innerHTML = iconFrame(markKey ? MARKS[markKey] : '', { title: `Lattice View: ${latticeQuickViewMode === 'off' ? 'Off' : latticeQuickViewMode}` });
+    const title = `Lattice View: ${latticeQuickViewMode === 'off' ? 'Off' : latticeQuickViewMode}`;
+    const html = iconFrame(markKey ? MARKS[markKey] : '', { title });
+    const el = document.getElementById('hud-quick-lattice-view');
+    if (el) el.innerHTML = html;
+    // Direct report 2026-08-29: this face stayed a fixed ⬡ regardless of
+    // mode, unlike the bottom-left icon -- same underlying state, two
+    // access points, should show the same live icon both places.
+    if (hudLatticeFaceEntry) hudLatticeFaceEntry.labelEl.innerHTML = html;
   }
   async function cycleLatticeQuickView() {
     const currentIdx = LATTICE_QUICK_VIEW_MODES.indexOf(latticeQuickViewMode);
