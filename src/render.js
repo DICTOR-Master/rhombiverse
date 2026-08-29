@@ -10,7 +10,7 @@ import { FULL_PYRAMIDS, presentAxisKeys } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
-import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS, isBCC } from './geometry-extensions/dual-lattice.js';
+import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS } from './geometry-extensions/dual-lattice.js';
 import { createBCCBuildController } from './core/bcc-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
 import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
@@ -2525,12 +2525,14 @@ async function init() {
   // - 'rd'/'cube'/'pyramid': every real cell shown as a complete block/
   //   bare cube/cube-plus-6-separate-pyramid-facets, regardless of its
   //   own actual partial-pyramid state.
-  // - 'bcc'/'octa'/'disphenoid': every real cell that's ALSO a valid
-  //   co-located BCC anchor (isBCC -- the same "can host a co-located
-  //   BCC point" filter the retired Interpenetrating Lattice Preview
-  //   used) shown as the corresponding TO / one octahedron bundle (4
-  //   disphenoids, fixed axis matching core/build.js's own bootstrap
-  //   default) / one bootstrap disphenoid there.
+  // - 'bcc'/'octa'/'disphenoid': every real cell's own nearest BCC dual
+  //   point(s) (nearestBCCPoints, deduped -- NOT isBCC's exact-match
+  //   filter, which the retired Interpenetrating Lattice Preview used
+  //   and which real testing showed reads as far too sparse to convey
+  //   "a lattice," only ~1/4 of FCC-valid cells by parity) shown as the
+  //   corresponding TO / one octahedron bundle (4 disphenoids, fixed
+  //   axis matching core/build.js's own bootstrap default) / one
+  //   bootstrap disphenoid there.
   // Rebuilt on every onChange() for all six modes now (no more camera-
   // following refresh timer -- dropped along with the old system's
   // per-mode ghost/opacity-fade sub-variants, neither needed once every
@@ -2616,10 +2618,11 @@ async function init() {
     }
     return pieces;
   }
-  // BCC-family modes: one shape per real cell that's ALSO a valid
-  // co-located BCC anchor -- same isBCC filter/world-position math the
-  // retired Interpenetrating Lattice Preview used for its own 'bcc'-
-  // only case, extended here to Octahedron Site/Disphenoid too.
+  // BCC-family modes: one shape per (deduped) nearest-BCC-point anchor
+  // -- see rebuildLatticeQuickView's own call site for why this uses
+  // nearestBCCPoints over every real cell rather than isBCC's exact-
+  // match filter (the retired Interpenetrating Lattice Preview's own
+  // 'bcc'-only approach), extended here to Octahedron Site/Disphenoid.
   function bccFamilyQuickViewPieces(cell, mode) {
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
     if (mode === 'bcc') {
@@ -2665,16 +2668,30 @@ async function init() {
 
     const isFccFamily = latticeQuickViewMode === 'rd' || latticeQuickViewMode === 'cube' || latticeQuickViewMode === 'pyramid';
     const pieces = [];
-    for (const cell of (w ? w.entries() : [])) {
-      if (isFccFamily) {
-        pieces.push(...fccQuickViewPieces(cell, latticeQuickViewMode));
-      } else if (isBCC(cell.x, cell.y, cell.z)) {
-        pieces.push(...bccFamilyQuickViewPieces(cell, latticeQuickViewMode));
+    const cells = w ? w.entries() : [];
+    if (isFccFamily) {
+      for (const cell of cells) pieces.push(...fccQuickViewPieces(cell, latticeQuickViewMode));
+    } else {
+      // BCC-family modes: nearest BCC dual point(s) for EVERY real cell
+      // (not just cells that already happen to sit exactly on a BCC
+      // point -- isBCC's own filter, only ~1/4 of FCC-valid cells by
+      // parity, real testing showed this read as far too sparse to
+      // convey "a lattice"). Same nearestBCCPoints() Dualize's own
+      // FCC->BCC direction already uses, deduped across the whole
+      // structure so cells near the same dual point don't produce
+      // overlapping duplicates.
+      const anchors = new Map(); // "x,y,z" -> [x, y, z]
+      for (const cell of cells) {
+        for (const p of nearestBCCPoints([cell.x, cell.y, cell.z])) anchors.set(p.join(','), p);
       }
+      for (const [x, y, z] of anchors.values()) pieces.push(...bccFamilyQuickViewPieces({ x, y, z }, latticeQuickViewMode));
     }
+    // Defensive only past this point -- nearestBCCPoints always returns
+    // a real anchor for any input, and the World is never truly empty
+    // (see onChange's own invariant), so `cells` (and therefore
+    // `pieces`) can't actually be empty here anymore.
     if (pieces.length === 0) {
       syncLatticeQuickViewActiveState(false);
-      if (!isFccFamily) showHudPrompt('Lattice View: no built cells at a coordinate that can host a co-located BCC point (needs all-even x,y,z) -- try a larger structure.', 5000);
       return;
     }
     const merged = mergeGeometries(pieces, false);
