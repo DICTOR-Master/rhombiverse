@@ -2624,13 +2624,25 @@ async function init() {
   // the merged EdgesGeometry -- needed for 'pyramid' mode to actually
   // show the 6-facet decomposition, not just the outer RD silhouette a
   // single convex hull over all points would collapse down to.
+  // 'pyramid' deliberately does NOT also include the bare cube piece:
+  // real flicker reported live (2026-08-29, "microflashing... could
+  // trigger epilepsy") traced to genuine z-fighting -- a pyramid's own
+  // base sits in the EXACT same plane as the cube face under it, so
+  // rendering both as separate solid pieces put two coincident,
+  // opposite-facing surfaces at the identical depth, fighting for which
+  // one the GPU draws on top every frame. The 6 pyramids' own outer
+  // faces already trace the same silhouette without it -- the real
+  // in-World partial-cell renderer (buildPartialCellGeometry) never hit
+  // this because it computes ONE merged convex hull, which naturally
+  // discards the redundant internal cube faces a hull algorithm would
+  // never have exposed in the first place.
   function fccQuickViewPieces(cell, mode) {
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
     const shift = (pts) => pts.map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
     if (mode === 'rd') return [new ConvexGeometry(shift(rdRawVerts(SCALE)))];
     const { cube, pyramids } = pyramidPieces(SCALE);
     if (mode === 'cube') return [new ConvexGeometry(shift(cube))];
-    const pieces = [new ConvexGeometry(shift(cube))];
+    const pieces = [];
     for (const axisKey of Object.keys(pyramids)) {
       const { base, apex } = pyramids[axisKey];
       pieces.push(new ConvexGeometry(shift([...base, apex])));
@@ -2718,6 +2730,18 @@ async function init() {
     latticeQuickViewMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
       color: SKELETON_COLOR, emissive: SKELETON_COLOR, emissiveIntensity: 0.6, flatShading: true,
       transparent: true, opacity: 0.55, metalness: 0.1, roughness: 0.6,
+      // Real flicker reported live (2026-08-29, "microflashing... could
+      // trigger epilepsy"), particularly visible with X-Ray exposing
+      // the interior: 'rd' mode's geometry sits EXACTLY where a real
+      // full cell already is (same shape, same position), and BCC/
+      // Octahedron Site/Disphenoid genuinely touch real geometry at
+      // real contact points (the interpenetrating-lattice design) --
+      // coincident depth with nothing to break the tie, so the GPU
+      // picks a different "winner" essentially at random each frame.
+      // polygonOffset nudges this mesh's rasterized depth slightly
+      // toward the camera so it deterministically wins, eliminating the
+      // fight instead of just hiding it.
+      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
     }));
     s.add(latticeQuickViewMesh);
     latticeQuickViewEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({ color: 0xffffff }));
@@ -3058,6 +3082,10 @@ async function init() {
     dualizePreviewMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
       color: SKELETON_COLOR, emissive: SKELETON_COLOR, emissiveIntensity: 0.6, flatShading: true,
       transparent: true, opacity: 0.55, metalness: 0.1, roughness: 0.6,
+      // Same real z-fighting fix as Lattice Quick-View's own mesh (see
+      // its own comment) -- Dualize's preview genuinely touches real
+      // built geometry at real contact points too.
+      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
     }));
     scene.add(dualizePreviewMesh);
     dualizePreviewEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({ color: 0xffffff }));
