@@ -869,6 +869,14 @@ function closeMobilePanels() {
 labToggleEl.addEventListener('click', () => {
   labPanelEl.classList.toggle('open');
 });
+// Direct report 2026-08-29: unlike Sculpt/Cultivate/Interact/Gallery,
+// the Lab panel had no close (✕) button of its own -- the only way to
+// close it was re-tapping the gear icon that opened it, easy to miss
+// especially on touch. Matches the same close-button convention/markup
+// (#lab-header/#lab-close) those other panels already use.
+document.getElementById('lab-close')?.addEventListener('click', () => {
+  labPanelEl.classList.remove('open');
+});
 
 // See docs/code-notes/render.md
 let cyborgWorldRef = null;

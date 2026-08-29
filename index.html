@@ -356,6 +356,14 @@
       pointer-events: auto;
       clip-path: polygon(-40% 0%, 100% -60%, 140% 100%, 0% 160%);
     }
+    #lab-header {
+      display: flex; align-items: center; justify-content: space-between;
+      font: 700 13px system-ui, sans-serif;
+      color: #9de0ff;
+      margin-bottom: 6px;
+    }
+    #lab-close { background: none; border: none; color: #9de0ff; cursor: pointer; font: 13px system-ui, sans-serif; opacity: 0.8; }
+    #lab-close:hover { opacity: 1; }
     #lab-panel h2 {
       margin: 4px 0 8px;
       font: 700 13px system-ui, sans-serif;
@@ -1107,6 +1115,7 @@
   <button id="lab-toggle" type="button" title="Advanced / Lab">⚙</button>
 
   <div id="lab-panel">
+    <div id="lab-header"><span>Lab</span><button id="lab-close" type="button" title="Close">✕</button></div>
     <h2>Settings</h2>
     <div id="lab-settings-section">
       <div class="row"><label for="setting-sensitivity">Look sensitivity</label><input id="setting-sensitivity" type="range" min="0.25" max="2.5" step="0.05" value="1" /></div>
