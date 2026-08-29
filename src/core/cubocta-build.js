@@ -56,11 +56,25 @@ export function createCuboctaBuildController({
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    // Both meshes at once, closest hit wins -- lets a click resolve
-    // against whichever real geometry is actually nearest the cursor,
-    // the same way bcc-build.js's own pick() already does.
-    const hits = raycaster.intersectObjects([cuboctaMesh, fccMesh]);
-    return hits.length > 0 ? hits[0] : null;
+    // cuboctaMesh checked FIRST, on its own, not blended with fccMesh
+    // into one closest-hit-wins list -- a real bug, caught live 2026-
+    // 08-29 ("no placement possible" once a first cuboctahedron already
+    // existed): a cuboctahedron sits at the SAME coordinate as, and
+    // fully inside, the real-scale FCC cell it was bootstrapped from
+    // (this file's own header -- "no 'nearest point' snap needed").
+    // That FCC cell's own outer surface is always geometrically closer
+    // to the camera than the smaller cuboctahedron sitting inside it,
+    // so a combined closest-hit-wins raycast (bcc-build.js's own
+    // pattern, correct THERE because BCC cells sit on a genuinely
+    // separate, non-coincident lattice) always resolved to the FCC
+    // cell instead -- meaning every click ever fell into the bootstrap
+    // branch below, found a cuboctahedron already there
+    // (cuboctaWorld.has), and silently no-opped. Once any cuboctahedron
+    // exists, its own mesh must win whenever it's hit at all.
+    const cuboctaHits = raycaster.intersectObject(cuboctaMesh);
+    if (cuboctaHits.length > 0) return cuboctaHits[0];
+    const fccHits = raycaster.intersectObject(fccMesh);
+    return fccHits.length > 0 ? fccHits[0] : null;
   }
 
   function onClick(event) {
