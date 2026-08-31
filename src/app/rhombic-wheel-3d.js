@@ -48,7 +48,7 @@ const ACTION_TO_MARK = {
   'tool:pieceType:cube': 'pieceCube',
   'tool:pieceType:pyramid': 'piecePyramid',
   'tool:pieceType:to': 'pieceTO',
-  'tool:pieceType:ioct': 'pieceOctaSite',
+  'tool:pieceType:ioct': 'pieceOctahedron',
   'tool:pieceType:idis': 'pieceDisphenoid',
   'tool:fill': 'fill',
   'tool:dig': 'dig',
