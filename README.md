@@ -1,9 +1,9 @@
 # Rhombiverse
 
-Rhombiverse is a browser-based instrument for exploring and sculpting space
-with rhombic dodecahedra on the FCC lattice — with symmetry tools and
-optional organic growth. A dual cube/octahedron structure is planned but not
-yet implemented (see "Core vs. Modules" below).
+Rhombiverse is a browser-based spatial editor for constructing and exploring
+with rhombic dodecahedra, truncated octahedra, cuboctahedra, and their
+related polyhedra on the FCC and BCC lattices — with symmetry tools,
+Dualize (FCC↔BCC), and optional organic growth.
 
 Everything is made of rhombi, and rhombi obey two different kinds of order
 at once. One is a crystal — rigid, repeating, minable, buildable, the same
@@ -17,8 +17,8 @@ From that one rule: raise a mountain range face-by-face from a single seed
 block, fill a sphere and stand on the surface of your own planetoid with
 gravity bending toward its core, plant something and let five-fold growth
 rules unfold it into a tree or a shell, leave a crystal field untouched and
-come back to find it larger. It's less a building game than a small,
-coherent universe of shape.
+come back to find it larger. It's a multi-lattice spatial editor first — a
+small, coherent field of shape to sculpt, decompose, and dualize.
 
 See `RHOMBIVERSE_PLAN.md` section 6 for the full vision statement, and
 `CLAUDE.md` for a technical map of this repo.
@@ -35,22 +35,22 @@ geometry itself:
 
 - **Core (always present):** lattice math (`lattice.js`), RD rendering,
   Sculpture Mode incl. build/chisel, base world-state schema, optional
-  Shared World sync. A dual cube/octahedron structure (`dual.js`) is
-  planned for this tier but doesn't exist in the codebase yet — see
-  `RHOMBIVERSE_PLAN.md`'s "Core vs. Modules" section for the full picture.
+  Shared World sync, plus BCC/TO Build, Cuboctahedron Build, Lattice
+  Quick-View, and Dualize (FCC↔BCC space-group dual, `dual-lattice.js`) —
+  view-only overlay, always visible whenever Crystal Core cells exist.
 - **Geometry Extensions (opt-in, still shape-focused):** radial gravity &
   planetoids (`gravity.js`, `planetoidgen.js`), Penrose/Ammann growth
-  (`growth.js`), lattice zoom (`latticezoom.js`), cultivation
-  (`cultivation.js`).
+  (`growth.js`), Duality Mode (periodic↔aperiodic tiling dual,
+  `dual.js`, shown once grown Penrose/Ammann structures exist), lattice
+  zoom (`latticezoom.js`), cultivation (`cultivation.js`).
 - **World Systems (secondary, game-loop, can be disabled or
   community-owned):** mining & resources, inventory, claims/regions
   (`regions.js`), trade (`trade.js`), achievements (`achievements.js`),
   animals (`animals.js`), hazards (`blackhole.js`, `supernova.js`,
-  `starsystem.js`), hydrosphere (`hydrosphere.js`). A `features.js` flag
-  registry now exists so some of these (achievements, animals, hydrosphere,
-  trade's inventory decay) load conditionally; mining, claims/regions, and
-  hazards are not yet disconnected from Core — see `RHOMBIVERSE_PLAN.md`'s
-  Migration Path for why and what's planned.
+  `starsystem.js`), hydrosphere (`hydrosphere.js`). `features.js`'s flag
+  registry disconnects all of these together in Rhombeometry mode (mining,
+  economy/claims, achievements, animals, hazards, hydrosphere all flip off
+  at once) — see `RHOMBIVERSE_PLAN.md`'s Migration Path for the history.
 
 A "Rhombeometry / Full World" mode toggle exists (welcome screen and
 Lab Settings) — defaults to Rhombeometry, geometry-only.
@@ -99,12 +99,14 @@ the shared Vercel AI Gateway, or a local fallback — never required to
 play). Full-Cyborg itself (Sculpt/Cultivate's most assisted tier) uses that
 same AI pattern.
 
-A first-time visit loads the real Showcase World (a continental planetoid
-with growth, evolved organisms, and animals already in it) and walks you
-through build → open the wheel → plant something → explore, rather than a
-tutorial modal. The welcome screen's four identity choices (Rhombinaut /
-Rhombitect / Rhombisculptor / Rhombiologist) are clickable — picking one
-drops you straight into that persona's mode.
+The welcome screen is a rotating RD logo with two live antipodal ENTER
+faces and a Mode choice (Pure Rhombeometry / Full Game World, defaulting
+to Rhombeometry — geometry only). Picking Full Game World on a first-time
+visit loads the real Showcase World (a continental planetoid with growth,
+evolved organisms, and animals already in it) and walks you through
+build → open the wheel → plant something → explore, rather than a
+tutorial modal; Rhombeometry mode instead starts from a blank single-cell
+world with no game-flavored onboarding.
 
 `docs/RHOMBIVERSE_UIUX_BUILD_PLAN.md` is the spec for this whole control-
 surface/onboarding/AI-assistance layer (tracks B1–B7); B1–B6 are done, and
