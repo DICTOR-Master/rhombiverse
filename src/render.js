@@ -2827,7 +2827,7 @@ async function init() {
     rd: 'RD -- every built cell shown as a complete block.',
     cube: 'Cube -- every built cell shown bare, pyramids hidden.',
     pyramid: "Pyramid -- every built cell's cube and 6 pyramid facets shown as separate pieces.",
-    cubocta: 'Cuboctahedron -- every built cell shown as the real coordination shape, plus a preview at each of its 6 face-touching axis-neighbor positions too.',
+    cubocta: 'Cuboctahedron -- every built cell shown as the real coordination shape, plus a preview at one face-touching axis-neighbor position too.',
     bcc: 'BCC/TO -- every co-locatable built cell shown as its dual truncated octahedron.',
     octa: 'Flattened Octahedron -- every co-locatable built cell shown as one octahedron bundle.',
     octahedron: 'Octahedron -- the Cuboctahedron gap-fill piece, previewed at one cube-center near every built cell.',
@@ -2978,25 +2978,29 @@ async function init() {
       // modes above.
       //
       // Extended 2026-08-31 (doubled-density CO Build) to ALSO preview
-      // the 6 new axis-neighbor positions (face-touching) alongside each
-      // real cell's own position. Briefly extended further to all 18
-      // real growth directions (also the 12 vertex-touching
-      // NEIGHBOR_OFFSETS), then reverted the same day: confirmed live
-      // that even a single real cell already produced a dense preview,
-      // and a real modest build counted out at ~80 total shapes across
-      // viewing angles -- too many, even at reduced opacity. Back to
-      // just the 6 axis offsets, the version already confirmed as a
-      // real improvement over showing only each cell's own position.
-      // Deduped via the same anchor-Map pattern the BCC-family modes
-      // below already use -- e.g. two real cells 2 units apart along one
-      // axis both reach the SAME odd-parity point between them.
+      // one face-touching axis-neighbor position alongside each real
+      // cell's own position -- enough to show the new capability exists
+      // without multiplying per cell the way every OTHER Lattice
+      // Quick-View mode deliberately never does (BCC-family modes below
+      // already use exactly ONE representative direction per anchor,
+      // LATTICE_QUICK_VIEW_AXIS_OFFSET/_OCTAHEDRON_DIRECTION, not every
+      // possible one -- see those constants' own comments). Went through
+      // two denser iterations first (6 axis positions, then all 18 real
+      // growth directions) before landing here: both were confirmed live
+      // as too dense specifically because they multiplied several
+      // shapes per real cell where every other mode shows roughly one --
+      // "still too many COs, multiplies too much compared to others"
+      // pinned down the actual problem (the multiplication factor
+      // itself, not just total opacity/count). Reusing the FIRST entry
+      // of CUBOCTA_AXIS_OFFSETS as that one representative direction, no
+      // new constant needed. Deduped via the same anchor-Map pattern the
+      // BCC-family modes below already use.
       const cuboctaAnchors = new Map(); // "x,y,z" -> [x, y, z]
+      const [repDx, repDy, repDz] = CUBOCTA_AXIS_OFFSETS[0];
       for (const cell of cells) {
         cuboctaAnchors.set(`${cell.x},${cell.y},${cell.z}`, [cell.x, cell.y, cell.z]);
-        for (const [dx, dy, dz] of CUBOCTA_AXIS_OFFSETS) {
-          const p = [cell.x + dx, cell.y + dy, cell.z + dz];
-          cuboctaAnchors.set(p.join(','), p);
-        }
+        const p = [cell.x + repDx, cell.y + repDy, cell.z + repDz];
+        cuboctaAnchors.set(p.join(','), p);
       }
       for (const [x, y, z] of cuboctaAnchors.values()) {
         const [wx, wy, wz] = cellToWorld(x, y, z, SCALE);
@@ -3048,16 +3052,13 @@ async function init() {
     pieces.forEach((g) => g.dispose());
     latticeQuickViewMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
       color: SKELETON_COLOR, emissive: SKELETON_COLOR, emissiveIntensity: 0.6, flatShading: true,
-      // 'cubocta' specifically previews up to 18 positions PER real
-      // cell (see this mode's own branch above), so real structures
-      // produce far more overlapping translucent surfaces stacked on
-      // each other than any other mode ever does -- direct user
-      // feedback, confirmed live (even a single real cell's own full
-      // 18-position preview already reads as dense). Lower opacity only
-      // for this one mode so the overlap blends into a soft haze
-      // instead of solid mush, keeping every position visible rather
-      // than reducing how many are shown.
-      transparent: true, opacity: latticeQuickViewMode === 'cubocta' ? 0.22 : 0.55, metalness: 0.1, roughness: 0.6,
+      // 'cubocta' previews 2 shapes per real cell (its own position +
+      // one representative axis-neighbor, see this mode's own branch
+      // above) where every other mode previews roughly 1 -- half the
+      // opacity here keeps the total visual weight comparable rather
+      // than compounding, direct user reasoning ("twice as many to
+      // start" -> half density).
+      transparent: true, opacity: latticeQuickViewMode === 'cubocta' ? 0.275 : 0.55, metalness: 0.1, roughness: 0.6,
       // Real flicker reported live (2026-08-29, "microflashing... could
       // trigger epilepsy"), particularly visible with X-Ray exposing
       // the interior: 'rd' mode's geometry sits EXACTLY where a real
@@ -3108,11 +3109,9 @@ async function init() {
     s.add(latticeQuickViewMesh);
     latticeQuickViewEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({
       color: 0xffffff, depthTest: latticeQuickViewMode !== 'cubocta',
-      // Same "up to 18 overlapping positions per real cell" reasoning as
-      // the fill material's own opacity above -- solid white edges from
-      // every one of those piled up were a big part of the visual noise
-      // (a triangle-edge outline per shape, all overlapping).
-      transparent: latticeQuickViewMode === 'cubocta', opacity: latticeQuickViewMode === 'cubocta' ? 0.35 : 1,
+      // Same "2 shapes per cell vs. every other mode's 1" reasoning as
+      // the fill material's own opacity above -- half here too.
+      transparent: latticeQuickViewMode === 'cubocta', opacity: latticeQuickViewMode === 'cubocta' ? 0.5 : 1,
     }));
     s.add(latticeQuickViewEdges);
     syncLatticeQuickViewActiveState(true);
