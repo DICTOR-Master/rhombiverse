@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices, octGapVertices, NEIGHBOR_OFFSETS } from './core/lattice.js';
+import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices, octGapVertices } from './core/lattice.js';
 import { FULL_PYRAMIDS, presentAxisKeys, hasCube, effectivePyramids } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
@@ -2827,7 +2827,7 @@ async function init() {
     rd: 'RD -- every built cell shown as a complete block.',
     cube: 'Cube -- every built cell shown bare, pyramids hidden.',
     pyramid: "Pyramid -- every built cell's cube and 6 pyramid facets shown as separate pieces.",
-    cubocta: 'Cuboctahedron -- every built cell shown as the real coordination shape, plus a preview at every real growth position around it (12 vertex-touching neighbors and 6 face-touching ones).',
+    cubocta: 'Cuboctahedron -- every built cell shown as the real coordination shape, plus a preview at each of its 6 face-touching axis-neighbor positions too.',
     bcc: 'BCC/TO -- every co-locatable built cell shown as its dual truncated octahedron.',
     octa: 'Flattened Octahedron -- every co-locatable built cell shown as one octahedron bundle.',
     octahedron: 'Octahedron -- the Cuboctahedron gap-fill piece, previewed at one cube-center near every built cell.',
@@ -2977,26 +2977,23 @@ async function init() {
       // needed, one real shape per real cell, same as the FCC-family
       // modes above.
       //
-      // Extended 2026-08-31 (doubled-density CO Build) to preview EVERY
-      // real growth direction from every real cell, not just its own
-      // position -- the original 12 face-diagonal NEIGHBOR_OFFSETS
-      // (vertex-touching) AND the 6 new axis offsets (face-touching).
-      // Real cuboctahedra can grow via either set now, matching
-      // core/cubocta-build.js's own ALL_OFFSETS exactly. A real gap
-      // caught live 2026-08-31: previewing only the 6 new axis positions
-      // meant a cell on the SURFACE of a build (with an empty
-      // face-diagonal neighbor spot, not yet built) never showed that
-      // spot as growable at all -- it only ever appeared when a real
-      // cell already happened to occupy it, i.e. mostly true in a
-      // filled interior but not at a structure's own edges, where
-      // "potential" growth spots matter most. Deduped via the same
-      // anchor-Map pattern the BCC-family modes below already use --
-      // e.g. two real cells 2 units apart along one axis both reach the
-      // SAME odd-parity point between them.
+      // Extended 2026-08-31 (doubled-density CO Build) to ALSO preview
+      // the 6 new axis-neighbor positions (face-touching) alongside each
+      // real cell's own position. Briefly extended further to all 18
+      // real growth directions (also the 12 vertex-touching
+      // NEIGHBOR_OFFSETS), then reverted the same day: confirmed live
+      // that even a single real cell already produced a dense preview,
+      // and a real modest build counted out at ~80 total shapes across
+      // viewing angles -- too many, even at reduced opacity. Back to
+      // just the 6 axis offsets, the version already confirmed as a
+      // real improvement over showing only each cell's own position.
+      // Deduped via the same anchor-Map pattern the BCC-family modes
+      // below already use -- e.g. two real cells 2 units apart along one
+      // axis both reach the SAME odd-parity point between them.
       const cuboctaAnchors = new Map(); // "x,y,z" -> [x, y, z]
       for (const cell of cells) {
         cuboctaAnchors.set(`${cell.x},${cell.y},${cell.z}`, [cell.x, cell.y, cell.z]);
-        for (const [dx, dy, dz] of [...NEIGHBOR_OFFSETS, ...CUBOCTA_AXIS_OFFSETS]) {
+        for (const [dx, dy, dz] of CUBOCTA_AXIS_OFFSETS) {
           const p = [cell.x + dx, cell.y + dy, cell.z + dz];
           cuboctaAnchors.set(p.join(','), p);
         }
