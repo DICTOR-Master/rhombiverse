@@ -1220,6 +1220,7 @@
         </select>
       </label>
     </div>
+    <div class="hint">Try placing 6 pyramids on a cube. Then 12. Then remove the outer 6.</div>
     <div id="generator-row" class="row" style="display: none;">
       <label>Body type:
         <select id="generator-type-select">
@@ -1488,7 +1489,28 @@
 
     <div class="sculpt-section-label">Growth Parameters (Manual)</div>
     <div class="sculpt-row">
-      <label>Directional bias
+      <label>Growth limit (generations)
+        <input id="cultivate-growth-limit" type="range" min="3" max="15" step="1" value="8" />
+        <span id="cultivate-growth-limit-value">8</span>
+      </label>
+    </div>
+    <div class="sculpt-row">
+      <label>Growth rate (faces/tick)
+        <input id="cultivate-growth-rate" type="range" min="1" max="6" step="1" value="2" />
+        <span id="cultivate-growth-rate-value">2</span>
+      </label>
+    </div>
+    <div class="sculpt-row">
+      <label>Bias
+        <select id="cultivate-prefer-type">
+          <option value="">Balanced</option>
+          <option value="acute">Acute</option>
+          <option value="oblate">Oblate</option>
+        </select>
+      </label>
+    </div>
+    <div class="sculpt-row">
+      <label>Direction
         <select id="cultivate-directional-bias">
           <option value="0,1,0">Upward</option>
           <option value="0,-1,0">Downward</option>
@@ -1500,7 +1522,7 @@
       </label>
     </div>
     <div class="sculpt-row">
-      <label>Density vs. spread <input id="cultivate-density-bias" type="range" min="0" max="1" step="0.05" value="0.5" /></label>
+      <label>Packing density <input id="cultivate-density-bias" type="range" min="0" max="1" step="0.05" value="0.5" /></label>
     </div>
 
     <div id="cultivate-suggestion" style="display:none;">

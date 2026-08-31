@@ -151,6 +151,22 @@ test('applyGrowth: grows every due seed in the world, reports whether anything c
   assert.ok(seeds.seed_2.tiles.length > 1);
 });
 
+test('applyGrowth: honors a seed\'s own stored phenotypeOverride on every tick, not just at plant time (genome-free growth sliders, section 6)', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  // amoeba's own GROWTH_TEMPLATES maxGeneration is 3 -- without the
+  // override this seed would stop growing there.
+  const seed = plantSeed(world, 'seed_1', 'amoeba', [0, 0, 0], 0);
+  world.setSeed('seed_1', { ...seed, phenotypeOverride: { maxGeneration: 8, facesPerTick: 2, preferType: null } });
+
+  let now = 0;
+  for (let i = 0; i < 8; i++) {
+    now += 30001;
+    applyGrowth(world, now);
+  }
+  const grown = world.getSeeds().seed_1;
+  assert.ok(grown.generation > 3, `expected the override's maxGeneration (8) to be honored past the template's own cap (3), got generation ${grown.generation}`);
+});
+
 test('tileWorldVertices: offsets by the seed origin, 8 distinct vertices per tile', () => {
   const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
   const seed = plantSeed(world, 'seed_1', 'amoeba', [5, 5, 5], 0);

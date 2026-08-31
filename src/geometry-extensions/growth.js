@@ -347,7 +347,13 @@ export function growSeed(seed, now = Date.now(), phenotypeOverride = null) {
 export function applyGrowth(world, now = Date.now()) {
   let changed = false;
   for (const [seedId, seed] of Object.entries(world.getSeeds())) {
-    if (growSeed(seed, now)) {
+    // A player-cultivated seed's own phenotypeOverride (Lab-panel
+    // sliders, see core/instance.js's phenotypeFromSliders()) applies on
+    // every tick, not just at plant time -- organism-owned seeds are
+    // grown by evolution.js's own growOrganism() instead, never via this
+    // loop with a real maxGeneration (GROWTH_TEMPLATES has no
+    // "organism:..." entries), so this can't double-drive them.
+    if (growSeed(seed, now, seed.phenotypeOverride ?? null)) {
       world.setSeed(seedId, seed);
       changed = true;
     }

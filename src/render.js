@@ -114,6 +114,7 @@ import {
   clearSharedWorldParam,
 } from './app/worldshare.js';
 import { GROWTH_TEMPLATES, plantSeed, applyGrowth, tileWorldVertices, pruneTile, VALID_TRIPLES, unitTileVertices } from './geometry-extensions/growth.js';
+import { phenotypeFromSliders } from './core/instance.js';
 import {
   createCultivationSession,
   proposeCultivationSite,
@@ -3208,7 +3209,7 @@ async function init() {
     } else {
       seed = plantSeed(world, seedId, species, origin);
       // See docs/code-notes/render.md
-      world.setSeed(seedId, { ...seed, growthParameters: currentGrowthParameters(), assistanceTier: cultivateSession.assistanceTier, authorId: myUserId ?? LOCAL_PLAYER_ID });
+      world.setSeed(seedId, { ...seed, growthParameters: currentGrowthParameters(), phenotypeOverride: currentPhenotypeOverride(), assistanceTier: cultivateSession.assistanceTier, authorId: myUserId ?? LOCAL_PLAYER_ID });
     }
     rebuildSeedMeshes(seedId, seed);
     if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
@@ -3392,6 +3393,27 @@ async function init() {
     const densityBias = Number(document.getElementById('cultivate-density-bias').value);
     return { directionalBias: [bx, by, bz], densityBias };
   }
+
+  // Genome-free growth sliders (RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md
+  // section 6) -- the "what"/rate half of a manually-cultivated seed's
+  // growth, same phenotypeOverride shape genomeToPhenotype() derives
+  // from a genome for organisms, built here directly from sliders via
+  // core/instance.js's phenotypeFromSliders() instead.
+  function currentPhenotypeOverride() {
+    return phenotypeFromSliders({
+      growthRate: (Number(document.getElementById('cultivate-growth-rate').value) - 1) / 5,
+      maturitySize: Number(document.getElementById('cultivate-growth-limit').value),
+      preferType: document.getElementById('cultivate-prefer-type').value || null,
+    });
+  }
+  const growthLimitEl = document.getElementById('cultivate-growth-limit');
+  const growthRateEl = document.getElementById('cultivate-growth-rate');
+  growthLimitEl?.addEventListener('input', () => {
+    document.getElementById('cultivate-growth-limit-value').textContent = growthLimitEl.value;
+  });
+  growthRateEl?.addEventListener('input', () => {
+    document.getElementById('cultivate-growth-rate-value').textContent = growthRateEl.value;
+  });
 
   function renderCultivateSuggestion() {
     const el = document.getElementById('cultivate-suggestion');
