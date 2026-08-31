@@ -5019,6 +5019,12 @@ async function init() {
     exportWorldFile({ ...world.toJSON(), planetoids });
   });
 
+  // .rhomb: pure-model export, no game data (RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md
+  // section 4) -- always extractable regardless of workspaceMode/pureGeometry.
+  document.getElementById('export-rhomb')?.addEventListener('click', () => {
+    exportWorldFile(world.toRhombJSON(), 'rhombiverse-model.rhomb');
+  });
+
   // B6 Shared Worlds Gallery -- requires Shared World (a real Supabase
   // account is needed for the shared_worlds table's RLS insert policy,
   // author_id = auth.uid()), same boundary claims already use. Requires

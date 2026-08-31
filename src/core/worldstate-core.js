@@ -186,6 +186,24 @@ export function createWorldStore(worldJSON, hooks = {}) {
         meta: { ...meta, lastModified: new Date().toISOString() },
       };
     },
+    // Pure-model export (.rhomb; RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md
+    // section 4) -- same fields as toJSON() minus everything game-only
+    // (claims/playerInventory/asteroidRegrowth/pendingTrades/organisms/
+    // planetoidEvolution). Organism-grown seeds are kept: once stripped
+    // of their owning organism they're just geometry, same as any other
+    // seed -- "always extractable, no game dependency" per the plan.
+    // Deliberately NOT a nested {model, game} wrapper -- see commit
+    // message / plan doc for why a flat filtered object was chosen
+    // over restructuring the live schema every save already round-trips.
+    toRhombJSON() {
+      return {
+        worldName,
+        version,
+        cells: Object.fromEntries(cells),
+        seeds,
+        meta: { ...meta, lastModified: new Date().toISOString() },
+      };
+    },
     replaceAll(newWorldJSON) {
       worldName = newWorldJSON.worldName;
       version = newWorldJSON.version;

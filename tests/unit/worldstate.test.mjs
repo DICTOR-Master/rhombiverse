@@ -72,6 +72,26 @@ test('toJSON / replaceAll round-trip preserves cells, claims, inventory, trades'
   assert.deepEqual(Object.keys(restored.getPendingTrades()), ['trade_1']);
 });
 
+test('toRhombJSON: pure model only, no game data (section 4 verification test)', () => {
+  const world = emptyWorld();
+  world.addCell(0, 0, 0, { material: 'base' });
+  world.addClaim('claim_0_0_0', { ownerId: 'p1', center: [0, 0, 0], size: '2-shell' });
+  world.creditInventory('p1', 'garnet', 5);
+  world.setPendingTrade('trade_1', { playerA: 'p1', playerB: 'p2' });
+  world.setSeed('seed_1', { species: 'amoeba', origin: [0, 0, 0], tiles: [] });
+  world.setOrganism('org_1', { genome: {}, seedId: 'seed_1', species: 'amoeba' });
+  world.setPlanetoidEvolution('p1', { generation: 3 });
+
+  const rhomb = world.toRhombJSON();
+  const forbidden = ['claims', 'playerInventory', 'asteroidRegrowth', 'pendingTrades', 'organisms', 'planetoidEvolution'];
+  for (const key of forbidden) {
+    assert.equal(key in rhomb, false, `.rhomb output must not include "${key}"`);
+  }
+  assert.deepEqual(Object.keys(rhomb.cells), ['0,0,0']);
+  assert.deepEqual(Object.keys(rhomb.seeds), ['seed_1']);
+  assert.ok(rhomb.meta.lastModified);
+});
+
 test('hooks: onAdd/onRemove fire exactly once per call, with correct args', () => {
   const added = [];
   const removed = [];
