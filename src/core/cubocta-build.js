@@ -29,7 +29,10 @@ import { NEIGHBOR_OFFSETS } from './lattice.js';
 // before (same-parity, vertex-touching). No parity check exists or is
 // needed anywhere here -- growth just adds whichever offset the click
 // direction best matches.
-const AXIS_OFFSETS = [
+// Exported for render.js's own Lattice Quick-View 'cubocta' mode, which
+// needs the same 6 axis offsets to preview the odd-parity positions a
+// real CO can now grow onto -- one real source of truth for this list.
+export const AXIS_OFFSETS = [
   [1, 0, 0], [-1, 0, 0],
   [0, 1, 0], [0, -1, 0],
   [0, 0, 1], [0, 0, -1],

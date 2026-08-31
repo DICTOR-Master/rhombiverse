@@ -12,7 +12,7 @@ import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
 import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS } from './geometry-extensions/dual-lattice.js';
 import { createBCCBuildController } from './core/bcc-build.js';
-import { createCuboctaBuildController } from './core/cubocta-build.js';
+import { createCuboctaBuildController, AXIS_OFFSETS as CUBOCTA_AXIS_OFFSETS } from './core/cubocta-build.js';
 import { createCuboctaGapBuildController, octGapCellToWorld, octGapCellForCOCell } from './core/cubocta-gap-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
 import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
@@ -2820,7 +2820,7 @@ async function init() {
     rd: 'RD -- every built cell shown as a complete block.',
     cube: 'Cube -- every built cell shown bare, pyramids hidden.',
     pyramid: "Pyramid -- every built cell's cube and 6 pyramid facets shown as separate pieces.",
-    cubocta: 'Cuboctahedron -- every built cell shown as the real coordination shape reaching to its 12 neighbors.',
+    cubocta: 'Cuboctahedron -- every built cell shown as the real coordination shape reaching to its 12 neighbors, plus a preview at each face-touching axis-neighbor position too.',
     bcc: 'BCC/TO -- every co-locatable built cell shown as its dual truncated octahedron.',
     octa: 'Octahedron Site -- every co-locatable built cell shown as one octahedron bundle.',
     octahedron: 'Octahedron -- the Cuboctahedron gap-fill piece, previewed at one cube-center near every built cell.',
@@ -2969,9 +2969,29 @@ async function init() {
       // family modes below, no cross-lattice nearest-point conversion is
       // needed, one real shape per real cell, same as the FCC-family
       // modes above.
+      //
+      // Extended 2026-08-31 (doubled-density CO Build) to ALSO preview
+      // the odd-parity axis-neighbor positions -- real cuboctahedra can
+      // now grow there too, touching face-to-face, so a "quick view of
+      // the lattice" that only ever showed one CO per real (always
+      // even-parity) cell was still depicting the pre-doubled-density
+      // picture. Deduped via the same anchor-Map pattern the BCC-family
+      // modes below already use -- two real cells 2 units apart along
+      // one axis both reach the SAME odd-parity point between them
+      // (e.g. cells (0,0,0) and (2,0,0) are both axis-adjacent to
+      // (1,0,0)), so without dedup that point would get an overlapping
+      // duplicate preview.
+      const cuboctaAnchors = new Map(); // "x,y,z" -> [x, y, z]
       for (const cell of cells) {
-        const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
-        const verts = cuboctahedronVertices(SCALE).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
+        cuboctaAnchors.set(`${cell.x},${cell.y},${cell.z}`, [cell.x, cell.y, cell.z]);
+        for (const [dx, dy, dz] of CUBOCTA_AXIS_OFFSETS) {
+          const p = [cell.x + dx, cell.y + dy, cell.z + dz];
+          cuboctaAnchors.set(p.join(','), p);
+        }
+      }
+      for (const [x, y, z] of cuboctaAnchors.values()) {
+        const [wx, wy, wz] = cellToWorld(x, y, z, SCALE);
+        const verts = cuboctahedronVertices(SCALE).map(([vx, vy, vz]) => new THREE.Vector3(vx + wx, vy + wy, vz + wz));
         pieces.push(new ConvexGeometry(verts));
       }
     } else if (latticeQuickViewMode === 'octahedron') {
