@@ -2480,7 +2480,7 @@ async function init() {
         // hand-off point, to the separate color-swatch overlay.
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
-          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Octahedron Site', idis: 'Disphenoid' };
+          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Octahedron', idis: 'Disphenoid' };
           document.getElementById('piece-type-select').value = value;
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
@@ -4210,12 +4210,6 @@ async function init() {
     updateSectionEnabled(); // keeps cuboctaMesh's own material in sync with X-Ray -- see that function's own header
     saveToLocalStorage(cuboctaWorld.toJSON(), CUBOCTA_STORAGE_KEY);
   }
-  // #cubocta-piece-select scopes which of the two controllers below
-  // actually handles the next click, both sharing the same 'cubocta'
-  // mode/canvas -- without this, a click meant to grow a CO would also
-  // resolve (and fire) inside the gap-octahedron controller, and vice
-  // versa.
-  const cuboctaPieceSelect = document.getElementById('cubocta-piece-select');
   createCuboctaBuildController({
     renderer,
     camera,
@@ -4226,7 +4220,7 @@ async function init() {
     cuboctaWorld,
     onChange: onCuboctaChange,
     getMaterial: () => materialSelect.value,
-    isActive: () => !walking && currentMode === 'cubocta' && FEATURES.bccLattice && cuboctaPieceSelect?.value !== 'octgap',
+    isActive: () => !walking && currentMode === 'cubocta' && FEATURES.bccLattice,
   });
 
   // Cuboctahedron gap-octahedron Build: own change handler -- genuinely
@@ -4237,6 +4231,12 @@ async function init() {
     updateSectionEnabled();
     saveToLocalStorage(octGapWorld.toJSON(), CUBOCTA_GAP_STORAGE_KEY);
   }
+  // Rewired onto the Piece picker's own 'ioct' slot (direct user
+  // request) -- reachable in the generic Build/Chisel modes (same as
+  // idis) rather than a dedicated mode, so it's driven by the SAME
+  // #piece-type-select the wheel already surfaces, not currentMode.
+  // Its own click/right-click/long-press handling is unaffected -- only
+  // WHEN it fires changed, not how.
   createCuboctaGapBuildController({
     renderer,
     camera,
@@ -4247,7 +4247,11 @@ async function init() {
     octGapWorld,
     onChange: onOctGapChange,
     getMaterial: () => materialSelect.value,
-    isActive: () => !walking && currentMode === 'cubocta' && FEATURES.bccLattice && cuboctaPieceSelect?.value === 'octgap',
+    isActive: () =>
+      !walking &&
+      (currentMode === 'build' || currentMode === 'chisel') &&
+      FEATURES.bccLattice &&
+      document.getElementById('piece-type-select')?.value === 'ioct',
   });
 
   // The old 2D radial menu (wheel.js) was removed 2026-08-25 -- the

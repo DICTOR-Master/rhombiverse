@@ -388,9 +388,11 @@ export function createBuildController({
       handleToClick(hit, mode);
       return;
     }
-    // Same reasoning, for the interstitial-lattice piece tiers.
+    // Same reasoning, for the interstitial-lattice 'idis' piece tier.
+    // 'ioct' deliberately excluded -- see the remove-path comment below
+    // for why.
     const pieceTypeForInterstitial = getPieceType();
-    if ((mode === 'build' || mode === 'chisel') && (pieceTypeForInterstitial === 'ioct' || pieceTypeForInterstitial === 'idis') && interstitialStore && interstitialGroup) {
+    if ((mode === 'build' || mode === 'chisel') && pieceTypeForInterstitial === 'idis' && interstitialStore && interstitialGroup) {
       handleInterstitialClick(hit, mode, pieceTypeForInterstitial);
       return;
     }
@@ -634,9 +636,14 @@ export function createBuildController({
       if (onRemoved) onRemoved(bccCell);
       return;
     }
-    // Same reasoning, for the interstitial-lattice piece tiers.
+    // Same reasoning, for the interstitial-lattice 'idis' piece tier.
+    // 'ioct' is deliberately excluded here -- rewired onto
+    // core/cubocta-gap-build.js's own controller (direct user request,
+    // 2026-08-31), which has its own independent right-click/long-press
+    // removal handling on the same canvas; routing it through here too
+    // would double-handle the same click.
     const pieceTypeForInterstitialRemove = getPieceType();
-    if (mode === 'build' && (pieceTypeForInterstitialRemove === 'ioct' || pieceTypeForInterstitialRemove === 'idis') && interstitialStore && interstitialGroup) {
+    if (mode === 'build' && pieceTypeForInterstitialRemove === 'idis' && interstitialStore && interstitialGroup) {
       handleInterstitialClick(hit, 'chisel', pieceTypeForInterstitialRemove);
       return;
     }
