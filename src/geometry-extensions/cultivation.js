@@ -72,7 +72,7 @@ export function parseCultivationIntent(text, origin) {
   };
 }
 
-const CULTIVATE_SYSTEM_PROMPT = `You translate a player's plain-language planting/growing request in a voxel-building game (Rhombiverse) into a small structured plan.
+const CULTIVATE_SYSTEM_PROMPT = `You translate someone's plain-language planting/growing request in a spatial editor (Rhombiverse) into a small structured plan.
 
 Pick the closest matching species from: fern, moss, fungus, shrub, conifer, sapling, nautilus, scallop -- or "none" if the request isn't about planting/growing anything at all.
 

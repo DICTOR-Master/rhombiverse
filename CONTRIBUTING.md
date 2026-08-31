@@ -98,5 +98,5 @@ Regular bugs: open a GitHub issue. Security issues: see `SECURITY.md`
 This project follows the Contributor Covenant — see
 `CODE_OF_CONDUCT.md`. Short version: be respectful, assume good faith,
 and the same "open commons" spirit described in `TERMS.md`'s Shared
-World section applies here too — to the codebase, not just the game
-world.
+World section applies here too — to the codebase, not just the Shared
+World itself.

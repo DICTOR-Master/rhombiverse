@@ -218,11 +218,11 @@ export function applyWorkspaceModeGate(resolvedFaces, workspaceMode) {
 
 // BCC Lattice feature gate (added 2026-08-28, WHEEL_PIECE): the 3 BCC/
 // interstitial piece tiers only mean anything when FEATURES.bccLattice
-// is on (Rhombeometry mode) -- Full Game World has no BCC/interstitial
+// is on (Rhombeometry mode) -- Full World has no BCC/interstitial
 // worlds to place them into at all. Deliberately a SEPARATE gate from
 // applyWorkspaceModeGate above -- that one is model-vs-world workspace
 // (an orthogonal axis, gates tool:bccBuild for a different reason), not
-// Rhombeometry-vs-Full-Game-World. Takes a plain boolean, not FEATURES
+// Rhombeometry-vs-Full-World. Takes a plain boolean, not FEATURES
 // itself, so this module stays free of any global-state import (same
 // reasoning applyWorkspaceModeGate already follows for workspaceMode).
 const BCC_LATTICE_ONLY_FACE_ACTIONS = new Set([

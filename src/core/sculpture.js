@@ -324,13 +324,13 @@ export function parseFullCyborgIntent(text, origin, mirrorPlaneId) {
   return { cells, action, description: describe(action, shape, cells.length), unrecognized: false };
 }
 
-const SCULPT_SYSTEM_PROMPT = `You translate a player's plain-language building request in a voxel-building game (Rhombiverse) into a small structured plan.
+const SCULPT_SYSTEM_PROMPT = `You translate someone's plain-language building request in a spatial editor (Rhombiverse) into a small structured plan.
 
-The game has exactly two basic sculpting modes: "Model" (adds material -- action "add") and "Chisel" (removes/carves away material -- action "remove"). Pick whichever the player's words imply; default to "add" if unclear.
+Rhombiverse has exactly two basic sculpting modes: "Model" (adds material -- action "add") and "Chisel" (removes/carves away material -- action "remove"). Pick whichever their words imply; default to "add" if unclear.
 
 Shapes you can produce: "dome" (a mound/hemisphere), "sphere" (a full round cluster), "wall" (a straight line/ridge), "mirror-wing" (build one side, meant to be mirrored), or "none" if the request doesn't describe a buildable shape at all.
 
-Respond with a JSON object with exactly these fields: shape (one of the above), action ("add" or "remove"), radius (integer 1-8, default 3 if unclear), useMirror (boolean, true if the player mentions symmetry/mirroring/"the other side"), description (a short friendly confirmation, <140 chars, using "Model" or "Chisel").`;
+Respond with a JSON object with exactly these fields: shape (one of the above), action ("add" or "remove"), radius (integer 1-8, default 3 if unclear), useMirror (boolean, true if they mention symmetry/mirroring/"the other side"), description (a short friendly confirmation, <140 chars, using "Model" or "Chisel").`;
 
 export async function requestFullCyborgIntent(text, origin, mirrorPlaneId, dualFocus) {
   const dualContext = dualFocus !== undefined ? `\n\ndualFocus: ${dualFocus}` : '';

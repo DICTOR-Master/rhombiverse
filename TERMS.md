@@ -37,7 +37,7 @@ includes automated flooding of builds, claims, or connections). Don't
 use the app for anything unlawful.
 
 In Shared World specifically: don't attempt to grief, deface, or destroy
-other players' builds or claimed land outside of what the game's own
+other players' builds or claimed land outside of what Rhombiverse's own
 rules and protections (right-click removal, claim `destructible`
 settings, Black Hole/Supernova mechanics, etc.) actually allow. Don't
 try to create multiple identities to get around the one-claim-per-player
@@ -70,7 +70,7 @@ World player can see, and in most cases build on or near — this is the
 whole point of Shared World, not an accidental side effect. By enabling
 Shared World and placing content, you agree that:
 
-- Other players may see, build adjacent to, or (subject to the game's
+- Other players may see, build adjacent to, or (subject to Rhombiverse's
   own mechanics — e.g. a claim's `destructible` setting, Black Hole/
   Supernova consumption of *foreign* matter only, never a protected or
   claimed cell without consent) interact with what you place.
@@ -81,7 +81,7 @@ Shared World and placing content, you agree that:
   simply disappear because the original placer left.
 - You grant Rhombiverse a license to store, transmit, and display what
   you place in the Shared World to other players, for as long as the
-  Shared World exists, so that the game can function as designed.
+  Shared World exists, so that it can function as designed.
 
 You still retain the right to remove your own individual cells
 yourself (right-click, in any mode) while they exist, subject to the
@@ -103,9 +103,9 @@ summary of how it actually works:
   toggle (whether Black Hole/Supernova mechanics are allowed to consume
   foreign matter that drifts into it, and whether gravity pulls
   entities standing inside it).
-- A claim is a gameplay reservation within Rhombiverse, not a real-world
+- A claim is an in-app reservation within Rhombiverse, not a real-world
   asset — it has no monetary value, isn't transferable, isn't a
-  blockchain token, and confers no rights outside the game.
+  blockchain token, and confers no rights outside Rhombiverse.
 - Because Shared World identities are anonymous and not tied to a
   verified account, the "one claim per identity" rule can, in practice,
   be worked around by starting a new anonymous session (e.g. a fresh

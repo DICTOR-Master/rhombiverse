@@ -7,7 +7,7 @@ import { buildRDFaces } from './rhombic-wheel-3d-core.js';
 
 const SKIP_KEY = 'rhombiverse-skip-intro';
 
-// Migration Path Phase C's Rhombeometry/Full Game World mode choice -- see
+// Migration Path Phase C's Rhombeometry/Full World mode choice -- see
 // companion doc for why picking a different mode reloads immediately.
 
 // --- Geometry: real 3D RD wireframe, built from the SAME shared source as
@@ -222,7 +222,7 @@ function overlayHtml() {
       <div class="mode-choice">
         <div class="mode-choice-prompt">Mode:</div>
         <button type="button" class="mode-choice-btn" data-mode="pure" id="mode-choice-pure">Pure Rhombeometry</button>
-        <button type="button" class="mode-choice-btn" data-mode="full" id="mode-choice-full">Full Game World</button>
+        <button type="button" class="mode-choice-btn" data-mode="full" id="mode-choice-full">Full World</button>
       </div>
       <label class="dont-show">
         <input type="checkbox" id="skip-intro-checkbox" />

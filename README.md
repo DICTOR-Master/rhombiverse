@@ -29,7 +29,7 @@ install, no account required.
 ## Core vs. Modules
 
 The project's true differentiator is the FCC lattice / rhombic dodecahedron
-geometry — not the game-loop systems (mining, trade, etc.) built on top of
+geometry — not the continuously-simulated systems (mining, trade, etc.) built on top of
 it. Those systems are valuable and genuinely fun, but secondary to the
 geometry itself:
 
@@ -43,7 +43,7 @@ geometry itself:
   (`growth.js`), Duality Mode (periodic↔aperiodic tiling dual,
   `dual.js`, shown once grown Penrose/Ammann structures exist), lattice
   zoom (`latticezoom.js`), cultivation (`cultivation.js`).
-- **World Systems (secondary, game-loop, can be disabled or
+- **World Systems (secondary, continuously-simulated, can be disabled or
   community-owned):** mining & resources, inventory, claims/regions
   (`regions.js`), trade (`trade.js`), achievements (`achievements.js`),
   animals (`animals.js`), hazards (`blackhole.js`, `supernova.js`,
@@ -100,13 +100,13 @@ play). Full-Cyborg itself (Sculpt/Cultivate's most assisted tier) uses that
 same AI pattern.
 
 The welcome screen is a rotating RD logo with two live antipodal ENTER
-faces and a Mode choice (Pure Rhombeometry / Full Game World, defaulting
-to Rhombeometry — geometry only). Picking Full Game World on a first-time
+faces and a Mode choice (Pure Rhombeometry / Full World, defaulting
+to Rhombeometry — geometry only). Picking Full World on a first-time
 visit loads the real Showcase World (a continental planetoid with growth,
 evolved organisms, and animals already in it) and walks you through
 build → open the wheel → plant something → explore, rather than a
 tutorial modal; Rhombeometry mode instead starts from a blank single-cell
-world with no game-flavored onboarding.
+world with no systems-flavored onboarding.
 
 `docs/RHOMBIVERSE_UIUX_BUILD_PLAN.md` is the spec for this whole control-
 surface/onboarding/AI-assistance layer (tracks B1–B7); B1–B6 are done, and

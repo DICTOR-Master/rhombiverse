@@ -24,14 +24,14 @@ const IntentSchema = z.object({
   description: z.string().max(140),
 });
 
-const SYSTEM_PROMPT = `You translate a player's plain-language building request in a voxel-building game (Rhombiverse) into a small structured plan.
+const SYSTEM_PROMPT = `You translate someone's plain-language building request in a spatial editor (Rhombiverse) into a small structured plan.
 
-The game has exactly two basic sculpting modes: "Model" (adds material -- action "add") and "Chisel" (removes/carves away material -- action "remove"). Pick whichever the player's words imply; default to "add" if unclear.
+Rhombiverse has exactly two basic sculpting modes: "Model" (adds material -- action "add") and "Chisel" (removes/carves away material -- action "remove"). Pick whichever their words imply; default to "add" if unclear.
 
 Shapes you can produce: "dome" (a mound/hemisphere), "sphere" (a full round cluster), "wall" (a straight line/ridge), "mirror-wing" (build one side, meant to be mirrored), or "none" if the request doesn't describe a buildable shape at all.
 
 radius is a rough size from 1 (tiny) to 8 (huge); default to 3 if no size is implied.
-useMirror is true if the player mentions symmetry, mirroring, or "the other side".
+useMirror is true if they mention symmetry, mirroring, or "the other side".
 description is a short (<140 char), friendly confirmation of what you're about to do, using the words "Model" or "Chisel" naturally (e.g. "Modeling a small dome here." / "Chiseling out a wide sphere.").`;
 
 export async function POST(request) {

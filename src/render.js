@@ -900,9 +900,9 @@ function buildCyborgWorldSummary() {
 }
 
 // Kept in sync with api/cyborg-suggest.js's own copy -- see docs/code-notes/render.md
-const CYBORG_SUGGEST_SYSTEM_PROMPT = `You are a creative building companion for Rhombiverse, a voxel-building game where every block is a rhombic dodecahedron.
+const CYBORG_SUGGEST_SYSTEM_PROMPT = `You are a creative building companion for Rhombiverse, a spatial editor where every block is a rhombic dodecahedron.
 
-Given a short description of what a player has already built, suggest ONE small, concrete, achievable next thing for them to build or plant -- something more interesting than "place another block", but still doable in a few minutes. Name a shape, direction, or technique (e.g. "try a mirrored arch to the east", "plant a conifer near your fern for a mixed grove", "hollow out the center and add windows"). Keep it under 140 characters, friendly, and specific to what they've actually built so far -- don't suggest something they've clearly already done. Never mention that you are an AI.
+Given a short description of what someone has already built, suggest ONE small, concrete, achievable next thing for them to build or plant -- something more interesting than "place another block", but still doable in a few minutes. Name a shape, direction, or technique (e.g. "try a mirrored arch to the east", "plant a conifer near your fern for a mixed grove", "hollow out the center and add windows"). Keep it under 140 characters, friendly, and specific to what they've actually built so far -- don't suggest something they've clearly already done. Never mention that you are an AI.
 
 Respond with a JSON object with exactly one field: suggestion (string, <140 chars).`;
 
@@ -1458,14 +1458,14 @@ async function init() {
     worldJSON = savedJSON;
   } else if (getSettings().pureGeometry) {
     // Rhombeometry's first-visit experience is geometry-only, full stop --
-    // no pre-built World, no game-flavored tour (both of those are Full
-    // Game World content, see onboardingCyborg.enable() below). Direct
+    // no pre-built World, no systems-flavored tour (both of those are
+    // Full World content, see onboardingCyborg.enable() below). Direct
     // user decision 2026-08-28: the mode choice on the welcome screen
     // ("geometry comes first") was silently undone the moment the world
     // itself loaded, since this branch used to run unconditionally
     // regardless of pureGeometry -- every first-time Rhombeometry visitor
     // was actually dropped into the same Showcase World + tour as Full
-    // Game World, no different first look at all.
+    // World, no different first look at all.
     worldJSON = await loadWorld('./data/starter-world.json');
   } else {
     try {
@@ -1492,7 +1492,7 @@ async function init() {
     saveToLocalStorage(world.toJSON());
     showHudPrompt('Loaded a shared World from your link.', 5000);
   }
-  // Every step of this tour narrates Full Game World content (an
+  // Every step of this tour narrates Full World content (an
   // "already-built World," pre-seeded "growing life", Explore framed as
   // walking around "yours and everyone else's") -- none of it true for
   // Rhombeometry's actual first-visit world (a single blank cell, no
@@ -2506,7 +2506,7 @@ async function init() {
         // something new into being" alongside Sculpt/Generate/Plant.
         // Same clickMode() shim as every other tool face; the
         // FEATURES.bccLattice check is defense-in-depth so this wheel
-        // face can't put a Full Game World session into BCC mode even
+        // face can't put a Full World session into BCC mode even
         // though the underlying .mode-btn itself would technically
         // still accept the click (it's just hidden by CSS there).
         if (action === 'tool:bccBuild') {
@@ -2525,7 +2525,7 @@ async function init() {
         // top|sy1sz1 slot by dropping Lenses from the universal ring.
         // Same Rhombeometry-only defense-in-depth check as tool:bccBuild
         // (even though #cubocta-build-toggle is already hidden by CSS in
-        // Full Game World).
+        // Full World).
         //
         // 2026-08-29 SAME-DAY FIX, real bug caught live: this used to
         // close the wheel immediately (BCC Build's own pattern), unlike
