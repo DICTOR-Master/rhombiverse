@@ -153,6 +153,12 @@ export const MARKS = {
   // 2D, deliberately different from Pyramid's plain flat-outline triangle.
   pieceOctaSite: `<polygon points="0,-32 20,0 0,32 -20,0" ${THIN}/><path d="M-20,0 H20" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
   pieceDisphenoid: `<polygon points="0,-30 26,20 -26,20" ${THIN}/><path d="M0,-30 L0,4 M-26,20 L0,4 M26,20 L0,4" stroke="currentColor" stroke-width="1.5"/>`,
+  // Octahedron (Cuboctahedron gap-fill piece, added 2026-08-31): direct
+  // user request -- a plain square (same outline as pieceCube, since the
+  // shape's own silhouette is axis-aligned and square-like from most
+  // angles) with a cross through it, to read as clearly distinct from
+  // bare Cube at a glance.
+  pieceOctahedron: `<polygon points="-24,-24 24,-24 24,24 -24,24" ${THIN}/><path d="M-24,0 H24 M0,-24 V24" stroke="currentColor" stroke-width="1.5"/>`,
   // Fill: "+" shown across three hexagons.
   fill: `
     <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>
