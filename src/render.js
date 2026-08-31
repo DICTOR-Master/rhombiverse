@@ -186,7 +186,7 @@ function showSyncWarning(error) {
     ? "You're building faster than Shared World allows right now -- some changes may not have saved. It refills over time; slow down a bit."
     : /asteroid cell at that position/i.test(errorMessage)
       ? "That rock is already gone -- someone else may have mined it first."
-      : "Some changes aren't reaching Shared World (connection issue) -- they may not be saved for other players.";
+      : "Some changes aren't reaching Shared World (connection issue) -- they may not be saved for other users.";
   el.textContent = `⚠ ${message}`;
   el.style.display = 'block';
   clearTimeout(syncWarningTimer);
@@ -2599,8 +2599,8 @@ async function init() {
         // pending-trades list and #inventory-hint both really live)
         // and explain the real mechanism, rather than pretending a
         // direct action exists. ---
-        if (action === 'tool:offer') { labToggleEl?.click(); showHudPrompt('Trades start via Interact: walk up to another player and tap Interact to propose one.', 4500); wheel3D.close(); return; }
-        if (action === 'tool:accept') { labToggleEl?.click(); showHudPrompt('Pending trades from other players show up in the Lab panel -- walk up and tap Interact to respond.', 4500); wheel3D.close(); return; }
+        if (action === 'tool:offer') { labToggleEl?.click(); showHudPrompt('Trades start via Interact: walk up to another user and tap Interact to propose one.', 4500); wheel3D.close(); return; }
+        if (action === 'tool:accept') { labToggleEl?.click(); showHudPrompt('Pending trades from other users show up in the Lab panel -- walk up and tap Interact to respond.', 4500); wheel3D.close(); return; }
         if (action === 'tool:inventory') { labToggleEl?.click(); wheel3D.close(); return; } // real inventory line lives in the Lab panel
 
         if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }

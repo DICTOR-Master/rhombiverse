@@ -621,14 +621,14 @@ export const WHEEL_TRADE = {
     // (where the real pending-trades list and inventory live) and
     // explain the real mechanism rather than pretending a direct
     // action exists. Judgment call -- see render.js's onAction.
-    "equator|sx1sy1":  { kind: "dept", label: "Offer", action: "tool:offer", desc: "Trades start via Interact -- walk up to another player and tap Interact." },
+    "equator|sx1sy1":  { kind: "dept", label: "Offer", action: "tool:offer", desc: "Trades start via Interact -- walk up to another user and tap Interact." },
     "equator|sx1sy-1": { kind: "dept", label: "Accept", action: "tool:accept", desc: "Pending trades from others show up in the Lab panel." },
     "equator|sx-1sy1": { kind: "dept", label: "Inventory", action: "tool:inventory", desc: "Opens the Lab panel, where your real inventory is shown." },
     // Temporary duplicate at Offer's true geometric antipode (equator|
     // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
     // policy: a blank face duplicates its antipode's content until
     // real content exists for it, direct user directive 2026-08-25.
-    "equator|sx-1sy-1": { kind: "dept", label: "Offer", action: "tool:offer", temporary: true, desc: "Trades start via Interact -- walk up to another player and tap Interact. Duplicated here for quick access from a spare slot." },
+    "equator|sx-1sy-1": { kind: "dept", label: "Offer", action: "tool:offer", temporary: true, desc: "Trades start via Interact -- walk up to another user and tap Interact. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
     "bottom|sx1sz-1":  { kind: "dept", label: "Inventory", action: "tool:inventory", temporary: true,
       desc: "Opens the Lab panel, where your real inventory is shown. Duplicated here for quick access from a spare slot." },
