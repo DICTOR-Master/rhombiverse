@@ -1,10 +1,11 @@
 [
   {
     "date": "2026-08-31",
-    "title": "Cuboctahedra, Corner to Corner",
+    "title": "Cuboctahedra, Face to Face",
     "items": [
-      "Cuboctahedron Build can now grow face-to-face with its neighbors, not just corner-to-corner -- click closer to a flat face on an existing one instead of a point to grow that way, filling in the space between them.",
-      "The Piece picker's Octahedron now fills the gap that opens up between face-touching cuboctahedra -- select it and click near a cuboctahedron's corner. A real, exact fit, not a rough approximation."
+      "Cuboctahedron Build can now grow face to face with its neighbors, not just corner to corner -- click closer to a flat face on an existing one instead of a point to grow that way, filling in the space between them.",
+      "New Piece: Octahedron -- fills the gap that opens up between cuboctahedra face to face. Select it and click near a Cuboctahedron's own corner. A real, exact fit, not a rough approximation -- and separate from the existing Octahedron Site, which still builds the same BCC-interstitial bundle it always has.",
+      "The Piece wheel's own Material face is gone -- picking any Piece now opens the color swatch right after, so shape and material stay a single step apart. Material's still one tap away from the bottom-left color icon too."
     ]
   },
   {

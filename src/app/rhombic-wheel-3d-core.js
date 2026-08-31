@@ -492,7 +492,7 @@ export const WHEEL_PIECE = {
     // "Octahedron Site" 4-disphenoid bundle above rather than replacing
     // it, direct user decision 2026-08-31.
     "top|sy1sz1":       { kind: "dept", label: "Octahedron", action: "tool:pieceType:octahedron",
-      desc: "Fills the gap between face-touching cuboctahedra -- click near a Cuboctahedron's own corner." },
+      desc: "Fills the gap between cuboctahedra face to face -- click near a Cuboctahedron's own corner." },
   }
 };
 
