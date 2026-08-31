@@ -3236,6 +3236,17 @@ async function init() {
   }
   refreshHudIndicator = updateHudIndicator;
   materialSelect.addEventListener('change', updateHudIndicator);
+  // Real bug, caught live 2026-08-31 ("picking CO... disphenoid coming
+  // instead", eventually pinned down to "picker shape is flat
+  // octahedron" -- not a placement bug at all, confirmed by checking
+  // real placed-cell data: CO placement itself was correct throughout).
+  // materialSelect got its own change listener above; #piece-type-select
+  // never did -- selecting a piece directly from the Lab panel's own
+  // dropdown (a real, direct interaction path, not just a wheel proxy)
+  // silently left the quick-select icon showing whatever the WHEEL had
+  // last set it to, with no refresh at all until some other action
+  // happened to call updateHudIndicator() again.
+  document.getElementById('piece-type-select')?.addEventListener('change', updateHudIndicator);
   // quickShapeEl/quickMaterialEl's own click handlers are wired up above,
   // inside the wheel3D block (they need wheel3D/toggleWheel3D/
   // seedIfWorldEmpty, which only exist in that block's own scope).
