@@ -407,7 +407,7 @@ export const WHEEL_BUILD = {
     // own genuine drag-rotation, not a bespoke second scene). See
     // WHEEL_PIECE below.
     "bottom|sy1sz-1":  { kind: "dept", label: "Piece", action: "navigateTo:piece",
-      desc: "Choose what Add/Remove operate on: RD, Cube, Pyramid, Truncated Octahedron, Octahedron, or Disphenoid." },
+      desc: "Choose what Add/Remove operate on: RD, Cube, Pyramid, Truncated Octahedron, Octahedron Site, Octahedron, or Disphenoid." },
     // Repeat is the 2D wheel's own real "tool-drag" leaf (drag across
     // faces to place a run of cells) -- reused via the new
     // toggleDragPlacement() export, same pattern as Material/Generate
@@ -465,7 +465,7 @@ export const WHEEL_PIECE = {
     "equator|sx1sy-1":  { kind: "dept", label: "Cube", action: "tool:pieceType:cube", desc: "A bare block, no pyramids -- build up from here with the Pyramid tier." },
     "equator|sx-1sy1":  { kind: "dept", label: "Pyramid", action: "tool:pieceType:pyramid", desc: "Add or remove one pyramid on an already-placed cell." },
     "equator|sx-1sy-1": { kind: "dept", label: "TO", action: "tool:pieceType:to", desc: "Truncated Octahedron -- the BCC lattice's own real space-filling cell." },
-    "bottom|sy1sz-1":   { kind: "dept", label: "Octahedron", action: "tool:pieceType:ioct", desc: "Fills the gap between face-touching cuboctahedra -- click near a Cuboctahedron's own corner." },
+    "bottom|sy1sz-1":   { kind: "dept", label: "Octahedron Site", action: "tool:pieceType:ioct", desc: "BCC interstitial lattice: places the 4-disphenoid bundle a flattened octahedron site combines into." },
     "bottom|sx1sz-1":   { kind: "dept", label: "Disphenoid", action: "tool:pieceType:idis", desc: "BCC interstitial lattice: one tetragonal disphenoid at a time." },
     // Cuboctahedron Build: not a "tool:pieceType:*" terminal like its
     // siblings -- it's its own click-to-place/grow mode (like BCC Build
@@ -478,16 +478,21 @@ export const WHEEL_PIECE = {
     // panel that opens on selection.
     "bottom|sx-1sz-1":  { kind: "dept", label: "CO", action: "tool:cuboctaBuild",
       desc: "Cuboctahedron -- place cells on the RD lattice's dual, vertex-pointed cuboctahedra, alongside your normal World (Rhombeometry only)." },
-    // Material, reachable here too (also still on WHEEL_BUILD's own
-    // equator, unchanged) -- direct user request 2026-08-29 to be able
-    // to pick shape and material "close together," i.e. on the same
-    // screen rather than two separate wheel navigations. A deliberate
-    // permanent second access point, not a temporary placeholder (see
-    // this file's own established pattern of filling a real SPARE with
-    // a real already-working feature, same as how Material first got
-    // added to WHEEL_BUILD and Remove to WHEEL_ALTER). Placed on the
-    // always-visible top|sy1sz1 -- see this wheel's own header comment.
-    "top|sy1sz1":       { kind: "dept", label: "Material", action: "tool:material", desc: "Pick a build material." },
+    // Material lived here 2026-08-29 through 2026-08-31 (direct request
+    // to pick shape and Material "close together"), then was removed --
+    // direct follow-up feedback: a real color swatch among this wheel's
+    // own monochrome marks was a genuine visual outlier, and picking any
+    // Piece face now opens the material-swatch overlay directly instead
+    // (see the tool:pieceType:* handler in render.js), so a dedicated
+    // face here was redundant besides. Material's still reachable at
+    // WHEEL_BUILD's own equator and the bottom-left HUD color icon,
+    // unchanged. This freed the always-visible top|sy1sz1 slot (see this
+    // wheel's own header comment) for the Cuboctahedron gap-fill
+    // Octahedron -- a genuinely new piece, kept distinct from the old
+    // "Octahedron Site" 4-disphenoid bundle above rather than replacing
+    // it, direct user decision 2026-08-31.
+    "top|sy1sz1":       { kind: "dept", label: "Octahedron", action: "tool:pieceType:octahedron",
+      desc: "Fills the gap between face-touching cuboctahedra -- click near a Cuboctahedron's own corner." },
   }
 };
 

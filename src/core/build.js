@@ -388,22 +388,25 @@ export function createBuildController({
       handleToClick(hit, mode);
       return;
     }
-    // Same reasoning, for the interstitial-lattice 'idis' piece tier.
+    // Same reasoning, for the interstitial-lattice piece tiers. 'ioct'
+    // (Octahedron Site) restored here 2026-08-31 -- kept on the wheel
+    // building the old 4-disphenoid bundle, direct user decision, after
+    // a brief detour where it was rewired to the new piece below and
+    // then un-rewired.
     const pieceTypeForInterstitial = getPieceType();
-    if ((mode === 'build' || mode === 'chisel') && pieceTypeForInterstitial === 'idis' && interstitialStore && interstitialGroup) {
+    if ((mode === 'build' || mode === 'chisel') && (pieceTypeForInterstitial === 'ioct' || pieceTypeForInterstitial === 'idis') && interstitialStore && interstitialGroup) {
       handleInterstitialClick(hit, mode, pieceTypeForInterstitial);
       return;
     }
-    // 'ioct' (Octahedron) is handled entirely by core/cubocta-gap-
-    // build.js's own independent click listener on the same canvas --
-    // but a REAL bug, caught live 2026-08-31 ("RD build is being
-    // triggered"): simply omitting 'ioct' from this dispatch let any
-    // click that controller's own raycast missed (e.g. not precisely on
-    // an existing cuboctahedron) fall through to the generic cellAt()
-    // RD-placement path below, since nothing here still recognized
-    // 'ioct' as a handled piece-type at all. Explicit no-op guard, not a
-    // fallthrough -- this handler still exists to do nothing, on purpose.
-    if ((mode === 'build' || mode === 'chisel') && pieceTypeForInterstitial === 'ioct') {
+    // 'octahedron' (the NEW Cuboctahedron gap-fill piece, distinct from
+    // 'ioct' above) is handled entirely by core/cubocta-gap-build.js's
+    // own independent click listener on the same canvas. Explicit no-op
+    // guard here, not a fallthrough -- a REAL bug, caught live
+    // 2026-08-31 ("RD build is being triggered"): omitting a piece-type
+    // from this dispatch entirely lets any click that controller's own
+    // raycast missed (e.g. not precisely on an existing cuboctahedron)
+    // fall through to the generic cellAt() RD-placement path below.
+    if ((mode === 'build' || mode === 'chisel') && pieceTypeForInterstitial === 'octahedron') {
       return;
     }
 
@@ -646,22 +649,18 @@ export function createBuildController({
       if (onRemoved) onRemoved(bccCell);
       return;
     }
-    // Same reasoning, for the interstitial-lattice 'idis' piece tier.
-    // 'ioct' is deliberately excluded here -- rewired onto
-    // core/cubocta-gap-build.js's own controller (direct user request,
-    // 2026-08-31), which has its own independent right-click/long-press
-    // removal handling on the same canvas; routing it through here too
-    // would double-handle the same click.
+    // Same reasoning, for the interstitial-lattice piece tiers -- 'ioct'
+    // restored here 2026-08-31, same as its onClick counterpart above.
     const pieceTypeForInterstitialRemove = getPieceType();
-    if (mode === 'build' && pieceTypeForInterstitialRemove === 'idis' && interstitialStore && interstitialGroup) {
+    if (mode === 'build' && (pieceTypeForInterstitialRemove === 'ioct' || pieceTypeForInterstitialRemove === 'idis') && interstitialStore && interstitialGroup) {
       handleInterstitialClick(hit, 'chisel', pieceTypeForInterstitialRemove);
       return;
     }
-    // Explicit no-op guard, same reasoning/bug as onClick's own -- a
-    // right-click with 'ioct' selected that misses an actual octahedron
+    // Explicit no-op guard for 'octahedron', same reasoning/bug as
+    // onClick's own -- a right-click that misses an actual octahedron
     // instance must not fall through to removing whatever real cell was
     // actually hit.
-    if (mode === 'build' && pieceTypeForInterstitialRemove === 'ioct') {
+    if (mode === 'build' && pieceTypeForInterstitialRemove === 'octahedron') {
       return;
     }
 

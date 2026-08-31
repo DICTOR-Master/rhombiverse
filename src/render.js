@@ -2468,19 +2468,27 @@ async function init() {
         // (rhombic-wheel-3d-core.js), replacing the old separate
         // piece-cluster-3d.js widget/pickers.openPieceTypePicker
         // 2026-08-28 -- direct feedback was to use "the same main real
-        // wheel" for this instead of a bespoke second scene. Picking a
-        // piece here used to close the wheel like every other terminal
-        // tool: action in this file -- changed 2026-08-29, direct
-        // request: shape and Material should be pickable "close
-        // together," so this ONE terminal action deliberately stays
-        // open instead of closing (Material now lives on this same
-        // WHEEL_PIECE screen, see rhombic-wheel-3d-core.js) rather than
-        // forcing a re-open just to reach it right after. Material's
-        // own handler below still closes the wheel -- that's the real
-        // hand-off point, to the separate color-swatch overlay.
+        // wheel" for this instead of a bespoke second scene.
+        //
+        // 2026-08-29 -> 2026-08-31: Material used to live on this same
+        // WHEEL_PIECE screen (its own top|sy1sz1 face) so shape+Material
+        // could be picked "close together," with this action
+        // deliberately staying open afterward rather than closing, so
+        // the player could navigate there next. Direct user feedback
+        // 2026-08-31: a real color swatch sitting among the wheel's own
+        // monochrome marks read as a genuine visual outlier, and it was
+        // sometimes hard to find besides. Replaced: Material's wheel
+        // face is gone (freeing that slot for Octahedron, see
+        // rhombic-wheel-3d-core.js), and picking ANY piece here now
+        // opens the real material-swatch overlay directly -- same
+        // `pickers.openMaterialPicker` call tool:material's own handler
+        // below uses, so there's exactly one material-picker code path,
+        // not two. wheel3D now closes here too, matching every other
+        // terminal tool: action -- there's no more Material face left on
+        // this screen to stay open for.
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
-          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Octahedron', idis: 'Disphenoid' };
+          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Octahedron Site', octahedron: 'Octahedron', idis: 'Disphenoid' };
           document.getElementById('piece-type-select').value = value;
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
@@ -2498,6 +2506,8 @@ async function init() {
           if (currentMode !== 'build' && currentMode !== 'chisel') clickMode('build');
           updateHudIndicator();
           showHudPrompt(`Piece: ${PIECE_LABELS[value] ?? value}`, 3000);
+          wheel3D.close();
+          pickers.openMaterialPicker((matValue, matLabel) => showHudPrompt(`Material: ${matLabel}`, 3000));
           return;
         }
         // Reuses the 2D wheel's own material-picker overlay (a real,
@@ -2763,8 +2773,9 @@ async function init() {
     pieceTypeToOption.disabled = !FEATURES.bccLattice;
     pieceTypeToOption.hidden = !FEATURES.bccLattice;
   }
-  // Same gating for the interstitial-lattice piece tiers.
-  for (const id of ['piece-type-ioct-option', 'piece-type-idis-option']) {
+  // Same gating for the interstitial-lattice piece tiers, plus the
+  // Cuboctahedron gap-fill Octahedron (same Rhombeometry-only reasoning).
+  for (const id of ['piece-type-ioct-option', 'piece-type-octahedron-option', 'piece-type-idis-option']) {
     const opt = document.getElementById(id);
     if (opt) {
       opt.disabled = !FEATURES.bccLattice;
@@ -3103,7 +3114,7 @@ async function init() {
   // MARKS entry -- same shape vocabulary the Piece wheel faces
   // themselves use (wheel-icons.js), so the quick-select icon below is
   // never a second, competing symbol for the same shape.
-  const PIECE_MARK_KEY = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', to: 'pieceTO', ioct: 'pieceOctahedron', idis: 'pieceDisphenoid' };
+  const PIECE_MARK_KEY = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', to: 'pieceTO', ioct: 'pieceOctaSite', octahedron: 'pieceOctahedron', idis: 'pieceDisphenoid' };
   const quickShapeEl = document.getElementById('hud-quick-shape');
   const quickMaterialEl = document.getElementById('hud-quick-material');
   // Bottom-left quick-select: always-visible current Piece/Material,
@@ -4231,12 +4242,12 @@ async function init() {
     updateSectionEnabled();
     saveToLocalStorage(octGapWorld.toJSON(), CUBOCTA_GAP_STORAGE_KEY);
   }
-  // Rewired onto the Piece picker's own 'ioct' slot (direct user
-  // request) -- reachable in the generic Build/Chisel modes (same as
-  // idis) rather than a dedicated mode, so it's driven by the SAME
-  // #piece-type-select the wheel already surfaces, not currentMode.
-  // Its own click/right-click/long-press handling is unaffected -- only
-  // WHEN it fires changed, not how.
+  // Driven by the Piece picker's own 'octahedron' slot (a real, separate
+  // value from 'ioct' -- direct user decision to keep the old flattened
+  // Octahedron Site/4-disphenoid bundle on the wheel exactly as it was,
+  // rather than replace it) -- reachable in the generic Build/Chisel
+  // modes (same as idis) rather than a dedicated mode, driven by the
+  // SAME #piece-type-select the wheel already surfaces, not currentMode.
   createCuboctaGapBuildController({
     renderer,
     camera,
@@ -4251,7 +4262,7 @@ async function init() {
       !walking &&
       (currentMode === 'build' || currentMode === 'chisel') &&
       FEATURES.bccLattice &&
-      document.getElementById('piece-type-select')?.value === 'ioct',
+      document.getElementById('piece-type-select')?.value === 'octahedron',
   });
 
   // The old 2D radial menu (wheel.js) was removed 2026-08-25 -- the
