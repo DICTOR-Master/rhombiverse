@@ -407,7 +407,7 @@ export const WHEEL_BUILD = {
     // own genuine drag-rotation, not a bespoke second scene). See
     // WHEEL_PIECE below.
     "bottom|sy1sz-1":  { kind: "dept", label: "Piece", action: "navigateTo:piece",
-      desc: "Choose what Add/Remove operate on: RD, Cube, Pyramid, Truncated Octahedron, Octahedron Site, Octahedron, or Disphenoid." },
+      desc: "Choose what Add/Remove operate on: RD, Cube, Pyramid, Truncated Octahedron, Flattened Octahedron, Octahedron, or Disphenoid." },
     // Repeat is the 2D wheel's own real "tool-drag" leaf (drag across
     // faces to place a run of cells) -- reused via the new
     // toggleDragPlacement() export, same pattern as Material/Generate
@@ -465,7 +465,7 @@ export const WHEEL_PIECE = {
     "equator|sx1sy-1":  { kind: "dept", label: "Cube", action: "tool:pieceType:cube", desc: "A bare block, no pyramids -- build up from here with the Pyramid tier." },
     "equator|sx-1sy1":  { kind: "dept", label: "Pyramid", action: "tool:pieceType:pyramid", desc: "Add or remove one pyramid on an already-placed cell." },
     "equator|sx-1sy-1": { kind: "dept", label: "TO", action: "tool:pieceType:to", desc: "Truncated Octahedron -- the BCC lattice's own real space-filling cell." },
-    "bottom|sy1sz-1":   { kind: "dept", label: "Octahedron Site", action: "tool:pieceType:ioct", desc: "BCC interstitial lattice: places the 4-disphenoid bundle a flattened octahedron site combines into." },
+    "bottom|sy1sz-1":   { kind: "dept", label: "Flattened Octahedron", action: "tool:pieceType:ioct", desc: "BCC interstitial lattice: places the 4-disphenoid bundle a flattened octahedron combines into." },
     "bottom|sx1sz-1":   { kind: "dept", label: "Disphenoid", action: "tool:pieceType:idis", desc: "BCC interstitial lattice: one tetragonal disphenoid at a time." },
     // Cuboctahedron Build: not a "tool:pieceType:*" terminal like its
     // siblings -- it's its own click-to-place/grow mode (like BCC Build

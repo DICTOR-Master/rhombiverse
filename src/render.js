@@ -1456,7 +1456,7 @@ async function init() {
   }
 
   wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
-  wireFirstUseHint('bcc-toggle', 'Lattice View: click to cycle a preview lens through every Piece type -- RD, Cube, Pyramid (shown on your real World), then BCC/TO, Octahedron Site, and Disphenoid (a hypothetical patch near you), then Off.');
+  wireFirstUseHint('bcc-toggle', 'Lattice View: click to cycle a preview lens through every Piece type -- RD, Cube, Pyramid (shown on your real World), then Cuboctahedron and Octahedron, then BCC/TO, Flattened Octahedron, and Disphenoid (a hypothetical patch near you), then Off.');
   wireFirstUseHint('clear-world-toggle', 'Clear World: erase everything and start fresh from a single seed cell.');
   wireFirstUseHint('reload-toggle', 'Reload: hard-refresh the app if anything looks stuck or stale.');
   wireFirstUseHint('sculpture-mode-toggle', 'Sculpture Mode: a separate, isolated scratch workspace -- nothing here touches your real World.');
@@ -2488,7 +2488,7 @@ async function init() {
         // this screen to stay open for.
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
-          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Octahedron Site', octahedron: 'Octahedron', idis: 'Disphenoid' };
+          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid' };
           document.getElementById('piece-type-select').value = value;
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
@@ -2814,7 +2814,14 @@ async function init() {
   // Site/Disphenoid cells) -- those are structurally different features
   // (persistent world-state) from this re-rendering, non-persistent
   // preview.
-  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'cubocta', 'bcc', 'octa', 'octahedron', 'disphenoid'];
+  // Order groups related forms adjacent to each other -- direct user
+  // request: Cuboctahedron next to the regular Octahedron (the two that
+  // fill space together, this session's own doubled-density work), and
+  // Octahedron Site next to Disphenoid (which composes into it, see
+  // interstitial-lattice.js). Labels/icons are keyed by mode name below
+  // (LATTICE_QUICK_VIEW_LABELS/_MARK_KEY), not by array position, so
+  // reordering this list alone is safe.
+  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'cubocta', 'octahedron', 'bcc', 'octa', 'disphenoid'];
   const LATTICE_QUICK_VIEW_LABELS = {
     off: 'Off.',
     rd: 'RD -- every built cell shown as a complete block.',
@@ -2822,7 +2829,7 @@ async function init() {
     pyramid: "Pyramid -- every built cell's cube and 6 pyramid facets shown as separate pieces.",
     cubocta: 'Cuboctahedron -- every built cell shown as the real coordination shape, plus a preview at every real growth position around it (12 vertex-touching neighbors and 6 face-touching ones).',
     bcc: 'BCC/TO -- every co-locatable built cell shown as its dual truncated octahedron.',
-    octa: 'Octahedron Site -- every co-locatable built cell shown as one octahedron bundle.',
+    octa: 'Flattened Octahedron -- every co-locatable built cell shown as one octahedron bundle.',
     octahedron: 'Octahedron -- the Cuboctahedron gap-fill piece, previewed at one cube-center near every built cell.',
     disphenoid: 'Disphenoid -- every co-locatable built cell shown as one disphenoid.',
   };
@@ -3044,7 +3051,16 @@ async function init() {
     pieces.forEach((g) => g.dispose());
     latticeQuickViewMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
       color: SKELETON_COLOR, emissive: SKELETON_COLOR, emissiveIntensity: 0.6, flatShading: true,
-      transparent: true, opacity: 0.55, metalness: 0.1, roughness: 0.6,
+      // 'cubocta' specifically previews up to 18 positions PER real
+      // cell (see this mode's own branch above), so real structures
+      // produce far more overlapping translucent surfaces stacked on
+      // each other than any other mode ever does -- direct user
+      // feedback, confirmed live (even a single real cell's own full
+      // 18-position preview already reads as dense). Lower opacity only
+      // for this one mode so the overlap blends into a soft haze
+      // instead of solid mush, keeping every position visible rather
+      // than reducing how many are shown.
+      transparent: true, opacity: latticeQuickViewMode === 'cubocta' ? 0.22 : 0.55, metalness: 0.1, roughness: 0.6,
       // Real flicker reported live (2026-08-29, "microflashing... could
       // trigger epilepsy"), particularly visible with X-Ray exposing
       // the interior: 'rd' mode's geometry sits EXACTLY where a real
@@ -3095,6 +3111,11 @@ async function init() {
     s.add(latticeQuickViewMesh);
     latticeQuickViewEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({
       color: 0xffffff, depthTest: latticeQuickViewMode !== 'cubocta',
+      // Same "up to 18 overlapping positions per real cell" reasoning as
+      // the fill material's own opacity above -- solid white edges from
+      // every one of those piled up were a big part of the visual noise
+      // (a triangle-edge outline per shape, all overlapping).
+      transparent: latticeQuickViewMode === 'cubocta', opacity: latticeQuickViewMode === 'cubocta' ? 0.35 : 1,
     }));
     s.add(latticeQuickViewEdges);
     syncLatticeQuickViewActiveState(true);
