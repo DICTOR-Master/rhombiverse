@@ -2830,7 +2830,7 @@ async function init() {
     cubocta: 'Cuboctahedron -- every built cell shown as the real coordination shape, plus a preview at one face-touching axis-neighbor position too.',
     bcc: 'BCC/TO -- every co-locatable built cell shown as its dual truncated octahedron.',
     octa: 'Flattened Octahedron -- every co-locatable built cell shown as one octahedron bundle.',
-    octahedron: 'Octahedron -- the Cuboctahedron gap-fill piece, previewed at one cube-center near every built cell.',
+    octahedron: 'Octahedron -- the Cuboctahedron gap-fill piece, previewed at two cube-centers near every built cell.',
     disphenoid: 'Disphenoid -- every co-locatable built cell shown as one disphenoid.',
   };
   const LATTICE_QUICK_VIEW_MARK_KEY = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', octahedron: 'pieceOctahedron', disphenoid: 'pieceDisphenoid' };
@@ -2844,7 +2844,17 @@ async function init() {
   // as the axis offset above, just body-diagonal instead of axis-aligned
   // since that's the real direction octGapCellForCOCell expects (see
   // core/cubocta-gap-build.js).
-  const LATTICE_QUICK_VIEW_OCTAHEDRON_DIRECTION = [1, 1, 1];
+  // Two opposite body-diagonal corners (out of 8 real ones -- see
+  // core/cubocta-gap-build.js's own BODY_DIAGONAL_OFFSETS), not just
+  // one -- direct user request to bring this mode's own density up to
+  // the same "2 per real cell" order 'cubocta' settled on above, since
+  // this mode has no "real cell shown as itself" baseline shape the way
+  // 'cubocta' does (every position here is a preview), one direction
+  // alone under-represented it by comparison.
+  const LATTICE_QUICK_VIEW_OCTAHEDRON_DIRECTIONS = [
+    [1, 1, 1],
+    [-1, -1, -1],
+  ];
   let latticeQuickViewMode = 'off';
   let latticeQuickViewMesh = null;
   let latticeQuickViewEdges = null;
@@ -3011,14 +3021,16 @@ async function init() {
       // Cuboctahedron gap-fill Octahedron: lives directly in the SAME
       // FCC-cell coordinate space as 'cubocta' above (octGapCellForCOCell
       // treats a real cell exactly like a real CO position, no BCC
-      // conversion involved) -- one representative octahedron per real
-      // cell, at the fixed LATTICE_QUICK_VIEW_OCTAHEDRON_DIRECTION corner,
-      // deduped the same way the BCC-family anchors below are (adjacent
-      // cells can share the same cube-center).
+      // conversion involved) -- two representative octahedra per real
+      // cell, at the fixed LATTICE_QUICK_VIEW_OCTAHEDRON_DIRECTIONS
+      // corners, deduped the same way the BCC-family anchors below are
+      // (adjacent cells can share the same cube-center).
       const anchors = new Map(); // "i,j,k" -> [i, j, k]
       for (const cell of cells) {
-        const p = octGapCellForCOCell(cell, LATTICE_QUICK_VIEW_OCTAHEDRON_DIRECTION);
-        anchors.set(p.join(','), p);
+        for (const dir of LATTICE_QUICK_VIEW_OCTAHEDRON_DIRECTIONS) {
+          const p = octGapCellForCOCell(cell, dir);
+          anchors.set(p.join(','), p);
+        }
       }
       for (const [i, j, k] of anchors.values()) {
         const [wx, wy, wz] = octGapCellToWorld(i, j, k, SCALE);
