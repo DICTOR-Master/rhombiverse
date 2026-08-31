@@ -19,7 +19,23 @@
 import * as THREE from 'three';
 import { NEIGHBOR_OFFSETS } from './lattice.js';
 
-const NEIGHBOR_DIRECTIONS = NEIGHBOR_OFFSETS.map(
+// Doubled-density growth (2026-08-31 session, real numeric verification
+// in the session's own scratch checks): axis-adjacent cuboctahedra
+// (opposite integer parity, e.g. cell (0,0,0) and (1,0,0)) share their
+// square faces vertex-for-vertex at the SAME existing CO scale -- no
+// resize needed. Extending the candidate direction set with these 6
+// axis offsets lets growth reach the previously-unused parity; the
+// original 12 face-diagonal NEIGHBOR_OFFSETS keep working exactly as
+// before (same-parity, vertex-touching). No parity check exists or is
+// needed anywhere here -- growth just adds whichever offset the click
+// direction best matches.
+const AXIS_OFFSETS = [
+  [1, 0, 0], [-1, 0, 0],
+  [0, 1, 0], [0, -1, 0],
+  [0, 0, 1], [0, 0, -1],
+];
+const ALL_OFFSETS = [...NEIGHBOR_OFFSETS, ...AXIS_OFFSETS];
+const NEIGHBOR_DIRECTIONS = ALL_OFFSETS.map(
   ([x, y, z]) => new THREE.Vector3(x, y, z).normalize()
 );
 
@@ -33,7 +49,7 @@ export function matchNeighborOffsetByDirection(dir) {
       bestIdx = i;
     }
   });
-  return NEIGHBOR_OFFSETS[bestIdx];
+  return ALL_OFFSETS[bestIdx];
 }
 
 export function createCuboctaBuildController({

@@ -101,6 +101,24 @@ export function cuboctahedronVertices(s = 1) {
   return NEIGHBOR_OFFSETS.map(([x, y, z]) => [x * scale, y * scale, z * scale]);
 }
 
+// Cuboctahedron gap-fill octahedron (doubled-density CO build, 2026-08-31
+// session): a plain axis-aligned regular octahedron, radius 0.5s -- the
+// SAME reach scale cuboctahedronVertices already uses, verified
+// numerically (not assumed) to be the exact zero-gap/zero-overlap filler
+// for the space left once cuboctahedra occupy BOTH lattice parities
+// (today's even-parity FCC points plus the previously-unused odd-parity
+// ones, touching face-to-face along axis directions). Its 6 vertices are
+// exactly the shared triangular-face vertices of the surrounding CO's;
+// volume conservation confirmed 1 CO + 1 of these per unit cell sums to
+// exactly the unit cell's own volume (0.833s^3 + 0.167s^3 = 1.0s^3).
+// Centered at a unit cell's own cube-center (i+0.5,j+0.5,k+0.5)*s, NOT
+// nested inside any RD/Cube cell -- reuses OCTA_VERTS' own direction set
+// (already used for RD's apex geometry) at half that radius.
+export function octGapVertices(s = 1) {
+  const half = s * 0.5;
+  return OCTA_VERTS.map(([x, y, z]) => [x * half, y * half, z * half]);
+}
+
 export function nearestValidCell(x, y, z) {
   const rx = Math.round(x);
   const ry = Math.round(y);

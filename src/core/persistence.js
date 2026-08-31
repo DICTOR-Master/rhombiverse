@@ -20,6 +20,11 @@ export const INTERSTITIAL_STORAGE_KEY = 'rhombiverse-interstitial-world';
 // FCC/BCC/interstitial save/load/clear call site.
 export const CUBOCTA_STORAGE_KEY = 'rhombiverse-cubocta-world';
 
+// Cuboctahedron gap-octahedron build (core/cubocta-gap-build.js): same
+// reasoning again -- a fifth independent store, own key, own coordinate
+// frame (offset cube-center addressing, not the main integer grid).
+export const CUBOCTA_GAP_STORAGE_KEY = 'rhombiverse-cubocta-gap-world';
+
 export function saveToLocalStorage(worldJSON, key = STORAGE_KEY) {
   try {
     localStorage.setItem(key, JSON.stringify(worldJSON));

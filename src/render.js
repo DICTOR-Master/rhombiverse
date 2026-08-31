@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices } from './core/lattice.js';
+import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices, octGapVertices } from './core/lattice.js';
 import { FULL_PYRAMIDS, presentAxisKeys, hasCube, effectivePyramids } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
@@ -13,6 +13,7 @@ import { bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
 import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS } from './geometry-extensions/dual-lattice.js';
 import { createBCCBuildController } from './core/bcc-build.js';
 import { createCuboctaBuildController } from './core/cubocta-build.js';
+import { createCuboctaGapBuildController, octGapCellToWorld } from './core/cubocta-gap-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
 import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
@@ -75,6 +76,7 @@ import {
   BCC_STORAGE_KEY,
   INTERSTITIAL_STORAGE_KEY,
   CUBOCTA_STORAGE_KEY,
+  CUBOCTA_GAP_STORAGE_KEY,
 } from './core/persistence.js';
 import {
   ensureAnonymousSession,
@@ -1081,6 +1083,16 @@ function buildCuboctaGeometry(scale) {
   return geometry;
 }
 
+// Same recipe again, for the Cuboctahedron gap-octahedron piece (real
+// geometry verified numerically this session -- see core/lattice.js's
+// own octGapVertices header).
+function buildOctGapGeometry(scale) {
+  const points = octGapVertices(scale).map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  const geometry = new ConvexGeometry(points);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 // See docs/code-notes/render.md
 // emerald/gold added 2026-08-29, direct request -- buildable colors
 // only (deliberately NOT wired into asteroids.js's YIELD_WEIGHTS,
@@ -1316,6 +1328,7 @@ function rebuildPartialCellMeshes(world, inReportMode = false) {
 // would corrupt the main world's own hit-testing. See core/bcc-build.md.
 let bccCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let cuboctaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
+let octGapCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are octGap's own offset-frame index, see core/cubocta-gap-build.js
 // Interstitial-lattice build: one real Mesh per disphenoid cell, same
 // pattern as partialCellGroup/partialCellMeshes above and for the same
 // reason (each cell's own geometry is genuinely different from its
@@ -1386,6 +1399,23 @@ function rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld) {
   cuboctaMesh.instanceMatrix.needsUpdate = true;
   if (cuboctaMesh.instanceColor) cuboctaMesh.instanceColor.needsUpdate = true;
   cuboctaMesh.computeBoundingSphere();
+}
+
+// Cuboctahedron gap-octahedron cells -- same instancing pattern again,
+// own offset-frame world position (octGapCellToWorld, not cellToWorld).
+function rebuildOctGapInstances(octGapMesh, octGapWorld) {
+  octGapCellOrder = octGapWorld.entries();
+  const m = new THREE.Matrix4();
+  octGapCellOrder.forEach((cell, i) => {
+    const [wx, wy, wz] = octGapCellToWorld(cell.x, cell.y, cell.z, SCALE);
+    m.makeTranslation(wx, wy, wz);
+    octGapMesh.setMatrixAt(i, m);
+    octGapMesh.setColorAt(i, instanceColorFor(cell));
+  });
+  octGapMesh.count = octGapCellOrder.length;
+  octGapMesh.instanceMatrix.needsUpdate = true;
+  if (octGapMesh.instanceColor) octGapMesh.instanceColor.needsUpdate = true;
+  octGapMesh.computeBoundingSphere();
 }
 
 // World Systems dynamic imports -- see docs/code-notes/render.md
@@ -1519,6 +1549,13 @@ async function init() {
   const cuboctaSavedJSON = loadFromLocalStorage(CUBOCTA_STORAGE_KEY);
   const cuboctaWorld = createWorldStore(cuboctaSavedJSON ?? { worldName: 'Cuboctahedron Lattice', version: 1, cells: {}, meta: {} });
 
+  // Cuboctahedron gap-octahedron Build: a fifth, independent store, own
+  // offset coordinate frame (core/cubocta-gap-build.js's own
+  // octGapCellToWorld) -- manually placed, genuinely optional, so unlike
+  // cuboctaWorld it has no "never truly empty" bootstrap invariant.
+  const octGapSavedJSON = loadFromLocalStorage(CUBOCTA_GAP_STORAGE_KEY);
+  const octGapWorld = createWorldStore(octGapSavedJSON ?? { worldName: 'Cuboctahedron Gap Octahedra', version: 1, cells: {}, meta: {} });
+
   const geometry = buildRDGeometry(SCALE);
   // White base color: actual per-cell color comes entirely from
   // setColorAt (instanceColorFor) via the multiplicative USE_INSTANCING_
@@ -1575,6 +1612,19 @@ async function init() {
   cuboctaMesh.material.polygonOffsetUnits = -8;
   scene.add(cuboctaMesh);
   rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld);
+
+  // Cuboctahedron gap-octahedron Build: its own InstancedMesh, same
+  // "own material clone, same MATERIAL_COLORS palette" pattern as
+  // cuboctaMesh above. Sits in genuinely empty space between cells (not
+  // nested inside a larger cell), so no polygonOffset/z-fighting
+  // treatment is needed -- verified numerically this session that its
+  // own faces are the exact, real boundary shared with the surrounding
+  // cuboctahedra, not a coincident duplicate surface.
+  const octGapGeometry = buildOctGapGeometry(SCALE);
+  const octGapMesh = new THREE.InstancedMesh(octGapGeometry, material.clone(), MAX_CELLS);
+  octGapMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(octGapMesh);
+  rebuildOctGapInstances(octGapMesh, octGapWorld);
 
   // Interstitial-lattice build: a third, independent store (own
   // localStorage key, INTERSTITIAL_STORAGE_KEY) -- see core/
@@ -2176,6 +2226,7 @@ async function init() {
     material.clippingPlanes = planes;
     bccMesh.material.clippingPlanes = planes;
     cuboctaMesh.material.clippingPlanes = planes;
+    octGapMesh.material.clippingPlanes = planes;
     // Cube-less cells (see core/pyramid.js's hasCube()) render as a
     // Group of separate pyramid meshes rather than one Mesh -- see
     // disposePartialCellObject3D's own header for why -- so a Group's
@@ -3032,7 +3083,7 @@ async function init() {
     plant: 'Click anywhere to plant a seed of the chosen species. Left alone, it grows on its own over real time.',
     sculpt: 'Model (add) onto a face, or Chisel (subtract) a clicked cell -- see the Sculpt panel for tier/mirror/brush.',
     bcc: 'Click a face of an existing BCC cell to extend it, or a face of your normal World to start one nearby. Right-click removes a BCC cell. Overlap with your normal World is expected -- it\'s how the two lattices join.',
-    cubocta: 'Click a face of your normal World to place a cuboctahedron there, or near a POINT of an existing one to grow toward that neighbor. Right-click removes one. Overlap with your normal World is expected.',
+    cubocta: 'Click a face of your normal World to place a cuboctahedron there, or near a POINT of an existing one to grow toward that neighbor. Right-click removes one. Overlap with your normal World is expected. Switch the Piece dropdown here to Gap Octahedron to fill the gaps between cuboctahedra instead -- click near a corner of an existing one.',
     dualize: 'Click an existing structure (FCC or a real placed BCC/TO cell) to preview its region (radius = Shell fill radius) reinterpreted through the other lattice. View-only -- nothing is written to your World.',
   };
   function updateModeUI() {
@@ -4159,6 +4210,12 @@ async function init() {
     updateSectionEnabled(); // keeps cuboctaMesh's own material in sync with X-Ray -- see that function's own header
     saveToLocalStorage(cuboctaWorld.toJSON(), CUBOCTA_STORAGE_KEY);
   }
+  // #cubocta-piece-select scopes which of the two controllers below
+  // actually handles the next click, both sharing the same 'cubocta'
+  // mode/canvas -- without this, a click meant to grow a CO would also
+  // resolve (and fire) inside the gap-octahedron controller, and vice
+  // versa.
+  const cuboctaPieceSelect = document.getElementById('cubocta-piece-select');
   createCuboctaBuildController({
     renderer,
     camera,
@@ -4169,7 +4226,28 @@ async function init() {
     cuboctaWorld,
     onChange: onCuboctaChange,
     getMaterial: () => materialSelect.value,
-    isActive: () => !walking && currentMode === 'cubocta' && FEATURES.bccLattice,
+    isActive: () => !walking && currentMode === 'cubocta' && FEATURES.bccLattice && cuboctaPieceSelect?.value !== 'octgap',
+  });
+
+  // Cuboctahedron gap-octahedron Build: own change handler -- genuinely
+  // optional/manually placed, so unlike onCuboctaChange there is no
+  // "never truly empty" seeding here.
+  function onOctGapChange() {
+    rebuildOctGapInstances(octGapMesh, octGapWorld);
+    updateSectionEnabled();
+    saveToLocalStorage(octGapWorld.toJSON(), CUBOCTA_GAP_STORAGE_KEY);
+  }
+  createCuboctaGapBuildController({
+    renderer,
+    camera,
+    cuboctaMesh,
+    octGapMesh,
+    cuboctaCellAt: (instanceId) => cuboctaCellOrder[instanceId],
+    octGapCellAt: (instanceId) => octGapCellOrder[instanceId],
+    octGapWorld,
+    onChange: onOctGapChange,
+    getMaterial: () => materialSelect.value,
+    isActive: () => !walking && currentMode === 'cubocta' && FEATURES.bccLattice && cuboctaPieceSelect?.value === 'octgap',
   });
 
   // The old 2D radial menu (wheel.js) was removed 2026-08-25 -- the
@@ -5030,6 +5108,11 @@ async function init() {
     clearLocalStorage(CUBOCTA_STORAGE_KEY);
     cuboctaWorld.replaceAll({ worldName: 'Cuboctahedron Lattice', version: 1, cells: {} });
     onCuboctaChange();
+    // Cuboctahedron gap-octahedron Build: a fifth real store, same
+    // "fresh start clears it too" reasoning as above.
+    clearLocalStorage(CUBOCTA_GAP_STORAGE_KEY);
+    octGapWorld.replaceAll({ worldName: 'Cuboctahedron Gap Octahedra', version: 1, cells: {} });
+    onOctGapChange();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);
