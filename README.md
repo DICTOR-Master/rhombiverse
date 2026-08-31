@@ -35,9 +35,13 @@ geometry itself:
 
 - **Core (always present):** lattice math (`lattice.js`), RD rendering,
   Sculpture Mode incl. build/chisel, base world-state schema, optional
-  Shared World sync, plus BCC/TO Build, Cuboctahedron Build, Lattice
-  Quick-View, and Dualize (FCC↔BCC space-group dual, `dual-lattice.js`) —
-  view-only overlay, always visible whenever Crystal Core cells exist.
+  Shared World sync, plus BCC/TO Build, Cuboctahedron Build (now growable
+  onto both lattice parities, so cuboctahedra can touch face-to-face, not
+  just vertex-to-vertex — the Piece picker's "Octahedron" fills the gaps
+  that opens up, a real zero-gap rectified cubic honeycomb, verified
+  numerically), Lattice Quick-View, and Dualize (FCC↔BCC space-group
+  dual, `dual-lattice.js`) — view-only overlay, always visible whenever
+  Crystal Core cells exist.
 - **Geometry Extensions (opt-in, still shape-focused):** radial gravity &
   planetoids (`gravity.js`, `planetoidgen.js`), Penrose/Ammann growth
   (`growth.js`), Duality Mode (periodic↔aperiodic tiling dual,

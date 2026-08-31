@@ -1,6 +1,14 @@
 [
   {
     "date": "2026-08-31",
+    "title": "Cuboctahedra, Corner to Corner",
+    "items": [
+      "Cuboctahedron Build can now grow face-to-face with its neighbors, not just corner-to-corner -- click closer to a flat face on an existing one instead of a point to grow that way, filling in the space between them.",
+      "The Piece picker's Octahedron now fills the gap that opens up between face-touching cuboctahedra -- select it and click near a cuboctahedron's corner. A real, exact fit, not a rough approximation."
+    ]
+  },
+  {
+    "date": "2026-08-31",
     "title": "Grow It Your Way",
     "items": [
       "New Cultivate sliders: Growth limit, Growth rate, and Bias, alongside the existing Direction and Packing density -- shape how far, how fast, and which way a manually-planted seed grows, no genome required.",
