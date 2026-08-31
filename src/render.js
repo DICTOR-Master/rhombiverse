@@ -13,7 +13,7 @@ import { bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
 import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS } from './geometry-extensions/dual-lattice.js';
 import { createBCCBuildController } from './core/bcc-build.js';
 import { createCuboctaBuildController } from './core/cubocta-build.js';
-import { createCuboctaGapBuildController, octGapCellToWorld } from './core/cubocta-gap-build.js';
+import { createCuboctaGapBuildController, octGapCellToWorld, octGapCellForCOCell } from './core/cubocta-gap-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
 import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
@@ -2814,7 +2814,7 @@ async function init() {
   // Site/Disphenoid cells) -- those are structurally different features
   // (persistent world-state) from this re-rendering, non-persistent
   // preview.
-  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'cubocta', 'bcc', 'octa', 'disphenoid'];
+  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'cubocta', 'bcc', 'octa', 'octahedron', 'disphenoid'];
   const LATTICE_QUICK_VIEW_LABELS = {
     off: 'Off.',
     rd: 'RD -- every built cell shown as a complete block.',
@@ -2823,14 +2823,21 @@ async function init() {
     cubocta: 'Cuboctahedron -- every built cell shown as the real coordination shape reaching to its 12 neighbors.',
     bcc: 'BCC/TO -- every co-locatable built cell shown as its dual truncated octahedron.',
     octa: 'Octahedron Site -- every co-locatable built cell shown as one octahedron bundle.',
+    octahedron: 'Octahedron -- the Cuboctahedron gap-fill piece, previewed at one cube-center near every built cell.',
     disphenoid: 'Disphenoid -- every co-locatable built cell shown as one disphenoid.',
   };
-  const LATTICE_QUICK_VIEW_MARK_KEY = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', disphenoid: 'pieceDisphenoid' };
+  const LATTICE_QUICK_VIEW_MARK_KEY = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', octahedron: 'pieceOctahedron', disphenoid: 'pieceDisphenoid' };
   // Fixed axis for octahedron/disphenoid coverage -- matches core/
   // build.js's own bootstrap default for a fresh 'ioct' placement; a
   // representative single orientation per anchor is enough for a
   // preview, not every possible one.
   const LATTICE_QUICK_VIEW_AXIS_OFFSET = [2, 0, 0];
+  // Fixed body-diagonal direction for the NEW Octahedron gap-fill
+  // preview -- same "one representative orientation is enough" reasoning
+  // as the axis offset above, just body-diagonal instead of axis-aligned
+  // since that's the real direction octGapCellForCOCell expects (see
+  // core/cubocta-gap-build.js).
+  const LATTICE_QUICK_VIEW_OCTAHEDRON_DIRECTION = [1, 1, 1];
   let latticeQuickViewMode = 'off';
   let latticeQuickViewMesh = null;
   let latticeQuickViewEdges = null;
@@ -2965,6 +2972,24 @@ async function init() {
       for (const cell of cells) {
         const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
         const verts = cuboctahedronVertices(SCALE).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
+        pieces.push(new ConvexGeometry(verts));
+      }
+    } else if (latticeQuickViewMode === 'octahedron') {
+      // Cuboctahedron gap-fill Octahedron: lives directly in the SAME
+      // FCC-cell coordinate space as 'cubocta' above (octGapCellForCOCell
+      // treats a real cell exactly like a real CO position, no BCC
+      // conversion involved) -- one representative octahedron per real
+      // cell, at the fixed LATTICE_QUICK_VIEW_OCTAHEDRON_DIRECTION corner,
+      // deduped the same way the BCC-family anchors below are (adjacent
+      // cells can share the same cube-center).
+      const anchors = new Map(); // "i,j,k" -> [i, j, k]
+      for (const cell of cells) {
+        const p = octGapCellForCOCell(cell, LATTICE_QUICK_VIEW_OCTAHEDRON_DIRECTION);
+        anchors.set(p.join(','), p);
+      }
+      for (const [i, j, k] of anchors.values()) {
+        const [wx, wy, wz] = octGapCellToWorld(i, j, k, SCALE);
+        const verts = octGapVertices(SCALE).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
         pieces.push(new ConvexGeometry(verts));
       }
     } else {
