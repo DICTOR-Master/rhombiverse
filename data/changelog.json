@@ -1,5 +1,20 @@
 [
   {
+    "date": "2026-08-31",
+    "title": "Grow It Your Way",
+    "items": [
+      "New Cultivate sliders: Growth limit, Growth rate, and Bias, alongside the existing Direction and Packing density -- shape how far, how fast, and which way a manually-planted seed grows, no genome required.",
+      "New hint in the Lab panel's Piece picker: try placing 6 pyramids on a cube, then 12, then remove the outer 6 -- a small nudge toward one of this tool's favorite tricks."
+    ]
+  },
+  {
+    "date": "2026-08-31",
+    "title": "Just the Shape, No Strings Attached",
+    "items": [
+      "New: Export Model (.rhomb) in the Lab panel -- a pure-geometry export of your cells and any grown seeds, with none of your claims, inventory, trades, or organism data along for the ride. Export World is unchanged, still there for the full picture."
+    ]
+  },
+  {
     "date": "2026-08-29",
     "title": "Cuboctahedron on the Piece Wheel",
     "items": [
