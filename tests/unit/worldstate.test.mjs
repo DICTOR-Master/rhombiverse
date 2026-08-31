@@ -40,13 +40,18 @@ test('addCell defaults region/status only when genuinely absent (Phase 5.8)', ()
   assert.equal(recolored.status, 'approved');
 });
 
-test('addCell stamps gravitySource/gravityWeight only for blackstar-glassite', () => {
+test('addCell no longer stamps gravitySource/gravityWeight/claimId (dead fields, removed 2026-08-31)', () => {
+  // gravity.js re-derives planetoid clusters from cell `material` alone
+  // and never reads these; claims are tracked entirely via the `claims`
+  // map + claimIdAt(), never `cell.claimId`. See
+  // RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md section 3.
   const world = emptyWorld();
   world.addCell(0, 0, 0, { material: 'blackstar-glassite' });
   world.addCell(1, 1, 0, { material: 'base' });
   const [bsg, base] = world.entries().sort((a, b) => a.x - b.x);
-  assert.equal(bsg.gravitySource, true);
-  assert.equal(bsg.gravityWeight, 1.0);
+  assert.equal(bsg.gravitySource, undefined);
+  assert.equal(bsg.gravityWeight, undefined);
+  assert.equal(bsg.claimId, undefined);
   assert.equal(base.gravitySource, undefined);
 });
 

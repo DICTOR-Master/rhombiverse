@@ -2,9 +2,10 @@
 // selection, catch-up simulation, isolation, adaptive damping (Stages 1-8).
 // This module imports growth.js, growth.js never imports this module.
 // Full design rationale/history for every export below: docs/code-notes/game-systems/evolution.md
-import { growSeed, tileWorldVertices, tilesOverlap, VALID_TRIPLES, GROWTH_TICK_MS } from '../geometry-extensions/growth.js';
+import { tileWorldVertices, tilesOverlap, GROWTH_TICK_MS } from '../geometry-extensions/growth.js';
 import { cellToWorld } from '../core/lattice.js';
 import { computePlanetoids, nearestPlanetoid } from '../geometry-extensions/gravity.js';
+import { plantInstance, growInstance, phenotypeFromSliders } from '../core/instance.js';
 
 export const GENOME_TRAIT_RANGES = {
   growthRate: [0, 1],
@@ -34,13 +35,17 @@ function branchingAngleToPreferType(branchingAngle) {
   return null;
 }
 
+// The genome-driven half of the split: derive plain slider-style inputs
+// from a genome, then hand off to core/instance.js's phenotypeFromSliders()
+// for the actual (genome-free) math -- kept in sync with Rhombeometry
+// mode's own Lab-panel sliders by construction, not by convention.
 export function genomeToPhenotype(genome) {
   const g = clampGenome(genome);
-  return {
-    facesPerTick: Math.round(1 + g.growthRate * 5), // 1..6
+  return phenotypeFromSliders({
+    growthRate: g.growthRate,
+    maturitySize: g.maturitySize,
     preferType: branchingAngleToPreferType(g.branchingAngle),
-    maxGeneration: Math.round(g.maturitySize), // already in real generation units, 3..15
-  };
+  });
 }
 
 // Namespaced species string on the underlying seed (organism:<species>) so it can
@@ -48,15 +53,7 @@ export function genomeToPhenotype(genome) {
 export const ORGANISM_SEED_SPECIES_PREFIX = 'organism:';
 export function plantOrganism(world, organismId, seedId, species, genome, origin, now = Date.now(), status = 'approved') {
   const clamped = clampGenome(genome);
-  const firstTriple = VALID_TRIPLES.find((t) => t.type === 'acute');
-  const seed = {
-    species: `${ORGANISM_SEED_SPECIES_PREFIX}${species}`,
-    origin,
-    plantedAt: now,
-    lastGrowthAt: now,
-    generation: 0,
-    tiles: [{ type: firstTriple.type, dirs: [...firstTriple.dirs], origin: [0, 0, 0] }],
-  };
+  const seed = plantInstance({ species: `${ORGANISM_SEED_SPECIES_PREFIX}${species}`, origin, now });
   world.setSeed(seedId, seed);
   world.setOrganism(organismId, { genome: clamped, seedId, species, plantedAt: now, status });
   return { seed, organism: world.getOrganisms()[organismId] };
@@ -68,7 +65,7 @@ export function growOrganism(world, organismId, now = Date.now()) {
   const seed = world.getSeeds()[organism.seedId];
   if (!seed) return false;
   const phenotype = genomeToPhenotype(organism.genome);
-  const grew = growSeed(seed, now, phenotype);
+  const grew = growInstance(seed, now, phenotype);
   if (grew) world.setSeed(organism.seedId, seed);
   return grew;
 }

@@ -5,13 +5,12 @@
 // docs/code-notes/core/worldstate-core.md
 import { cellKey, parseCellKey } from './lattice.js';
 
-// Core vs. Modules boundary (RHOMBIVERSE_PLAN.md, 2026-08-23): render.js
-// supplies the real claimIdAt via setRegionsIntegration(), gated behind
-// FEATURES.economy. Inert default here (no claims exist) otherwise.
-let claimIdAt = () => null;
-export function setRegionsIntegration({ claimIdAt: claimIdAtFn }) {
-  claimIdAt = claimIdAtFn;
-}
+// Core vs. Modules boundary (RHOMBIVERSE_PLAN.md, 2026-08-23) used to
+// have a claimIdAt integration point here too (render.js supplied the
+// real one via setRegionsIntegration(), gated behind FEATURES.economy).
+// Removed 2026-08-31 along with the claimId cell-stamping it only
+// existed to feed (see addCell below) -- sculpture.js and gravity.js
+// still have their own setRegionsIntegration() for their own real uses.
 
 export async function loadWorld(url) {
   const res = await fetch(url);
@@ -47,16 +46,20 @@ export function createWorldStore(worldJSON, hooks = {}) {
       return cells.has(cellKey(x, y, z));
     },
     addCell(x, y, z, data) {
-      const { gravitySource, gravityWeight, ...rest } = data;
-      let stamped =
-        data.material === 'blackstar-glassite'
-          ? { ...rest, gravitySource: true, gravityWeight: gravityWeight ?? 1.0 }
-          : rest;
+      // gravitySource/gravityWeight and claimId used to be stamped here
+      // too -- removed 2026-08-31 (RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md
+      // section 3): gravity.js re-derives planetoid clusters from cell
+      // `material` alone (never reads these), and nothing reads
+      // `cell.claimId` back either -- claims are tracked entirely via the
+      // `claims` map + claimIdAt(). Both were dead weight on every cell.
+      // region/status are NOT included in that cleanup -- they're
+      // documented schema-v1 fields (RHOMBIVERSE_PLAN.md section 3) for
+      // moderation, and `status` is live-read for flagged/removed
+      // rendering (render.js).
+      const { gravitySource, gravityWeight, claimId, ...rest } = data;
+      let stamped = rest;
       if (stamped.region === undefined) stamped = { ...stamped, region: 'open' };
       if (stamped.status === undefined) stamped = { ...stamped, status: 'pending' };
-      if (stamped.claimId === undefined) {
-        stamped = { ...stamped, claimId: claimIdAt(claims, x, y, z) };
-      }
       cells.set(cellKey(x, y, z), stamped);
       cellsEntriesCache = null;
       hooks.onAdd?.(x, y, z, stamped);

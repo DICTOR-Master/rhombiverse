@@ -56,7 +56,7 @@ import {
   MAX_ORGANISMS_PER_PLANETOID,
 } from '../../src/game-systems/evolution.js';
 import { createWorldStore } from '../../src/core/worldstate-core.js';
-import { applyGrowth } from '../../src/geometry-extensions/growth.js';
+import { applyGrowth, plantSeed } from '../../src/geometry-extensions/growth.js';
 
 function growToMaturity(world, organismId, maxTicks = 20) {
   let now = 0;
@@ -104,6 +104,17 @@ test('plantOrganism: a fresh organism is never invisible (at least one tile imme
   assert.deepEqual(Object.keys(world.getSeeds()), ['seed_1']);
   assert.equal(organism.seedId, 'seed_1');
   assert.ok(organism.genome.growthRate === 0.5);
+});
+
+test('plantOrganism\'s seed and plantSeed\'s seed have identical shape for the same inputs (core/instance.js de-duplication, section 3)', () => {
+  const world = createWorldStore({ worldName: 't', version: 1, cells: {} });
+  const { seed: organismSeed } = plantOrganism(world, 'org_1', 'seed_organism', 'amoeba', { growthRate: 0.5 }, [1, 2, 3], 5000);
+  const plainSeed = plantSeed(world, 'seed_plain', 'amoeba', [1, 2, 3], 5000);
+  const { species: organismSpecies, ...organismRest } = organismSeed;
+  const { species: plainSpecies, ...plainRest } = plainSeed;
+  assert.equal(organismSpecies, 'organism:amoeba');
+  assert.equal(plainSpecies, 'amoeba');
+  assert.deepEqual(organismRest, plainRest);
 });
 
 test('growOrganism: grows the linked seed using genome-derived parameters, respects the genome\'s own maxGeneration cap', () => {

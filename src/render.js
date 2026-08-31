@@ -36,7 +36,7 @@ import {
   speckleCountForBiomass,
   AGGREGATE_MAX_SPECKLES,
 } from './geometry-extensions/latticezoom.js';
-import { loadWorld, createWorldStore, setRegionsIntegration as setWorldstateRegionsIntegration } from './core/worldstate-core.js';
+import { loadWorld, createWorldStore } from './core/worldstate-core.js';
 import { createBuildController, removeShell, recolorShell } from './core/build.js';
 import { generatePlanetoid } from './geometry-extensions/planetoidgen.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR, QUALITY_LEVELS_ASCENDING } from './app/settings.js';
@@ -1421,7 +1421,6 @@ async function init() {
   // Regions-integration wiring (Migration Path Phase A) -- see docs/code-notes/render.md
   if (FEATURES.economy) {
     setSculptureRegionsIntegration({ claimIdAt, isClaimProtected });
-    setWorldstateRegionsIntegration({ claimIdAt });
     setGravityRegionsIntegration({ isClaimProtected });
   }
 
