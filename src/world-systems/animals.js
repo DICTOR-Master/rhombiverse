@@ -1,9 +1,9 @@
 // RHOMBIVERSE_SPEC_ANIMALS.md Stage A -- Species Profiles & Habitat
 // Placement. animals.js imports evolution.js, never the reverse.
 // mobilityRange/huntBias live as SIBLING fields on the organism record,
-// not inside genome (see docs/code-notes/game-systems/animals.md for why).
+// not inside genome (see docs/code-notes/world-systems/animals.md for why).
 // Full design rationale/history for every export below:
-// docs/code-notes/game-systems/animals.md
+// docs/code-notes/world-systems/animals.md
 import {
   GENOME_TRAIT_RANGES,
   plantOrganism,

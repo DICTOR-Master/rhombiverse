@@ -1,5 +1,5 @@
 // Achievements/soft-goals. Detection only -- render.js owns the toast UI.
-// Full design rationale/history: docs/code-notes/game-systems/achievements.md
+// Full design rationale/history: docs/code-notes/world-systems/achievements.md
 const STORAGE_KEY = 'rhombiverse-achievements';
 
 function loadEarned() {

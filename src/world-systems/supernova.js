@@ -1,5 +1,5 @@
 // Supernova Threshold -- RHOMBIVERSE_SPEC_SUPERNOVA.md.
-// Full design rationale/history: docs/code-notes/game-systems/supernova.md
+// Full design rationale/history: docs/code-notes/world-systems/supernova.md
 import { cellKey, cellToWorld, cellsInShells } from '../core/lattice.js';
 import { BSG_MATERIAL, findClusters, bsgClusterStats } from '../geometry-extensions/gravity.js';
 import { isStar, pickCoreCell, defaultLedger, STAR_BSG_THRESHOLD } from './starsystem.js';

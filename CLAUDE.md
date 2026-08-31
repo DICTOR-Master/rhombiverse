@@ -42,7 +42,7 @@ build order:
   (`src/geometry-extensions/cultivation.js`), **bring-your-own-AI-key** support
   (`src/app/byok.js` — direct browser calls to Anthropic/OpenAI/etc., with a
   shared Vercel AI Gateway fallback in `api/` and a local keyword-parser
-  last resort), an **achievements** toast system (`src/game-systems/achievements.js`),
+  last resort), an **achievements** toast system (`src/world-systems/achievements.js`),
   **World sharing** via compressed URLs (`src/app/worldshare.js`) and a
   public **Gallery** (`shared_worlds` table, `src/app/sync.js`), a sequenced
   first-visit **onboarding** walkthrough that loads the real Showcase
@@ -127,10 +127,10 @@ build order:
   (genome/phenotype → reproduction/HGT/sexual selection →
   environmental selection → deterministic catch-up engine → trophic
   coupling → isolation enforcement → adaptive damping → moderation hook
-  → player-facing surface). `src/game-systems/evolution.js`.
+  → player-facing surface). `src/world-systems/evolution.js`.
 - **`RHOMBIVERSE_SPEC_ANIMALS.md`** — done, all 6 stages (species/
   habitat, mobility, sexual reproduction, trophic herbivory/carnivory,
-  habitat crossover, full verification). `src/game-systems/animals.js`.
+  habitat crossover, full verification). `src/world-systems/animals.js`.
 - **`RHOMBIVERSE_SPEC_LATTICE_ZOOM.md`** — done, all 6 stages (static
   sub-lattice geometry → camera-distance trigger → multi-level depth &
   blending → adaptive damping → real-organism/plant-coverage rendering

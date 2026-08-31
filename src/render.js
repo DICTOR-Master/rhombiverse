@@ -130,7 +130,7 @@ import {
   averageTraitValue,
   planetoidKeyFor,
   localBiomassAvailability,
-} from './game-systems/evolution.js';
+} from './world-systems/evolution.js';
 // Inert defaults for the dynamically-loaded World Systems bindings above.
 let applyInventoryDecay = () => {};
 let checkAchievements = () => [];
@@ -1391,14 +1391,14 @@ function rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld) {
 // World Systems dynamic imports -- see docs/code-notes/render.md
 async function init() {
   if (FEATURES.achievements) {
-    ({ checkAchievements } = await import('./game-systems/achievements.js'));
+    ({ checkAchievements } = await import('./world-systems/achievements.js'));
   }
   if (FEATURES.economy) {
-    ({ applyInventoryDecay } = await import('./game-systems/trade.js'));
-    ({ computeClaim, claimFootprintWorldVertices, claimIdAt, isClaimProtected } = await import('./game-systems/regions.js'));
+    ({ applyInventoryDecay } = await import('./world-systems/trade.js'));
+    ({ computeClaim, claimFootprintWorldVertices, claimIdAt, isClaimProtected } = await import('./world-systems/regions.js'));
   }
   if (FEATURES.hydrosphere) {
-    ({ applyHydrosphere } = await import('./game-systems/hydrosphere.js'));
+    ({ applyHydrosphere } = await import('./world-systems/hydrosphere.js'));
   }
   if (FEATURES.animals) {
     ({
@@ -1409,15 +1409,15 @@ async function init() {
       animalGenerationStepHook,
       reproduceFn,
       computeAnimalSurvivalProbability,
-    } = await import('./game-systems/animals.js'));
+    } = await import('./world-systems/animals.js'));
   }
   if (FEATURES.mining) {
-    ({ seedAsteroidBelts, applyAsteroidRegeneration, applyPopulationScaledSpawning, listBelts, mineAsteroidCell } = await import('./game-systems/asteroids.js'));
+    ({ seedAsteroidBelts, applyAsteroidRegeneration, applyPopulationScaledSpawning, listBelts, mineAsteroidCell } = await import('./world-systems/asteroids.js'));
   }
   if (FEATURES.hazards) {
-    ({ applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } = await import('./game-systems/blackhole.js'));
-    ({ applyStarFusion, annotateStars, canPlaceMaterial: canPlaceForStars } = await import('./game-systems/starsystem.js'));
-    ({ applyDetonationCheck, annotateSupernovae } = await import('./game-systems/supernova.js'));
+    ({ applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } = await import('./world-systems/blackhole.js'));
+    ({ applyStarFusion, annotateStars, canPlaceMaterial: canPlaceForStars } = await import('./world-systems/starsystem.js'));
+    ({ applyDetonationCheck, annotateSupernovae } = await import('./world-systems/supernova.js'));
   }
   // Regions-integration wiring (Migration Path Phase A) -- see docs/code-notes/render.md
   if (FEATURES.economy) {

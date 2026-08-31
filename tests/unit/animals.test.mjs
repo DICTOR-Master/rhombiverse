@@ -26,7 +26,7 @@ import {
   PREDATION_PROBABILITY,
   isAtHabitatBoundary,
   CROSSOVER_MIN_BOUNDARY_GENERATIONS,
-} from '../../src/game-systems/animals.js';
+} from '../../src/world-systems/animals.js';
 import {
   isMature,
   growOrganism,
@@ -35,7 +35,7 @@ import {
   plantOrganism,
   reproduce,
   computeSurvivalProbability,
-} from '../../src/game-systems/evolution.js';
+} from '../../src/world-systems/evolution.js';
 import { createWorldStore } from '../../src/core/worldstate-core.js';
 
 function growToMaturity(world, organismId, maxTicks = 20) {

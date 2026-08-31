@@ -1,6 +1,6 @@
 // Asteroid Belts (Resource Mining) -- RHOMBIVERSE_SPEC_ASTEROIDS.md.
 // Acquisition only (no crafting/conversion). Full rationale/history:
-// docs/code-notes/game-systems/asteroids.md
+// docs/code-notes/world-systems/asteroids.md
 import { cellKey, parseCellKey, cellsInShells, isValidCell } from '../core/lattice.js';
 
 const NODE_SHELL_RADIUS = 1; // 1 (center) + 12 (shell 1) = 13 cells/node
@@ -14,7 +14,7 @@ export function listBelts() {
   return BELTS.map((b) => ({ id: b.id, center: b.center }));
 }
 
-// First-guess yield weights, tunable -- see docs/code-notes/game-systems/asteroids.md
+// First-guess yield weights, tunable -- see docs/code-notes/world-systems/asteroids.md
 const YIELD_WEIGHTS = [
   ['base', 35],
   ['garnet', 25],
@@ -48,7 +48,7 @@ function seedNode(world, beltCenter, offset, id) {
   }
 }
 
-// Idempotent -- see docs/code-notes/game-systems/asteroids.md
+// Idempotent -- see docs/code-notes/world-systems/asteroids.md
 export function seedAsteroidBelts(world) {
   const alreadySeeded = world.entries().some((c) => c.asteroidNodeId);
   if (alreadySeeded) return;
@@ -61,7 +61,7 @@ export function seedAsteroidBelts(world) {
 }
 
 // Population-scaled spawning (section 5, Adaptive Damping) -- see
-// docs/code-notes/game-systems/asteroids.md
+// docs/code-notes/world-systems/asteroids.md
 const BASE_NODES_PER_BELT = 3;
 const NODES_PER_ACTIVE_USER = 2;
 const MAX_EXTRA_NODES_PER_BELT = 6;
@@ -94,7 +94,7 @@ export function targetNodesPerBelt(world, now = Date.now()) {
   return BASE_NODES_PER_BELT + extra;
 }
 
-// Purely additive -- see docs/code-notes/game-systems/asteroids.md
+// Purely additive -- see docs/code-notes/world-systems/asteroids.md
 export function applyPopulationScaledSpawning(world, now = Date.now()) {
   const target = targetNodesPerBelt(world, now);
   if (target <= BASE_NODES_PER_BELT) return;
@@ -119,7 +119,7 @@ export function mineAsteroidCell(world, cell, ownerId, now = Date.now()) {
   if (ownerId) world.creditInventory(ownerId, cell.material, 1);
 }
 
-// Per-node regrowth (section 4) -- see docs/code-notes/game-systems/asteroids.md
+// Per-node regrowth (section 4) -- see docs/code-notes/world-systems/asteroids.md
 export function applyAsteroidRegeneration(world, now = Date.now()) {
   const queue = world.getRegrowthQueue();
   for (const [key, entry] of Object.entries(queue)) {

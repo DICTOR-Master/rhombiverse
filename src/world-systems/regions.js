@@ -1,7 +1,7 @@
 // Region Ownership & Claiming -- RHOMBIVERSE_SPEC_REGIONS.md. Distinct
 // from Phase 5.8's per-cell moderation `region` field (core/reviewed/
 // open) -- this file is about claimId/who OWNS an area, not vetting.
-// Full design rationale/history: docs/code-notes/game-systems/regions.md
+// Full design rationale/history: docs/code-notes/world-systems/regions.md
 import { cellKey, cellsInShells, cellToWorld } from '../core/lattice.js';
 
 export const CLAIM_SIZE_SHELLS = 8;

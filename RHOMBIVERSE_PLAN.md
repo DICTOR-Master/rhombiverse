@@ -58,7 +58,7 @@ src/
     latticezoom.js
     planetoidgen.js
     gravity.js
-  game-systems/
+  world-systems/
     asteroids.js
     trade.js
     regions.js
@@ -116,7 +116,7 @@ src/
       same breakdown, kept in sync with this entry.
   - [x] Phase B (mostly done, 2026-08-23): every file except `render.js`
         itself physically moved (`git mv`) into the `core/` /
-        `geometry-extensions/` / `game-systems/` / `app/` layout above,
+        `geometry-extensions/` / `world-systems/` / `app/` layout above,
         with every cross-module `import`/dynamic `import()` path fixed —
         `worldstate.js` renamed to `worldstate-core.js` per the layout
         above along the way. Seven files this section's original draft

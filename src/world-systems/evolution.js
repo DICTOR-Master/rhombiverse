@@ -1,7 +1,7 @@
 // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md -- genome/phenotype, reproduction,
 // selection, catch-up simulation, isolation, adaptive damping (Stages 1-8).
 // This module imports growth.js, growth.js never imports this module.
-// Full design rationale/history for every export below: docs/code-notes/game-systems/evolution.md
+// Full design rationale/history for every export below: docs/code-notes/world-systems/evolution.md
 import { tileWorldVertices, tilesOverlap, GROWTH_TICK_MS } from '../geometry-extensions/growth.js';
 import { cellToWorld } from '../core/lattice.js';
 import { computePlanetoids, nearestPlanetoid } from '../geometry-extensions/gravity.js';

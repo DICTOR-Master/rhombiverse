@@ -2,7 +2,7 @@
 // Extreme case of the same gravity-source mechanic, no new material/
 // object type. Scoped for single-player, with an absolute cross-player
 // consumption guard -- see companion doc for the full history.
-// Full design rationale/history: docs/code-notes/game-systems/blackhole.md
+// Full design rationale/history: docs/code-notes/world-systems/blackhole.md
 import { shellCount, cellKey, cellToWorld, cellsInShells } from '../core/lattice.js';
 import { BSG_MATERIAL, findClusters, bsgClusterStats } from '../geometry-extensions/gravity.js';
 import { isClaimProtected } from './regions.js';

@@ -1,5 +1,5 @@
 // Inventory, Trade & Resource Decay -- RHOMBIVERSE_SPEC_TRADE_INVENTORY.md.
-// Full design rationale/history: docs/code-notes/game-systems/trade.md
+// Full design rationale/history: docs/code-notes/world-systems/trade.md
 
 const FREE_THRESHOLDS = {
   base: 30,

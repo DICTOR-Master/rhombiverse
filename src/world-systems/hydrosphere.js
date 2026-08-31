@@ -1,5 +1,5 @@
 // Water & Ice 9.9 (planetoid hydrosphere) -- RHOMBIVERSE_SPEC_WATER_ICE.md.
-// Full rationale: docs/code-notes/game-systems/hydrosphere.md
+// Full rationale: docs/code-notes/world-systems/hydrosphere.md
 import { findClusters, BSG_MATERIAL } from '../geometry-extensions/gravity.js';
 
 export const ICE99_MATERIAL = 'ice99';

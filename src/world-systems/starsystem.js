@@ -1,6 +1,6 @@
 // Star System Anchor -- RHOMBIVERSE_SPEC_STAR_SYSTEM.md.
 // Full design rationale/history for every export below:
-// docs/code-notes/game-systems/starsystem.md
+// docs/code-notes/world-systems/starsystem.md
 import { cellToWorld } from '../core/lattice.js';
 import { BSG_MATERIAL, findClusters, bsgClusterStats } from '../geometry-extensions/gravity.js';
 

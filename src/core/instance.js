@@ -1,6 +1,6 @@
 // Crystal Core "instance" primitives: pure geometry only (position,
 // generation, appearance), no genome/reproduction/survival. Shared by
-// growth.js's own player-cultivation path and game-systems/evolution.js's
+// growth.js's own player-cultivation path and world-systems/evolution.js's
 // organism path, so the seed-record shape is built in exactly one place.
 // See RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md section 3 (delivered
 // 2026-08-31) for the plantInstance/growInstance naming this formalizes.

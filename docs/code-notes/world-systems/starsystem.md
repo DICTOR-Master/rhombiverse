@@ -1,4 +1,4 @@
-# Notes: `src/game-systems/starsystem.js`
+# Notes: `src/world-systems/starsystem.js`
 
 Full design rationale/history for this file's exports, moved out of the
 source so the code itself stays lite and readable — nothing here is

@@ -1,4 +1,4 @@
-# Notes: `src/game-systems/asteroids.js`
+# Notes: `src/world-systems/asteroids.js`
 
 Full design rationale/history for this file, moved out of the source so
 the code itself stays lite and readable — nothing here is new, it's the

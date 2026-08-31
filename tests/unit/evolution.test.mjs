@@ -54,7 +54,7 @@ import {
   nextLandscapeState,
   LANDSCAPE_STATE_EMA_RATE,
   MAX_ORGANISMS_PER_PLANETOID,
-} from '../../src/game-systems/evolution.js';
+} from '../../src/world-systems/evolution.js';
 import { createWorldStore } from '../../src/core/worldstate-core.js';
 import { applyGrowth, plantSeed } from '../../src/geometry-extensions/growth.js';
 
