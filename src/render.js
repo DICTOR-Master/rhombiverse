@@ -1155,52 +1155,42 @@ function buildSphericalGeometry({ mode, R, n }) {
 // superellipsoid formula at n=2, so this stays within "sphere or
 // superellipsoid," per direct instruction.
 //
-// Direct override #2, further live-build feedback the same session:
-// DICTO's own governing rule, given directly after two more rounds of
-// live testing -- "Lots of sides fill up shape, fewer sides come out at
-// edges slightly." A real, coherent design principle, not per-shape
-// guesswork: a many-faced shape (already close to sphere-like) gets
-// sized to genuinely fill its own bulk (volume-matched R); a few-faced,
-// pointier shape keeps its corners visibly poking out a bit past the
-// sphere (face-plane R -- which, for ANY convex shape, is by
-// construction always less than its own vertex distance, so corners
-// poking out "slightly" is exactly what face-plane R already gives for
-// free, no separate formula needed).
-//   Many faces -> volume-matched: RD (12), Cuboctahedron (14),
-//     Truncated Octahedron (14).
-//   Few faces -> face-plane distance: Cube (6), Octahedron (8),
-//     Disphenoid (4, see the toggle handler's own disphenoidR).
-// RD's volume-matched R was explicitly confirmed correct ("see RD now
-// for guideline match with shape") -- the reference every other
-// many-faced shape here now follows. Cuboctahedron's superellipsoid is
-// dropped entirely per direct instruction ("revert to sphere") --
-// distorted/uneven bulging (full R only exactly on the diagonal ray,
-// well short of it everywhere else) is what was actually reading wrong,
-// not just raw size; a uniform sphere at the same volume-matched
-// principle as RD fixes both. Truncated Octahedron moves from its
-// axis-face-distance (scale) to volume-matched (~0.98*scale) under this
-// same rule; direct feedback said even the axis-distance sphere still
-// read "definitely too small," so if it still doesn't look full enough
-// under the general rule, that's a real, separate signal to size it
-// individually rather than mechanically deriving it from volume alone.
-// Real volumes, each grounded in this repo's own actual geometry, not
-// re-derived from scratch: RD = cube(scale^3) + 6 pyramids(scale^3/6
-// each) = 2*scale^3 (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md section 2 /
-// pyramidPieces); Octahedron(gap) = (4/3)*r^3 at r=0.5*scale =
-// scale^3/6; Cube = scale^3 trivially; Cuboctahedron = (5/6)*scale^3
-// (octGapVertices' own header comment: "0.833s^3 + 0.167s^3 = 1.0s^3"
-// -- CO + its gap-octahedron exactly fill one unit cell); Truncated
-// Octahedron = 4*scale^3 (edge a=scale/sqrt(2) at this repo's own
-// bccShapeScaleFor(scale) normalization, V=8*sqrt(2)*a^3). Sanity check
-// against the explicit "cube and cube-octahedron should be closer in
-// size than cube and RD" ordering constraint: |cube-CO| = |0.5-0.584| =
-// 0.084*scale, |cube-RD| = |0.5-0.782| = 0.282*scale -- holds.
+// Direct override #2, real live-build feedback across several rounds
+// the same session, ending in a real dense-world test that overturned
+// the "many sides fill up" rule tried above (kept in git history, not
+// repeated here): DICTO's own summary was "TO great size, nearly
+// everything else massively too big." Root cause: face-plane distance
+// is not just "the smallest measure of a shape's size" -- for these
+// real lattice-tiling polyhedra it's EXACTLY the tangent/touching
+// distance between two adjacent cells (that's the whole reason these
+// shapes tile space with zero gaps or overlaps in their own real
+// geometry). Any R bigger than that -- volume-matched included --
+// necessarily overlaps every real neighbor along that axis. A single
+// isolated cell (how RD's volume-matched R was first eyeballed, and
+// almost certainly how sparse, rarely-placed Truncated Octahedron/BCC
+// Build cells were tested too) never reveals this; a real densely-built
+// world, dominated by RD, does -- the overlap compounds across every
+// adjacent pair into something that reads as massively oversized.
+// So: face-plane distance is the safe, correct default for every
+// shape here, full stop -- it's the one value mathematically
+// guaranteed to never overlap a neighbor at any density. Truncated
+// Octahedron is kept as the sole confirmed exception (volume-matched,
+// ~0.98*scale) since it was explicitly confirmed "great size" in that
+// same real dense-world test -- if that turns out to have been a
+// sparse-test blind spot after all (i.e. it starts reading too big once
+// BCC cells are actually packed densely), the fix is exactly this same
+// reasoning: drop it back to axis-face-distance (scale).
 function sphericalClassificationFor(scale) {
   return {
-    rd: { mode: 'sphere', R: volumeMatchedRadius(2 * scale ** 3) },
+    rd: classifyShape({ faceDistances: [{ distance: scale / Math.SQRT2 }] }),
     octahedron: classifyShape({ faceDistances: [{ distance: (0.5 * scale) / Math.sqrt(3) }] }),
     cube: classifyShape({ faceDistances: [{ distance: 0.5 * scale }] }),
-    cuboctahedron: { mode: 'sphere', R: volumeMatchedRadius((5 / 6) * scale ** 3) },
+    cuboctahedron: classifyShape({
+      faceDistances: [
+        { distance: 0.5 * scale, family: 'axis' },
+        { distance: (0.5 * scale) * (2 / Math.sqrt(3)), family: 'diagonal' },
+      ],
+    }),
     truncatedOctahedron: { mode: 'sphere', R: volumeMatchedRadius(4 * scale ** 3) },
   };
 }
