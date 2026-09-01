@@ -24,10 +24,7 @@ import {
   hasCube,
   hasPyramid,
   effectivePyramids,
-  nearestPyramidAxis,
-  classifyExistingPyramidHit,
-  flatToFlatMirror,
-  pointToPointMirror,
+  resolvePyramidClickOnExisting,
 } from './pyramid.js';
 import { generatePlanetoid } from '../geometry-extensions/planetoidgen.js';
 import { nearestBCCCell } from '../geometry-extensions/dual-lattice.js';
@@ -539,38 +536,47 @@ export function createBuildController({
     // per core/pyramid.js).
     if (getPieceType() === 'pyramid') {
       // Direct instruction 2026-09-01 ("it just needed to be able to
-      // attach flat to flat or point to point"): a click landing on an
+      // attach flat to flat or point to point"), THEN a real regression
+      // report the same day ("pyramids still dont seem to like having a
+      // downward piece placed as the last piece of cub[e] and usually
+      // place somewhere upwards close by"): a click landing on an
       // EXISTING cube-less pyramid's own tagged mesh (userData.axisKey,
-      // see buildPyramidOnlyMeshes in render.js) is one of 3 real,
-      // distinct intents depending on exactly where -- the exposed flat
-      // base (bond flat-to-flat, forming a real octahedron), near the
-      // apex tip on a side face (bond point-to-point, chaining further
-      // out), or near a side face's own base edge ('sibling' -- grow the
-      // missing NEIGHBORING axis on this SAME cell, the pre-existing
-      // 2026-08-29 behavior below, unchanged). Before this classification
-      // existed, every one of these landed on 'sibling', so flat-to-flat/
-      // point-to-point growth was unreachable -- confirmed via direct
-      // trace against pyramidPieces()'s own geometry, not guessed.
+      // see buildPyramidOnlyMeshes in render.js) can mean 3 different
+      // things -- fill this SAME cell's own last missing axis (the
+      // pre-existing 2026-08-29 "build toward a full RD/cube from one
+      // seed" behavior), bond flat-to-flat at the exposed base (a real
+      // octahedron), or bond point-to-point at the apex tip (chains
+      // further out). A first version of this picked base/apex BEFORE
+      // ever checking whether completing the cell was the obviously
+      // closer, intended target -- resolvePyramidClickOnExisting (core/
+      // pyramid.js) fixes that by comparing every real candidate's own
+      // landmark point against the actual click point in one pass,
+      // nearest wins, no fixed priority order.
       const hitAxisKey = hit.object?.userData?.axisKey;
       if (hitAxisKey) {
         const [hwx, hwy, hwz] = cellToWorld(cell.x, cell.y, cell.z);
         const hitLocalPoint = [hit.point.x - hwx, hit.point.y - hwy, hit.point.z - hwz];
-        const hn = hit.face.normal;
-        const intent = classifyExistingPyramidHit({
-          axisKey: hitAxisKey,
-          localNormal: [hn.x, hn.y, hn.z],
+        const missingAxisKeys = PYRAMID_AXES.filter((k) => !hasPyramid(effectivePyramids(cell), k));
+        const resolved = resolvePyramidClickOnExisting({
+          hostCell: [cell.x, cell.y, cell.z],
+          hitAxisKey,
+          missingAxisKeys,
           localPoint: hitLocalPoint,
           pieces: pyramidPieces(),
         });
-        if (intent === 'base' || intent === 'apex') {
-          const mirror = intent === 'base'
-            ? flatToFlatMirror([cell.x, cell.y, cell.z], hitAxisKey)
-            : pointToPointMirror([cell.x, cell.y, cell.z], hitAxisKey);
-          const [mx, my, mz] = mirror.host;
+        if (resolved.type === 'fill') {
+          const fillResult = applyPyramidEdit(world, 'add', cell.x, cell.y, cell.z, resolved.axisKey);
+          if (fillResult) {
+            onChange();
+            if (onPlaced) onPlaced(cell);
+            return;
+          }
+        } else {
+          const [mx, my, mz] = resolved.host;
           if (!world.has(mx, my, mz)) {
             const material = getMaterial();
             if (canPlaceMaterial(material, mx, my, mz)) {
-              bootstrapPyramidCell(world, mx, my, mz, mirror.axisKey, material);
+              bootstrapPyramidCell(world, mx, my, mz, resolved.axisKey, material);
               onChange();
               if (onPlaced) onPlaced({ x: mx, y: my, z: mz, material });
               return;
@@ -578,40 +584,6 @@ export function createBuildController({
           }
           if (onPieceNoOp) onPieceNoOp('add');
           return;
-        }
-        // intent === 'sibling': fall through to the existing "complete
-        // this SAME cell's own remaining slots" behavior below.
-      }
-      // Cube-less cells (core/pyramid.js's hasCube()) have no flat
-      // "missing pyramid" cube face to click the normal way -- their
-      // own PRESENT pyramids are the only clickable geometry (see
-      // render.js's buildPyramidOnlyMeshes for why). Real bug caught
-      // live 2026-08-29 ("cant form RDs" / "have to have spaces"):
-      // every click on an existing cube-less cell's own pyramid fell
-      // straight through resolveClickedPyramidAxis into "already
-      // present" -> bootstrap-a-new-neighbor below, since there was
-      // never a genuinely missing axis's own geometry to land on
-      // directly -- a cube-less cell could gain its FIRST pyramid but
-      // never a second one of its own; every further click just grew a
-      // separate cell elsewhere. Fixed: if the clicked cell is
-      // cube-less and still has any axis missing, always complete THAT
-      // SAME cell first -- whichever missing axis's apex is closest to
-      // the click wins, checked across all 6 (not just the 2 sharing
-      // one rhombic face, which only means something for a cube-having
-      // cell's own real rhombic geometry). Falls through to the normal
-      // resolution below only once the cell has nothing left to add.
-      if (!hasCube(cell)) {
-        const missing = PYRAMID_AXES.filter((k) => !hasPyramid(effectivePyramids(cell), k));
-        if (missing.length > 0) {
-          const [cwx, cwy, cwz] = cellToWorld(cell.x, cell.y, cell.z);
-          const localPoint = [hit.point.x - cwx, hit.point.y - cwy, hit.point.z - cwz];
-          const fillAxisKey = nearestPyramidAxis(localPoint, missing, pyramidPieces());
-          const fillResult = applyPyramidEdit(world, 'add', cell.x, cell.y, cell.z, fillAxisKey);
-          if (fillResult) {
-            onChange();
-            if (onPlaced) onPlaced(cell);
-            return;
-          }
         }
       }
       const axisKey = resolveClickedPyramidAxis(hit, cell);

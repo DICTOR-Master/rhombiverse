@@ -158,24 +158,43 @@ export function pointToPointMirror(hostCell, axisKey) {
   return { host, axisKey: oppositeAxisKey(axisKey) };
 }
 
-// Classify a hit on an ALREADY-PRESENT pyramid's own geometry into one of
-// 3 real, distinct player intents: 'base' (the flat exposed back --
-// flat-to-flat bond), 'apex' (near the tip on one of the 4 triangular
-// side faces -- point-to-point bond), or 'sibling' (near a side face's
-// own base edge -- grow the missing NEIGHBORING axis on this SAME cell,
-// the pre-existing 2026-08-29 "build toward a full RD from one seed"
-// behavior, left unchanged). Direct report 2026-09-01 ("bond back to
-// back to form octahedron ... cant seem to do it"): before this
-// classification existed, every click on an existing pyramid's own
-// geometry -- base included -- was treated as 'sibling', so flat-to-flat
-// and point-to-point growth were simply unreachable.
-export function classifyExistingPyramidHit({ axisKey, localNormal, localPoint, pieces }) {
-  if (pyramidAxisForNormal(localNormal) === oppositeAxisKey(axisKey)) return 'base';
-  const { apex, base } = pieces.pyramids[axisKey];
-  const distToApex = dist3(localPoint, apex);
-  const nearest2 = base.map((c) => ({ c, d: dist3(localPoint, c) })).sort((a, b) => a.d - b.d).slice(0, 2);
-  const nearEdgeMid = [0, 1, 2].map((k) => (nearest2[0].c[k] + nearest2[1].c[k]) / 2);
-  return distToApex < dist3(localPoint, nearEdgeMid) ? 'apex' : 'sibling';
+// Resolve a click on an ALREADY-PRESENT pyramid's own geometry into
+// exactly one real outcome. Direct regression report 2026-09-01
+// ("pyramids still dont seem to like having a downward piece placed as
+// the last piece of cub[e] and usually place somewhere upwards close
+// by"), found via a failing test of the very fix meant to add bonding:
+// comparing every candidate purely by 3D distance to the click point
+// (an earlier version of this function did exactly that) doesn't work,
+// because the clicked axis's OWN base-center/apex landmark is always
+// far closer to the click than any OTHER axis's apex is (you're
+// clicking ON that pyramid, after all) -- so it always wins, even when
+// the player is obviously just trying to complete an almost-full cube
+// by clicking anywhere near its one remaining gap.
+//
+// The real distinguishing signal is how many pyramids this cell already
+// has: with exactly ONE present (a genuinely lone, undecided pyramid --
+// PYRAMID_AXES.length - 1 == 5 missing), the doc's own "1 pyramid
+// stands alone, 2 bond to form an octahedron" branch point is live, so
+// flat-to-flat/point-to-point bonding is offered and competes fairly by
+// distance. Once a SECOND pyramid has ever been added to the same cell
+// (missingAxisKeys.length < 5), the player has already committed to
+// "6 pyramids = cube" on THIS cell -- every further click completes a
+// missing sibling, unconditionally, exactly like before 2026-09-01,
+// with no competition from bonding at all.
+export function resolvePyramidClickOnExisting({ hostCell, hitAxisKey, missingAxisKeys, localPoint, pieces }) {
+  if (missingAxisKeys.length < PYRAMID_AXES.length - 1) {
+    return { type: 'fill', axisKey: nearestPyramidAxis(localPoint, missingAxisKeys, pieces) };
+  }
+  const candidates = missingAxisKeys.map((k) => ({
+    dist: dist3(localPoint, pieces.pyramids[k].apex),
+    action: { type: 'fill', axisKey: k },
+  }));
+  const { apex, base } = pieces.pyramids[hitAxisKey];
+  const baseCenter = [0, 1, 2].map((i) => base.reduce((sum, c) => sum + c[i], 0) / base.length);
+  candidates.push({ dist: dist3(localPoint, apex), action: { type: 'pointToPoint', ...pointToPointMirror(hostCell, hitAxisKey) } });
+  candidates.push({ dist: dist3(localPoint, baseCenter), action: { type: 'flatToFlat', ...flatToFlatMirror(hostCell, hitAxisKey) } });
+  candidates.sort((a, b) => a.dist - b.dist);
+  return candidates[0].action;
 }
 
 // "Pyramid without a cube" bootstrap (direct instruction 2026-08-29):
