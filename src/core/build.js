@@ -7,7 +7,6 @@
 import * as THREE from 'three';
 import {
   NEIGHBOR_OFFSETS,
-  isValidCell,
   cellsInShells,
   cellKey,
   parseCellKey,
@@ -25,6 +24,8 @@ import {
   hasPyramid,
   effectivePyramids,
   resolvePyramidClickOnExisting,
+  pyramidAxisForNormal,
+  axisKeyToOffset,
 } from './pyramid.js';
 import { generatePlanetoid } from '../geometry-extensions/planetoidgen.js';
 import { nearestBCCCell } from '../geometry-extensions/dual-lattice.js';
@@ -53,6 +54,47 @@ export function matchNeighborOffset(faceNormal) {
     }
   });
   return NEIGHBOR_OFFSETS[bestIdx];
+}
+
+// Real regression, direct report 2026-09-01 ("cubes have narrow
+// opportunities"/"pyramids form both cubes and RDs and any position is
+// potentially either anyway"): matchNeighborOffset only ever makes exact
+// sense for a DIAGONAL rhombic-face normal -- RD's own 12 real faces
+// line up exactly with the 12 NEIGHBOR_OFFSETS directions, so every RD
+// face resolves unambiguously. A Cube's 6 flat faces are a genuinely
+// different case: each one sits EXACTLY 45 degrees from 4 different
+// NEIGHBOR_OFFSETS directions at once (a real tie, confirmed
+// numerically), and the tie-break always favors the same lowest-index
+// candidate regardless of where on the face you click -- only 5 of the
+// 12 real directions are ever reachable from a cube's faces at all, and
+// 2 different faces (+x and +y) collapse onto the identical target
+// cell. That's what "narrow opportunities" was actually describing.
+//
+// Real fix, verified safe by construction: when the clicked face is
+// genuinely flat/axis-aligned (pyramidAxisForNormal returns non-null --
+// this ONLY ever happens on an exposed cube face with no pyramid on
+// that axis, since a present pyramid replaces the flat face with its
+// own slanted triangular sides), grow straight out along that PURE
+// axis instead of snapping to a diagonal. Two cubes placed pure-axis-
+// adjacent (SCALE apart) sit exactly tangent -- half-width 0.5 + 0.5 =
+// 1.0 = SCALE, zero overlap, by construction, not assumed. This can
+// never fire for a real RD face (RD never exposes a flat, axis-aligned
+// face at all -- pyramidAxisForNormal always returns null for one),
+// so RD's own real growth/placement is completely untouched by this;
+// it only ever activates for a Cube/partial-pyramid-cell's own
+// genuinely exposed flat face.
+//
+// This is also the real mechanism behind "any position is potentially
+// either [cube or RD] anyway": a cell reached via a pure-axis offset is
+// stored exactly like any other cell (no separate schema/store), so it
+// can grow its own further pyramids/cube exactly the same way -- the
+// lattice isn't literally "doubled" as a new parity rule, it's that
+// pure-axis growth from an exposed flat face was always geometrically
+// safe and simply wasn't being offered.
+export function resolveGrowthOffset(faceNormal) {
+  const axisKey = pyramidAxisForNormal([faceNormal.x, faceNormal.y, faceNormal.z]);
+  if (axisKey) return axisKeyToOffset(axisKey);
+  return matchNeighborOffset(faceNormal);
 }
 
 function distanceFromCenter(cx, cy, cz, x, y, z) {
@@ -615,7 +657,13 @@ export function createBuildController({
         const bnx = cell.x + neighborOffset[0];
         const bny = cell.y + neighborOffset[1];
         const bnz = cell.z + neighborOffset[2];
-        if (isValidCell(bnx, bny, bnz) && !world.has(bnx, bny, bnz)) {
+        // isValidCell's parity gate dropped here too, same reasoning as
+        // resolveGrowthOffset's own header -- a diagonal offset is safe
+        // regardless of the source cell's own parity (if this cell was
+        // itself reached via pure-axis growth from an odd position, its
+        // own further diagonal growth is exactly as safe as the
+        // original even lattice's, just consistently shifted).
+        if (!world.has(bnx, bny, bnz)) {
           const [nwx, nwy, nwz] = cellToWorld(bnx, bny, bnz);
           const newAxisKey = resolveBootstrapPyramidAxis({
             localPointFromNewCell: [hit.point.x - nwx, hit.point.y - nwy, hit.point.z - nwz],
@@ -650,12 +698,20 @@ export function createBuildController({
       if (onPlaced) onPlaced(cell);
       return;
     }
-    const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
+    const [dx, dy, dz] = resolveGrowthOffset(hit.face.normal);
     const nx = cell.x + dx;
     const ny = cell.y + dy;
     const nz = cell.z + dz;
     const material = getMaterial();
-    if (!isValidCell(nx, ny, nz) || world.has(nx, ny, nz)) return;
+    // isValidCell's own even-parity check is dropped here (not touched
+    // globally -- every other system that calls it, claims/asteroids/
+    // growth/shell-counting included, is untouched): it was never an
+    // intrinsic geometric requirement, just where the original seed
+    // happened to sit -- FCC packing is translation-symmetric, so a
+    // structure built from an odd-parity seed (reached via
+    // resolveGrowthOffset's own pure-axis growth) tiles exactly as
+    // safely as the original. Only real occupancy is checked now.
+    if (world.has(nx, ny, nz)) return;
     if (!canPlaceMaterial(material, nx, ny, nz)) return;
     const data = getPieceType() === 'cube' ? { material, pyramids: 0 } : { material };
     world.addCell(nx, ny, nz, data);
@@ -759,21 +815,21 @@ export function createBuildController({
     if (!hit) return null;
     const cell = cellAt(hit);
     if (!cell) return null;
-    const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
+    // resolveGrowthOffset/no isValidCell gate -- kept consistent with
+    // the real placement handler above (see its own comment): every
+    // integer position is a real, safe growth target now, only real
+    // occupancy still matters. A stale ghost that doesn't match where a
+    // click would actually place a cell would be a real, confusing bug.
+    const [dx, dy, dz] = resolveGrowthOffset(hit.face.normal);
     const nx = cell.x + dx;
     const ny = cell.y + dy;
     const nz = cell.z + dz;
-    if (!isValidCell(nx, ny, nz)) return null;
     const first = { x: nx, y: ny, z: nz, occupied: world.has(nx, ny, nz) };
     if (!showSecond) return [first];
     const nx2 = nx + dx;
     const ny2 = ny + dy;
     const nz2 = nz + dz;
-    const cells = [first];
-    if (isValidCell(nx2, ny2, nz2)) {
-      cells.push({ x: nx2, y: ny2, z: nz2, occupied: world.has(nx2, ny2, nz2) });
-    }
-    return cells;
+    return [first, { x: nx2, y: ny2, z: nz2, occupied: world.has(nx2, ny2, nz2) }];
   }
 
   function onPointerMove(event) {

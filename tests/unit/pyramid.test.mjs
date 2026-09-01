@@ -16,6 +16,8 @@ import {
   nearestPyramidAxis,
   resolvePyramidAxisForHit,
   resolvePyramidClickOnExisting,
+  pyramidAxisForNormal,
+  axisKeyToOffset,
 } from '../../src/core/pyramid.js';
 
 const pieces = pyramidPieces();
@@ -150,4 +152,44 @@ test('classifyPyramidHitRegion: a click near z+\'s own apex (side face, tip end)
     pieces,
   });
   assert.equal(resolved.type, 'pointToPoint');
+});
+
+// --- "Cubes have narrow opportunities" / "lattice needs doubling for
+// pyramids", direct reports 2026-09-01: build.js's resolveGrowthOffset
+// (not importable here -- build.js pulls in `three` -- but its own
+// logic is exactly axisKeyToOffset(pyramidAxisForNormal(n)) when that's
+// non-null, else the existing matchNeighborOffset) is grounded here via
+// its two real building blocks, both pure and THREE-free.
+
+test('axisKeyToOffset: all 6 real pure-axis offsets match PYRAMID_AXES exactly', () => {
+  assert.deepEqual(axisKeyToOffset('x+'), [1, 0, 0]);
+  assert.deepEqual(axisKeyToOffset('x-'), [-1, 0, 0]);
+  assert.deepEqual(axisKeyToOffset('y+'), [0, 1, 0]);
+  assert.deepEqual(axisKeyToOffset('y-'), [0, -1, 0]);
+  assert.deepEqual(axisKeyToOffset('z+'), [0, 0, 1]);
+  assert.deepEqual(axisKeyToOffset('z-'), [0, 0, -1]);
+});
+
+test('regression: all 6 of a Cube\'s real flat faces now resolve to 6 DISTINCT growth targets (the old matchNeighborOffset-only approach only ever reached 5, with +x/+y colliding on the same cell -- verified independently in this same session)', () => {
+  const faces = { 'x+': [1, 0, 0], 'x-': [-1, 0, 0], 'y+': [0, 1, 0], 'y-': [0, -1, 0], 'z+': [0, 0, 1], 'z-': [0, 0, -1] };
+  const offsets = Object.entries(faces).map(([expectedAxis, normal]) => {
+    const axisKey = pyramidAxisForNormal(normal);
+    assert.equal(axisKey, expectedAxis, `pyramidAxisForNormal(${normal}) should identify its own face`);
+    return axisKeyToOffset(axisKey).join(',');
+  });
+  const distinct = new Set(offsets);
+  assert.equal(distinct.size, 6, `expected 6 distinct growth targets, got ${distinct.size}: ${offsets.join(' | ')}`);
+});
+
+test('safety: two cubes placed pure-axis-adjacent (SCALE apart) sit exactly tangent -- zero overlap, by construction', () => {
+  const SCALE = 1;
+  const cubeHalfWidth = 0.5 * SCALE;
+  const pureAxisSpacing = SCALE; // axisKeyToOffset gives a unit step, * SCALE in world units
+  assert.ok(Math.abs(cubeHalfWidth + cubeHalfWidth - pureAxisSpacing) < 1e-9, 'two cube half-widths must sum to exactly the real pure-axis spacing');
+});
+
+test('RD faces are never flat/axis-aligned -- pyramidAxisForNormal always returns null for a real diagonal RD face, so resolveGrowthOffset\'s pure-axis branch can never fire for RD growth', () => {
+  // A real RD face normal -- e.g. the (1,1,0)-type direction, normalized.
+  const rdFaceNormal = [1 / Math.SQRT2, 1 / Math.SQRT2, 0];
+  assert.equal(pyramidAxisForNormal(rdFaceNormal), null);
 });

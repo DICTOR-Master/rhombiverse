@@ -169,6 +169,20 @@ function axisIndexAndSign(axisKey) {
   return { axisIndex: i < 2 ? 0 : i < 4 ? 1 : 2, sign: i % 2 === 0 ? 1 : -1 };
 }
 
+// The pure integer offset (e.g. [1,0,0] for 'x+') a given axis key
+// points along -- used by growPureAxisOffset (build.js) to grow a new
+// Cube/Pyramid cell straight out from a genuinely flat, exposed cube
+// face, instead of lossily snapping to one of the 12 diagonal
+// NEIGHBOR_OFFSETS directions (see that function's own header for why
+// snapping was a real, confirmed bug -- only 5 of 12 real directions
+// reachable from a cube's 6 flat faces, 2 duplicated).
+export function axisKeyToOffset(axisKey) {
+  const { axisIndex, sign } = axisIndexAndSign(axisKey);
+  const offset = [0, 0, 0];
+  offset[axisIndex] = sign;
+  return offset;
+}
+
 export function flatToFlatMirror(hostCell, axisKey) {
   const { axisIndex, sign } = axisIndexAndSign(axisKey);
   const host = hostCell.slice();
