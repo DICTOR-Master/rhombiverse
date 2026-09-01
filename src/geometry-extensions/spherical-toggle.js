@@ -6,16 +6,13 @@
 // consumes this module's outputs (mode/R/n, or raw sample points from
 // sampleSuperellipsoidGrid) to build the actual BufferGeometry.
 //
-// Stage 1 of the addendum: Section 1 (classification) + Section 2
-// (superellipsoid formula) + Section 3 (volume-matched fallback), applied
-// to the 5 InstancedMesh piece families that already have simple, known
-// face-plane geometry (RD, Cube, Octahedron/octGap, Cuboctahedron,
-// Truncated Octahedron). Section 4 (ring-of-disphenoids -> torus) is NOT
-// implemented here -- deliberately deferred, since it needs real
-// world-state grouping logic (not just per-shape math) and the spec
-// itself calls its own thresholds "intentionally loose... tune after
-// testing", which argues for building it as its own separately-verified
-// stage rather than bundling it in speculatively.
+// Covers Section 1 (classification) + Section 2 (superellipsoid formula)
+// + Section 3 (volume-matched fallback). There is no ring/torus grouping
+// in this feature at all, by direct instruction -- not deferred, ruled
+// out entirely. Every cell (disphenoid included) always renders as its
+// own individual sphere, regardless of how many same-type cells share an
+// axis. The spec's own original draft had a ring-of-disphenoids->torus
+// section; it was removed from the doc, not left as future work.
 //
 // EPSILON_UNIFORM deviates from the spec's own suggested value: the spec
 // suggests a flat 1e-4 absolute tolerance, written against numeric

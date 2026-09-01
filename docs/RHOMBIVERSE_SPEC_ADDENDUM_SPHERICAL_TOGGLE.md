@@ -5,8 +5,13 @@
 A view toggle that renders geometric bodies in a simplified, near-spherical
 form: shapes with uniform face-distance render as true spheres; shapes with
 non-uniform face-distance render as superellipsoids (a "flattened sphere"
-that still respects the shape's cubic symmetry); rings of same-type cells
-arranged in a closed loop render as a torus.
+that still respects the shape's cubic symmetry).
+
+**No torus/ring-grouping of any kind — direct instruction, ruled out
+entirely, not deferred.** Every cell (disphenoid included) always renders
+as its own individual sphere, full stop, regardless of how many same-type
+cells are arranged around a shared axis. An earlier draft of this doc had
+a ring→torus section; it's removed, not "not yet built" — don't re-add it.
 
 General spirit: **make everything as near-spherical as possible.** The rules
 below are a starting algorithm, not a locked spec — thresholds are exposed as
@@ -90,40 +95,6 @@ change required. Volume-matched sphere radii, precomputed for reference:
 
 ---
 
-## 4. Ring → torus (general blanket rule)
-
-When a set of same-type cells (e.g. disphenoids) are arranged as a closed
-loop with rotational symmetry around a common axis, render the group as a
-single torus instead of N individual spheres.
-
-Kept intentionally loose per current direction — tune after testing:
-
-- **Central body:** not required. A closed ring with nothing in the middle
-  still qualifies.
-- **Closure:** require a closed loop for now (`ARC_CLOSURE_THRESHOLD` =
-  360° − small tolerance). Expose as a constant if partial-arc rendering
-  turns out to be wanted later.
-- **Ring size:** no fixed count. Any set of ≥3 same-type cells spaced at
-  consistent angular intervals around a shared axis qualifies — don't
-  special-case 3-fold/4-fold symmetry specifically.
-- **Detection:** group cells by (a) same shape type, (b) shared rotation
-  axis (within `AXIS_ALIGNMENT_TOLERANCE`), (c) consistent angular spacing
-  (within `SPACING_TOLERANCE`), (d) consistent radial distance from the
-  shared axis (within `RADIUS_TOLERANCE`).
-
-**Torus geometry, once a ring is detected:**
-
-- Major radius = mean distance from ring centroid to each cell's center.
-- Minor radius = each cell's own individual sphere radius (from Section 1 —
-  disphenoids resolve to spheres individually, so the torus tube radius is
-  literally that sphere radius).
-
-All four tolerance constants above should be named and adjustable in one
-place, since the exact thresholds are expected to change after DICTO
-reviews the first build.
-
----
-
 ## Implementation notes
 
 - Cube / Octahedron / RD keep using the existing plain-sphere path — no
@@ -131,6 +102,9 @@ reviews the first build.
 - Superellipsoid rendering needs one reusable function
   (`|x|^n+|y|^n+|z|^n=R^n`), parameterized by `R` and `n` — not a per-shape
   mesh.
-- All numeric thresholds in Sections 3–4 should live as named constants in
+- All numeric thresholds in Section 3 should live as named constants in
   one config location, not inline, so DICTO can retune after visual testing
   without touching detection/render logic.
+- No ring/torus grouping — see Purpose above. Disphenoids (including the
+  Flattened Octahedron, which is 4 disphenoids around a shared axis) always
+  render as individual spheres, never merged.

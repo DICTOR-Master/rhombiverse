@@ -1133,10 +1133,12 @@ function buildSphericalGeometry({ mode, R, n }) {
 // buildCuboctaGeometry/buildOctGapGeometry/buildBCCGeometry already use
 // above, not re-derived by hand (see tests/unit/spherical-toggle.test.mjs
 // for the numeric cross-check against those same generators). RD/
-// Octahedron(gap)/Cube are uniform (Section 1 case 2, "plain sphere");
-// Cuboctahedron is the axis/body-diagonal two-family case (Section 1
-// case 3, superellipsoid). Disphenoid/ring-to-torus (Section 4) is out
-// of scope for this stage -- see that module's own header comment.
+// Octahedron(gap)/Cube/Cuboctahedron are all uniform (Section 1 case 2,
+// "plain sphere") -- Cuboctahedron dropped its superellipsoid entirely,
+// see Direct override #2 below. There is no ring/torus grouping in this
+// feature at all, by direct instruction -- not deferred, ruled out
+// entirely (Disphenoid always renders as an individual sphere, see
+// spherical-toggle.js's own header).
 //
 // Direct override #1, real live-build feedback (2026-09-01, DICTO:
 // "spheres obviously too small" -- and to stay strictly
@@ -2486,10 +2488,11 @@ async function init() {
 
   // Spherical Toggle (docs/RHOMBIVERSE_SPEC_ADDENDUM_SPHERICAL_TOGGLE.md),
   // Stage 1 -- a client-side view swap only, same spirit as Duality above
-  // (your cells are untouched). Covers every real placeable piece type
-  // except Section 4's disphenoid-ring-to-torus grouping (out of scope by
-  // direct instruction -- disphenoids still convert individually below,
-  // just never merged into a torus). EVERY shape renders as a plain
+  // (your cells are untouched). Covers every real placeable piece type.
+  // No ring/torus grouping of any kind, by direct instruction -- not
+  // deferred, ruled out entirely: disphenoids always convert
+  // individually below, never merged into a torus, no matter how many
+  // same-type cells share an axis. EVERY shape renders as a plain
   // sphere now -- no superellipsoid in active use ("revert to sphere",
   // direct instruction) and no third volumeSphere render mode either
   // (that's not a different shape anyway, just a different radius choice
