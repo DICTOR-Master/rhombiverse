@@ -16,6 +16,7 @@ import { createCuboctaBuildController, AXIS_OFFSETS as CUBOCTA_AXIS_OFFSETS } fr
 import { createCuboctaGapBuildController, octGapCellToWorld, octGapCellForCOCell } from './core/cubocta-gap-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
 import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
+import { classifyShape, sampleSuperellipsoidGrid } from './geometry-extensions/spherical-toggle.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { FEATURES } from './app/features.js';
 import {
@@ -1093,6 +1094,71 @@ function buildOctGapGeometry(scale) {
   return geometry;
 }
 
+// Spherical Toggle (docs/RHOMBIVERSE_SPEC_ADDENDUM_SPHERICAL_TOGGLE.md),
+// Stage 1: turns a spherical-toggle.js lat/lon point grid into a real
+// BufferGeometry -- ONE shared mesh-building step for every render mode
+// ('sphere'/'volumeSphere' pass n=2 through the same superellipsoid
+// formula, 'superellipsoid' passes the shape's own solved n), per the
+// spec's own "one reusable function... not a per-shape mesh" note.
+function buildSphericalGeometryFromGrid(grid) {
+  const positions = [];
+  const rows = grid.length;
+  const cols = grid[0].length;
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) positions.push(...grid[i][j]);
+  }
+  const indices = [];
+  for (let i = 0; i < rows - 1; i++) {
+    for (let j = 0; j < cols - 1; j++) {
+      const a = i * cols + j;
+      const b = a + 1;
+      const c = a + cols;
+      const d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function buildSphericalGeometry({ mode, R, n }) {
+  return buildSphericalGeometryFromGrid(sampleSuperellipsoidGrid(R, mode === 'superellipsoid' ? n : 2));
+}
+
+// Real per-shape face-plane distances, at this world's own SCALE --
+// grounded directly in the same vertex generators buildRDGeometry/
+// buildCuboctaGeometry/buildOctGapGeometry/buildBCCGeometry already use
+// above, not re-derived by hand (see tests/unit/spherical-toggle.test.mjs
+// for the numeric cross-check against those same generators). Covers the
+// 4 real InstancedMesh piece families this stage wires the toggle to --
+// RD and Octahedron(gap) are uniform (Section 1 case 2, "plain sphere");
+// Cuboctahedron/Truncated Octahedron are the axis/body-diagonal
+// two-family case (Section 1 case 3, superellipsoid). The Cube piece
+// (Pyramid Sub-Cell, a per-cell-mesh system, not InstancedMesh) and
+// Disphenoid/ring-to-torus (Section 4) are separate, not-yet-built
+// stages -- see that module's own header comment.
+function sphericalClassificationFor(scale) {
+  return {
+    rd: classifyShape({ faceDistances: [{ distance: scale / Math.SQRT2 }] }),
+    octahedron: classifyShape({ faceDistances: [{ distance: (0.5 * scale) / Math.sqrt(3) }] }),
+    cuboctahedron: classifyShape({
+      faceDistances: [
+        { distance: 0.5 * scale, family: 'axis' },
+        { distance: (0.5 * scale) * (2 / Math.sqrt(3)), family: 'diagonal' },
+      ],
+    }),
+    truncatedOctahedron: classifyShape({
+      faceDistances: [
+        { distance: scale, family: 'axis' },
+        { distance: scale * (Math.sqrt(3) / 2), family: 'diagonal' },
+      ],
+    }),
+  };
+}
+
 // See docs/code-notes/render.md
 // emerald/gold added 2026-08-29, direct request -- buildable colors
 // only (deliberately NOT wired into asteroids.js's YIELD_WEIGHTS,
@@ -1462,6 +1528,7 @@ async function init() {
   }
 
   wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
+  wireFirstUseHint('spherical-toggle', 'Spherical: renders shapes in a simplified near-spherical form -- a client-side view only, your cells are untouched.');
   wireFirstUseHint('bcc-toggle', 'Lattice View: click to cycle a preview lens through every Piece type -- RD, Cube, Pyramid (shown on your real World), then Cuboctahedron and Octahedron, then BCC/TO, Flattened Octahedron, and Disphenoid (a hypothetical patch near you), then Off.');
   wireFirstUseHint('clear-world-toggle', 'Clear World: erase everything and start fresh from a single seed cell.');
   wireFirstUseHint('reload-toggle', 'Reload: hard-refresh the app if anything looks stuck or stale.');
@@ -2379,6 +2446,45 @@ async function init() {
       dualityShadowMesh.material.dispose();
       dualityShadowMesh = null;
     }
+  });
+
+  // Spherical Toggle (docs/RHOMBIVERSE_SPEC_ADDENDUM_SPHERICAL_TOGGLE.md),
+  // Stage 1 -- a client-side view swap only, same spirit as Duality above
+  // (your cells are untouched), but simpler: since every instance of a
+  // given piece type shares one BufferGeometry already (InstancedMesh),
+  // toggling the view is just swapping which geometry object each of the
+  // 4 wired meshes points at, not building a whole separate overlay mesh.
+  // Deliberately NOT applied to sculptureMesh (own separate concern) or
+  // the Lattice Zoom sub-lattice/aggregate-speckle meshes (also reuse
+  // `geometry`/buildRDGeometry at other scales) -- out of scope for this
+  // stage, and safe to leave alone: reassigning mesh.geometry only
+  // changes that one InstancedMesh's own property, not the underlying
+  // object other meshes still reference.
+  let sphericalModeActive = false;
+  const sphericalShapes = sphericalClassificationFor(SCALE);
+  const sphericalGeometries = {
+    rd: buildSphericalGeometry(sphericalShapes.rd),
+    octahedron: buildSphericalGeometry(sphericalShapes.octahedron),
+    cuboctahedron: buildSphericalGeometry(sphericalShapes.cuboctahedron),
+    truncatedOctahedron: buildSphericalGeometry(sphericalShapes.truncatedOctahedron),
+  };
+  const originalGeometries = {
+    rd: geometry,
+    octahedron: octGapGeometry,
+    cuboctahedron: cuboctaGeometry,
+    truncatedOctahedron: bccGeometry,
+  };
+  document.getElementById('spherical-toggle')?.addEventListener('click', () => {
+    sphericalModeActive = !sphericalModeActive;
+    document.getElementById('spherical-toggle').classList.toggle('active', sphericalModeActive);
+    const active = sphericalModeActive ? sphericalGeometries : originalGeometries;
+    mesh.geometry = active.rd;
+    octGapMesh.geometry = active.octahedron;
+    cuboctaMesh.geometry = active.cuboctahedron;
+    bccMesh.geometry = active.truncatedOctahedron;
+    showHudPrompt(sphericalModeActive
+      ? 'Spherical: RD/Octahedron shown as true spheres, Cuboctahedron/Truncated Octahedron as superellipsoids -- a client-side view only, your cells are untouched.'
+      : 'Spherical: off.', 5000);
   });
 
   // BCC dual-lattice Phase 2 (third revision, 2026-08-25) -- Rhombeometry-

@@ -219,6 +219,18 @@
     }
     #duality-toggle:hover { background: rgba(255, 255, 255, 0.15); }
     #duality-toggle.active { background: rgba(200, 140, 255, 0.4); border-color: #c88cff; color: #fff; }
+    #spherical-toggle {
+      position: fixed; top: 12px; right: 354px; z-index: 900;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      color: #ddd;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font: 15px system-ui, sans-serif;
+      cursor: pointer;
+    }
+    #spherical-toggle:hover { background: rgba(255, 255, 255, 0.15); }
+    #spherical-toggle.active { background: rgba(120, 220, 255, 0.4); border-color: #78dcff; color: #fff; }
     #bcc-toggle {
       position: fixed; top: 12px; right: 202px; z-index: 900;
       width: 30px; height: 30px;
@@ -264,7 +276,7 @@
        calls .click() on them programmatically, same reuse pattern as
        every other real action in this app. */
     #sculpture-mode-toggle, #cyborg-toggle, #xray-toggle, #duality-toggle,
-    #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle,
+    #spherical-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle,
     #reload-toggle, #lab-toggle {
       display: none;
     }
@@ -299,7 +311,7 @@
        and #hud-crosshair are deliberately excluded -- the prompt IS the
        transition's own cue text, and the crosshair fades in/out on its
        own timing (render.js), not this one. */
-    #hud-wordmark, #hud-wheel-cue, #hud-quick-shape, #hud-quick-material, #hud-quick-lattice-view, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle {
+    #hud-wordmark, #hud-wheel-cue, #hud-quick-shape, #hud-quick-material, #hud-quick-lattice-view, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #spherical-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle {
       transition: opacity 0.3s ease;
     }
     body.explore-transitioning #hud-wordmark,
@@ -312,6 +324,7 @@
     body.explore-transitioning #cyborg-toggle,
     body.explore-transitioning #sculpture-mode-toggle,
     body.explore-transitioning #duality-toggle,
+    body.explore-transitioning #spherical-toggle,
     body.explore-transitioning #bcc-toggle,
     body.explore-transitioning #rhombic-wheel-3d-toggle,
     body.explore-transitioning #clear-world-toggle,
@@ -1119,6 +1132,7 @@
   <button id="cyborg-toggle" type="button" title="Cyborg Mode: guided walkthrough">◈</button>
   <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>
   <button id="duality-toggle" type="button" title="Duality: view this structure's aperiodic shadow">◐</button>
+  <button id="spherical-toggle" type="button" title="Spherical: view shapes in near-spherical form">◯</button>
   <button id="bcc-toggle" type="button" title="BCC Lattice: view the nested dual body-centered-cubic detail lattice (Rhombeometry only)">⬡</button>
   <button id="rhombic-wheel-3d-toggle" type="button" title="Menu (Tab / Space): navigate departments via the real RD mesh">◈</button>
   <button id="clear-world-toggle" type="button" title="Clear World: erase everything and start fresh">⊘</button>

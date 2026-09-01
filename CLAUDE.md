@@ -139,6 +139,26 @@ build order:
 - **Showcase world** — done, `data/presets/showcase-world.json` (a real
   continental planetoid with growth, evolved organisms, and animals),
   loadable via the `#preset-select` dropdown.
+- **Spherical Toggle** (2026-09-01, `docs/RHOMBIVERSE_SPEC_ADDENDUM_SPHERICAL_TOGGLE.md`)
+  — **Stage 1 only**: classification + superellipsoid math
+  (`src/geometry-extensions/spherical-toggle.js`, pure/THREE-free, unit
+  tested against this repo's own real vertex generators, not just the
+  spec's illustrative numbers — a real numeric error in the spec's own
+  Truncated Octahedron volume-matched-sphere constant was caught and
+  fixed during review, 1.9695 -> 1.1371) wired into a HUD toggle
+  (`#spherical-toggle`, `render.js`) covering the 4 InstancedMesh piece
+  families that have simple known face geometry: RD and Octahedron(gap)
+  render as true spheres, Cuboctahedron and Truncated Octahedron as
+  superellipsoids. Reachable via the persistent HUD Wheel
+  (`hud-wheel-3d.js`, replaced the last Duality-duplicate face). **NOT
+  yet done**: the Cube piece (Pyramid Sub-Cell, a per-cell-mesh system,
+  not InstancedMesh), Sculpture Mode's own mesh, Lattice Zoom's
+  sub-lattice/aggregate-speckle meshes, and Section 4 (disphenoid-ring
+  -> torus) — deliberately deferred, needs real world-state grouping
+  logic verified as its own stage, not bundled in speculatively. Not yet
+  confirmed in a live browser (no Playwright/npm available in this
+  session's environment) — verify visually before treating Stage 1 as
+  fully done.
 - **Rhombic Wheel 3D** (2026-08-25, `src/app/rhombic-wheel-3d-core.js`/
   `rhombic-wheel-3d.js`) — the sole navigation surface now, on the real
   RD mesh. The old 2D radial menu (`wheel.js`) was fully removed the

@@ -97,15 +97,23 @@ const HUD_FACES = {
   'top|sx1sz1':       { symbol: '◇', elId: 'rhombic-wheel-3d-toggle', title: 'Menu' },
   'top|sx-1sz1':      { symbol: '⊘', elId: 'clear-world-toggle',      title: 'Clear World' },
   'bottom|sy1sz-1':   { symbol: '↻', elId: 'reload-toggle',           title: 'Reload' },
-  // The 3 remaining bottom faces are temporary duplicates of an
-  // existing function at their TRUE geometric antipode (centroid
-  // inversion through the origin, verified numerically, same standing
-  // policy as the main Rhombic Wheel 3D -- "until those blank faces
-  // are filled they should serve as temporary duplicates at opposite
-  // points on the RD to their duplicates", direct user directive
-  // 2026-08-25). Each antipode pairing below was confirmed NOT
-  // edge-adjacent to the face it duplicates before being assigned.
-  'bottom|sy-1sz-1':  { symbol: '◐', elId: 'duality-toggle',          title: 'Duality', temporary: true },
+  // This face was a temporary duplicate of Duality at its true
+  // geometric antipode (see the policy note below on the one remaining
+  // duplicate). Replaced with real new content, Spherical Toggle, the
+  // same "duplicate slot -> real function" swap BCC Build (bottom|
+  // sx1sz-1 below) already did with a Clear World duplicate --
+  // Spherical is the closer sibling to Duality anyway (both are
+  // client-side view toggles that reinterpret the same cells, not new
+  // world-state), so it fits its old spot semantically too.
+  'bottom|sy-1sz-1':  { symbol: '◯', elId: 'spherical-toggle',        title: 'Spherical' },
+  // The 1 remaining bottom face (sx-1sz-1, below) is a temporary
+  // duplicate of an existing function at its TRUE geometric antipode
+  // (centroid inversion through the origin, verified numerically, same
+  // standing policy as the main Rhombic Wheel 3D -- "until those blank
+  // faces are filled they should serve as temporary duplicates at
+  // opposite points on the RD to their duplicates", direct user
+  // directive 2026-08-25). Each antipode pairing below was confirmed
+  // NOT edge-adjacent to the face it duplicates before being assigned.
   // 2026-08-26 direct instruction: this slot's Clear World duplicate
   // (a confirm()-gated destructive action -- arguably doesn't even
   // WANT a quick-access shortcut) replaced with real new content, BCC
