@@ -2922,6 +2922,18 @@ async function init() {
         // MODE_HINTS.cubocta above, already shown persistently in the
         // Lab panel's mode-hint line the whole time this mode is active,
         // the same place every other mode's own instructions live.
+        //
+        // Real gap, direct report 2026-09-01 ("cube-octahedron doesnt
+        // go to color wheel when opened"): "stays open" above only ever
+        // meant the WHEEL stayed open -- the actual openMaterialPicker
+        // call every tool:pieceType:* pick makes right after was never
+        // actually added here, across this handler's entire history
+        // (confirmed via git log -- the comment's own "Material
+        // reachable immediately" claim was aspirational, not real). The
+        // color WAS always changeable via the separate tool:material
+        // quick-select, just never auto-opened the way every other
+        // Piece already does. Added below, matching tool:pieceType:*'s
+        // own call exactly.
         if (action === 'tool:cuboctaBuild') {
           if (!FEATURES.bccLattice) {
             wheel3D.close();
@@ -2930,6 +2942,7 @@ async function init() {
           }
           clickMode('cubocta');
           showHudPrompt('Piece: CO', 3000);
+          pickers.openMaterialPicker((value, label) => showHudPrompt(`Material: ${label}`, 3000));
           return;
         }
 

@@ -183,43 +183,69 @@ export function pointToPointMirror(hostCell, axisKey) {
   return { host, axisKey: oppositeAxisKey(axisKey) };
 }
 
+// Classify a hit on an already-present pyramid's OWN geometry into one
+// of 3 real regions -- 'base' (the flat exposed back, opposite the
+// pyramid's own outward axis -- flat-to-flat bond), 'apex' (nearer this
+// pyramid's own tip than its own base-edge midpoint, on one of its 4
+// triangular side faces -- point-to-point bond), or 'sibling' (the rest
+// of a side face, nearer the base -- grow a missing NEIGHBOR axis on
+// this SAME cell). Deliberately compares ONLY against this ONE
+// pyramid's own landmarks (its own apex vs. its own nearest base-edge
+// midpoint), never against any OTHER axis's geometry -- see
+// resolvePyramidClickOnExisting's own header for why that distinction
+// matters.
+function classifyPyramidHitRegion({ axisKey, localNormal, localPoint, pieces }) {
+  if (localNormal && pyramidAxisForNormal(localNormal) === oppositeAxisKey(axisKey)) return 'base';
+  const { apex, base } = pieces.pyramids[axisKey];
+  const distToApex = dist3(localPoint, apex);
+  const nearest2 = base.map((c) => ({ c, d: dist3(localPoint, c) })).sort((a, b) => a.d - b.d).slice(0, 2);
+  const nearEdgeMid = [0, 1, 2].map((k) => (nearest2[0].c[k] + nearest2[1].c[k]) / 2);
+  return distToApex < dist3(localPoint, nearEdgeMid) ? 'apex' : 'sibling';
+}
+
 // Resolve a click on an ALREADY-PRESENT pyramid's own geometry into
-// exactly one real outcome. Direct regression report 2026-09-01
-// ("pyramids still dont seem to like having a downward piece placed as
-// the last piece of cub[e] and usually place somewhere upwards close
-// by"), found via a failing test of the very fix meant to add bonding:
-// comparing every candidate purely by 3D distance to the click point
-// (an earlier version of this function did exactly that) doesn't work,
-// because the clicked axis's OWN base-center/apex landmark is always
-// far closer to the click than any OTHER axis's apex is (you're
-// clicking ON that pyramid, after all) -- so it always wins, even when
-// the player is obviously just trying to complete an almost-full cube
-// by clicking anywhere near its one remaining gap.
+// exactly one real outcome.
 //
-// The real distinguishing signal is how many pyramids this cell already
-// has: with exactly ONE present (a genuinely lone, undecided pyramid --
-// PYRAMID_AXES.length - 1 == 5 missing), the doc's own "1 pyramid
-// stands alone, 2 bond to form an octahedron" branch point is live, so
-// flat-to-flat/point-to-point bonding is offered and competes fairly by
-// distance. Once a SECOND pyramid has ever been added to the same cell
-// (missingAxisKeys.length < 5), the player has already committed to
-// "6 pyramids = cube" on THIS cell -- every further click completes a
-// missing sibling, unconditionally, exactly like before 2026-09-01,
-// with no competition from bonding at all.
-export function resolvePyramidClickOnExisting({ hostCell, hitAxisKey, missingAxisKeys, localPoint, pieces }) {
+// Real regression, direct report 2026-09-01 ("placing pyramids is
+// still too difficult, impossible even ... used to be placeable by
+// tapping surface you want to attach to"): an earlier version of this
+// function (itself already a fix for a DIFFERENT regression, the "last
+// inverted cap" bug -- see git history) threw every candidate -- up to
+// 5 missing-sibling fill targets PLUS both bond candidates -- into one
+// flat distance-to-click race. That mostly resolved correctly (a
+// sibling axis's apex sits on a completely different cube face, usually
+// far from a click on THIS pyramid's own surface), but near shared cube
+// corners/base edges the distances can land close enough for ordinary
+// click-precision noise to flip the outcome -- exactly the described
+// symptom (sometimes fills a sibling, sometimes bonds, sometimes
+// nothing), not a single deterministic failure.
+//
+// Real fix: classify which REGION of the clicked pyramid's own geometry
+// was hit first (classifyPyramidHitRegion, above -- comparing only
+// within that one pyramid's own landmarks, never against unrelated
+// siblings elsewhere on the cube), THEN resolve within that region.
+// 'sibling' still needs nearestPyramidAxis to pick WHICH missing axis,
+// but now compared only among the real missing candidates, with no
+// bond-candidate competition muddying that comparison.
+//
+// The real distinguishing signal for whether bonding is even offered at
+// all is unchanged from the previous fix: how many pyramids this cell
+// already has. Exactly ONE present (missingAxisKeys.length ==
+// PYRAMID_AXES.length - 1, a genuinely lone, undecided pyramid) is the
+// doc's own "1 stands alone, 2 bond to form an octahedron" branch
+// point, so flat-to-flat/point-to-point bonding is offered. Once a
+// SECOND pyramid has ever been added to the same cell, the player has
+// already committed to "6 pyramids = cube" on THIS cell -- every
+// further click completes a missing sibling unconditionally, with no
+// bonding offered at all, regardless of which region was hit.
+export function resolvePyramidClickOnExisting({ hostCell, hitAxisKey, missingAxisKeys, localNormal, localPoint, pieces }) {
   if (missingAxisKeys.length < PYRAMID_AXES.length - 1) {
     return { type: 'fill', axisKey: nearestPyramidAxis(localPoint, missingAxisKeys, pieces) };
   }
-  const candidates = missingAxisKeys.map((k) => ({
-    dist: dist3(localPoint, pieces.pyramids[k].apex),
-    action: { type: 'fill', axisKey: k },
-  }));
-  const { apex, base } = pieces.pyramids[hitAxisKey];
-  const baseCenter = [0, 1, 2].map((i) => base.reduce((sum, c) => sum + c[i], 0) / base.length);
-  candidates.push({ dist: dist3(localPoint, apex), action: { type: 'pointToPoint', ...pointToPointMirror(hostCell, hitAxisKey) } });
-  candidates.push({ dist: dist3(localPoint, baseCenter), action: { type: 'flatToFlat', ...flatToFlatMirror(hostCell, hitAxisKey) } });
-  candidates.sort((a, b) => a.dist - b.dist);
-  return candidates[0].action;
+  const region = classifyPyramidHitRegion({ axisKey: hitAxisKey, localNormal, localPoint, pieces });
+  if (region === 'base') return { type: 'flatToFlat', ...flatToFlatMirror(hostCell, hitAxisKey) };
+  if (region === 'apex') return { type: 'pointToPoint', ...pointToPointMirror(hostCell, hitAxisKey) };
+  return { type: 'fill', axisKey: nearestPyramidAxis(localPoint, missingAxisKeys, pieces) };
 }
 
 // "Pyramid without a cube" bootstrap (direct instruction 2026-08-29):

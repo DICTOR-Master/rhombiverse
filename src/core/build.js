@@ -562,11 +562,13 @@ export function createBuildController({
       if (hitAxisKey) {
         const [hwx, hwy, hwz] = cellToWorld(cell.x, cell.y, cell.z);
         const hitLocalPoint = [hit.point.x - hwx, hit.point.y - hwy, hit.point.z - hwz];
+        const hitLocalNormal = hit.face ? [hit.face.normal.x, hit.face.normal.y, hit.face.normal.z] : null;
         const missingAxisKeys = PYRAMID_AXES.filter((k) => !hasPyramid(effectivePyramids(cell), k));
         const resolved = resolvePyramidClickOnExisting({
           hostCell: [cell.x, cell.y, cell.z],
           hitAxisKey,
           missingAxisKeys,
+          localNormal: hitLocalNormal,
           localPoint: hitLocalPoint,
           pieces: pyramidPieces(),
         });

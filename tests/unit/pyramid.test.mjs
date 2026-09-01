@@ -97,3 +97,57 @@ test('resolvePyramidClickOnExisting: once a 2nd pyramid is present (4 missing), 
   assert.equal(resolved.type, 'fill');
   assert.equal(resolved.axisKey, 'y-');
 });
+
+// --- Real regression, direct report 2026-09-01 ("placing pyramids is
+// still too difficult, impossible even ... used to be placeable by
+// tapping surface you want to attach to", inconsistent outcomes
+// depending on exact click position): resolvePyramidClickOnExisting's
+// OWN flat distance-race (missing-sibling candidates competing against
+// bond candidates) is now replaced with region classification -- these
+// tests ground that against real pyramidPieces() geometry, not
+// constructed numbers.
+
+test('classifyPyramidHitRegion (via resolvePyramidClickOnExisting): a click on z+\'s own exposed flat BASE, using its real face normal, resolves to flatToFlat -- not a distance race', () => {
+  const { base } = pieces.pyramids['z+'];
+  const baseCenter = [0, 1, 2].map((i) => base.reduce((sum, c) => sum + c[i], 0) / base.length);
+  const resolved = resolvePyramidClickOnExisting({
+    hostCell: [0, 0, 0],
+    hitAxisKey: 'z+',
+    missingAxisKeys: PYRAMID_AXES.filter((k) => k !== 'z+'), // lone pyramid, 5 missing
+    localNormal: [0, 0, -1], // the base's real outward normal -- opposite of z+'s own axis
+    localPoint: baseCenter,
+    pieces,
+  });
+  assert.equal(resolved.type, 'flatToFlat');
+});
+
+test('classifyPyramidHitRegion: a click near a shared BASE CORNER (the exact region the old flat-distance-race bug misfired on) still resolves to sibling-fill, not an unrelated bond/fill target', () => {
+  // A real cube corner shared between z+'s base and 2 other (missing)
+  // axes' own bases -- the previous version's flat race across ALL
+  // missing siblings' apexes could misfire here since real distances
+  // get close; region classification only ever compares against z+'s
+  // OWN apex/base-edge-midpoint, so it can't be pulled off by a
+  // same-cell sibling's own apex being coincidentally closer.
+  const cubeCorner = pieces.cube.find(([x, y, z]) => x > 0 && y > 0 && z > 0);
+  const resolved = resolvePyramidClickOnExisting({
+    hostCell: [0, 0, 0],
+    hitAxisKey: 'z+',
+    missingAxisKeys: PYRAMID_AXES.filter((k) => k !== 'z+'),
+    localNormal: null, // a genuine side-face hit, not the flat base
+    localPoint: cubeCorner,
+    pieces,
+  });
+  assert.equal(resolved.type, 'fill', `expected a sibling fill at a shared base corner, got ${resolved.type}`);
+});
+
+test('classifyPyramidHitRegion: a click near z+\'s own apex (side face, tip end) resolves to pointToPoint, independent of any other axis\'s geometry', () => {
+  const resolved = resolvePyramidClickOnExisting({
+    hostCell: [0, 0, 0],
+    hitAxisKey: 'z+',
+    missingAxisKeys: PYRAMID_AXES.filter((k) => k !== 'z+'),
+    localNormal: null,
+    localPoint: pieces.pyramids['z+'].apex,
+    pieces,
+  });
+  assert.equal(resolved.type, 'pointToPoint');
+});
