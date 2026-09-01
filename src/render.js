@@ -1155,49 +1155,53 @@ function buildSphericalGeometry({ mode, R, n }) {
 // superellipsoid formula at n=2, so this stays within "sphere or
 // superellipsoid," per direct instruction.
 //
-// Direct override #2, further live-build feedback the same session
-// (DICTO: "RD slightly too small" / "cube and cube-octahedron slightly
-// too big"): confirms a systematic pattern, not a one-off -- every
-// uniform ("plain sphere") shape here is a faceted, pointy lattice-
-// tiling solid whose real VERTICES reach much farther than its own
-// face-plane distance (the smallest possible measure of "how big is
-// this shape", by definition -- that's exactly why R was reading small
-// across the board). Switched RD/Octahedron(gap)/Cube from face-plane
-// R to a volume-matched R instead (still just `{mode:'sphere', R}`, not
-// a new render mode -- see spherical-toggle.js's own volumeMatchedRadius,
-// exported precisely for this: sizing a sphere by real volume rather
-// than by its tightest inscribed measure). Real volumes, each grounded
-// in this repo's own actual decomposition, not re-derived from scratch:
-// RD = cube(scale^3) + 6 pyramids(scale^3/6 each) = 2*scale^3 (RD's
-// real cube+6-pyramid decomposition, RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md
-// section 2 / pyramidPieces); Octahedron(gap) = standard regular-
-// octahedron-from-vertex-radius formula (4/3)*r^3 at r=0.5*scale =
-// scale^3/6; Cube = scale^3 (edge=scale) trivially. Cuboctahedron's
-// superellipsoid is UNCHANGED here -- by the same "real vertices reach
-// past face distance" analysis, its own vertices (the actual FCC
-// NEIGHBOR_OFFSETS directions) reach 0.7071*scale, well past its
-// superellipsoid's own global-max reach (0.5774*scale, exactly its real
-// diagonal-face distance, by construction) -- if anything it's already
-// undersized in absolute terms, so "too big" here most likely reads as
-// a RELATIVE effect against RD's now-corrected undersized sphere, not
-// an absolute CO sizing bug. Left as-is pending confirmation once RD's
-// fix lands; Disphenoid also intentionally left at face-plane R for now
-// (its own volume-matched R would be a much larger, ~54% jump -- a very
-// elongated shape, no real feedback yet that it specifically reads
-// wrong, and that big a jump risks visible clipping through its own
-// real faces rather than fixing anything).
+// Direct override #2, further live-build feedback the same session:
+// DICTO's own governing rule, given directly after two more rounds of
+// live testing -- "Lots of sides fill up shape, fewer sides come out at
+// edges slightly." A real, coherent design principle, not per-shape
+// guesswork: a many-faced shape (already close to sphere-like) gets
+// sized to genuinely fill its own bulk (volume-matched R); a few-faced,
+// pointier shape keeps its corners visibly poking out a bit past the
+// sphere (face-plane R -- which, for ANY convex shape, is by
+// construction always less than its own vertex distance, so corners
+// poking out "slightly" is exactly what face-plane R already gives for
+// free, no separate formula needed).
+//   Many faces -> volume-matched: RD (12), Cuboctahedron (14),
+//     Truncated Octahedron (14).
+//   Few faces -> face-plane distance: Cube (6), Octahedron (8),
+//     Disphenoid (4, see the toggle handler's own disphenoidR).
+// RD's volume-matched R was explicitly confirmed correct ("see RD now
+// for guideline match with shape") -- the reference every other
+// many-faced shape here now follows. Cuboctahedron's superellipsoid is
+// dropped entirely per direct instruction ("revert to sphere") --
+// distorted/uneven bulging (full R only exactly on the diagonal ray,
+// well short of it everywhere else) is what was actually reading wrong,
+// not just raw size; a uniform sphere at the same volume-matched
+// principle as RD fixes both. Truncated Octahedron moves from its
+// axis-face-distance (scale) to volume-matched (~0.98*scale) under this
+// same rule; direct feedback said even the axis-distance sphere still
+// read "definitely too small," so if it still doesn't look full enough
+// under the general rule, that's a real, separate signal to size it
+// individually rather than mechanically deriving it from volume alone.
+// Real volumes, each grounded in this repo's own actual geometry, not
+// re-derived from scratch: RD = cube(scale^3) + 6 pyramids(scale^3/6
+// each) = 2*scale^3 (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md section 2 /
+// pyramidPieces); Octahedron(gap) = (4/3)*r^3 at r=0.5*scale =
+// scale^3/6; Cube = scale^3 trivially; Cuboctahedron = (5/6)*scale^3
+// (octGapVertices' own header comment: "0.833s^3 + 0.167s^3 = 1.0s^3"
+// -- CO + its gap-octahedron exactly fill one unit cell); Truncated
+// Octahedron = 4*scale^3 (edge a=scale/sqrt(2) at this repo's own
+// bccShapeScaleFor(scale) normalization, V=8*sqrt(2)*a^3). Sanity check
+// against the explicit "cube and cube-octahedron should be closer in
+// size than cube and RD" ordering constraint: |cube-CO| = |0.5-0.584| =
+// 0.084*scale, |cube-RD| = |0.5-0.782| = 0.282*scale -- holds.
 function sphericalClassificationFor(scale) {
   return {
     rd: { mode: 'sphere', R: volumeMatchedRadius(2 * scale ** 3) },
-    octahedron: { mode: 'sphere', R: volumeMatchedRadius(scale ** 3 / 6) },
-    cube: { mode: 'sphere', R: volumeMatchedRadius(scale ** 3) },
-    cuboctahedron: classifyShape({
-      faceDistances: [
-        { distance: 0.5 * scale, family: 'axis' },
-        { distance: (0.5 * scale) * (2 / Math.sqrt(3)), family: 'diagonal' },
-      ],
-    }),
-    truncatedOctahedron: { mode: 'sphere', R: scale },
+    octahedron: classifyShape({ faceDistances: [{ distance: (0.5 * scale) / Math.sqrt(3) }] }),
+    cube: classifyShape({ faceDistances: [{ distance: 0.5 * scale }] }),
+    cuboctahedron: { mode: 'sphere', R: volumeMatchedRadius((5 / 6) * scale ** 3) },
+    truncatedOctahedron: { mode: 'sphere', R: volumeMatchedRadius(4 * scale ** 3) },
   };
 }
 
@@ -2493,22 +2497,20 @@ async function init() {
   // Spherical Toggle (docs/RHOMBIVERSE_SPEC_ADDENDUM_SPHERICAL_TOGGLE.md),
   // Stage 1 -- a client-side view swap only, same spirit as Duality above
   // (your cells are untouched). Covers every real placeable piece type
-  // except Cube (Pyramid Sub-Cell -- a per-cell, often-irregular partial
-  // shape, no clean single spherical mapping, still open) and Section 4's
-  // disphenoid-ring-to-torus grouping (out of scope by direct
-  // instruction -- disphenoids still convert individually below, just
-  // never merged into a torus). RD/Octahedron/Truncated Octahedron/
-  // Disphenoid all render as plain spheres; Cuboctahedron as a
-  // superellipsoid -- kept strictly to "sphere or superellipsoid" per
-  // direct instruction, no third volumeSphere render mode (that's not a
-  // different shape anyway, just a different radius choice for a
-  // sphere -- see sphericalClassificationFor's own header for why
-  // Truncated Octahedron ended up sphere instead of superellipsoid).
-  // For the 4 InstancedMesh piece families (RD/Octahedron/Cuboctahedron/
-  // Truncated Octahedron), every instance already shares one
-  // BufferGeometry, so toggling the view is just swapping which geometry
-  // object each mesh points at. Disphenoid is different (own Mesh per
-  // cell, no InstancedMesh) -- handled separately below.
+  // except Section 4's disphenoid-ring-to-torus grouping (out of scope by
+  // direct instruction -- disphenoids still convert individually below,
+  // just never merged into a torus). EVERY shape renders as a plain
+  // sphere now -- no superellipsoid in active use ("revert to sphere",
+  // direct instruction) and no third volumeSphere render mode either
+  // (that's not a different shape anyway, just a different radius choice
+  // for a sphere). See sphericalClassificationFor's own header for the
+  // real governing rule behind each shape's radius (many faces ->
+  // volume-matched, few faces -> face-plane distance). For the 4
+  // InstancedMesh piece families (RD/Octahedron/Cuboctahedron/Truncated
+  // Octahedron), every instance already shares one BufferGeometry, so
+  // toggling the view is just swapping which geometry object each mesh
+  // points at. Disphenoid and Cube are different (own Mesh per cell, no
+  // InstancedMesh) -- handled separately below.
   // Deliberately NOT applied to sculptureMesh (own separate concern) or
   // the Lattice Zoom sub-lattice/aggregate-speckle meshes (also reuse
   // `geometry`/buildRDGeometry at other scales) -- out of scope for this
@@ -2614,7 +2616,7 @@ async function init() {
     applySphericalToDisphenoids(sphericalModeActive);
     applySphericalToCubes(sphericalModeActive);
     showHudPrompt(sphericalModeActive
-      ? 'Spherical: RD/Octahedron/Truncated Octahedron/Cube/Disphenoid shown as true spheres, Cuboctahedron shown as a superellipsoid -- a client-side view only, your cells are untouched.'
+      ? 'Spherical: every real placeable shape shown as a true sphere -- a client-side view only, your cells are untouched.'
       : 'Spherical: off.', 5000);
   });
 
