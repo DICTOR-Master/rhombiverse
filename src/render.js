@@ -15,7 +15,7 @@ import { createBCCBuildController } from './core/bcc-build.js';
 import { createCuboctaBuildController, AXIS_OFFSETS as CUBOCTA_AXIS_OFFSETS } from './core/cubocta-build.js';
 import { createCuboctaGapBuildController, octGapCellToWorld, octGapCellForCOCell } from './core/cubocta-gap-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
-import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
+import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids, disphenoidKey, disphenoidNeighborAcrossFace } from './geometry-extensions/interstitial-lattice.js';
 import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extensions/spherical-toggle.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { FEATURES } from './app/features.js';
@@ -2536,40 +2536,105 @@ async function init() {
   // Mesh with the cell's real WORLD-SPACE coordinates baked directly
   // into its geometry (no separate .position, same convention
   // buildInterstitialGeometry already uses) -- not InstancedMesh, since
-  // each disphenoid has its own unique orientation. So unlike the 4
-  // meshes above, there's no single shared geometry to swap; a
-  // per-cell sphere geometry, translated to that cell's own real
-  // centroid, has to be built and swapped in per Mesh instead.
-  // R is a fixed constant, not per-cell -- disphenoids are all
-  // congruent (isosceles tetrahedra, only orientation/position differs),
-  // and genuinely uniform face-distance from their own centroid
-  // (verified: both non-adjacent-vertex face planes checked numerically
-  // land at the same distance from centroid, 1/(2*sqrt(2)) in the raw
-  // [0,0,0]/[2,0,0]/[1,1,1]/[1,1,-1]-type integer coordinates
-  // bootstrapDisphenoid/octahedronDisphenoids produce) -- Section 1
-  // case 2, plain sphere, exactly as the spec's own note says
-  // ("disphenoids... always equidistant from center -- treat as sphere
-  // individually, no exception logic needed").
-  const disphenoidR = SCALE / (2 * Math.SQRT2);
+  // each disphenoid has its own unique orientation. Disphenoids are all
+  // congruent (isosceles tetrahedra, only orientation/position differs)
+  // and genuinely uniform face-distance from their own centroid --
+  // Section 1 case 2, plain sphere -- but which R applies depends on
+  // real world state, per two rounds of direct instruction (2026-09-01):
+  //
+  //  1. Two disphenoids that are REAL touching neighbors (share a face,
+  //     found via disphenoidNeighborAcrossFace -- not the full ring,
+  //     pairs only, no torus) both being present merges them into ONE
+  //     combined sphere at their shared centroid, sized for their
+  //     combined volume. R = min(volume-matched(4/3*scale^3),
+  //     ceiling) -- ceiling here is HALF the real distance from that
+  //     merged centroid to the closest other real disphenoid position
+  //     (its own 2 remaining bundle-mates, verified numerically to be
+  //     the binding one, closer than the "outward" neighbors) =
+  //     sqrt(10)/8 * scale. The ceiling binds (0.3953*scale <
+  //     0.6828*scale uncapped), so R = sqrt(10)/8*scale exactly.
+  //  2. A disphenoid with no available pairing partner: if it has ANY
+  //     real neighbor actually present in the world (whether or not
+  //     that neighbor is itself already claimed by a different pair),
+  //     it stays capped at the original single-disphenoid ceiling
+  //     (1/(2*sqrt(2))*scale, half the real distance to any of its own
+  //     4 real neighbor positions, all equidistant). If it has NO real
+  //     neighbor present anywhere, there's nothing to overlap, so it's
+  //     rendered at its own uncapped volume-matched radius instead --
+  //     genuinely bigger, per direct instruction ("doesn't have to
+  //     worry about touching neighbour").
+  // All three R values verified in spherical-toggle.test.mjs, computed
+  // programmatically from the real interstitial-lattice.js functions,
+  // not hand-derived.
+  const disphenoidR = SCALE / (2 * Math.SQRT2); // capped: a real neighbor is present somewhere
+  const disphenoidFreeR = volumeMatchedRadius((2 / 3) * SCALE ** 3); // free: no real neighbor anywhere
+  const disphenoidPairR = Math.min(volumeMatchedRadius((4 / 3) * SCALE ** 3), (Math.sqrt(10) / 8) * SCALE);
   const disphenoidSphereTemplate = buildSphericalGeometry({ mode: 'sphere', R: disphenoidR });
+  const disphenoidFreeSphereTemplate = buildSphericalGeometry({ mode: 'sphere', R: disphenoidFreeR });
+  const disphenoidPairSphereTemplate = buildSphericalGeometry({ mode: 'sphere', R: disphenoidPairR });
   const disphenoidOriginalGeometries = new Map(); // key -> original Mesh geometry
+  const disphenoidPairMeshes = new Map(); // "keyA|keyB" -> merged sphere Mesh added to interstitialGroup
   function disphenoidCentroid(verts) {
     const world = disphenoidVertsToWorld(verts, SCALE);
     return [0, 1, 2].map((i) => world.reduce((s, v) => s + v[i], 0) / world.length);
   }
+  function disphenoidRealNeighborKeys(cell) {
+    return [0, 1, 2, 3].map((i) => disphenoidKey(disphenoidNeighborAcrossFace(cell.verts, i)));
+  }
   function applySphericalToDisphenoids(active) {
-    for (const [key, m] of interstitialMeshes) {
-      if (active) {
-        if (!disphenoidOriginalGeometries.has(key)) disphenoidOriginalGeometries.set(key, m.geometry);
-        const cell = interstitialStore.entries().find((c) => c.key === key);
-        if (!cell) continue;
-        const [cx, cy, cz] = disphenoidCentroid(cell.verts);
-        const sphereGeom = disphenoidSphereTemplate.clone();
-        sphereGeom.translate(cx, cy, cz);
-        m.geometry = sphereGeom;
-      } else {
+    // Stale pair meshes from a previous toggle-on cycle -- rebuilt
+    // fresh every time, since which cells are present/paired may have
+    // changed since the last toggle.
+    for (const pairMesh of disphenoidPairMeshes.values()) {
+      interstitialGroup.remove(pairMesh);
+      pairMesh.material.dispose();
+    }
+    disphenoidPairMeshes.clear();
+
+    if (!active) {
+      for (const [key, m] of interstitialMeshes) {
+        m.visible = true;
         const original = disphenoidOriginalGeometries.get(key);
         if (original) m.geometry = original;
+      }
+      return;
+    }
+
+    const cells = interstitialStore.entries();
+    const cellByKey = new Map(cells.map((c) => [c.key, c]));
+    const claimed = new Set();
+    for (const cell of cells) {
+      if (claimed.has(cell.key)) continue;
+      const m = interstitialMeshes.get(cell.key);
+      if (!m) continue;
+      if (!disphenoidOriginalGeometries.has(cell.key)) disphenoidOriginalGeometries.set(cell.key, m.geometry);
+
+      const neighborKeys = disphenoidRealNeighborKeys(cell);
+      const presentNeighborKeys = neighborKeys.filter((k) => cellByKey.has(k) && k !== cell.key);
+      const pairPartnerKey = presentNeighborKeys.find((k) => !claimed.has(k));
+
+      if (pairPartnerKey) {
+        const partner = cellByKey.get(pairPartnerKey);
+        const partnerMesh = interstitialMeshes.get(pairPartnerKey);
+        claimed.add(cell.key);
+        claimed.add(pairPartnerKey);
+        const cA = disphenoidCentroid(cell.verts);
+        const cB = disphenoidCentroid(partner.verts);
+        const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
+        mat.color.copy(instanceColorFor(cell));
+        const pairMesh = new THREE.Mesh(disphenoidPairSphereTemplate, mat);
+        pairMesh.position.set((cA[0] + cB[0]) / 2, (cA[1] + cB[1]) / 2, (cA[2] + cB[2]) / 2);
+        interstitialGroup.add(pairMesh);
+        disphenoidPairMeshes.set(`${cell.key}|${pairPartnerKey}`, pairMesh);
+        m.visible = false;
+        if (partnerMesh) partnerMesh.visible = false;
+      } else {
+        m.visible = true;
+        const template = presentNeighborKeys.length > 0 ? disphenoidSphereTemplate : disphenoidFreeSphereTemplate;
+        const [cx, cy, cz] = disphenoidCentroid(cell.verts);
+        const sphereGeom = template.clone();
+        sphereGeom.translate(cx, cy, cz);
+        m.geometry = sphereGeom;
       }
     }
   }

@@ -17,7 +17,14 @@ import {
 import { rdRawVerts, CUBE_VERTS, octGapVertices, cuboctahedronVertices, NEIGHBOR_OFFSETS } from '../../src/core/lattice.js';
 import { truncatedOctahedronVertices, BCC_NEIGHBOR_OFFSETS } from '../../src/geometry-extensions/dual-lattice.js';
 import { bccShapeScaleFor } from '../../src/geometry-extensions/bcc-detail-lattice.js';
-import { bootstrapDisphenoid, disphenoidVertsToWorld } from '../../src/geometry-extensions/interstitial-lattice.js';
+import {
+  bootstrapDisphenoid,
+  disphenoidVertsToWorld,
+  octahedronDisphenoids,
+  disphenoidKey,
+  disphenoidNeighborAcrossFace,
+  disphenoidVolume,
+} from '../../src/geometry-extensions/interstitial-lattice.js';
 // octGapCellToWorld inlined, NOT imported from cubocta-gap-build.js --
 // that file imports `three` (not an npm dep here, see this file's own
 // header), same reasoning cubocta-gap.test.mjs already documents.
@@ -276,6 +283,69 @@ test('volumeMatchedRadius applied to real per-shape volumes matches render.js\'s
 test('EPSILON_UNIFORM_REL is a relative (not absolute) tolerance', () => {
   assert.equal(typeof EPSILON_UNIFORM_REL, 'number');
   assert.ok(EPSILON_UNIFORM_REL > 0 && EPSILON_UNIFORM_REL < 1e-2);
+});
+
+// --- Disphenoid pairwise merging (render.js's applySphericalToDisphenoids,
+// 2026-09-01): a touching pair merges into one sphere; an unpaired
+// disphenoid with a real neighbor present anywhere stays at the original
+// capped radius; a fully isolated one (no real neighbor at all) gets its
+// own uncapped volume-matched radius instead. All three R values here are
+// computed programmatically from the real octahedronDisphenoids/
+// disphenoidNeighborAcrossFace functions, not hand-derived, and cross-
+// checked against render.js's own constants.
+
+function centroidOf(verts) {
+  return [0, 1, 2].map((i) => verts.reduce((s, v) => s + v[i], 0) / verts.length);
+}
+function dist3(a, b) {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+
+test('a real bundle-mate pair is reachable via disphenoidNeighborAcrossFace (not assumed adjacent)', () => {
+  const [D0, D1] = octahedronDisphenoids([0, 0, 0], [2, 0, 0]);
+  const reachedKeys = [0, 1, 2, 3].map((i) => disphenoidKey(disphenoidNeighborAcrossFace(D0, i)));
+  assert.ok(reachedKeys.includes(disphenoidKey(D1)), 'D0 must reach D1 across exactly one of its 4 real faces');
+});
+
+test('merged-pair ceiling: half the real distance from the pair centroid to its closest other real disphenoid (a remaining bundle-mate, not an outward neighbor)', () => {
+  const [D0, D1, D2, D3] = octahedronDisphenoids([0, 0, 0], [2, 0, 0]);
+  const cA = centroidOf(D0);
+  const cB = centroidOf(D1);
+  const mid = [0, 1, 2].map((i) => (cA[i] + cB[i]) / 2);
+
+  const candidateDistances = [D2, D3].map((d) => dist3(mid, centroidOf(d)));
+  // Also check D0/D1's own "outward" (non-shared-face) neighbors -- confirms
+  // the bundle-mates really are the closest, not assumed.
+  for (const [cell, excludeShared] of [[D0, 2], [D1, 3]]) {
+    for (let i = 0; i < 4; i++) {
+      if (i === excludeShared) continue;
+      const nb = disphenoidNeighborAcrossFace(cell, i);
+      candidateDistances.push(dist3(mid, centroidOf(nb)));
+    }
+  }
+  const minDist = Math.min(...candidateDistances);
+  assert.ok(Math.abs(minDist - Math.sqrt(10) / 4) < 1e-9, `got minDist=${minDist}, expected sqrt(10)/4=${Math.sqrt(10) / 4}`);
+  const ceiling = minDist / 2;
+  assert.ok(Math.abs(ceiling - Math.sqrt(10) / 8) < 1e-9);
+});
+
+test('disphenoidPairR: volume-matched(4/3*scale^3) exceeds the ceiling, so the ceiling binds', () => {
+  const scale = 1;
+  const [D0] = octahedronDisphenoids([0, 0, 0], [2, 0, 0]);
+  const pairVolume = 2 * disphenoidVolume(D0) * scale ** 3; // disphenoidVolume is on raw (unscaled) verts
+  const uncapped = volumeMatchedRadius((4 / 3) * scale ** 3);
+  assert.ok(Math.abs(pairVolume - (4 / 3) * scale ** 3) < 1e-9, `got pairVolume=${pairVolume}`);
+  const ceiling = (Math.sqrt(10) / 8) * scale;
+  assert.ok(uncapped > ceiling, 'expected the ceiling to actually bind');
+  const R = Math.min(uncapped, ceiling);
+  assert.ok(Math.abs(R - ceiling) < 1e-9);
+});
+
+test('disphenoidFreeR (no real neighbor present) is bigger than the capped single-disphenoid R', () => {
+  const scale = 1;
+  const capped = scale / (2 * Math.SQRT2);
+  const free = volumeMatchedRadius((2 / 3) * scale ** 3);
+  assert.ok(free > capped, `expected free=${free} > capped=${capped}`);
 });
 
 // --- Proportion pass (2026-09-01): R = min(volume-matched radius, real

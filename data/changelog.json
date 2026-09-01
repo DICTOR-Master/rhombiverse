@@ -4,7 +4,8 @@
     "title": "See It Round: Spherical Toggle",
     "items": [
       "New view toggle on the corner HUD wheel: render your whole build in a simplified, near-spherical form -- every real piece (RD, Cube, Octahedron, Cuboctahedron, Truncated Octahedron, Disphenoid, and every Pyramid combination in between) shown as a sphere, sized by its own real volume but never bigger than the exact distance to its nearest same-type neighbor, so nothing overlaps no matter how densely you've built. A client-side view only -- your actual cells are completely untouched, flip it off any time.",
-      "A lone Pyramid or a cube with only some of its 6 pyramids on gets sized the same principled way -- 6 pyramids with no cube lands at exactly Cube's own size (they're the same real volume), and the full 12-pyramid build lands at exactly RD's."
+      "A lone Pyramid or a cube with only some of its 6 pyramids on gets sized the same principled way -- 6 pyramids with no cube lands at exactly Cube's own size (they're the same real volume), and the full 12-pyramid build lands at exactly RD's.",
+      "Two Disphenoids that actually touch (real neighbors, not just any two) now merge into a single bigger sphere sized for their combined volume, instead of rendering as two small separate ones. A Disphenoid with no real neighbor placed nearby at all also renders bigger than one that does -- nothing there to overlap, so no need to hold back."
     ]
   },
   {
