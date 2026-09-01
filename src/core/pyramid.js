@@ -106,11 +106,36 @@ export function nearestPyramidAxis(localPoint, candidateAxisKeys, pieces) {
 // already converted to the cell's own local (untranslated) frame by the
 // caller -- this module has no THREE dependency, so it only ever sees
 // plain [x,y,z] arrays.
-export function resolvePyramidAxisForHit({ localNormal, localPoint, neighborOffset, pieces }) {
+//
+// Real regression, direct report 2026-09-01 ("pyramids still dont like
+// filling in last inverted cap" -- a fill click near the one remaining
+// downward gap kept placing a stray pyramid elsewhere instead): a click
+// that lands on a DIAGONAL rhombic side face -- an EXISTING pyramid's
+// own slant, not the still-open flat cube face itself -- falls through
+// to the `direct` check returning null (a slanted face is never
+// axis-aligned), landing in the neighborOffset fallback below. That
+// fallback maps the clicked face to exactly 2 candidate axes that could
+// jointly own a rhombic face at that orientation, then used to pick
+// whichever's own apex was closer to the click point -- but the
+// clicked pyramid's OWN apex is always closer than a missing sibling's,
+// since the click physically landed on that pyramid's own geometry.
+// The exact same flaw 72568ca already fixed for the separate tagged-
+// mesh click path (resolvePyramidClickOnExisting), just never applied
+// here. Real fix: of the 2 candidates, a diagonal rhombic face can only
+// ever be clickable where at least one of its 2 owning pyramids is
+// actually present (if neither were, there'd be no slanted geometry
+// there to click) -- so if exactly one candidate is still genuinely
+// missing on this cell, that's deterministically the intended target,
+// no distance comparison needed at all.
+export function resolvePyramidAxisForHit({ localNormal, localPoint, neighborOffset, missingAxisKeys, pieces }) {
   const direct = pyramidAxisForNormal(localNormal);
   if (direct) return direct;
   if (!neighborOffset) return null;
   const candidates = candidateAxesForNeighborOffset(neighborOffset);
+  if (missingAxisKeys) {
+    const stillMissing = candidates.filter((k) => missingAxisKeys.includes(k));
+    if (stillMissing.length === 1) return stillMissing[0];
+  }
   return nearestPyramidAxis(localPoint, candidates, pieces);
 }
 

@@ -224,13 +224,19 @@ export function createBuildController({
   // Which of the clicked cell's own 6 pyramids a hit landed on -- shared
   // by both the 'pyramid' piece-tier Add and Remove branches below. See
   // core/pyramid.md for the full derivation.
-  function resolveClickedPyramidAxis(hit, cell) {
+  // preferMissing: ONLY for Add -- Remove (both call sites below) must
+  // never prefer a missing axis, since that would try to remove a
+  // pyramid that isn't there and silently no-op instead of removing the
+  // one actually clicked. See resolvePyramidAxisForHit's own header for
+  // why this distinction exists at all.
+  function resolveClickedPyramidAxis(hit, cell, { preferMissing = false } = {}) {
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z);
     const n = hit.face.normal;
     return resolvePyramidAxisForHit({
       localNormal: [n.x, n.y, n.z],
       localPoint: [hit.point.x - wx, hit.point.y - wy, hit.point.z - wz],
       neighborOffset: matchNeighborOffset(n),
+      missingAxisKeys: preferMissing ? PYRAMID_AXES.filter((k) => !hasPyramid(effectivePyramids(cell), k)) : undefined,
       pieces: pyramidPieces(),
     });
   }
@@ -586,7 +592,7 @@ export function createBuildController({
           return;
         }
       }
-      const axisKey = resolveClickedPyramidAxis(hit, cell);
+      const axisKey = resolveClickedPyramidAxis(hit, cell, { preferMissing: true });
       if (!axisKey) { if (onPieceNoOp) onPieceNoOp('add'); return; }
       const result = applyPyramidEdit(world, 'add', cell.x, cell.y, cell.z, axisKey);
       // No-op: that pyramid's already there -- true of every freshly
