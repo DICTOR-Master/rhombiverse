@@ -16,7 +16,7 @@ import { createCuboctaBuildController, AXIS_OFFSETS as CUBOCTA_AXIS_OFFSETS } fr
 import { createCuboctaGapBuildController, octGapCellToWorld, octGapCellForCOCell } from './core/cubocta-gap-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
 import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
-import { classifyShape, sampleSuperellipsoidGrid } from './geometry-extensions/spherical-toggle.js';
+import { classifyShape, sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extensions/spherical-toggle.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { FEATURES } from './app/features.js';
 import {
@@ -1132,34 +1132,65 @@ function buildSphericalGeometry({ mode, R, n }) {
 // grounded directly in the same vertex generators buildRDGeometry/
 // buildCuboctaGeometry/buildOctGapGeometry/buildBCCGeometry already use
 // above, not re-derived by hand (see tests/unit/spherical-toggle.test.mjs
-// for the numeric cross-check against those same generators). Covers the
-// 4 real InstancedMesh piece families this stage wires the toggle to --
-// RD and Octahedron(gap) are uniform (Section 1 case 2, "plain sphere");
+// for the numeric cross-check against those same generators). RD/
+// Octahedron(gap)/Cube are uniform (Section 1 case 2, "plain sphere");
 // Cuboctahedron is the axis/body-diagonal two-family case (Section 1
-// case 3, superellipsoid). The Cube piece (Pyramid Sub-Cell, a
-// per-cell-mesh system, not InstancedMesh) and Disphenoid/ring-to-torus
-// (Section 4) are out of scope for this stage -- see that module's own
-// header comment.
+// case 3, superellipsoid). Disphenoid/ring-to-torus (Section 4) is out
+// of scope for this stage -- see that module's own header comment.
 //
-// Direct override, real live-build feedback (2026-09-01, DICTO: "spheres
-// obviously too small" -- and to stay strictly sphere-or-superellipsoid,
-// no volumeSphere third category): Truncated Octahedron's solved n is
-// ~1.585 (n<2, since its axis/square faces sit farther out than its
-// diagonal/hex faces). Below n=2 the coordinate-axis points are the
-// GLOBAL maximum of the surface -- the superellipsoid never exceeds R
-// in any direction and pinches down to 0.866*R everywhere off-axis
-// (down to the hex-face direction), reading as visibly undersized next
-// to Cuboctahedron's own superellipsoid (n~2.71, which bulges OUTWARD
-// past R instead of pinching in). Rendered as a plain sphere instead,
-// same R (still the real axis/square-face touching distance, so it
-// still meets axis-neighbors correctly) -- uniformly full in every
-// direction rather than pinching, which is what was reading as too
-// small. A sphere is just this same superellipsoid formula at n=2, so
-// this stays within "sphere or superellipsoid," per direct instruction.
+// Direct override #1, real live-build feedback (2026-09-01, DICTO:
+// "spheres obviously too small" -- and to stay strictly
+// sphere-or-superellipsoid, no volumeSphere third category): Truncated
+// Octahedron's solved n is ~1.585 (n<2, since its axis/square faces sit
+// farther out than its diagonal/hex faces). Below n=2 the
+// coordinate-axis points are the GLOBAL maximum of the surface -- the
+// superellipsoid never exceeds R in any direction and pinches down to
+// 0.866*R everywhere off-axis (down to the hex-face direction), reading
+// as visibly undersized next to Cuboctahedron's own superellipsoid
+// (n~2.71, which bulges OUTWARD past R instead of pinching in).
+// Rendered as a plain sphere instead, same R (still the real
+// axis/square-face touching distance, so it still meets axis-neighbors
+// correctly) -- uniformly full in every direction rather than pinching,
+// which is what was reading as too small. A sphere is just this same
+// superellipsoid formula at n=2, so this stays within "sphere or
+// superellipsoid," per direct instruction.
+//
+// Direct override #2, further live-build feedback the same session
+// (DICTO: "RD slightly too small" / "cube and cube-octahedron slightly
+// too big"): confirms a systematic pattern, not a one-off -- every
+// uniform ("plain sphere") shape here is a faceted, pointy lattice-
+// tiling solid whose real VERTICES reach much farther than its own
+// face-plane distance (the smallest possible measure of "how big is
+// this shape", by definition -- that's exactly why R was reading small
+// across the board). Switched RD/Octahedron(gap)/Cube from face-plane
+// R to a volume-matched R instead (still just `{mode:'sphere', R}`, not
+// a new render mode -- see spherical-toggle.js's own volumeMatchedRadius,
+// exported precisely for this: sizing a sphere by real volume rather
+// than by its tightest inscribed measure). Real volumes, each grounded
+// in this repo's own actual decomposition, not re-derived from scratch:
+// RD = cube(scale^3) + 6 pyramids(scale^3/6 each) = 2*scale^3 (RD's
+// real cube+6-pyramid decomposition, RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md
+// section 2 / pyramidPieces); Octahedron(gap) = standard regular-
+// octahedron-from-vertex-radius formula (4/3)*r^3 at r=0.5*scale =
+// scale^3/6; Cube = scale^3 (edge=scale) trivially. Cuboctahedron's
+// superellipsoid is UNCHANGED here -- by the same "real vertices reach
+// past face distance" analysis, its own vertices (the actual FCC
+// NEIGHBOR_OFFSETS directions) reach 0.7071*scale, well past its
+// superellipsoid's own global-max reach (0.5774*scale, exactly its real
+// diagonal-face distance, by construction) -- if anything it's already
+// undersized in absolute terms, so "too big" here most likely reads as
+// a RELATIVE effect against RD's now-corrected undersized sphere, not
+// an absolute CO sizing bug. Left as-is pending confirmation once RD's
+// fix lands; Disphenoid also intentionally left at face-plane R for now
+// (its own volume-matched R would be a much larger, ~54% jump -- a very
+// elongated shape, no real feedback yet that it specifically reads
+// wrong, and that big a jump risks visible clipping through its own
+// real faces rather than fixing anything).
 function sphericalClassificationFor(scale) {
   return {
-    rd: classifyShape({ faceDistances: [{ distance: scale / Math.SQRT2 }] }),
-    octahedron: classifyShape({ faceDistances: [{ distance: (0.5 * scale) / Math.sqrt(3) }] }),
+    rd: { mode: 'sphere', R: volumeMatchedRadius(2 * scale ** 3) },
+    octahedron: { mode: 'sphere', R: volumeMatchedRadius(scale ** 3 / 6) },
+    cube: { mode: 'sphere', R: volumeMatchedRadius(scale ** 3) },
     cuboctahedron: classifyShape({
       faceDistances: [
         { distance: 0.5 * scale, family: 'axis' },
@@ -2542,6 +2573,36 @@ async function init() {
     }
   }
 
+  // Cube piece (Pyramid Sub-Cell, `partialCellMeshes` -- see core/
+  // pyramid.md): rendered per-cell, not InstancedMesh, but unlike
+  // Disphenoid above each of these DOES use a real object3D.position
+  // (buildPartialCellObject3D), so a single shared sphere geometry can
+  // be swapped in directly, same as the 4 InstancedMesh families.
+  // Only converts a cell that's a PURE cube (hasCube && zero pyramids
+  // present) -- any cube+pyramid-subset mix, or a cube-less
+  // pyramid-only cell (a THREE.Group of individual pyramid Meshes, not
+  // a single Mesh), is a genuinely irregular shape with no clean
+  // sphere/superellipsoid mapping, so those stay as their real shape,
+  // matching this stage's stance on Disphenoid-ring/other irregular
+  // cases -- not silently forced into an inaccurate round shape.
+  const cubeSphereGeometry = buildSphericalGeometry(sphericalShapes.cube);
+  const cubeOriginalGeometries = new Map(); // cellKey string -> original Mesh geometry
+  function isPureCubeMesh(entry) {
+    return hasCube(entry.cell) && entry.mesh.isMesh && effectivePyramids(entry.cell) === 0;
+  }
+  function applySphericalToCubes(active) {
+    for (const [key, entry] of partialCellMeshes) {
+      if (!isPureCubeMesh(entry)) continue;
+      if (active) {
+        if (!cubeOriginalGeometries.has(key)) cubeOriginalGeometries.set(key, entry.mesh.geometry);
+        entry.mesh.geometry = cubeSphereGeometry;
+      } else {
+        const original = cubeOriginalGeometries.get(key);
+        if (original) entry.mesh.geometry = original;
+      }
+    }
+  }
+
   document.getElementById('spherical-toggle')?.addEventListener('click', () => {
     sphericalModeActive = !sphericalModeActive;
     document.getElementById('spherical-toggle').classList.toggle('active', sphericalModeActive);
@@ -2551,8 +2612,9 @@ async function init() {
     cuboctaMesh.geometry = active.cuboctahedron;
     bccMesh.geometry = active.truncatedOctahedron;
     applySphericalToDisphenoids(sphericalModeActive);
+    applySphericalToCubes(sphericalModeActive);
     showHudPrompt(sphericalModeActive
-      ? 'Spherical: RD/Octahedron/Truncated Octahedron/Disphenoid shown as true spheres, Cuboctahedron shown as a superellipsoid -- a client-side view only, your cells are untouched.'
+      ? 'Spherical: RD/Octahedron/Truncated Octahedron/Cube/Disphenoid shown as true spheres, Cuboctahedron shown as a superellipsoid -- a client-side view only, your cells are untouched.'
       : 'Spherical: off.', 5000);
   });
 

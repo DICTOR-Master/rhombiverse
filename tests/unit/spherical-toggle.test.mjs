@@ -213,6 +213,60 @@ test('real Disphenoid (bootstrapDisphenoid) is uniform -> sphere, R = SCALE/(2*s
   assert.ok(Math.abs(result.R - 1 / (2 * Math.SQRT2)) < 1e-9, `got R=${result.R}`);
 });
 
+// Volume-matched radii (Direct override #2 in render.js's own
+// sphericalClassificationFor -- real live-build feedback that
+// face-plane-distance spheres read systematically too small for these
+// pointy, faceted, lattice-tiling shapes). Cube and Octahedron are
+// verified fully independently here: tetrahedron-volume-from-origin
+// decomposition using ONLY the real vertex data, no face-ordering
+// assumptions needed since a tetrahedron's signed volume from the
+// origin to any 3 points doesn't care which order they're given in.
+function tetraVolumeFromOrigin(a, b, c) {
+  const cross = [
+    b[1] * c[2] - b[2] * c[1],
+    b[2] * c[0] - b[0] * c[2],
+    b[0] * c[1] - b[1] * c[0],
+  ];
+  return Math.abs(a[0] * cross[0] + a[1] * cross[1] + a[2] * cross[2]) / 6;
+}
+
+test('real Octahedron (octGapVertices) volume = scale^3/6, verified via its real 8 faces', () => {
+  const scale = 3; // arbitrary non-1 scale, to also confirm cubic scaling
+  const verts = octGapVertices(scale); // 6 verts: (+-R,0,0),(0,+-R,0),(0,0,+-R)
+  const byAxis = [0, 1, 2].map((axis) => verts.filter((v) => v[axis] !== 0));
+  let volume = 0;
+  for (const vx of byAxis[0]) {
+    for (const vy of byAxis[1]) {
+      for (const vz of byAxis[2]) {
+        volume += tetraVolumeFromOrigin(vx, vy, vz); // one of the 8 real triangular faces each time
+      }
+    }
+  }
+  assert.ok(Math.abs(volume - scale ** 3 / 6) < 1e-9, `got volume=${volume}, expected ${scale ** 3 / 6}`);
+});
+
+test('real Cube piece (CUBE_VERTS half-scale) volume = scale^3', () => {
+  const scale = 2.5;
+  const cube = CUBE_VERTS.map(([x, y, z]) => [x * 0.5 * scale, y * 0.5 * scale, z * 0.5 * scale]);
+  // Axis-aligned box -- real volume is just the product of its own real
+  // per-axis extents, no decomposition/ordering needed at all.
+  const extent = (axis) => Math.max(...cube.map((v) => v[axis])) - Math.min(...cube.map((v) => v[axis]));
+  const volume = extent(0) * extent(1) * extent(2);
+  assert.ok(Math.abs(volume - scale ** 3) < 1e-9, `got volume=${volume}, expected ${scale ** 3}`);
+});
+
+test('volumeMatchedRadius applied to real per-shape volumes matches render.js\'s own documented constants', () => {
+  // RD volume (2*scale^3) is grounded in this repo's own pre-existing,
+  // already-relied-upon cube+6-pyramid decomposition (pyramidPieces,
+  // RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md section 2) -- this is a
+  // consistency check on the arithmetic, not a from-scratch
+  // re-derivation of that decomposition itself.
+  const scale = 1;
+  assert.ok(Math.abs(volumeMatchedRadius(2 * scale ** 3) - 0.7816) < 1e-3);
+  assert.ok(Math.abs(volumeMatchedRadius(scale ** 3 / 6) - 0.3413) < 1e-3);
+  assert.ok(Math.abs(volumeMatchedRadius(scale ** 3) - 0.6204) < 1e-3);
+});
+
 test('EPSILON_UNIFORM_REL is a relative (not absolute) tolerance', () => {
   assert.equal(typeof EPSILON_UNIFORM_REL, 'number');
   assert.ok(EPSILON_UNIFORM_REL > 0 && EPSILON_UNIFORM_REL < 1e-2);
