@@ -340,3 +340,21 @@ test('Octahedron(gap) ceiling: half its own real octGap-lattice neighbor spacing
   assert.ok(newValue > oldValue, `expected growth: new=${newValue}, old=${oldValue}`);
   assert.ok(newValue < ceiling);
 });
+
+// Pyramid/Cube pieces (render.js's applySphericalToPartials): every
+// pyramid-based cell shares ONE real per-pyramid volume unit
+// (PYRAMID_VOLUME = scale^3/6, exactly 1/6 of RD's own cube+6-pyramid
+// volume) -- these two exact relationships are why 6-pyramids-no-cube
+// lands at precisely Cube's own sphere size, and why "twelve" (however
+// spread across real construction) lands at precisely RD's.
+test('6 real pyramid-units (no cube) sum to exactly Cube\'s own real volume (scale^3)', () => {
+  const scale = 3;
+  const pyramidVolume = scale ** 3 / 6;
+  assert.ok(Math.abs(6 * pyramidVolume - scale ** 3) < 1e-9);
+});
+
+test('12 real pyramid-units sum to exactly RD\'s own real volume (2*scale^3, cube+6-pyramids)', () => {
+  const scale = 3;
+  const pyramidVolume = scale ** 3 / 6;
+  assert.ok(Math.abs(12 * pyramidVolume - 2 * scale ** 3) < 1e-9);
+});

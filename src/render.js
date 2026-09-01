@@ -1183,7 +1183,11 @@ function buildSphericalGeometry({ mode, R, n }) {
 // way RD/CO/TO/Disphenoid do) is well past that:
 //   Cube: volume-matched 0.6204*s, ceiling 0.7071*s (Cube shares RD's
 //     own main-world lattice, so the same sqrt(2)*s spacing applies) ->
-//     0.6204*s, real growth from the old 0.5*s.
+//     0.6204*s, real growth from the old 0.5*s. Cube itself isn't a
+//     field below -- it's the pyramids=0 case of the same general
+//     partial-cell formula the toggle handler applies directly (see
+//     applySphericalToPartials/partialCellVolume), which gives the
+//     exact same 0.6204*s result since it's the identical formula.
 //   Octahedron(gap): volume-matched 0.3413*s, ceiling 0.5000*s (half
 //     the octGap lattice's own real neighbor spacing, 1.0*s, per
 //     octGapCellToWorld's (i+0.5,j+0.5,k+0.5)*s placement -- coincides
@@ -1194,7 +1198,6 @@ function sphericalClassificationFor(scale) {
   return {
     rd: cap(2 * scale ** 3, scale / Math.SQRT2),
     octahedron: cap(scale ** 3 / 6, 0.5 * scale),
-    cube: cap(scale ** 3, scale / Math.SQRT2),
     cuboctahedron: cap((5 / 6) * scale ** 3, 0.5 * scale),
     truncatedOctahedron: cap(4 * scale ** 3, scale),
   };
@@ -2571,32 +2574,80 @@ async function init() {
     }
   }
 
-  // Cube piece (Pyramid Sub-Cell, `partialCellMeshes` -- see core/
-  // pyramid.md): rendered per-cell, not InstancedMesh, but unlike
+  // Cube and Pyramid pieces (Pyramid Sub-Cell, `partialCellMeshes` --
+  // see core/pyramid.md): rendered per-cell, not InstancedMesh, but unlike
   // Disphenoid above each of these DOES use a real object3D.position
-  // (buildPartialCellObject3D), so a single shared sphere geometry can
-  // be swapped in directly, same as the 4 InstancedMesh families.
-  // Only converts a cell that's a PURE cube (hasCube && zero pyramids
-  // present) -- any cube+pyramid-subset mix, or a cube-less
-  // pyramid-only cell (a THREE.Group of individual pyramid Meshes, not
-  // a single Mesh), is a genuinely irregular shape with no clean
-  // sphere/superellipsoid mapping, so those stay as their real shape,
-  // matching this stage's stance on Disphenoid-ring/other irregular
-  // cases -- not silently forced into an inaccurate round shape.
-  const cubeSphereGeometry = buildSphericalGeometry(sphericalShapes.cube);
-  const cubeOriginalGeometries = new Map(); // cellKey string -> original Mesh geometry
-  function isPureCubeMesh(entry) {
-    return hasCube(entry.cell) && entry.mesh.isMesh && effectivePyramids(entry.cell) === 0;
+  // (buildPartialCellObject3D), so a shared sphere geometry can be
+  // swapped in directly, same as the 4 InstancedMesh families -- just
+  // one geometry per real (cube present?, pyramid count) combination
+  // rather than a single shared one, since the cell's own real volume
+  // (and so its correctly-sized sphere) depends on both.
+  //
+  // Direct instruction (2026-09-01): every pyramid-based cell (1
+  // through 6 pyramids, with or without a cube) gets the SAME
+  // min(volume-matched, real tangent ceiling) rule already used for
+  // every other shape, fed that cell's own real combined volume --
+  // not a separate hardcoded per-count table, and not distinct shape
+  // primitives (a spherical cap for 1, an ellipsoid for 2, etc. --
+  // considered and explicitly turned down in favor of this simpler,
+  // already-built formula). Real volume: cube (scale^3, only if
+  // present) + presentCount * (scale^3/6) -- PYRAMID_VOLUME below is
+  // exactly 1/6 of RD's own 2*scale^3 volume (RD = cube + 6 pyramids).
+  // Ceiling: same as RD/Cube's own (scale/sqrt(2)) -- every one of
+  // these cells sits at a real main-world FCC lattice point, sharing
+  // that exact same real neighbor spacing (sqrt(2)*scale) regardless
+  // of which pyramids happen to be present on it.
+  // A cube-less pyramid-only cell renders as a THREE.Group of
+  // individual pyramid Meshes (buildPyramidOnlyMeshes), not a single
+  // Mesh -- Groups have no .geometry to swap, so instead its children
+  // are hidden and one sphere Mesh is added as an extra child (in the
+  // Group's own LOCAL space, so it inherits the Group's real
+  // object3D.position automatically).
+  const PYRAMID_VOLUME = SCALE ** 3 / 6;
+  const PARTIAL_CEILING = SCALE / Math.SQRT2; // same real ceiling as RD/Cube -- same lattice
+  function partialCellVolume(cell) {
+    const count = presentAxisKeys(effectivePyramids(cell)).length;
+    return (hasCube(cell) ? SCALE ** 3 : 0) + count * PYRAMID_VOLUME;
   }
-  function applySphericalToCubes(active) {
+  const partialSphereGeometryCache = new Map(); // volume (fixed-precision key) -> geometry
+  function partialSphereGeometryFor(cell) {
+    const volume = partialCellVolume(cell);
+    const key = volume.toFixed(9);
+    if (!partialSphereGeometryCache.has(key)) {
+      const R = Math.min(volumeMatchedRadius(volume), PARTIAL_CEILING);
+      partialSphereGeometryCache.set(key, buildSphericalGeometry({ mode: 'sphere', R }));
+    }
+    return partialSphereGeometryCache.get(key);
+  }
+  const partialOriginalGeometries = new Map(); // cellKey string -> original Mesh geometry
+  const partialAddedSphereMeshes = new Map(); // cellKey string -> sphere Mesh added to a cube-less Group
+  function applySphericalToPartials(active) {
     for (const [key, entry] of partialCellMeshes) {
-      if (!isPureCubeMesh(entry)) continue;
-      if (active) {
-        if (!cubeOriginalGeometries.has(key)) cubeOriginalGeometries.set(key, entry.mesh.geometry);
-        entry.mesh.geometry = cubeSphereGeometry;
+      if (hasCube(entry.cell)) {
+        if (active) {
+          if (!partialOriginalGeometries.has(key)) partialOriginalGeometries.set(key, entry.mesh.geometry);
+          entry.mesh.geometry = partialSphereGeometryFor(entry.cell);
+        } else {
+          const original = partialOriginalGeometries.get(key);
+          if (original) entry.mesh.geometry = original;
+        }
+      } else if (active) {
+        if (!partialAddedSphereMeshes.has(key)) {
+          const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
+          mat.color.copy(instanceColorFor(entry.cell));
+          const sphereMesh = new THREE.Mesh(partialSphereGeometryFor(entry.cell), mat);
+          entry.mesh.children.forEach((c) => { c.visible = false; });
+          entry.mesh.add(sphereMesh);
+          partialAddedSphereMeshes.set(key, sphereMesh);
+        }
       } else {
-        const original = cubeOriginalGeometries.get(key);
-        if (original) entry.mesh.geometry = original;
+        const sphereMesh = partialAddedSphereMeshes.get(key);
+        if (sphereMesh) {
+          entry.mesh.remove(sphereMesh);
+          sphereMesh.material.dispose();
+          entry.mesh.children.forEach((c) => { c.visible = true; });
+          partialAddedSphereMeshes.delete(key);
+        }
       }
     }
   }
@@ -2610,7 +2661,7 @@ async function init() {
     cuboctaMesh.geometry = active.cuboctahedron;
     bccMesh.geometry = active.truncatedOctahedron;
     applySphericalToDisphenoids(sphericalModeActive);
-    applySphericalToCubes(sphericalModeActive);
+    applySphericalToPartials(sphericalModeActive);
     showHudPrompt(sphericalModeActive
       ? 'Spherical: every real placeable shape shown as a true sphere -- a client-side view only, your cells are untouched.'
       : 'Spherical: off.', 5000);
