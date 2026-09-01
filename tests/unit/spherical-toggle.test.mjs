@@ -285,13 +285,21 @@ test('EPSILON_UNIFORM_REL is a relative (not absolute) tolerance', () => {
   assert.ok(EPSILON_UNIFORM_REL > 0 && EPSILON_UNIFORM_REL < 1e-2);
 });
 
-// --- Disphenoid pairwise merging (render.js's applySphericalToDisphenoids,
-// 2026-09-01): a touching pair merges into one sphere; an unpaired
-// disphenoid with a real neighbor present anywhere stays at the original
-// capped radius; a fully isolated one (no real neighbor at all) gets its
-// own uncapped volume-matched radius instead. All three R values here are
-// computed programmatically from the real octahedronDisphenoids/
-// disphenoidNeighborAcrossFace functions, not hand-derived, and cross-
+// --- Disphenoid pairwise merging -- NOT currently wired into render.js
+// (built, then reverted the same session, 2026-09-01: a merged pair next
+// to two still-small individual spheres in the same 4-disphenoid bundle
+// read as an inconsistent "lumpy" composition; render.js now always uses
+// the plain uncapped disphenoidFreeR for every disphenoid, no pairing).
+// Kept here, not deleted: DICTO explicitly wants to revisit a real
+// stretched-ellipsoid alternative later, and the real geometric facts
+// below (which neighbor is closest, what the exact ceiling is) still
+// hold and would be the starting point for that -- a touching pair
+// merges into one sphere; an unpaired disphenoid with a real neighbor
+// present anywhere stays at the original capped radius; a fully isolated
+// one (no real neighbor at all) gets its own uncapped volume-matched
+// radius instead. All three R values here are computed programmatically
+// from the real octahedronDisphenoids/disphenoidNeighborAcrossFace
+// functions, not hand-derived, and cross-
 // checked against render.js's own constants.
 
 function centroidOf(verts) {

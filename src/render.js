@@ -15,7 +15,7 @@ import { createBCCBuildController } from './core/bcc-build.js';
 import { createCuboctaBuildController, AXIS_OFFSETS as CUBOCTA_AXIS_OFFSETS } from './core/cubocta-build.js';
 import { createCuboctaGapBuildController, octGapCellToWorld, octGapCellForCOCell } from './core/cubocta-gap-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
-import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids, disphenoidKey, disphenoidNeighborAcrossFace } from './geometry-extensions/interstitial-lattice.js';
+import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
 import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extensions/spherical-toggle.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { FEATURES } from './app/features.js';
@@ -1172,10 +1172,11 @@ function buildSphericalGeometry({ mode, R, n }) {
 //     (half the BCC lattice's own axis-neighbor spacing, 2*s) ->
 //     0.9847*s, under its own ceiling already, no capping needed
 //     (unchanged, confirmed "great size").
-//   Disphenoid: see the toggle handler's own disphenoidR -- ceiling
-//     0.3536*s binds (volume-matched would be 0.5437*s), same rule,
-//     but this is the one shape where "bigger" is asked for anyway;
-//     flagged back to DICTO rather than silently overridden either way.
+//   Disphenoid: NOT this rule -- see the toggle handler's own
+//     disphenoidFreeR. Direct instruction overrides the ceiling
+//     entirely here (uncapped volume-matched, 0.5419*s, always, no
+//     neighbor-distance capping at all) after live testing showed the
+//     ceiling-respecting version read as too small to accept.
 // And two shapes this rule newly (correctly) grows, since they were
 // previously stuck at their own face-plane distance even though their
 // REAL ceiling (half their real neighbor spacing, not their own face
@@ -2539,102 +2540,55 @@ async function init() {
   // each disphenoid has its own unique orientation. Disphenoids are all
   // congruent (isosceles tetrahedra, only orientation/position differs)
   // and genuinely uniform face-distance from their own centroid --
-  // Section 1 case 2, plain sphere -- but which R applies depends on
-  // real world state, per two rounds of direct instruction (2026-09-01):
+  // Section 1 case 2, plain sphere.
   //
-  //  1. Two disphenoids that are REAL touching neighbors (share a face,
-  //     found via disphenoidNeighborAcrossFace -- not the full ring,
-  //     pairs only, no torus) both being present merges them into ONE
-  //     combined sphere at their shared centroid, sized for their
-  //     combined volume. R = min(volume-matched(4/3*scale^3),
-  //     ceiling) -- ceiling here is HALF the real distance from that
-  //     merged centroid to the closest other real disphenoid position
-  //     (its own 2 remaining bundle-mates, verified numerically to be
-  //     the binding one, closer than the "outward" neighbors) =
-  //     sqrt(10)/8 * scale. The ceiling binds (0.3953*scale <
-  //     0.6828*scale uncapped), so R = sqrt(10)/8*scale exactly.
-  //  2. A disphenoid with no available pairing partner: if it has ANY
-  //     real neighbor actually present in the world (whether or not
-  //     that neighbor is itself already claimed by a different pair),
-  //     it stays capped at the original single-disphenoid ceiling
-  //     (1/(2*sqrt(2))*scale, half the real distance to any of its own
-  //     4 real neighbor positions, all equidistant). If it has NO real
-  //     neighbor present anywhere, there's nothing to overlap, so it's
-  //     rendered at its own uncapped volume-matched radius instead --
-  //     genuinely bigger, per direct instruction ("doesn't have to
-  //     worry about touching neighbour").
-  // All three R values verified in spherical-toggle.test.mjs, computed
-  // programmatically from the real interstitial-lattice.js functions,
-  // not hand-derived.
-  const disphenoidR = SCALE / (2 * Math.SQRT2); // capped: a real neighbor is present somewhere
-  const disphenoidFreeR = volumeMatchedRadius((2 / 3) * SCALE ** 3); // free: no real neighbor anywhere
-  const disphenoidPairR = Math.min(volumeMatchedRadius((4 / 3) * SCALE ** 3), (Math.sqrt(10) / 8) * SCALE);
-  const disphenoidSphereTemplate = buildSphericalGeometry({ mode: 'sphere', R: disphenoidR });
-  const disphenoidFreeSphereTemplate = buildSphericalGeometry({ mode: 'sphere', R: disphenoidFreeR });
-  const disphenoidPairSphereTemplate = buildSphericalGeometry({ mode: 'sphere', R: disphenoidPairR });
+  // Simplified back from a real pairwise-merge + neighbor-aware-capping
+  // attempt (kept in git history, not repeated here) after direct
+  // live-testing feedback the same day: a merged pair next to two
+  // still-small individual spheres in the same 4-disphenoid bundle read
+  // as an inconsistent, lumpy composition ("looks weird"). Direct
+  // instruction: "disphenoid one max size sphere, flattened octahedron
+  // four max sized spheres is better" -- every disphenoid, alone or in
+  // a full bundle, always renders at its own uncapped volume-matched
+  // radius, full stop, no pairing, no neighbor-presence checking at
+  // all. In a full 4-bundle the 4 spheres DO overlap each other at this
+  // size (confirmed acceptable, unlike the ruled-out torus/fusion
+  // look -- 4 distinct big spheres reads differently than one smooth
+  // merged ring surface even with real overlap between them).
+  //
+  // Open follow-up, explicitly requested, NOT implemented ("I would
+  // like to try the other alternative"): an anisotropic ellipsoid,
+  // volume-preserving but compressed toward a close neighbor and
+  // stretched elsewhere, instead of a plain sphere. Real and buildable
+  // in principle (superellipsoidPoint's formula generalizes cleanly to
+  // 3 independent semi-axes), but only ever a PARTIAL fix for this
+  // specific shape: a disphenoid's 4 real face directions are not
+  // mutually orthogonal, so one 3-axis ellipsoid can't respect all 4 at
+  // once in a full bundle (where every direction has a real neighbor)
+  // -- and it needs a genuinely new per-cell rotation/orientation step,
+  // unlike every other shape here (translation only). Discussed and
+  // deliberately deferred, not silently dropped -- see
+  // project_rhombiverse_spherical_toggle.md.
+  const disphenoidFreeR = volumeMatchedRadius((2 / 3) * SCALE ** 3);
+  const disphenoidSphereTemplate = buildSphericalGeometry({ mode: 'sphere', R: disphenoidFreeR });
   const disphenoidOriginalGeometries = new Map(); // key -> original Mesh geometry
-  const disphenoidPairMeshes = new Map(); // "keyA|keyB" -> merged sphere Mesh added to interstitialGroup
   function disphenoidCentroid(verts) {
     const world = disphenoidVertsToWorld(verts, SCALE);
     return [0, 1, 2].map((i) => world.reduce((s, v) => s + v[i], 0) / world.length);
   }
-  function disphenoidRealNeighborKeys(cell) {
-    return [0, 1, 2, 3].map((i) => disphenoidKey(disphenoidNeighborAcrossFace(cell.verts, i)));
-  }
   function applySphericalToDisphenoids(active) {
-    // Stale pair meshes from a previous toggle-on cycle -- rebuilt
-    // fresh every time, since which cells are present/paired may have
-    // changed since the last toggle.
-    for (const pairMesh of disphenoidPairMeshes.values()) {
-      interstitialGroup.remove(pairMesh);
-      pairMesh.material.dispose();
-    }
-    disphenoidPairMeshes.clear();
-
-    if (!active) {
-      for (const [key, m] of interstitialMeshes) {
-        m.visible = true;
-        const original = disphenoidOriginalGeometries.get(key);
-        if (original) m.geometry = original;
-      }
-      return;
-    }
-
-    const cells = interstitialStore.entries();
-    const cellByKey = new Map(cells.map((c) => [c.key, c]));
-    const claimed = new Set();
-    for (const cell of cells) {
-      if (claimed.has(cell.key)) continue;
-      const m = interstitialMeshes.get(cell.key);
-      if (!m) continue;
-      if (!disphenoidOriginalGeometries.has(cell.key)) disphenoidOriginalGeometries.set(cell.key, m.geometry);
-
-      const neighborKeys = disphenoidRealNeighborKeys(cell);
-      const presentNeighborKeys = neighborKeys.filter((k) => cellByKey.has(k) && k !== cell.key);
-      const pairPartnerKey = presentNeighborKeys.find((k) => !claimed.has(k));
-
-      if (pairPartnerKey) {
-        const partner = cellByKey.get(pairPartnerKey);
-        const partnerMesh = interstitialMeshes.get(pairPartnerKey);
-        claimed.add(cell.key);
-        claimed.add(pairPartnerKey);
-        const cA = disphenoidCentroid(cell.verts);
-        const cB = disphenoidCentroid(partner.verts);
-        const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
-        mat.color.copy(instanceColorFor(cell));
-        const pairMesh = new THREE.Mesh(disphenoidPairSphereTemplate, mat);
-        pairMesh.position.set((cA[0] + cB[0]) / 2, (cA[1] + cB[1]) / 2, (cA[2] + cB[2]) / 2);
-        interstitialGroup.add(pairMesh);
-        disphenoidPairMeshes.set(`${cell.key}|${pairPartnerKey}`, pairMesh);
-        m.visible = false;
-        if (partnerMesh) partnerMesh.visible = false;
-      } else {
-        m.visible = true;
-        const template = presentNeighborKeys.length > 0 ? disphenoidSphereTemplate : disphenoidFreeSphereTemplate;
+    for (const [key, m] of interstitialMeshes) {
+      if (active) {
+        if (!disphenoidOriginalGeometries.has(key)) disphenoidOriginalGeometries.set(key, m.geometry);
+        const cell = interstitialStore.entries().find((c) => c.key === key);
+        if (!cell) continue;
         const [cx, cy, cz] = disphenoidCentroid(cell.verts);
-        const sphereGeom = template.clone();
+        const sphereGeom = disphenoidSphereTemplate.clone();
         sphereGeom.translate(cx, cy, cz);
         m.geometry = sphereGeom;
+      } else {
+        const original = disphenoidOriginalGeometries.get(key);
+        if (original) m.geometry = original;
       }
     }
   }
