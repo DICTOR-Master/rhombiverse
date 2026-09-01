@@ -1,5 +1,13 @@
 [
   {
+    "date": "2026-09-01",
+    "title": "One Pyramid, Every Shape",
+    "items": [
+      "The Pyramid piece is Rhombiverse's real foundational cell: one stands alone, two bond together (flat-to-flat into a free octahedron, or point-to-point to keep chaining outward), six form a cube, and twelve build up into a full Rhombic Dodecahedron -- the same single piece scales into every core shape here, Cuboctahedra included.",
+      "Fixed: bonding a second pyramid onto an existing lone one now correctly builds outward -- flat-to-flat and point-to-point placement both work as intended, instead of misplacing the new pyramid back on the same cell."
+    ]
+  },
+  {
     "date": "2026-08-31",
     "title": "Cuboctahedra, Face to Face",
     "items": [

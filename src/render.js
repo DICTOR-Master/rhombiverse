@@ -1251,7 +1251,13 @@ function buildPyramidOnlyMeshes(cell, color) {
     geometry.computeVertexNormals();
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
     mat.color.copy(color);
-    meshes.push(new THREE.Mesh(geometry, mat));
+    const pyramidMesh = new THREE.Mesh(geometry, mat);
+    // Which of the 6 axes this specific sub-mesh is -- core/build.js's
+    // pyramid click handler needs this to tell "clicked my own existing
+    // pyramid's base/apex" apart from "clicked a bare cube's flat face",
+    // see classifyExistingPyramidHit in core/pyramid.js.
+    pyramidMesh.userData.axisKey = axisKey;
+    meshes.push(pyramidMesh);
   }
   return meshes;
 }

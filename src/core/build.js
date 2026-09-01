@@ -25,6 +25,9 @@ import {
   hasPyramid,
   effectivePyramids,
   nearestPyramidAxis,
+  classifyExistingPyramidHit,
+  flatToFlatMirror,
+  pointToPointMirror,
 } from './pyramid.js';
 import { generatePlanetoid } from '../geometry-extensions/planetoidgen.js';
 import { nearestBCCCell } from '../geometry-extensions/dual-lattice.js';
@@ -502,7 +505,13 @@ export function createBuildController({
     // one pyramid.
     if (mode === 'chisel') {
       if (getPieceType() === 'pyramid') {
-        const axisKey = resolveClickedPyramidAxis(hit, cell);
+        // A click landing on an existing lone pyramid's own tagged mesh
+        // (see buildPyramidOnlyMeshes in render.js) unambiguously means
+        // THAT pyramid, regardless of which exact face (base or side)
+        // was hit -- more reliable than resolveClickedPyramidAxis's own
+        // normal-based guess, which would otherwise read a base-face hit
+        // as the OPPOSITE (absent) axis and wrongly no-op.
+        const axisKey = hit.object?.userData?.axisKey || resolveClickedPyramidAxis(hit, cell);
         if (!axisKey) { if (onPieceNoOp) onPieceNoOp('remove'); return; }
         const result = applyPyramidEdit(world, 'remove', cell.x, cell.y, cell.z, axisKey);
         // No-op: that pyramid's already gone. A direct live report ("I
@@ -529,6 +538,50 @@ export function createBuildController({
     // just with or without pyramids: 0 explicitly set (absent means FULL
     // per core/pyramid.js).
     if (getPieceType() === 'pyramid') {
+      // Direct instruction 2026-09-01 ("it just needed to be able to
+      // attach flat to flat or point to point"): a click landing on an
+      // EXISTING cube-less pyramid's own tagged mesh (userData.axisKey,
+      // see buildPyramidOnlyMeshes in render.js) is one of 3 real,
+      // distinct intents depending on exactly where -- the exposed flat
+      // base (bond flat-to-flat, forming a real octahedron), near the
+      // apex tip on a side face (bond point-to-point, chaining further
+      // out), or near a side face's own base edge ('sibling' -- grow the
+      // missing NEIGHBORING axis on this SAME cell, the pre-existing
+      // 2026-08-29 behavior below, unchanged). Before this classification
+      // existed, every one of these landed on 'sibling', so flat-to-flat/
+      // point-to-point growth was unreachable -- confirmed via direct
+      // trace against pyramidPieces()'s own geometry, not guessed.
+      const hitAxisKey = hit.object?.userData?.axisKey;
+      if (hitAxisKey) {
+        const [hwx, hwy, hwz] = cellToWorld(cell.x, cell.y, cell.z);
+        const hitLocalPoint = [hit.point.x - hwx, hit.point.y - hwy, hit.point.z - hwz];
+        const hn = hit.face.normal;
+        const intent = classifyExistingPyramidHit({
+          axisKey: hitAxisKey,
+          localNormal: [hn.x, hn.y, hn.z],
+          localPoint: hitLocalPoint,
+          pieces: pyramidPieces(),
+        });
+        if (intent === 'base' || intent === 'apex') {
+          const mirror = intent === 'base'
+            ? flatToFlatMirror([cell.x, cell.y, cell.z], hitAxisKey)
+            : pointToPointMirror([cell.x, cell.y, cell.z], hitAxisKey);
+          const [mx, my, mz] = mirror.host;
+          if (!world.has(mx, my, mz)) {
+            const material = getMaterial();
+            if (canPlaceMaterial(material, mx, my, mz)) {
+              bootstrapPyramidCell(world, mx, my, mz, mirror.axisKey, material);
+              onChange();
+              if (onPlaced) onPlaced({ x: mx, y: my, z: mz, material });
+              return;
+            }
+          }
+          if (onPieceNoOp) onPieceNoOp('add');
+          return;
+        }
+        // intent === 'sibling': fall through to the existing "complete
+        // this SAME cell's own remaining slots" behavior below.
+      }
       // Cube-less cells (core/pyramid.js's hasCube()) have no flat
       // "missing pyramid" cube face to click the normal way -- their
       // own PRESENT pyramids are the only clickable geometry (see

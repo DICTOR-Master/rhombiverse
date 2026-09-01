@@ -114,6 +114,70 @@ export function resolvePyramidAxisForHit({ localNormal, localPoint, neighborOffs
   return nearestPyramidAxis(localPoint, candidates, pieces);
 }
 
+// --- Free-standing pyramid-to-pyramid bonding ("attach flat to flat or
+// point to point", direct instruction 2026-09-01) -----------------------
+// A lone (cube-less) pyramid's own base and apex are both real, clickable
+// geometry (buildPyramidOnlyMeshes in render.js builds the FULL convex
+// hull of base+apex, not just the 4 outward-facing side triangles) -- so
+// a second pyramid can bond to an EXISTING one either at its flat base
+// (mirrored, forming a real -- though not Platonic-regular, since the
+// base is a cube-face square and the sides are isosceles not
+// equilateral -- octahedron) or apex-to-apex (tips touching, bases
+// flaring away from each other, chaining the structure further out).
+// Both are derived directly from pyramidPieces()'s own base/apex
+// formulas: for a pyramid at host cell C with axis index i, sign σ
+// (PYRAMID_AXES pairs are consecutive +/-, so i XOR 1 on the PYRAMID_AXES
+// index gives the opposite key), base_world[i] = C[i]*s + σ*0.5s and
+// apex_world[i] = C[i]*s + σ*s. Solving "new pyramid's own base/apex
+// formula equals the existing one's" for the new host's own integer
+// coordinate gives the two rules below -- flat-to-flat: newHost = C + σ
+// (one step out), opposite axis; point-to-point: newHost = C + 2σ (two
+// steps out, past the existing apex), opposite axis.
+export function oppositeAxisKey(axisKey) {
+  const i = PYRAMID_AXES.indexOf(axisKey);
+  const j = i % 2 === 0 ? i + 1 : i - 1;
+  return PYRAMID_AXES[j];
+}
+
+function axisIndexAndSign(axisKey) {
+  const i = PYRAMID_AXES.indexOf(axisKey);
+  return { axisIndex: i < 2 ? 0 : i < 4 ? 1 : 2, sign: i % 2 === 0 ? 1 : -1 };
+}
+
+export function flatToFlatMirror(hostCell, axisKey) {
+  const { axisIndex, sign } = axisIndexAndSign(axisKey);
+  const host = hostCell.slice();
+  host[axisIndex] += sign;
+  return { host, axisKey: oppositeAxisKey(axisKey) };
+}
+
+export function pointToPointMirror(hostCell, axisKey) {
+  const { axisIndex, sign } = axisIndexAndSign(axisKey);
+  const host = hostCell.slice();
+  host[axisIndex] += 2 * sign;
+  return { host, axisKey: oppositeAxisKey(axisKey) };
+}
+
+// Classify a hit on an ALREADY-PRESENT pyramid's own geometry into one of
+// 3 real, distinct player intents: 'base' (the flat exposed back --
+// flat-to-flat bond), 'apex' (near the tip on one of the 4 triangular
+// side faces -- point-to-point bond), or 'sibling' (near a side face's
+// own base edge -- grow the missing NEIGHBORING axis on this SAME cell,
+// the pre-existing 2026-08-29 "build toward a full RD from one seed"
+// behavior, left unchanged). Direct report 2026-09-01 ("bond back to
+// back to form octahedron ... cant seem to do it"): before this
+// classification existed, every click on an existing pyramid's own
+// geometry -- base included -- was treated as 'sibling', so flat-to-flat
+// and point-to-point growth were simply unreachable.
+export function classifyExistingPyramidHit({ axisKey, localNormal, localPoint, pieces }) {
+  if (pyramidAxisForNormal(localNormal) === oppositeAxisKey(axisKey)) return 'base';
+  const { apex, base } = pieces.pyramids[axisKey];
+  const distToApex = dist3(localPoint, apex);
+  const nearest2 = base.map((c) => ({ c, d: dist3(localPoint, c) })).sort((a, b) => a.d - b.d).slice(0, 2);
+  const nearEdgeMid = [0, 1, 2].map((k) => (nearest2[0].c[k] + nearest2[1].c[k]) / 2);
+  return distToApex < dist3(localPoint, nearEdgeMid) ? 'apex' : 'sibling';
+}
+
 // "Pyramid without a cube" bootstrap (direct instruction 2026-08-29):
 // clicking a face where a pyramid is already present has nothing to add
 // on the CLICKED cell -- but if the real FCC neighbor beyond that face
