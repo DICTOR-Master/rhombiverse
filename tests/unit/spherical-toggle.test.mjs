@@ -14,10 +14,16 @@ import {
   superellipsoidPoint,
   EPSILON_UNIFORM_REL,
 } from '../../src/geometry-extensions/spherical-toggle.js';
-import { rdRawVerts, CUBE_VERTS, octGapVertices, cuboctahedronVertices } from '../../src/core/lattice.js';
-import { truncatedOctahedronVertices } from '../../src/geometry-extensions/dual-lattice.js';
+import { rdRawVerts, CUBE_VERTS, octGapVertices, cuboctahedronVertices, NEIGHBOR_OFFSETS } from '../../src/core/lattice.js';
+import { truncatedOctahedronVertices, BCC_NEIGHBOR_OFFSETS } from '../../src/geometry-extensions/dual-lattice.js';
 import { bccShapeScaleFor } from '../../src/geometry-extensions/bcc-detail-lattice.js';
 import { bootstrapDisphenoid, disphenoidVertsToWorld } from '../../src/geometry-extensions/interstitial-lattice.js';
+// octGapCellToWorld inlined, NOT imported from cubocta-gap-build.js --
+// that file imports `three` (not an npm dep here, see this file's own
+// header), same reasoning cubocta-gap.test.mjs already documents.
+function octGapCellToWorld(i, j, k, s = 1) {
+  return [(i + 0.5) * s, (j + 0.5) * s, (k + 0.5) * s];
+}
 
 function planeDistance(points) {
   // points: 3+ coplanar points -- returns the plane's distance from the origin.
@@ -270,4 +276,67 @@ test('volumeMatchedRadius applied to real per-shape volumes matches render.js\'s
 test('EPSILON_UNIFORM_REL is a relative (not absolute) tolerance', () => {
   assert.equal(typeof EPSILON_UNIFORM_REL, 'number');
   assert.ok(EPSILON_UNIFORM_REL > 0 && EPSILON_UNIFORM_REL < 1e-2);
+});
+
+// --- Proportion pass (2026-09-01): R = min(volume-matched radius, real
+// tangent ceiling), where "tangent ceiling" is HALF the real distance to
+// the nearest same-type neighbor in whatever lattice that piece type
+// actually occupies. Each ceiling below is grounded in real placement
+// data (not assumed), matching render.js's own sphericalClassificationFor
+// header -- these are the same numbers that function's `cap()` helper
+// uses directly.
+
+test('RD/Cube ceiling: half the main FCC world\'s own NEIGHBOR_OFFSETS spacing', () => {
+  const scale = 2; // arbitrary, confirms scale-linearity too
+  const spacing = Math.hypot(...NEIGHBOR_OFFSETS[0]) * scale; // (1,1,0)-type, magnitude sqrt(2)
+  const ceiling = spacing / 2;
+  assert.ok(Math.abs(ceiling - scale / Math.SQRT2) < 1e-9, `got ceiling=${ceiling}`);
+  // RD: volume-matched (0.7816*scale) exceeds this -> capped at the ceiling.
+  assert.ok(Math.min(0.7816 * scale, ceiling) === ceiling);
+  // Cube: volume-matched (0.6204*scale) is under the ceiling -> real growth, unchanged by the cap.
+  assert.ok(Math.min(0.6204 * scale, ceiling) < ceiling);
+});
+
+test('Cuboctahedron ceiling: half its own real axis-adjacent spacing (1.0*scale, its doubled-density lattice, not RD\'s)', () => {
+  const scale = 2;
+  const originCO = cuboctahedronVertices(scale);
+  const neighborCO = cuboctahedronVertices(scale).map(([x, y, z]) => [x + scale, y, z]); // real axis-adjacent CO, per lattice.js's own header
+  const originFace = originCO.filter((v) => Math.abs(v[0] - 0.5 * scale) < 1e-9);
+  const neighborFace = neighborCO.filter((v) => Math.abs(v[0] - 0.5 * scale) < 1e-9);
+  // Real touching faces coincide exactly (vertex-for-vertex) -- so the
+  // ceiling (half the axis-adjacent spacing) equals CO's own square-face
+  // distance exactly, verified directly rather than assumed.
+  const originKeys = new Set(originFace.map((v) => v.map((n) => n.toFixed(6)).join(',')));
+  const neighborKeys = new Set(neighborFace.map((v) => v.map((n) => n.toFixed(6)).join(',')));
+  assert.deepEqual(originKeys, neighborKeys);
+  const ceiling = scale / 2;
+  assert.ok(Math.abs(ceiling - 0.5 * scale) < 1e-9);
+  assert.ok(Math.min(volumeMatchedRadius((5 / 6) * scale ** 3), ceiling) === ceiling); // volume-matched exceeds -> capped
+});
+
+test('Truncated Octahedron ceiling: half BCC_NEIGHBOR_OFFSETS\' own axis-family spacing (2*scale)', () => {
+  const scale = 2;
+  const axisOffset = BCC_NEIGHBOR_OFFSETS.find(([x, y, z]) => Math.hypot(x, y, z) === 2);
+  assert.ok(axisOffset, 'expected a real (+-2,0,0)-type axis offset in BCC_NEIGHBOR_OFFSETS');
+  const spacing = Math.hypot(...axisOffset) * scale;
+  const ceiling = spacing / 2;
+  assert.ok(Math.abs(ceiling - scale) < 1e-9, `got ceiling=${ceiling}`);
+  // Confirmed "great size": volume-matched (0.9847*scale) is UNDER this
+  // ceiling already, so the cap is inert -- min() just passes it through.
+  assert.ok(Math.min(volumeMatchedRadius(4 * scale ** 3), ceiling) < ceiling);
+});
+
+test('Octahedron(gap) ceiling: half its own real octGap-lattice neighbor spacing (1.0*scale)', () => {
+  const scale = 2;
+  const a = octGapCellToWorld(0, 0, 0, scale);
+  const b = octGapCellToWorld(1, 0, 0, scale); // real adjacent octGap index
+  const spacing = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  const ceiling = spacing / 2;
+  assert.ok(Math.abs(ceiling - 0.5 * scale) < 1e-9, `got ceiling=${ceiling}`);
+  // Real growth: volume-matched (0.3413*scale) is comfortably under this
+  // ceiling, unlike the old face-plane-distance value (0.2887*scale).
+  const oldValue = (0.5 * scale) / Math.sqrt(3);
+  const newValue = Math.min(volumeMatchedRadius(scale ** 3 / 6), ceiling);
+  assert.ok(newValue > oldValue, `expected growth: new=${newValue}, old=${oldValue}`);
+  assert.ok(newValue < ceiling);
 });

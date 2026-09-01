@@ -1,6 +1,14 @@
 [
   {
     "date": "2026-09-01",
+    "title": "See It Round: Spherical Toggle",
+    "items": [
+      "New view toggle on the corner HUD wheel: render your whole build in a simplified, near-spherical form -- every real piece (RD, Cube, Octahedron, Cuboctahedron, Truncated Octahedron, Disphenoid) shown as a sphere, sized by its own real volume but never bigger than the exact distance to its nearest same-type neighbor, so nothing overlaps no matter how densely you've built. A client-side view only -- your actual cells are completely untouched, flip it off any time.",
+      "Pyramid pieces (and any cube with only some of its 6 pyramids on) keep their real shape under the toggle -- genuinely irregular, no honest sphere to reduce them to."
+    ]
+  },
+  {
+    "date": "2026-09-01",
     "title": "Pyramid: A Firm Foundation",
     "items": [
       "The Pyramid piece is Rhombiverse's real foundational cell: one stands alone, two bond together (flat-to-flat into a free octahedron, or point-to-point to keep chaining outward), six form a cube, and twelve build up into a full Rhombic Dodecahedron -- the same single piece scales into every core shape here, Cuboctahedra included.",

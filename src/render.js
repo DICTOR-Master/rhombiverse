@@ -16,7 +16,7 @@ import { createCuboctaBuildController, AXIS_OFFSETS as CUBOCTA_AXIS_OFFSETS } fr
 import { createCuboctaGapBuildController, octGapCellToWorld, octGapCellForCOCell } from './core/cubocta-gap-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
 import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
-import { classifyShape, sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extensions/spherical-toggle.js';
+import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extensions/spherical-toggle.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { FEATURES } from './app/features.js';
 import {
@@ -1140,60 +1140,63 @@ function buildSphericalGeometry({ mode, R, n }) {
 // entirely (Disphenoid always renders as an individual sphere, see
 // spherical-toggle.js's own header).
 //
-// Direct override #1, real live-build feedback (2026-09-01, DICTO:
-// "spheres obviously too small" -- and to stay strictly
-// sphere-or-superellipsoid, no volumeSphere third category): Truncated
-// Octahedron's solved n is ~1.585 (n<2, since its axis/square faces sit
-// farther out than its diagonal/hex faces). Below n=2 the
-// coordinate-axis points are the GLOBAL maximum of the surface -- the
-// superellipsoid never exceeds R in any direction and pinches down to
-// 0.866*R everywhere off-axis (down to the hex-face direction), reading
-// as visibly undersized next to Cuboctahedron's own superellipsoid
-// (n~2.71, which bulges OUTWARD past R instead of pinching in).
-// Rendered as a plain sphere instead, same R (still the real
-// axis/square-face touching distance, so it still meets axis-neighbors
-// correctly) -- uniformly full in every direction rather than pinching,
-// which is what was reading as too small. A sphere is just this same
-// superellipsoid formula at n=2, so this stays within "sphere or
-// superellipsoid," per direct instruction.
+// Governing rule (2026-09-01, DICTO: "run some sort of a proportion
+// pass if we could make mathematically consistent so much the better"),
+// after several rounds of real live-build feedback converged on it:
 //
-// Direct override #2, real live-build feedback across several rounds
-// the same session, ending in a real dense-world test that overturned
-// the "many sides fill up" rule tried above (kept in git history, not
-// repeated here): DICTO's own summary was "TO great size, nearly
-// everything else massively too big." Root cause: face-plane distance
-// is not just "the smallest measure of a shape's size" -- for these
-// real lattice-tiling polyhedra it's EXACTLY the tangent/touching
-// distance between two adjacent cells (that's the whole reason these
-// shapes tile space with zero gaps or overlaps in their own real
-// geometry). Any R bigger than that -- volume-matched included --
-// necessarily overlaps every real neighbor along that axis. A single
-// isolated cell (how RD's volume-matched R was first eyeballed, and
-// almost certainly how sparse, rarely-placed Truncated Octahedron/BCC
-// Build cells were tested too) never reveals this; a real densely-built
-// world, dominated by RD, does -- the overlap compounds across every
-// adjacent pair into something that reads as massively oversized.
-// So: face-plane distance is the safe, correct default for every
-// shape here, full stop -- it's the one value mathematically
-// guaranteed to never overlap a neighbor at any density. Truncated
-// Octahedron is kept as the sole confirmed exception (volume-matched,
-// ~0.98*scale) since it was explicitly confirmed "great size" in that
-// same real dense-world test -- if that turns out to have been a
-// sparse-test blind spot after all (i.e. it starts reading too big once
-// BCC cells are actually packed densely), the fix is exactly this same
-// reasoning: drop it back to axis-face-distance (scale).
+//   R = min(volume-matched radius, real tangent ceiling)
+//
+// "Tangent ceiling" = HALF the real distance to the nearest same-type
+// neighbor cell in whatever lattice/store that piece type actually
+// occupies -- the one value mathematically guaranteed to never overlap
+// a neighbor, at any world density (this is the lesson from the
+// earlier "TO great size, nearly everything else massively too big"
+// round: any R past this line compounds into visible overlap across a
+// real densely-built world, even though a single isolated cell never
+// reveals it). Volume-matched is the natural "how big should this
+// really read" target; the ceiling is a hard safety cap on top of it,
+// never the other way around.
+//
+// This single rule reproduces every value already confirmed correct by
+// direct live testing, with the real numbers behind each shape's own
+// ceiling (all independently grounded in that shape's own real
+// placement lattice, not assumed):
+//   RD:                   volume-matched 0.7816*s, ceiling 0.7071*s
+//     (half the main FCC world's own NEIGHBOR_OFFSETS spacing,
+//     sqrt(2)*s) -> capped at 0.7071*s (unchanged, confirmed good).
+//   Cuboctahedron:        volume-matched 0.5838*s, ceiling 0.5000*s
+//     (half CO's own real axis-adjacent spacing, 1.0*s -- CO's own
+//     doubled-density lattice, both integer parities, not the same
+//     spacing as RD's) -> capped at 0.5000*s (unchanged, confirmed).
+//   Truncated Octahedron: volume-matched 0.9847*s, ceiling 1.0000*s
+//     (half the BCC lattice's own axis-neighbor spacing, 2*s) ->
+//     0.9847*s, under its own ceiling already, no capping needed
+//     (unchanged, confirmed "great size").
+//   Disphenoid: see the toggle handler's own disphenoidR -- ceiling
+//     0.3536*s binds (volume-matched would be 0.5437*s), same rule,
+//     but this is the one shape where "bigger" is asked for anyway;
+//     flagged back to DICTO rather than silently overridden either way.
+// And two shapes this rule newly (correctly) grows, since they were
+// previously stuck at their own face-plane distance even though their
+// REAL ceiling (half their real neighbor spacing, not their own face
+// distance -- these two don't tile flush with a same-type neighbor the
+// way RD/CO/TO/Disphenoid do) is well past that:
+//   Cube: volume-matched 0.6204*s, ceiling 0.7071*s (Cube shares RD's
+//     own main-world lattice, so the same sqrt(2)*s spacing applies) ->
+//     0.6204*s, real growth from the old 0.5*s.
+//   Octahedron(gap): volume-matched 0.3413*s, ceiling 0.5000*s (half
+//     the octGap lattice's own real neighbor spacing, 1.0*s, per
+//     octGapCellToWorld's (i+0.5,j+0.5,k+0.5)*s placement -- coincides
+//     with octahedron's own vertex/circumradius) -> 0.3413*s, real
+//     growth from the old 0.2887*s.
 function sphericalClassificationFor(scale) {
+  const cap = (volume, ceiling) => ({ mode: 'sphere', R: Math.min(volumeMatchedRadius(volume), ceiling) });
   return {
-    rd: classifyShape({ faceDistances: [{ distance: scale / Math.SQRT2 }] }),
-    octahedron: classifyShape({ faceDistances: [{ distance: (0.5 * scale) / Math.sqrt(3) }] }),
-    cube: classifyShape({ faceDistances: [{ distance: 0.5 * scale }] }),
-    cuboctahedron: classifyShape({
-      faceDistances: [
-        { distance: 0.5 * scale, family: 'axis' },
-        { distance: (0.5 * scale) * (2 / Math.sqrt(3)), family: 'diagonal' },
-      ],
-    }),
-    truncatedOctahedron: { mode: 'sphere', R: volumeMatchedRadius(4 * scale ** 3) },
+    rd: cap(2 * scale ** 3, scale / Math.SQRT2),
+    octahedron: cap(scale ** 3 / 6, 0.5 * scale),
+    cube: cap(scale ** 3, scale / Math.SQRT2),
+    cuboctahedron: cap((5 / 6) * scale ** 3, 0.5 * scale),
+    truncatedOctahedron: cap(4 * scale ** 3, scale),
   };
 }
 
