@@ -146,19 +146,30 @@ build order:
   spec's illustrative numbers — a real numeric error in the spec's own
   Truncated Octahedron volume-matched-sphere constant was caught and
   fixed during review, 1.9695 -> 1.1371) wired into a HUD toggle
-  (`#spherical-toggle`, `render.js`) covering the 4 InstancedMesh piece
-  families that have simple known face geometry: RD and Octahedron(gap)
-  render as true spheres, Cuboctahedron and Truncated Octahedron as
-  superellipsoids. Reachable via the persistent HUD Wheel
-  (`hud-wheel-3d.js`, replaced the last Duality-duplicate face). **NOT
-  yet done**: the Cube piece (Pyramid Sub-Cell, a per-cell-mesh system,
-  not InstancedMesh), Sculpture Mode's own mesh, Lattice Zoom's
-  sub-lattice/aggregate-speckle meshes, and Section 4 (disphenoid-ring
-  -> torus) — deliberately deferred, needs real world-state grouping
-  logic verified as its own stage, not bundled in speculatively. Not yet
-  confirmed in a live browser (no Playwright/npm available in this
-  session's environment) — verify visually before treating Stage 1 as
-  fully done.
+  (`#spherical-toggle`, `render.js`), reachable via the persistent HUD
+  Wheel (`hud-wheel-3d.js`, replaced the last Duality-duplicate face).
+  Covers every real placeable piece type except Cube. Direct instruction
+  (2026-09-01): stay strictly to **sphere or superellipsoid**, no third
+  `volumeSphere` render mode (it isn't a different shape anyway, just a
+  different radius choice for a sphere). RD / Octahedron(gap) /
+  Truncated Octahedron / Disphenoid (own per-cell Mesh, not
+  InstancedMesh, so handled as a separate code path — see
+  `sphericalClassificationFor`'s own header) all render as plain
+  spheres; Cuboctahedron as a superellipsoid. Truncated Octahedron was
+  **originally** classified superellipsoid per the spec's own Section 1
+  rule, but real live-build feedback the same day ("spheres obviously
+  too small") caught a genuine visual property of its solved exponent
+  (n≈1.585 < 2 pinches the shape down to 0.866×R everywhere off-axis,
+  unlike Cuboctahedron's n≈2.71 which bulges outward past R) — switched
+  to a plain sphere at the same R (still the real axis-face touching
+  distance) instead. **NOT yet done**: the Cube piece (Pyramid Sub-Cell,
+  a per-cell, often-irregular partial shape — no clean single spherical
+  mapping), Sculpture Mode's own mesh, Lattice Zoom's sub-lattice/
+  aggregate-speckle meshes, and Section 4 (disphenoid-ring -> torus,
+  explicitly deferred by direct instruction — disphenoids still convert
+  individually, just never merged into a torus). Not yet confirmed in a
+  live browser (no Playwright/npm available in this session's
+  environment) — verify visually before treating Stage 1 as fully done.
 - **Rhombic Wheel 3D** (2026-08-25, `src/app/rhombic-wheel-3d-core.js`/
   `rhombic-wheel-3d.js`) — the sole navigation surface now, on the real
   RD mesh. The old 2D radial menu (`wheel.js`) was fully removed the

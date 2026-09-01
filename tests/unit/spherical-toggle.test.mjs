@@ -17,6 +17,7 @@ import {
 import { rdRawVerts, CUBE_VERTS, octGapVertices, cuboctahedronVertices } from '../../src/core/lattice.js';
 import { truncatedOctahedronVertices } from '../../src/geometry-extensions/dual-lattice.js';
 import { bccShapeScaleFor } from '../../src/geometry-extensions/bcc-detail-lattice.js';
+import { bootstrapDisphenoid, disphenoidVertsToWorld } from '../../src/geometry-extensions/interstitial-lattice.js';
 
 function planeDistance(points) {
   // points: 3+ coplanar points -- returns the plane's distance from the origin.
@@ -194,6 +195,22 @@ test('real Truncated Octahedron (truncatedOctahedronVertices at bccShapeScaleFor
   assert.equal(result.mode, 'superellipsoid');
   assert.ok(Math.abs(result.R - 1) < 1e-6, `got R=${result.R}`); // axis distance = SCALE = 1
   assert.ok(Math.abs(result.n - 1.5850) < 1e-3);
+});
+
+test('real Disphenoid (bootstrapDisphenoid) is uniform -> sphere, R = SCALE/(2*sqrt(2))', () => {
+  const raw = bootstrapDisphenoid([0, 0, 0]);
+  const world = disphenoidVertsToWorld(raw, 1); // SCALE=1
+  const centroid = [0, 1, 2].map((i) => world.reduce((s, v) => s + v[i], 0) / 4);
+  // All 4 faces (each excluding one of the 4 vertices) -- confirm every
+  // one lands the same distance from centroid, not just one face.
+  const distances = [0, 1, 2, 3].map((excludeIdx) => {
+    const face = world.filter((_, i) => i !== excludeIdx);
+    const d = planeDistance(face.map((v) => [v[0] - centroid[0], v[1] - centroid[1], v[2] - centroid[2]]));
+    return d;
+  });
+  const result = classifyShape({ faceDistances: distances.map((distance) => ({ distance })) });
+  assert.equal(result.mode, 'sphere');
+  assert.ok(Math.abs(result.R - 1 / (2 * Math.SQRT2)) < 1e-9, `got R=${result.R}`);
 });
 
 test('EPSILON_UNIFORM_REL is a relative (not absolute) tolerance', () => {

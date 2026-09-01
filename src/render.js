@@ -1135,11 +1135,27 @@ function buildSphericalGeometry({ mode, R, n }) {
 // for the numeric cross-check against those same generators). Covers the
 // 4 real InstancedMesh piece families this stage wires the toggle to --
 // RD and Octahedron(gap) are uniform (Section 1 case 2, "plain sphere");
-// Cuboctahedron/Truncated Octahedron are the axis/body-diagonal
-// two-family case (Section 1 case 3, superellipsoid). The Cube piece
-// (Pyramid Sub-Cell, a per-cell-mesh system, not InstancedMesh) and
-// Disphenoid/ring-to-torus (Section 4) are separate, not-yet-built
-// stages -- see that module's own header comment.
+// Cuboctahedron is the axis/body-diagonal two-family case (Section 1
+// case 3, superellipsoid). The Cube piece (Pyramid Sub-Cell, a
+// per-cell-mesh system, not InstancedMesh) and Disphenoid/ring-to-torus
+// (Section 4) are out of scope for this stage -- see that module's own
+// header comment.
+//
+// Direct override, real live-build feedback (2026-09-01, DICTO: "spheres
+// obviously too small" -- and to stay strictly sphere-or-superellipsoid,
+// no volumeSphere third category): Truncated Octahedron's solved n is
+// ~1.585 (n<2, since its axis/square faces sit farther out than its
+// diagonal/hex faces). Below n=2 the coordinate-axis points are the
+// GLOBAL maximum of the surface -- the superellipsoid never exceeds R
+// in any direction and pinches down to 0.866*R everywhere off-axis
+// (down to the hex-face direction), reading as visibly undersized next
+// to Cuboctahedron's own superellipsoid (n~2.71, which bulges OUTWARD
+// past R instead of pinching in). Rendered as a plain sphere instead,
+// same R (still the real axis/square-face touching distance, so it
+// still meets axis-neighbors correctly) -- uniformly full in every
+// direction rather than pinching, which is what was reading as too
+// small. A sphere is just this same superellipsoid formula at n=2, so
+// this stays within "sphere or superellipsoid," per direct instruction.
 function sphericalClassificationFor(scale) {
   return {
     rd: classifyShape({ faceDistances: [{ distance: scale / Math.SQRT2 }] }),
@@ -1150,12 +1166,7 @@ function sphericalClassificationFor(scale) {
         { distance: (0.5 * scale) * (2 / Math.sqrt(3)), family: 'diagonal' },
       ],
     }),
-    truncatedOctahedron: classifyShape({
-      faceDistances: [
-        { distance: scale, family: 'axis' },
-        { distance: scale * (Math.sqrt(3) / 2), family: 'diagonal' },
-      ],
-    }),
+    truncatedOctahedron: { mode: 'sphere', R: scale },
   };
 }
 
@@ -2450,10 +2461,23 @@ async function init() {
 
   // Spherical Toggle (docs/RHOMBIVERSE_SPEC_ADDENDUM_SPHERICAL_TOGGLE.md),
   // Stage 1 -- a client-side view swap only, same spirit as Duality above
-  // (your cells are untouched), but simpler: since every instance of a
-  // given piece type shares one BufferGeometry already (InstancedMesh),
-  // toggling the view is just swapping which geometry object each of the
-  // 4 wired meshes points at, not building a whole separate overlay mesh.
+  // (your cells are untouched). Covers every real placeable piece type
+  // except Cube (Pyramid Sub-Cell -- a per-cell, often-irregular partial
+  // shape, no clean single spherical mapping, still open) and Section 4's
+  // disphenoid-ring-to-torus grouping (out of scope by direct
+  // instruction -- disphenoids still convert individually below, just
+  // never merged into a torus). RD/Octahedron/Truncated Octahedron/
+  // Disphenoid all render as plain spheres; Cuboctahedron as a
+  // superellipsoid -- kept strictly to "sphere or superellipsoid" per
+  // direct instruction, no third volumeSphere render mode (that's not a
+  // different shape anyway, just a different radius choice for a
+  // sphere -- see sphericalClassificationFor's own header for why
+  // Truncated Octahedron ended up sphere instead of superellipsoid).
+  // For the 4 InstancedMesh piece families (RD/Octahedron/Cuboctahedron/
+  // Truncated Octahedron), every instance already shares one
+  // BufferGeometry, so toggling the view is just swapping which geometry
+  // object each mesh points at. Disphenoid is different (own Mesh per
+  // cell, no InstancedMesh) -- handled separately below.
   // Deliberately NOT applied to sculptureMesh (own separate concern) or
   // the Lattice Zoom sub-lattice/aggregate-speckle meshes (also reuse
   // `geometry`/buildRDGeometry at other scales) -- out of scope for this
@@ -2474,6 +2498,50 @@ async function init() {
     cuboctahedron: cuboctaGeometry,
     truncatedOctahedron: bccGeometry,
   };
+  // Disphenoid (interstitial-lattice, incl. the "Flattened Octahedron"
+  // bundle -- 4 disphenoids around a shared axis, no separate primitive,
+  // see interstitial-lattice.js's own header): each cell is its own real
+  // Mesh with the cell's real WORLD-SPACE coordinates baked directly
+  // into its geometry (no separate .position, same convention
+  // buildInterstitialGeometry already uses) -- not InstancedMesh, since
+  // each disphenoid has its own unique orientation. So unlike the 4
+  // meshes above, there's no single shared geometry to swap; a
+  // per-cell sphere geometry, translated to that cell's own real
+  // centroid, has to be built and swapped in per Mesh instead.
+  // R is a fixed constant, not per-cell -- disphenoids are all
+  // congruent (isosceles tetrahedra, only orientation/position differs),
+  // and genuinely uniform face-distance from their own centroid
+  // (verified: both non-adjacent-vertex face planes checked numerically
+  // land at the same distance from centroid, 1/(2*sqrt(2)) in the raw
+  // [0,0,0]/[2,0,0]/[1,1,1]/[1,1,-1]-type integer coordinates
+  // bootstrapDisphenoid/octahedronDisphenoids produce) -- Section 1
+  // case 2, plain sphere, exactly as the spec's own note says
+  // ("disphenoids... always equidistant from center -- treat as sphere
+  // individually, no exception logic needed").
+  const disphenoidR = SCALE / (2 * Math.SQRT2);
+  const disphenoidSphereTemplate = buildSphericalGeometry({ mode: 'sphere', R: disphenoidR });
+  const disphenoidOriginalGeometries = new Map(); // key -> original Mesh geometry
+  function disphenoidCentroid(verts) {
+    const world = disphenoidVertsToWorld(verts, SCALE);
+    return [0, 1, 2].map((i) => world.reduce((s, v) => s + v[i], 0) / world.length);
+  }
+  function applySphericalToDisphenoids(active) {
+    for (const [key, m] of interstitialMeshes) {
+      if (active) {
+        if (!disphenoidOriginalGeometries.has(key)) disphenoidOriginalGeometries.set(key, m.geometry);
+        const cell = interstitialStore.entries().find((c) => c.key === key);
+        if (!cell) continue;
+        const [cx, cy, cz] = disphenoidCentroid(cell.verts);
+        const sphereGeom = disphenoidSphereTemplate.clone();
+        sphereGeom.translate(cx, cy, cz);
+        m.geometry = sphereGeom;
+      } else {
+        const original = disphenoidOriginalGeometries.get(key);
+        if (original) m.geometry = original;
+      }
+    }
+  }
+
   document.getElementById('spherical-toggle')?.addEventListener('click', () => {
     sphericalModeActive = !sphericalModeActive;
     document.getElementById('spherical-toggle').classList.toggle('active', sphericalModeActive);
@@ -2482,8 +2550,9 @@ async function init() {
     octGapMesh.geometry = active.octahedron;
     cuboctaMesh.geometry = active.cuboctahedron;
     bccMesh.geometry = active.truncatedOctahedron;
+    applySphericalToDisphenoids(sphericalModeActive);
     showHudPrompt(sphericalModeActive
-      ? 'Spherical: RD/Octahedron shown as true spheres, Cuboctahedron/Truncated Octahedron as superellipsoids -- a client-side view only, your cells are untouched.'
+      ? 'Spherical: RD/Octahedron/Truncated Octahedron/Disphenoid shown as true spheres, Cuboctahedron shown as a superellipsoid -- a client-side view only, your cells are untouched.'
       : 'Spherical: off.', 5000);
   });
 
