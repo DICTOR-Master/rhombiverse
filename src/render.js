@@ -3716,6 +3716,17 @@ async function init() {
   autoAssignMaterialCheckbox?.addEventListener('change', () => {
     if (autoAssignMaterialsRow) autoAssignMaterialsRow.style.display = autoAssignMaterialCheckbox.checked ? 'flex' : 'none';
   });
+  // Auto-assign now defaults ON (direct instruction 2026-09-02, "default
+  // auto assign color with manual override" -- the checkbox's own HTML
+  // `checked` attribute already covers a fresh page load; this covers
+  // the row's own visibility matching that same default, since it
+  // otherwise only syncs on the checkbox's 'change' event). Manual
+  // override is still one click away either way -- uncheck for the
+  // plain material picker, or use the per-piece dropdowns above without
+  // unchecking anything.
+  if (autoAssignMaterialsRow && autoAssignMaterialCheckbox) {
+    autoAssignMaterialsRow.style.display = autoAssignMaterialCheckbox.checked ? 'flex' : 'none';
+  }
 
   const getShellCount = () => Math.min(Math.max(1, Number(shellCountInput.value) || 1), MAX_SHELL);
 
