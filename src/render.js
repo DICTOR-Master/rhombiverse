@@ -1211,6 +1211,11 @@ function sphericalClassificationFor(scale) {
 // not something to invent numbers for without being asked). gold
 // reuses hud-wheel-3d.js's own GOLD constant (0xd4af37) verbatim for
 // visual consistency with the one other "gold" already in this app.
+// amethyst/rose-quartz/citrine/turquoise added 2026-09-02, direct
+// request for a fuller palette -- same "buildable color only" scoping
+// as emerald/gold above. Deliberately NOT separate "-glassite"
+// variants (direct correction: translucency is the World View toggle
+// below, not per-material dropdown entries) -- see WORLD_VIEW_MODES.
 const MATERIAL_COLORS = {
   base: 0x8899aa,
   garnet: 0x8b2e2e,
@@ -1222,11 +1227,35 @@ const MATERIAL_COLORS = {
   water: 0x2e6f9e,
   emerald: 0x50c878,
   gold: 0xd4af37,
+  amethyst: 0x9966cc,
+  'rose-quartz': 0xe8a0b4,
+  citrine: 0xe08a3c,
+  turquoise: 0x30c9b8,
 };
 
 function materialColor(material) {
   return new THREE.Color(MATERIAL_COLORS[material] ?? MATERIAL_COLORS.base);
 }
+
+// Auto-assign (direct request 2026-09-02, "By piece type"): when the
+// #auto-assign-material checkbox is on, each piece type places with its
+// own fixed material instead of whatever #material-select currently
+// shows -- see currentMaterialFor() below, wired into the 3 piece-
+// placing controllers only (main build, Cuboctahedron, octahedron-gap),
+// not the Recolor tool or Sculpture/AI material assignment, which stay
+// explicit picks. 'cubocta' is a virtual key -- Piece:CO has no entry
+// of its own in #piece-type-select (it's a separate mode), so its own
+// getMaterial call site passes this key directly.
+const AUTO_ASSIGN_MATERIAL_BY_PIECE = {
+  rd: 'base',
+  cube: 'ferrostone',
+  pyramid: 'garnet',
+  to: 'gold',
+  ioct: 'turquoise',
+  idis: 'amethyst',
+  octahedron: 'emerald',
+  cubocta: 'citrine',
+};
 
 // See docs/code-notes/render.md
 const SPECIES_COLORS = {
@@ -2235,6 +2264,8 @@ async function init() {
     applyDetonationCheck(world);
     rebuildInstances(mesh, world, currentMode === 'report');
     updateSectionEnabled(); // keeps newly created partial-cell (Pyramid) mesh materials in sync with X-Ray -- see that function's own header
+    applyWorldViewMaterials(); // same reasoning as updateSectionEnabled() above -- see World View's own header
+    if (worldViewMode === 'skeleton') rebuildWorldViewSkeleton();
     // Keep an active Lattice Quick-View in sync with your real World --
     // every mode now re-renders your own cells (see
     // rebuildLatticeQuickView's own header), so a build/remove while one
@@ -2365,6 +2396,141 @@ async function init() {
       syncXrayHandleToSectionPlane();
     });
   }
+
+  // World View (direct request 2026-09-02, refined mid-build: "toggle
+  // between color trans or skeleton" -- one 3-way, mutually-exclusive
+  // whole-world display mode, not a per-material dropdown proliferation
+  // and not two independent checkboxes that could both be on at once).
+  // 'translucent' reuses the exact same material set updateSectionEnabled
+  // already touches for clippingPlanes (same reasoning: freshly created
+  // materials -- a new bccMesh.material.clone(), a newly-placed partial
+  // cell's own MeshStandardMaterial -- need the CURRENT mode reapplied
+  // immediately, not just at the next manual toggle). 'skeleton' ("Ghost
+  // + edges", matching the Rhombic Wheel's own SKELETON_COLOR face
+  // style) hides the solid meshes and shows a separate merged-geometry
+  // overlay instead -- InstancedMesh can't render THREE.EdgesGeometry's
+  // line-pairs correctly (it always draws its geometry as triangles), so
+  // per-instance edges aren't possible without a second mesh; the merged-
+  // geometry-per-rebuild technique below is the SAME one already proven
+  // 3x in this file for Lattice Quick-View/Dualize preview, not new
+  // machinery. Scoped to the main World's whole+partial RD/Cube/Pyramid
+  // cells for this first pass -- BCC/Cuboctahedron/interstitial pieces
+  // stay solid under Skeleton for now (all optional/advanced features,
+  // same "no per-cell data migration" reasoning kept this simple).
+  let worldViewMode = 'color';
+  let skeletonMesh = null;
+  let skeletonEdges = null;
+  let skeletonGeneration = 0;
+  const TRANSLUCENT_OPACITY = 0.55; // matches Lattice Quick-View/Dualize preview's own established "see-through structure" opacity
+  function worldViewMaterials() {
+    const mats = [material, bccMesh.material, cuboctaMesh.material, octGapMesh.material];
+    for (const { mesh: m } of partialCellMeshes.values()) {
+      if (m.isGroup) { for (const child of m.children) mats.push(child.material); }
+      else mats.push(m.material);
+    }
+    for (const m of interstitialMeshes.values()) mats.push(m.material);
+    return mats;
+  }
+  function applyWorldViewMaterials() {
+    const translucent = worldViewMode === 'translucent';
+    for (const mat of worldViewMaterials()) {
+      mat.transparent = translucent;
+      mat.opacity = translucent ? TRANSLUCENT_OPACITY : 1;
+      mat.depthWrite = !translucent;
+    }
+  }
+  function setSolidWorldVisible(visible) {
+    mesh.visible = visible;
+    bccMesh.visible = visible;
+    cuboctaMesh.visible = visible;
+    octGapMesh.visible = visible;
+    partialCellGroup.visible = visible;
+    interstitialGroup.visible = visible;
+  }
+  function clearWorldViewSkeleton() {
+    if (skeletonMesh) {
+      skeletonMesh.parent?.remove(skeletonMesh);
+      skeletonMesh.geometry.dispose();
+      skeletonMesh.material.dispose();
+      skeletonMesh = null;
+    }
+    if (skeletonEdges) {
+      skeletonEdges.parent?.remove(skeletonEdges);
+      skeletonEdges.geometry.dispose();
+      skeletonEdges.material.dispose();
+      skeletonEdges = null;
+    }
+  }
+  // Per-cell world-space geometry for the Skeleton merge below -- same
+  // whole-vs-partial split visibleCells()/isPartialCell() already use
+  // for the real solid meshes, just building loose geometries instead of
+  // instance matrices. Cube-less cells return one ConvexGeometry per
+  // pyramid (not one merged hull) for the same "preserve internal seams,
+  // avoid coincident-face z-fighting" reasoning as fccQuickViewPieces's
+  // own 'pyramid' branch.
+  function skeletonCellPieces(cell) {
+    const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+    const shift = (g) => g.translate(wx, wy, wz);
+    if (!isPartialCell(cell)) return [shift(buildRDGeometry(SCALE))];
+    if (cell.cube === false) {
+      const pieces = pyramidPieces(SCALE);
+      return presentAxisKeys(effectivePyramids(cell)).map((axisKey) => {
+        const { base, apex } = pieces.pyramids[axisKey];
+        const points = [...base, apex].map(([x, y, z]) => new THREE.Vector3(x, y, z));
+        return shift(new ConvexGeometry(points));
+      });
+    }
+    return [shift(buildPartialCellGeometry(effectivePyramids(cell)))];
+  }
+  async function rebuildWorldViewSkeleton() {
+    const myGeneration = ++skeletonGeneration;
+    clearWorldViewSkeleton();
+    const { world: w, scene: s } = activeWorldTriple();
+    const cells = w ? w.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed') : [];
+    if (cells.length === 0) return;
+    const pieces = cells.flatMap(skeletonCellPieces);
+    const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
+    if (myGeneration !== skeletonGeneration) { pieces.forEach((g) => g.dispose()); return; } // stale, see rebuildLatticeQuickView's own generation-counter precedent
+    const merged = mergeGeometries(pieces, false);
+    pieces.forEach((g) => g.dispose());
+    skeletonMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
+      color: SKELETON_COLOR, emissive: SKELETON_COLOR, emissiveIntensity: 0.6, flatShading: true,
+      transparent: true, opacity: 0.16, depthWrite: false,
+    }));
+    s.add(skeletonMesh);
+    skeletonEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({ color: SKELETON_COLOR }));
+    s.add(skeletonEdges);
+  }
+  async function applyWorldViewMode() {
+    if (worldViewMode === 'skeleton') {
+      setSolidWorldVisible(false);
+      await rebuildWorldViewSkeleton();
+    } else {
+      skeletonGeneration++; // invalidate any in-flight skeleton rebuild
+      clearWorldViewSkeleton();
+      setSolidWorldVisible(true);
+      applyWorldViewMaterials();
+    }
+    document.getElementById('world-view-toggle')?.classList.toggle('active', worldViewMode !== 'color');
+  }
+  const worldViewSelect = document.getElementById('world-view-select');
+  worldViewSelect?.addEventListener('change', () => {
+    worldViewMode = worldViewSelect.value;
+    applyWorldViewMode();
+  });
+  // Standalone top-right round toggle (direct correction 2026-09-02:
+  // "separate position on HUD" -- NOT folded into the bottom-left
+  // Piece/Material/Lattice-View quick-select row), same cycle-on-click
+  // pattern as X-Ray/BCC Lattice's own toggle buttons.
+  document.getElementById('world-view-toggle')?.addEventListener('click', () => {
+    const modes = ['color', 'translucent', 'skeleton'];
+    worldViewMode = modes[(modes.indexOf(worldViewMode) + 1) % modes.length];
+    if (worldViewSelect) worldViewSelect.value = worldViewMode;
+    showHudPrompt(`World View: ${worldViewMode[0].toUpperCase()}${worldViewMode.slice(1)}`, 3000);
+    applyWorldViewMode();
+  });
+  const worldViewToggleBtn = document.getElementById('world-view-toggle');
+  if (worldViewToggleBtn) worldViewToggleBtn.innerHTML = iconFrame(MARKS.worldView, { title: 'World View (tap to cycle)' });
 
   const xrayHandleGeometry = new THREE.PlaneGeometry(40, 40);
   const xrayHandleMaterial = new THREE.MeshBasicMaterial({
@@ -3455,6 +3621,15 @@ async function init() {
   const shellCountInput = document.getElementById('shell-count');
   const hollowFromInput = document.getElementById('hollow-from');
   const materialSelect = document.getElementById('material-select');
+  const autoAssignMaterialCheckbox = document.getElementById('auto-assign-material');
+
+  // See AUTO_ASSIGN_MATERIAL_BY_PIECE's own header.
+  function currentMaterialFor(pieceType) {
+    if (autoAssignMaterialCheckbox?.checked && AUTO_ASSIGN_MATERIAL_BY_PIECE[pieceType]) {
+      return AUTO_ASSIGN_MATERIAL_BY_PIECE[pieceType];
+    }
+    return materialSelect.value;
+  }
 
   const getShellCount = () => Math.min(Math.max(1, Number(shellCountInput.value) || 1), MAX_SHELL);
 
@@ -4528,7 +4703,7 @@ async function init() {
     getMode: () => (walking ? null : currentMode),
     getShellCount,
     getMinShell: () => Math.min(Math.max(1, Number(hollowFromInput.value) || 1), getShellCount()),
-    getMaterial: () => materialSelect.value,
+    getMaterial: () => currentMaterialFor(document.getElementById('piece-type-select').value),
     getGeneratorType: () => document.getElementById('generator-type-select').value,
     getPieceType: () => document.getElementById('piece-type-select').value,
     // TO ("adopted family member", direct instruction 2026-08-26): lets
@@ -4582,6 +4757,7 @@ async function init() {
     }
     rebuildBCCInstances(bccMesh, bccWorld);
     updateSectionEnabled(); // keeps bccMesh's own material in sync with X-Ray -- see that function's own header
+    applyWorldViewMaterials(); // same reasoning -- see World View's own header
     saveToLocalStorage(bccWorld.toJSON(), BCC_STORAGE_KEY);
   }
 
@@ -4597,6 +4773,7 @@ async function init() {
     }
     rebuildInterstitialMeshes(interstitialStore);
     updateSectionEnabled(); // keeps newly created interstitial mesh materials in sync with X-Ray -- see that function's own header
+    applyWorldViewMaterials(); // same reasoning -- see World View's own header
     saveToLocalStorage(interstitialStore.toJSON(), INTERSTITIAL_STORAGE_KEY);
   }
   // Cuboctahedron Build: own change handler, same "never truly empty"
@@ -4607,6 +4784,7 @@ async function init() {
     }
     rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld);
     updateSectionEnabled(); // keeps cuboctaMesh's own material in sync with X-Ray -- see that function's own header
+    applyWorldViewMaterials(); // same reasoning -- see World View's own header
     saveToLocalStorage(cuboctaWorld.toJSON(), CUBOCTA_STORAGE_KEY);
   }
   createCuboctaBuildController({
@@ -4618,7 +4796,7 @@ async function init() {
     cuboctaCellAt: (instanceId) => cuboctaCellOrder[instanceId],
     cuboctaWorld,
     onChange: onCuboctaChange,
-    getMaterial: () => materialSelect.value,
+    getMaterial: () => currentMaterialFor('cubocta'),
     isActive: () => !walking && currentMode === 'cubocta' && FEATURES.bccLattice,
   });
 
@@ -4628,6 +4806,7 @@ async function init() {
   function onOctGapChange() {
     rebuildOctGapInstances(octGapMesh, octGapWorld);
     updateSectionEnabled();
+    applyWorldViewMaterials(); // same reasoning -- see World View's own header
     saveToLocalStorage(octGapWorld.toJSON(), CUBOCTA_GAP_STORAGE_KEY);
   }
   // Driven by the Piece picker's own 'octahedron' slot (a real, separate
@@ -4645,7 +4824,7 @@ async function init() {
     octGapCellAt: (instanceId) => octGapCellOrder[instanceId],
     octGapWorld,
     onChange: onOctGapChange,
-    getMaterial: () => materialSelect.value,
+    getMaterial: () => currentMaterialFor('octahedron'),
     isActive: () =>
       !walking &&
       (currentMode === 'build' || currentMode === 'chisel') &&

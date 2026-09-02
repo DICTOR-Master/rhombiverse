@@ -257,6 +257,19 @@
     #reload-toggle { right: 278px; }
     #clear-world-toggle:hover, #reload-toggle:hover { background: rgba(255, 255, 255, 0.15); }
     #clear-world-toggle:hover { border-color: #ff6b6b; }
+    #world-view-toggle {
+      position: fixed; top: 12px; right: 392px; z-index: 900;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      color: #ddd;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font: 15px system-ui, sans-serif;
+      cursor: pointer;
+    }
+    #world-view-toggle:hover { background: rgba(255, 255, 255, 0.15); }
+    #world-view-toggle.active { background: rgba(120, 190, 255, 0.4); border-color: #7cf; color: #fff; }
+    #world-view-toggle svg { width: 20px; height: 20px; }
     #rhombic-wheel-3d-toggle {
       position: fixed; top: 12px; right: 316px; z-index: 900;
       width: 30px; height: 30px;
@@ -311,7 +324,7 @@
        and #hud-crosshair are deliberately excluded -- the prompt IS the
        transition's own cue text, and the crosshair fades in/out on its
        own timing (render.js), not this one. */
-    #hud-wordmark, #hud-wheel-cue, #hud-quick-shape, #hud-quick-material, #hud-quick-lattice-view, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #spherical-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle {
+    #hud-wordmark, #hud-wheel-cue, #hud-quick-shape, #hud-quick-material, #hud-quick-lattice-view, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #spherical-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle, #world-view-toggle {
       transition: opacity 0.3s ease;
     }
     body.explore-transitioning #hud-wordmark,
@@ -328,7 +341,8 @@
     body.explore-transitioning #bcc-toggle,
     body.explore-transitioning #rhombic-wheel-3d-toggle,
     body.explore-transitioning #clear-world-toggle,
-    body.explore-transitioning #reload-toggle {
+    body.explore-transitioning #reload-toggle,
+    body.explore-transitioning #world-view-toggle {
       opacity: 0;
       pointer-events: none;
     }
@@ -1131,6 +1145,7 @@
   <button id="sculpture-mode-toggle" type="button" title="Sculpture Mode: a separate, isolated scratch workspace">◆</button>
   <button id="cyborg-toggle" type="button" title="Cyborg Mode: guided walkthrough">◈</button>
   <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>
+  <button id="world-view-toggle" type="button" title="World View: Color / Translucent / Skeleton (tap to cycle)"></button>
   <button id="duality-toggle" type="button" title="Duality: view this structure's aperiodic shadow">◐</button>
   <button id="spherical-toggle" type="button" title="Spherical: view shapes in near-spherical form">◯</button>
   <button id="bcc-toggle" type="button" title="BCC Lattice: view the nested dual body-centered-cubic detail lattice (Rhombeometry only)">⬡</button>
@@ -1216,8 +1231,15 @@
           <option value="water">Water</option>
           <option value="emerald">Emerald</option>
           <option value="gold">Gold</option>
+          <option value="amethyst">Amethyst</option>
+          <option value="rose-quartz">Rose Quartz</option>
+          <option value="citrine">Citrine</option>
+          <option value="turquoise">Turquoise</option>
         </select>
       </label>
+    </div>
+    <div id="auto-assign-row" class="row">
+      <label><input id="auto-assign-material" type="checkbox" /> Auto-assign material by piece type</label>
     </div>
     <div id="piece-type-row" class="row">
       <label>Piece:
@@ -1287,6 +1309,15 @@
     </div>
     <h2>World, Import/Export &amp; Sharing</h2>
     <hr style="border-color: rgba(255,255,255,0.15); margin: 8px 0;" />
+    <div class="row">
+      <label>World view:
+        <select id="world-view-select">
+          <option value="color">Color</option>
+          <option value="translucent">Translucent</option>
+          <option value="skeleton">Skeleton</option>
+        </select>
+      </label>
+    </div>
     <div class="row">
       <label><input id="section-enable" type="checkbox" /> Section view</label>
     </div>

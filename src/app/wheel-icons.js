@@ -478,6 +478,16 @@ export const MARKS = {
     <polygon points="0,0 0,-32 27.71,-16" fill="currentColor" opacity="0.55"/>
     <polygon points="0,0 27.71,16 0,32" fill="currentColor" opacity="0.55"/>
     <polygon points="0,0 -27.71,16 -27.71,-16" fill="currentColor" opacity="0.55"/>`,
+  // World View toggle (Color / Translucent / Skeleton, render.js's
+  // #world-view-toggle), direct request: "three rings overlapping."
+  // Three equal circles at 120-degree symmetry around center, stroke
+  // only -- one ring per mode, the overlap reading as "one control,
+  // several ways to look at the same thing" rather than three separate
+  // switches.
+  worldView: `
+    <circle cx="0" cy="-14" r="22" stroke="currentColor" stroke-width="3" fill="none"/>
+    <circle cx="12.1" cy="7" r="22" stroke="currentColor" stroke-width="3" fill="none"/>
+    <circle cx="-12.1" cy="7" r="22" stroke="currentColor" stroke-width="3" fill="none"/>`,
 };
 
 // One filled hexagon in a given real color -- for the bottom-left
