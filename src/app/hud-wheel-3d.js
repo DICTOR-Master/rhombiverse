@@ -198,7 +198,19 @@ const HUD_FACES = {
     svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><path d="M0,-1.5 L1.3,-0.75 L1.3,0.75 L0,1.5 L-1.3,0.75 L-1.3,-0.75 Z M0.18,0.18 L0.18,1.0 L-0.18,1.0 L-0.18,0.18 L-1.0,0.18 L-1.0,-0.18 L-0.18,-0.18 L-0.18,-1.0 L0.18,-1.0 L0.18,-0.18 L1.0,-0.18 L1.0,0.18 Z" fill="currentColor" fill-rule="evenodd"/></svg>',
     elId: 'cubocta-build-toggle', title: 'Cuboctahedron Build',
   },
-  'bottom|sx-1sz-1':  { symbol: '◇', elId: 'rhombic-wheel-3d-toggle', title: 'Menu', temporary: true },
+  // Was a temporary duplicate Menu face (its true geometric antipode had
+  // no non-duplicate content to swap in when the wheel-audit pass filled
+  // every other slot -- see the policy note above). Filled 2026-09-02
+  // with the new World View toggle (direct correction: a standalone
+  // top-right button "interferes with name Rhombiverse" -- same
+  // "real placement belongs on the medallion, not a new floating
+  // button" precedent Cuboctahedron Build's own face already
+  // established). Three overlapping rings, same mark as wheel-icons.js's
+  // MARKS.worldView, redrawn at this file's own tiny coordinate scale.
+  'bottom|sx-1sz-1':  {
+    svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><circle cx="0" cy="-0.73" r="1.14" stroke="currentColor" stroke-width="0.16" fill="none"/><circle cx="0.63" cy="0.36" r="1.14" stroke="currentColor" stroke-width="0.16" fill="none"/><circle cx="-0.63" cy="0.36" r="1.14" stroke="currentColor" stroke-width="0.16" fill="none"/></svg>',
+    elId: 'world-view-toggle', title: 'World View',
+  },
 };
 
 export function createHudWheel3D(renderer, { size = 144, margin = 12, getBackgroundColor } = {}) {

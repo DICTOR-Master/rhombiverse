@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-09-02",
+    "title": "A Fuller Palette",
+    "items": [
+      "Four new materials: Amethyst, Rose Quartz, Citrine, and Turquoise -- same real-mineral naming as Garnet, Emerald, and Gold, now 14 colors deep.",
+      "New Auto-assign option next to the material picker: turn it on and every piece type (RD, Cube, Pyramid, Truncated Octahedron, Flattened Octahedron, Disphenoid, Octahedron, Cuboctahedron) places with its own fixed default material, no manual picking needed.",
+      "New World View toggle -- a standalone button next to X-Ray, or the three-rings symbol on the corner HUD wheel -- switches your whole build between Color (normal), Translucent (every material, Glassite included, actually see-through for the first time), and Skeleton (ghost fill plus a real edge outline, matching the Rhombic Wheel's own look)."
+    ]
+  },
+  {
+    "date": "2026-09-02",
     "title": "New Faces on the Wheel",
     "items": [
       "Settings is now a real gear -- bold, centered, and easy to spot at a glance instead of a small faint glyph.",

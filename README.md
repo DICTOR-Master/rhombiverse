@@ -67,10 +67,15 @@ its own tools:
 
 - **Build** — click/tap a face to place a block; right-click (or long-press
   on touch) always removes the clicked cell, in every mode. A material
-  picker, Repeat (drag to place a run of cells), and a **Fill/Round/
-  Excavate** planetoid toolkit for building whole spheres and retrofitting
-  them (radial gravity bends toward the core once a body is large enough to
-  have one).
+  picker (14 real-mineral colors, gem-themed — garnet, emerald, gold,
+  amethyst, and more — with an Auto-assign option that gives every piece
+  type its own default material automatically), Repeat (drag to place a
+  run of cells), and a **Fill/Round/Excavate** planetoid toolkit for
+  building whole spheres and retrofitting them (radial gravity bends
+  toward the core once a body is large enough to have one). A standalone
+  **World View** toggle (top-right, or the corner HUD wheel) switches the
+  whole build between Color, Translucent, and Skeleton (ghost fill + edge
+  outline) at a glance.
 - **Alter** — Dig, Smooth, Fill, Replace: reshaping existing structure.
 - **Create** — **Sculpt** (a real order-48 cubic symmetry/mirror tool with a
   shell brush, Model/Chisel modes, and an Assistance Spectrum from fully
