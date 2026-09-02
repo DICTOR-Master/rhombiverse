@@ -266,27 +266,47 @@ export const MARKS = {
     <path d="M0,-46 V46" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>`,
   // Cyborg: direct request 2026-09-02 -- "a symbolic robot head like
   // from metropolis would suit Cyborg much better" than the plain ◈
-  // glyph. Researched, not guessed: the Maschinenmensch ("Maria") from
-  // Fritz Lang's Metropolis (1927), designed by Walter Schulze-
-  // Mittendorff -- Art Deco, a smooth mask-like rounded head (its own
-  // look explicitly evokes Tutankhamun's golden funerary mask) over a
-  // metallic torso built from banded/ribbed segmented plating. Reduced
-  // to this project's own geometric icon vocabulary: a rounded-capsule
-  // head outline (the mask), two round eyes (a small legible nod to a
-  // face, since the film mask itself reads as too subtle at icon
-  // scale), and three horizontal collar bands of increasing width below
-  // (the ribbed plating) -- not a literal illustration, a recognizable
-  // silhouette. Sources: reactormag.com/metropolis-a-fever-dream-of-
-  // mankind-our-machines-and-maria, mikekalil.com/blog/robot-maria-
-  // metropolis, en.wikipedia.org/wiki/Walter_Schulze-Mittendorff.
-  // Applies everywhere Cyborg appears -- see the matching SVG in
-  // hud-wheel-3d.js's HUD_FACES (same design, its own tiny coordinate
-  // scale), replacing that file's own bare ◈ glyph.
+  // glyph, "with step pyramid type ears." Researched, not guessed: the
+  // Maschinenmensch ("Maria") from Fritz Lang's Metropolis (1927),
+  // designed by Walter Schulze-Mittendorff -- Art Deco, a smooth
+  // mask-like head (its own look explicitly evokes Tutankhamun's golden
+  // funerary mask) over banded/ribbed segmented plating. Sources:
+  // reactormag.com/metropolis-a-fever-dream-of-mankind-our-machines-and-
+  // maria, mikekalil.com/blog/robot-maria-metropolis,
+  // en.wikipedia.org/wiki/Walter_Schulze-Mittendorff.
+  //
+  // Went through 5 rounds of direct visual review (a proof-sheet
+  // artifact, not blind pushes -- ears/head/eyes/neck each got real
+  // live feedback before landing here):
+  //  v1 (rounded rect + 2 dot eyes + 3 flat collar lines): "not
+  //     immediately recognizable as robot, too much neck," and its
+  //     head (y=-38..4) sat crowded against the frame's own y=-46 edge.
+  //  v2 ("headphone-cup" ears, single gradual taper): "looks like long
+  //     corks, not a stepped pyramid" -- the step-width jump (3->9
+  //     units) was too gentle against a 16-unit ear to read as blocks.
+  //  v3 (2-level jump -- tiny tabs + one huge spike): "worse" -- only 2
+  //     real sizes isn't a staircase, just a spike with flat flanges.
+  //  v4 (this one): 4 real tiers per half (2/5/8/11 units of
+  //     protrusion), each a distinct step, graduating up to the widest
+  //     point at the vertical center, mirrored top/bottom -- confirmed
+  //     "perfect."
+  // Head is a true ellipse (not a rounded rect -- "wanted a bit more
+  // beautiful than square"), nudged up slightly off dead-center
+  // (cy=-5) per "a little bit more towards top" without repeating v1's
+  // crowded extreme. Eyes sized down from the first oval-head pass.
+  // Neck: two open rings (not v1's 3 solid bars) -- narrower one next
+  // to the head, wider one below, reading as a neck that flares
+  // outward going down.
+  // Applies everywhere Cyborg appears -- see the matching (simplified
+  // for its much smaller render size) SVG in hud-wheel-3d.js's
+  // HUD_FACES, replacing that file's own bare ◈ glyph.
   cyborg: `
-    <rect x="-20" y="-38" width="40" height="42" rx="18" ry="18" fill="none" stroke="currentColor" stroke-width="3"/>
-    <circle cx="-9" cy="-18" r="5" fill="currentColor"/>
-    <circle cx="9" cy="-18" r="5" fill="currentColor"/>
-    <path d="M-14,10 H14 M-17,19 H17 M-20,28 H20" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`,
+    <path d="M19,-13 L21,-13 L21,-11 L24,-11 L24,-9 L27,-9 L27,-7 L30,-7 L30,-3 L27,-3 L27,-1 L24,-1 L24,1 L21,1 L21,3 L19,3 Z M-19,-13 L-21,-13 L-21,-11 L-24,-11 L-24,-9 L-27,-9 L-27,-7 L-30,-7 L-30,-3 L-27,-3 L-27,-1 L-24,-1 L-24,1 L-21,1 L-21,3 L-19,3 Z" fill="currentColor"/>
+    <ellipse cx="0" cy="-5" rx="20" ry="24" fill="none" stroke="currentColor" stroke-width="3"/>
+    <circle cx="-8" cy="-9" r="5.5" fill="currentColor"/>
+    <circle cx="8" cy="-9" r="5.5" fill="currentColor"/>
+    <ellipse cx="0" cy="22" rx="8" ry="3" fill="none" stroke="currentColor" stroke-width="2.2"/>
+    <ellipse cx="0" cy="28" rx="10" ry="3" fill="none" stroke="currentColor" stroke-width="2.2"/>`,
 
   // --- 2026-08-26 second pass: the actions the spec's own table never
   // resolved. Not in RHOMBIVERSE_SPEC_ICON_SYSTEM.md itself -- designed
@@ -367,17 +387,16 @@ export const MARKS = {
   // "too small" (font-size 40, fixed to 64), then "off center"
   // (measured live -- the glyph's own rendered bbox center sat at
   // cy=-5.6, not 0, a real font-metrics quirk, not eyeballing error),
-  // then "still a bit small" even at font-size 64/h=71 -- same root
-  // cause as BCC Lattice's hexagon (c731054): a Unicode symbol glyph's
-  // own strokes can stay visually thin/spindly no matter how large the
-  // font-size gets, so bounding-box size stops being a useful proxy for
-  // visual weight. Same fix: a real hand-built SVG instead of a font
-  // glyph, for direct control over ink. 8 teeth, computed from real
-  // trig (rOuter=40, rRoot=30, evenly spaced -- not eyeballed), solid
-  // fill with an evenodd center hole cut via a circle subpath. Bold,
-  // perfectly centered on (0,0) by construction, single-symbol sized
-  // (rOuter=40 vs the 46-unit frame radius).
-  lab: `<path d="M39.1,-8.3 L39.1,8.3 L27.7,11.5 L33.5,21.8 L21.8,33.5 L11.5,27.7 L8.3,39.1 L-8.3,39.1 L-11.5,27.7 L-21.8,33.5 L-33.5,21.8 L-27.7,11.5 L-39.1,8.3 L-39.1,-8.3 L-27.7,-11.5 L-33.5,-21.8 L-21.8,-33.5 L-11.5,-27.7 L-8.3,-39.1 L8.3,-39.1 L11.5,-27.7 L21.8,-33.5 L33.5,-21.8 L27.7,-11.5 Z M14,0 A14,14 0 1,0 -14,0 A14,14 0 1,0 14,0 Z" fill="currentColor" fill-rule="evenodd"/>`,
+  // then "still a bit small" even at font-size 64/h=71 (same root cause
+  // as BCC Lattice's hexagon, c731054: a Unicode glyph can stay
+  // visually thin no matter the font-size) -- fixed with a first-pass
+  // hand-built SVG (rOuter=40, 8 sharp-pointed teeth), then a direct
+  // follow-up: "too big and too simplistic." Redrawn with more care --
+  // rOuter 40->30 (smaller), and real trapezoidal teeth (flat tips,
+  // flat valleys, computed from real trig, not pointed sawtooth) for an
+  // actual cog profile instead of a spiky one. Solid fill, evenodd
+  // center hole (r=10), perfectly centered on (0,0) by construction.
+  lab: `<path d="M20.33,-8.42 L29.54,-5.21 L29.54,5.21 L20.33,8.42 L24.57,17.21 L17.21,24.57 L8.42,20.33 L5.21,29.54 L-5.21,29.54 L-8.42,20.33 L-17.21,24.57 L-24.57,17.21 L-20.33,8.42 L-29.54,5.21 L-29.54,-5.21 L-20.33,-8.42 L-24.57,-17.21 L-17.21,-24.57 L-8.42,-20.33 L-5.21,-29.54 L5.21,-29.54 L8.42,-20.33 L17.21,-24.57 L24.57,-17.21 Z M10,0 A10,10 0 1,0 -10,0 A10,10 0 1,0 10,0 Z" fill="currentColor" fill-rule="evenodd"/>`,
   // Home: a literal "H" (two uprights + a crossbar, see HOME_HEX_R/
   // HOME_H_HALF_W/HOME_H_HALF_H above) centered inside an outline
   // hexagon -- "H" for Home. Was a plain solid hexagon before; direct

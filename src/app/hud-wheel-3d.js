@@ -112,15 +112,18 @@ const HUD_FACES = {
   // elId (#lab-toggle) unchanged.
   'equator|sx1sy1':   { symbol: '⚙', elId: 'lab-toggle',              title: 'Settings' },
   'equator|sx1sy-1':  { symbol: '⛶', elId: 'xray-toggle',             title: 'X-Ray' },
-  // Real SVG robot head, not the bare ◈ glyph: direct request
-  // 2026-09-02, "a symbolic robot head like from metropolis would suit
-  // Cyborg much better" -- same design as wheel-icons.js's MARKS.cyborg
-  // (see that file's own comment for the Metropolis/Maschinenmensch
-  // research and sourcing), scaled into this file's own tiny
-  // coordinate convention. Rounded-capsule head (the Art Deco mask),
-  // two round eyes, three banded collar lines (the ribbed plating).
+  // Real SVG robot head, not the bare ◈ glyph -- same final design as
+  // wheel-icons.js's MARKS.cyborg (see that file's own comment for the
+  // full 5-round review history and Metropolis/Maschinenmensch
+  // sourcing), scaled into this file's own tiny coordinate convention.
+  // Ellipse head, big round eyes, two open neck rings (narrow-then-
+  // wide going down). Ears simplified to 2 tiers instead of the main
+  // mark's 4 -- at this face's true render size (~1/19th the main
+  // wheel's), 4 sub-1-unit steps would blur into noise; 2 clear tiers
+  // (a small tab + one bold peak at the vertical center) keep the
+  // "graduated, not a smooth cork" silhouette legible at actual size.
   'equator|sx-1sy1':  {
-    svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><rect x="-1.05" y="-1.98" width="2.1" height="2.2" rx="0.94" ry="0.94" fill="none" stroke="currentColor" stroke-width="0.24"/><circle cx="-0.47" cy="-0.94" r="0.26" fill="currentColor"/><circle cx="0.47" cy="-0.94" r="0.26" fill="currentColor"/><path d="M-0.73,0.52 H0.73 M-0.88,0.99 H0.88 M-1.04,1.46 H1.04" stroke="currentColor" stroke-width="0.24" stroke-linecap="round"/></svg>',
+    svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><path d="M1,-0.68 L1.1,-0.68 L1.1,-0.47 L1.5,-0.47 L1.5,-0.05 L1.1,-0.05 L1.1,0.16 L1,0.16 Z M-1,-0.68 L-1.1,-0.68 L-1.1,-0.47 L-1.5,-0.47 L-1.5,-0.05 L-1.1,-0.05 L-1.1,0.16 L-1,0.16 Z" fill="currentColor"/><ellipse cx="0" cy="-0.26" rx="1.04" ry="1.25" fill="none" stroke="currentColor" stroke-width="0.16"/><circle cx="-0.42" cy="-0.47" r="0.29" fill="currentColor"/><circle cx="0.42" cy="-0.47" r="0.29" fill="currentColor"/><ellipse cx="0" cy="1.14" rx="0.42" ry="0.16" fill="none" stroke="currentColor" stroke-width="0.16"/><ellipse cx="0" cy="1.46" rx="0.52" ry="0.16" fill="none" stroke="currentColor" stroke-width="0.16"/></svg>',
     elId: 'cyborg-toggle', title: 'Cyborg Mode',
   },
   'equator|sx-1sy-1': { symbol: '◆', elId: 'sculpture-mode-toggle',   title: 'Sculpture Mode' },
