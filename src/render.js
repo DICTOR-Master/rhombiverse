@@ -3120,6 +3120,20 @@ async function init() {
         // quick-select, just never auto-opened the way every other
         // Piece already does. Added below, matching tool:pieceType:*'s
         // own call exactly.
+        //
+        // STILL-OPEN-WHEEL BUG, direct report 2026-09-02 ("when selected
+        // the color wheel appears behind instead of in front so
+        // impossible to select"): the "stays open" design above was
+        // written before openMaterialPicker was ever really wired in
+        // here (see the paragraph just above) -- once it was, the wheel
+        // (z-index 990) kept covering the picker strip (z-index 985,
+        // wheel-pickers.js), since the wheel was still open when the
+        // picker opened. tool:pieceType:* never hit this because IT
+        // already calls wheel3D.close() first (line ~3026). Matching
+        // that here too -- Material is still reachable immediately
+        // (right after this click, not "stay open in case"), it's just
+        // reachable through a picker that isn't hidden behind the wheel
+        // anymore.
         if (action === 'tool:cuboctaBuild') {
           if (!FEATURES.bccLattice) {
             wheel3D.close();
@@ -3128,6 +3142,7 @@ async function init() {
           }
           clickMode('cubocta');
           showHudPrompt('Piece: CO', 3000);
+          wheel3D.close();
           pickers.openMaterialPicker((value, label) => showHudPrompt(`Material: ${label}`, 3000));
           return;
         }
