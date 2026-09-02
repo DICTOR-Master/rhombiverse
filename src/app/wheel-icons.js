@@ -183,17 +183,33 @@ export const MARKS = {
     <polygon points="${rhombusPts(28, 36, -22, 0)}" fill="currentColor"/>
     <polygon points="${rhombusPts(28, 36, 22, 0)}" fill="none" stroke="currentColor" stroke-width="2"/>
     <path d="M-4,-4 H4 M-4,4 H4" ${STROKE}/>`,
-  // Blueprint (wheel id "rhombitect", unchanged internally): hexagon
-  // (the frame's own) with one edge shown as a measured/ruled line --
-  // drawn INSET from the frame's own edge (not retracing it) so the
-  // ruled ticks are actually visible against the hexagon interior, not
-  // lost on top of the frame outline itself.
-  rhombitect: `<path d="M-28,-16 V16 M-28,-16 h6 M-28,0 h6 M-28,16 h6" ${STROKE}/>`,
+  // Blueprint (wheel id "rhombitect", unchanged internally): a pair of
+  // dividing compasses -- the precise-coordinate-building theme this
+  // wheel is actually about (Dome/Spiral Column/Templates/Generate a
+  // Body), drawn as a real drafting tool rather than an abstraction.
+  // Replaces a ruled vertical line with 3 ticks, direct report
+  // 2026-09-02 ("really dont get what the E even means" -- the 3
+  // right-pointing ticks off a vertical spine read exactly as a
+  // capital E, not a ruled edge). Pivot joint (filled dot) at top, two
+  // straight legs splaying to sharp points, a small curved crossbar
+  // partway down suggesting the adjustable hinge real dividers have.
+  rhombitect: `
+    <circle cx="0" cy="-32" r="4" fill="currentColor"/>
+    <path d="M0,-32 L-23,32 M0,-32 L23,32" ${STROKE}/>
+    <path d="M-14,0 Q0,8 14,0" stroke="currentColor" stroke-width="2" fill="none"/>`,
   // Cultivate (mark key "rhombivate", unchanged internally): single
-  // rhombus, creased down the center like a leaf/bean.
+  // rhombus, creased down the center like a leaf/bean. Enlarged
+  // 2026-09-02 -- a single-symbol mark like this one is effectively
+  // 2-3x smaller than the "same" nominal size next to a mark sharing
+  // its hexagon with 2-3 shapes, so it needs to actually dominate the
+  // frame the way Add's bold "+" does, not just be "somewhat bigger."
+  // 30x40 -> 46x62, outline bumped from the shared THIN (2px) to 2.5px
+  // for real single-symbol boldness. Plant/Prune below share this exact
+  // shape (documented as deliberately reusing it) so they're enlarged
+  // to match, not left inconsistent.
   rhombivate: `
-    <polygon points="${rhombusPts(30, 40)}" ${THIN}/>
-    <path d="M0,-20 Q6,0 0,20" ${THIN}/>`,
+    <polygon points="${rhombusPts(46, 62)}" stroke="currentColor" stroke-width="2.5" fill="none"/>
+    <path d="M0,-31 Q9,0 0,31" stroke="currentColor" stroke-width="2.5" fill="none"/>`,
   // Explore: hexagon split diagonally into an arrow shape, with a faint trailing echo of smaller hexagons.
   explore: `
     <polygon points="${hexPts(12, -30, 22)}" stroke="currentColor" stroke-width="1.5" opacity="0.3" fill="none"/>
@@ -204,12 +220,29 @@ export const MARKS = {
     <polygon points="${rhombusPts(24, 31, 0, -12)}" ${THIN}/>
     <polygon points="${rhombusPts(24, 31, -14, 10)}" ${THIN}/>
     <polygon points="${rhombusPts(24, 31, 14, 10)}" ${THIN}/>`,
-  // Almanac: four small diamonds arranged around a center point.
+  // Lattice View: Off -- a plain bold hexagon, real content instead of
+  // a blank frame. Direct report 2026-09-02 ("lattice view symbols are
+  // still feint on HUD"): the corner HUD wheel's own BCC Lattice face
+  // gets its innerHTML overwritten live by render.js's
+  // updateLatticeQuickViewIcon() (a real state-sync mechanism, not a
+  // bug) -- LATTICE_QUICK_VIEW_MARK_KEY had no 'off' entry, so the
+  // default/most-common state rendered an EMPTY iconFrame (just the
+  // outline, zero ink) rather than anything faint-but-present. This
+  // mark fills that gap; single-symbol sizing (see rhombivate/cyborg/
+  // lab above for the same reasoning).
+  latticeOff: `<polygon points="${hexPts(32)}" stroke="currentColor" stroke-width="2.5" fill="none"/>`,
+  // Almanac: four diamonds arranged around a center point. Enlarged
+  // 2026-09-02 (direct report: "almanac ... too small") -- each
+  // diamond's own bounding box was small even though the 4-diamond
+  // group's overall spread wasn't, reading as sparse/thin rather than
+  // bold; 16x16 -> 22x22 per diamond, same 24-unit offset (verified no
+  // overlap: each diamond's own half-width/height is 11, well under the
+  // 24-unit gap to its neighbors).
   almanac: `
-    <polygon points="${rhombusPts(16, 16, 24, 0)}" ${THIN}/>
-    <polygon points="${rhombusPts(16, 16, 0, 24)}" ${THIN}/>
-    <polygon points="${rhombusPts(16, 16, -24, 0)}" ${THIN}/>
-    <polygon points="${rhombusPts(16, 16, 0, -24)}" ${THIN}/>`,
+    <polygon points="${rhombusPts(22, 22, 24, 0)}" ${THIN}/>
+    <polygon points="${rhombusPts(22, 22, 0, 24)}" ${THIN}/>
+    <polygon points="${rhombusPts(22, 22, -24, 0)}" ${THIN}/>
+    <polygon points="${rhombusPts(22, 22, 0, -24)}" ${THIN}/>`,
   // Duality: a black diamond nested inside a white diamond, and a white diamond
   // nested inside a black diamond, diagonally opposite.
   duality: `
@@ -234,7 +267,13 @@ export const MARKS = {
   // Cyborg: resolved by the live cross-walk, not a new mark -- reuses the
   // HUD wheel's own existing glyph (◈) verbatim, one symbol/one purpose,
   // rather than either of the spec's original two candidate directions.
-  cyborg: `<text x="0" y="11" font-size="44" text-anchor="middle" fill="currentColor">◈</text>`,
+  // Enlarged 2026-09-02 (direct report, refined further: a single-
+  // symbol mark like this one should read as dominant as a bold single
+  // stroke mark like Add's "+", not just "somewhat bigger than before"
+  // -- a symbol sharing its hexagon with 2-3 others is effectively 2-3x
+  // smaller even at the "same" nominal size, since it's only ever one
+  // piece of the frame's total ink) -- font-size 44 -> 68.
+  cyborg: `<text x="0" y="17" font-size="68" text-anchor="middle" fill="currentColor">◈</text>`,
 
   // --- 2026-08-26 second pass: the actions the spec's own table never
   // resolved. Not in RHOMBIVERSE_SPEC_ICON_SYSTEM.md itself -- designed
@@ -280,9 +319,9 @@ export const MARKS = {
   // "growing thing" language) but a distinct, more specific mark, not a
   // duplicate of the department's own icon.
   plant: `
-    <polygon points="${rhombusPts(30, 40)}" ${THIN}/>
-    <path d="M0,-20 Q6,0 0,20" ${THIN}/>
-    <circle cx="0" cy="20" r="5" fill="currentColor"/>`,
+    <polygon points="${rhombusPts(46, 62)}" stroke="currentColor" stroke-width="2.5" fill="none"/>
+    <path d="M0,-31 Q9,0 0,31" stroke="currentColor" stroke-width="2.5" fill="none"/>
+    <circle cx="0" cy="31" r="7" fill="currentColor"/>`,
   // Growth Params: three vertical bars of different heights (adjustable
   // parameters) -- deliberately not a dial/slider (outside this
   // project's hex/rhombus vocabulary), a bar-height comparison is real
@@ -291,9 +330,9 @@ export const MARKS = {
   // Prune: the same creased rhombus as Plant/Cultivate, with a cut mark
   // (a short crossing line) at one point -- trimming.
   prune: `
-    <polygon points="${rhombusPts(30, 40)}" ${THIN}/>
-    <path d="M0,-20 Q6,0 0,20" ${THIN}/>
-    <path d="M-8,4 L8,-4" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`,
+    <polygon points="${rhombusPts(46, 62)}" stroke="currentColor" stroke-width="2.5" fill="none"/>
+    <path d="M0,-31 Q9,0 0,31" stroke="currentColor" stroke-width="2.5" fill="none"/>
+    <path d="M-11,6 L11,-6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`,
   // Offer: single rhombus with an outward arrow -- giving something away.
   offer: `
     <polygon points="${rhombusPts(26, 34)}" ${THIN}/>
@@ -310,10 +349,13 @@ export const MARKS = {
     <rect x="-16" y="4" width="12" height="12" fill="currentColor"/>
     <rect x="4" y="4" width="12" height="12" fill="currentColor"/>`,
   // --- Universal-ring gaps (appear on every wheel, not spec-resolved) ---
-  // Lab / Settings: resolved by the same live cross-walk logic as Cyborg
-  // -- already has a real shipped icon (⚙, the HUD's lab-toggle), reuse
-  // verbatim rather than invent a competing hex/rhombus mark for it.
-  lab: `<text x="0" y="11" font-size="40" text-anchor="middle" fill="currentColor">⚙</text>`,
+  // Settings (mark key "lab", unchanged internally): resolved by the
+  // same live cross-walk logic as Cyborg -- already has a real shipped
+  // icon (⚙, the HUD's lab-toggle), reuse verbatim rather than invent a
+  // competing hex/rhombus mark for it. Enlarged 2026-09-02, same
+  // single-symbol-vs-shared-hexagon reasoning as Cyborg above --
+  // font-size 40 -> 64.
+  lab: `<text x="0" y="16" font-size="64" text-anchor="middle" fill="currentColor">⚙</text>`,
   // Home: a literal "H" (two uprights + a crossbar, see HOME_HEX_R/
   // HOME_H_HALF_W/HOME_H_HALF_H above) centered inside an outline
   // hexagon -- "H" for Home. Was a plain solid hexagon before; direct

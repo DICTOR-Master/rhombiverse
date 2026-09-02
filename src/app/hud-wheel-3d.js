@@ -107,7 +107,10 @@ const SYMBOL_SCALE = {
 // symbol-only wheel would be genuinely ambiguous with no text to
 // disambiguate, unlike the old button row where position/tooltip did.
 const HUD_FACES = {
-  'equator|sx1sy1':   { symbol: '⚙', elId: 'lab-toggle',              title: 'Advanced / Lab' },
+  // Direct instruction 2026-09-02: "get rid of lab everywhere" -- title
+  // only, dropped from "Advanced / Lab" to plain "Settings"; internal
+  // elId (#lab-toggle) unchanged.
+  'equator|sx1sy1':   { symbol: '⚙', elId: 'lab-toggle',              title: 'Settings' },
   'equator|sx1sy-1':  { symbol: '⛶', elId: 'xray-toggle',             title: 'X-Ray' },
   'equator|sx-1sy1':  { symbol: '◈', elId: 'cyborg-toggle',           title: 'Cyborg Mode' },
   'equator|sx-1sy-1': { symbol: '◆', elId: 'sculpture-mode-toggle',   title: 'Sculpture Mode' },
@@ -123,6 +126,18 @@ const HUD_FACES = {
   // gives direct stroke-width control instead of depending on font
   // glyph rendering) -- a plain hexagon outline, matching that face's
   // own coordinate scale and stroke weight for visual consistency.
+  //
+  // IMPORTANT: this static value is a real fallback, but it is NOT what
+  // the user actually sees in practice -- render.js's
+  // updateLatticeQuickViewIcon() overwrites this exact face's
+  // labelEl.innerHTML live, once at startup and again on every Lattice
+  // View cycle, keyed by LATTICE_QUICK_VIEW_MARK_KEY (a different icon
+  // system, wheel-icons.js's MARKS/iconFrame). The "still feint" report
+  // that named this face was actually that live sync producing a
+  // BLANK frame in the default 'off' state (no mark key existed for
+  // it) -- fixed there (see LATTICE_QUICK_VIEW_MARK_KEY / MARKS.
+  // latticeOff), not by anything in this file. Keep this SVG in sync
+  // with MARKS.latticeOff's own visual weight if either ever changes.
   'top|sy-1sz1':      {
     svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><polygon points="0,-2.3 1.99,-1.15 1.99,1.15 0,2.3 -1.99,1.15 -1.99,-1.15" fill="none" stroke="currentColor" stroke-width="0.32" stroke-linejoin="round"/></svg>',
     elId: 'bcc-toggle', title: 'BCC Lattice',

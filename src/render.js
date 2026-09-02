@@ -1580,7 +1580,7 @@ async function init() {
   wireFirstUseHint('sculpture-mode-toggle', 'Sculpture Mode: a separate, isolated scratch workspace -- nothing here touches your real World.');
   wireFirstUseHint('cyborg-toggle', 'Cyborg Mode: a guided walkthrough, step by step.');
   wireFirstUseHint('xray-toggle', 'X-Ray: drag a cutaway plane through the structure to see inside it.');
-  wireFirstUseHint('lab-toggle', 'Lab: advanced settings and tools live here.');
+  wireFirstUseHint('lab-toggle', 'Settings: advanced settings and tools live here.');
   // Moved from the welcome card's own quickstart line -- see docs/code-notes/render.md
   wireFirstUseHint('hud-wheel-cue', 'Tab / Space (or tap Menu) opens the Rhombic Wheel -- build, sculpt, grow, and more, all from here.');
   wireFirstUseHint('export-json', 'Export your World anytime to keep a copy.');
@@ -2879,7 +2879,7 @@ async function init() {
         if (action === 'tool:bccBuild') {
           wheel3D.close();
           if (!FEATURES.bccLattice) {
-            showHudPrompt('BCC Build is Rhombeometry-only -- switch modes in the Lab panel first.', 4000);
+            showHudPrompt('BCC Build is Rhombeometry-only -- switch modes in the Settings panel first.', 4000);
             return;
           }
           clickMode('bcc');
@@ -2932,7 +2932,7 @@ async function init() {
         if (action === 'tool:cuboctaBuild') {
           if (!FEATURES.bccLattice) {
             wheel3D.close();
-            showHudPrompt('Cuboctahedron Build is Rhombeometry-only -- switch modes in the Lab panel first.', 4000);
+            showHudPrompt('Cuboctahedron Build is Rhombeometry-only -- switch modes in the Settings panel first.', 4000);
             return;
           }
           clickMode('cubocta');
@@ -2981,7 +2981,7 @@ async function init() {
         // and explain the real mechanism, rather than pretending a
         // direct action exists. ---
         if (action === 'tool:offer') { labToggleEl?.click(); showHudPrompt('Trades start via Interact: walk up to another user and tap Interact to propose one.', 4500); wheel3D.close(); return; }
-        if (action === 'tool:accept') { labToggleEl?.click(); showHudPrompt('Pending trades from other users show up in the Lab panel -- walk up and tap Interact to respond.', 4500); wheel3D.close(); return; }
+        if (action === 'tool:accept') { labToggleEl?.click(); showHudPrompt('Pending trades from other users show up in the Settings panel -- walk up and tap Interact to respond.', 4500); wheel3D.close(); return; }
         if (action === 'tool:inventory') { labToggleEl?.click(); wheel3D.close(); return; } // real inventory line lives in the Lab panel
 
         if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
@@ -3152,7 +3152,12 @@ async function init() {
     octahedron: 'Octahedron -- the Cuboctahedron gap-fill piece, previewed at two cube-centers near every built cell.',
     disphenoid: 'Disphenoid -- every co-locatable built cell shown as one disphenoid.',
   };
-  const LATTICE_QUICK_VIEW_MARK_KEY = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', octahedron: 'pieceOctahedron', disphenoid: 'pieceDisphenoid' };
+  // 'off' added 2026-09-02: without it, markKey was undefined and
+  // updateLatticeQuickViewIcon() below rendered a totally blank
+  // iconFrame (outline only, zero ink) for the default/most-common
+  // state -- direct report ("lattice view symbols are still feint")
+  // traced to this, not a rendering-strength issue. See MARKS.latticeOff.
+  const LATTICE_QUICK_VIEW_MARK_KEY = { off: 'latticeOff', rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', octahedron: 'pieceOctahedron', disphenoid: 'pieceDisphenoid' };
   // Fixed axis for octahedron/disphenoid coverage -- matches core/
   // build.js's own bootstrap default for a fresh 'ioct' placement; a
   // representative single orientation per anchor is enough for a

@@ -145,7 +145,11 @@ export const LABEL_STYLE = {
 export const UNIVERSAL_RING = {
   "top|sy-1sz1": { kind: "universal", label: "Cyborg",         action: "openCyborg",
                    desc: "Assistance Spectrum controls — Manual, Semi-Cyborg, Full-Cyborg tiers." },
-  "top|sx1sz1":  { kind: "universal", label: "Lab / Settings", action: "openLab",
+  // Direct instruction 2026-09-02: "get rid of lab everywhere" -- label
+  // only, dropped from "Lab / Settings" to plain "Settings"; internal
+  // id/action ("openLab", #lab-toggle, #lab-panel) unchanged, same
+  // label-only-rename pattern already used for Rhombitect/Rhombivate.
+  "top|sx1sz1":  { kind: "universal", label: "Settings", action: "openLab",
                    desc: "The full technical interface — claims, JSON, moderation, generation parameters." },
   "top|sx-1sz1": { kind: "universal", label: "Almanac",        action: "openAlmanac",
                    desc: "Math & Geometry reference — the demonstrations behind everything you build." }
@@ -210,7 +214,7 @@ export function applyWorkspaceModeGate(resolvedFaces, workspaceMode) {
   for (const [key, data] of Object.entries(resolvedFaces)) {
     if (data.action && WORLD_ONLY_FACE_ACTIONS.has(data.action)) {
       gated[key] = { kind: "spare", label: data.label, action: null,
-        desc: `${data.label} needs World workspace mode (Lab panel) — switch there to use it.` };
+        desc: `${data.label} needs World workspace mode (Settings panel) — switch there to use it.` };
     }
   }
   return gated;
@@ -641,7 +645,7 @@ export const WHEEL_TRADE = {
     // explain the real mechanism rather than pretending a direct
     // action exists. Judgment call -- see render.js's onAction.
     "equator|sx1sy1":  { kind: "dept", label: "Offer", action: "tool:offer", desc: "Trades start via Interact -- walk up to another user and tap Interact." },
-    "equator|sx1sy-1": { kind: "dept", label: "Accept", action: "tool:accept", desc: "Pending trades from others show up in the Lab panel." },
+    "equator|sx1sy-1": { kind: "dept", label: "Accept", action: "tool:accept", desc: "Pending trades from others show up in the Settings panel." },
     // Direct follow-up report, same day: moving Inventory to top|sy1sz1
     // freed up a real blank spot that's discoverable by rotating.
     // Verified non-adjacent numerically (equator|sx-1sy1's own 4
@@ -650,7 +654,7 @@ export const WHEEL_TRADE = {
     // among them). Accept balances coverage against Offer, which
     // already has its own duplicate just below.
     "equator|sx-1sy1": { kind: "dept", label: "Accept", action: "tool:accept", temporary: true,
-      desc: "Pending trades from others show up in the Lab panel. Duplicated here for quick access from a spare slot." },
+      desc: "Pending trades from others show up in the Settings panel. Duplicated here for quick access from a spare slot." },
     // Temporary duplicate at Offer's true geometric antipode (equator|
     // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
     // policy: a blank face duplicates its antipode's content until
@@ -661,7 +665,7 @@ export const WHEEL_TRADE = {
     // slot, 2026-09-02) since this bottom-ring face isn't in top|sy1sz1's
     // own 4-face adjacency set.
     "bottom|sx1sz-1":  { kind: "dept", label: "Inventory", action: "tool:inventory", temporary: true,
-      desc: "Opens the Lab panel, where your real inventory is shown. Duplicated here for quick access from a spare slot." },
+      desc: "Opens the Settings panel, where your real inventory is shown. Duplicated here for quick access from a spare slot." },
     // Was a 2nd Offer copy (2026-08-25 audit fix): Offer already has its
     // true original PLUS an equator-antipode duplicate, and this bottom
     // slot is edge-adjacent to that duplicate (equator|sx-1sy-1) -- a
@@ -671,7 +675,7 @@ export const WHEEL_TRADE = {
     // so it fills the slot with genuinely new coverage instead of a
     // colliding 3rd copy of Offer.
     "bottom|sx-1sz-1": { kind: "dept", label: "Accept", action: "tool:accept", temporary: true,
-      desc: "Pending trades from others show up in the Lab panel. Duplicated here for quick access from a spare slot." },
+      desc: "Pending trades from others show up in the Settings panel. Duplicated here for quick access from a spare slot." },
     // Direct report 2026-09-02: top|sy1sz1 is one of only 3 faces
     // visible at a wheel's default opening rotation -- leaving it SPARE
     // made landing on this wheel look mostly empty (Offer + Lab/Settings
@@ -680,7 +684,7 @@ export const WHEEL_TRADE = {
     // rather than adding a new duplicate (Offer, the equator's other
     // real face, IS adjacent to top|sy1sz1 so couldn't be used) -- see
     // WHEEL_HOME's own top|sy1sz1 comment for the shared reasoning.
-    "top|sy1sz1":      { kind: "dept", label: "Inventory", action: "tool:inventory", desc: "Opens the Lab panel, where your real inventory is shown." }
+    "top|sy1sz1":      { kind: "dept", label: "Inventory", action: "tool:inventory", desc: "Opens the Settings panel, where your real inventory is shown." }
   }
 };
 
