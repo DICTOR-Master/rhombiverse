@@ -54,19 +54,14 @@ const CSS = `
   color: #0a0a0c;
   font: 700 30px/1 system-ui, sans-serif;
   /* Legibility pass, 2026-09-02 (direct user request: "black and white
-     on all symbols"): a single soft rgba(255,255,255,0.55) glow wasn't
-     enough contrast against the gold medallion's own reflections/the
-     world scene showing through at low opacity. Stacked drop-shadow()
-     (not text-shadow) so the same treatment applies uniformly to BOTH
-     the plain-glyph faces (textContent) and the one real inline-SVG
-     face (BCC Build, bottom|sx1sz-1) -- text-shadow only ever affected
-     the text ones. Four cardinal-offset shadows + two soft blurs read
-     as a crisp, near-opaque white outline around the black glyph --
-     a real black-and-white badge, not just a faint halo. */
-  filter:
-    drop-shadow(0 0 2px #fff) drop-shadow(0 0 2px #fff)
-    drop-shadow(1px 0 0 #fff) drop-shadow(-1px 0 0 #fff)
-    drop-shadow(0 1px 0 #fff) drop-shadow(0 -1px 0 #fff);
+     on all symbols"). First attempt used a crisp multi-layer outline;
+     direct follow-up feedback said that read as too much white overall
+     -- reverted to the original single text-shadow mechanism, just a
+     little stronger (opacity 0.55->0.8, blur 3px->4px) rather than a
+     new outline effect. filter: drop-shadow() instead of text-shadow so
+     it also reaches the one real inline-SVG face (BCC Build,
+     bottom|sx1sz-1), which text-shadow never affected. */
+  filter: drop-shadow(0 0 4px rgba(255,255,255,0.8));
   pointer-events: none;
   user-select: none;
 }
