@@ -2488,19 +2488,38 @@ async function init() {
   // pyramid (not one merged hull) for the same "preserve internal seams,
   // avoid coincident-face z-fighting" reasoning as fccQuickViewPieces's
   // own 'pyramid' branch.
+  //
+  // Spherical-aware (direct follow-up 2026-09-02, "spheres dont render
+  // skeletal on world view"): sphericalModeActive/sphericalGeometries/
+  // partialSphereGeometryFor are declared further down this same scope
+  // (spherical-toggle.js's own real-cell-shape swap) -- safe to
+  // reference here since this function is only ever CALLED later, after
+  // those are initialized, same as every other forward reference in
+  // this file's init(). All 4 are shared/cached template geometries
+  // (real cells reuse the SAME object), so always .clone() before
+  // .translate() -- mutating a shared template in place would corrupt
+  // every other cell using it, including Spherical Toggle's own solid
+  // meshes.
   function skeletonCellPieces(cell) {
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
-    const shift = (g) => g.translate(wx, wy, wz);
-    if (!isPartialCell(cell)) return [shift(buildRDGeometry(SCALE))];
+    const shift = (g) => g.clone().translate(wx, wy, wz);
+    if (!isPartialCell(cell)) {
+      return [shift(sphericalModeActive ? sphericalGeometries.rd : buildRDGeometry(SCALE))];
+    }
+    // A partial cell's own sphere size depends on its real volume
+    // (partialSphereGeometryFor), same for both the cube and cube-less
+    // cases -- unlike the angular shapes below, no need to keep pyramids
+    // as separate pieces once they're just one sphere.
+    if (sphericalModeActive) return [shift(partialSphereGeometryFor(cell))];
     if (cell.cube === false) {
       const pieces = pyramidPieces(SCALE);
       return presentAxisKeys(effectivePyramids(cell)).map((axisKey) => {
         const { base, apex } = pieces.pyramids[axisKey];
         const points = [...base, apex].map(([x, y, z]) => new THREE.Vector3(x, y, z));
-        return shift(new ConvexGeometry(points));
+        return new ConvexGeometry(points).translate(wx, wy, wz);
       });
     }
-    return [shift(buildPartialCellGeometry(effectivePyramids(cell)))];
+    return [buildPartialCellGeometry(effectivePyramids(cell)).translate(wx, wy, wz)];
   }
   async function rebuildWorldViewSkeleton() {
     const myGeneration = ++skeletonGeneration;
@@ -2513,26 +2532,35 @@ async function init() {
     // follow-up 2026-09-02 ("not all shapes showing up in skeleton"),
     // same real geometry+position recipe each one's own InstancedMesh/
     // Mesh rebuild already uses (buildBCCGeometry/buildCuboctaGeometry/
-    // buildOctGapGeometry/buildInterstitialGeometry), just as loose
-    // geometries instead of instance matrices -- same technique
-    // skeletonCellPieces already uses for the main world above.
+    // buildOctGapGeometry/buildInterstitialGeometry) -- or, under
+    // Spherical Toggle, the same sphere templates that rebuild swaps
+    // those meshes' OWN .geometry to -- just as loose geometries
+    // instead of instance matrices.
     if (!sculptureModeActive) {
       for (const cell of bccWorld.entries()) {
         const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
-        pieces.push(buildBCCGeometry(bccShapeScaleFor(SCALE)).translate(wx, wy, wz));
+        const g = sphericalModeActive ? sphericalGeometries.truncatedOctahedron.clone() : buildBCCGeometry(bccShapeScaleFor(SCALE));
+        pieces.push(g.translate(wx, wy, wz));
       }
       for (const cell of cuboctaWorld.entries()) {
         const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
-        pieces.push(buildCuboctaGeometry(SCALE).translate(wx, wy, wz));
+        const g = sphericalModeActive ? sphericalGeometries.cuboctahedron.clone() : buildCuboctaGeometry(SCALE);
+        pieces.push(g.translate(wx, wy, wz));
       }
       for (const cell of octGapWorld.entries()) {
         const [wx, wy, wz] = octGapCellToWorld(cell.x, cell.y, cell.z, SCALE);
-        pieces.push(buildOctGapGeometry(SCALE).translate(wx, wy, wz));
+        const g = sphericalModeActive ? sphericalGeometries.octahedron.clone() : buildOctGapGeometry(SCALE);
+        pieces.push(g.translate(wx, wy, wz));
       }
-      // Already baked in absolute world-space vertices (see
-      // buildInterstitialGeometry's own header) -- no translate needed.
       for (const cell of interstitialStore.entries()) {
-        pieces.push(buildInterstitialGeometry(cell.verts, SCALE));
+        if (sphericalModeActive) {
+          const [cx, cy, cz] = disphenoidCentroid(cell.verts);
+          pieces.push(disphenoidSphereTemplate.clone().translate(cx, cy, cz));
+        } else {
+          // Already baked in absolute world-space vertices (see
+          // buildInterstitialGeometry's own header) -- no translate needed.
+          pieces.push(buildInterstitialGeometry(cell.verts, SCALE));
+        }
       }
     }
     if (pieces.length === 0) return;
@@ -2893,6 +2921,12 @@ async function init() {
     bccMesh.geometry = active.truncatedOctahedron;
     applySphericalToDisphenoids(sphericalModeActive);
     applySphericalToPartials(sphericalModeActive);
+    // Skeleton's own merged overlay isn't one of the meshes swapped
+    // above -- rebuild it too if it's the one currently showing, or it
+    // would keep showing the OLD (angular or spherical) shapes until
+    // the next unrelated World View change. See skeletonCellPieces's
+    // own header.
+    if (worldViewMode === 'skeleton') rebuildWorldViewSkeleton();
     showHudPrompt(sphericalModeActive
       ? 'Spherical: every real placeable shape shown as a true sphere -- a client-side view only, your cells are untouched.'
       : 'Spherical: off.', 5000);
