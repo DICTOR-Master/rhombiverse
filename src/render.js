@@ -4499,6 +4499,17 @@ async function init() {
       flashAt(cell, 0x9de0ff);
       playPlaceSound();
       window.dispatchEvent(new CustomEvent('rhombiverse:cellPlaced', { detail: cell })); // B3
+      // Direct report 2026-09-02: generating a body right where you're
+      // standing/looking can fill the whole screen with the new mass at
+      // typical shell-fill radii -- genuinely disorienting on first use,
+      // read as "stuck, no way back" even though Tab/Menu still worked
+      // the whole time. A toast survives being visually engulfed (it's
+      // a fixed HUD overlay, not part of the 3D scene), so it's the
+      // direct fix for the actual complaint -- not a generation/camera
+      // change, which is a bigger, separate design question.
+      if (currentMode === 'generate') {
+        showHudPrompt("Body generated. If it fills your view, that's normal -- Tab / Menu (bottom-left) still opens the wheel from here.", 6000);
+      }
     },
     onRemoved: (cell) => {
       flashAt(cell, 0xff8866);
