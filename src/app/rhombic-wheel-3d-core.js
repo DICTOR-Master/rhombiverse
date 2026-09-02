@@ -310,10 +310,15 @@ export const WHEEL_HOME = {
     // uniformly across every wheel with a remaining blank face.
     "bottom|sx1sz-1":   { kind: "dept", label: "Cultivate", action: "navigateTo:cultivate", temporary: true,
       desc: "Plant, Prune, and Growth Parameters for the organic/Penrose layer. Duplicated here for quick access from a spare slot." },
-    // Swapped with top|sy1sz1 below, 2026-09-02 -- see that key's own
-    // comment for why. This slot (not one of the 3 default-visible
-    // faces) now holds the genuine SPARE instead.
-    "bottom|sx-1sz-1":  SPARE,
+    // Direct follow-up report, same day: this swap freed up a real
+    // blank spot that's discoverable by rotating -- "another blank face
+    // as it spins." Verified non-adjacent numerically (bottom|sx-1sz-1's
+    // 4 neighbors are Cultivate/Trade/Explore/Alter, none of which is
+    // Build) -- filled with a Build duplicate rather than leaving a
+    // genuine dead end, same standing "duplicate a spare rather than
+    // leave it blank" policy as everywhere else in this file.
+    "bottom|sx-1sz-1":  { kind: "dept", label: "Build", action: "navigateTo:build", temporary: true,
+      desc: "Add, Symmetry, Fill, and Piece. Duplicated here for quick access from a spare slot." },
     // Direct report 2026-09-02: top|sy1sz1 is one of only 3 faces
     // visible at a wheel's default opening rotation (equator|sx1sy1,
     // top|sx1sz1, top|sy1sz1 -- see WHEEL_PIECE's own header comment)
@@ -347,10 +352,15 @@ export const WHEEL_BUILD = {
     // a genuinely different, richer tool. Same action string/mechanism.
     "equator|sx1sy-1": { kind: "dept", label: "Symmetry", action: "tool:symmetry", desc: "Opens the Symmetry panel -- brush, mirror, and symmetry tools, no World required." },
     "equator|sx-1sy1": { kind: "dept", label: "Fill", action: "tool:fill", desc: "Fill mode -- click to fill in a gap." },
-    // Swapped with top|sy1sz1 below, 2026-09-02 -- see that key's own
-    // comment for why. This slot (not one of the 3 default-visible
-    // faces) now holds the genuine SPARE instead.
-    "equator|sx-1sy-1": SPARE,
+    // Direct follow-up report, same day: the top|sy1sz1 swap below freed
+    // up a real blank spot that's discoverable by rotating. Verified
+    // non-adjacent numerically (equator|sx-1sy-1's own 4 neighbors are
+    // top|sy-1sz1, bottom|sy-1sz-1, top|sx-1sz1, and bottom|sx-1sz-1 --
+    // Add's true original, equator|sx1sy1, isn't among them) -- filled
+    // with an Add duplicate (this wheel's single most-used action)
+    // rather than leaving a genuine dead end.
+    "equator|sx-1sy-1": { kind: "dept", label: "Add", action: "tool:add", temporary: true,
+      desc: "Click a face to add a piece there -- see Piece for which kind (RD / Cube / Pyramid). Duplicated here for quick access from a spare slot." },
     // Piece picker (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md follow-up,
     // 2026-08-26): what Add/Remove operate on -- RD (a full block),
     // Cube (bare, no pyramids), or Pyramid (edit one pyramid on an
@@ -491,10 +501,16 @@ export const WHEEL_ALTER = {
     // applied to a Smooth duplicate, not to real new distinct content).
     // Alter/"remove" is its natural department, mirroring how Dig is
     // Rhombi-model's whole-block-tier counterpart.
-    // Remove moved to top|sy1sz1, 2026-09-02 (see that key's own
-    // comment) -- this slot (not one of the 3 default-visible faces)
-    // now holds the genuine SPARE instead.
-    "bottom|sx1sz-1":  SPARE,
+    // Direct follow-up report, same day: moving Remove to top|sy1sz1
+    // freed up a real blank spot that's discoverable by rotating.
+    // Verified non-adjacent numerically (bottom|sx1sz-1's own 4
+    // neighbors are equator|sx1sy1 [Dig], equator|sx1sy-1 [Smooth],
+    // bottom|sy1sz-1, and bottom|sy-1sz-1 -- Remove's new true
+    // original, top|sy1sz1, isn't among them). Replace (equator|sx-1sy1)
+    // skipped as a duplicate target -- it's a non-functional stub, same
+    // reasoning as elsewhere in this wheel.
+    "bottom|sx1sz-1":  { kind: "dept", label: "Remove", action: "tool:remove", temporary: true,
+      desc: "Click a piece to remove it -- see Piece (Build wheel) for which kind (RD / Cube / Pyramid). Duplicated here for quick access from a spare slot." },
     // Smooth's duplicate -- confirmed non-adjacent to both
     // equator|sx1sy-1 (its true original) and top|sy1sz1 (Remove's new
     // slot, since neither is in top|sy1sz1's own 4-face adjacency set).
@@ -527,10 +543,17 @@ export const WHEEL_RHOMBITECT = {
     "equator|sx1sy1":  { kind: "dept", label: "Dome", action: "tool:dome", desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it." },
     "equator|sx1sy-1": { kind: "dept", label: "Spiral Column", action: "tool:spiralColumn", desc: "Not built yet." },
     "equator|sx-1sy1": { kind: "dept", label: "Templates", action: "tool:templates", desc: "Not built yet." },
-    // Swapped with top|sy1sz1 below, 2026-09-02 -- see that key's own
-    // comment for why. This slot (not one of the 3 default-visible
-    // faces) now holds the genuine SPARE instead.
-    "equator|sx-1sy-1": SPARE,
+    // Direct follow-up report, same day: moving Generate a Body to
+    // top|sy1sz1 freed up a real blank spot that's discoverable by
+    // rotating. Verified non-adjacent numerically (equator|sx-1sy-1's
+    // own 4 neighbors are top|sy-1sz1, bottom|sy-1sz-1, top|sx-1sz1,
+    // and bottom|sx-1sz-1 -- Dome's true original, equator|sx1sy1,
+    // isn't among them). Spiral Column/Templates skipped -- both
+    // non-functional stubs, same reasoning as elsewhere in this file.
+    // Generate a Body itself already has its own duplicate (below), so
+    // Dome balances coverage rather than tripling one action.
+    "equator|sx-1sy-1": { kind: "dept", label: "Dome", action: "tool:dome", temporary: true,
+      desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
     // Least-adjacent placement duplicates Dome; the OTHER remaining
     // slot skips Templates on purpose (a non-functional stub, same
@@ -566,10 +589,15 @@ export const WHEEL_CULTIVATE = {
     // gesture on an existing growth tile while already in Plant mode
     // (see render.js's contextmenu listener / pruneTile()).
     "equator|sx1sy-1": { kind: "dept", label: "Prune", action: "tool:prune", desc: "Sets Plant mode -- right-click an existing growth tile to prune it." },
-    // Swapped with top|sy1sz1 below, 2026-09-02 -- see that key's own
-    // comment for why. This slot (not one of the 3 default-visible
-    // faces) now holds the genuine SPARE instead.
-    "equator|sx-1sy1": SPARE,
+    // Direct follow-up report, same day: moving Growth Params to
+    // top|sy1sz1 freed up a real blank spot that's discoverable by
+    // rotating. Verified non-adjacent numerically (equator|sx-1sy1's
+    // own 4 neighbors are top|sy1sz1, bottom|sy1sz-1, top|sx-1sz1, and
+    // bottom|sx-1sz-1 -- Prune's true original, equator|sx1sy-1, isn't
+    // among them). Prune balances coverage against Plant, which already
+    // has its own duplicate just below.
+    "equator|sx-1sy1": { kind: "dept", label: "Prune", action: "tool:prune", temporary: true,
+      desc: "Sets Plant mode -- right-click an existing growth tile to prune it. Duplicated here for quick access from a spare slot." },
     // Temporary duplicate at Plant's true geometric antipode (equator|
     // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
     // policy: a blank face duplicates its antipode's content until
@@ -614,10 +642,15 @@ export const WHEEL_TRADE = {
     // action exists. Judgment call -- see render.js's onAction.
     "equator|sx1sy1":  { kind: "dept", label: "Offer", action: "tool:offer", desc: "Trades start via Interact -- walk up to another user and tap Interact." },
     "equator|sx1sy-1": { kind: "dept", label: "Accept", action: "tool:accept", desc: "Pending trades from others show up in the Lab panel." },
-    // Swapped with top|sy1sz1 below, 2026-09-02 -- see that key's own
-    // comment for why. This slot (not one of the 3 default-visible
-    // faces) now holds the genuine SPARE instead.
-    "equator|sx-1sy1": SPARE,
+    // Direct follow-up report, same day: moving Inventory to top|sy1sz1
+    // freed up a real blank spot that's discoverable by rotating.
+    // Verified non-adjacent numerically (equator|sx-1sy1's own 4
+    // neighbors are top|sy1sz1, bottom|sy1sz-1, top|sx-1sz1, and
+    // bottom|sx-1sz-1 -- Accept's true original, equator|sx1sy-1, isn't
+    // among them). Accept balances coverage against Offer, which
+    // already has its own duplicate just below.
+    "equator|sx-1sy1": { kind: "dept", label: "Accept", action: "tool:accept", temporary: true,
+      desc: "Pending trades from others show up in the Lab panel. Duplicated here for quick access from a spare slot." },
     // Temporary duplicate at Offer's true geometric antipode (equator|
     // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
     // policy: a blank face duplicates its antipode's content until
