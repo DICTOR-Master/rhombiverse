@@ -11,7 +11,6 @@ import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
 import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS } from './geometry-extensions/dual-lattice.js';
-import { createBCCBuildController } from './core/bcc-build.js';
 import { createCuboctaBuildController, AXIS_OFFSETS as CUBOCTA_AXIS_OFFSETS } from './core/cubocta-build.js';
 import { createCuboctaGapBuildController, octGapCellToWorld, octGapCellForCOCell } from './core/cubocta-gap-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
@@ -2866,33 +2865,12 @@ async function init() {
         if (action === 'tool:prune') { clickMode('plant'); showHudPrompt('Prune: right-click an existing growth tile while in Plant mode.', 4000); wheel3D.close(); return; }
         if (action === 'tool:growthParams') { document.getElementById('cultivate-panel')?.classList.add('open'); wheel3D.close(); return; } // real "Growth Parameters" section lives in this panel
 
-        // --- BCC Build (core/bcc-build.md): lived on the now-retired
-        // Rhombisis wheel, moved directly onto Home 2026-09-02 (see
-        // rhombic-wheel-3d-core.js's WHEEL_HOME header comment). Action
-        // string/handler unchanged -- resolution is action-keyed, not
-        // wheel-keyed, so moving which wheel a face lives on needs no
-        // change here. Same clickMode() shim as every other tool face; the
-        // FEATURES.bccLattice check is defense-in-depth so this wheel
-        // face can't put a Full World session into BCC mode even
-        // though the underlying .mode-btn itself would technically
-        // still accept the click (it's just hidden by CSS there).
-        if (action === 'tool:bccBuild') {
-          wheel3D.close();
-          if (!FEATURES.bccLattice) {
-            showHudPrompt('BCC Build is Rhombeometry-only -- switch modes in the Settings panel first.', 4000);
-            return;
-          }
-          clickMode('bcc');
-          showHudPrompt('BCC Build: click a face to place a BCC lattice cell (or a face of your normal World to start one nearby). Right-click removes.', 4500);
-          return;
-        }
-
         // --- Piece: Cuboctahedron Build (core/cubocta-build.js), the RD
         // lattice's own dual shape -- 2026-08-29, freed onto Piece's
         // top|sy1sz1 slot by dropping Lenses from the universal ring.
-        // Same Rhombeometry-only defense-in-depth check as tool:bccBuild
-        // (even though #cubocta-build-toggle is already hidden by CSS in
-        // Full World).
+        // Same Rhombeometry-only defense-in-depth check the retired
+        // standalone BCC Build face used to have (even though
+        // #cubocta-build-toggle is already hidden by CSS in Full World).
         //
         // 2026-08-29 SAME-DAY FIX, real bug caught live: this used to
         // close the wheel immediately (BCC Build's own pattern), unlike
@@ -3065,22 +3043,16 @@ async function init() {
   // drives the exact same underlying cycle (see cycleLatticeQuickView).
   const hudQuickLatticeViewEl = document.getElementById('hud-quick-lattice-view');
   if (hudQuickLatticeViewEl) hudQuickLatticeViewEl.style.display = FEATURES.bccLattice ? '' : 'none';
-  // Real BCC cell placement (core/bcc-build.md) -- same Rhombeometry-only
-  // gating as the preview toggle above.
-  const bccBuildRow = document.getElementById('bcc-build-row');
-  if (bccBuildRow) bccBuildRow.style.display = FEATURES.bccLattice ? '' : 'none';
-  // Real Cuboctahedron cell placement -- same Rhombeometry-only gating,
-  // same Lab-panel entry-point precedent as BCC Build's own ("every
-  // wheel face is already allocated," core/bcc-build.md) rather than a
-  // wheel face.
+  // Real Cuboctahedron cell placement -- same Rhombeometry-only gating.
+  // Lab-panel entry point kept alongside the real wheel face (Piece:CO)
+  // as a second doorway to the same mode -- not code duplication, both
+  // just call clickMode('cubocta').
   const cuboctaBuildRow = document.getElementById('cubocta-build-row');
   if (cuboctaBuildRow) cuboctaBuildRow.style.display = FEATURES.bccLattice ? '' : 'none';
   // Dualize preview (reframe Stage 3): same Rhombeometry-only gating as
   // the rest of the BCC/TO family -- Lab-panel entry point rather than a
-  // wheel face, same precedent as BCC Build's own original placement
-  // ("every wheel face is already allocated," core/bcc-build.md) -- a
-  // wheel face can follow later once a commit path exists to make it a
-  // more central tool, per that same precedent's own trajectory.
+  // wheel face; a wheel face can follow later once a commit path exists
+  // to make it a more central tool.
   const dualizeRow = document.getElementById('dualize-row');
   if (dualizeRow) dualizeRow.style.display = FEATURES.bccLattice ? '' : 'none';
   // Piece picker's TO option (core/build.js's handleToClick) -- same
@@ -3843,9 +3815,8 @@ async function init() {
     dualizePointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     dualizeRaycaster.setFromCamera(dualizePointer, camera);
     // Raycast both real lattices, closest hit wins -- same pattern
-    // core/bcc-build.js's own TO-piece click handling already uses to
-    // let one click react correctly to whichever real structure is
-    // actually there.
+    // core/build.js's own handleToClick already uses to let one click
+    // react correctly to whichever real structure is actually there.
     const hits = dualizeRaycaster.intersectObjects([mesh, bccMesh]);
     if (hits.length === 0 || hits[0].instanceId === undefined) return;
     const hitBcc = hits[0].object === bccMesh;
@@ -4562,9 +4533,10 @@ async function init() {
     getPieceType: () => document.getElementById('piece-type-select').value,
     // TO ("adopted family member", direct instruction 2026-08-26): lets
     // the universal Add/Remove actions ALSO target the separate BCC
-    // dual-lattice world, reusing its own bootstrap-vs-extend logic
-    // (core/bcc-build.js) via core/build.js's handleToClick -- not a
-    // pretense that a truncated octahedron is a piece of the same RD
+    // dual-lattice world, via core/build.js's own handleToClick (which
+    // owns the bootstrap-vs-extend logic directly, using
+    // geometry-extensions/dual-lattice.js's matchBCCNeighborOffset) --
+    // not a pretense that a truncated octahedron is a piece of the same RD
     // decomposition RD/Cube/Pyramid are. bccWorld/bccMesh always exist
     // regardless of FEATURES.bccLattice (see their own construction
     // above); the Piece picker's own 'to' option is what's actually
@@ -4593,14 +4565,18 @@ async function init() {
   // machinery (asteroid regen, hydrosphere, achievements, undo stack...)
   // that's off in Rhombeometry mode anyway, the only mode this build ever
   // runs in. Mirrors how Sculpture Mode's own sculptTarget.apply is a
-  // small dedicated rebuild, not a reuse of onChange(). See core/
-  // bcc-build.md.
+  // small dedicated rebuild, not a reuse of onChange(). Still shared by
+  // core/build.js's own Piece:TO handleToClick (the standalone BCC Build
+  // mode/controller this used to also serve was cut 2026-09-02 as
+  // redundant with that -- see core/build.js's own onBCCChange param
+  // and rhombic-wheel-3d-core.js's WHEEL_HOME comment for the removal).
   function onBCCChange() {
     // Same "never truly empty" invariant as the main world's own
     // onChange() -- direct instruction, 2026-08-29: applies to every
     // lattice, not just the FCC one. (0,0,0) is a real, always-valid BCC
     // lattice point (isBCC: all-even), so this restores exactly the
-    // same kind of real, buildable anchor a fresh BCC Build starts from.
+    // same kind of real, buildable anchor a fresh BCC placement starts
+    // from.
     if (bccWorld.entries().length === 0) {
       bccWorld.addCell(0, 0, 0, { material: 'base' });
     }
@@ -4623,19 +4599,6 @@ async function init() {
     updateSectionEnabled(); // keeps newly created interstitial mesh materials in sync with X-Ray -- see that function's own header
     saveToLocalStorage(interstitialStore.toJSON(), INTERSTITIAL_STORAGE_KEY);
   }
-  createBCCBuildController({
-    renderer,
-    camera,
-    fccMesh: mesh,
-    bccMesh,
-    fccCellAt: (instanceId) => cellOrder[instanceId],
-    bccCellAt: (instanceId) => bccCellOrder[instanceId],
-    bccWorld,
-    onChange: onBCCChange,
-    getMaterial: () => materialSelect.value,
-    isActive: () => !walking && currentMode === 'bcc' && FEATURES.bccLattice,
-  });
-
   // Cuboctahedron Build: own change handler, same "never truly empty"
   // reasoning as onBCCChange/onInterstitialChange above.
   function onCuboctaChange() {

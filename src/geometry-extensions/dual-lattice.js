@@ -134,6 +134,37 @@ export function nearestBCCCell(x, y, z) {
   return dist2(evenPt) <= dist2(oddPt) ? evenPt : oddPt;
 }
 
+// Normalized BCC_NEIGHBOR_OFFSETS directions, precomputed once -- moved
+// here 2026-09-02 from the now-retired core/bcc-build.js (its own
+// standalone build controller was cut as redundant with core/build.js's
+// own Piece:TO handleToClick, which already does the exact same
+// bootstrap/extend mechanic), but the plain geometry helper itself is
+// real, shared math that stays. Rewritten to plain x/y/z scalar math
+// (no THREE dependency) to match this file's own "pure math only"
+// design -- the caller's faceNormal only ever needs to expose .x/.y/.z,
+// which a THREE.Vector3 already does.
+const BCC_NEIGHBOR_DIRECTIONS = BCC_NEIGHBOR_OFFSETS.map(([x, y, z]) => {
+  const len = Math.hypot(x, y, z);
+  return [x / len, y / len, z / len];
+});
+
+// Given a face normal (anything exposing .x/.y/.z), returns whichever of
+// the 14 BCC_NEIGHBOR_OFFSETS it points closest to -- how a click on an
+// existing BCC/TO cell's face resolves which real neighbor to extend
+// into, same mechanic as the FCC lattice's own 12-neighbor face lookup.
+export function matchBCCNeighborOffset(faceNormal) {
+  let bestIdx = 0;
+  let bestDot = -Infinity;
+  BCC_NEIGHBOR_DIRECTIONS.forEach(([dx, dy, dz], i) => {
+    const dot = dx * faceNormal.x + dy * faceNormal.y + dz * faceNormal.z;
+    if (dot > bestDot) {
+      bestDot = dot;
+      bestIdx = i;
+    }
+  });
+  return BCC_NEIGHBOR_OFFSETS[bestIdx];
+}
+
 // Standalone sanity gate: `node src/geometry-extensions/dual-lattice.js`
 if (typeof process !== 'undefined' && process.argv[1] && process.argv[1].endsWith('dual-lattice.js')) {
   const verts = truncatedOctahedronVertices(1);

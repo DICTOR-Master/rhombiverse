@@ -28,8 +28,7 @@ import {
   axisKeyToOffset,
 } from './pyramid.js';
 import { generatePlanetoid } from '../geometry-extensions/planetoidgen.js';
-import { nearestBCCCell } from '../geometry-extensions/dual-lattice.js';
-import { matchBCCNeighborOffset } from './bcc-build.js';
+import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
 import {
   bootstrapDisphenoid,
   disphenoidKey,

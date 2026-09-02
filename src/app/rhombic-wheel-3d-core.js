@@ -196,8 +196,12 @@ const WORLD_ONLY_FACE_ACTIONS = new Set([
   "navigateTo:trade",     // Trade -- Offer/Accept/Inventory, the decay economy
   "navigateTo:explore",   // Explore -- grouped with the dynamic side per the reframe brief's own "Grow/Explore/Simulate"
   "tool:plant",           // Cultivate's Plant
-  "tool:bccBuild",        // Home's BCC Build
   "tool:cuboctaBuild",    // Piece's Cuboctahedron Build
+  // "tool:bccBuild" removed 2026-09-02 -- the standalone BCC Build face
+  // it gated is retired; BCC-lattice placement now happens entirely via
+  // Piece:TO + the universal Add/Remove tool ("tool:add"/"tool:remove",
+  // static placement, never gated by Model-workspace mode -- correctly,
+  // since it's not continuously-simulated).
 ]);
 
 // Applied after resolveWheelFaces(), never before -- operates on the
@@ -334,10 +338,23 @@ export const WHEEL_HOME = {
     // user's own two suggested fixes -- a duplicate, or reshuffling so
     // real content isn't clustered -- reshuffling needs no new
     // duplicate-adjacency bookkeeping at all, so it's the simpler of
-    // the two here). BCC Build had no existing duplicate anywhere on
-    // Home, so nothing else needs updating to keep it reachable.
-    "top|sy1sz1":       { kind: "dept", label: "BCC Build", action: "tool:bccBuild",
-      desc: "Place cells on the dual body-centered-cubic lattice, alongside your normal World (Rhombeometry only)." }
+    // the two here). BCC Build originally filled this slot and had no
+    // existing duplicate anywhere on Home, so nothing else needed
+    // updating to keep it reachable at the time.
+    //
+    // BCC Build itself retired 2026-09-02 (direct report): it was a
+    // genuinely separate, duplicate implementation of the exact
+    // bootstrap/extend mechanic Piece:TO's own handleToClick already
+    // provided (see core/build.js, core/bcc-build.md) -- not a second
+    // real doorway to a shared action, an actual reimplementation. Its
+    // face here is replaced with a Piece duplicate (its own true
+    // original lives on WHEEL_BUILD, a different wheel's own key
+    // namespace, so the same-wheel adjacency rule doesn't apply) --
+    // Piece is the one remaining doorway to BCC/TO placement now, so
+    // giving it direct Home-level visibility makes real sense post-
+    // removal, not an arbitrary filler pick.
+    "top|sy1sz1":       { kind: "dept", label: "Piece", action: "navigateTo:piece", temporary: true,
+      desc: "Choose what Add/Remove operate on: RD, Cube, Pyramid, Truncated Octahedron, Flattened Octahedron, Octahedron, or Disphenoid. Duplicated here for quick access from a spare slot." }
   }
 };
 

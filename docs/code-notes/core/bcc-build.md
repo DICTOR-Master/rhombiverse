@@ -1,5 +1,19 @@
 # Notes: `src/core/bcc-build.js` and the BCC dual-lattice build feature
 
+**RETIRED 2026-09-02.** `src/core/bcc-build.js` (the standalone
+"BCC Build" mode/controller this doc covers) is deleted -- direct
+report found it was a genuinely separate, ~112-line reimplementation of
+the exact same bootstrap/extend mechanic `core/build.js`'s own
+Piece:TO `handleToClick` already provided, both writing into the same
+`bccWorld`. Piece:TO (pick Piece -> TO, then use the universal
+Add/Remove tool) is the one remaining doorway to real BCC-lattice
+placement. The one genuinely reusable piece of this file,
+`matchBCCNeighborOffset`, moved to `geometry-extensions/dual-lattice.js`
+(rewritten to plain x/y/z math, dropping its THREE.js dependency to
+match that file's own "pure math only" design) -- everything else
+below is historical design rationale for the removed controller, kept
+for the record, not a description of current code.
+
 Full design rationale/history, moved out of the source so the code
 itself stays lite and readable. See `CONTRIBUTING.md`'s "Ground rules"
 for why this split exists. Covers `src/core/bcc-build.js` plus its

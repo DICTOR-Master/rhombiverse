@@ -59,8 +59,8 @@ const CSS = `
      -- reverted to the original single text-shadow mechanism, just a
      little stronger (opacity 0.55->0.8, blur 3px->4px) rather than a
      new outline effect. filter: drop-shadow() instead of text-shadow so
-     it also reaches the one real inline-SVG face (BCC Build,
-     bottom|sx1sz-1), which text-shadow never affected.
+     it also reaches the real inline-SVG faces (e.g. Cuboctahedron
+     Build, bottom|sx1sz-1), which text-shadow never affected.
      Second round of direct feedback, same day, more specific: the real
      problem isn't glow strength, it's that some Unicode glyphs are
      inherently thin single-line marks (Spherical's ◯, X-Ray's ⛶,
@@ -135,10 +135,11 @@ const HUD_FACES = {
   // SYMBOL_SCALE bump above wasn't the actual gap; the font just
   // renders ⬡ with much thinner strokes than sibling glyphs like ◇,
   // and -webkit-text-stroke didn't compensate enough for that specific
-  // codepoint. Same fix already used for BCC Build below (a real SVG
-  // gives direct stroke-width control instead of depending on font
-  // glyph rendering) -- a plain hexagon outline, matching that face's
-  // own coordinate scale and stroke weight for visual consistency.
+  // codepoint. Same fix already used for Cuboctahedron Build below (a
+  // real SVG gives direct stroke-width control instead of depending on
+  // font glyph rendering) -- a plain hexagon outline, matching that
+  // face's own coordinate scale and stroke weight for visual
+  // consistency.
   //
   // IMPORTANT: this static value is a real fallback, but it is NOT what
   // the user actually sees in practice -- render.js's
@@ -161,39 +162,31 @@ const HUD_FACES = {
   // This face was a temporary duplicate of Duality at its true
   // geometric antipode (see the policy note below on the one remaining
   // duplicate). Replaced with real new content, Spherical Toggle, the
-  // same "duplicate slot -> real function" swap BCC Build (bottom|
-  // sx1sz-1 below) already did with a Clear World duplicate --
-  // Spherical is the closer sibling to Duality anyway (both are
-  // client-side view toggles that reinterpret the same cells, not new
-  // world-state), so it fits its old spot semantically too.
+  // same "duplicate slot -> real function" swap Cuboctahedron Build
+  // (bottom|sx1sz-1 below) later also did with the (by-then-retired)
+  // BCC Build's own slot -- Spherical is the closer sibling to Duality
+  // anyway (both are client-side view toggles that reinterpret the
+  // same cells, not new world-state), so it fits its old spot
+  // semantically too.
   'bottom|sy-1sz-1':  { symbol: '◯', elId: 'spherical-toggle',        title: 'Spherical' },
-  // The 1 remaining bottom face (sx-1sz-1, below) is a temporary
-  // duplicate of an existing function at its TRUE geometric antipode
-  // (centroid inversion through the origin, verified numerically, same
-  // standing policy as the main Rhombic Wheel 3D -- "until those blank
-  // faces are filled they should serve as temporary duplicates at
-  // opposite points on the RD to their duplicates", direct user
-  // directive 2026-08-25). Each antipode pairing below was confirmed
-  // NOT edge-adjacent to the face it duplicates before being assigned.
-  // 2026-08-26 direct instruction: this slot's Clear World duplicate
-  // (a confirm()-gated destructive action -- arguably doesn't even
-  // WANT a quick-access shortcut) replaced with real new content, BCC
-  // Build, rather than another copy. Clear World keeps its own true
-  // original face (top|sx-1sz1) untouched. See core/bcc-build.md.
-  //
-  // Real SVG glyph, not a Unicode stand-in: the truncated octahedron
-  // viewed straight down a square-face axis, verified against
-  // truncatedOctahedronVertices (not eyeballed) -- 8 outer points at
-  // radius sqrt(5) (the hexagonal faces' silhouette) form the octagon,
-  // 4 inner points at radius 1 (the near square face itself) form the
-  // centered square. One-symbol-one-purpose: deliberately distinct from
-  // 'BCC Lattice' (top|sy-1sz1)'s own plain hexagon SVG (also a real
-  // SVG now, see that face's own comment) -- same shape family, but
-  // this is real placement, that's a live preview, and they're
-  // different functions.
+  // BCC Build retired 2026-09-02 (direct report): a genuinely separate,
+  // duplicate implementation of the exact bootstrap/extend mechanic
+  // Piece:TO's own handleToClick already provided (see core/build.js,
+  // core/bcc-build.md) -- not a second real doorway, an actual
+  // reimplementation. This slot is filled with real new content
+  // instead of a duplicate ("no blank spaces but no adjacent
+  // duplications either," direct instruction) -- Cuboctahedron Build
+  // had no seat anywhere on this medallion at all (only on the Piece
+  // wheel and the Lab panel), so it's a genuinely new capability here,
+  // not filler. Verified non-adjacent to every real Cuboctahedron
+  // Build doorway (there isn't another one on this wheel to be
+  // adjacent to). Same hexagon-with-3-alternating-wedges mark as
+  // wheel-icons.js's MARKS.cuboctahedron, scaled to this file's own
+  // tiny coordinate convention -- one symbol, one purpose, same shape
+  // everywhere it appears.
   'bottom|sx1sz-1':   {
-    svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><polygon points="-2,-1 -1,-2 1,-2 2,-1 2,1 1,2 -1,2 -2,1" fill="none" stroke="currentColor" stroke-width="0.28" stroke-linejoin="round"/><polygon points="0,-1 1,0 0,1 -1,0" fill="none" stroke="currentColor" stroke-width="0.28" stroke-linejoin="round"/></svg>',
-    elId: 'bcc-build-toggle', title: 'BCC Build',
+    svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><polygon points="0,-1.66 1.44,-0.83 1.44,0.83 0,1.66 -1.44,0.83 -1.44,-0.83" fill="none" stroke="currentColor" stroke-width="0.16"/><polygon points="0,0 0,-1.66 1.44,-0.83" fill="currentColor" opacity="0.55"/><polygon points="0,0 1.44,0.83 0,1.66" fill="currentColor" opacity="0.55"/><polygon points="0,0 -1.44,0.83 -1.44,-0.83" fill="currentColor" opacity="0.55"/></svg>',
+    elId: 'cubocta-build-toggle', title: 'Cuboctahedron Build',
   },
   'bottom|sx-1sz-1':  { symbol: '◇', elId: 'rhombic-wheel-3d-toggle', title: 'Menu', temporary: true },
 };

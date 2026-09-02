@@ -83,9 +83,6 @@ const ACTION_TO_MARK = {
   // Universal ring (every wheel): Lab/Settings and Home.
   openLab: 'lab',
   navigateHome: 'home',
-  // BCC Build: same mark as the HUD wheel's own icon, now on the main
-  // wheel too.
-  'tool:bccBuild': 'bccBuild',
   // Cuboctahedron Build (Piece, 2026-08-29): reuses the same pinwheel
   // mark Lattice Quick-View already uses for this shape.
   'tool:cuboctaBuild': 'cuboctahedron',

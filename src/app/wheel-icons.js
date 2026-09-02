@@ -426,13 +426,6 @@ export const MARKS = {
   // Unlike pieceRD's solid hexagon, Home's is outline (not filled) --
   // the anchor itself rather than a piece sample.
   home: `<polygon points="${hexPts(HOME_HEX_R)}" ${THIN}/><path d="M-${HOME_H_HALF_W},-${HOME_H_HALF_H} V${HOME_H_HALF_H} M${HOME_H_HALF_W},-${HOME_H_HALF_H} V${HOME_H_HALF_H} M-${HOME_H_HALF_W},0 H${HOME_H_HALF_W}" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>`,
-  // BCC Build: the SAME real geometry as the HUD wheel's own icon
-  // (hud-wheel-3d.js) -- the truncated octahedron's silhouette down a
-  // square-face axis, scaled into this mark's coordinate space. One
-  // symbol, one purpose, same shape everywhere it appears.
-  bccBuild: `
-    <polygon points="-30,-15 -15,-30 15,-30 30,-15 30,15 15,30 -15,30 -30,15" ${THIN}/>
-    <polygon points="0,-15 15,0 0,15 -15,0" ${THIN}/>`,
   // Cuboctahedron (Lattice Quick-View, added 2026-08-29): a real
   // silhouette, not an arbitrary glyph -- viewed down one of its own
   // 3-fold axes, a cuboctahedron's outline IS a regular hexagon (same
