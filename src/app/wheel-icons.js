@@ -6,13 +6,17 @@
 // generator this file's marks were computed with, referenced in
 // docs/code-notes/app/wheel-icons.md. Full design rationale there too.
 //
-// Frame (spec section 2): a circle with a regular hexagon's own 6
-// vertices touching it from the inside -- real geometry (a hexagon's
-// vertices legitimately sit on its circumscribed circle), not a
-// decorative border. This SAME hexagon outline IS "the one hexagon" a
-// single-hexagon mark (e.g. Rhombi-model's "+ inside one hexagon")
-// refers to -- no redundant nested hexagon drawn for those. Multi-
-// hexagon/multi-rhombus marks draw their own smaller shapes inside it.
+// Frame (spec section 2): a regular hexagon -- this SAME outline IS
+// "the one hexagon" a single-hexagon mark (e.g. Rhombi-model's "+
+// inside one hexagon") refers to, no redundant nested hexagon drawn for
+// those. Multi-hexagon/multi-rhombus marks draw their own smaller
+// shapes inside it. Originally paired with a circumscribing circle
+// (the hexagon's vertices legitimately sit on its circumscribed
+// circle, real geometry not a decorative border) -- dropped 2026-09-02,
+// direct report ("makes it messy like construction lines") once Smooth
+// (a real hexagon-in-circle mark, see below) made the frame's own
+// circle read as a redundant echo on every single icon, not just that
+// one.
 
 const D2R = Math.PI / 180;
 function hexPts(R, cx = 0, cy = 0, startDeg = -90) {
@@ -90,12 +94,11 @@ const HOME_HEX_R = 28;
 const HOME_H_HALF_W = 14;
 const HOME_H_HALF_H = 16;
 
-// The frame itself: circle + the universal hexagon outline. `inner` is
-// the concept-specific mark, drawn on top, sharing the same coordinate
+// The frame itself: the universal hexagon outline. `inner` is the
+// concept-specific mark, drawn on top, sharing the same coordinate
 // space (all marks below are authored in this same -50..50 space).
 export function iconFrame(inner, { title } = {}) {
   return `<svg viewBox="-50 -50 100 100" width="1em" height="1em" role="img"${title ? ` aria-label="${title}"` : ''}>
-  <circle cx="0" cy="0" r="${FRAME_R}" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.35"/>
   <polygon points="${hexPts(FRAME_R)}" fill="none" stroke="currentColor" stroke-width="2"/>
   ${inner}
 </svg>`;
