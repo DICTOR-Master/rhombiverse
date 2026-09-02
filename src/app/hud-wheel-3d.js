@@ -71,7 +71,7 @@ const CSS = `
      every glyph's own outline (not a halo/shadow) -- a small value
      visibly bolds the thin ones without over-thickening the already-
      solid ones already carrying plenty of ink. */
-  -webkit-text-stroke: 0.9px currentColor;
+  -webkit-text-stroke: 1.4px currentColor;
   filter: drop-shadow(0 0 4px rgba(255,255,255,0.8));
   pointer-events: none;
   user-select: none;
@@ -112,7 +112,21 @@ const HUD_FACES = {
   'equator|sx-1sy1':  { symbol: '◈', elId: 'cyborg-toggle',           title: 'Cyborg Mode' },
   'equator|sx-1sy-1': { symbol: '◆', elId: 'sculpture-mode-toggle',   title: 'Sculpture Mode' },
   'top|sy1sz1':       { symbol: '◐', elId: 'duality-toggle',          title: 'Duality' },
-  'top|sy-1sz1':      { symbol: '⬡', elId: 'bcc-toggle',              title: 'BCC Lattice' },
+  // Real SVG hexagon, not the bare ⬡ Unicode glyph: direct report
+  // 2026-09-02 ("some single line lattice wheel symbols on HUD are
+  // still feint") -- measured live, this glyph's rendered ink bounding
+  // box is comparable in SIZE to the others (X-Ray/Menu), so the
+  // SYMBOL_SCALE bump above wasn't the actual gap; the font just
+  // renders ⬡ with much thinner strokes than sibling glyphs like ◇,
+  // and -webkit-text-stroke didn't compensate enough for that specific
+  // codepoint. Same fix already used for BCC Build below (a real SVG
+  // gives direct stroke-width control instead of depending on font
+  // glyph rendering) -- a plain hexagon outline, matching that face's
+  // own coordinate scale and stroke weight for visual consistency.
+  'top|sy-1sz1':      {
+    svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><polygon points="0,-2.3 1.99,-1.15 1.99,1.15 0,2.3 -1.99,1.15 -1.99,-1.15" fill="none" stroke="currentColor" stroke-width="0.32" stroke-linejoin="round"/></svg>',
+    elId: 'bcc-toggle', title: 'BCC Lattice',
+  },
   'top|sx1sz1':       { symbol: '◇', elId: 'rhombic-wheel-3d-toggle', title: 'Menu' },
   'top|sx-1sz1':      { symbol: '⊘', elId: 'clear-world-toggle',      title: 'Clear World' },
   'bottom|sy1sz-1':   { symbol: '↻', elId: 'reload-toggle',           title: 'Reload' },
@@ -145,9 +159,10 @@ const HUD_FACES = {
   // radius sqrt(5) (the hexagonal faces' silhouette) form the octagon,
   // 4 inner points at radius 1 (the near square face itself) form the
   // centered square. One-symbol-one-purpose: deliberately distinct from
-  // 'BCC Lattice' (top|sy-1sz1)'s bare ⬡ -- same shape family, but this
-  // is real placement, that's a live preview, and they're different
-  // functions.
+  // 'BCC Lattice' (top|sy-1sz1)'s own plain hexagon SVG (also a real
+  // SVG now, see that face's own comment) -- same shape family, but
+  // this is real placement, that's a live preview, and they're
+  // different functions.
   'bottom|sx1sz-1':   {
     svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><polygon points="-2,-1 -1,-2 1,-2 2,-1 2,1 1,2 -1,2 -2,1" fill="none" stroke="currentColor" stroke-width="0.28" stroke-linejoin="round"/><polygon points="0,-1 1,0 0,1 -1,0" fill="none" stroke="currentColor" stroke-width="0.28" stroke-linejoin="round"/></svg>',
     elId: 'bcc-build-toggle', title: 'BCC Build',
