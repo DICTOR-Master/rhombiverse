@@ -171,8 +171,25 @@ export const MARKS = {
     <polygon points="${hexPts(16, 0, 0)}" ${THIN}/>
     <polygon points="${hexPts(16, 26, 0)}" ${THIN}/>
     <path d="M-9,0 H9" ${STROKE}/>`,
-  // Smooth: hexagon with rounded corners instead of sharp points.
-  smooth: `<path d="M0,-40 A10,10 0 0 1 8.66,-35 L34.5,-15 A10,10 0 0 1 34.5,-1 L34.5,15 A10,10 0 0 1 34.5,29 L8.66,35 A10,10 0 0 1 0,40 A10,10 0 0 1 -8.66,35 L-34.5,15 A10,10 0 0 1 -34.5,-1 L-34.5,-15 A10,10 0 0 1 -8.66,-35 Z" ${THIN}/>`,
+  // Smooth: direct report 2026-09-02, "has never been right" -- the old
+  // mark (a hexagon with every corner rounded by a small radius) reads
+  // almost identically to the frame hexagon drawn behind every icon
+  // (same shape family, same silhouette), barely visible as its own
+  // symbol. Went through a few rounds of live review before landing
+  // here (a filled-band nested pair, then a single filleted-hexagon
+  // path, both real attempts but not quite right) -- final direction:
+  // "a hex inside a perfect circle outside, [with] the separating lines
+  // blended into a thick but as fine as possible boundary." Built as
+  // ONE filled shape: evenodd fill between a circle and a hexagon
+  // inscribed in it at the exact same circumradius (32, both touching
+  // at all 6 vertices) -- the two boundaries merge into a single solid
+  // band, hexagonal on the inner edge, circular on the outer edge,
+  // tapering to true zero width exactly at the 6 touch points. That
+  // taper is the thinnest the band can possibly be while still
+  // connecting a hexagon to its own circumscribed circle -- a real
+  // geometric consequence of touching at the same radius, not a
+  // stroke-width guess. Confirmed "you got it."
+  smooth: `<path d="M32,0 A32,32 0 1,0 -32,0 A32,32 0 1,0 32,0 Z M0,-32 L27.71,-16 L27.71,16 L0,32 L-27.71,16 L-27.71,-16 Z" fill="currentColor" fill-rule="evenodd"/>`,
   // Replace: two overlapping hexagons with a real double-headed arrow at the overlap.
   replace: `
     <polygon points="${hexPts(28, -14, 0)}" ${THIN}/>
