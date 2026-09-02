@@ -1239,13 +1239,21 @@ function materialColor(material) {
 
 // Auto-assign (direct request 2026-09-02, "By piece type"): when the
 // #auto-assign-material checkbox is on, each piece type places with its
-// own fixed material instead of whatever #material-select currently
-// shows -- see currentMaterialFor() below, wired into the 3 piece-
-// placing controllers only (main build, Cuboctahedron, octahedron-gap),
-// not the Recolor tool or Sculpture/AI material assignment, which stay
-// explicit picks. 'cubocta' is a virtual key -- Piece:CO has no entry
-// of its own in #piece-type-select (it's a separate mode), so its own
-// getMaterial call site passes this key directly.
+// own material instead of whatever #material-select currently shows --
+// see currentMaterialFor() below, wired into the 3 piece-placing
+// controllers only (main build, Cuboctahedron, octahedron-gap), not the
+// Recolor tool or Sculpture/AI material assignment, which stay explicit
+// picks. 'cubocta' is a virtual key -- Piece:CO has no entry of its own
+// in #piece-type-select (it's a separate mode), so its own getMaterial
+// call site passes this key directly.
+//
+// These are DEFAULTS only -- direct follow-up 2026-09-02 ("autoselected
+// colors for all shapes adjustable"): the real, live-in-effect mapping
+// is autoAssignOverrides (below), user-editable via the per-piece
+// dropdowns #auto-assign-materials-row builds, persisted to
+// localStorage. This object is what a dropdown falls back to before the
+// user has ever touched it for that piece, and what Reset (if added
+// later) would restore.
 const AUTO_ASSIGN_MATERIAL_BY_PIECE = {
   rd: 'base',
   cube: 'ferrostone',
@@ -1256,6 +1264,17 @@ const AUTO_ASSIGN_MATERIAL_BY_PIECE = {
   octahedron: 'emerald',
   cubocta: 'citrine',
 };
+const AUTO_ASSIGN_PIECE_LABELS = {
+  rd: 'RD (full block)',
+  cube: 'Cube',
+  pyramid: 'Pyramid',
+  to: 'Truncated Octahedron',
+  ioct: 'Flattened Octahedron',
+  idis: 'Disphenoid',
+  octahedron: 'Octahedron',
+  cubocta: 'Cuboctahedron',
+};
+const AUTO_ASSIGN_STORAGE_KEY = 'rhombiverse-auto-assign-materials';
 
 // See docs/code-notes/render.md
 const SPECIES_COLORS = {
@@ -3623,13 +3642,52 @@ async function init() {
   const materialSelect = document.getElementById('material-select');
   const autoAssignMaterialCheckbox = document.getElementById('auto-assign-material');
 
+  // Per-piece overrides on top of AUTO_ASSIGN_MATERIAL_BY_PIECE's own
+  // defaults -- direct follow-up 2026-09-02 ("autoselected colors for
+  // all shapes adjustable"). Loaded once here; each dropdown below
+  // writes back into this object AND localStorage on change.
+  let autoAssignOverrides = {};
+  try {
+    autoAssignOverrides = JSON.parse(localStorage.getItem(AUTO_ASSIGN_STORAGE_KEY)) ?? {};
+  } catch { /* corrupt/missing -- fall back to the built-in defaults */ }
+
   // See AUTO_ASSIGN_MATERIAL_BY_PIECE's own header.
   function currentMaterialFor(pieceType) {
-    if (autoAssignMaterialCheckbox?.checked && AUTO_ASSIGN_MATERIAL_BY_PIECE[pieceType]) {
-      return AUTO_ASSIGN_MATERIAL_BY_PIECE[pieceType];
+    if (autoAssignMaterialCheckbox?.checked) {
+      return autoAssignOverrides[pieceType] ?? AUTO_ASSIGN_MATERIAL_BY_PIECE[pieceType] ?? materialSelect.value;
     }
     return materialSelect.value;
   }
+
+  // Builds the "Auto-assign colors" mini-panel -- one label + material
+  // dropdown per piece type, options cloned straight from #material-
+  // select so the list can never drift out of sync with the real
+  // palette. Built once at startup (not per-toggle) since the row's
+  // OWN visibility is all that needs to change when the checkbox
+  // flips, not its contents.
+  const autoAssignMaterialsRow = document.getElementById('auto-assign-materials-row');
+  if (autoAssignMaterialsRow) {
+    for (const pieceType of Object.keys(AUTO_ASSIGN_MATERIAL_BY_PIECE)) {
+      const wrap = document.createElement('label');
+      wrap.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; opacity:0.85;';
+      const span = document.createElement('span');
+      span.textContent = AUTO_ASSIGN_PIECE_LABELS[pieceType] ?? pieceType;
+      const select = document.createElement('select');
+      for (const opt of materialSelect.options) {
+        select.add(new Option(opt.textContent, opt.value));
+      }
+      select.value = autoAssignOverrides[pieceType] ?? AUTO_ASSIGN_MATERIAL_BY_PIECE[pieceType];
+      select.addEventListener('change', () => {
+        autoAssignOverrides[pieceType] = select.value;
+        try { localStorage.setItem(AUTO_ASSIGN_STORAGE_KEY, JSON.stringify(autoAssignOverrides)); } catch { /* best-effort only */ }
+      });
+      wrap.append(span, select);
+      autoAssignMaterialsRow.appendChild(wrap);
+    }
+  }
+  autoAssignMaterialCheckbox?.addEventListener('change', () => {
+    if (autoAssignMaterialsRow) autoAssignMaterialsRow.style.display = autoAssignMaterialCheckbox.checked ? 'flex' : 'none';
+  });
 
   const getShellCount = () => Math.min(Math.max(1, Number(shellCountInput.value) || 1), MAX_SHELL);
 
