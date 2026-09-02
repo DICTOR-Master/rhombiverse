@@ -73,7 +73,7 @@ its own tools:
   run of cells), and a **Fill/Round/Excavate** planetoid toolkit for
   building whole spheres and retrofitting them (radial gravity bends
   toward the core once a body is large enough to have one). A standalone
-  **World View** toggle (top-right, or the corner HUD wheel) switches the
+  **World View** toggle (the three-rings face on the corner HUD wheel) switches the
   whole build between Color, Translucent, and Skeleton (ghost fill + edge
   outline) at a glance.
 - **Alter** — Dig, Smooth, Fill, Replace: reshaping existing structure.
