@@ -3296,22 +3296,6 @@ async function init() {
       if (wheel3D.isOpen) wheel3D.close();
       pickers.openMaterialPicker((value, label) => showHudPrompt(`Material: ${label}`, 3000));
     });
-    // Direct report 2026-09-02 ("cant find the auto picker for color" --
-    // "found it okay but maybe needs another way in"): jumps straight to
-    // the Auto-assign section of the Settings panel instead of making
-    // players hunt past Look sensitivity/FOV/Graphics quality for it.
-    // Opens Settings itself (not a new overlay) since a bank of 8
-    // per-piece dropdowns doesn't fit the same radial-swatch UI
-    // Material's own quick-select uses.
-    document.getElementById('hud-quick-auto-assign')?.addEventListener('click', () => {
-      if (wheel3D.isOpen) wheel3D.close();
-      if (pickers.isAnyPickerOpen()) pickers.closeAnyPicker();
-      labPanelEl.classList.add('open');
-      const target = document.getElementById('auto-assign-row');
-      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      target?.classList.add('quick-highlight');
-      setTimeout(() => target?.classList.remove('quick-highlight'), 1600);
-    });
   }
 
   const bccToggleBtn = document.getElementById('bcc-toggle');
@@ -3829,15 +3813,6 @@ async function init() {
   const PIECE_MARK_KEY = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', to: 'pieceTO', ioct: 'pieceOctaSite', octahedron: 'pieceOctahedron', idis: 'pieceDisphenoid' };
   const quickShapeEl = document.getElementById('hud-quick-shape');
   const quickMaterialEl = document.getElementById('hud-quick-material');
-  // Auto-assign's own quick-select icon is fixed (not per-mode like the
-  // two above), so it's set once here rather than inside
-  // updateQuickSelect() below. Reuses MARKS.material's existing 3-color
-  // "pick one of many" glyph -- distinct at a glance from Material's own
-  // single-swatch icon (quickMaterialEl, current color only), and no new
-  // mark needed for a concept ("multiple assigned colors") this one
-  // already depicts.
-  const quickAutoAssignEl = document.getElementById('hud-quick-auto-assign');
-  if (quickAutoAssignEl) quickAutoAssignEl.innerHTML = iconFrame(MARKS.material, { title: 'Auto-assign colors' });
   // Bottom-left quick-select: always-visible current Piece/Material,
   // direct request 2026-08-29 ("a little hexagon icon of each... stay
   // open at bottom next to menu") -- unlike updateHudIndicator's own
