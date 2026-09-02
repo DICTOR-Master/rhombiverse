@@ -1,6 +1,16 @@
 [
   {
     "date": "2026-09-02",
+    "title": "See It Through, Any Shape",
+    "items": [
+      "Spherical Toggle and World View now work together properly: switch to Skeleton while Spherical is on and every ghosted shape shows as a real wireframe sphere, not the original angular piece -- flip Spherical on or off while Skeleton is already showing and it updates immediately.",
+      "Fixed: Translucent mode had no visible effect at all -- materials were changing correctly under the hood but the render never picked it up. Now genuinely see-through, with real colors showing through overlapping pieces (not just a generic fade).",
+      "Fixed: picking Cuboctahedron from the Piece wheel opened its color picker behind the wheel itself, making it impossible to click. The wheel now closes first, same as every other Piece pick.",
+      "Auto-assign material by piece type now defaults on, with all 8 per-piece colors adjustable in Settings -- manual picking is still one click away."
+    ]
+  },
+  {
+    "date": "2026-09-02",
     "title": "A Fuller Palette",
     "items": [
       "Four new materials: Amethyst, Rose Quartz, Citrine, and Turquoise -- same real-mineral naming as Garnet, Emerald, and Gold, now 14 colors deep.",
