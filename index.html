@@ -138,7 +138,7 @@
        at bottom next to menu"). Tapping either reopens straight to
        where that value gets changed (Piece wheel / Material picker),
        not back through Home -- see render.js's updateQuickSelect(). */
-    #hud-quick-shape, #hud-quick-material, #hud-quick-lattice-view {
+    #hud-quick-shape, #hud-quick-material, #hud-quick-lattice-view, #hud-quick-auto-assign {
       position: fixed; bottom: 8px; z-index: 900;
       width: 36px; height: 36px;
       background: rgba(0, 0, 0, 0.45);
@@ -148,8 +148,8 @@
       display: flex; align-items: center; justify-content: center;
       padding: 0; cursor: pointer;
     }
-    #hud-quick-shape svg, #hud-quick-material svg, #hud-quick-lattice-view svg { width: 24px; height: 24px; }
-    #hud-quick-shape:hover, #hud-quick-material:hover, #hud-quick-lattice-view:hover { background: rgba(255, 255, 255, 0.15); }
+    #hud-quick-shape svg, #hud-quick-material svg, #hud-quick-lattice-view svg, #hud-quick-auto-assign svg { width: 24px; height: 24px; }
+    #hud-quick-shape:hover, #hud-quick-material:hover, #hud-quick-lattice-view:hover, #hud-quick-auto-assign:hover { background: rgba(255, 255, 255, 0.15); }
     #hud-quick-shape { left: 64px; }
     #hud-quick-material { left: 106px; }
     /* Lattice View quick-select: third bottom-left icon, direct request
@@ -161,6 +161,16 @@
        control (see FEATURES.bccLattice gating in render.js). */
     #hud-quick-lattice-view { left: 148px; }
     #hud-quick-lattice-view.active { border-color: #39ff88; background: rgba(57, 255, 136, 0.18); }
+    /* Auto-assign quick-select: fourth bottom-left icon, direct report
+       2026-09-02 ("cant find the auto picker for color" -- "found it
+       okay but maybe needs another way in"): the per-piece Auto-assign
+       dropdowns (#auto-assign-materials-row) sit inside the Settings
+       panel, scrolled well past Look sensitivity/FOV/Graphics quality --
+       real, but easy to miss. This jumps straight there instead of
+       opening Material's own color-wheel overlay (a bank of per-piece
+       dropdowns doesn't fit that radial-swatch UI). */
+    #hud-quick-auto-assign { left: 190px; }
+    #hud-quick-auto-assign.active { border-color: #39ff88; background: rgba(57, 255, 136, 0.18); }
     #lab-toggle {
       position: fixed; top: 12px; right: 12px; z-index: 900;
       width: 30px; height: 30px;
@@ -311,7 +321,7 @@
        and #hud-crosshair are deliberately excluded -- the prompt IS the
        transition's own cue text, and the crosshair fades in/out on its
        own timing (render.js), not this one. */
-    #hud-wordmark, #hud-wheel-cue, #hud-quick-shape, #hud-quick-material, #hud-quick-lattice-view, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #spherical-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle, #world-view-toggle {
+    #hud-wordmark, #hud-wheel-cue, #hud-quick-shape, #hud-quick-material, #hud-quick-lattice-view, #hud-quick-auto-assign, #lab-toggle, #xray-toggle, #cyborg-toggle, #sculpture-mode-toggle, #duality-toggle, #spherical-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle, #reload-toggle, #world-view-toggle {
       transition: opacity 0.3s ease;
     }
     body.explore-transitioning #hud-wordmark,
@@ -319,6 +329,7 @@
     body.explore-transitioning #hud-quick-shape,
     body.explore-transitioning #hud-quick-material,
     body.explore-transitioning #hud-quick-lattice-view,
+    body.explore-transitioning #hud-quick-auto-assign,
     body.explore-transitioning #lab-toggle,
     body.explore-transitioning #xray-toggle,
     body.explore-transitioning #cyborg-toggle,
@@ -387,6 +398,14 @@
       margin-bottom: 6px;
     }
     #lab-close { background: none; border: none; color: #9de0ff; cursor: pointer; font: 13px system-ui, sans-serif; opacity: 0.8; }
+    /* Brief flash so a scrollIntoView-jumped-to section (currently just
+       #auto-assign-row, hud-quick-auto-assign) is unmistakable at a
+       glance, not just "the panel scrolled somewhere." */
+    @keyframes quick-highlight-flash {
+      0%, 100% { background: transparent; }
+      30% { background: rgba(124, 204, 255, 0.35); }
+    }
+    .quick-highlight { animation: quick-highlight-flash 1.6s ease; border-radius: 4px; }
     #lab-close:hover { opacity: 1; }
     #lab-panel h2 {
       margin: 4px 0 8px;
@@ -1129,6 +1148,7 @@
   <button id="hud-quick-shape" type="button" title="Shape (tap to change)"></button>
   <button id="hud-quick-material" type="button" title="Material (tap to change)"></button>
   <button id="hud-quick-lattice-view" type="button" title="Lattice View (tap to cycle)"></button>
+  <button id="hud-quick-auto-assign" type="button" title="Auto-assign colors (tap to open)"></button>
   <button id="sculpture-mode-toggle" type="button" title="Sculpture Mode: a separate, isolated scratch workspace">◆</button>
   <button id="cyborg-toggle" type="button" title="Cyborg Mode: guided walkthrough">◈</button>
   <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>
