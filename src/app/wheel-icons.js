@@ -168,12 +168,22 @@ export const MARKS = {
     <polygon points="${hexPts(16, 0, 0)}" ${THIN}/>
     <polygon points="${hexPts(16, 26, 0)}" ${THIN}/>
     <path d="M0,-9 V9 M-9,0 H9" ${STROKE}/>`,
-  // Dig: "-" shown across three hexagons.
+  // Dig: direct report 2026-09-02 -- "the symbol it replaced [Alter's
+  // old borrowed icon] seems to be doing double duty as dig." Confirmed
+  // live: the old mark (three hexagons, a bare "-" at center) was
+  // nearly identical to Fill's own mark (same three hexagons, a "+" at
+  // center) -- the only difference was a barely-visible center glyph,
+  // not two distinct symbols for two different tools. Redrawn as
+  // concentric shells -- same radii as MARKS.shellBrush below (14/24/34,
+  // a real shared scale, not arbitrary), outer two solid (real, kept
+  // material), innermost dashed (excavated/absent) -- directly depicts
+  // what Dig actually does (hollow a shell-built structure down to a
+  // chosen radius), distinct from Fill's own "add material" cross at a
+  // glance.
   dig: `
-    <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>
-    <polygon points="${hexPts(16, 0, 0)}" ${THIN}/>
-    <polygon points="${hexPts(16, 26, 0)}" ${THIN}/>
-    <path d="M-9,0 H9" ${STROKE}/>`,
+    <polygon points="${hexPts(34)}" ${THIN}/>
+    <polygon points="${hexPts(24)}" ${THIN}/>
+    <polygon points="${hexPts(14)}" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 3" fill="none"/>`,
   // Alter (wheel-doorway face, "navigateTo:alter"): direct request
   // 2026-09-02, "should change to be like six segment recycling
   // symbol" -- was reusing Dig's own mark (its first of 4 tools),
