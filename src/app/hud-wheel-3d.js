@@ -180,12 +180,22 @@ const HUD_FACES = {
   // wheel and the Lab panel), so it's a genuinely new capability here,
   // not filler. Verified non-adjacent to every real Cuboctahedron
   // Build doorway (there isn't another one on this wheel to be
-  // adjacent to). Same hexagon-with-3-alternating-wedges mark as
-  // wheel-icons.js's MARKS.cuboctahedron, scaled to this file's own
-  // tiny coordinate convention -- one symbol, one purpose, same shape
-  // everywhere it appears.
+  // adjacent to). Deliberately NOT the same hexagon-with-3-alternating-
+  // wedges mark wheel-icons.js's MARKS.cuboctahedron uses -- direct
+  // follow-up report caught a real collision that mark would have
+  // caused: render.js's updateLatticeQuickViewIcon() overwrites the
+  // 'BCC Lattice' face above (top|sy-1sz1) with that exact same mark
+  // whenever Lattice View is cycled to its own 'cubocta' preview mode
+  // -- confirmed live, both faces showed the identical icon
+  // simultaneously. Same "real placement vs. live preview need visibly
+  // different icons, even for the same shape family" precedent the
+  // retired BCC Build face already established against BCC Lattice's
+  // own plain hexagon. Solid filled hexagon with a "+" cut out (evenodd)
+  // instead -- the same Add-tool "+" language used elsewhere in this
+  // app, on a solid (not wedge-shaded) hexagon, so it reads as "commit/
+  // place" rather than "preview."
   'bottom|sx1sz-1':   {
-    svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><polygon points="0,-1.66 1.44,-0.83 1.44,0.83 0,1.66 -1.44,0.83 -1.44,-0.83" fill="none" stroke="currentColor" stroke-width="0.16"/><polygon points="0,0 0,-1.66 1.44,-0.83" fill="currentColor" opacity="0.55"/><polygon points="0,0 1.44,0.83 0,1.66" fill="currentColor" opacity="0.55"/><polygon points="0,0 -1.44,0.83 -1.44,-0.83" fill="currentColor" opacity="0.55"/></svg>',
+    svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><path d="M0,-1.5 L1.3,-0.75 L1.3,0.75 L0,1.5 L-1.3,0.75 L-1.3,-0.75 Z M0.18,0.18 L0.18,1.0 L-0.18,1.0 L-0.18,0.18 L-1.0,0.18 L-1.0,-0.18 L-0.18,-0.18 L-0.18,-1.0 L0.18,-1.0 L0.18,-0.18 L1.0,-0.18 L1.0,0.18 Z" fill="currentColor" fill-rule="evenodd"/></svg>',
     elId: 'cubocta-build-toggle', title: 'Cuboctahedron Build',
   },
   'bottom|sx-1sz-1':  { symbol: '◇', elId: 'rhombic-wheel-3d-toggle', title: 'Menu', temporary: true },

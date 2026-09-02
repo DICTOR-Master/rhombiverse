@@ -174,6 +174,33 @@ export const MARKS = {
     <polygon points="${hexPts(16, 0, 0)}" ${THIN}/>
     <polygon points="${hexPts(16, 26, 0)}" ${THIN}/>
     <path d="M-9,0 H9" ${STROKE}/>`,
+  // Alter (wheel-doorway face, "navigateTo:alter"): direct request
+  // 2026-09-02, "should change to be like six segment recycling
+  // symbol" -- was reusing Dig's own mark (its first of 4 tools),
+  // reasonable at the time but not a real symbol of its own. 6 chevron
+  // arrows at true 60-degree rotational symmetry (computed from trig,
+  // not eyeballed), each a 2-segment bent line ending in a solid
+  // arrowhead -- reshaping/reclaiming existing structure, the same
+  // idea a recycling symbol stands for. Went through 4 live-reviewed
+  // rounds against a real proof-sheet artifact: 3 arrows read "too
+  // thin," 6 arrows at stroke-width 9 "too chunky, crowds the frame,"
+  // scaled in to fit with real margin, then thinned again ("slightly
+  // more delicate") to the final stroke-width 3.2 below.
+  alter: `
+    <g stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="currentColor">
+      <path d="M1.15,-10.94 L10.8,-20.31 L17.09,-15.39" fill="none"/>
+      <polygon points="13.14,-12.77 21.82,-11.7 18.68,-19.86"/>
+      <path d="M10.05,-4.47 L22.99,-0.8 L21.87,7.11" fill="none"/>
+      <polygon points="17.63,5 21.04,13.05 26.54,6.25"/>
+      <path d="M8.9,6.47 L12.19,19.51 L4.78,22.5" fill="none"/>
+      <polygon points="4.49,17.76 -0.78,24.75 7.86,26.11"/>
+      <path d="M-1.15,10.94 L-10.8,20.31 L-17.09,15.39" fill="none"/>
+      <polygon points="-13.14,12.77 -21.82,11.7 -18.68,19.86"/>
+      <path d="M-10.05,4.47 L-22.99,0.8 L-21.87,-7.11" fill="none"/>
+      <polygon points="-17.63,-5 -21.04,-13.05 -26.54,-6.25"/>
+      <path d="M-8.9,-6.47 L-12.19,-19.51 L-4.78,-22.5" fill="none"/>
+      <polygon points="-4.49,-17.76 0.78,-24.75 -7.86,-26.11"/>
+    </g>`,
   // Smooth: direct report 2026-09-02, "has never been right" -- the old
   // mark (a hexagon with every corner rounded by a small radius) reads
   // almost identically to the frame hexagon drawn behind every icon

@@ -73,13 +73,14 @@ const ACTION_TO_MARK = {
   'tool:offer': 'offer',
   'tool:accept': 'accept',
   'tool:inventory': 'inventory',
-  // Build/Alter department-nav faces reuse their own wheel's primary
-  // tool icon -- the face is a doorway into that wheel, so its first/
-  // defining action doubles as a preview of what's inside, rather than
-  // inventing two more marks for "leads to the Rhombi-model wheel" /
-  // "leads to the Dig wheel."
+  // Build's department-nav face reuses its own wheel's primary tool
+  // icon -- the face is a doorway into that wheel, so Add doubles as a
+  // preview of what's inside. Alter used to do the same with Dig, but
+  // got its own real mark (a 6-arrow recycling symbol) 2026-09-02 --
+  // direct request, see wheel-icons.js's MARKS.alter for the full
+  // design-review history.
   'navigateTo:build': 'add',
-  'navigateTo:alter': 'dig',
+  'navigateTo:alter': 'alter',
   // Universal ring (every wheel): Lab/Settings and Home.
   openLab: 'lab',
   navigateHome: 'home',
