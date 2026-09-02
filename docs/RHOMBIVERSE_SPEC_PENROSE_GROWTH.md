@@ -27,14 +27,14 @@ crystal blobs.
 
 Grounded Simplicity (`RHOMBIVERSE_PRINCIPLES.md` section 0) means
 borrowing the real, named mathematical objects here exactly as the base
-game borrows the real FCC lattice — not inventing an "aperiodic-looking"
+app borrows the real FCC lattice — not inventing an "aperiodic-looking"
 approximation. The real construction, **numerically verified during
 this spec pass, not just cited**:
 
 - Take the 12 vertices of a regular icosahedron: all coordinate
   permutations of `(0, ±1, ±φ)`, where `φ = (1+√5)/2`. Six of these,
   one from each antipodal pair, are the **six icosahedral star
-  vectors** — the same six five-fold axes the game's own FCC/RD system
+  vectors** — the same six five-fold axes the app's own FCC/RD system
   has no relationship to (this is a genuinely different, non-periodic
   lattice, by design).
 - Any three star vectors are pairwise separated by exactly one of two
@@ -99,7 +99,7 @@ aperiodicity comes from the real substitution grammar's own local
 matching rules (Ammann's rhombohedra require matching-rule markings on
 shared faces — de Bruijn/Ammann's own real mechanism — to avoid
 gaps/overlaps when tiles are placed one at a time rather than by a
-single global inflation), not from anything invented for this game.
+single global inflation), not from anything invented for this app.
 
 ---
 

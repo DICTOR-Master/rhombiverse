@@ -14,7 +14,7 @@ A black hole must be creatable by players without ever being able to consume unb
 
 **Real-physics grounding:** near an actual black hole (Schwarzschild geometry), space itself stretches — an object falling toward the event horizon appears, to a distant observer, to take infinitely longer to arrive, asymptotically approaching but never reaching it in finite observed time. This spec adapts that real behavior directly, rather than inventing a hard numeric cap.
 
-**Mechanic:** as any entity or structure approaches a black hole, the game **procedurally inserts additional lattice cells** between the approaching entity and the black hole's center — using the same FCC coordinate system already defined in `RHOMBIVERSE_PLAN.md` section 2. The closer the entity gets, the more new space is generated, such that apparent remaining distance shrinks progressively more slowly, asymptotically approaching (but never reaching) zero.
+**Mechanic:** as any entity or structure approaches a black hole, the app **procedurally inserts additional lattice cells** between the approaching entity and the black hole's center — using the same FCC coordinate system already defined in `RHOMBIVERSE_PLAN.md` section 2. The closer the entity gets, the more new space is generated, such that apparent remaining distance shrinks progressively more slowly, asymptotically approaching (but never reaching) zero.
 
 **Effect:** arrival at the black hole's true center becomes **structurally impossible**, not merely disallowed by a rule — the entity is always still "approaching," never "arrived," for any practically reachable play session.
 

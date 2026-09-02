@@ -4,7 +4,7 @@
 
 Rhombiverse is one **world-state**, rendered by whatever client reads it. Two systems will eventually write to that world-state, but only one is built first:
 
-1. **RD Lattice (build system)** — deterministic, player-placed, FCC-packed rhombic dodecahedra. Ships in v1.
+1. **RD Lattice (build system)** — deterministic, user-placed, FCC-packed rhombic dodecahedra. Ships in v1.
 2. **Penrose/RT Growth (organic system)** — procedural, aperiodic, 5-fold quasicrystalline growth (plants/creatures). Ships in v2+, as an additive layer on the same world format.
 
 **Golden rule:** the world is data (JSON), not baked geometry. Any renderer, any client, any future multiplayer backend just reads/writes this data. This is what makes "open to the public" possible without a rewrite later.
@@ -15,10 +15,11 @@ Rhombiverse is one **world-state**, rendered by whatever client reads it. Two sy
 
 The FCC lattice / rhombic dodecahedron geometry — and its planned dual
 cube-octahedron structure — is this project's core: what makes Rhombiverse
-Rhombiverse rather than another voxel builder. The game-loop World Systems
-(mining, trade, claims, hazards, and the rest) built on top of that geometry
-are valuable, well-built, and genuinely fun — but secondary, and meant to be
-independently extendable rather than load-bearing for the core experience.
+Rhombiverse rather than another voxel builder. The continuously-simulated
+World Systems (mining, trade, claims, hazards, and the rest) built on top of
+that geometry are valuable, well-built, and genuinely engaging — but
+secondary, and meant to be independently extendable rather than
+load-bearing for the core experience.
 
 - **Core (always present):** lattice math (`lattice.js`), rendering
   (`render.js`), build/chisel (`build.js`), Sculpture Mode (`sculpture.js`),
@@ -33,7 +34,7 @@ independently extendable rather than load-bearing for the core experience.
   planetoids (`gravity.js`, `planetoidgen.js`), Penrose/Ammann growth
   (`growth.js`), lattice zoom (`latticezoom.js`), cultivation
   (`cultivation.js`).
-- **World Systems (secondary, game-loop, can be disabled or
+- **World Systems (secondary, continuously-simulated, can be disabled or
   community-owned):** mining & resources (`asteroids.js`), inventory, claims/
   regions (`regions.js`), trade (`trade.js`), achievements
   (`achievements.js`), animals (`animals.js`), hazards (`blackhole.js`,
@@ -125,7 +126,7 @@ src/
         `byok.js`/`cyborg.js`/`sfx.js`/`worldshare.js` all went to
         `app/` — each is app-shell/orchestration-adjacent (DOM UI,
         cross-cutting service, or share-link plumbing), none is
-        geometry-core logic or World-Systems game-loop content.
+        geometry-core logic or World-Systems continuously-simulated content.
         **`render.js` deliberately NOT split into `render-core.js` +
         `index-orchestrator.js`** — at 4,347 lines with rendering and
         app orchestration genuinely intertwined throughout (world-system
@@ -160,14 +161,14 @@ src/
         FEATURES-gated UI (claim-land-row) all confirmed to flip
         correctly in both directions, real reload included. **Cross-
         referenced 2026-08-28**: the reframe implementation plan's Stage
-        8 ("Game Systems Containment") asked for a player-facing
+        8 ("Game Systems Containment") asked for a user-facing
         Playground/Survival Demo mode that sets all World Systems flags
         true for a session, leaving the default at false — this is
-        already exactly what Rhombeometry/Full Game World does (Full
-        Game World = all six flags true; Rhombeometry, the actual
-        session default, = all six false), just under different names.
-        Direct user decision: nothing new built for Stage 8, this
-        satisfies it as-is.
+        already exactly what Rhombeometry/Full World does (Full World =
+        all six flags true; Rhombeometry, the actual session default, =
+        all six false), just under different names. Direct user
+        decision: nothing new built for Stage 8, this satisfies it
+        as-is.
   - [ ] Phase D: Optionally publish `core/` + dual Sculpture Mode as a
         standalone reusable library/template.
 
@@ -252,14 +253,14 @@ World-space position = lattice coord × scale factor `s` (start `s = 1`). No rot
 - Raycast from camera/cursor to detect which of the 12 faces of a hovered cell is targeted.
 - Click/tap → compute neighbor coordinate via offset table → add cell to world-state → re-render.
 - Right-click/long-press → remove cell (block delete).
-- **Success check:** player can build outward face-by-face from the seed cell using only mouse/touch.
+- **Success check:** the user can build outward face-by-face from the seed cell using only mouse/touch.
 
 **Phase 3 — Local Persistence**
 - `persistence.js`: save world-state to `localStorage` on every change; load on page open.
 - Add "New World" / "Export JSON" / "Import JSON" buttons — this makes the JSON schema portable before any backend exists.
 - **Success check:** refreshing the browser preserves the build; JSON can be manually shared/re-imported.
 
-**Phase 4 — Deploy Publicly (playable, still single-player)**
+**Phase 4 — Deploy Publicly (usable, still solo)**
 - Deploy to GitHub Pages or Vercel from the private repo (deployment can be public even if source repo stays private).
 - Share the live link — this is the earliest possible "public and interactive" milestone.
 - **Success check:** anyone with the link can build in their own local session.
@@ -272,7 +273,7 @@ World-space position = lattice coord × scale factor `s` (start `s = 1`). No rot
 - Planetoid = a cluster of RD cells filled within a given radius of a center coordinate. Provide a "fill sphere" tool (radius input → auto-fills all valid lattice cells within that radius of a chosen center), then allow normal Phase-2 hand-building/carving on top.
 - Radial gravity: movement/physics must support gravity vectors that point toward a planetoid's center, not just globally down. Structural decision — flag this now so Phase 1–2 movement code isn't hardcoded to flat "down" gravity, even though radial gravity isn't implemented until this phase.
 - Crystal-growth mode (optional, ties to Phase 6 timing): cells auto-add adjacent to filled cells with an open face, weighted by a resource/mineral value — planetoids that grow unattended using the same lattice math, modeling real garnet crystal growth.
-- **Success check:** player can seed a planetoid, walk on its surface with gravity pulling toward its center, and watch it optionally grow new cells over time.
+- **Success check:** the user can seed a planetoid, walk on its surface with gravity pulling toward its center, and watch it optionally grow new cells over time.
 
 **Phase 5.8 — Trust Zones / Moderation (concentric ring model)**
 - Extend world-state (already schema-ready via `region` and `status` fields from section 3):
@@ -306,9 +307,9 @@ World-space position = lattice coord × scale factor `s` (start `s = 1`). No rot
 
 Rhombiverse is a world built from a single honest rule: everything is made of rhombi, and rhombi obey two different kinds of order at once. One is a crystal — rigid, repeating, minable, buildable, the same everywhere you look, the geometry real garnet already grows in. The other is a quasicrystal — aperiodic, five-fold, never quite repeating, the geometry evolution already reaches for in flowers and shells. Nothing here is arbitrary; every shape traces back to real crystallography and real mathematics, which means the world can keep surprising you without ever feeling random.
 
-From that one rule, a whole range of things becomes possible: raise a mountain range face-by-face from a single seed block. Fill a sphere and stand on the surface of your own planetoid, gravity bending toward its core instead of some flat horizon. Plant something and let five-fold growth rules unfold it into a tree, a shell, a creature's frame — never twice the same, but always recognizably grown rather than generated. Leave a crystal field untouched and come back to find it larger, closer to some mineral logic than to any player's hand. Two people can build side by side in the same lattice and never place a block in exactly the same way twice, because 12 faces and infinite radii offer more room than a flat grid ever could.
+From that one rule, a whole range of things becomes possible: raise a mountain range face-by-face from a single seed block. Fill a sphere and stand on the surface of your own planetoid, gravity bending toward its core instead of some flat horizon. Plant something and let five-fold growth rules unfold it into a tree, a shell, a creature's frame — never twice the same, but always recognizably grown rather than generated. Leave a crystal field untouched and come back to find it larger, closer to some mineral logic than to any single hand. Two people can build side by side in the same lattice and never place a block in exactly the same way twice, because 12 faces and infinite radii offer more room than a flat grid ever could.
 
-It's less a building game than a small, coherent universe of shape — one where the built and the grown are drawn from the same rhombus, obeying different laws, and where every structure you make is, in some real sense, also a fact about geometry.
+It's a small, coherent universe of shape — one where the built and the grown are drawn from the same rhombus, obeying different laws, and where every structure you make is, in some real sense, also a fact about geometry.
 
 ---
 

@@ -23,7 +23,7 @@ small, coherent field of shape to sculpt, decompose, and dualize.
 See `RHOMBIVERSE_PLAN.md` section 6 for the full vision statement, and
 `CLAUDE.md` for a technical map of this repo.
 
-Play it at **[rhombiverse.vercel.app](https://rhombiverse.vercel.app)** — no
+Try it at **[rhombiverse.vercel.app](https://rhombiverse.vercel.app)** — no
 install, no account required.
 
 ## Core vs. Modules
@@ -91,17 +91,18 @@ its own tools:
 
 Supporting systems: **Shared World** (opt-in — Supabase realtime sync, no
 account needed beyond a lightweight anonymous session), a **pseudonymous
-display name** with live named avatars for other connected players, an
-in-world **Interact** action for two-sided drag-and-tap barter trades,
-mining/inventory/resource decay, ownership claims, an **achievements** toast
-system, **World sharing** via a compressed shareable link, a public
-**Gallery** of shared/showcase Worlds, a **What's New** changelog (the 🕘
-button next to About), and **Cyborg Mode** — an optional guided walkthrough
-that, once finished, can also suggest a genuinely creative next thing to
-build (real AI, same three-tier pattern as Full-Cyborg: your own API key,
-the shared Vercel AI Gateway, or a local fallback — never required to
-play). Full-Cyborg itself (Sculpt/Cultivate's most assisted tier) uses that
-same AI pattern.
+display name** with live named avatars for other people connected at the
+same time, an in-world **Interact** action for two-sided drag-and-tap
+barter trades, mining/inventory/resource decay, ownership claims, an
+**achievements** toast system, **World sharing** via a compressed
+shareable link, a public **Gallery** of shared/showcase Worlds, a
+**What's New** changelog (the 🕘 button next to About), and **Cyborg
+Mode** — an optional guided walkthrough that, once finished, can also
+suggest a genuinely creative next thing to build (real AI, same
+three-tier pattern as Full-Cyborg: your own API key, the shared Vercel
+AI Gateway, or a local fallback — never required to use). Full-Cyborg
+itself (Sculpt/Cultivate's most assisted tier) uses that same AI
+pattern.
 
 The welcome screen is a rotating RD logo with two live antipodal ENTER
 faces and a Mode choice (Pure Rhombeometry / Full World, defaulting

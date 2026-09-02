@@ -1,13 +1,13 @@
 # Terms of Service
 
-Effective for the public playable link described in `RHOMBIVERSE_PLAN.md`
+Effective for the public link described in `RHOMBIVERSE_PLAN.md`
 Phase 4. This is a minimal terms document for a small hobby project — it
 will need real legal review before this project takes on real accounts,
 payments, or a larger user base (see `docs/RHOMBIVERSE_COMPLIANCE.md`).
 
 ## What this is
 
-Rhombiverse is a free, browser-based building toy. By default it runs in
+Rhombiverse is a free, browser-based spatial building tool. By default it runs in
 **local mode**: there is no account system, no server-side storage, and
 your content is not visible to anyone else. Everything you build is
 saved only in your own browser's local storage, or in a JSON file you
@@ -37,10 +37,10 @@ includes automated flooding of builds, claims, or connections). Don't
 use the app for anything unlawful.
 
 In Shared World specifically: don't attempt to grief, deface, or destroy
-other players' builds or claimed land outside of what Rhombiverse's own
+other users' builds or claimed land outside of what Rhombiverse's own
 rules and protections (right-click removal, claim `destructible`
 settings, Black Hole/Supernova mechanics, etc.) actually allow. Don't
-try to create multiple identities to get around the one-claim-per-player
+try to create multiple identities to get around the one-claim-per-user
 limit. Shared World currently uses a lightweight anonymous identity per
 browser rather than verified accounts, so this rule is enforced as best
 effort, not guaranteed — see `docs/RHOMBIVERSE_SPEC_LOOPHOLES.md`'s own
@@ -65,9 +65,9 @@ Content you build while Shared World is **off** stays local to your own
 browser or your own exported JSON files, exactly as described above.
 
 Content you place while Shared World is **on** is sent to and stored on
-a shared backend and becomes part of a single world that every Shared
-World player can see, and in most cases build on or near — this is the
-whole point of Shared World, not an accidental side effect. By enabling
+a shared backend and becomes part of a single world that everyone in
+that Shared World can see, and in most cases build on or near — this is
+the whole point of Shared World, not an accidental side effect. By enabling
 Shared World and placing content, you agree that:
 
 - Other players may see, build adjacent to, or (subject to Rhombiverse's

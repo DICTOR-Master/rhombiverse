@@ -4,7 +4,7 @@
 
 Synthesized from: the MVP spec, the Improvement Plan v2, the Duality/Cultivation addendum, the Assistance Spectrum/Sculpture Mode addendum, the Cyborg Mode addendum, and — for B7's moderation gate specifically — the Compliance/Safety/Governance checklist. The contradictions between these docs were resolved by the project owner across two rounds of decisions (2026-08-17).
 
-**A note on references inside the prompts below:** where a prompt says something like "reuse the lattice's existing order-48 symmetry" or "the existing regions/claims system," that points at code already in your repository — the live game is confirmed to already exist past Phase 6, so Claude Code can find these by reading the codebase, not by needing another planning document. Where something genuinely isn't specified anywhere yet, it's called out in §Open Items rather than glossed over.
+**A note on references inside the prompts below:** where a prompt says something like "reuse the lattice's existing order-48 symmetry" or "the existing regions/claims system," that points at code already in your repository — the live app is confirmed to already exist past Phase 6, so Claude Code can find these by reading the codebase, not by needing another planning document. Where something genuinely isn't specified anywhere yet, it's called out in §Open Items rather than glossed over.
 
 ---
 
@@ -36,7 +36,7 @@ Nine steps: A is fully independent. B1–B7 are mostly sequential; B3 and B4b ha
 
 ---
 
-## Track B — Live Game (existing repository)
+## Track B — Live App (existing repository)
 
 ### B1 — Make It Playable
 
@@ -68,9 +68,9 @@ Terminology renames (apply consistently, everywhere outside Lab/Advanced view):
 
 ### B3 — Cyborg Mode (guided onboarding)
 
-No dependency — builds on the Phase 2 build tool (camera orbit, face hover, placement), which already exists in the live game.
+No dependency — builds on the Phase 2 build tool (camera orbit, face hover, placement), which already exists in the live app.
 
-> Working in the existing Rhombiverse repository, implement Cyborg Mode. Create a `cyborg-subscript.json` format: an ordered list of steps, each with a `stepId`, a plain-language `instruction`, a `successCondition` (a named event the game client emits or can be made to emit), a `hintAfterSeconds` window, a plain-language `hint` shown if the success condition hasn't fired within that window, and a `highlightTarget` CSS selector for visually anchoring the guidance on screen. Author a real `first-build-session` subscript covering camera orbit, face-hover, and block placement — the actual existing build-tool mechanics — using this exact shape:
+> Working in the existing Rhombiverse repository, implement Cyborg Mode. Create a `cyborg-subscript.json` format: an ordered list of steps, each with a `stepId`, a plain-language `instruction`, a `successCondition` (a named event the app emits or can be made to emit), a `hintAfterSeconds` window, a plain-language `hint` shown if the success condition hasn't fired within that window, and a `highlightTarget` CSS selector for visually anchoring the guidance on screen. Author a real `first-build-session` subscript covering camera orbit, face-hover, and block placement — the actual existing build-tool mechanics — using this exact shape:
 >
 > ```json
 > {
@@ -105,7 +105,7 @@ No dependency — builds on the Phase 2 build tool (camera orbit, face hover, pl
 > }
 > ```
 >
-> Emit the named success-condition events (`cameraRotated`, `faceHovered`, `cellPlaced`) from existing game code where they aren't already available. Build a simple agent-narration UI (text + `highlightTarget` highlighting) that listens for these events and surfaces hints per the `hintAfterSeconds` timing. If a player performs an action out of the expected order (e.g. places a block before orbiting the camera), recognize the corresponding step's success condition whenever it fires rather than strictly enforcing sequence. Cyborg Mode must be toggleable off at any time with zero persistent state change to the world — it only guides, it never acts on the player's behalf in this pass; do not implement an agent-acts-on-behalf-of-player mode here.
+> Emit the named success-condition events (`cameraRotated`, `faceHovered`, `cellPlaced`) from existing app code where they aren't already available. Build a simple agent-narration UI (text + `highlightTarget` highlighting) that listens for these events and surfaces hints per the `hintAfterSeconds` timing. If a user performs an action out of the expected order (e.g. places a block before orbiting the camera), recognize the corresponding step's success condition whenever it fires rather than strictly enforcing sequence. Cyborg Mode must be toggleable off at any time with zero persistent state change to the world — it only guides, it never acts on the user's behalf in this pass; do not implement an agent-acts-on-behalf-of-user mode here.
 
 **Done when:** toggling Cyborg Mode narrates the first-build-session subscript, hints appear only after their timing window elapses without success, and toggling off leaves world-state untouched.
 
@@ -144,7 +144,7 @@ Sculpture Mode is a **separate top-level mode from the shared Universe** — its
 
 Depends on B1 (the Rhombic Wheel must exist).
 
-> Working in the existing Rhombiverse repository, wire the shared Sculpture tool module (symmetry mirroring, shell-radius brush, Assistance Spectrum tiers) into the Rhombic Wheel's "Create" first-level category, built in B1. Selecting Create opens a second-level radial menu, styled with the same rhombic grammar as the rest of the wheel, exposing the Manual-tier tools (symmetry mirror, shell brush) and an assistance-tier selector. Edits made here write directly to the player's claim/world-state like any other build action, attributed to the player's `authorId`. Build Manual and Semi-Cyborg tiers fully and enable them — Semi-Cyborg already requires explicit player accept before any world-state change, consistent with every other consent-gated action in this game. Build Full-Cyborg's logic too (parse natural-language intent into concrete cell edits, restricted to the player's own claimed region — using the existing regions/claims system already in the codebase — or `destructible`-flagged space, with all resulting cells attributed to the requesting player's `authorId`, not the agent), but keep it behind a feature flag that stays off until B7's moderation work is verified complete, since this tier writes shared world-state without per-action confirmation.
+> Working in the existing Rhombiverse repository, wire the shared Sculpture tool module (symmetry mirroring, shell-radius brush, Assistance Spectrum tiers) into the Rhombic Wheel's "Create" first-level category, built in B1. Selecting Create opens a second-level radial menu, styled with the same rhombic grammar as the rest of the wheel, exposing the Manual-tier tools (symmetry mirror, shell brush) and an assistance-tier selector. Edits made here write directly to the user's claim/world-state like any other build action, attributed to the user's `authorId`. Build Manual and Semi-Cyborg tiers fully and enable them — Semi-Cyborg already requires explicit user accept before any world-state change, consistent with every other consent-gated action in this app. Build Full-Cyborg's logic too (parse natural-language intent into concrete cell edits, restricted to the user's own claimed region — using the existing regions/claims system already in the codebase — or `destructible`-flagged space, with all resulting cells attributed to the requesting user's `authorId`, not the agent), but keep it behind a feature flag that stays off until B7's moderation work is verified complete, since this tier writes shared world-state without per-action confirmation.
 
 #### B4b — Standalone Sculpture Mode (separate top-level mode)
 
@@ -185,7 +185,7 @@ Duality depends on B2 (extends the X-Ray/viewport pattern). Cultivation depends 
 
 ---
 
-### B6 — Make It a Game
+### B6 — Make It Engaging
 
 Depends on B1 and B2.
 

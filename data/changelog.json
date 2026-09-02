@@ -1,5 +1,34 @@
 [
   {
+    "date": "2026-09-02",
+    "title": "New Faces on the Wheel",
+    "items": [
+      "Settings is now a real gear -- bold, centered, and easy to spot at a glance instead of a small faint glyph.",
+      "Cyborg has a proper symbol: a Metropolis-inspired robot head, stepped headphone-style ears and all.",
+      "Smooth is now a hexagon touching its own circle from the inside, one clean blended line -- not the barely-there rounded hexagon it used to be.",
+      "Blueprint's icon is a pair of dividing compasses now, not an unclear tick-marked line.",
+      "Dropped the faint circle that used to sit behind every hexagon icon on the wheel -- just the hexagon now, noticeably sharper.",
+      "Boosted contrast on several corner-HUD symbols (Spherical, X-Ray, Reload, BCC Lattice) that were hard to make out against the medallion."
+    ]
+  },
+  {
+    "date": "2026-09-02",
+    "title": "A Simpler Wheel",
+    "items": [
+      "Two departments retired: Construct (a pure hop with no content of its own) and Rhombisis (three of its four faces just duplicated tools already on Build, Blueprint, and Cultivate). Build and Alter now sit directly on Home; BCC Build moved there too.",
+      "Every wheel shows real content the moment you land on it now, not a blank face mixed in with the first ones you see.",
+      "\"Rhombitect\" and \"Rhombivate\" are now Blueprint and Cultivate -- plain English, matching the rest of the wheel. \"Lab / Settings\" is just Settings everywhere.",
+      "The welcome screen's ENTER is a large, always-clickable label now, fixed at the center of the rotating logo -- no more waiting for a swinging face to catch it, and the old pulsing glow faces are gone."
+    ]
+  },
+  {
+    "date": "2026-09-02",
+    "title": "Never Wonder Where the Wheel Went",
+    "items": [
+      "Generating a body right where you're standing can still fill your whole view -- a toast now confirms it happened and reminds you Tab or Menu still opens the wheel from there."
+    ]
+  },
+  {
     "date": "2026-09-01",
     "title": "See It Round: Spherical Toggle",
     "items": [
@@ -134,7 +163,7 @@
       "Two new real, placeable pieces (Piece picker, Rhombeometry): Disphenoid and Octahedron Site -- the genuine BCC interstitial-site tessellation (the same octahedral/tetrahedral geometry carbon actually sits in inside iron), not a view-only overlay.",
       "Disphenoid places one at a time; Octahedron Site places the 4-disphenoid bundle they combine into in one click. Both grow by clicking an existing one's own face, same as every other piece type.",
       "Builds freely on top of your FCC and BCC worlds -- overlap between all three lattices is expected, not prevented.",
-      "Piece is a real destination on the main Rhombic Wheel now, not a separate popup -- open it the same way as any other department (Build > Piece) to reach all 6 pieces (RD, Cube, Pyramid, Truncated Octahedron, Octahedron Site, Disphenoid) by rotating the one real wheel, same as everywhere else in the game."
+      "Piece is a real destination on the main Rhombic Wheel now, not a separate popup -- open it the same way as any other department (Build > Piece) to reach all 6 pieces (RD, Cube, Pyramid, Truncated Octahedron, Octahedron Site, Disphenoid) by rotating the one real wheel, same as everywhere else in the app."
     ]
   },
   {
@@ -186,7 +215,7 @@
     "title": "A Truly Blank Canvas",
     "items": [
       "First-time Rhombeometry visitors now land on a single cell in empty space, not the pre-built Showcase World and its guided tour -- geometry really does come first now.",
-      "Full Game World's first visit is unchanged."
+      "Full World's first visit is unchanged."
     ]
   },
   {
@@ -303,9 +332,9 @@
       "One control surface for everything: the Rhombic Wheel (Tab / Space, or tap Menu) replaces the old always-visible sidebar.",
       "Sculpt: a real symmetry/mirror tool with Model and Chisel modes, plus a standalone Sculpture Mode scratch workspace.",
       "Grow: Cultivate real aperiodic growth, and see the tiling a structure casts with Duality Mode.",
-      "Cyborg Mode: an optional guided walkthrough, plus real AI assistance for Sculpt/Cultivate -- bring your own API key or use the shared one, never required to play.",
+      "Cyborg Mode: an optional guided walkthrough, plus real AI assistance for Sculpt/Cultivate -- bring your own API key or use the shared one, never required to use.",
       "Achievements, World sharing via a link, a public Gallery of shared Worlds, and a sequenced first-visit tour instead of a tutorial modal.",
-      "Walk up to another player and Interact to trade -- named avatars, a lightweight pseudonymous display name, no accounts.",
+      "Walk up to another person and Interact to trade -- named avatars, a lightweight pseudonymous display name, no accounts.",
       "A pass of real mobile/touch fixes: tap-to-open the wheel, bottom-sheet tool panels, first-use hints on the icon toggles."
     ]
   },

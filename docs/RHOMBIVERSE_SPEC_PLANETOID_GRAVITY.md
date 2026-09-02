@@ -81,7 +81,7 @@ This is the same 12-neighbor-direction geometry already defined in the main plan
 - Gravity direction for all cells updates as the pulse passes through them, rather than snapping instantly everywhere at once — the shockwave *is* the visual/physical representation of the field reasserting itself, shell by shell outward.
 - **Magnitude scales with how far past Shell 4 the new center lands.** A shift that just crosses into Shell 5 produces a modest ripple; a shift landing many shells out produces a much larger one. Anything within the Shell 1–4 tolerance zone, or anything while the planetoid is still in forming state, produces no event at all.
 
-**Honest framing:** this is a stylized dramatization, not real physics — real gravitational fields don't "propagate" as a visible outward pulse at a game-readable speed. It's a deliberate game-feel choice, justified narratively as the planetoid's field "reasserting" itself, similar to how games often visualize instant physical events (impacts, energy releases) as expanding rings for readability.
+**Honest framing:** this is a stylized dramatization, not real physics — real gravitational fields don't "propagate" as a visible outward pulse at a screen-readable speed. It's a deliberate visual-feel choice, justified narratively as the planetoid's field "reasserting" itself, similar to how interactive visualizations often render instant physical events (impacts, energy releases) as expanding rings for readability.
 
 ### 4.4 Low-Maintenance Debounce & Scoping
 

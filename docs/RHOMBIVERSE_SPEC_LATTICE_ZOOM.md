@@ -48,7 +48,7 @@ The RD is already this project's own Voronoi cell of the FCC lattice
 (`lattice.js`'s own header). Real crystalline materials are genuinely
 self-similar across scale this way — the same close-packing arrangement
 recurs from the unit-cell scale up through visible crystallite grains,
-not a metaphor borrowed for this game but the actual physics the game's
+not a metaphor borrowed for this app but the actual physics the app's
 own lattice is already modeled on. That means "zoom into a block and it
 turns out to be built from smaller RD-packed blocks" requires no new
 geometry system: it's `lattice.js`'s own `NEIGHBOR_OFFSETS`/
@@ -117,7 +117,7 @@ inventory, not gravity mass, not claims, not the asteroid/trade economy.
 It is a rendering-layer addition read against the existing `cells` map,
 same as how claim visualization or growth-tile rendering already read
 world state without owning any of it. A LOD bug can make the wrong
-picture; it cannot desync or corrupt the real, synced game state.
+picture; it cannot desync or corrupt the real, synced world state.
 
 ## 5. Adaptive Damping
 

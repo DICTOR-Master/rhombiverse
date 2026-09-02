@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Effective for the public playable link described in `RHOMBIVERSE_PLAN.md`
+Effective for the public link described in `RHOMBIVERSE_PLAN.md`
 Phase 4.
 
 ## Short version
@@ -27,7 +27,7 @@ involved — no analytics or tracking are added by enabling it.
   remove, any land claim you grant, and asteroid-mining state are sent
   to and stored on a shared backend database (Supabase), tagged with
   your anonymous Shared World identity (see below) and a timestamp.
-  This data is visible to every Shared World player, by design — it's
+  This data is visible to everyone in that Shared World, by design — it's
   how the shared world works, not a leak. See `TERMS.md`'s "Shared
   World and your content" section for what that means for content you
   place there.

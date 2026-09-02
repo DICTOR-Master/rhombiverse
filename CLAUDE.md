@@ -342,19 +342,19 @@ inside the boundary while coding.
   Mode (`render.js`, Duality toggle), which shows the aperiodic
   Penrose-tiling shadow a structure casts, not a cube/octahedron dual
   mesh.
-- New game-loop functionality belongs in World Systems, gated behind a
-  flag in `features.js`, defaulted to `false` for anything genuinely new,
-  and loaded via dynamic `import()` — not wired into core's always-on
-  path. (`features.js`'s existing World Systems flags default to `true`,
-  not `false` — deliberate, since those are already-shipped live
-  features; see that file's own header comment before changing any of
-  them.)
-- Game-system PRs and modules are welcome and can be owned/maintained by
-  other contributors independent of core.
+- New continuously-simulated functionality belongs in World Systems,
+  gated behind a flag in `features.js`, defaulted to `false` for
+  anything genuinely new, and loaded via dynamic `import()` — not wired
+  into core's always-on path. (`features.js`'s existing World Systems
+  flags default to `true`, not `false` — deliberate, since those are
+  already-shipped live features; see that file's own header comment
+  before changing any of them.)
+- World-Systems PRs and modules are welcome and can be owned/maintained
+  by other contributors independent of core.
 
 ## Build order (full detail in `RHOMBIVERSE_PLAN.md` section 4)
 
-Phases 1–4 are the base game (single-player, local, becomes public/static
+Phases 1–4 are the base build (solo, local, becomes public/static
 once deployed). Phase 5+ and the spec addenda layer on progressively:
 
 1. **Lattice + Renderer** — one RD renders, camera orbits. No interactivity.
