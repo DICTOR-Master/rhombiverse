@@ -183,22 +183,17 @@ export const MARKS = {
     <polygon points="${rhombusPts(28, 36, -22, 0)}" fill="currentColor"/>
     <polygon points="${rhombusPts(28, 36, 22, 0)}" fill="none" stroke="currentColor" stroke-width="2"/>
     <path d="M-4,-4 H4 M-4,4 H4" ${STROKE}/>`,
-  // Rhombitect: hexagon (the frame's own) with one edge shown as a
-  // measured/ruled line -- drawn INSET from the frame's own edge (not
-  // retracing it) so the ruled ticks are actually visible against the
-  // hexagon interior, not lost on top of the frame outline itself.
+  // Blueprint (wheel id "rhombitect", unchanged internally): hexagon
+  // (the frame's own) with one edge shown as a measured/ruled line --
+  // drawn INSET from the frame's own edge (not retracing it) so the
+  // ruled ticks are actually visible against the hexagon interior, not
+  // lost on top of the frame outline itself.
   rhombitect: `<path d="M-28,-16 V16 M-28,-16 h6 M-28,0 h6 M-28,16 h6" ${STROKE}/>`,
-  // Rhombivate (Cultivate): single rhombus, creased down the center like a leaf/bean.
+  // Cultivate (mark key "rhombivate", unchanged internally): single
+  // rhombus, creased down the center like a leaf/bean.
   rhombivate: `
     <polygon points="${rhombusPts(30, 40)}" ${THIN}/>
     <path d="M0,-20 Q6,0 0,20" ${THIN}/>`,
-  // Rhombisis: central hexagon with three faint rays to three smaller hexagons.
-  rhombisis: `
-    <path d="M0,0 L0,-32 M0,0 L27.71,16 M0,0 L-27.71,16" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
-    <polygon points="${hexPts(9, 0, -41)}" ${THIN}/>
-    <polygon points="${hexPts(9, 27.71, 7)}" ${THIN}/>
-    <polygon points="${hexPts(9, -27.71, 7)}" ${THIN}/>
-    <polygon points="${hexPts(14, 0, 0)}" fill="currentColor"/>`,
   // Explore: hexagon split diagonally into an arrow shape, with a faint trailing echo of smaller hexagons.
   explore: `
     <polygon points="${hexPts(12, -30, 22)}" stroke="currentColor" stroke-width="1.5" opacity="0.3" fill="none"/>
@@ -280,8 +275,8 @@ export const MARKS = {
   // hexagon -- as literal as this vocabulary allows for "spawn a
   // celestial body."
   generateBody: `<circle cx="0" cy="0" r="20" fill="currentColor"/>`,
-  // Plant: Rhombivate's own creased-rhombus, plus a small filled seed
-  // dot at its base -- related to Rhombivate (same department, same
+  // Plant: Cultivate's own creased-rhombus, plus a small filled seed
+  // dot at its base -- related to Cultivate (same department, same
   // "growing thing" language) but a distinct, more specific mark, not a
   // duplicate of the department's own icon.
   plant: `
@@ -293,7 +288,7 @@ export const MARKS = {
   // project's hex/rhombus vocabulary), a bar-height comparison is real
   // grounded geometry instead.
   growthParams: `<path d="M-18,14 V-6 M0,14 V-18 M18,14 V2" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>`,
-  // Prune: the same creased rhombus as Plant/Rhombivate, with a cut mark
+  // Prune: the same creased rhombus as Plant/Cultivate, with a cut mark
   // (a short crossing line) at one point -- trimming.
   prune: `
     <polygon points="${rhombusPts(30, 40)}" ${THIN}/>
@@ -314,17 +309,6 @@ export const MARKS = {
     <rect x="4" y="-16" width="12" height="12" fill="currentColor"/>
     <rect x="-16" y="4" width="12" height="12" fill="currentColor"/>
     <rect x="4" y="4" width="12" height="12" fill="currentColor"/>`,
-  // Construct: a pure routing hub with no tool of its own (its own code
-  // comment: "not a full wheel with its own faces... routes directly to
-  // Build or Alter") -- a hexagon split in half, echoing Build's "+" on
-  // one side and Alter's "-" on the other, rather than an arbitrary new
-  // symbol for something that's genuinely just a choice between two
-  // already-iconified things.
-  construct: `
-    <path d="M0,-46 V46" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>
-    <path d="M-13,-13 V13 M-19,0 H-7" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
-    <path d="M7,0 H19" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.85"/>`,
-
   // --- Universal-ring gaps (appear on every wheel, not spec-resolved) ---
   // Lab / Settings: resolved by the same live cross-walk logic as Cyborg
   // -- already has a real shipped icon (⚙, the HUD's lab-toggle), reuse
@@ -336,10 +320,8 @@ export const MARKS = {
   // user report 2026-08-29 that it read as near-identical to Piece/RD's
   // own solid hexagon (MARKS.pieceRD) fixed by giving Home a real,
   // literal distinguishing mark instead of just varying size/fill.
-  // Deliberately still distinct from Rhombisis (a central hexagon WITH
-  // rays to satellites) -- Home has no rays, and unlike both Rhombisis
-  // and pieceRD, Home's hexagon is now outline (not filled), the anchor
-  // itself rather than a piece sample.
+  // Unlike pieceRD's solid hexagon, Home's is outline (not filled) --
+  // the anchor itself rather than a piece sample.
   home: `<polygon points="${hexPts(HOME_HEX_R)}" ${THIN}/><path d="M-${HOME_H_HALF_W},-${HOME_H_HALF_H} V${HOME_H_HALF_H} M${HOME_H_HALF_W},-${HOME_H_HALF_H} V${HOME_H_HALF_H} M-${HOME_H_HALF_W},0 H${HOME_H_HALF_W}" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>`,
   // BCC Build: the SAME real geometry as the HUD wheel's own icon
   // (hud-wheel-3d.js) -- the truncated octahedron's silhouette down a

@@ -181,18 +181,18 @@ export function resolveWheelFaces(wheelConfig) {
 // Model vs. World Separation (reframe Stage 2, direct user decision
 // 2026-08-28): split by static vs. dynamic -- anything that grows,
 // decays, or moves on its own needs live simulation to mean anything,
-// so it's locked out while workspaceMode is 'model'. Construct,
-// Rhombitect, and Rhombisis's Symmetry/Generate-a-Body stay available
-// in both modes (pure geometry, no clock involved). Action-keyed (not
+// so it's locked out while workspaceMode is 'model'. Build's Symmetry
+// and Rhombitect's/Blueprint's Generate a Body stay available in both
+// modes (pure geometry, no clock involved). Action-keyed (not
 // face-key-keyed) so every existing "temporary duplicate" face sharing
-// one of these actions (e.g. Home's own bottom|sx1sz-1 Rhombivate
+// one of these actions (e.g. Home's own bottom|sx1sz-1 Cultivate
 // duplicate) is gated for free, with no separate list to keep in sync.
 const WORLD_ONLY_FACE_ACTIONS = new Set([
-  "navigateTo:cultivate", // Rhombivate -- Plant/Prune/Growth Parameters
+  "navigateTo:cultivate", // Cultivate -- Plant/Prune/Growth Parameters
   "navigateTo:trade",     // Trade -- Offer/Accept/Inventory, the decay economy
   "navigateTo:explore",   // Explore -- grouped with the dynamic side per the reframe brief's own "Grow/Explore/Simulate"
-  "tool:plant",           // Rhombisis's Plant a Seed
-  "tool:bccBuild",        // Rhombisis's BCC Build
+  "tool:plant",           // Cultivate's Plant
+  "tool:bccBuild",        // Home's BCC Build
   "tool:cuboctaBuild",    // Piece's Cuboctahedron Build
 ]);
 
@@ -265,31 +265,40 @@ export const DUPLICATE_HOME_FACE = {
 // Equator ring key order for reference: sx1sy1, sx1sy-1, sx-1sy1, sx-1sy-1.
 // Bottom ring key order: sy1sz-1, sy-1sz-1 (=5th slot, injected), sx1sz-1, sx-1sz-1.
 
+// Simplification pass, 2026-09-02 (direct user decision -- entry/
+// operation-protocol audit found too many near-identical names and
+// redundant navigation hops): Construct (a pure two-child router with
+// no content of its own) and Rhombisis (a "second doorway" wheel whose
+// three of four real faces just duplicated Build/Rhombitect/Cultivate's
+// own actions under a different label) are both retired as wheels.
+// Build and Alter move directly onto Home (removing a click for the two
+// most-used departments); Rhombisis's one genuinely unique action (BCC
+// Build) moves directly onto Home too. Every other duplicate doorway
+// (Symmetry, Generate a Body, Plant a Seed/Plant) is cut down to the
+// single copy on its real mechanism wheel -- "one tool, one doorway."
+// "Rhombitect" and "Rhombivate" (both invented portmanteaus, sitting
+// next to plain-English "Trade"/"Explore"/"Build"/"Alter" on the same
+// Home wheel) are relabeled to "Blueprint" and "Cultivate" -- label
+// only, the internal id/action ("rhombitect", "navigateTo:cultivate")
+// is untouched, so no other file needs to change. See LESSONS.md /
+// session notes for the full before/after audit.
 export const WHEEL_HOME = {
   id: "home",
-  // Home's 5th universal slot hosts a 6th department here -- unassigned
-  // in the flow chart itself, but explicitly reserved for exactly this
-  // ("here that's moot, so it hosts a 6th department instead"). Filled
-  // 2026-08-25 with Rhombisis (see WHEEL_RHOMBISIS below), per direct
-  // user decision -- restores a unified "genesis" gesture (sculpt,
-  // generate a body, plant a seed) the flow chart's own department
-  // taxonomy had scattered across Build/Rhombitect/Cultivate by
-  // mechanism rather than by shared creative intent. Real second
-  // doorway, not new logic -- every face here reuses an action string
-  // already handled in render.js's onAction.
-  fifthSlotOverride: { kind: "dept", label: "Rhombisis", action: "navigateTo:rhombisis",
-    desc: "Sculpt, Generate a Body, Plant a Seed — every act of bringing something new into being, in one place." },
+  // Home's 5th universal slot: previously hosted Rhombisis (see history
+  // above); now hosts Alter directly, the second of the two departments
+  // freed up by retiring Construct.
+  fifthSlotOverride: { kind: "dept", label: "Alter", action: "navigateTo:alter",
+    desc: "Dig, Smooth, Replace, and Remove." },
   faces: {
-    "equator|sx1sy1":   { kind: "dept", label: "Construct",  action: "navigateTo:construct",
-      desc: "Build and Alter modules live here." },
-    "equator|sx1sy-1":  { kind: "dept", label: "Rhombitect", action: "navigateTo:rhombitect",
-      desc: "Precise coordinate building — Dome, Spiral Column, Templates." },
+    "equator|sx1sy1":   { kind: "dept", label: "Build",  action: "navigateTo:build",
+      desc: "Add, Symmetry, Fill, and Piece. Was one click deeper, behind Construct -- moved directly onto Home." },
+    "equator|sx1sy-1":  { kind: "dept", label: "Blueprint", action: "navigateTo:rhombitect",
+      desc: "Precise coordinate building — Dome, Spiral Column, Templates. Was labeled \"Rhombitect\"; renamed to plain English, same wheel underneath." },
     // Label only -- internal id/action ("cultivate") unchanged, so
     // #cultivate-panel and every navigateTo:cultivate reference stay
-    // exactly as they are. Deliberate departure from Flow_chart.md's
-    // own literal naming (unlike Rhombitect, which already matches
-    // the source doc) -- direct user decision, made eyes-open.
-    "equator|sx-1sy1":  { kind: "dept", label: "Rhombivate",  action: "navigateTo:cultivate",
+    // exactly as they are. Was labeled "Rhombivate"; renamed to match
+    // its own internal name and drop the invented portmanteau.
+    "equator|sx-1sy1":  { kind: "dept", label: "Cultivate",  action: "navigateTo:cultivate",
       desc: "Plant, Prune, and Growth Parameters for the organic/Penrose layer." },
     "equator|sx-1sy-1": { kind: "dept", label: "Trade",      action: "navigateTo:trade",
       desc: "Offer, Accept, and Inventory — the resource/decay economy." },
@@ -299,70 +308,17 @@ export const WHEEL_HOME = {
     // bottom|sx-1sz-1 is non-adjacent to equator|sx1sy1, bottom|
     // sx1sz-1 is non-adjacent to equator|sx-1sy1), same rule applied
     // uniformly across every wheel with a remaining blank face.
-    "bottom|sx1sz-1":   { kind: "dept", label: "Rhombivate", action: "navigateTo:cultivate", temporary: true,
+    "bottom|sx1sz-1":   { kind: "dept", label: "Cultivate", action: "navigateTo:cultivate", temporary: true,
       desc: "Plant, Prune, and Growth Parameters for the organic/Penrose layer. Duplicated here for quick access from a spare slot." },
-    "bottom|sx-1sz-1":  { kind: "dept", label: "Construct", action: "navigateTo:construct", temporary: true,
-      desc: "Build and Alter modules live here. Duplicated here for quick access from a spare slot." },
+    // Was a Construct duplicate -- Construct is retired, so this slot
+    // now carries real content instead: BCC Build, Rhombisis's one
+    // genuinely unique action (not a copy of anything else on Home).
+    "bottom|sx-1sz-1":  { kind: "dept", label: "BCC Build", action: "tool:bccBuild",
+      desc: "Place cells on the dual body-centered-cubic lattice, alongside your normal World (Rhombeometry only)." },
     // top|sy1sz1 freed up 2026-08-29 (Lenses dropped from the universal
     // ring). No non-colliding real or duplicate content identified for
     // Home yet -- left as a genuine SPARE, same as this file's standing
     // convention elsewhere.
-    "top|sy1sz1":       SPARE
-  }
-};
-
-// Construct is a routing grouping in the flow chart ("not a wheel with
-// its own faces... routes directly to Build or Alter"), not a full
-// 12-face department wheel -- but a single click still has to resolve
-// to exactly one of two destinations somehow. Per direct user decision
-// 2026-08-25, that's built the same way every other level of this
-// navigation system already resolves one face into more faces: a real
-// (mostly-spare) wheel with just Build and Alter populated, routing
-// onward via the same navigateTo:<id> mechanism as everything else --
-// no new UI paradigm, no popup picker, reusing resolveWheelFaces/
-// switchWheel exactly as-is. This is the "grouping with two children"
-// read of the flow chart's intent, not a literal violation of it.
-export const WHEEL_CONSTRUCT = {
-  id: "construct",
-  faces: {
-    "equator|sx1sy1":   { kind: "dept", label: "Build", action: "navigateTo:build",
-      desc: "Add, Symmetry, Fill, and Piece." },
-    "equator|sx1sy-1":  { kind: "dept", label: "Alter", action: "navigateTo:alter",
-      desc: "Dig, Smooth, Replace, and Remove." },
-    // Temporary duplicates at each real face's true geometric antipode
-    // (centroid inversion through the RD's center, verified
-    // numerically -- equator|sx-1sy1 <-> equator|sx1sy-1, equator|
-    // sx-1sy-1 <-> equator|sx1sy1) -- standing policy: a blank face
-    // duplicates its antipode's content until real content exists for
-    // it, direct user directive 2026-08-25.
-    "equator|sx-1sy1":  { kind: "dept", label: "Alter", action: "navigateTo:alter", temporary: true,
-      desc: "Dig, Smooth, Replace, and Remove. Duplicated here for quick access from a spare slot." },
-    "equator|sx-1sy-1": { kind: "dept", label: "Build", action: "navigateTo:build", temporary: true,
-      desc: "Add, Symmetry, Fill, and Piece. Duplicated here for quick access from a spare slot." },
-    // DUPLICATE_HOME_FACE sits at bottom|sy1sz-1, not bottom|sx1sz-1 --
-    // that's the one bottom-ring face that does NOT share an edge with
-    // the real Home slot (bottom|sy-1sz-1); bottom|sx1sz-1 and
-    // bottom|sx-1sz-1 both do (verified numerically, not eyeballed).
-    // Direct user directive 2026-08-25: two faces doing the same job
-    // belong in mirror-opposite positions, not adjacent ones. Applies
-    // to every wheel below with a duplicate.
-    "bottom|sy1sz-1":   DUPLICATE_HOME_FACE,
-    // Both remaining bottom slots reverted to genuine SPARE (2026-08-25
-    // audit fix): this wheel only has two distinct real actions (Build,
-    // Alter) and both are ALREADY doubled via their equator antipode
-    // above, which between them saturate both edge-adjacent neighbors
-    // of every bottom slot -- a 3rd copy of either can only ever land
-    // next to one of its own siblings. Confirmed via the same numeric
-    // edge-adjacency audit that first caught this bug class (see
-    // /tmp/rw3d_duplicate_adjacency_audit.mjs): "Build" was adjacent
-    // between equator|sx-1sy-1 and bottom|sx-1sz-1, "Alter" between
-    // equator|sx1sy-1 and bottom|sx1sz-1. No non-colliding real content
-    // exists for these two slots, so they stay open rather than forcing
-    // a violation of the mirror-opposite/least-adjacent duplicate rule.
-    "bottom|sx1sz-1":   SPARE,
-    "bottom|sx-1sz-1":  SPARE,
-    // top|sy1sz1 freed up 2026-08-29 (Lenses dropped from the universal
-    // ring). No non-colliding content for this routing wheel -- SPARE.
     "top|sy1sz1":       SPARE
   }
 };
@@ -457,7 +413,7 @@ export const WHEEL_BUILD = {
 // reachable with zero rotation -- and Cuboctahedron Build (a real mode
 // switch, same category as BCC Build) moved to bottom|sx-1sz-1,
 // requiring a deliberate rotation first, same as BCC Build's own
-// placement on WHEEL_RHOMBISIS.
+// placement on Home (bottom|sx-1sz-1 there too, since 2026-09-02).
 export const WHEEL_PIECE = {
   id: "piece",
   faces: {
@@ -653,58 +609,15 @@ export const WHEEL_TRADE = {
   }
 };
 
-// Rhombisis: a unified "genesis" doorway for the three real acts of
-// bringing something new into being -- sculpting, generating a body,
-// planting a seed -- which the flow chart's own department taxonomy
-// scattered across Build/Rhombitect/Cultivate by mechanism, not by
-// shared creative intent (2026-08-25, direct user decision). Every
-// action string below is already handled in render.js's onAction --
-// this wheel adds a second doorway to the exact same real behavior,
-// zero new logic, same pattern DUPLICATE_HOME_FACE already uses for a
-// single face, just for three at once.
-export const WHEEL_RHOMBISIS = {
-  id: "rhombisis",
-  faces: {
-    // Relabeled from "Sculpt" (2026-08-26, same universal-actions pass
-    // that renamed WHEEL_BUILD's own copy) -- same action/mechanism, just
-    // no longer sharing a label with the new plain Remove action.
-    "equator|sx1sy1":   { kind: "dept", label: "Symmetry", action: "tool:symmetry",
-      desc: "Opens the Symmetry panel -- brush, mirror, and symmetry tools, no World required." },
-    "equator|sx1sy-1":  { kind: "dept", label: "Generate a Body", action: "tool:generateBody",
-      desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...)." },
-    "equator|sx-1sy1":  { kind: "dept", label: "Plant a Seed", action: "tool:plant",
-      desc: "Pick a species, then click to plant it. Opens the Cultivate panel." },
-    // Temporary duplicate at Symmetry's true geometric antipode (equator|
-    // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
-    // policy: a blank face duplicates its antipode's content until
-    // real content exists for it, direct user directive 2026-08-25.
-    "equator|sx-1sy-1": { kind: "dept", label: "Symmetry", action: "tool:symmetry", temporary: true,
-      desc: "Opens the Symmetry panel -- brush, mirror, and symmetry tools, no World required. Duplicated here for quick access from a spare slot." },
-    "bottom|sy1sz-1":   DUPLICATE_HOME_FACE,
-    // Remaining 2 bottom spares: least-adjacent-available placement
-    // (verified numerically -- bottom|sx-1sz-1 is non-adjacent to
-    // equator|sx1sy1, bottom|sx1sz-1 is non-adjacent to equator|
-    // sx-1sy1), same rule applied uniformly across every wheel.
-    "bottom|sx1sz-1":   { kind: "dept", label: "Plant a Seed", action: "tool:plant", temporary: true,
-      desc: "Pick a species, then click to plant it. Opens the Cultivate panel. Duplicated here for quick access from a spare slot." },
-    // 2026-08-26 direct instruction: this slot's Generate a Body
-    // duplicate (a 3rd copy of a function with no existing duplicate
-    // problem -- Generate a Body is also reachable via WHEEL_
-    // RHOMBITECT's own copy) replaced with BCC Build, real new content
-    // rather than another quick-access copy. "A fourth way to bring
-    // something new into being," alongside this wheel's Sculpt/
-    // Generate a Body/Plant a Seed. See core/bcc-build.md.
-    "bottom|sx-1sz-1":  { kind: "dept", label: "BCC Build", action: "tool:bccBuild",
-      desc: "Place cells on the dual body-centered-cubic lattice, alongside your normal World (Rhombeometry only)." },
-    // top|sy1sz1 freed up 2026-08-29 (Lenses dropped from the universal
-    // ring). SPARE -- BCC Build already covers this wheel's own "4th
-    // genesis" slot; no further non-colliding content found.
-    "top|sy1sz1":       SPARE
-  }
-};
+// Rhombisis (unified "genesis" doorway for Symmetry/Generate a Body/
+// Plant a Seed/BCC Build) retired 2026-09-02 -- see WHEEL_HOME's own
+// header comment for the full reasoning. BCC Build (its one genuinely
+// unique action) moved to Home; the other three were pure duplicates of
+// Build/Rhombitect/Cultivate's own real faces, cut per "one tool, one
+// doorway."
 
 export const ALL_WHEELS = {
-  home: WHEEL_HOME, construct: WHEEL_CONSTRUCT, build: WHEEL_BUILD, alter: WHEEL_ALTER,
+  home: WHEEL_HOME, build: WHEEL_BUILD, alter: WHEEL_ALTER,
   rhombitect: WHEEL_RHOMBITECT, cultivate: WHEEL_CULTIVATE, trade: WHEEL_TRADE,
-  rhombisis: WHEEL_RHOMBISIS, piece: WHEEL_PIECE
+  piece: WHEEL_PIECE
 };

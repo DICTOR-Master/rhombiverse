@@ -2727,12 +2727,6 @@ async function init() {
           wheel3D.close();
           return;
         }
-        // Construct no longer needs a special case here: it's now a
-        // real (mostly-spare) wheel in ALL_WHEELS with Build and Alter
-        // as its two populated faces, so navigateTo:construct already
-        // resolves via the generic ALL_WHEELS[target] branch above,
-        // same as every other real wheel. See rhombic-wheel-3d-core.js.
-
         // Real tool wiring below -- reuses existing, already-working
         // primitives (mode-btn clicks, panel-open functions) rather
         // than reimplementing anything, same pattern as Explore's
@@ -2872,11 +2866,12 @@ async function init() {
         if (action === 'tool:prune') { clickMode('plant'); showHudPrompt('Prune: right-click an existing growth tile while in Plant mode.', 4000); wheel3D.close(); return; }
         if (action === 'tool:growthParams') { document.getElementById('cultivate-panel')?.classList.add('open'); wheel3D.close(); return; } // real "Growth Parameters" section lives in this panel
 
-        // --- Rhombisis: BCC Build (core/bcc-build.md), replacing WHEEL_
-        // RHOMBISIS's own Generate a Body duplicate at bottom|sx-1sz-1,
-        // 2026-08-26 direct instruction -- "a fourth way to bring
-        // something new into being" alongside Sculpt/Generate/Plant.
-        // Same clickMode() shim as every other tool face; the
+        // --- BCC Build (core/bcc-build.md): lived on the now-retired
+        // Rhombisis wheel, moved directly onto Home 2026-09-02 (see
+        // rhombic-wheel-3d-core.js's WHEEL_HOME header comment). Action
+        // string/handler unchanged -- resolution is action-keyed, not
+        // wheel-keyed, so moving which wheel a face lives on needs no
+        // change here. Same clickMode() shim as every other tool face; the
         // FEATURES.bccLattice check is defense-in-depth so this wheel
         // face can't put a Full World session into BCC mode even
         // though the underlying .mode-btn itself would technically

@@ -56,9 +56,8 @@ const ACTION_TO_MARK = {
   'tool:smooth': 'smooth',
   'tool:replace': 'replace',
   'navigateTo:trade': 'trade',
-  'navigateTo:rhombitect': 'rhombitect',
-  'navigateTo:cultivate': 'rhombivate',
-  'navigateTo:rhombisis': 'rhombisis',
+  'navigateTo:rhombitect': 'rhombitect', // wheel now labeled "Blueprint"; mark/id name unchanged
+  'navigateTo:cultivate': 'rhombivate', // wheel now labeled "Cultivate"; mark/id name unchanged
   'navigateTo:explore': 'explore',
   openAlmanac: 'almanac',
   openCyborg: 'cyborg',
@@ -81,10 +80,6 @@ const ACTION_TO_MARK = {
   // "leads to the Dig wheel."
   'navigateTo:build': 'add',
   'navigateTo:alter': 'dig',
-  // Construct has no tool of its own (pure routing hub, see its own
-  // real code comment in rhombic-wheel-3d-core.js) -- gets a dedicated
-  // mark instead of reusing either child's.
-  'navigateTo:construct': 'construct',
   // Universal ring (every wheel): Lab/Settings and Home.
   openLab: 'lab',
   navigateHome: 'home',
