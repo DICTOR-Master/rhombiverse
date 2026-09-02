@@ -57,6 +57,22 @@ const RD_EDGES_3D = buildRDEdges();
 // gives its exact opposite) are lit up, not just one, per direct feedback
 // ("double the opportunity to enter") -- each swings into view once per
 // half-revolution instead of once per full one.
+//
+// Entry-flow audit, 2026-09-02: the swinging ENTER faces above were only
+// clickable while actually facing the viewer -- real friction, since a
+// first-time visitor had to wait for/time a click, with no visible hint
+// that a plain Enter keypress works at any time. Fixed by adding a
+// second, large, POSITION-STATIC "ENTER" label centered over the logo
+// (see STATIC_ENTER_STYLE / the `<text id="static-enter-label">` in
+// logoSvg() and its own click wiring in startLogoSpin below) -- always
+// visible, always clickable, no facing/timing gate at all. This is
+// deliberately layered ON TOP of the rotating shape's own center,
+// consistent with 2026-08-26's "ENTER lives on the shape itself" intent
+// (not a separately-positioned button below the logo, which was
+// rejected then) -- it just doesn't rotate or fade with it. The
+// swinging per-face glow (polygon fill pulse) stays as a decorative
+// echo of the same affordance; its own duplicate "ENTER" text label was
+// removed to avoid two overlapping copies of the word during a pass.
 function prepareEnterFace(face) {
   let verts = face.verts;
   const centroid = centroidOf(verts);
@@ -103,30 +119,43 @@ function transform(p, angle) { return rotateY(rotateX(p, LOGO_TILT), angle); }
 
 function logoSvg() {
   const lines = RD_EDGES_3D.map((_, i) => `<line class="rd-edge" data-i="${i}" />`).join('');
+  // Decorative only now -- the glow polygons still pulse as a face swings
+  // toward the viewer, but no longer carry their own "ENTER" text (that
+  // would duplicate the static label below, appearing twice at once
+  // during a pass). See the module-header comment above.
   const enterEls = ENTER_FACES.map((_, i) => `
-      <polygon id="enter-face-poly-${i}" fill="#7cf" fill-opacity="0" stroke="#bfe6ff" stroke-width="1.5" stroke-opacity="0" />
-      <text id="enter-face-label-${i}" x="0" y="0" text-anchor="middle" dominant-baseline="central"
-            font-family="system-ui, sans-serif" font-weight="700" font-size="10.5" letter-spacing="0.6"
-            fill="#eafcff" fill-opacity="0">ENTER</text>`).join('');
+      <polygon id="enter-face-poly-${i}" fill="#7cf" fill-opacity="0" stroke="#bfe6ff" stroke-width="1.5" stroke-opacity="0" />`).join('');
   return `
-    <svg id="welcome-logo-svg" viewBox="-70 -70 140 140" width="180" height="180" role="img" aria-label="Rhombiverse logo: a rotating wireframe rhombic dodecahedron, two opposite faces doubling as Enter">
+    <svg id="welcome-logo-svg" viewBox="-70 -70 140 140" width="180" height="180" role="img" aria-label="Rhombiverse logo: a rotating wireframe rhombic dodecahedron. Click ENTER, centered on the logo, to begin.">
       <g stroke="#7cf" stroke-width="1.5" stroke-linecap="round" fill="none">${lines}</g>${enterEls}
+      <!-- Static ENTER label: fixed at the SVG's own center, outside the
+           rotating group above, so it never turns or tilts with the RD.
+           Always full pointer-events -- clicking it never depends on
+           rotation phase. A gentle opacity breathe (driven by the same
+           pulsePhase as the decorative glow above, in startLogoSpin) is
+           the only animation it gets. -->
+      <text id="static-enter-label" x="0" y="1" text-anchor="middle" dominant-baseline="central"
+            font-family="system-ui, sans-serif" font-weight="800" font-size="22" letter-spacing="1.5"
+            fill="#eafcff" style="cursor:pointer"
+            stroke="#04141c" stroke-width="4" paint-order="stroke">ENTER</text>
     </svg>`;
 }
 
 // Recomputed every animation frame while the overlay is visible; started/
 // stopped by show()/hide() below rather than left running once dismissed.
-// `onEnterHit` fires on a click while either ENTER face is actually
-// toward the viewer -- see the module header for why ENTER lives here
-// instead of a separately-positioned button, and for why there are two.
+// `onEnterHit` fires on a click of the static center label (always) or a
+// swinging face's decorative glow polygon (only while it's actually
+// toward the viewer) -- see the module header for why ENTER lives here
+// instead of a separately-positioned button, and for the 2026-09-02 fix
+// that made the static label the real, non-timing-dependent entry point.
 function startLogoSpin(onEnterHit) {
   const svg = document.getElementById('welcome-logo-svg');
   if (!svg) return () => {};
   const edgeEls = svg.querySelectorAll('.rd-edge');
+  const staticLabel = document.getElementById('static-enter-label');
   const enterEls = ENTER_FACES.map((f, i) => ({
     face: f,
     poly: document.getElementById(`enter-face-poly-${i}`),
-    label: document.getElementById(`enter-face-label-${i}`),
     active: false,
   }));
   let raf = null;
@@ -155,7 +184,6 @@ function startLogoSpin(onEnterHit) {
     for (const e of enterEls) {
       const tVerts = e.face.verts.map((p) => transform(p, angle));
       const tNormal = transform(e.face.normal, angle);
-      const tCentroid = transform(e.face.centroid, angle);
       // Orthographic drop-z projection: the viewer sits on +Z looking
       // toward the origin, so a rotated normal's own z-component IS how
       // much this face currently faces them (1 = dead-on, 0 = edge-on,
@@ -182,16 +210,22 @@ function startLogoSpin(onEnterHit) {
       e.poly.setAttribute('fill-opacity', String(opacity * 0.55));
       e.poly.setAttribute('stroke-opacity', String(opacity));
       e.poly.setAttribute('stroke-width', String(1.5 + 1.5 * opacity));
-      e.label.setAttribute('x', String(tCentroid[0] * LOGO_SCALE));
-      e.label.setAttribute('y', String(tCentroid[1] * LOGO_SCALE));
-      e.label.setAttribute('fill-opacity', String(opacity));
 
+      // Decorative-only click target -- still works while genuinely
+      // facing the viewer (a nice bonus for someone who clicks the glow
+      // directly), but the static label below is the real, always-on
+      // entry point now, so nothing about entering the app depends on
+      // this state any more.
       e.active = sweep > 0.35;
       e.poly.style.pointerEvents = e.active ? 'auto' : 'none';
-      e.label.style.pointerEvents = e.active ? 'auto' : 'none';
       e.poly.style.cursor = e.active ? 'pointer' : 'default';
-      e.label.style.cursor = e.active ? 'pointer' : 'default';
     }
+
+    // Static label: fixed position (set once, never touched here), just
+    // a gentle always-substantially-visible breathe for attention --
+    // never drops low enough to read as "off", and pointer-events stays
+    // 'auto' unconditionally (set once below, not per frame).
+    if (staticLabel) staticLabel.setAttribute('fill-opacity', String(0.82 + 0.18 * Math.sin(pulsePhase)));
 
     raf = requestAnimationFrame(frame);
   }
@@ -199,8 +233,13 @@ function startLogoSpin(onEnterHit) {
   for (const e of enterEls) {
     const onClick = () => { if (e.active) onEnterHit(); };
     e.poly.addEventListener('click', onClick);
-    e.label.addEventListener('click', onClick);
-    listeners.push({ el: e.poly, onClick }, { el: e.label, onClick });
+    listeners.push({ el: e.poly, onClick });
+  }
+  if (staticLabel) {
+    staticLabel.style.pointerEvents = 'auto';
+    const onStaticClick = () => onEnterHit();
+    staticLabel.addEventListener('click', onStaticClick);
+    listeners.push({ el: staticLabel, onClick: onStaticClick });
   }
   raf = requestAnimationFrame(frame);
   return () => {
