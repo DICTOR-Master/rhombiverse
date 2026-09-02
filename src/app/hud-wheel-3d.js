@@ -60,7 +60,18 @@ const CSS = `
      little stronger (opacity 0.55->0.8, blur 3px->4px) rather than a
      new outline effect. filter: drop-shadow() instead of text-shadow so
      it also reaches the one real inline-SVG face (BCC Build,
-     bottom|sx1sz-1), which text-shadow never affected. */
+     bottom|sx1sz-1), which text-shadow never affected.
+     Second round of direct feedback, same day, more specific: the real
+     problem isn't glow strength, it's that some Unicode glyphs are
+     inherently thin single-line marks (Spherical's ◯, X-Ray's ⛶,
+     Reload's ↻, Menu's ◇) that font-weight:700 barely thickens -- bold
+     Latin weight doesn't reliably apply to symbol codepoints the same
+     font falls back to -- while filled glyphs (Lab's ⚙, Cyborg's ◈)
+     read fine already. -webkit-text-stroke adds real stroke width to
+     every glyph's own outline (not a halo/shadow) -- a small value
+     visibly bolds the thin ones without over-thickening the already-
+     solid ones already carrying plenty of ink. */
+  -webkit-text-stroke: 0.9px currentColor;
   filter: drop-shadow(0 0 4px rgba(255,255,255,0.8));
   pointer-events: none;
   user-select: none;
