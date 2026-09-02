@@ -112,7 +112,17 @@ const HUD_FACES = {
   // elId (#lab-toggle) unchanged.
   'equator|sx1sy1':   { symbol: '⚙', elId: 'lab-toggle',              title: 'Settings' },
   'equator|sx1sy-1':  { symbol: '⛶', elId: 'xray-toggle',             title: 'X-Ray' },
-  'equator|sx-1sy1':  { symbol: '◈', elId: 'cyborg-toggle',           title: 'Cyborg Mode' },
+  // Real SVG robot head, not the bare ◈ glyph: direct request
+  // 2026-09-02, "a symbolic robot head like from metropolis would suit
+  // Cyborg much better" -- same design as wheel-icons.js's MARKS.cyborg
+  // (see that file's own comment for the Metropolis/Maschinenmensch
+  // research and sourcing), scaled into this file's own tiny
+  // coordinate convention. Rounded-capsule head (the Art Deco mask),
+  // two round eyes, three banded collar lines (the ribbed plating).
+  'equator|sx-1sy1':  {
+    svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><rect x="-1.05" y="-1.98" width="2.1" height="2.2" rx="0.94" ry="0.94" fill="none" stroke="currentColor" stroke-width="0.24"/><circle cx="-0.47" cy="-0.94" r="0.26" fill="currentColor"/><circle cx="0.47" cy="-0.94" r="0.26" fill="currentColor"/><path d="M-0.73,0.52 H0.73 M-0.88,0.99 H0.88 M-1.04,1.46 H1.04" stroke="currentColor" stroke-width="0.24" stroke-linecap="round"/></svg>',
+    elId: 'cyborg-toggle', title: 'Cyborg Mode',
+  },
   'equator|sx-1sy-1': { symbol: '◆', elId: 'sculpture-mode-toggle',   title: 'Sculpture Mode' },
   'top|sy1sz1':       { symbol: '◐', elId: 'duality-toggle',          title: 'Duality' },
   // Real SVG hexagon, not the bare ⬡ Unicode glyph: direct report
