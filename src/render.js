@@ -2456,6 +2456,7 @@ async function init() {
       mat.transparent = translucent;
       mat.opacity = translucent ? TRANSLUCENT_OPACITY : 1;
       mat.depthWrite = !translucent;
+      mat.needsUpdate = true;
     }
   }
   function setSolidWorldVisible(visible) {
@@ -2506,8 +2507,35 @@ async function init() {
     clearWorldViewSkeleton();
     const { world: w, scene: s } = activeWorldTriple();
     const cells = w ? w.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed') : [];
-    if (cells.length === 0) return;
     const pieces = cells.flatMap(skeletonCellPieces);
+    // BCC/Cuboctahedron/octahedron-gap/interstitial are real-World-only
+    // (Sculpture Mode's own scratch world has no equivalents) -- direct
+    // follow-up 2026-09-02 ("not all shapes showing up in skeleton"),
+    // same real geometry+position recipe each one's own InstancedMesh/
+    // Mesh rebuild already uses (buildBCCGeometry/buildCuboctaGeometry/
+    // buildOctGapGeometry/buildInterstitialGeometry), just as loose
+    // geometries instead of instance matrices -- same technique
+    // skeletonCellPieces already uses for the main world above.
+    if (!sculptureModeActive) {
+      for (const cell of bccWorld.entries()) {
+        const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+        pieces.push(buildBCCGeometry(bccShapeScaleFor(SCALE)).translate(wx, wy, wz));
+      }
+      for (const cell of cuboctaWorld.entries()) {
+        const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+        pieces.push(buildCuboctaGeometry(SCALE).translate(wx, wy, wz));
+      }
+      for (const cell of octGapWorld.entries()) {
+        const [wx, wy, wz] = octGapCellToWorld(cell.x, cell.y, cell.z, SCALE);
+        pieces.push(buildOctGapGeometry(SCALE).translate(wx, wy, wz));
+      }
+      // Already baked in absolute world-space vertices (see
+      // buildInterstitialGeometry's own header) -- no translate needed.
+      for (const cell of interstitialStore.entries()) {
+        pieces.push(buildInterstitialGeometry(cell.verts, SCALE));
+      }
+    }
+    if (pieces.length === 0) return;
     const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
     if (myGeneration !== skeletonGeneration) { pieces.forEach((g) => g.dispose()); return; } // stale, see rebuildLatticeQuickView's own generation-counter precedent
     const merged = mergeGeometries(pieces, false);
