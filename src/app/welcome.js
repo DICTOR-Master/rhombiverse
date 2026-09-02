@@ -135,9 +135,9 @@ function logoSvg() {
            pulsePhase as the decorative glow above, in startLogoSpin) is
            the only animation it gets. -->
       <text id="static-enter-label" x="0" y="1" text-anchor="middle" dominant-baseline="central"
-            font-family="system-ui, sans-serif" font-weight="800" font-size="22" letter-spacing="1.5"
+            font-family="system-ui, sans-serif" font-weight="800" font-size="19" letter-spacing="1.5"
             fill="#eafcff" style="cursor:pointer"
-            stroke="#04141c" stroke-width="4" paint-order="stroke">ENTER</text>
+            stroke="#04141c" stroke-width="2.5" paint-order="stroke">ENTER</text>
     </svg>`;
 }
 
