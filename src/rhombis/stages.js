@@ -39,6 +39,19 @@ function pieceMaterial() {
 function makeOuterSolid(geometry, position = ORIGIN) {
   const material = new THREE.MeshStandardMaterial({
     color: WIRE_COLOR, transparent: true, opacity: TRANSLUCENT_OPACITY, depthWrite: false, roughness: 0.6,
+    // DoubleSide: without it, WebGL back-face culling (the material's
+    // own default) means a closed convex shape like the cube only ever
+    // renders its near 3 faces -- blended against the background, not
+    // against each other, so it reads as flat painted panels rather
+    // than glass. Direct live report (2026-09-03): "cube isnt
+    // translucent it is opaque so blocks view" -- confirmed the RD read
+    // as more convincingly see-through than the cube purely because its
+    // 12 smaller facets happen to overlap each other more from most
+    // angles; the cube's 3 big flat near-faces never showed the far
+    // wall at all. Rendering back faces too is what actually produces
+    // the "see the far side through the near side" depth cue real glass
+    // has.
+    side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.copy(position);
@@ -63,6 +76,7 @@ function makeVoid(geometry, { id, requiredOrientation, quaternion = IDENTITY_QUA
   // piece uses, so the ghost is exactly the shape you'd actually get.
   const wire = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
     color: WIRE_COLOR, transparent: true, opacity: GHOST_OPACITY, depthWrite: false, roughness: 0.5,
+    side: THREE.DoubleSide, // see makeOuterSolid's own comment -- same reasoning
   }));
   wire.quaternion.copy(quaternion);
   wire.position.copy(position);

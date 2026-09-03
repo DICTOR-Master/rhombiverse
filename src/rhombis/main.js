@@ -371,10 +371,38 @@ function flashRejectWire(wire) {
 function refreshVoidHighlights() {
   const selectedId = current.state.selectedPieceId;
   const validity = selectedId ? voidValidityForPiece(current.state, selectedId) : null;
+  // Real live bug (2026-09-03, "cube isnt translucent it is opaque so
+  // blocks view"): an auto-orienting piece (Stage 3/5/6's loose pieces,
+  // no orientationOptions -- any open void takes it) makes EVERY open
+  // void valid at once. Popping every one of them to VALID_GHOST_OPACITY
+  // stacks that many near-opaque translucent layers on top of each
+  // other -- alpha blending N overlapping layers approaches full opacity
+  // fast regardless of any single layer's own opacity value (a 6-void
+  // cube already reads as a solid wall even at a much-reduced per-layer
+  // opacity; Stage 6 can have up to 24 simultaneously valid), so no
+  // fixed opacity number fixes this for every stage's void count. There
+  // is also nothing to disambiguate when literally every open void is a
+  // correct answer -- unlike Stage 4's "1 of 12" or Stage 1/2's "1 of 2"
+  // under a specific orientation, a ghost per void carries zero extra
+  // information here. Fixed by hiding ghosts entirely in this case: the
+  // outer translucent shell alone is what's shown, exactly as idle.
+  const openVoidIds = current.voids
+    .filter((v) => !current.state.voids.find((sv) => sv.id === v.id).filled)
+    .map((v) => v.id);
+  const validCount = validity ? openVoidIds.filter((id) => validity[id]).length : 0;
+  // openVoidIds.length > 1 matters: Stage 1 has exactly ONE void total,
+  // so "every open void valid" there just means "yes, correct
+  // orientation" -- real, meaningful feedback with nothing to stack, not
+  // the many-layers-of-green problem this guard exists for.
+  const everyOpenVoidValid = validity && openVoidIds.length > 1 && validCount === openVoidIds.length;
   for (const v of current.voids) {
     const stateVoid = current.state.voids.find((sv) => sv.id === v.id);
     if (stateVoid.filled) continue;
-    if (validity) {
+    if (validity && everyOpenVoidValid) {
+      v.wire.visible = !current.hideIdleVoidWires;
+      v.wire.material.color.setHex(WIRE_COLOR);
+      v.wire.material.opacity = GHOST_OPACITY;
+    } else if (validity) {
       const valid = validity[v.id];
       v.wire.visible = true;
       v.wire.material.color.setHex(valid ? VALID_TARGET_COLOR : INVALID_TARGET_COLOR);
@@ -488,7 +516,36 @@ function handleTap(clientX, clientY) {
   const voidTargets = current.voids.map((v) => v.hitTarget);
   const hits = raycaster.intersectObjects([...pieceTargets, ...voidTargets], false);
   if (hits.length === 0) return;
-  const hitObj = hits[0].object;
+
+  // Real live bug (2026-09-03, "third green inside piece in RD will not
+  // accept tapping as it is surrounded by incorrectly oriented pieces
+  // which block"): raycaster hits are sorted purely by 3D distance, with
+  // no regard for a void's own filled/valid state or how visible its
+  // ghost currently is right now. An invalid void's ghost is
+  // deliberately rendered near-invisible (INVALID_GHOST_OPACITY), but
+  // its hitTarget geometry is exactly as solid as ever -- if it happens
+  // to sit closer to the camera along the same ray as a valid target
+  // behind it, hits[0] silently resolves to the invalid one and the tap
+  // is rejected even though the player was clearly aiming at (and could
+  // dimly see) the valid target through it. A filled void's hitTarget
+  // has the same problem -- nothing excluded it once its ghost was
+  // hidden. Fixed by walking the sorted hit list for the first hit
+  // that's actually usable (a piece, or an unfilled void that's valid
+  // when validity is known) before falling back to the closest hit of
+  // any kind -- preserves the reject-flash for a genuine miss (nothing
+  // valid anywhere along the ray) while no longer letting an invisible-
+  // ish invalid/filled void silently eat a tap meant for something valid
+  // behind it.
+  const selectedId = current.state.selectedPieceId;
+  const validity = selectedId ? voidValidityForPiece(current.state, selectedId) : null;
+  const isUsableVoidHit = (obj) => {
+    const v = current.voids.find((vv) => vv.hitTarget === obj);
+    if (!v) return false;
+    if (current.state.voids.find((sv) => sv.id === v.id).filled) return false;
+    return validity ? Boolean(validity[v.id]) : true;
+  };
+  const bestHit = hits.find((h) => pieceTargets.includes(h.object) || isUsableVoidHit(h.object)) || hits[0];
+  const hitObj = bestHit.object;
 
   const hitPiece = current.pieces.find((p) => p.mesh === hitObj);
   if (hitPiece) {

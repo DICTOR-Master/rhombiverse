@@ -458,6 +458,67 @@ build order:
   raw-tree dev server, a real gap in this session's own verification
   method that's worth remembering for anything else added to the repo
   root (a new top-level HTML entry point, in particular) going forward.
+
+  **Two more real bugs found live on the deployed site, same day, after
+  the 404 fix above** (2026-09-03):
+
+  1. "cube isnt translucent it is opaque so blocks view" -- the outer
+  solid shell (`makeOuterSolid`) had no `side` set on its material, so
+  WebGL's default back-face culling meant a closed convex shape only
+  ever rendered its near 2-3 faces, blended against the background, not
+  against each other -- no far wall ever showed through, so it read as
+  flat painted panels rather than glass (confirmed genuinely translucent
+  underneath by temporarily forcing opacity to 0.08 and seeing it go
+  much dimmer, ruling out "opacity isn't applying at all" before
+  chasing the real cause). Fixed with `side: THREE.DoubleSide` on both
+  `makeOuterSolid` and `makeVoid`'s ghost material. That alone wasn't
+  enough for Stage 3/5/6 specifically, though: an auto-orienting piece
+  (no `orientationOptions` -- any open void accepts it) makes EVERY open
+  void valid at once, and popping every one of them to
+  `VALID_GHOST_OPACITY` stacks that many translucent layers on top of
+  each other -- alpha-blending N overlapping layers approaches full
+  opacity fast regardless of any single layer's own value (screenshotted
+  proof: Stage 3's 6-void cube read as one solid green wall when
+  selected). There's also nothing to disambiguate when literally every
+  open void is correct, unlike Stage 4's real "1 of 12". Fixed in
+  `main.js`'s `refreshVoidHighlights()`: when every open void is
+  simultaneously valid AND there's more than one of them (`> 1` matters
+  -- Stage 1 has exactly one void total, where "the one open void is
+  valid" is real, meaningful feedback with nothing to stack, not this
+  problem), skip the pop treatment and fall back to the calm/idle
+  opacity instead. Verified live both ways (Stage 3 selected now looks
+  like the idle shell, Stage 1's real match still pops green; Stage 4's
+  real "1 of 12" pop independently re-confirmed unaffected).
+
+  2. "third green inside piece in RD will not accept tapping as it is
+  surrounded by incorrectly oriented pieces which block" -- a real
+  raycasting-priority bug, not a placement-logic bug.
+  `raycaster.intersectObjects` sorts purely by 3D distance, with no
+  regard for a void's filled/valid state or how visible its ghost
+  currently is. An invalid void's ghost is deliberately rendered
+  near-invisible (`INVALID_GHOST_OPACITY`), but its `hitTarget` geometry
+  is exactly as solid as ever -- Stage 4's outward-pointing wedge sits
+  physically BETWEEN the camera and its own axis's inward wedge (the
+  RD's outward spike is closer to the viewer than the RD's own interior
+  along that same face-normal ray), so tapping toward an inward target
+  could resolve to the outward wedge's hitTarget first and reject,
+  even though the player was aiming at (and could dimly see) the valid
+  target behind it. Fixed in `main.js`'s `handleTap`: instead of always
+  taking `hits[0]`, walk the sorted hit list for the first hit that's
+  actually usable (a piece, or an unfilled void that's valid when
+  validity is known) before falling back to the closest hit of any kind
+  -- preserves the reject-flash for a genuine miss (nothing valid
+  anywhere along the ray) while no longer letting an invisible-ish
+  invalid/filled void silently eat a tap meant for something valid
+  behind it. Verified live: reproduced the exact reported scenario
+  (piece starts 'x+:in', tapped toward the x+ face where the outward
+  wedge sits in front of the inward one) and confirmed placement now
+  succeeds where it previously would have been swallowed by the
+  closer-but-invalid outward wedge.
+
+  Full `node --test tests/unit/*.test.mjs` clean (275/275) after both
+  fixes -- both are pure THREE-rendering/raycasting-side changes, no
+  `puzzle-state.js` edits.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
