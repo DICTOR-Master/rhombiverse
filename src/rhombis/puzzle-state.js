@@ -15,16 +15,23 @@
 // exactly as Stage 1 did (no orientation gate), so this is additive,
 // not a schema change to what Stage 1 already relies on.
 //
-// Stage 5 adds `groupId` (on a void) and `fillsGroup` (on a piece),
-// both optional too. A normal ("loose") piece never sets `fillsGroup`
+// Stage 5 adds `groupIds` (on a void, an array) and `fillsGroup` (on a
+// piece, a single id). A normal ("loose") piece never sets `fillsGroup`
 // and behaves exactly as before -- fills the one void it's tapped
-// onto. A "fused" piece's `fillsGroup` names a groupId; placing it
-// fills EVERY void sharing that groupId in one placement, but only if
-// none of them are filled yet (a fused piece physically can't fit
-// where a loose piece already sits) -- the spec's own "more than one
-// valid decomposition of the same volume": the group's voids stay
+// onto. A "fused" piece's `fillsGroup` names one id; placing it fills
+// EVERY void whose `groupIds` INCLUDES that id, in one placement, but
+// only if none of them are filled yet (a fused piece physically can't
+// fit where a loose piece already sits) -- the spec's own "more than
+// one valid decomposition of the same volume": the group's voids stay
 // individually fillable by loose pieces too, right up until a fused
-// piece claims the whole group at once.
+// piece claims the whole group at once. `groupIds` is an ARRAY, not a
+// single id, because a void can belong to more than one fused piece's
+// own group at once -- a 2-cell composite's void belongs to both its
+// own cell's single-cell group (a decoy single-RD fused piece can
+// still claim just that cell) AND a shared cross-cell group (a
+// "joined pair" fused piece spanning both cells at once). Every
+// existing single-group void just gets a one-element array; nothing
+// about the single-group case changed semantically.
 //
 // Every void also tracks `filledBy` (a piece id, or null while open) --
 // Stage 7's undo needs a reverse mapping from a placed piece back to
@@ -94,10 +101,10 @@ export function placeSelected(state, voidId) {
   }
 
   if (piece.fillsGroup) {
-    if (voidEntry.groupId !== piece.fillsGroup) {
+    if (!voidEntry.groupIds.includes(piece.fillsGroup)) {
       return { state, placed: false, pieceId, voidId, reason: 'nothing-selected' };
     }
-    const groupVoids = state.voids.filter((v) => v.groupId === piece.fillsGroup);
+    const groupVoids = state.voids.filter((v) => v.groupIds.includes(piece.fillsGroup));
     if (groupVoids.some((v) => v.filled)) {
       return { state, placed: false, pieceId, voidId, reason: 'group-partially-filled' };
     }
@@ -153,7 +160,7 @@ export function voidValidityForPiece(state, pieceId) {
   const validByVoidId = {};
   const canAct = Boolean(piece && !piece.placed);
   const groupAllOpen = canAct && piece.fillsGroup
-    ? state.voids.filter((v) => v.groupId === piece.fillsGroup).every((v) => !v.filled)
+    ? state.voids.filter((v) => v.groupIds.includes(piece.fillsGroup)).every((v) => !v.filled)
     : false;
 
   for (const v of state.voids) {
@@ -161,7 +168,7 @@ export function voidValidityForPiece(state, pieceId) {
     if (!canAct) {
       validByVoidId[v.id] = false;
     } else if (piece.fillsGroup) {
-      validByVoidId[v.id] = v.groupId === piece.fillsGroup && groupAllOpen;
+      validByVoidId[v.id] = v.groupIds.includes(piece.fillsGroup) && groupAllOpen;
     } else {
       validByVoidId[v.id] = !v.requiredOrientation || v.requiredOrientation === piece.orientation;
     }

@@ -182,7 +182,7 @@ function loadStage(index) {
       orientationOptions: p.orientationOptions,
       fillsGroup: p.fillsGroup,
     })),
-    voids: built.voids.map((v) => ({ id: v.id, requiredOrientation: v.requiredOrientation, groupId: v.groupId })),
+    voids: built.voids.map((v) => ({ id: v.id, requiredOrientation: v.requiredOrientation, groupIds: v.groupIds })),
   });
 
   const boundingRadius = boundingRadiusFromOrigin([built.skeletonGroup, ...built.pieces.map((p) => p.mesh)]);

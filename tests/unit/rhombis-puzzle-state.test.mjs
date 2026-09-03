@@ -313,7 +313,7 @@ function stage5State() {
       ...[0, 1, 2, 3, 4, 5].map((i) => ({ id: `p${i}` })),
       { id: 'fused', fillsGroup: 'cube' },
     ],
-    voids: ['x+', 'x-', 'y+', 'y-', 'z+', 'z-'].map((axis) => ({ id: `v-${axis}`, groupId: 'cube' })),
+    voids: ['x+', 'x-', 'y+', 'y-', 'z+', 'z-'].map((axis) => ({ id: `v-${axis}`, groupIds: ['cube'] })),
   });
 }
 
@@ -379,15 +379,15 @@ test('voidValidityForPiece: the fused piece reads all-green when the group is fu
 
 // Stage 6's real shape: two independent 12-void cells (Stage 4's own
 // RD, repeated), each with its own fused-whole-RD alternate -- see
-// stages.js's buildStage6. groupId/fillsGroup already generalize to
+// stages.js's buildStage6. groupIds/fillsGroup already generalize to
 // more than one simultaneous group for free (no puzzle-state.js
 // changes were needed to build this stage).
 function stage6State() {
   const axes = ['x+', 'x-', 'y+', 'y-', 'z+', 'z-'];
   const cellVoidIds = (cellId) => axes.flatMap((axis) => [`v-${cellId}-in-${axis}`, `v-${cellId}-out-${axis}`]);
   const voids = [
-    ...cellVoidIds('cell-0').map((id) => ({ id, groupId: 'cell-0' })),
-    ...cellVoidIds('cell-1').map((id) => ({ id, groupId: 'cell-1' })),
+    ...cellVoidIds('cell-0').map((id) => ({ id, groupIds: ['cell-0'] })),
+    ...cellVoidIds('cell-1').map((id) => ({ id, groupIds: ['cell-1'] })),
   ];
   return createPuzzleState({
     pieces: [
@@ -414,7 +414,7 @@ test('Stage 6: solvable with one cell fused and the other built loose (a genuine
   state = selectPiece(state, 'fused-cell-0');
   state = placeSelected(state, 'v-cell-0-in-x+').state;
 
-  const cell1VoidIds = state.voids.filter((v) => v.groupId === 'cell-1').map((v) => v.id);
+  const cell1VoidIds = state.voids.filter((v) => v.groupIds.includes('cell-1')).map((v) => v.id);
   cell1VoidIds.forEach((voidId, i) => {
     state = selectPiece(state, `p${i}`);
     const result = placeSelected(state, voidId);
@@ -431,7 +431,7 @@ test('Stage 6: fusing one cell does not affect the other cell\'s own fused optio
   state = placeSelected(state, 'v-cell-0-in-x+').state;
 
   const validity = voidValidityForPiece(state, 'fused-cell-1');
-  for (const v of state.voids.filter((vv) => vv.groupId === 'cell-1')) {
+  for (const v of state.voids.filter((vv) => vv.groupIds.includes('cell-1'))) {
     assert.equal(validity[v.id], true);
   }
 });
@@ -448,6 +448,74 @@ test('Stage 6: all 24 loose pieces (no fused pieces at all) is a third valid com
   assert.equal(isSolved(state), true);
   assert.equal(state.pieces.find((p) => p.id === 'fused-cell-0').placed, false);
   assert.equal(state.pieces.find((p) => p.id === 'fused-cell-1').placed, false);
+});
+
+// The joined-pair stage's real shape (id 7 in STAGES, "Joined Pair" --
+// not to be confused with this file's own older "Stage 7" comments
+// below, which predate this and refer to the undo-feature milestone,
+// not a playable puzzle level; see stages.js's buildStage7). Same
+// 2-cell layout as Stage 6, but no loose pieces at all -- exactly two
+// fused pieces: a genuine cross-cell "joined pair" (fillsGroup:
+// 'joined-01') and a same-cell "decoy" (fillsGroup: 'cell-0'). This is
+// the real reason `groupIds` had to become an array: a cell-0 void
+// belongs to BOTH 'cell-0' (the decoy's group) and 'joined-01' (the
+// joined pair's group) at once.
+function joinedPairState() {
+  const axes = ['x+', 'x-', 'y+', 'y-', 'z+', 'z-'];
+  const cellVoidIds = (cellId) => axes.flatMap((axis) => [`v-${cellId}-in-${axis}`, `v-${cellId}-out-${axis}`]);
+  const voids = [
+    ...cellVoidIds('cell-0').map((id) => ({ id, groupIds: ['cell-0', 'joined-01'] })),
+    ...cellVoidIds('cell-1').map((id) => ({ id, groupIds: ['cell-1', 'joined-01'] })),
+  ];
+  return createPuzzleState({
+    pieces: [
+      { id: 'decoy', fillsGroup: 'cell-0' },
+      { id: 'joined-pair', fillsGroup: 'joined-01' },
+    ],
+    voids,
+  });
+}
+
+test('joined pair: fills all 24 voids across both cells from a single tap', () => {
+  let state = joinedPairState();
+  state = selectPiece(state, 'joined-pair');
+  const result = placeSelected(state, 'v-cell-0-in-x+');
+  assert.equal(result.placed, true);
+  assert.equal(result.filledVoidIds.length, 24);
+  assert.equal(isSolved(result.state), true);
+});
+
+test('joined pair: the decoy correctly fills just its own cell, a real (not fake) placement', () => {
+  let state = joinedPairState();
+  state = selectPiece(state, 'decoy');
+  const result = placeSelected(state, 'v-cell-0-in-x+');
+  assert.equal(result.placed, true);
+  assert.equal(result.filledVoidIds.length, 12);
+  assert.equal(result.filledVoidIds.every((id) => id.startsWith('v-cell-0-')), true);
+  assert.equal(isSolved(result.state), false); // cell-1 still open, no piece left to fill it
+});
+
+test('joined pair: the decoy is rejected against cell-1 (wrong group)', () => {
+  let state = joinedPairState();
+  state = selectPiece(state, 'decoy');
+  const result = placeSelected(state, 'v-cell-1-in-x+');
+  assert.equal(result.placed, false);
+});
+
+test('joined pair: using the decoy on cell-0 traps the joined pair (group-partially-filled)', () => {
+  let state = joinedPairState();
+  state = selectPiece(state, 'decoy');
+  state = placeSelected(state, 'v-cell-0-in-x+').state;
+
+  state = selectPiece(state, 'joined-pair');
+  const result = placeSelected(state, 'v-cell-1-in-x+');
+  assert.equal(result.placed, false);
+  assert.equal(result.reason, 'group-partially-filled');
+
+  const validity = voidValidityForPiece(state, 'joined-pair');
+  for (const v of state.voids.filter((vv) => !vv.filled)) {
+    assert.equal(validity[v.id], false);
+  }
 });
 
 // Stage 7's undo needs a reverse mapping from a placed piece back to

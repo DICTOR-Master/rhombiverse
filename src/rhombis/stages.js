@@ -7,6 +7,7 @@
 // so adding Stage 4+ is a new build function here, not a main.js
 // rewrite.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey } from './geometry.js';
 import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld } from '../core/lattice.js';
 
@@ -68,7 +69,7 @@ function makeOuterSolid(geometry, position = ORIGIN) {
 // fix landed (apex ended up at -AXIS_NORMALS*scale/2, base at the
 // origin). The real fix is a translation by +AXIS_NORMALS*(scale/2)
 // alongside the rotation, which is what buildStage3 now passes.
-function makeVoid(geometry, { id, requiredOrientation, quaternion = IDENTITY_QUATERNION, position = ORIGIN, groupId }) {
+function makeVoid(geometry, { id, requiredOrientation, quaternion = IDENTITY_QUATERNION, position = ORIGIN, groupIds = [] }) {
   // A translucent GHOST COPY of the piece that would go here -- not a
   // wireframe outline -- shown/colored red or green by main.js's
   // refreshVoidHighlights() while a piece is selected (direct decision
@@ -87,7 +88,7 @@ function makeVoid(geometry, { id, requiredOrientation, quaternion = IDENTITY_QUA
   return {
     id,
     requiredOrientation,
-    groupId,
+    groupIds,
     wire,
     hitTarget,
     quaternion: quaternion.clone(),
@@ -336,13 +337,13 @@ function buildStage4(scale) {
 // loose pyramids one at a time, each correctly oriented (exactly Stage
 // 3's own flow, still fully available) OR by selecting the fused piece
 // and tapping once -- both are real, independent decompositions of the
-// identical cube volume (puzzle-state.js's own `fillsGroup`/`groupId`
+// identical cube volume (puzzle-state.js's own `fillsGroup`/`groupIds`
 // mechanism, unit tested for both paths plus the "fused piece rejected
 // once a loose piece has claimed part of the group" case). A void's
-// `groupId` (for the fused path) and `requiredOrientation` (for the
+// `groupIds` (for the fused path) and `requiredOrientation` (for the
 // loose path) are independent and don't conflict -- `voidValidityForPiece`
 // /`placeSelected` only ever read `requiredOrientation` for a piece
-// WITHOUT `fillsGroup`, and only ever read `groupId` for one WITH it.
+// WITHOUT `fillsGroup`, and only ever read `groupIds` for one WITH it.
 // The fused piece is a genuine `THREE.BoxGeometry` -- a real cube, not 6
 // stitched copies of the shared pyramid mesh -- since it's honestly a
 // DIFFERENT physical object, not a transform of the one shared piece the
@@ -359,7 +360,7 @@ function buildStage5(scale) {
       id: `v-${axisKey}`,
       quaternion: inwardQuaternion(axisKey),
       position: AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2),
-      groupId: GROUP_ID,
+      groupIds: [GROUP_ID],
       requiredOrientation: `${axisKey}:in`,
     });
     skeletonGroup.add(...v.sceneObjects);
@@ -416,14 +417,29 @@ function buildStage5(scale) {
 // identical regardless of which cell or axis they end up on, same as
 // Stage 4's own single-queue tray); the 2 fused RD pieces are each
 // their own always-visible slot, same as Stage 5's fused cube.
-function buildStage6(scale) {
-  const pyramid = pyramidGeometry(scale);
-  const skeletonGroup = new THREE.Group();
 
+// Shared by Stage 6 and Stage 7 -- the real adjacent-cell-pair position
+// math (`core/lattice.js`'s own NEIGHBOR_OFFSETS/cellToWorld, the exact
+// math the main app uses for real RD cells), centered on the pair's own
+// midpoint so dragging rotates the composite around its natural middle.
+// Factored out so both stages are PROVABLY the same underlying geometry,
+// not just visually similar -- Stage 7 (direct instruction 2026-09-04,
+// "the two target cells were joined previously no?" -- no, confirmed by
+// reading the code: Stage 6's two fused pieces are independent, each
+// filling only its own cell, never both at once) adds a genuinely new
+// "joined pair" piece that fills both cells in a single placement,
+// which needed no new cell-position math, only a new piece.
+function twoCellCenters(scale) {
   const cellOffsets = [[0, 0, 0], NEIGHBOR_OFFSETS[0]];
   const cellWorldPositions = cellOffsets.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
   const centroid = cellWorldPositions[0].clone().add(cellWorldPositions[1]).multiplyScalar(0.5);
-  const cellCenters = cellWorldPositions.map((p) => p.clone().sub(centroid));
+  return cellWorldPositions.map((p) => p.clone().sub(centroid));
+}
+
+function buildStage6(scale) {
+  const pyramid = pyramidGeometry(scale);
+  const skeletonGroup = new THREE.Group();
+  const cellCenters = twoCellCenters(scale);
 
   const voids = [];
   const groups = [];
@@ -442,7 +458,7 @@ function buildStage6(scale) {
           id: `v-${groupId}-${dirLabel}-${axisKey}`,
           quaternion: toQuaternion(axisKey),
           position: facePosition,
-          groupId,
+          groupIds: [groupId],
           requiredOrientation: `${axisKey}:${dirLabel}`,
         });
         skeletonGroup.add(...v.sceneObjects);
@@ -479,6 +495,93 @@ function buildStage6(scale) {
   };
 }
 
+// Stage 7 -- joined pair: the SAME 2-cell composite as Stage 6
+// (`twoCellCenters`, provably identical geometry), but a genuinely
+// different puzzle, not more content on Stage 6's own engine. Direct
+// instruction (2026-09-04): "2 joined cell arrangement - two joined
+// cell solution... 1 single cell as decoy". No loose pieces at all --
+// exactly two fused pieces:
+//  - the JOINED PAIR: one real physical object spanning both cells,
+//    filling all 24 voids in a single placement -- a genuinely new
+//    mechanic (Stage 6's own two fused pieces are independent, each
+//    only ever filling its own cell; nothing before this filled both
+//    at once). Built by merging two rhombicDodecahedronGeometry(scale)
+//    instances, each translated to its own cell's center, into one
+//    real BufferGeometry (three/addons' mergeGeometries, the same
+//    established pattern render.js already uses for its own merged
+//    skeleton meshes) -- one real THREE.Mesh, not a Group, since
+//    main.js's raycaster intersects pieceTargets non-recursively and
+//    would never see a Group's children.
+//  - the DECOY: an ordinary single-cell whole-RD fused piece, visually
+//    identical to Stage 5/6's own fused pieces and just as functional
+//    -- tap it onto cell-0 and it genuinely, correctly fills that
+//    cell's 12 voids. The trap is real, not a fake/rejected button: use
+//    it and cell-1 has nothing left to fill it with (no loose pieces,
+//    only one decoy), so the composite is stuck open until Undo. A
+//    decoy that simply rejected every tap wouldn't be a decoy, just a
+//    disabled-looking button -- this one has to actually work to be
+//    worth avoiding.
+// This needed puzzle-state.js's own `groupIds` generalization (voids
+// carry an ARRAY of group memberships now, not one) -- a cell-0 void
+// belongs to BOTH 'cell-0' (the decoy's own group) and 'joined-01' (the
+// joined pair's group) at once, so `voidValidityForPiece`/
+// `placeSelected` can resolve either piece's own group correctly
+// against the same 24 voids without the two mechanisms conflicting.
+function buildStage7(scale) {
+  const skeletonGroup = new THREE.Group();
+  const cellCenters = twoCellCenters(scale);
+  const pyramid = pyramidGeometry(scale);
+
+  const voids = [];
+  cellCenters.forEach((cellCenter, cellIndex) => {
+    const cellGroupId = `cell-${cellIndex}`;
+    skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
+    PYRAMID_AXES.forEach((axisKey) => {
+      const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
+      [['in', inwardQuaternion], ['out', outwardQuaternion]].forEach(([dirLabel, toQuaternion]) => {
+        const v = makeVoid(pyramid, {
+          id: `v-${cellGroupId}-${dirLabel}-${axisKey}`,
+          quaternion: toQuaternion(axisKey),
+          position: facePosition,
+          groupIds: [cellGroupId, 'joined-01'],
+        });
+        skeletonGroup.add(...v.sceneObjects);
+        voids.push(v);
+      });
+    });
+  });
+
+  const groups = [
+    { id: 'cell-0', position: cellCenters[0].clone(), quaternion: new THREE.Quaternion() },
+    { id: 'joined-01', position: ORIGIN, quaternion: new THREE.Quaternion() },
+  ];
+
+  const decoyGeometry = rhombicDodecahedronGeometry(scale);
+  const decoyPiece = makeFusedPiece(decoyGeometry, {
+    id: 'decoy',
+    fillsGroup: 'cell-0',
+    homePosition: new THREE.Vector3(scale * 4, 0, 0),
+  });
+
+  const joinedGeometry = mergeGeometries([
+    rhombicDodecahedronGeometry(scale).translate(cellCenters[0].x, cellCenters[0].y, cellCenters[0].z),
+    rhombicDodecahedronGeometry(scale).translate(cellCenters[1].x, cellCenters[1].y, cellCenters[1].z),
+  ], false);
+  const joinedPiece = makeFusedPiece(joinedGeometry, {
+    id: 'joined-pair',
+    fillsGroup: 'joined-01',
+    homePosition: new THREE.Vector3(scale * 4, -scale * 2.6, 0),
+  });
+
+  return {
+    skeletonGroup,
+    pieces: [decoyPiece, joinedPiece],
+    voids,
+    groups,
+    hideIdleVoidWires: true,
+  };
+}
+
 export const STAGES = [
   { id: 1, name: 'One Piece', build: buildStage1 },
   { id: 2, name: 'Octahedron', build: buildStage2 },
@@ -486,4 +589,5 @@ export const STAGES = [
   { id: 4, name: 'Rhombic Dodecahedron', build: buildStage4 },
   { id: 5, name: 'Conjoined Pieces', build: buildStage5 },
   { id: 6, name: 'Multi-Cell', build: buildStage6 },
+  { id: 7, name: 'Joined Pair', build: buildStage7 },
 ];

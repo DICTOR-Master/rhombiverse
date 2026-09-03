@@ -619,6 +619,91 @@ build order:
   correctly immediately after rotating mid-selection (a real
   select-rotate-flip-place sequence, not just visual inspection). Full
   suite re-run clean (275/275) after this fix too.
+
+  **New playable level: "Joined Pair" (`STAGES` id 7, `buildStage7`),
+  2026-09-04** (direct instruction, after confirming via a direct
+  question -- "the two target cells were joined previously no?" -- that
+  Stage 6 had never actually built this: its two fused pieces are
+  independent, each only ever filling its own cell). Reuses Stage 6's
+  exact 2-cell layout (factored out into a shared `twoCellCenters(scale)`
+  helper so the two stages are provably the same geometry, not just
+  visually similar) but is a genuinely different puzzle, not more
+  content on the same engine: NO loose pieces at all, exactly two fused
+  pieces --
+  - the **joined pair**: one real physical object spanning both cells,
+    filling all 24 voids in a single placement -- built by merging two
+    `rhombicDodecahedronGeometry(scale)` instances (each translated to
+    its own cell's center) into one real `BufferGeometry` via
+    `three/addons/utils/BufferGeometryUtils.js`'s `mergeGeometries`
+    (the same established pattern `render.js` already uses for its own
+    merged skeleton meshes, imported statically this time rather than
+    render.js's own dynamic `await import()`, since stages.js's build
+    functions are called synchronously from `main.js`'s `loadStage()`
+    and staying sync avoided a wider async refactor). Deliberately ONE
+    real `THREE.Mesh`, not a `THREE.Group` of two -- `main.js`'s
+    raycaster intersects `pieceTargets` non-recursively, so a Group's
+    children would simply never be hit-tested.
+  - the **decoy**: an ordinary single-cell whole-RD fused piece,
+    visually identical to Stage 5/6's own fused pieces and just as
+    functional -- tap it onto cell-0 and it genuinely, correctly fills
+    that cell's 12 voids. Direct instruction on what makes it a real
+    decoy, not a fake button: "1 single cell as decoy" meant it had to
+    actually work, not be silently rejected everywhere -- use it and
+    cell-1 has nothing left to fill it with (no loose pieces, only one
+    decoy), so the composite is stuck open until Undo. A decoy that
+    just flashed red on every tap wouldn't be tempting, just broken.
+
+  **Real generalization needed in `puzzle-state.js`**: a void's single
+  `groupId` string became a `groupIds` ARRAY, since a cell-0 void now
+  belongs to BOTH `'cell-0'` (the decoy's own group) and `'joined-01'`
+  (the joined pair's group) at once -- something no earlier stage ever
+  needed (Stage 5/6's groups never overlapped). `voidValidityForPiece`/
+  `placeSelected` now check `voidEntry.groupIds.includes(piece.
+  fillsGroup)` instead of `===`; a piece's own `fillsGroup` stayed a
+  single id (unchanged) -- only voids needed multi-membership, not
+  pieces. Every existing single-group void across Stage 5/6 (and this
+  file's own `stage5State()`/`stage6State()` test fixtures) just got a
+  one-element array; the single-group case is semantically identical to
+  before, confirmed by the full suite passing unchanged for those. 4 new
+  tests added directly covering the new mechanic (`joinedPairState()`):
+  the joined pair fills all 24 in one tap, the decoy genuinely fills
+  just its own 12 (not a no-op), the decoy is rejected against the
+  wrong cell, and using the decoy correctly traps the joined pair
+  (`reason: 'group-partially-filled'`, every remaining void reading
+  invalid for it). Verified live end-to-end, not just unit-tested: a
+  fresh board solves in one tap with the joined pair (screenshotted
+  "Solved!"); selecting the decoy correctly shows cell-0 green/cell-1
+  red (screenshotted); placing the decoy on cell-0 then selecting the
+  joined pair shows the ENTIRE remaining shape red (the trap, confirmed
+  visually, not just via the unit test); Undo correctly restores to a
+  fresh, still-solvable 24-void state afterward. Full `node --test
+  tests/unit/*.test.mjs` clean (275 -> 279).
+
+  **Naming note**: this is the first STAGES entry with `id: 7` -- an
+  unrelated, MUCH earlier use of "Stage 7" already exists in this same
+  file (and in `puzzle-state.js`'s own comments) meaning "post-Stage-6
+  polish work" (undo, scoring, a piece-bank UI, procedural generation --
+  see this section's own punch list below), not a playable level. The
+  two are unrelated; don't conflate a comment referencing "Stage 7's
+  undo" with this actual playable Stage 7.
+
+  **Next planned work, not yet started** (direct instruction 2026-09-04,
+  "from here forward all mathematical possibilities in any cell
+  arrangement" / "then 3 cell arrangements"): rather than hand-picking a
+  few named 3-cell shapes ("a line," "a triangle"), write a genuine
+  symmetry-based enumerator -- the FCC lattice's 12 `NEIGHBOR_OFFSETS`
+  are invariant under the full 48-operation octahedral symmetry group
+  (all coordinate permutations x all sign flips); BFS-grow every
+  connected N-cell cluster from a seed cell, canonicalize each one
+  (apply all 48 symmetries, keep the lexicographically-smallest
+  coordinate representation) to collapse rotations/reflections of the
+  same shape into one entry, exactly the "free polyomino" counting
+  problem adapted to this lattice. For N=2 this providably yields
+  exactly 1 shape (matches Stage 6/7 already being the same geometry,
+  a real sanity check once built); for N=3 it'll yield the REAL,
+  complete list (not a guess) to build the next stage(s) from. Scoped as
+  reusable infrastructure, not a one-off -- meant to power N=3 and any
+  later N without more hand design.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
