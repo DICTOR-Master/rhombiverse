@@ -921,6 +921,28 @@ build order:
   a blocky 80s-style RHOMBIS logo built from RDs ("if possible") --
   both are more open-ended visual-design tasks, deliberately sequenced
   after the more mechanical zoom/starfield work, not yet started.
+
+  **Welcome-screen tagline is now a real link, same day** (direct
+  instruction, deliberate wordplay: "could we use the sub heading
+  rhombis a new way in as a link to enumerator... A new way in
+  (wordplay too)"). `welcome.js`'s own tagline mechanism was already
+  established (always the newest `data/changelog.json` entry's title,
+  see this file's own earlier "accessibility gap" writeup above) but
+  was always plain text. `data/changelog.json` entries can now
+  optionally carry a `link` field -- the "Rhombis: A New Way In" entry
+  got `"link": "./rhombis.html?stage=8"`, and `welcome.js` renders the
+  tagline as a real `<a>` when one's present (unchanged plain text
+  otherwise, so every other entry is unaffected). The wordplay lands
+  literally: the tagline that originally announced Rhombis now IS a
+  new way in -- a direct shortcut straight to Stage 8, the first
+  enumerator-generated puzzle, skipping the intro tutorial stages
+  entirely for a returning player who wants the newest content. A
+  small step toward the separately-requested "level select for
+  returning users" idea, not a replacement for it. Styled with a
+  subtle dotted underline (`index.html`'s `.tagline a`), not a jarring
+  default blue link. Verified live: the link's real href resolves to
+  `./rhombis.html?stage=8`, and clicking it actually navigates there
+  (Stage 8, correct title), not just present in markup.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

@@ -200,7 +200,21 @@ function init() {
     if (!entry) return;
     const tagline = document.getElementById('welcome-tagline');
     if (!tagline) return;
-    tagline.textContent = entry.title;
+    // An entry can optionally carry its own `link` (data/changelog.json)
+    // -- direct instruction (2026-09-04, wordplay intended: "Rhombis: A
+    // New Way In" becomes a literal new way in, straight to the newest
+    // enumerator-powered stages rather than the intro). Plain text
+    // when absent, exactly the prior behavior -- most entries won't
+    // have anywhere meaningful to link to.
+    if (entry.link) {
+      tagline.innerHTML = '';
+      const a = document.createElement('a');
+      a.href = entry.link;
+      a.textContent = entry.title;
+      tagline.appendChild(a);
+    } else {
+      tagline.textContent = entry.title;
+    }
   });
 
   const fullBtn = document.getElementById('mode-choice-full');
