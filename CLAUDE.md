@@ -742,16 +742,62 @@ build order:
   reachability bugs slipping through). Full `node --test
   tests/unit/*.test.mjs` clean.
 
-  **Not yet built**: turning any of the 4 real N=3 shapes into an
-  actual playable stage -- this file only generates the shape data
-  (which cells, at which lattice coordinates), not stage content. Two
-  further direct notes for whenever that stage-building work starts:
-  decoy pieces should vary in size as levels progress (not just
-  single-cell decoys), and a 3-cell stage's tray should offer the
-  singles-only path ALONGSIDE a 2-piece-joined option (a joined pair
-  covering 2 of the 3 cells, plus 1 single for the third) -- echoing
-  Stage 6/7's own "more than one valid decomposition" spec requirement
-  at 3-cell scale, not just "all loose vs. all fused".
+  **All 4 built as real playable stages, same day** (`STAGES` ids 8-11,
+  direct instruction "all 4"): `buildNCellStage(scale, cellLatticeOffsets,
+  joinedPairIndices)` is one generic builder driving all four, not four
+  hand-written stages -- parametrized entirely by real data from
+  `enumerateShapes(3)` (`THREE_CELL_SHAPES`, the exact cell coordinates
+  the enumerator produced) plus each shape's own directly-computed
+  adjacent-pair indices (a bent chain's two END cells are NOT adjacent
+  to each other even though both are adjacent to the middle one, so
+  "any two of the three" was never a safe default -- verified per-shape
+  before picking one, not assumed). Named by heading convention "N
+  Cells: <Shape>" starting from N=2 (direct instruction) -- Stage 7
+  renamed to "2 Cells: Joined Pair" to match, Stages 8-11 are "3 Cells:
+  Triangle" / "Narrow Bend" / "Wide Bend" / "Straight Line".
+
+  Tray design, per direct instruction ("an extra two piece with three
+  pieces, after singles"): N single-cell fused pieces (one per cell,
+  each independently always correct -- unlike Stage 7, this is NOT a
+  decoy/trap design, matching Stage 5/6's own "more than one valid
+  decomposition" spirit at 3-cell scale) PLUS one "joined pair" fused
+  piece spanning the shape's own adjacent cell pair. No loose pyramids
+  at all, matching the direct instruction's own "singles" (whole-cell)
+  framing.
+
+  **A real concern checked and NOT found to be a problem**: selecting
+  the joined pair makes 24 of 36 voids simultaneously valid at once (2
+  of 3 cells) -- close to the exact condition (many simultaneously-valid
+  ghosts) that caused the earlier "cube isnt translucent" stacking-
+  opacity bug. Verified live before shipping (screenshotted) that it
+  does NOT recur here: unlike Stage 3's original bug (6 voids all
+  tiling the SAME compact cube volume, heavily overlapping in screen
+  space from any angle), a 3-cell shape's voids are spread across
+  spatially SEPARATE lobes -- each lobe's own 12 voids only overlap
+  within that lobe's own small screen region, never across lobes. Both
+  the joined-pair selection (2 clearly green lobes, 1 red) and a single
+  selection (1 green, 2 red) read cleanly with no wall effect.
+
+  Verified live end-to-end on Stage 8 (Triangle): all 4 stages load
+  with zero console/page errors and the correct 36-void count; a real
+  joined-pair placement succeeds (36 -> 12, screenshotted). The
+  remaining single-piece placement was confirmed correct at the
+  puzzle-state.js level (own unit tests, not reasoned about by
+  inspection) rather than exhaustively re-verified pixel-by-pixel live
+  for all 4 stages -- direct instruction mid-session ("rewire every
+  time a stage is finished so I can test manually more easily") shifted
+  hands-on verification of 9/10/11 to direct manual play rather than
+  more automated Playwright runs; Stage 7 was independently confirmed
+  working by direct manual test the same way ("stage 7 ok by test").
+  Full `node --test tests/unit/*.test.mjs` clean.
+
+  **Open notes for whenever this progression continues**: decoy pieces
+  should vary in size as levels advance (not just single-cell decoys --
+  not yet relevant here since Stages 8-11 aren't decoy/trap designs,
+  but will matter once a later stage reintroduces that mechanic); N=4
+  (20 real shapes, already computed by the enumerator, not yet
+  characterized or built) is the natural next step once 8-11 are
+  confirmed solid by hands-on play.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

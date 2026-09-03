@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey } from './geometry.js';
 import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld } from '../core/lattice.js';
+import { enumerateShapes } from './cell-arrangements.js';
 
 export const WIRE_COLOR = 0x6ad0ff;
 const PIECE_COLOR = 0xffb35c;
@@ -582,6 +583,113 @@ function buildStage7(scale) {
   };
 }
 
+// Stages 8-11 -- the 4 REAL, symmetry-verified 3-cell shapes
+// (`cell-arrangements.js`'s own `enumerateShapes(3)`, computed and
+// hand-checked 2026-09-04 -- not guessed: a triangle, a straight line,
+// and two genuinely different bent-chain angles). Direct instruction:
+// "all 4" get built, and each one's tray follows "an extra two piece
+// with three pieces, after singles" -- N single-cell fused pieces (one
+// per cell, each independently correct, unlike Stage 7's decoy) PLUS
+// one "joined pair" fused piece spanning an ADJACENT pair of the N
+// cells (which pair is actually adjacent varies per shape -- computed
+// directly from the real cell coordinates, not assumed, since a bent
+// chain's two end cells are NOT adjacent to each other even though
+// they're both adjacent to the middle one). Unlike Stage 7, this is
+// NOT a decoy/trap design -- every piece here is a genuine, always-
+// correct way to make progress (matching Stage 5/6's own "more than
+// one valid decomposition" spirit at 3-cell scale), so no
+// group-partially-filled stuck states are the intended experience.
+// Deliberately no loose pyramids at all, matching the direct
+// instruction's own "singles" (whole-cell) framing, not raw per-void
+// pieces.
+function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
+  const skeletonGroup = new THREE.Group();
+  const pyramid = pyramidGeometry(scale);
+  const n = cellLatticeOffsets.length;
+
+  const cellWorldPositions = cellLatticeOffsets.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = cellWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / n);
+  const cellCenters = cellWorldPositions.map((p) => p.clone().sub(centroid));
+
+  const [ji, jj] = joinedPairIndices;
+  const joinedGroupId = `joined-${ji}${jj}`;
+
+  const voids = [];
+  cellCenters.forEach((cellCenter, cellIndex) => {
+    const cellGroupId = `cell-${cellIndex}`;
+    const groupIds = cellIndex === ji || cellIndex === jj ? [cellGroupId, joinedGroupId] : [cellGroupId];
+    skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
+    PYRAMID_AXES.forEach((axisKey) => {
+      const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
+      [['in', inwardQuaternion], ['out', outwardQuaternion]].forEach(([dirLabel, toQuaternion]) => {
+        const v = makeVoid(pyramid, {
+          id: `v-${cellGroupId}-${dirLabel}-${axisKey}`,
+          quaternion: toQuaternion(axisKey),
+          position: facePosition,
+          groupIds,
+        });
+        skeletonGroup.add(...v.sceneObjects);
+        voids.push(v);
+      });
+    });
+  });
+
+  const groups = cellCenters.map((center, i) => ({ id: `cell-${i}`, position: center.clone(), quaternion: new THREE.Quaternion() }));
+  // The joined piece's own merged geometry already bakes in both
+  // lobes' correct relative offset (each translated to its own
+  // cellCenter, already expressed relative to the whole shape's
+  // centroid-origin before merging) -- same reasoning as Stage 7's own
+  // 'joined-01' group, so this snaps to the shared origin, not a
+  // midpoint.
+  groups.push({ id: joinedGroupId, position: ORIGIN, quaternion: new THREE.Quaternion() });
+
+  const homeSpacing = scale * 2.2;
+  const pieces = [];
+  for (let i = 0; i < n; i++) {
+    pieces.push(makeFusedPiece(rhombicDodecahedronGeometry(scale), {
+      id: `single-${i}`,
+      fillsGroup: `cell-${i}`,
+      homePosition: new THREE.Vector3(scale * 4, -homeSpacing * i, 0),
+    }));
+  }
+
+  const joinedGeometry = mergeGeometries(
+    [ji, jj].map((idx) => rhombicDodecahedronGeometry(scale).translate(cellCenters[idx].x, cellCenters[idx].y, cellCenters[idx].z)),
+    false,
+  );
+  pieces.push(makeFusedPiece(joinedGeometry, {
+    id: 'joined-pair',
+    fillsGroup: joinedGroupId,
+    homePosition: new THREE.Vector3(scale * 4, -homeSpacing * n, 0),
+  }));
+
+  return {
+    skeletonGroup,
+    pieces,
+    voids,
+    groups,
+    hideIdleVoidWires: true,
+  };
+}
+
+// The 4 real N=3 shapes, in the exact cell coordinates
+// cell-arrangements.js's own enumerateShapes(3) produces, plus each
+// one's own directly-computed adjacent joined-pair indices (verified
+// 2026-09-04, not assumed -- a bent chain's two ends are NOT adjacent
+// to each other even though both are adjacent to the middle cell, so
+// "any two of the three" is not a safe default).
+const THREE_CELL_SHAPES = [
+  { name: 'Triangle', cells: [[0, 0, 0], [0, 1, -1], [1, 0, -1]], joinedPair: [0, 1] },
+  { name: 'Narrow Bend', cells: [[0, 0, 0], [0, 1, -1], [1, -1, 0]], joinedPair: [0, 1] },
+  { name: 'Wide Bend', cells: [[0, 0, 0], [0, 0, 2], [0, 1, 1]], joinedPair: [0, 2] },
+  { name: 'Straight Line', cells: [[0, 0, 0], [0, 1, -1], [0, 2, -2]], joinedPair: [0, 1] },
+];
+
+function buildStage8(scale) { return buildNCellStage(scale, THREE_CELL_SHAPES[0].cells, THREE_CELL_SHAPES[0].joinedPair); }
+function buildStage9(scale) { return buildNCellStage(scale, THREE_CELL_SHAPES[1].cells, THREE_CELL_SHAPES[1].joinedPair); }
+function buildStage10(scale) { return buildNCellStage(scale, THREE_CELL_SHAPES[2].cells, THREE_CELL_SHAPES[2].joinedPair); }
+function buildStage11(scale) { return buildNCellStage(scale, THREE_CELL_SHAPES[3].cells, THREE_CELL_SHAPES[3].joinedPair); }
+
 export const STAGES = [
   { id: 1, name: 'One Piece', build: buildStage1 },
   { id: 2, name: 'Octahedron', build: buildStage2 },
@@ -589,5 +697,9 @@ export const STAGES = [
   { id: 4, name: 'Rhombic Dodecahedron', build: buildStage4 },
   { id: 5, name: 'Conjoined Pieces', build: buildStage5 },
   { id: 6, name: 'Multi-Cell', build: buildStage6 },
-  { id: 7, name: 'Joined Pair', build: buildStage7 },
+  { id: 7, name: '2 Cells: Joined Pair', build: buildStage7 },
+  { id: 8, name: '3 Cells: Triangle', build: buildStage8 },
+  { id: 9, name: '3 Cells: Narrow Bend', build: buildStage9 },
+  { id: 10, name: '3 Cells: Wide Bend', build: buildStage10 },
+  { id: 11, name: '3 Cells: Straight Line', build: buildStage11 },
 ];
