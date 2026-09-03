@@ -187,24 +187,40 @@ function buildStage2(scale) {
   };
 }
 
+// Every orientation a Stage 3/5 loose cube piece can be turned to: all 6
+// axes, inward only (the cube has no outward voids) -- 'x+:in', 'x-:in',
+// ... 6 total, reusing geometry.js's quaternionForOrientationKey.
+const CUBE_ORIENTATIONS = PYRAMID_AXES.map((axisKey) => `${axisKey}:in`);
+
 // Stage 3 -- cube: 6 of the same pyramid, apex pointing INWARD off each
 // of the cube's 6 faces, all 6 apexes meeting at the shared center
 // (RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md's own cube row: "apexes
-// meeting at the cube's center, one pyramid per face"). No player-
-// driven orientation choice here (unlike Stage 2) -- each void has
-// exactly one correct pose and the piece snaps to it on placement, so
-// pieces carry no `orientation`/`orientationOptions` at all. What's new
-// this stage is the TRAY: 6 identical piece entries, but only the next
-// unplaced one is ever visible in the tray slot at once (main.js reveals
-// the next after each placement) with the remaining count shown in the
-// HUD text -- "tray needs to track counts of identical pieces" per the
-// spec, without needing a new puzzle-state.js shape (they're still just
-// 6 ordinary piece ids).
+// meeting at the cube's center, one pyramid per face").
 //
-// Direct instruction (2026-09-03): the skeleton's internal pyramid
-// seams stay visible from the start for now (all 6 wires drawn up
-// front), not just the cube's outer silhouette -- the spec's stricter
-// "no lattice until solved" is deferred, not forgotten.
+// Manual orientation, matching Stage 4's own mechanic (direct
+// instruction 2026-09-03, "extend manual orientation to stage 3, 5, and
+// 6" -- confirming a direct question raised the same day, "why not only
+// allow green for correctly oriented piece": with auto-orient (any open
+// void accepts any piece as-is, this stage's ORIGINAL design), literally
+// every open void was simultaneously "valid", which is both an odd fit
+// for a game about spatial reasoning and the exact root cause of an
+// earlier live rendering bug (many simultaneously-valid ghosts stacking
+// into a solid wall, since a translucent layer's opacity compounds with
+// every other overlapping one -- see this file's own git history / the
+// project's own CLAUDE.md for the "cube isnt translucent" writeup). Every
+// piece now starts at a fixed wrong orientation ('x+:in') and must be
+// cycled -- tap the selected piece again -- through all 6 real targets
+// before it will place, exactly Stage 4's own flow at 6-way instead of
+// 12-way scale. Needed zero puzzle-state.js changes, same reason Stage 4
+// didn't: flipPiece()/placeSelected() only ever compare `orientation`
+// strings, already proven to generalize to any orientation-key count.
+//
+// What's still new this stage on top of that: the TRAY -- 6 identical
+// piece entries, but only the next unplaced one is ever visible in the
+// tray slot at once (main.js reveals the next after each placement)
+// with the remaining count shown in the HUD text -- "tray needs to
+// track counts of identical pieces" per the spec, without needing a new
+// puzzle-state.js shape (they're still just 6 ordinary piece ids).
 function buildStage3(scale) {
   const geometry = pyramidGeometry(scale);
   const skeletonGroup = new THREE.Group();
@@ -215,6 +231,7 @@ function buildStage3(scale) {
       id: `v-${axisKey}`,
       quaternion: inwardQuaternion(axisKey),
       position: AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2),
+      requiredOrientation: `${axisKey}:in`,
     });
     skeletonGroup.add(...v.sceneObjects);
     return v;
@@ -222,7 +239,7 @@ function buildStage3(scale) {
 
   const homePosition = new THREE.Vector3(scale * 2.6, 0, 0);
   const pieces = PYRAMID_AXES.map((axisKey, i) => {
-    const p = makePiece(geometry, { id: `p${i}`, homePosition });
+    const p = makePiece(geometry, { id: `p${i}`, orientation: 'x+:in', orientationOptions: CUBE_ORIENTATIONS, homePosition });
     p.mesh.visible = i === 0; // only the next available copy shows in the tray
     return p;
   });
@@ -309,21 +326,28 @@ function buildStage4(scale) {
   };
 }
 
-// Stage 5 -- conjoined pieces: the SAME 6-void cube as Stage 3, but the
-// tray now also offers a single pre-fused "cube" piece as an alternate
-// fill for all 6 at once (RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md:
-// "a fused six for a cube... optional fill for part of a larger void").
-// Demonstrates the spec's own Stage 5 "Done when" directly: solvable
-// either by placing 6 loose pyramids one at a time (exactly Stage 3's
-// own flow, still fully available) OR by selecting the fused piece and
-// tapping once -- both are real, independent decompositions of the
+// Stage 5 -- conjoined pieces: the SAME 6-void cube as Stage 3 (now also
+// manually-oriented, same reasoning as Stage 3's own header -- direct
+// instruction 2026-09-03), but the tray now also offers a single
+// pre-fused "cube" piece as an alternate fill for all 6 at once
+// (RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md: "a fused six for a
+// cube... optional fill for part of a larger void"). Demonstrates the
+// spec's own Stage 5 "Done when" directly: solvable either by placing 6
+// loose pyramids one at a time, each correctly oriented (exactly Stage
+// 3's own flow, still fully available) OR by selecting the fused piece
+// and tapping once -- both are real, independent decompositions of the
 // identical cube volume (puzzle-state.js's own `fillsGroup`/`groupId`
 // mechanism, unit tested for both paths plus the "fused piece rejected
-// once a loose piece has claimed part of the group" case). The fused
-// piece is a genuine `THREE.BoxGeometry` -- a real cube, not 6 stitched
-// copies of the shared pyramid mesh -- since it's honestly a DIFFERENT
-// physical object, not a transform of the one shared piece the rest of
-// Rhombis reuses.
+// once a loose piece has claimed part of the group" case). A void's
+// `groupId` (for the fused path) and `requiredOrientation` (for the
+// loose path) are independent and don't conflict -- `voidValidityForPiece`
+// /`placeSelected` only ever read `requiredOrientation` for a piece
+// WITHOUT `fillsGroup`, and only ever read `groupId` for one WITH it.
+// The fused piece is a genuine `THREE.BoxGeometry` -- a real cube, not 6
+// stitched copies of the shared pyramid mesh -- since it's honestly a
+// DIFFERENT physical object, not a transform of the one shared piece the
+// rest of Rhombis reuses; it has no orientation concept at all, unlike
+// its loose siblings.
 function buildStage5(scale) {
   const geometry = pyramidGeometry(scale);
   const skeletonGroup = new THREE.Group();
@@ -336,6 +360,7 @@ function buildStage5(scale) {
       quaternion: inwardQuaternion(axisKey),
       position: AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2),
       groupId: GROUP_ID,
+      requiredOrientation: `${axisKey}:in`,
     });
     skeletonGroup.add(...v.sceneObjects);
     return v;
@@ -343,7 +368,7 @@ function buildStage5(scale) {
 
   const homePosition = new THREE.Vector3(scale * 2.6, 0, 0);
   const loosePieces = PYRAMID_AXES.map((axisKey, i) => {
-    const p = makePiece(geometry, { id: `p${i}`, homePosition });
+    const p = makePiece(geometry, { id: `p${i}`, orientation: 'x+:in', orientationOptions: CUBE_ORIENTATIONS, homePosition });
     p.mesh.visible = i === 0; // only the next available copy shows in the tray
     return p;
   });
@@ -376,10 +401,10 @@ function buildStage5(scale) {
 // whole composite around its natural middle, not off to one side.
 //
 // Each cell independently offers Stage 5's own loose-vs-fused choice,
-// now at 12-piece scale: 12 loose pyramids (auto-orienting to whichever
-// void is tapped -- unlike Stage 4's own pieces, which since the
-// manual-orientation prototype no longer auto-orient) OR one real,
-// whole rhombic-
+// now at 12-piece scale: 12 loose pyramids (manually oriented, same
+// 12-way in/out cycle as Stage 4's own pieces -- direct instruction
+// 2026-09-03 extended manual orientation to every stage that still had
+// auto-orienting loose pieces) OR one real, whole rhombic-
 // dodecahedron piece (geometry.js's rhombicDodecahedronGeometry,
 // reusing core/lattice.js's own rdRawVerts -- the exact same mesh the
 // main app places for a real RD cell) that fills that cell's own 12
@@ -418,6 +443,7 @@ function buildStage6(scale) {
           quaternion: toQuaternion(axisKey),
           position: facePosition,
           groupId,
+          requiredOrientation: `${axisKey}:${dirLabel}`,
         });
         skeletonGroup.add(...v.sceneObjects);
         voids.push(v);
@@ -435,7 +461,11 @@ function buildStage6(scale) {
 
   const looseHome = new THREE.Vector3(scale * 3.6, -scale * 1.3, scale * 2.2);
   for (let i = 0; i < voids.length; i++) {
-    const p = makePiece(pyramid, { id: `p${i}`, homePosition: looseHome });
+    // Manual orientation, same reasoning as Stage 3/4/5's own headers
+    // (direct instruction 2026-09-03) -- reuses RD_ORIENTATIONS
+    // unchanged, since a Stage 6 loose piece is geometrically identical
+    // to a Stage 4 one and needs the exact same 12-way in/out cycle.
+    const p = makePiece(pyramid, { id: `p${i}`, orientation: 'x+:in', orientationOptions: RD_ORIENTATIONS, homePosition: looseHome });
     p.mesh.visible = i === 0; // only the next available copy shows in the tray
     loosePieces.push(p);
   }

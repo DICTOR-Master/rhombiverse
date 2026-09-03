@@ -164,7 +164,8 @@ build order:
   own stated outward-cap coordinate exactly) rather than assumed from
   the Stage 3 pattern.
 
-  **Stage 4 is currently a manual-orientation PROTOTYPE, not the
+  **Stage 4 introduced manual orientation, later confirmed and extended
+  to every stage (see this section's own later entry) -- not the
   original auto-snap design** (direct instruction 2026-09-03, "let's
   prototype manual orientation on stage 4 and feel it out" -- a real
   question the user raised about whether auto-snapping every loose
@@ -223,14 +224,48 @@ build order:
   mesh's own pivot to its bounding-box centroid before it's used as a
   flippable tray piece.
 
-  Not yet re-verified live end-to-end for a full 12-piece solve (the
-  select-flip-place LOOP was confirmed once, real placement, real
-  count decrement, correct snap) -- pending the user's own hands-on
-  "feel it out" pass before deciding whether to keep, tune (e.g. a
-  smarter cycle order, or fewer discrete steps), or revert to Stage 3's
-  auto-snap style. Stage 3, 5, 6's loose pieces are UNCHANGED
-  (still auto-snap) -- this prototype is deliberately scoped to Stage 4
-  only, per the direct instruction.
+  **Decision confirmed and extended, 2026-09-03**: after live hands-on
+  play (full stage completions, plus the endgame-visibility and
+  rotation-tracking bugs above found and fixed along the way), manual
+  orientation is the KEEP direction, not reverted -- and extended to
+  every remaining auto-orienting stage in the same conversation, per
+  direct instruction ("extend manual orientation to stage 3, 5, and 6",
+  itself confirming an earlier direct question, "why not only allow
+  green for correctly oriented piece"). Stage 3 and Stage 5/6's loose
+  pieces now all cycle through real orientation options
+  (`CUBE_ORIENTATIONS` -- 6 inward-only axis keys for the cube stages;
+  `RD_ORIENTATIONS`, already built for Stage 4, reused unchanged for
+  Stage 6's loose RD pieces) exactly like Stage 4's own pieces, and every
+  void across every stage now carries a real `requiredOrientation`. Zero
+  `puzzle-state.js` changes needed (same reason Stage 4 needed none --
+  `flipPiece()`/`placeSelected()` only ever compare orientation strings,
+  proven to generalize at any scale); a void's `groupId` (Stage 5/6's
+  fused-piece path) and `requiredOrientation` (the loose-piece path)
+  coexist without conflict since `voidValidityForPiece`/`placeSelected`
+  only ever read ONE of the two depending on whether the selected piece
+  has `fillsGroup` set. This also fully resolves the earlier
+  "opaque/stacking" rendering fix's own root cause for loose pieces: with
+  a real orientation gate, at most one void is ever valid at a time (the
+  same reason Stage 4 never needed the calm-opacity fallback), so that
+  fallback is now only ever exercised by an actual fused-piece selection,
+  exactly what it was really for. Verified live: Stage 3 selecting a
+  piece now shows exactly one green facet that moves correctly as you
+  flip (screenshotted both orientations), a real placement at the
+  correct orientation succeeds (6 -> 5 left), Stage 5's fused-piece path
+  is unaffected (still solves the whole cube in one tap, still shows the
+  calm/idle shell while selected, not a stacked wall), and Stage 6's
+  loose pieces correctly cycle through the full in/out set
+  (screenshotted "x+ face, inward" -> "x+ face, outward" after one
+  flip). Full `node --test tests/unit/*.test.mjs` clean (275/275) --
+  the suite's own `stage3State()`/`stage5State()`/`stage6State()` test
+  fixtures are independent, hand-built analogs that exercise
+  `puzzle-state.js`'s GENERIC mechanisms directly (a void with no
+  `requiredOrientation` always valid, etc.) rather than importing
+  `stages.js`'s real build functions, so they were never coupled to this
+  change and needed no updates -- worth knowing if their own comments
+  read as describing current Stage 3/5/6 behavior, since they no longer
+  do (a documentation nit, not a real test gap: the mechanism they cover
+  is still real and still exercised by a fused-piece selection).
 
   **Stage 5** (conjoined pieces) is the first REAL
   architecture extension, not just new content on the existing engine:
