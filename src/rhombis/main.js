@@ -34,13 +34,12 @@
 // placed piece should.
 import * as THREE from 'three';
 import { quaternionForOrientationKey } from './geometry.js';
-import { STAGES, WIRE_COLOR } from './stages.js';
+import { STAGES, WIRE_COLOR, GHOST_OPACITY } from './stages.js';
 import { createPuzzleState, selectPiece, flipPiece, placeSelected, isSolved, voidValidityForPiece } from './puzzle-state.js';
 
 const SCALE = 2;
 const SELECTED_EMISSIVE = 0x664422;
 const REJECT_FLASH_COLOR = 0xff5050;
-const FILLED_WIRE_COLOR = 0x9be3ff;
 // Direct instruction (2026-09-03): while a piece is selected, every
 // unfilled void's own wire shows red or green for whether THAT piece,
 // at its current orientation, would actually fit there right now (not
@@ -48,6 +47,16 @@ const FILLED_WIRE_COLOR = 0x9be3ff;
 // "invalid" so red means the same thing everywhere in this UI.
 const VALID_TARGET_COLOR = 0x6dff9e;
 const INVALID_TARGET_COLOR = REJECT_FLASH_COLOR;
+// Found live (2026-09-03): with every open void's ghost at the same
+// opacity, a stage with many simultaneously-invalid voids (Stage 4's 12,
+// only 1 ever valid at once under manual orientation) stacks 11 red
+// translucent wedges on top of each other and reads as one solid red
+// blob -- the single green one gets visually lost in it, defeating the
+// whole point of the highlight. Invalid ghosts stay faint (a hint nudge,
+// not real information -- there's only ever one correct answer); the
+// valid one renders near-opaque so it visually pops out on its own.
+const VALID_GHOST_OPACITY = 0.85;
+const INVALID_GHOST_OPACITY = 0.12;
 const STAGE_ADVANCE_DELAY_MS = 1400;
 const ROTATION_DAMPING = 0.25;
 // Friendlier labels for the small, named set of orientations that have
@@ -223,7 +232,12 @@ function syncVisualsToState() {
 
   for (const v of current.voids) {
     const filled = current.state.voids.find((sv) => sv.id === v.id).filled;
-    v.wire.material.color.setHex(filled ? FILLED_WIRE_COLOR : WIRE_COLOR);
+    // Filled: real piece mesh occupies this spot, ghost hidden (see
+    // handlePlacement's own comment). Unfilled: reset to the neutral
+    // ghost color -- refreshVoidHighlights() right below decides
+    // visibility/red-green from current selection.
+    v.wire.visible = !filled;
+    if (!filled) v.wire.material.color.setHex(WIRE_COLOR);
   }
   refreshVoidHighlights();
   updateHud();
@@ -322,19 +336,26 @@ function setPieceSelectedVisual(piece, isSelected) {
 function flashRejectWire(wire) {
   const originalColor = wire.material.color.getHex();
   const originalVisible = wire.visible;
+  const originalOpacity = wire.material.opacity;
   wire.visible = true;
   wire.material.color.setHex(REJECT_FLASH_COLOR);
+  // Force full opacity for the flash itself -- an already-invalid ghost
+  // normally sits at INVALID_GHOST_OPACITY (faint, by design), which
+  // would make the reject flash nearly invisible if left untouched.
+  wire.material.opacity = VALID_GHOST_OPACITY;
   setTimeout(() => {
     wire.material.color.setHex(originalColor);
     wire.visible = originalVisible;
+    wire.material.opacity = originalOpacity;
   }, 180);
 }
 
-// Recolors every unfilled void's wire: green if the currently selected
-// piece (at its current orientation) would fit there right now, red if
-// not. Filled voids are left alone (they already show
-// FILLED_WIRE_COLOR, set once at placement time). Call this any time
-// selection, orientation, or fill state changes.
+// Recolors every unfilled void's translucent ghost piece: green if the
+// currently selected piece (at its current orientation) would fit there
+// right now, red if not. Filled voids are left alone (their ghost was
+// already hidden at placement time -- the real solid piece occupies
+// that spot now). Call this any time selection, orientation, or fill
+// state changes.
 //
 // Also controls IDLE visibility for stages that opt into it
 // (`hideIdleVoidWires` -- Stage 3+, direct instruction 2026-09-03 after
@@ -354,11 +375,14 @@ function refreshVoidHighlights() {
     const stateVoid = current.state.voids.find((sv) => sv.id === v.id);
     if (stateVoid.filled) continue;
     if (validity) {
+      const valid = validity[v.id];
       v.wire.visible = true;
-      v.wire.material.color.setHex(validity[v.id] ? VALID_TARGET_COLOR : INVALID_TARGET_COLOR);
+      v.wire.material.color.setHex(valid ? VALID_TARGET_COLOR : INVALID_TARGET_COLOR);
+      v.wire.material.opacity = valid ? VALID_GHOST_OPACITY : INVALID_GHOST_OPACITY;
     } else {
       v.wire.visible = !current.hideIdleVoidWires;
       v.wire.material.color.setHex(WIRE_COLOR);
+      v.wire.material.opacity = GHOST_OPACITY;
     }
   }
 }
@@ -522,8 +546,11 @@ function handleTap(clientX, clientY) {
   for (const filledId of result.filledVoidIds) {
     const filledVoid = current.voids.find((v) => v.id === filledId);
     if (!filledVoid) continue;
-    filledVoid.wire.material.color.setHex(FILLED_WIRE_COLOR);
-    filledVoid.wire.visible = true; // a real seam -- stays visible even on hideIdleVoidWires stages
+    // The real solid piece mesh now occupies this exact position/
+    // orientation -- the translucent ghost would just double up on top
+    // of it, so hide it rather than recoloring it (2026-09-03 ghost-
+    // piece-overlay redesign, superseding the old FILLED_WIRE_COLOR seam).
+    filledVoid.wire.visible = false;
   }
   revealNextTrayPiece();
   refreshVoidHighlights();

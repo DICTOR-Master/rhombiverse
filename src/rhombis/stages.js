@@ -14,28 +14,35 @@ export const WIRE_COLOR = 0x6ad0ff;
 const PIECE_COLOR = 0xffb35c;
 const IDENTITY_QUATERNION = new THREE.Quaternion();
 const ORIGIN = new THREE.Vector3(0, 0, 0);
+// Verbatim reuse of render.js's own World View "translucent" treatment
+// (applyWorldViewMaterials(), TRANSLUCENT_OPACITY) rather than inventing
+// a second translucency convention -- direct instruction (2026-09-03,
+// "we have all software in rhombiverse... in world view translucent").
+const TRANSLUCENT_OPACITY = 0.55;
+export const GHOST_OPACITY = 0.65;
 
 function pieceMaterial() {
   return new THREE.MeshStandardMaterial({ color: PIECE_COLOR, roughness: 0.5, metalness: 0.1 });
 }
 
-// A stage's permanent, always-visible reference frame -- the outer
-// cube/RD silhouette ONLY (a real THREE.BoxGeometry or
-// rhombicDodecahedronGeometry, its own clean edge set, no internal
-// pyramid diagonals) -- direct instruction (2026-09-03), confirming the
-// spec's own "no grid, no internal lines beyond the target's own
-// silhouette" rule after live feedback: with every void's own wire
-// visible from the start (Stage 3-6's earlier behavior), the RD's 12
-// pyramids' worth of crisscrossing internal seams made the inward voids
-// unreadable ("far too many lines... couldn't see how to fit in inner
-// ones"). Individual void wires now default to hidden (main.js's
-// refreshVoidHighlights) and only show red/green while a piece that
-// could go there is selected, or once actually filled -- this object is
-// what's left to look at otherwise.
-function makeOuterBoundary(geometry, position = ORIGIN) {
-  const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({ color: WIRE_COLOR }));
-  wire.position.copy(position);
-  return wire;
+// A stage's permanent, always-visible reference frame -- a real SOLID
+// cube/RD mesh (not a wireframe), rendered translucent, so the goal
+// shape reads as an actual 3D form rather than a tangle of edge lines.
+// Direct instruction (2026-09-03): "I think goal piece should be
+// translucent not skeleton and placing piece solid" -- replaces the
+// earlier wireframe-only outer boundary (still fine, just superseded).
+// A placed piece sits inside this fully opaque, so the shape visually
+// "fills in" as you go -- also the answer to a separate same-day note
+// ("goal piece should grow incrementally"): no separate growth/reveal
+// logic needed, solidification falls straight out of real geometry
+// filling real voids.
+function makeOuterSolid(geometry, position = ORIGIN) {
+  const material = new THREE.MeshStandardMaterial({
+    color: WIRE_COLOR, transparent: true, opacity: TRANSLUCENT_OPACITY, depthWrite: false, roughness: 0.6,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.copy(position);
+  return mesh;
 }
 
 // `position` is a real translation, not just cosmetic -- Stage 1/2's
@@ -49,7 +56,14 @@ function makeOuterBoundary(geometry, position = ORIGIN) {
 // origin). The real fix is a translation by +AXIS_NORMALS*(scale/2)
 // alongside the rotation, which is what buildStage3 now passes.
 function makeVoid(geometry, { id, requiredOrientation, quaternion = IDENTITY_QUATERNION, position = ORIGIN, groupId }) {
-  const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({ color: WIRE_COLOR }));
+  // A translucent GHOST COPY of the piece that would go here -- not a
+  // wireframe outline -- shown/colored red or green by main.js's
+  // refreshVoidHighlights() while a piece is selected (direct decision
+  // 2026-09-03, "ghost piece overlay"). Same geometry a real placed
+  // piece uses, so the ghost is exactly the shape you'd actually get.
+  const wire = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+    color: WIRE_COLOR, transparent: true, opacity: GHOST_OPACITY, depthWrite: false, roughness: 0.5,
+  }));
   wire.quaternion.copy(quaternion);
   wire.position.copy(position);
   const hitTarget = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ visible: false }));
@@ -180,7 +194,7 @@ function buildStage2(scale) {
 function buildStage3(scale) {
   const geometry = pyramidGeometry(scale);
   const skeletonGroup = new THREE.Group();
-  skeletonGroup.add(makeOuterBoundary(new THREE.BoxGeometry(scale, scale, scale)));
+  skeletonGroup.add(makeOuterSolid(new THREE.BoxGeometry(scale, scale, scale)));
 
   const voids = PYRAMID_AXES.map((axisKey) => {
     const v = makeVoid(geometry, {
@@ -241,7 +255,7 @@ const RD_ORIENTATIONS = PYRAMID_AXES.flatMap((axisKey) => [`${axisKey}:in`, `${a
 function buildStage4(scale) {
   const geometry = pyramidGeometry(scale);
   const skeletonGroup = new THREE.Group();
-  skeletonGroup.add(makeOuterBoundary(rhombicDodecahedronGeometry(scale)));
+  skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale)));
 
   const voids = PYRAMID_AXES.flatMap((axisKey) => {
     const facePosition = AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2);
@@ -299,7 +313,7 @@ function buildStage4(scale) {
 function buildStage5(scale) {
   const geometry = pyramidGeometry(scale);
   const skeletonGroup = new THREE.Group();
-  skeletonGroup.add(makeOuterBoundary(new THREE.BoxGeometry(scale, scale, scale)));
+  skeletonGroup.add(makeOuterSolid(new THREE.BoxGeometry(scale, scale, scale)));
   const GROUP_ID = 'cube';
 
   const voids = PYRAMID_AXES.map((axisKey) => {
@@ -380,7 +394,7 @@ function buildStage6(scale) {
   cellCenters.forEach((cellCenter, cellIndex) => {
     const groupId = `cell-${cellIndex}`;
     groups.push({ id: groupId, position: cellCenter.clone(), quaternion: new THREE.Quaternion() });
-    skeletonGroup.add(makeOuterBoundary(rhombicDodecahedronGeometry(scale), cellCenter));
+    skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
 
     PYRAMID_AXES.forEach((axisKey) => {
       const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));

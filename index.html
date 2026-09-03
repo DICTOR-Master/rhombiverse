@@ -613,6 +613,9 @@
     .sculpt-section-label { margin: 10px 0 4px; font: 700 11px system-ui, sans-serif; color: #9cd; letter-spacing: 0.03em; }
     .sculpt-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
     .sculpt-hint { opacity: 0.7; margin-top: 6px; font-size: 12px; }
+    #rhombis-settings-link { margin: 0 0 14px; opacity: 0.85; }
+    #rhombis-settings-link a { color: #9de0ff; text-decoration: none; }
+    #rhombis-settings-link a:hover { text-decoration: underline; }
     .sculpt-btn {
       font: inherit; color: inherit;
       background: rgba(255, 255, 255, 0.1);
@@ -1149,6 +1152,7 @@
 
   <div id="lab-panel">
     <div id="lab-header"><span>Settings</span><button id="lab-close" type="button" title="Close">✕</button></div>
+    <div class="sculpt-hint" id="rhombis-settings-link">New here, or just want a quick puzzle? <a href="./rhombis.html">Try Rhombis</a> any time.</div>
     <h2>Settings</h2>
     <div id="lab-settings-section">
       <div class="row"><label for="setting-sensitivity">Look sensitivity</label><input id="setting-sensitivity" type="range" min="0.25" max="2.5" step="0.05" value="1" /></div>

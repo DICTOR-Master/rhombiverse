@@ -354,30 +354,78 @@ build order:
   tests/unit/*.test.mjs` suite re-run clean (275/275) -- this change is
   purely visual/THREE-side, no `puzzle-state.js` changes.
 
-  **Bigger goal-shape redesign, decided but NOT yet built** (2026-09-03,
-  direct follow-up after the above fix landed): replace the wireframe
-  skeleton entirely with the stage's real SOLID geometry rendered
-  translucent, reusing the main app's own already-established World View
-  translucent treatment verbatim rather than inventing new material
-  logic (`render.js`'s `applyWorldViewMaterials()`/`TRANSLUCENT_OPACITY
-  = 0.55`: `transparent: true, opacity: 0.55, depthWrite: false`). A
-  placed piece stays fully solid/opaque and visually "fills in" the
-  translucent ghost -- this is also the answer to a separate suggestion
-  ("goal piece should grow incrementally") that arrived the same
-  conversation: no separate reveal/growth logic needed, solidification
-  falls out of real geometry filling real voids. Per direct decision
-  when asked how void-targeting should work without wireframe voids to
-  color: a translucent GHOST COPY of the selected piece is shown sitting
-  in each candidate void's position/orientation, tinted green if it
-  would place validly there and red if not -- not a tint on the goal
-  mesh's own faces, and not dropping validity highlighting. Also covers
-  a separate related note ("no situation where 12 identical pieces are
-  waiting to be added"): the tray should show one instance per distinct
-  piece TYPE with a count badge, not N queued duplicate meshes -- this
-  matches the already-decided "countdown, no need to show all identical
-  pieces" call from earlier the same day. None of this is implemented
-  yet -- flagged here so it isn't lost, but the wireframe-based system
-  above is the current shipped state.
+  **Goal-shape redesign: translucent solid + ghost-piece overlay, DONE**
+  (2026-09-03, direct follow-up after the above fix landed): the
+  wireframe skeleton (`makeOuterBoundary`) is gone, replaced by
+  `makeOuterSolid()` -- the stage's real SOLID cube/RD/composite
+  geometry rendered translucent, reusing the main app's own already-
+  established World View translucent treatment verbatim rather than
+  inventing new material logic (`render.js`'s
+  `applyWorldViewMaterials()`/`TRANSLUCENT_OPACITY = 0.55`: `transparent:
+  true, opacity: 0.55, depthWrite: false`). A placed piece stays fully
+  solid/opaque and visually "fills in" the translucent shell -- this is
+  also the answer to a separate suggestion ("goal piece should grow
+  incrementally") that arrived the same conversation: no separate
+  reveal/growth logic needed, solidification falls straight out of real
+  geometry filling real voids. Per direct decision on how void-targeting
+  should work without wireframe voids to color: `makeVoid()`'s wire is
+  now a translucent GHOST COPY of the piece that would go there (the
+  SAME geometry a placed piece uses), tinted per `refreshVoidHighlights()`
+  -- green if the selected piece would place validly there, red if not.
+  **Real legibility bug found and fixed during live verification, same
+  session**: with every open void's ghost at one shared opacity, a stage
+  with many simultaneously-open voids (Stage 4's 12, only ever 1 valid
+  at once under manual orientation) stacked 11 translucent red wedges on
+  top of each other and rendered as one solid red blob -- the single
+  green one visually disappeared into it, defeating the whole point of
+  the highlight (screenshotted both ways: solid red blob before, a
+  clearly popped-out green wedge after). Fixed by splitting ghost
+  opacity by validity (`VALID_GHOST_OPACITY = 0.85`,
+  `INVALID_GHOST_OPACITY = 0.12`) -- invalid ghosts stay a faint hint,
+  the one valid target renders near-opaque and reads instantly.
+  `flashRejectWire()` also needed a matching fix: forces full opacity
+  during its own flash now, since an already-faint invalid ghost would
+  otherwise make a rejected-placement flash nearly invisible. A filled
+  void's ghost is hidden outright (not recolored) once a real piece
+  occupies that exact position/orientation -- showing both would double
+  up two solid objects in the same space. Also confirms the earlier
+  "no situation where 12 identical pieces waiting" note needed no new
+  work: the tray already reveals one piece at a time with a count badge
+  (`revealNextTrayPiece()`, decided and shipped in Stage 5+), not N
+  queued duplicate meshes. Full `node --test tests/unit/*.test.mjs`
+  clean (275/275) -- pure THREE/visual-side change, no `puzzle-state.js`
+  edits.
+
+  **Real accessibility gap found and fixed, same session** (2026-09-03,
+  direct report: "rhombis is not accessible on app"): the only link to
+  Rhombis anywhere in the main app was a one-time welcome-overlay link
+  (`welcome.js`'s `.rhombis-link`), gated behind
+  `localStorage['rhombiverse-skip-intro']` -- any returning visitor (the
+  overwhelming majority of real usage) never sees that overlay again and
+  had no way back to Rhombis at all. Also surfaced a real, previously-
+  unnoticed mechanism while investigating: `welcome.js`'s own tagline is
+  ALWAYS the newest `data/changelog.json` entry's title
+  (`loadLatestUpdate()`/`tagline.textContent = entry.title`) -- meaning
+  every changelog entry, however narrow, briefly becomes the entire
+  app's public-facing tagline for every new visitor, not just a line in
+  a changelog nobody reads. Confirmed live (screenshotted): the welcome
+  card's subtitle really did read "Rhombis: A Steadier Tray" (an
+  internal tap-target bugfix on a barely-reachable feature) before this
+  was caught. Fixed both: (1) a persistent `#rhombis-settings-link` line
+  added to `#lab-panel` (Settings, reachable via the real live nav path
+  -- the Rhombic Wheel 3D menu's gear face, not the legacy flat
+  `#lab-toggle` button which the live UI no longer shows by default) --
+  verified live via a real click through to `rhombis.html`, not just
+  visual inspection; (2) `data/changelog.json` trimmed back to ONE real
+  Rhombis entry ("Rhombis: A New Way In", the genuine launch
+  announcement) with the five subsequent internal-iteration entries
+  (Stage 4/5/6 additions, undo button, tray bugfix, lattice-declutter
+  fix) removed -- they were real work, just not each individually
+  tagline-worthy for an audience with no way to reach the feature they
+  described. **Changelog policy going forward, direct instruction
+  2026-09-03**: only add an entry for something that actually, currently
+  affects reachable users -- not every internal iteration on a WIP/beta
+  feature, given this tagline mechanism's real reach.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
