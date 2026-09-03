@@ -236,11 +236,37 @@ build order:
   specific cell, 24 -> 23). `tests/unit/rhombis-puzzle-state.test.mjs`
   (27 cases total now) separately proves fused+fused, fused+loose, and
   all-24-loose all solve the same composite, and that fusing one cell
-  never affects the other cell's own fused option. Stage 7 (procedural
-  content/polish) is NOT yet built. Its own scoring/timer slot
-  is the intended home for a later "spatial reasoning" score (direct
-  suggestion 2026-09-03: NOT literally IQ -- that implies a validated
-  psychometric claim this can't back up) -- not scoped or built yet.
+  never affects the other cell's own fused option. **Stage 7 (content/
+  polish): undo is done**, the rest is NOT yet built. Undo pops the
+  pre-placement snapshot off a per-stage history stack (only real
+  placements push -- selecting/flipping a piece is already trivially
+  reversible by tapping again) and re-derives every mesh's transform/
+  parent/visibility from the restored state (`syncVisualsToState()`)
+  rather than hand-writing the inverse of each placement type -- one
+  code path correctly handles both a 1-void loose undo and an N-void
+  fused-group undo (needed `puzzle-state.js`'s new `filledBy` field on
+  each void: which piece placed it, the reverse mapping a loose piece's
+  own resync needs; a fused piece's target comes from its `fillsGroup`
+  directly instead). Also correctly cancels a pending stage-auto-advance
+  if undo fires inside that delay window (`current.advanceTimer`,
+  tracked so `undo()`/`clearCurrentStage()` can `clearTimeout` it).
+  Verified live: undo right after solving Stage 1 restores the piece to
+  the tray in its pre-flip orientation AND genuinely prevents the
+  advance (confirmed still on Stage 1 after waiting past the full delay,
+  not just immediately after undo); a Stage 5 loose placement undoes
+  cleanly (6->5->6), and a Stage 5 FUSED placement undoes all 6 voids at
+  once in a single undo click (0->6, not a partial revert) -- both
+  screenshotted, not just HUD-text-checked. The rest of Stage 7
+  (procedural skeleton generator, scoring/timer, a real piece-bank tray
+  UI, pinch-to-rotate/hold-to-preview) is NOT yet built -- these involve
+  more subjective/open-ended design calls (a generation algorithm, a
+  scoring formula, a UI redesign direction) than Stages 1-6's own
+  spec-literal shapes did, so left as an explicit punch list for
+  direct review rather than guessed at length unattended. The scoring
+  slot specifically is the intended home for a later "spatial
+  reasoning" score (direct suggestion 2026-09-03: NOT literally IQ --
+  that implies a validated psychometric claim this can't back up) --
+  not scoped or built yet.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

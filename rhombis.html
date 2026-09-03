@@ -48,6 +48,17 @@
     @media (max-width: 480px) {
       #rhombis-solved { font-size: 1.8rem; }
     }
+    #rhombis-undo {
+      position: fixed; z-index: 10;
+      left: calc(1rem + env(safe-area-inset-left));
+      bottom: calc(1.5rem + env(safe-area-inset-bottom));
+      font-family: system-ui, sans-serif; font-size: 0.9rem; color: #cfe9ff;
+      background: rgba(5, 5, 10, 0.6); border: 1px solid #3a4a5a;
+      border-radius: 999px; padding: 0.5rem 1rem;
+      min-width: 2.75rem; min-height: 2.75rem; /* comfortable touch target */
+    }
+    #rhombis-undo:disabled { opacity: 0.35; }
+    #rhombis-undo:not(:disabled):active { background: rgba(155, 227, 255, 0.15); }
   </style>
   <script type="importmap">
     {
@@ -65,6 +76,7 @@
     <a href="./index.html">&larr; Rhombiverse</a>
   </div>
   <div id="rhombis-hud"></div>
+  <button id="rhombis-undo" type="button" disabled>Undo</button>
   <div id="rhombis-solved" hidden>Solved!</div>
   <script type="module" src="./src/rhombis/main.js"></script>
 </body>

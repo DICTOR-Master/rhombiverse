@@ -125,12 +125,14 @@ window.addEventListener('orientationchange', () => {
 const hud = document.getElementById('rhombis-hud');
 const solvedBanner = document.getElementById('rhombis-solved');
 const stageLabel = document.getElementById('rhombis-stage');
+const undoButton = document.getElementById('rhombis-undo');
 
 let stageIndex = 0;
-let current = null; // { skeletonGroup, pieces, voids, state, boundingRadius }
+let current = null; // { skeletonGroup, pieces, voids, state, boundingRadius, history, advanceTimer }
 
 function clearCurrentStage() {
   if (!current) return;
+  if (current.advanceTimer) clearTimeout(current.advanceTimer);
   scene.remove(current.skeletonGroup);
   current.pieces.forEach((p) => scene.remove(p.mesh));
 }
@@ -154,12 +156,70 @@ function loadStage(index) {
   });
 
   const boundingRadius = boundingRadiusFromOrigin([built.skeletonGroup, ...built.pieces.map((p) => p.mesh)]);
-  current = { ...built, groups: built.groups ?? [], state, boundingRadius };
+  current = { ...built, groups: built.groups ?? [], state, boundingRadius, history: [], advanceTimer: null };
   applyCameraFraming();
   solvedBanner.hidden = true;
   stageLabel.textContent = `Stage ${stageDef.id}: ${stageDef.name}`;
   updateHud();
+  updateUndoButton();
 }
+
+function updateUndoButton() {
+  undoButton.disabled = !current || current.history.length === 0;
+}
+
+// Stage 7's undo: pops the last placement's pre-placement snapshot and
+// re-derives every mesh's transform/parent/visibility from it, rather
+// than trying to hand-write the inverse of each placement -- simpler
+// and more robust than tracking exactly what a given placement changed,
+// and cheap enough at Rhombis' piece counts to just redo it in full
+// every time. Only placements go on the history stack (selecting or
+// flipping a piece is already trivially reversible by tapping again),
+// so this is genuinely "undo my last placement", not a full action log.
+function syncVisualsToState() {
+  for (const p of current.pieces) {
+    const sp = currentStatePiece(p.id);
+    if (sp.placed) {
+      const target = p.fillsGroup
+        ? current.groups.find((g) => g.id === p.fillsGroup)
+        : current.voids.find((v) => current.state.voids.find((sv) => sv.id === v.id).filledBy === p.id);
+      current.skeletonGroup.add(p.mesh);
+      p.mesh.position.copy(target.position);
+      p.mesh.quaternion.copy(target.quaternion);
+      p.mesh.userData.targetQuaternion = target.quaternion;
+    } else {
+      scene.add(p.mesh); // detach from skeletonGroup back to the fixed tray, if it was there
+      p.mesh.position.copy(p.homePosition);
+      const restQuaternion = sp.orientation ? outwardQuaternion(sp.orientation) : new THREE.Quaternion();
+      p.mesh.quaternion.copy(restQuaternion);
+      p.mesh.userData.targetQuaternion = restQuaternion;
+      p.mesh.visible = Boolean(p.fillsGroup); // fused: always shown; loose: fixed by revealNextTrayPiece below
+    }
+    setPieceSelectedVisual(p, p.id === current.state.selectedPieceId);
+  }
+  revealNextTrayPiece();
+
+  for (const v of current.voids) {
+    const filled = current.state.voids.find((sv) => sv.id === v.id).filled;
+    v.wire.material.color.setHex(filled ? FILLED_WIRE_COLOR : WIRE_COLOR);
+  }
+  refreshVoidHighlights();
+  updateHud();
+}
+
+function undo() {
+  if (!current || current.history.length === 0) return;
+  if (current.advanceTimer) {
+    clearTimeout(current.advanceTimer);
+    current.advanceTimer = null;
+  }
+  solvedBanner.hidden = true;
+  current.state = { ...current.history.pop(), selectedPieceId: null };
+  syncVisualsToState();
+  updateUndoButton();
+}
+
+undoButton.addEventListener('click', undo);
 
 function pieceById(id) {
   return current.pieces.find((p) => p.id === id);
@@ -253,7 +313,7 @@ function advanceOrFinish() {
   solvedBanner.hidden = false;
   solvedBanner.textContent = next ? 'Solved!' : 'Solved! More stages coming soon.';
   if (next) {
-    setTimeout(() => {
+    current.advanceTimer = setTimeout(() => {
       stageIndex += 1;
       loadStage(stageIndex);
     }, STAGE_ADVANCE_DELAY_MS);
@@ -360,12 +420,15 @@ function handleTap(clientX, clientY) {
   const hitVoid = current.voids.find((v) => v.hitTarget === hitObj);
   if (!hitVoid) return;
 
+  const previousState = current.state;
   const result = placeSelected(current.state, hitVoid.id);
   current.state = result.state;
   if (!result.placed) {
     flashRejectWire(hitVoid.wire);
     return;
   }
+  current.history.push(previousState);
+  updateUndoButton();
 
   const placedPiece = pieceById(result.pieceId);
   // A loose piece snaps to the one void it was tapped onto; a fused

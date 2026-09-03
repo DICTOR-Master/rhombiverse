@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-09-03",
+    "title": "Rhombis Gets an Undo Button",
+    "items": [
+      "Made a wrong move in Rhombis? Tap Undo (bottom-left) to take back your last placement -- works whether it was a single loose piece or a whole pre-fused piece that filled several spots at once, and cancels an in-progress \"Solved!\" transition too if you catch it in time."
+    ]
+  },
+  {
+    "date": "2026-09-03",
     "title": "Rhombis Links Two Worlds",
     "items": [
       "Rhombis' sixth puzzle spans two real rhombic dodecahedra, positioned exactly the way neighboring cells sit in the actual Rhombiverse lattice -- a real link back to the world you build everywhere else. Each half offers its own choice too: 12 loose pyramids or one pre-fused whole-RD piece, so there's more than one way to finish either side."

@@ -407,3 +407,22 @@ test('Stage 6: all 24 loose pieces (no fused pieces at all) is a third valid com
   assert.equal(state.pieces.find((p) => p.id === 'fused-cell-0').placed, false);
   assert.equal(state.pieces.find((p) => p.id === 'fused-cell-1').placed, false);
 });
+
+// Stage 7's undo needs a reverse mapping from a placed piece back to
+// where it went, to resync the scene after popping a history snapshot.
+test('filledBy: a fresh void starts with no owner, and a loose placement records which piece filled it', () => {
+  let state = stage1State();
+  assert.equal(state.voids[0].filledBy, null);
+  state = selectPiece(state, 'p0');
+  const result = placeSelected(state, 'v0');
+  assert.equal(result.state.voids[0].filledBy, 'p0');
+});
+
+test('filledBy: a fused placement records the SAME piece id on every void it filled', () => {
+  let state = stage5State();
+  state = selectPiece(state, 'fused');
+  const result = placeSelected(state, 'v-x+');
+  for (const v of result.state.voids) {
+    assert.equal(v.filledBy, 'fused');
+  }
+});

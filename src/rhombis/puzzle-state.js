@@ -25,11 +25,18 @@
 // valid decomposition of the same volume": the group's voids stay
 // individually fillable by loose pieces too, right up until a fused
 // piece claims the whole group at once.
+//
+// Every void also tracks `filledBy` (a piece id, or null while open) --
+// Stage 7's undo needs a reverse mapping from a placed piece back to
+// where it went (a loose piece's own one void's position/quaternion) to
+// resync the scene after popping a history snapshot; a fused piece's
+// own target comes from its `fillsGroup` directly instead, but its
+// group's voids get `filledBy` set too, for uniformity.
 
 export function createPuzzleState({ pieces, voids }) {
   return {
     pieces: pieces.map((p) => ({ ...p, placed: false })),
-    voids: voids.map((v) => ({ ...v, filled: false })),
+    voids: voids.map((v) => ({ ...v, filled: false, filledBy: null })),
     selectedPieceId: null,
   };
 }
@@ -97,7 +104,7 @@ export function placeSelected(state, voidId) {
     const groupVoidIds = groupVoids.map((v) => v.id);
     const fillSet = new Set(groupVoidIds);
     const pieces = state.pieces.map((p) => (p.id === pieceId ? { ...p, placed: true } : p));
-    const voids = state.voids.map((v) => (fillSet.has(v.id) ? { ...v, filled: true } : v));
+    const voids = state.voids.map((v) => (fillSet.has(v.id) ? { ...v, filled: true, filledBy: pieceId } : v));
     return {
       state: { pieces, voids, selectedPieceId: null },
       placed: true,
@@ -115,7 +122,7 @@ export function placeSelected(state, voidId) {
   }
 
   const pieces = state.pieces.map((p) => (p.id === pieceId ? { ...p, placed: true } : p));
-  const voids = state.voids.map((v) => (v.id === voidId ? { ...v, filled: true } : v));
+  const voids = state.voids.map((v) => (v.id === voidId ? { ...v, filled: true, filledBy: pieceId } : v));
   return {
     state: { pieces, voids, selectedPieceId: null },
     placed: true,
