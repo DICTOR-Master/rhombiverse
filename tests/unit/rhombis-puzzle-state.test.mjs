@@ -518,6 +518,82 @@ test('joined pair: using the decoy on cell-0 traps the joined pair (group-partia
   }
 });
 
+// Stages 8-15's real shape: N single-cell pieces + 1 joined-pair (2
+// cells) + 1 "full" piece (all N cells at once) -- see stages.js's
+// buildNCellStage. Three cells, matching Stage 8's own real shape
+// scale, is enough to prove a void can belong to THREE groups at once
+// (its own cell, the joined pair if it's one of that pair's 2 cells,
+// and the full group) without the mechanisms interfering -- N=4's
+// stages reuse the exact same code path, so this doesn't need its own
+// separate 4-cell fixture to be a real test of the mechanism.
+function threeCellWithFullPieceState() {
+  const axes = ['x+', 'x-', 'y+', 'y-', 'z+', 'z-'];
+  const cellVoidIds = (cellId) => axes.flatMap((axis) => [`v-${cellId}-in-${axis}`, `v-${cellId}-out-${axis}`]);
+  const voids = [
+    ...cellVoidIds('cell-0').map((id) => ({ id, groupIds: ['cell-0', 'joined-01', 'full'] })),
+    ...cellVoidIds('cell-1').map((id) => ({ id, groupIds: ['cell-1', 'joined-01', 'full'] })),
+    ...cellVoidIds('cell-2').map((id) => ({ id, groupIds: ['cell-2', 'full'] })),
+  ];
+  return createPuzzleState({
+    pieces: [
+      { id: 'single-0', fillsGroup: 'cell-0' },
+      { id: 'single-1', fillsGroup: 'cell-1' },
+      { id: 'single-2', fillsGroup: 'cell-2' },
+      { id: 'joined-pair', fillsGroup: 'joined-01' },
+      { id: 'full', fillsGroup: 'full' },
+    ],
+    voids,
+  });
+}
+
+test('full piece: fills all 36 voids across all three cells from a single tap', () => {
+  let state = threeCellWithFullPieceState();
+  state = selectPiece(state, 'full');
+  const result = placeSelected(state, 'v-cell-0-in-x+');
+  assert.equal(result.placed, true);
+  assert.equal(result.filledVoidIds.length, 36);
+  assert.equal(isSolved(result.state), true);
+});
+
+test('full piece: three independent singles (no joined pair, no full piece) also solves it', () => {
+  let state = threeCellWithFullPieceState();
+  for (const cellId of ['cell-0', 'cell-1', 'cell-2']) {
+    state = selectPiece(state, `single-${cellId.split('-')[1]}`);
+    state = placeSelected(state, `v-${cellId}-in-x+`).state;
+  }
+  assert.equal(isSolved(state), true);
+  assert.equal(state.pieces.find((p) => p.id === 'joined-pair').placed, false);
+  assert.equal(state.pieces.find((p) => p.id === 'full').placed, false);
+});
+
+test('full piece: a single placement on cell-2 traps BOTH the joined pair and the full piece', () => {
+  let state = threeCellWithFullPieceState();
+  state = selectPiece(state, 'single-2');
+  state = placeSelected(state, 'v-cell-2-in-x+').state;
+
+  const joinedResult = placeSelected(selectPiece(state, 'joined-pair'), 'v-cell-0-in-x+');
+  assert.equal(joinedResult.placed, true); // joined pair's own group (cell-0/cell-1) is untouched by a cell-2 placement
+  assert.equal(joinedResult.filledVoidIds.length, 24);
+
+  const fullResult = placeSelected(selectPiece(state, 'full'), 'v-cell-0-in-x+');
+  assert.equal(fullResult.placed, false);
+  assert.equal(fullResult.reason, 'group-partially-filled');
+});
+
+test('full piece: a joined-pair placement leaves the full piece rejected but the third single still works', () => {
+  let state = threeCellWithFullPieceState();
+  state = selectPiece(state, 'joined-pair');
+  state = placeSelected(state, 'v-cell-0-in-x+').state;
+
+  const fullResult = placeSelected(selectPiece(state, 'full'), 'v-cell-2-in-x+');
+  assert.equal(fullResult.placed, false);
+  assert.equal(fullResult.reason, 'group-partially-filled');
+
+  const singleResult = placeSelected(selectPiece(state, 'single-2'), 'v-cell-2-in-x+');
+  assert.equal(singleResult.placed, true);
+  assert.equal(isSolved(singleResult.state), true);
+});
+
 // Stage 7's undo needs a reverse mapping from a placed piece back to
 // where it went, to resync the scene after popping a history snapshot.
 test('filledBy: a fresh void starts with no owner, and a loose placement records which piece filled it', () => {

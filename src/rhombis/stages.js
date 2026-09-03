@@ -602,6 +602,17 @@ function buildStage7(scale) {
 // Deliberately no loose pyramids at all, matching the direct
 // instruction's own "singles" (whole-cell) framing, not raw per-void
 // pieces.
+//
+// For N>2, also offers a "full" piece spanning ALL N cells at once --
+// direct instruction (2026-09-04) generalizing the joined-pair pattern
+// to its natural endpoint (a joined-pair already IS the full solution
+// at N=2, which is why Stage 7 doesn't need a separate one) and
+// retrofitted onto Stage 8-11 too ("maybe add this back to 3 piece
+// level"). Every void gets a 'full' groupId alongside its own cell and
+// (for the joined pair's own 2 cells) the joined-pair's groupId -- a
+// void can belong to its cell's single, the joined pair (if it's one
+// of that pair's own 2 cells), AND the full piece simultaneously, all
+// independent thanks to `groupIds` already being an array.
 function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
@@ -613,11 +624,14 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
 
   const [ji, jj] = joinedPairIndices;
   const joinedGroupId = `joined-${ji}${jj}`;
+  const includeFullPiece = n > 2;
 
   const voids = [];
   cellCenters.forEach((cellCenter, cellIndex) => {
     const cellGroupId = `cell-${cellIndex}`;
-    const groupIds = cellIndex === ji || cellIndex === jj ? [cellGroupId, joinedGroupId] : [cellGroupId];
+    const groupIds = [cellGroupId];
+    if (cellIndex === ji || cellIndex === jj) groupIds.push(joinedGroupId);
+    if (includeFullPiece) groupIds.push('full');
     skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
     PYRAMID_AXES.forEach((axisKey) => {
       const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
@@ -642,6 +656,7 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
   // 'joined-01' group, so this snaps to the shared origin, not a
   // midpoint.
   groups.push({ id: joinedGroupId, position: ORIGIN, quaternion: new THREE.Quaternion() });
+  if (includeFullPiece) groups.push({ id: 'full', position: ORIGIN, quaternion: new THREE.Quaternion() });
 
   const homeSpacing = scale * 2.2;
   const pieces = [];
@@ -662,6 +677,18 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
     fillsGroup: joinedGroupId,
     homePosition: new THREE.Vector3(scale * 4, -homeSpacing * n, 0),
   }));
+
+  if (includeFullPiece) {
+    const fullGeometry = mergeGeometries(
+      cellCenters.map((center) => rhombicDodecahedronGeometry(scale).translate(center.x, center.y, center.z)),
+      false,
+    );
+    pieces.push(makeFusedPiece(fullGeometry, {
+      id: 'full',
+      fillsGroup: 'full',
+      homePosition: new THREE.Vector3(scale * 4, -homeSpacing * (n + 1), 0),
+    }));
+  }
 
   return {
     skeletonGroup,
@@ -706,15 +733,39 @@ function classifyThreeCellShape(cells) {
   return match.name;
 }
 
+const NEIGHBOR_OFFSET_KEYS = new Set(NEIGHBOR_OFFSETS.map((v) => v.join(',')));
+
 function findAdjacentCellPair(cells) {
-  const offsetKeys = new Set(NEIGHBOR_OFFSETS.map((v) => v.join(',')));
   for (let i = 0; i < cells.length; i++) {
     for (let j = i + 1; j < cells.length; j++) {
       const d = [cells[j][0] - cells[i][0], cells[j][1] - cells[i][1], cells[j][2] - cells[i][2]];
-      if (offsetKeys.has(d.join(','))) return [i, j];
+      if (NEIGHBOR_OFFSET_KEYS.has(d.join(','))) return [i, j];
     }
   }
   throw new Error('No adjacent cell pair found -- shape is not actually connected');
+}
+
+// Topological signature of a shape (independent of which stage size
+// it's used for): edgeCount (how many of the possible cell pairs are
+// actually lattice-adjacent), degrees (each cell's own adjacency count
+// within the shape, sorted descending -- distinguishes e.g. a 3-edge
+// chain [2,2,1,1] from a 3-edge star [3,1,1,1], same edge count but a
+// genuinely different branching structure), and maxDistance (the
+// farthest apart any two cells in the shape are -- a straight chain
+// always maximizes this for its own cell count).
+function shapeTopology(cells) {
+  const n = cells.length;
+  const degrees = new Array(n).fill(0);
+  let edgeCount = 0;
+  let maxDistance = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const d = [cells[j][0] - cells[i][0], cells[j][1] - cells[i][1], cells[j][2] - cells[i][2]];
+      maxDistance = Math.max(maxDistance, Math.hypot(...d));
+      if (NEIGHBOR_OFFSET_KEYS.has(d.join(','))) { degrees[i]++; degrees[j]++; edgeCount++; }
+    }
+  }
+  return { edgeCount, degrees: [...degrees].sort((a, b) => b - a), maxDistance };
 }
 
 const THREE_CELL_STAGE_DEFS = enumerateShapes(3)[3].map((shape) => ({
@@ -729,6 +780,51 @@ const THREE_CELL_STAGES = THREE_CELL_STAGE_DEFS.map((def, i) => ({
   build: (scale) => buildNCellStage(scale, def.cells, def.joinedPair),
 }));
 
+// A CURATED subset of the 20 real N=4 shapes, not all of them (direct
+// instruction 2026-09-04: N=3's "all 4" doesn't scale the same way to
+// N=4's 20 -- start with a handful of genuinely distinct topologies,
+// not every one). Each pick is selected from the real
+// `enumerateShapes(4)[4]` output by its own verified topological
+// signature (`shapeTopology`), never a hardcoded cell list -- same
+// "wire it for real" fix this file's own N=3 section needed earlier
+// the same day. Picks span structures that don't even exist at N=3:
+// Tetrahedron (every cell mutually adjacent -- the maximally compact
+// case, FCC's real N=4 analog of N=3's own triangle), Ring (a closed
+// 4-cycle, every cell degree 2, no "ends" at all -- topologically
+// impossible with only 3 cells), Star (one cell adjacent to the other
+// 3, which aren't adjacent to each other -- a branching tripod, also
+// impossible at N=3, since that needs a degree-3 cell), and Straight
+// Line (the single shape with the greatest possible cell-to-cell
+// distance for N=4, direct continuation of the N=3 pattern).
+const fourCellShapesRaw = enumerateShapes(4)[4];
+function pickFourCellShape(matchSignature, tiebreakSmallestDistance) {
+  const matches = fourCellShapesRaw.filter((s) => matchSignature(shapeTopology(s.cells)));
+  if (matches.length === 0) throw new Error('No N=4 shape matched the requested signature');
+  if (matches.length === 1 || tiebreakSmallestDistance === undefined) return matches[0];
+  return matches.reduce((best, s) => {
+    const bestDist = shapeTopology(best.cells).maxDistance;
+    const sDist = shapeTopology(s.cells).maxDistance;
+    return (tiebreakSmallestDistance ? sDist < bestDist : sDist > bestDist) ? s : best;
+  });
+}
+
+const FOUR_CELL_STAGE_DEFS = [
+  { name: 'Tetrahedron', shape: pickFourCellShape((t) => t.edgeCount === 6) },
+  { name: 'Ring', shape: pickFourCellShape((t) => t.edgeCount === 4 && t.degrees.every((d) => d === 2)) },
+  { name: 'Star', shape: pickFourCellShape((t) => t.edgeCount === 3 && t.degrees[0] === 3, true) },
+  { name: 'Straight Line', shape: pickFourCellShape((t) => t.edgeCount === 3 && t.degrees[0] === 2, false) },
+].map(({ name, shape }) => ({
+  name,
+  cells: shape.cells,
+  joinedPair: findAdjacentCellPair(shape.cells),
+}));
+
+const FOUR_CELL_STAGES = FOUR_CELL_STAGE_DEFS.map((def, i) => ({
+  id: 12 + i,
+  name: `4 Cells: ${def.name}`,
+  build: (scale) => buildNCellStage(scale, def.cells, def.joinedPair),
+}));
+
 export const STAGES = [
   { id: 1, name: 'One Piece', build: buildStage1 },
   { id: 2, name: 'Octahedron', build: buildStage2 },
@@ -738,4 +834,5 @@ export const STAGES = [
   { id: 6, name: 'Multi-Cell', build: buildStage6 },
   { id: 7, name: '2 Cells: Joined Pair', build: buildStage7 },
   ...THREE_CELL_STAGES,
+  ...FOUR_CELL_STAGES,
 ];

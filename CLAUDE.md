@@ -811,13 +811,68 @@ build order:
   working by direct manual test the same way ("stage 7 ok by test").
   Full `node --test tests/unit/*.test.mjs` clean.
 
+  **"Full" piece generalization + N=4 curated stages, added the same
+  day** (`STAGES` ids 12-15, direct instruction: "scope out four piece
+  levels using logic applied with addition of full four piece
+  solutions, maybe add this back to 3 piece level"). Two real pieces of
+  work:
+
+  1. `buildNCellStage` gained a THIRD fused-piece option for N>2: a
+  "full" piece spanning ALL N cells at once (merging N
+  `rhombicDodecahedronGeometry` instances, same `mergeGeometries`
+  pattern as the joined pair). A void can now belong to its own cell's
+  group, the joined-pair's group (if it's one of that pair's 2 cells),
+  AND `'full'` simultaneously -- `groupIds` already being an array
+  (from Stage 7's own generalization) made this a small, additive
+  change, not a new mechanism. Retrofitted onto Stages 8-11 too (the
+  "maybe add this back to 3 piece level" half of the instruction) --
+  every N=3 stage now offers 3 singles, 1 joined pair, AND 1 full
+  piece, all genuine alternate solutions, none of them a decoy. 4 new
+  tests (`threeCellWithFullPieceState`) directly prove a void handling
+  THREE simultaneous group memberships works correctly: the full piece
+  solves in one tap, three independent singles still solve it without
+  touching the fused pieces at all, a single placement on the third
+  cell traps the full piece specifically (not the joined pair, whose
+  own 2 cells are untouched), and a joined-pair placement traps the
+  full piece while leaving the remaining single still genuinely usable.
+
+  2. **N=4 scope, decided via direct question**: N=3 had exactly 4 real
+  shapes (a small, complete set worth building "all of"); N=4 has 20 --
+  a curated subset was chosen over building all 20, confirmed by direct
+  answer. The 4 picks were chosen from REAL topology data
+  (`shapeTopology`: edge count + per-cell degree sequence + max pairwise
+  distance, computed for all 20 real shapes before picking, not
+  guessed), specifically to span structures that don't even exist at
+  N=3: **Tetrahedron** (6 edges, every cell degree 3 -- all 4 mutually
+  adjacent, the maximally compact case, FCC's real analog of N=3's
+  triangle), **Ring** (4 edges, every cell degree 2 -- a closed 4-cycle
+  with no "ends" at all, topologically impossible with only 3 cells),
+  **Star** (3 edges, one cell degree 3 and three degree 1 -- a
+  branching tripod, also impossible at N=3 since that needs a degree-3
+  cell), and **Straight Line** (the single N=4 shape with the greatest
+  possible cell-to-cell distance, direct continuation of the N=3
+  pattern). Each pick is selected from the real `enumerateShapes(4)[4]`
+  output by `pickFourCellShape`'s own signature-matching (with an
+  explicit, documented tiebreak for Star, since 3 different real
+  4-cell shapes share its exact edge/degree signature at different
+  "spreads" -- picked the most compact one) -- same "derive it for
+  real, never hardcode a snapshot" discipline the N=3 fix established,
+  applied from the start this time rather than needing a second bug
+  report to get there.
+
+  Verified live: all 4 N=4 stages load with zero errors and the
+  correct 48-void count (12 per cell), visually distinct from each
+  other and from the N=3 shapes (screenshotted); the retrofitted full
+  piece confirmed working on both a 3-cell stage (Stage 8, 36 -> 0 in
+  one tap) and a 4-cell stage (Stage 12 Tetrahedron, 48 -> 0 in one
+  tap). Full `node --test tests/unit/*.test.mjs` clean.
+
   **Open notes for whenever this progression continues**: decoy pieces
-  should vary in size as levels advance (not just single-cell decoys --
-  not yet relevant here since Stages 8-11 aren't decoy/trap designs,
-  but will matter once a later stage reintroduces that mechanic); N=4
-  (20 real shapes, already computed by the enumerator, not yet
-  characterized or built) is the natural next step once 8-11 are
-  confirmed solid by hands-on play.
+  should vary in size as levels advance -- still not relevant to
+  Stages 8-15 (none of them are decoy/trap designs), will matter once a
+  later stage reintroduces that mechanic; the remaining 16 real N=4
+  shapes (and N=5+, not yet enumerated at all) remain available in
+  `cell-arrangements.js` whenever this progression continues further.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
