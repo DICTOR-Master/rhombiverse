@@ -7,8 +7,8 @@
 // so adding Stage 4+ is a new build function here, not a main.js
 // rewrite.
 import * as THREE from 'three';
-import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS } from './geometry.js';
-import { PYRAMID_AXES } from '../core/lattice.js';
+import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry } from './geometry.js';
+import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld } from '../core/lattice.js';
 
 export const WIRE_COLOR = 0x6ad0ff;
 const PIECE_COLOR = 0xffb35c;
@@ -291,10 +291,91 @@ function buildStage5(scale) {
   };
 }
 
+// Stage 6 -- multi-cell: two full rhombic dodecahedra (Stage 4's own
+// 12-void cell, repeated) at REAL adjacent FCC lattice positions --
+// core/lattice.js's own NEIGHBOR_OFFSETS/cellToWorld, the exact math
+// the main Rhombiverse app uses to place real RD cells, not a Rhombis-
+// only approximation ("the connection back to the original 'strings of
+// blocks' idea and the Rhombiverse lattice work", the spec's own
+// framing for this stage). The two cells are centered on their own
+// shared centroid (not cell 0's own position) so dragging rotates the
+// whole composite around its natural middle, not off to one side.
+//
+// Each cell independently offers Stage 5's own loose-vs-fused choice,
+// now at 12-piece scale: 12 loose pyramids (auto-orienting to whichever
+// void is tapped, exactly like Stage 4) OR one real, whole rhombic-
+// dodecahedron piece (geometry.js's rhombicDodecahedronGeometry,
+// reusing core/lattice.js's own rdRawVerts -- the exact same mesh the
+// main app places for a real RD cell) that fills that cell's own 12
+// voids in a single placement. With 2 independent per-cell choices this
+// gives 4 real combinations overall (loose+loose, loose+fused,
+// fused+loose, fused+fused) -- comfortably past the spec's own
+// "fillable by more than one piece combination". All 24 loose pieces
+// share ONE tray queue across both cells (visually and mechanically
+// identical regardless of which cell or axis they end up on, same as
+// Stage 4's own single-queue tray); the 2 fused RD pieces are each
+// their own always-visible slot, same as Stage 5's fused cube.
+function buildStage6(scale) {
+  const pyramid = pyramidGeometry(scale);
+  const skeletonGroup = new THREE.Group();
+
+  const cellOffsets = [[0, 0, 0], NEIGHBOR_OFFSETS[0]];
+  const cellWorldPositions = cellOffsets.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = cellWorldPositions[0].clone().add(cellWorldPositions[1]).multiplyScalar(0.5);
+  const cellCenters = cellWorldPositions.map((p) => p.clone().sub(centroid));
+
+  const voids = [];
+  const groups = [];
+  const loosePieces = [];
+  const fusedPieces = [];
+
+  cellCenters.forEach((cellCenter, cellIndex) => {
+    const groupId = `cell-${cellIndex}`;
+    groups.push({ id: groupId, position: cellCenter.clone(), quaternion: new THREE.Quaternion() });
+
+    PYRAMID_AXES.forEach((axisKey) => {
+      const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
+      [['in', inwardQuaternion], ['out', outwardQuaternion]].forEach(([dirLabel, toQuaternion]) => {
+        const v = makeVoid(pyramid, {
+          id: `v-${groupId}-${dirLabel}-${axisKey}`,
+          quaternion: toQuaternion(axisKey),
+          position: facePosition,
+          groupId,
+        });
+        skeletonGroup.add(...v.sceneObjects);
+        voids.push(v);
+      });
+    });
+
+    const fusedGeometry = rhombicDodecahedronGeometry(scale);
+    const fusedHome = new THREE.Vector3(scale * 4, -scale * 2.6 * cellIndex, -scale * 1.6);
+    fusedPieces.push(makeFusedPiece(fusedGeometry, {
+      id: `fused-${groupId}`,
+      fillsGroup: groupId,
+      homePosition: fusedHome,
+    }));
+  });
+
+  const looseHome = new THREE.Vector3(scale * 3.6, -scale * 1.3, scale * 2.2);
+  for (let i = 0; i < voids.length; i++) {
+    const p = makePiece(pyramid, { id: `p${i}`, homePosition: looseHome });
+    p.mesh.visible = i === 0; // only the next available copy shows in the tray
+    loosePieces.push(p);
+  }
+
+  return {
+    skeletonGroup,
+    pieces: [...loosePieces, ...fusedPieces],
+    voids,
+    groups,
+  };
+}
+
 export const STAGES = [
   { id: 1, name: 'One Piece', build: buildStage1 },
   { id: 2, name: 'Octahedron', build: buildStage2 },
   { id: 3, name: 'Cube', build: buildStage3 },
   { id: 4, name: 'Rhombic Dodecahedron', build: buildStage4 },
   { id: 5, name: 'Conjoined Pieces', build: buildStage5 },
+  { id: 6, name: 'Multi-Cell', build: buildStage6 },
 ];

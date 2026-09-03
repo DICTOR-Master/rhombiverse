@@ -107,8 +107,8 @@ build order:
   reverted.
 
 - **Rhombis** (2026-09-03, `docs/RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md`)
-  — **Stages 1-5 done** (one piece; octahedron/2 pieces; cube/6 pieces;
-  rhombic dodecahedron/12 pieces; conjoined pieces): a standalone
+  — **Stages 1-6 done** (one piece; octahedron/2 pieces; cube/6 pieces;
+  rhombic dodecahedron/12 pieces; conjoined pieces; multi-cell): a standalone
   geometric-packing intro puzzle, `rhombis.html` + `src/
   rhombis/`. `geometry.js`'s `pyramidGeometry()` is the one mesh every
   stage reuses (`ConvexGeometry` over `core/lattice.js`'s already-real,
@@ -204,8 +204,40 @@ build order:
   unchanged). `tests/unit/rhombis-puzzle-state.test.mjs` (23 cases total
   now) separately proves both full decompositions solve the puzzle and
   that a partially-loose-filled group rejects the fused piece with
-  `reason: 'group-partially-filled'`. Stages 6-7 (multi-cell puzzles,
-  procedural content/polish) are NOT yet built. Stage 7's own scoring/timer slot
+  `reason: 'group-partially-filled'`. **Stage 6** (multi-cell) needed
+  ZERO `puzzle-state.js` changes -- the `groupId`/`fillsGroup` mechanism
+  Stage 5 built already generalizes to more than one simultaneous group
+  for free, since a fused piece only ever looks at its OWN `fillsGroup`
+  value. Two full Stage-4-style 12-void RD cells, positioned at a REAL
+  adjacent FCC lattice offset via `core/lattice.js`'s own
+  `NEIGHBOR_OFFSETS`/`cellToWorld` -- the exact math the main app uses
+  to place real RD cells, not a Rhombis-only approximation (the spec's
+  own framing for this stage: "the connection back to... the Rhombiverse
+  lattice work"). The composite is re-centered on the two cells' own
+  midpoint (not cell 0's position) so dragging rotates it around its
+  natural middle. Each cell independently offers loose-vs-fused, now a
+  real whole-RD fused piece (`geometry.js`'s new
+  `rhombicDodecahedronGeometry()`, reusing `core/lattice.js`'s own
+  `rdRawVerts()` -- the SAME 14-point hull `render.js`'s `buildRDGeometry`
+  uses for every real placed RD in the main app, not an approximation)
+  standing in for that cell's 12 loose pyramids at once -- 4 real
+  combinations overall (loose+loose / loose+fused / fused+loose /
+  fused+fused). All 24 loose pieces share one tray queue across both
+  cells; the 2 fused RD pieces are each their own always-visible slot.
+  Verified live: selecting one cell's fused piece correctly turns ONLY
+  that cell's own 12 voids green (the other cell's 12 stay their normal
+  color, provably independent, not just asserted); placing it fills
+  exactly that cell's 12 voids in one tap (24 -> 12, not a partial or
+  over-fill); placing the second cell's fused piece completes the whole
+  composite with the correct final "Solved!" state and a genuinely
+  correct double-RD silhouette (two real rhombic dodecahedra sharing a
+  face, matching real FCC packing); the loose path was independently
+  spot-checked too (one loose pyramid correctly auto-orients within a
+  specific cell, 24 -> 23). `tests/unit/rhombis-puzzle-state.test.mjs`
+  (27 cases total now) separately proves fused+fused, fused+loose, and
+  all-24-loose all solve the same composite, and that fusing one cell
+  never affects the other cell's own fused option. Stage 7 (procedural
+  content/polish) is NOT yet built. Its own scoring/timer slot
   is the intended home for a later "spatial reasoning" score (direct
   suggestion 2026-09-03: NOT literally IQ -- that implies a validated
   psychometric claim this can't back up) -- not scoped or built yet.

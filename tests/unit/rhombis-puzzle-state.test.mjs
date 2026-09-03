@@ -334,3 +334,76 @@ test('voidValidityForPiece: the fused piece reads all-green when the group is fu
     assert.equal(validity[`v-${axis}`], false);
   }
 });
+
+// Stage 6's real shape: two independent 12-void cells (Stage 4's own
+// RD, repeated), each with its own fused-whole-RD alternate -- see
+// stages.js's buildStage6. groupId/fillsGroup already generalize to
+// more than one simultaneous group for free (no puzzle-state.js
+// changes were needed to build this stage).
+function stage6State() {
+  const axes = ['x+', 'x-', 'y+', 'y-', 'z+', 'z-'];
+  const cellVoidIds = (cellId) => axes.flatMap((axis) => [`v-${cellId}-in-${axis}`, `v-${cellId}-out-${axis}`]);
+  const voids = [
+    ...cellVoidIds('cell-0').map((id) => ({ id, groupId: 'cell-0' })),
+    ...cellVoidIds('cell-1').map((id) => ({ id, groupId: 'cell-1' })),
+  ];
+  return createPuzzleState({
+    pieces: [
+      ...Array.from({ length: 24 }, (_, i) => ({ id: `p${i}` })),
+      { id: 'fused-cell-0', fillsGroup: 'cell-0' },
+      { id: 'fused-cell-1', fillsGroup: 'cell-1' },
+    ],
+    voids,
+  });
+}
+
+test('Stage 6: solvable with both cells fused (one tap each)', () => {
+  let state = stage6State();
+  state = selectPiece(state, 'fused-cell-0');
+  state = placeSelected(state, 'v-cell-0-in-x+').state;
+  state = selectPiece(state, 'fused-cell-1');
+  const result = placeSelected(state, 'v-cell-1-out-z-');
+  assert.equal(result.placed, true);
+  assert.equal(isSolved(result.state), true);
+});
+
+test('Stage 6: solvable with one cell fused and the other built loose (a genuinely different combination)', () => {
+  let state = stage6State();
+  state = selectPiece(state, 'fused-cell-0');
+  state = placeSelected(state, 'v-cell-0-in-x+').state;
+
+  const cell1VoidIds = state.voids.filter((v) => v.groupId === 'cell-1').map((v) => v.id);
+  cell1VoidIds.forEach((voidId, i) => {
+    state = selectPiece(state, `p${i}`);
+    const result = placeSelected(state, voidId);
+    assert.equal(result.placed, true);
+    state = result.state;
+  });
+
+  assert.equal(isSolved(state), true);
+});
+
+test('Stage 6: fusing one cell does not affect the other cell\'s own fused option', () => {
+  let state = stage6State();
+  state = selectPiece(state, 'fused-cell-0');
+  state = placeSelected(state, 'v-cell-0-in-x+').state;
+
+  const validity = voidValidityForPiece(state, 'fused-cell-1');
+  for (const v of state.voids.filter((vv) => vv.groupId === 'cell-1')) {
+    assert.equal(validity[v.id], true);
+  }
+});
+
+test('Stage 6: all 24 loose pieces (no fused pieces at all) is a third valid combination', () => {
+  let state = stage6State();
+  const voidIds = state.voids.map((v) => v.id);
+  voidIds.forEach((voidId, i) => {
+    state = selectPiece(state, `p${i}`);
+    const result = placeSelected(state, voidId);
+    assert.equal(result.placed, true);
+    state = result.state;
+  });
+  assert.equal(isSolved(state), true);
+  assert.equal(state.pieces.find((p) => p.id === 'fused-cell-0').placed, false);
+  assert.equal(state.pieces.find((p) => p.id === 'fused-cell-1').placed, false);
+});

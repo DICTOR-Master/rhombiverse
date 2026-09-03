@@ -20,13 +20,28 @@
 // base plane) rather than needing a second geometry variant.
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { pyramidPieces } from '../core/lattice.js';
+import { pyramidPieces, rdRawVerts } from '../core/lattice.js';
 
 export function pyramidGeometry(scale = 1) {
   const { base, apex } = pyramidPieces(scale).pyramids['y+'];
   const points = [...base, apex].map(([x, y, z]) => new THREE.Vector3(x, y, z));
   const geometry = new ConvexGeometry(points);
   geometry.translate(0, -scale / 2, 0);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+// A real, whole rhombic dodecahedron mesh -- Stage 6's "fused twelve"
+// piece (a full RD standing in for a cell's own 12 loose pyramids at
+// once, RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md's "conjoined
+// pieces" extended to a whole cell). Reuses core/lattice.js's own
+// rdRawVerts() -- the SAME 14-point convex hull recipe render.js's own
+// buildRDGeometry() uses for every real placed RD in the main
+// Rhombiverse app -- rather than deriving RD geometry a second way, so
+// this fused piece is a genuine RD, not an approximation.
+export function rhombicDodecahedronGeometry(scale = 1) {
+  const points = rdRawVerts(scale).map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  const geometry = new ConvexGeometry(points);
   geometry.computeVertexNormals();
   return geometry;
 }
