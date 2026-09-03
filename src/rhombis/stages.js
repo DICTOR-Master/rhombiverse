@@ -672,23 +672,62 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
   };
 }
 
-// The 4 real N=3 shapes, in the exact cell coordinates
-// cell-arrangements.js's own enumerateShapes(3) produces, plus each
-// one's own directly-computed adjacent joined-pair indices (verified
-// 2026-09-04, not assumed -- a bent chain's two ends are NOT adjacent
-// to each other even though both are adjacent to the middle cell, so
-// "any two of the three" is not a safe default).
-const THREE_CELL_SHAPES = [
-  { name: 'Triangle', cells: [[0, 0, 0], [0, 1, -1], [1, 0, -1]], joinedPair: [0, 1] },
-  { name: 'Narrow Bend', cells: [[0, 0, 0], [0, 1, -1], [1, -1, 0]], joinedPair: [0, 1] },
-  { name: 'Wide Bend', cells: [[0, 0, 0], [0, 0, 2], [0, 1, 1]], joinedPair: [0, 2] },
-  { name: 'Straight Line', cells: [[0, 0, 0], [0, 1, -1], [0, 2, -2]], joinedPair: [0, 1] },
+// The 4 real N=3 shapes -- ACTUALLY called from enumerateShapes(3),
+// not a hand-copied snapshot of its output (a real bug, caught live
+// 2026-09-04, "you havent wired enumerator": the import existed but
+// was never called, so this array was a frozen literal that would have
+// silently drifted from the real generator the moment its internals
+// ever changed). Each shape's own name is derived by classifying its
+// real pairwise cell distances (in edge-length units, edge = sqrt(2)):
+// the 4 real N=3 shapes have distinct maximum pairwise distances --
+// Triangle sqrt(2) (equilateral, all sides equal, the most compact
+// possible), Narrow Bend 2, Wide Bend sqrt(6), Straight Line 2*sqrt(2)
+// (the two ends of a straight 3-chain are the farthest apart of any
+// N=3 shape) -- verified directly against `cell-arrangements.js`'s own
+// hand-built-shape tests, not just eyeballed. Each shape's own
+// adjacent joined-pair indices are likewise computed directly from its
+// real cell coordinates (a bent chain's two END cells are NOT adjacent
+// to each other even though both are adjacent to the middle one, so
+// "any two of three" is never a safe default) rather than hardcoded
+// per shape.
+const EDGE_LENGTH = Math.sqrt(2);
+const THREE_CELL_SIGNATURES = [
+  { name: 'Triangle', maxDistance: EDGE_LENGTH },
+  { name: 'Narrow Bend', maxDistance: 2 },
+  { name: 'Wide Bend', maxDistance: Math.sqrt(6) },
+  { name: 'Straight Line', maxDistance: 2 * EDGE_LENGTH },
 ];
 
-function buildStage8(scale) { return buildNCellStage(scale, THREE_CELL_SHAPES[0].cells, THREE_CELL_SHAPES[0].joinedPair); }
-function buildStage9(scale) { return buildNCellStage(scale, THREE_CELL_SHAPES[1].cells, THREE_CELL_SHAPES[1].joinedPair); }
-function buildStage10(scale) { return buildNCellStage(scale, THREE_CELL_SHAPES[2].cells, THREE_CELL_SHAPES[2].joinedPair); }
-function buildStage11(scale) { return buildNCellStage(scale, THREE_CELL_SHAPES[3].cells, THREE_CELL_SHAPES[3].joinedPair); }
+function classifyThreeCellShape(cells) {
+  const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+  const maxDistance = Math.max(dist(cells[0], cells[1]), dist(cells[0], cells[2]), dist(cells[1], cells[2]));
+  const match = THREE_CELL_SIGNATURES.find((s) => Math.abs(s.maxDistance - maxDistance) < 0.01);
+  if (!match) throw new Error(`Unrecognized 3-cell shape: max pairwise distance ${maxDistance}`);
+  return match.name;
+}
+
+function findAdjacentCellPair(cells) {
+  const offsetKeys = new Set(NEIGHBOR_OFFSETS.map((v) => v.join(',')));
+  for (let i = 0; i < cells.length; i++) {
+    for (let j = i + 1; j < cells.length; j++) {
+      const d = [cells[j][0] - cells[i][0], cells[j][1] - cells[i][1], cells[j][2] - cells[i][2]];
+      if (offsetKeys.has(d.join(','))) return [i, j];
+    }
+  }
+  throw new Error('No adjacent cell pair found -- shape is not actually connected');
+}
+
+const THREE_CELL_STAGE_DEFS = enumerateShapes(3)[3].map((shape) => ({
+  name: classifyThreeCellShape(shape.cells),
+  cells: shape.cells,
+  joinedPair: findAdjacentCellPair(shape.cells),
+}));
+
+const THREE_CELL_STAGES = THREE_CELL_STAGE_DEFS.map((def, i) => ({
+  id: 8 + i,
+  name: `3 Cells: ${def.name}`,
+  build: (scale) => buildNCellStage(scale, def.cells, def.joinedPair),
+}));
 
 export const STAGES = [
   { id: 1, name: 'One Piece', build: buildStage1 },
@@ -698,8 +737,5 @@ export const STAGES = [
   { id: 5, name: 'Conjoined Pieces', build: buildStage5 },
   { id: 6, name: 'Multi-Cell', build: buildStage6 },
   { id: 7, name: '2 Cells: Joined Pair', build: buildStage7 },
-  { id: 8, name: '3 Cells: Triangle', build: buildStage8 },
-  { id: 9, name: '3 Cells: Narrow Bend', build: buildStage9 },
-  { id: 10, name: '3 Cells: Wide Bend', build: buildStage10 },
-  { id: 11, name: '3 Cells: Straight Line', build: buildStage11 },
+  ...THREE_CELL_STAGES,
 ];

@@ -745,16 +745,36 @@ build order:
   **All 4 built as real playable stages, same day** (`STAGES` ids 8-11,
   direct instruction "all 4"): `buildNCellStage(scale, cellLatticeOffsets,
   joinedPairIndices)` is one generic builder driving all four, not four
-  hand-written stages -- parametrized entirely by real data from
-  `enumerateShapes(3)` (`THREE_CELL_SHAPES`, the exact cell coordinates
-  the enumerator produced) plus each shape's own directly-computed
-  adjacent-pair indices (a bent chain's two END cells are NOT adjacent
-  to each other even though both are adjacent to the middle one, so
-  "any two of the three" was never a safe default -- verified per-shape
-  before picking one, not assumed). Named by heading convention "N
-  Cells: <Shape>" starting from N=2 (direct instruction) -- Stage 7
-  renamed to "2 Cells: Joined Pair" to match, Stages 8-11 are "3 Cells:
-  Triangle" / "Narrow Bend" / "Wide Bend" / "Straight Line".
+  hand-written stages. Named by heading convention "N Cells: <Shape>"
+  starting from N=2 (direct instruction) -- Stage 7 renamed to "2 Cells:
+  Joined Pair" to match, Stages 8-11 are "3 Cells: Triangle" / "Narrow
+  Bend" / "Wide Bend" / "Straight Line".
+
+  **Real bug, caught live the same day: "you havent wired enumerator"**
+  -- the FIRST version of this imported `enumerateShapes` but never
+  actually called it, hardcoding a hand-copied snapshot of its output
+  (`THREE_CELL_SHAPES` as a literal array) instead. Fixed properly:
+  `THREE_CELL_STAGE_DEFS` now calls `enumerateShapes(3)[3]` for real,
+  every stage load. Since the raw enumeration order isn't guaranteed
+  stable across contexts (confirmed live: the SAME code produced Narrow
+  Bend and Wide Bend in swapped positions between a plain-Node run and
+  the real browser's own module context -- almost certainly BFS growth
+  order sensitivity, not a bug in the math itself, but a real
+  demonstration of why trusting array position would have been wrong),
+  each shape's own name is derived by classifying its REAL pairwise
+  cell distances (`classifyThreeCellShape` -- the 4 shapes have
+  distinct, verified maximum pairwise distances: Triangle sqrt(2),
+  Narrow Bend 2, Wide Bend sqrt(6), Straight Line 2*sqrt(2)), and its
+  joined-pair indices are likewise found by checking real adjacency
+  (`findAdjacentCellPair`) against whatever cells actually came back --
+  never assumed from position. `STAGES`' own 8-11 entries are now built
+  by mapping over this real, freshly-computed list
+  (`...THREE_CELL_STAGES` spread into the array), not four separately
+  hardcoded id/name/build triples. Verified live after the fix: the
+  displayed stage names are correct regardless of the underlying
+  enumeration order (confirmed the actual browser-context order does
+  differ from the original hand-copied snapshot, and the labels still
+  come out right because they're derived, not positional).
 
   Tray design, per direct instruction ("an extra two piece with three
   pieces, after singles"): N single-cell fused pieces (one per cell,
