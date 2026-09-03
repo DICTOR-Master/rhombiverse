@@ -271,6 +271,7 @@ function syncVisualsToState() {
       p.mesh.position.copy(target.position);
       p.mesh.quaternion.copy(target.quaternion);
       p.mesh.userData.targetQuaternion = target.quaternion;
+      p.mesh.scale.setScalar(1); // real full size once actually part of the assembled shape, not the capped tray-display size
     } else {
       scene.add(p.mesh); // detach from skeletonGroup back to the fixed tray, if it was there
       p.mesh.position.copy(p.homePosition);
@@ -278,6 +279,7 @@ function syncVisualsToState() {
       p.mesh.quaternion.copy(restQuaternion);
       p.mesh.userData.targetQuaternion = restQuaternion;
       p.mesh.visible = Boolean(p.fillsGroup); // fused: always shown; loose: fixed by revealNextTrayPiece below
+      p.mesh.scale.setScalar(p.trayScale ?? 1);
     }
     setPieceSelectedVisual(p, p.id === current.state.selectedPieceId);
   }
@@ -706,6 +708,7 @@ function handleTap(clientX, clientY) {
   placedPiece.mesh.position.copy(target.position);
   placedPiece.mesh.quaternion.copy(target.quaternion);
   placedPiece.mesh.userData.targetQuaternion = target.quaternion;
+  placedPiece.mesh.scale.setScalar(1); // real full size once actually part of the assembled shape, not the capped tray-display size
   setPieceSelectedVisual(placedPiece, false);
   for (const filledId of result.filledVoidIds) {
     const filledVoid = current.voids.find((v) => v.id === filledId);

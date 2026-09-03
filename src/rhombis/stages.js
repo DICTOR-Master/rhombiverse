@@ -119,11 +119,12 @@ function makePiece(geometry, { id, orientation, orientationOptions, homePosition
 // main.js's revealNextTrayPiece, which only ever queues loose pieces),
 // since the player CHOOSES between it and the loose pieces rather than
 // receiving it in sequence.
-function makeFusedPiece(geometry, { id, fillsGroup, homePosition }) {
+function makeFusedPiece(geometry, { id, fillsGroup, homePosition, trayScale = 1 }) {
   const mesh = new THREE.Mesh(geometry, pieceMaterial());
   mesh.position.copy(homePosition);
+  mesh.scale.setScalar(trayScale);
   mesh.userData.pieceId = id;
-  return { id, fillsGroup, mesh, homePosition: homePosition.clone() };
+  return { id, fillsGroup, mesh, homePosition: homePosition.clone(), trayScale };
 }
 
 // Stage 1 -- engine + one piece. Direct instruction (2026-09-03): even
@@ -658,13 +659,68 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
   groups.push({ id: joinedGroupId, position: ORIGIN, quaternion: new THREE.Quaternion() });
   if (includeFullPiece) groups.push({ id: 'full', position: ORIGIN, quaternion: new THREE.Quaternion() });
 
-  const homeSpacing = scale * 2.2;
+  // Real live bug (2026-09-04, "picker tray pieces are overlapping each
+  // other"): a fixed per-slot spacing (the old `homeSpacing * i`) is
+  // correct for N single-RD-sized pieces, but the joined-pair and full
+  // pieces are physically BIGGER (2 or N cells' worth of merged
+  // geometry) -- at that same fixed spacing they visibly overlapped
+  // both each other and the single above them (confirmed live,
+  // screenshotted: N=4's tray showed a single crammed blob for its
+  // last 2-3 slots). Fixed by laying out the tray with each piece's
+  // OWN real bounding-sphere radius: track a running Y cursor, moving
+  // it down by the previous piece's own half-height, a fixed gap, and
+  // the next piece's own half-height before placing it -- correct
+  // regardless of how much bigger the fused pieces get as N grows,
+  // not a per-shape magic number.
+  //
+  // Second real live bug, found immediately after fixing the first:
+  // Stage 15 (Straight Line) rendered as an entirely blank screen. Root
+  // cause: `boundingRadiusFromOrigin` (main.js) frames the camera from
+  // the FARTHEST point across skeleton AND every tray piece combined --
+  // a straight 4-cell chain's own "full" piece spans real lattice
+  // distance ~4.24 (its two end cells are the single farthest-apart
+  // pair of any real N=4 shape, see cell-arrangements.js's own
+  // Straight Line writeup), so its merged geometry's own bounding
+  // sphere is dramatically bigger than a single RD's -- big enough,
+  // positioned deep in the tray, to force the derived camera distance
+  // out so far the actual target shape shrank to a few sub-pixel
+  // specks. Fixed by CAPPING a merged tray piece's visual size
+  // (`trayScale`, applied as a real THREE.Object3D.scale, reset to 1
+  // the moment it's actually placed into the assembled shape --
+  // main.js's own placement/undo-resync code) rather than restructuring
+  // the shared camera framing -- ordinary 2-cell joined pairs and
+  // compact N=4 "full" pieces (Tetrahedron/Ring/Star) stay full scale
+  // (comfortably under the cap), only a genuinely oversized piece like
+  // Straight Line's own full piece gets visually shrunk in the tray.
+  const singleRDGeometry = rhombicDodecahedronGeometry(scale);
+  singleRDGeometry.computeBoundingSphere();
+  const MAX_TRAY_RADIUS = singleRDGeometry.boundingSphere.radius * 2.2;
+
+  function trayScaleFor(geometry) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius;
+    return radius > MAX_TRAY_RADIUS ? MAX_TRAY_RADIUS / radius : 1;
+  }
+
+  const TRAY_GAP = scale * 0.5;
+  let trayCursorY = 0;
+  function nextTrayPosition(geometry, trayScale = 1) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius * trayScale;
+    if (trayCursorY !== 0) trayCursorY -= TRAY_GAP;
+    trayCursorY -= radius;
+    const y = trayCursorY;
+    trayCursorY -= radius;
+    return new THREE.Vector3(scale * 4, y, 0);
+  }
+
   const pieces = [];
   for (let i = 0; i < n; i++) {
-    pieces.push(makeFusedPiece(rhombicDodecahedronGeometry(scale), {
+    const geometry = rhombicDodecahedronGeometry(scale);
+    pieces.push(makeFusedPiece(geometry, {
       id: `single-${i}`,
       fillsGroup: `cell-${i}`,
-      homePosition: new THREE.Vector3(scale * 4, -homeSpacing * i, 0),
+      homePosition: nextTrayPosition(geometry),
     }));
   }
 
@@ -672,10 +728,12 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
     [ji, jj].map((idx) => rhombicDodecahedronGeometry(scale).translate(cellCenters[idx].x, cellCenters[idx].y, cellCenters[idx].z)),
     false,
   );
+  const joinedTrayScale = trayScaleFor(joinedGeometry);
   pieces.push(makeFusedPiece(joinedGeometry, {
     id: 'joined-pair',
     fillsGroup: joinedGroupId,
-    homePosition: new THREE.Vector3(scale * 4, -homeSpacing * n, 0),
+    homePosition: nextTrayPosition(joinedGeometry, joinedTrayScale),
+    trayScale: joinedTrayScale,
   }));
 
   if (includeFullPiece) {
@@ -683,10 +741,12 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
       cellCenters.map((center) => rhombicDodecahedronGeometry(scale).translate(center.x, center.y, center.z)),
       false,
     );
+    const fullTrayScale = trayScaleFor(fullGeometry);
     pieces.push(makeFusedPiece(fullGeometry, {
       id: 'full',
       fillsGroup: 'full',
-      homePosition: new THREE.Vector3(scale * 4, -homeSpacing * (n + 1), 0),
+      homePosition: nextTrayPosition(fullGeometry, fullTrayScale),
+      trayScale: fullTrayScale,
     }));
   }
 

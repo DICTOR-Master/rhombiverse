@@ -943,6 +943,69 @@ build order:
   default blue link. Verified live: the link's real href resolves to
   `./rhombis.html?stage=8`, and clicking it actually navigates there
   (Stage 8, correct title), not just present in markup.
+
+  **Two real bugs found live testing the N=3/N=4 tray, same day**
+  ("picker tray pieces are overlapping each other and cant be
+  rotated", then Stage 15 rendering fully blank after the first fix).
+
+  1. The fixed per-slot vertical spacing (`homeSpacing * i`) was tuned
+  for N single-RD-sized pieces, but the joined-pair and full pieces are
+  physically bigger (2 or N cells' worth of merged geometry) --
+  screenshotted live showing N=4's last 2-3 tray slots crammed into one
+  overlapping blob. Fixed by laying the tray out from each piece's own
+  real bounding-sphere radius (a running Y cursor moves down by the
+  previous piece's own half-height, a fixed gap, then the next piece's
+  own half-height) instead of a uniform per-slot gap.
+
+  2. That fix immediately surfaced a second, worse bug: Stage 15
+  (Straight Line) rendered completely blank. Root cause: `main.js`'s
+  `boundingRadiusFromOrigin` derives camera distance from the farthest
+  point across the skeleton AND every tray piece combined -- Straight
+  Line's own "full" piece spans real lattice distance ~4.24 (the
+  single farthest-apart cell pair of any real N=4 shape), so its
+  merged geometry's own bounding sphere is dramatically larger than a
+  single RD's, and positioning it correctly-spaced-but-far-down the
+  tray (fix #1, above) pushed the derived camera distance out so far
+  the actual target shrank to sub-pixel specks. Fixed by CAPPING a
+  merged piece's visual size in the tray (`trayScaleFor`/`trayScale`,
+  a real `Object3D.scale` set at creation and reset to 1 the instant
+  the piece is actually placed into the assembled shape -- both the
+  live-placement code and the undo/resync path needed the reset) --
+  ordinary 2-cell joined pairs and compact N=4 pieces (Tetrahedron/
+  Ring/Star) stay full scale, comfortably under the cap; only Straight
+  Line's own outlier full piece gets visibly shrunk in the tray (still
+  correctly selectable/placeable at the smaller size, confirmed live --
+  a uniformly-scaled elongated shape still LOOKS elongated, just
+  smaller, which is the geometrically honest result, not a further
+  bug). Verified live across all 8 real N=3/N=4 stages after both
+  fixes: no overlap, no blank renders, correct piece counts. Full
+  `node --test tests/unit/*.test.mjs` clean -- pure THREE-rendering-
+  side, no puzzle-state.js surface.
+
+  **Open design conversation, same live-testing session, not yet
+  acted on**: several related pieces of direct feedback arrived
+  together and are being treated as one upcoming redesign pass rather
+  than four separate patches --
+  - A first-time player ("my wife played earliest stages") found that
+    target and tray should be independently rotatable/viewable, not
+    coupled through one shared drag gesture.
+  - Layout: picker/tray pieces should move to top-right, target should
+    sit left-of-center (not the current roughly-centered-target,
+    tray-to-the-side layout).
+  - The target shell should be MORE transparent than its current 0.55
+    opacity.
+  - A deeper game-design critique of the N=3/N=4 tray content itself:
+    "alternatives should be different configurations of four... not
+    one perfect one and oddments only too obvious no skill" -- the
+    current "N singles + 1 joined-pair + 1 full-solve piece" structure
+    means the full piece trivializes the puzzle (tap the one obvious
+    piece, done, no spatial reasoning required) while the leftover
+    singles carry no real challenge either (fused pieces have no
+    orientation concept at all). The suggested fix is real alternate
+    DECOMPOSITIONS (different genuine sub-groupings of the N cells,
+    not one dominant shortcut piece plus filler) -- echoes the
+    project's own original Day 1 "genuine jigsaw, not revolve one big
+    piece" design question. None of this has been scoped or built yet.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
