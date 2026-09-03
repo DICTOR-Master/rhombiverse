@@ -200,6 +200,10 @@ const hud = document.getElementById('rhombis-hud');
 const solvedBanner = document.getElementById('rhombis-solved');
 const stageLabel = document.getElementById('rhombis-stage');
 const undoButton = document.getElementById('rhombis-undo');
+const stagePicker = document.getElementById('rhombis-stage-picker');
+const stagePickerToggle = document.getElementById('rhombis-stage-picker-toggle');
+const stagePickerClose = document.getElementById('rhombis-stage-picker-close');
+const stageList = document.getElementById('rhombis-stage-list');
 
 // Dev/testing convenience only, never surfaced in the UI: ?stage=4
 // jumps straight to that stage's own id (STAGES' own `id` field, not
@@ -251,6 +255,51 @@ function loadStage(index) {
 function updateUndoButton() {
   undoButton.disabled = !current || current.history.length === 0;
 }
+
+// Stage picker -- direct instruction (2026-09-04): a returning player
+// shouldn't have to replay every earlier stage just to reach one they
+// already know they want. A fixed jump-in link (the welcome screen's
+// own tagline link, ?stage=8) covers exactly one destination; this
+// covers all of them, live, without a page reload. Populated directly
+// from STAGES, so a stage added later needs no picker-specific update.
+function populateStagePicker() {
+  stageList.innerHTML = '';
+  STAGES.forEach((stageDef, index) => {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'rhombis-stage-option';
+    option.dataset.stageIndex = String(index);
+    option.innerHTML = `<span class="stage-num">${stageDef.id}</span><span>${stageDef.name}</span>`;
+    option.addEventListener('click', () => {
+      stageIndex = index;
+      loadStage(stageIndex);
+      closeStagePicker();
+    });
+    stageList.appendChild(option);
+  });
+}
+
+function refreshStagePickerCurrent() {
+  for (const option of stageList.children) {
+    option.classList.toggle('current', Number(option.dataset.stageIndex) === stageIndex);
+  }
+}
+
+function openStagePicker() {
+  refreshStagePickerCurrent();
+  stagePicker.hidden = false;
+}
+
+function closeStagePicker() {
+  stagePicker.hidden = true;
+}
+
+populateStagePicker();
+stagePickerToggle.addEventListener('click', openStagePicker);
+stagePickerClose.addEventListener('click', closeStagePicker);
+stagePicker.addEventListener('click', (e) => {
+  if (e.target === stagePicker) closeStagePicker(); // backdrop tap
+});
 
 // Stage 7's undo: pops the last placement's pre-placement snapshot and
 // re-derives every mesh's transform/parent/visibility from it, rather

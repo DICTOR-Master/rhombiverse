@@ -1003,6 +1003,49 @@ build order:
   behavioral surface, no new tests needed (existing N=3 tests never
   asserted on specific names, only on counts/placement behavior).
 
+  **Real level-select screen, same day** (direct instruction, after
+  hitting the gap three times live: "I think we need a level select
+  opening for returning users that dont want to start from beginning
+  again" / the welcome tagline's own `?stage=8` shortcut "didnt give me
+  options just threw me into last few puzzles" / "I thought there
+  would be a selection possible"). A new "Stages" button in
+  `rhombis.html`'s topbar opens a real overlay (`#rhombis-stage-picker`)
+  listing all 15 `STAGES` entries by id + name, generated directly from
+  the live `STAGES` array (`populateStagePicker()`) so a stage added
+  later needs no picker-specific update; the currently-open stage gets
+  a highlighted border, tapping any option jumps straight there
+  (`loadStage`) and closes the picker, and tapping the backdrop or the
+  close button dismisses it without navigating. Verified live: 15
+  options listed, jumping to Stage 12 (Tetrahedron) correctly loads
+  it and closes the overlay, reopening correctly highlights Stage 12
+  as current -- also visibly confirms the "Right-Angle Bend" rename
+  from the fix above shows correctly in the real list, not just in
+  isolation. Full `node --test tests/unit/*.test.mjs` clean (295/295,
+  unchanged -- pure main-app-side navigation UI, no puzzle-state.js
+  surface). This does NOT replace the separately-requested independent
+  target/tray viewport work below -- it solves "let me jump to a
+  specific stage", not "let me see the tray at a reasonable size".
+
+  **Two real bug reports investigated and NOT reproduced, same day**
+  ("stage 8 accepted fused piece to fill final part" / clarified to "a
+  fused piece was accepted to fill final single cell"; "stage 12
+  rejected a fused pair and two singles which should work"). Both
+  scenarios were reproduced with EXACT clicking (a temporary debug hook
+  exposing camera/renderer/current, real perspective-projection math to
+  click precise screen coordinates rather than guessing pixels, removed
+  before committing each time) rather than pixel-guessing, and in both
+  cases the actual game state was already correct: a fused piece
+  selected against a too-small remaining group is genuinely rejected
+  (`placed: false`, void stays unfilled), and a genuine joined-pair +
+  2-singles combination genuinely solves the puzzle end to end. Given
+  the SAME session separately surfaced "as you enlarge picker pieces
+  disappear" and "because they are all in a line you can only view them
+  at a small size" -- the likely real explanation is imprecise manual
+  taps on small/overlapping on-screen targets (a UX problem) being
+  misread as logic rejections, not actual puzzle-state bugs. Worth
+  re-checking once the independent-viewport work below lands and tray
+  pieces are large enough to tap precisely.
+
   **Open design conversation, same live-testing session, not yet
   acted on**: several related pieces of direct feedback arrived
   together and are being treated as one upcoming redesign pass rather

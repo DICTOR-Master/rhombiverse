@@ -59,6 +59,57 @@
     }
     #rhombis-undo:disabled { opacity: 0.35; }
     #rhombis-undo:not(:disabled):active { background: rgba(155, 227, 255, 0.15); }
+
+    /* Stage picker -- direct instruction (2026-09-04), a returning
+       player shouldn't have to replay every earlier stage just to jump
+       back to one they want; "shortcut from welcome didnt give me
+       options just threw me into last few puzzles" confirmed a fixed
+       jump-in link alone doesn't cover this. */
+    #rhombis-stage-picker-toggle {
+      pointer-events: auto; background: none; border: none; color: #9be3ff;
+      font: 600 0.85rem system-ui, sans-serif; letter-spacing: 0.04em;
+      padding: 0.4rem 0.6rem; cursor: pointer;
+    }
+    #rhombis-stage-picker-toggle:hover { text-decoration: underline; }
+    #rhombis-stage-picker {
+      position: fixed; inset: 0; z-index: 20;
+      background: rgba(2, 2, 6, 0.85); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      font-family: system-ui, sans-serif;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+    #rhombis-stage-picker[hidden] { display: none; }
+    #rhombis-stage-picker-panel {
+      background: #0c0f16; border: 1px solid #2a3a4a; border-radius: 16px;
+      padding: 1.25rem; width: min(420px, 92vw); max-height: 82vh;
+      display: flex; flex-direction: column; gap: 0.75rem;
+    }
+    #rhombis-stage-picker-header {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    #rhombis-stage-picker-header h2 {
+      margin: 0; font-size: 1.1rem; color: #e8f4ff; font-weight: 700;
+    }
+    #rhombis-stage-picker-close {
+      background: none; border: none; color: #9be3ff; font-size: 1.2rem;
+      cursor: pointer; padding: 0.25rem 0.5rem; line-height: 1;
+    }
+    #rhombis-stage-list {
+      overflow-y: auto; display: flex; flex-direction: column; gap: 0.35rem;
+    }
+    .rhombis-stage-option {
+      display: flex; align-items: baseline; gap: 0.6rem;
+      background: rgba(155, 227, 255, 0.06); border: 1px solid #24313e;
+      border-radius: 10px; padding: 0.6rem 0.8rem; color: #cfe9ff;
+      font-size: 0.95rem; text-align: left; cursor: pointer;
+    }
+    .rhombis-stage-option:active { background: rgba(155, 227, 255, 0.15); }
+    .rhombis-stage-option.current {
+      border-color: #6ad0ff; background: rgba(106, 208, 255, 0.14);
+    }
+    .rhombis-stage-option .stage-num {
+      color: #6ad0ff; font-weight: 700; min-width: 1.6rem;
+    }
   </style>
   <script type="importmap">
     {
@@ -73,11 +124,23 @@
   <div id="app"></div>
   <div id="rhombis-topbar">
     <span><span id="rhombis-title">RHOMBIS</span><span id="rhombis-stage"></span></span>
-    <a href="./index.html">&larr; Rhombiverse</a>
+    <span>
+      <button id="rhombis-stage-picker-toggle" type="button">Stages</button>
+      <a href="./index.html">&larr; Rhombiverse</a>
+    </span>
   </div>
   <div id="rhombis-hud"></div>
   <button id="rhombis-undo" type="button" disabled>Undo</button>
   <div id="rhombis-solved" hidden>Solved!</div>
+  <div id="rhombis-stage-picker" hidden>
+    <div id="rhombis-stage-picker-panel">
+      <div id="rhombis-stage-picker-header">
+        <h2>Choose a Stage</h2>
+        <button id="rhombis-stage-picker-close" type="button" title="Close">&times;</button>
+      </div>
+      <div id="rhombis-stage-list"></div>
+    </div>
+  </div>
   <script type="module" src="./src/rhombis/main.js"></script>
 </body>
 </html>
