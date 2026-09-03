@@ -81,6 +81,41 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.2);
 sun.position.set(3, 5, 4);
 scene.add(sun);
 
+// Starry sky background -- direct instruction (2026-09-04, "a starry
+// sky background"). A real THREE.Points cloud, not a texture/CSS
+// trick, on a fixed sphere far enough out to read as "at infinity" --
+// comfortably inside the camera's own far clip plane (100 below) but
+// well beyond any stage's own bounding radius (a handful of units even
+// at the biggest stages), so pinch/wheel-zooming the puzzle never
+// visibly moves the stars, exactly like a real distant sky wouldn't.
+// Two layers, not one, for a genuine size/brightness variety rather
+// than a uniform dot grid -- `sizeAttenuation: false` keeps each
+// star's own screen size constant regardless of distance/zoom, the
+// correct look for something meant to be read as infinitely far.
+function buildStarfield(count, radiusRange, size, opacity) {
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    // Real uniform sampling on a sphere (not a naive per-axis random,
+    // which clusters points near the corners of the bounding cube).
+    const u = Math.random();
+    const v = Math.random();
+    const theta = 2 * Math.PI * u;
+    const phi = Math.acos(2 * v - 1);
+    const r = radiusRange[0] + Math.random() * (radiusRange[1] - radiusRange[0]);
+    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    positions[i * 3 + 2] = r * Math.cos(phi);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({
+    color: 0xffffff, size, sizeAttenuation: false, transparent: true, opacity, depthWrite: false,
+  });
+  return new THREE.Points(geometry, material);
+}
+scene.add(buildStarfield(900, [70, 85], 1.1, 0.55));
+scene.add(buildStarfield(120, [70, 85], 2.2, 0.9));
+
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
 const CAMERA_DIRECTION = new THREE.Vector3(2.5, 2, 5).normalize();
 
@@ -118,6 +153,23 @@ function boundingRadiusFromOrigin(objects) {
   return Math.sqrt(maxDistSq);
 }
 
+// Pinch-to-zoom/wheel-zoom multiply the DERIVED distance rather than
+// replacing it -- direct instruction (2026-09-04, "need pinch and
+// expand gestures to make puzzle bigger"), fulfilling a gap this
+// file's own pointer-handling comment already flagged ("no pinch
+// gesture is defined for two fingers yet"). Keeping the derivation
+// (real bounding-radius math, not a hand-tuned distance) as the base
+// and treating zoom as a multiplier on top preserves the "always
+// frames correctly regardless of aspect ratio or stage size" property
+// that fixed a real narrow-viewport bug earlier -- zoom is a per-
+// session interactive adjustment layered over a still-correct default,
+// not a replacement for it. Reset to 1 on every stage load (a stage
+// with a very different bounding radius shouldn't inherit an
+// unrelated previous zoom level).
+let zoomFactor = 1;
+const MIN_ZOOM = 0.4;
+const MAX_ZOOM = 2.5;
+
 function applyCameraFraming() {
   const aspect = window.innerWidth / window.innerHeight;
   camera.aspect = aspect;
@@ -126,7 +178,7 @@ function applyCameraFraming() {
   const vFov = THREE.MathUtils.degToRad(camera.fov);
   const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
   const limitingHalfFov = Math.min(vFov, hFov) / 2;
-  const distance = (current.boundingRadius / Math.sin(limitingHalfFov)) * FRAME_MARGIN;
+  const distance = (current.boundingRadius / Math.sin(limitingHalfFov)) * FRAME_MARGIN * zoomFactor;
   camera.position.copy(CAMERA_DIRECTION).multiplyScalar(distance);
   camera.lookAt(0, 0, 0);
 }
@@ -169,6 +221,7 @@ function clearCurrentStage() {
 
 function loadStage(index) {
   clearCurrentStage();
+  zoomFactor = 1; // a new stage's own derived framing, not a leftover zoom from whatever was open before
   const stageDef = STAGES[index];
   const built = stageDef.build(SCALE);
 
@@ -446,21 +499,26 @@ function advanceOrFinish() {
   }
 }
 
-// --- Tap vs. drag-to-rotate: a SINGLE pointer that moves past the
-// threshold spins the skeleton (updated live on every move, not just at
-// the end); one that comes back up without moving far is a tap instead.
-// A second pointer joining mid-gesture cancels both -- no pinch/rotate
-// gesture is defined for two fingers (yet; Stage 7's own "touch
-// refinements" is where the spec places pinch-to-rotate), so it's
-// simply ignored rather than fighting a one-finger drag already in
-// progress.
-const activePointers = new Set();
+// --- Tap vs. drag-to-rotate vs. pinch-to-zoom: a SINGLE pointer that
+// moves past the threshold spins the skeleton (updated live on every
+// move); one that comes back up without moving far is a tap instead. A
+// second pointer joining mid-gesture cancels the single-finger
+// candidate (no fighting a one-finger drag already in progress) and
+// starts tracking a pinch instead -- direct instruction (2026-09-04,
+// "need pinch and expand gestures to make puzzle bigger"), fulfilling
+// a gap this comment used to flag as not-yet-built. `activePointers`
+// is a Map (id -> last known {x,y}), not just a Set, since pinch needs
+// both fingers' actual positions, not just a count.
+const activePointers = new Map();
 let tapCandidateId = null;
 let pointerDownPos = null;
 let dragLast = null;
+let pinchStartDistance = null;
+let pinchStartZoom = null;
 const TAP_MOVE_THRESHOLD = 10;
 const ROTATE_SPEED = 0.012;
 const MAX_PITCH = Math.PI / 2 - 0.02;
+const WHEEL_ZOOM_SPEED = 0.0015;
 
 function cancelTapCandidate() {
   tapCandidateId = null;
@@ -468,18 +526,38 @@ function cancelTapCandidate() {
   dragLast = null;
 }
 
+function currentPinchDistance() {
+  const [a, b] = [...activePointers.values()];
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
 renderer.domElement.addEventListener('pointerdown', (e) => {
-  activePointers.add(e.pointerId);
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (activePointers.size === 1) {
     tapCandidateId = e.pointerId;
     pointerDownPos = { x: e.clientX, y: e.clientY };
     dragLast = { x: e.clientX, y: e.clientY };
   } else {
     cancelTapCandidate();
+    if (activePointers.size === 2) {
+      pinchStartDistance = currentPinchDistance();
+      pinchStartZoom = zoomFactor;
+    }
   }
 });
 
 renderer.domElement.addEventListener('pointermove', (e) => {
+  if (activePointers.has(e.pointerId)) activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (activePointers.size === 2 && pinchStartDistance) {
+    // Fingers spreading apart (expand) shrinks the distance ratio,
+    // shrinking zoomFactor -- a smaller camera distance means a
+    // BIGGER/closer view, matching "expand to make it bigger" as a
+    // real, not just labeled, effect.
+    const ratio = pinchStartDistance / currentPinchDistance();
+    zoomFactor = THREE.MathUtils.clamp(pinchStartZoom * ratio, MIN_ZOOM, MAX_ZOOM);
+    applyCameraFraming();
+    return;
+  }
   if (e.pointerId !== tapCandidateId || !dragLast || !current) return;
   const dx = e.clientX - dragLast.x;
   const dy = e.clientY - dragLast.y;
@@ -491,6 +569,7 @@ renderer.domElement.addEventListener('pointermove', (e) => {
 
 renderer.domElement.addEventListener('pointerup', (e) => {
   activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) pinchStartDistance = null;
   if (e.pointerId !== tapCandidateId || !pointerDownPos) return;
   const dx = e.clientX - pointerDownPos.x;
   const dy = e.clientY - pointerDownPos.y;
@@ -502,8 +581,18 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 
 renderer.domElement.addEventListener('pointercancel', (e) => {
   activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) pinchStartDistance = null;
   if (e.pointerId === tapCandidateId) cancelTapCandidate();
 });
+
+// Desktop equivalent of pinch -- same zoomFactor, same clamped range.
+// preventDefault stops the page itself from scrolling under a wheel
+// event landing on the canvas.
+renderer.domElement.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  zoomFactor = THREE.MathUtils.clamp(zoomFactor * (1 + e.deltaY * WHEEL_ZOOM_SPEED), MIN_ZOOM, MAX_ZOOM);
+  applyCameraFraming();
+}, { passive: false });
 
 const raycaster = new THREE.Raycaster();
 const pointerNDC = new THREE.Vector2();

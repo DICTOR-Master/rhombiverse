@@ -873,6 +873,54 @@ build order:
   later stage reintroduces that mechanic; the remaining 16 real N=4
   shapes (and N=5+, not yet enumerated at all) remain available in
   `cell-arrangements.js` whenever this progression continues further.
+
+  **Pinch/wheel zoom + starry background, added the same day** (direct
+  instruction: "need pinch and expand gestures to make puzzle bigger
+  and a starry sky background"). Zoom is a multiplier (`zoomFactor`,
+  clamped [0.4, 2.5], reset to 1 on every stage load) applied on top of
+  the existing DERIVED camera distance (`applyCameraFraming`'s own
+  bounding-radius math), not a replacement for it -- preserves the
+  "always frames correctly regardless of aspect ratio or stage size"
+  property a past bug fix established, with zoom layered on as a per-
+  session interactive adjustment. `activePointers` changed from a Set
+  to a Map (id -> last {x,y}) since pinch needs both fingers' actual
+  positions, not just a count; a genuine 2-finger pinch tracks the
+  distance between them and scales `zoomFactor` by the ratio (fingers
+  spreading apart shrinks the distance ratio, shrinking `zoomFactor`,
+  which means a SMALLER camera distance -- a bigger/closer view, so
+  "expand to make it bigger" is a real effect, not just a label). Wheel
+  does the same on desktop. Verified live: wheel zoom confirmed both
+  directions (screenshotted before/in/out); a REAL two-finger pinch
+  simulated via synthetic PointerEvents (Playwright has no high-level
+  multi-touch API) confirmed the expand gesture visibly grows the
+  puzzle, and that a 2-finger gesture never triggers an accidental tap/
+  placement (already true structurally -- `cancelTapCandidate()` fires
+  the moment a second pointer joins, same guard that already protected
+  the single-finger tap-vs-drag logic).
+
+  Starry background: two `THREE.Points` layers (900 small dim stars +
+  120 larger bright ones, for real size/brightness variety rather than
+  a uniform dot grid), positioned via genuine uniform-sphere sampling
+  (not naive per-axis random, which clusters near a bounding cube's
+  corners) at a fixed radius comfortably inside the camera's far clip
+  plane (100) but well beyond any stage's own bounding radius --
+  `sizeAttenuation: false` keeps each star a constant screen size
+  regardless of zoom, correct for something meant to read as
+  infinitely far away. Added directly to `scene`, not `skeletonGroup`,
+  so rotating/zooming the puzzle never visibly moves the stars --
+  verified live (screenshotted before/after a real drag-rotate,
+  identical star positions in both).
+
+  Full `node --test tests/unit/*.test.mjs` clean (295/295, unchanged --
+  both features are pure THREE-rendering/input-side, no puzzle-state.js
+  surface).
+
+  **Still open from the same request**: a small HUD/topbar symbol
+  showing the current stage's cell arrangement as a "skeleton side
+  view" (direct instruction, mentioned a triangle-of-RDs example), and
+  a blocky 80s-style RHOMBIS logo built from RDs ("if possible") --
+  both are more open-ended visual-design tasks, deliberately sequenced
+  after the more mechanical zoom/starfield work, not yet started.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
