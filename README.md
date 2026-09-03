@@ -132,8 +132,12 @@ evolution, animals, lattice zoom).
 ```
 rhombiverse/
   index.html                # static entry point, Three.js via import map (no bundling; see "Running locally")
+  rhombis.html               # Rhombis: standalone geometric-packing intro puzzle, linked from the welcome screen
   api/                       # Vercel serverless functions (AI Gateway proxy: sculpt/cultivate/cyborg-suggest)
   src/
+    rhombis/                 # Rhombis' own code: puzzle-state.js (pure state machine), geometry.js
+                              #   (THREE mesh, built on core/lattice.js's pyramidPieces()), stages.js
+                              #   (per-stage scene content), main.js (generic engine: input/render/advance)
     lattice.js               # RD/FCC coordinate math, 12-neighbor lookup
     render.js                 # Three.js scene, per-frame loop, most UI wiring
     build.js                   # placement/removal, face-picking, mouse+touch input

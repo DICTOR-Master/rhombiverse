@@ -106,6 +106,52 @@ build order:
   resolving a bare directory argument, reproduced locally too) and was
   reverted.
 
+- **Rhombis** (2026-09-03, `docs/RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md`)
+  — **Stages 1-3 done** (one piece; octahedron/2 pieces; cube/6 pieces):
+  a standalone geometric-packing intro puzzle, `rhombis.html` + `src/
+  rhombis/`. `geometry.js`'s `pyramidGeometry()` is the one mesh every
+  stage reuses (`ConvexGeometry` over `core/lattice.js`'s already-real,
+  already-tested `pyramidPieces(s).pyramids['y+']`, re-centered to the
+  spec's own canonical pose -- base square at y=0, apex at (0,s/2,0));
+  `outwardQuaternion(axisKey)`/`inwardQuaternion(axisKey)` are the
+  general axis-keyed orientation system (reuses `core/pyramid.js`'s own
+  `x+`/`x-`/.../`z-` vocabulary) every stage composes that mesh with --
+  Stage 2's up/down flip and Stage 3's 6 cube faces are both just this
+  plus a transform, no second geometry derivation. `puzzle-state.js` is
+  the pure state machine (unit tested, 17 cases): `orientation`/
+  `orientationOptions` (a piece), `requiredOrientation` (a void), both
+  optional and additive; `flipPiece()` cycles a piece's own
+  `orientationOptions` list; `voidValidityForPiece()` classifies every
+  open void red/green for a given piece, live, not just after a
+  rejected tap. `stages.js` holds per-stage scene content (`STAGES`
+  array, plain functions, no main.js changes needed to add one);
+  `main.js` is the generic engine -- tap-vs-drag detection (real Pointer
+  Event ids, a second finger joining mid-gesture cancels tap-candidacy),
+  select/flip/place, red/green target highlighting, solved-state, auto-
+  advance to the next `STAGES` entry, and a derived (not hand-tuned)
+  camera fit: distance is back-solved from the real bounding radius of
+  skeleton+tray against the tighter of the horizontal/vertical FOV, so
+  a narrow phone viewport still frames everything correctly. **Rotation
+  spins the skeleton's own Group, not an orbiting camera** -- found via
+  real testing that an orbiting camera also swings the TRAY (a separate
+  fixed-position object sharing the same world origin) around with it,
+  so reaching a cube's hidden faces visually dragged the tray onto the
+  skeleton; a placed piece is reparented tray-group -> skeleton-group
+  (`Object3D.add()`) so it then rotates with the rest of the assembled
+  shape. Own separate zero-build-step entry point (own import map, does
+  not import `render.js` or touch the Core/Modules boundary), linked
+  from the welcome screen (`welcome.js`'s `.rhombis-link`), built mobile/
+  touch-first (capped pixel ratio, safe-area CSS, `touch-action`/tap-
+  highlight hardening). A real geometry bug was caught and fixed during
+  Stage 3 verification (not shipped broken): the cube's 6 void positions
+  were rotated but never translated, leaving apex/base swapped relative
+  to spec (verified numerically before AND after the fix). Verified via
+  real headless-Chromium runs, including real iPhone-viewport touch
+  taps, across all 3 stages end to end. Stages 4-7 (RD/conjoined/multi-
+  cell/procedural) are NOT yet built. Stage 7's own scoring/timer slot
+  is the intended home for a later "spatial reasoning" score (direct
+  suggestion 2026-09-03: NOT literally IQ -- that implies a validated
+  psychometric claim this can't back up) -- not scoped or built yet.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
@@ -234,6 +280,31 @@ this section states what's CURRENTLY true, it does not narrate how it
 got there. If you need the story behind something, `git log --oneline`
 and the commit bodies are the real record, not a second markdown file
 duplicating them.
+
+**Design idea flagged for the wider app, not yet implemented outside
+Rhombis** (2026-09-03, reinforced twice by direct user suggestion the
+same day): Rhombis' selected-piece validity highlighting
+(`src/rhombis/main.js`'s `refreshVoidHighlights()`, `puzzle-state.js`'s
+`voidValidityForPiece()`) recolors every open target red or green,
+live, for whatever's currently selected/held -- not just a flash after
+a rejected action. **Priority candidate: the pyramid/BCC sub-piece
+placement system** (`core/pyramid.js`'s `resolvePyramidAxisForHit`/
+`resolvePyramidClickOnExisting`, `core/build.js`'s piece-tier-aware Add/
+Remove) -- the user specifically named this area ("could really help in
+Rhombiverse for all smaller pieces") after separately reporting live
+"hit or miss" placement/removal behavior with the Pyramid piece tier.
+That report led to a real, now-fixed bug the same session -- see
+`docs/code-notes/core/pyramid.md`'s own "Second real live report,
+2026-09-03" section for the full repro/root-cause/fix, not narrated
+twice here. This is also the module with the longest real
+bug history in the repo (`git log --oneline -- src/core/pyramid.js`:
+multiple "last pyramid bonds outward instead"/"stray pyramid placed
+elsewhere" regressions), making it the highest-value place to try a
+live green/red hover-or-selected preview rather than only reacting
+after a click lands wrong. Other plausible spots: Build/Piece:TO
+placement generally, Sculpture Mode's symmetry/mirror preview, region/
+claim-boundary editing. Nobody has scoped or built any of this yet --
+still a flagged idea, not a task in progress.
 
 ## Read this before touching anything
 

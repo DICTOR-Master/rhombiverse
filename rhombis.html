@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Rhombis -- a Rhombiverse introduction</title>
+  <style>
+    html, body {
+      margin: 0; height: 100%; background: #05050a; overflow: hidden;
+      overscroll-behavior: none; touch-action: manipulation;
+      -webkit-user-select: none; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #app { position: fixed; inset: 0; }
+    #app canvas { display: block; touch-action: none; }
+    #rhombis-topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: calc(0.75rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+               0.75rem calc(1rem + env(safe-area-inset-left));
+      font-family: system-ui, sans-serif; color: #e8f4ff;
+      pointer-events: none;
+    }
+    #rhombis-topbar a {
+      color: #9be3ff; pointer-events: auto; text-decoration: none;
+      padding: 0.4rem 0.2rem; /* bigger tap target than the text alone */
+    }
+    #rhombis-topbar a:hover { text-decoration: underline; }
+    #rhombis-title { font-weight: 600; letter-spacing: 0.08em; }
+    #rhombis-stage { font-size: 0.85rem; opacity: 0.75; margin-left: 0.75rem; }
+    #rhombis-hud {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: calc(1.5rem + env(safe-area-inset-bottom));
+      z-index: 10; font-family: system-ui, sans-serif; color: #cfe9ff;
+      background: rgba(5, 5, 10, 0.6); padding: 0.5rem 1rem; border-radius: 999px;
+      pointer-events: none; font-size: 0.95rem;
+      max-width: calc(100vw - 2rem); text-align: center;
+    }
+    #rhombis-solved {
+      position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
+      z-index: 11; font-family: system-ui, sans-serif; font-size: 2.5rem; font-weight: 700;
+      color: #9be3ff; text-shadow: 0 0 20px rgba(155, 227, 255, 0.7);
+      pointer-events: none; text-align: center; max-width: 90vw;
+    }
+    @media (max-width: 480px) {
+      #rhombis-solved { font-size: 1.8rem; }
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.185.1/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.185.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="rhombis-topbar">
+    <span><span id="rhombis-title">RHOMBIS</span><span id="rhombis-stage"></span></span>
+    <a href="./index.html">&larr; Rhombiverse</a>
+  </div>
+  <div id="rhombis-hud"></div>
+  <div id="rhombis-solved" hidden>Solved!</div>
+  <script type="module" src="./src/rhombis/main.js"></script>
+</body>
+</html>

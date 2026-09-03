@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-09-03",
+    "title": "Rhombis: A New Way In",
+    "items": [
+      "New: Rhombis, a short geometric-packing puzzle that introduces the game's core pyramid-to-cube-to-rhombic-dodecahedron relationships -- rotate a target shape, tap pieces into place, and watch it build from a single pyramid up through an octahedron and a cube. Wrong orientations are flagged red, valid ones green, right on the shape itself. Linked from the welcome screen; built mobile/touch-first from the start.",
+      "Fixed: completing a cube's very last missing pyramid could occasionally spawn an unrelated stray piece elsewhere instead of finishing the block you were actually working on.",
+      "Fixed: a leftover \"no pyramid there\" message could linger on screen well after it stopped being true, making a successful placement look like it hadn't worked."
+    ]
+  },
+  {
     "date": "2026-09-02",
     "title": "See It Through, Any Shape",
     "items": [

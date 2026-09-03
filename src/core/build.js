@@ -26,6 +26,7 @@ import {
   resolvePyramidClickOnExisting,
   pyramidAxisForNormal,
   axisKeyToOffset,
+  nearestPyramidAxis,
 } from './pyramid.js';
 import { generatePlanetoid } from '../geometry-extensions/planetoidgen.js';
 import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
@@ -637,7 +638,35 @@ export function createBuildController({
       }
       const axisKey = resolveClickedPyramidAxis(hit, cell, { preferMissing: true });
       if (!axisKey) { if (onPieceNoOp) onPieceNoOp('add'); return; }
-      const result = applyPyramidEdit(world, 'add', cell.x, cell.y, cell.z, axisKey);
+      let result = applyPyramidEdit(world, 'add', cell.x, cell.y, cell.z, axisKey);
+      // Real bug, reproduced live 2026-09-03: resolveClickedPyramidAxis's
+      // "preferMissing" only shortcuts to a missing axis when it's one of
+      // the 2 candidates tied to the SPECIFIC face actually hit
+      // (candidateAxesForNeighborOffset, from that face's own neighbor
+      // offset) -- clicking a diagonal seam between two OTHER, already-
+      // PRESENT pyramids (nowhere near the real gap) resolves to one of
+      // THOSE instead, no-ops here, and used to fall straight through to
+      // "grow a stray neighbor cell" below even though this cell still
+      // had a real pyramid missing elsewhere. That contradicted this
+      // whole block's own documented invariant ("never changes what
+      // happens when there genuinely IS a pyramid still to add") --
+      // confirmed via a real Playwright repro (build a cell to 5/6
+      // pyramids, click the same spot that filled the first two; the 3rd
+      // click spawned an unrelated new cell instead of completing this
+      // one). Fix: if this cell has ANY pyramid still missing, complete
+      // the nearest one first -- mirrors resolvePyramidClickOnExisting's
+      // own 'fill' branch just below, which already does exactly this
+      // for the OTHER click path (landing on an existing tagged pyramid
+      // mesh) and never had this bug.
+      if (!result) {
+        const missingAxisKeys = PYRAMID_AXES.filter((k) => !hasPyramid(effectivePyramids(cell), k));
+        if (missingAxisKeys.length > 0) {
+          const [hwx, hwy, hwz] = cellToWorld(cell.x, cell.y, cell.z);
+          const hitLocalPoint = [hit.point.x - hwx, hit.point.y - hwy, hit.point.z - hwz];
+          const nearestMissing = nearestPyramidAxis(hitLocalPoint, missingAxisKeys, pyramidPieces());
+          result = applyPyramidEdit(world, 'add', cell.x, cell.y, cell.z, nearestMissing);
+        }
+      }
       // No-op: that pyramid's already there -- true of every freshly
       // placed (full) block, so this is the very first thing a player
       // picking Pyramid tries on any existing block. See the 'chisel'
@@ -648,9 +677,10 @@ export function createBuildController({
       // the clicked face is empty -- if so, a single cube-less pyramid
       // can grow there instead, reaching back toward the cell you
       // clicked. This is the ONLY place that check runs (not a separate
-      // mode/piece tier): it only ever fires on the exact click that
-      // would otherwise be a pure no-op, so it never changes what
-      // happens when there genuinely IS a pyramid still to add.
+      // mode/piece tier): only reached now once the cell's own missing
+      // pyramids (if any) have already been ruled out above, so it still
+      // never changes what happens when there's a pyramid of THIS cell's
+      // own left to add.
       if (!result) {
         const neighborOffset = matchNeighborOffset(hit.face.normal);
         const bnx = cell.x + neighborOffset[0];

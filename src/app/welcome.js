@@ -163,6 +163,9 @@ function overlayHtml() {
         <input type="checkbox" id="skip-intro-checkbox" />
         Don't show this again on this device
       </label>
+      <div class="rhombis-link">
+        <a href="./rhombis.html">New here? Try Rhombis, a short intro puzzle &rarr;</a>
+      </div>
       <div class="legal-links">
         <a href="./TERMS.md" target="_blank" rel="noopener">Terms</a>
         · <a href="./PRIVACY.md" target="_blank" rel="noopener">Privacy</a>

@@ -114,3 +114,61 @@ tries and the very first thing that goes silent. The no-op itself was
 never a bug; the silence was. `core/build.js`'s new `onPieceNoOp`
 callback (wired in `render.js` to a real `showHudPrompt`) gives the
 player the actual reason instead of nothing.
+
+**Second real live report, 2026-09-03**: "still having issues with
+placing pyramids... seemingly weird placing logic," "wrong orientation/
+position," reported as ongoing/"hit or miss" across Build and Sculpture
+Mode. Investigated via a real Playwright repro against production
+(`~/rhombiverse/tests/browser`'s own Playwright install; see the
+`browser-test-harness` skill) reading `localStorage`'s real world JSON
+after each click — not the HUD prompt text, which turned out to be an
+unreliable signal for a separate reason below. Two findings:
+
+1. **Not a bug, but a real, confusing UX gap**: `render.js`'s
+   `showHudPrompt` (search that name) only toggles a CSS `visible`
+   class on its timeout — it never clears the element's `textContent`.
+   A successful Add/Remove shows no prompt at all (success is silent by
+   design). So a stale failure message ("No pyramid there to remove —
+   that face is already a flat cube.") can sit in the DOM indefinitely
+   after its own toast has visually faded, and reads as if it's
+   describing whatever you *just* did, even when that click actually
+   succeeded. Not fixed as part of this investigation — flagged here so
+   it isn't lost; the actual fix is trivial (clear `textContent` too, or
+   show a brief real confirmation on success) but out of scope for the
+   session that found it.
+2. **Real, confirmed, reproducible bug** (now fixed, this same commit):
+   `core/build.js`'s Add+Pyramid handler, the branch that runs when the
+   click did NOT land on an existing tagged pyramid mesh
+   (`hitAxisKey` falsy, ~line 639), called `resolveClickedPyramidAxis(hit,
+   cell, { preferMissing: true })` and, if that no-op'd, fell straight
+   through to "grow a stray neighbor cell" (the documented "pyramid
+   without a cube" behavior a few lines below). But `preferMissing` only
+   shortcuts to a missing axis when it's one of the *2 candidates tied to
+   the specific face actually hit* (`candidateAxesForNeighborOffset`, off
+   that face's own FCC neighbor offset) — clicking a diagonal seam
+   between two OTHER, already-present pyramids (nowhere near the real
+   gap) resolves to one of those instead, no-ops, and used to trigger the
+   neighbor-growth fallback even though the SAME cell still had a real
+   pyramid missing elsewhere. This directly contradicted this whole
+   block's own documented invariant ("never changes what happens when
+   there genuinely IS a pyramid still to add"). Reproduced deterministically:
+   strip 3 pyramids from a fresh cell via Remove, Add them back one at a
+   time at a FIXED screen point (no camera movement) — the first two
+   Add clicks correctly complete the same cell; the third, at the exact
+   same screen point, instead spawns an unrelated new cell elsewhere
+   (confirmed via the real `cells` JSON, not visual guessing). Root
+   cause confirmed by comparing against `resolvePyramidClickOnExisting`
+   (the OTHER click path, landing on an existing tagged pyramid mesh),
+   which already gets this right — its own `'fill'` branch checks ALL of
+   the cell's missing axes, not just the 2 tied to whichever face was
+   hit. Fix: when the face-specific resolution no-ops, check whether the
+   cell has ANY pyramid still missing at all; if so, complete the
+   nearest one (`nearestPyramidAxis` over the full `missingAxisKeys`
+   list, mirroring the other path) before ever falling through to the
+   neighbor-growth logic. No `core/pyramid.js` change was needed —
+   `nearestPyramidAxis` already existed and already did the right thing
+   given the full candidate list; `build.js` just wasn't calling it with
+   the full list in this one branch. Verified fixed via the same
+   Playwright repro: the 3rd Add click now completes the original
+   cell (all 6 axes present, `pyramids` field correctly dropped back to
+   absent-means-full) with no stray cell created.

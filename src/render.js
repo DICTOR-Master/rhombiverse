@@ -455,7 +455,18 @@ function showHudPrompt(text, ms = 4000) {
   el.textContent = text;
   el.classList.add('visible');
   clearTimeout(hudPromptTimer);
-  hudPromptTimer = setTimeout(() => el.classList.remove('visible'), ms);
+  // Real, live-investigated confusion (2026-09-03): this only ever
+  // toggled the 'visible' class, never cleared textContent -- #hud-
+  // prompt has no opacity/fade transition (just display:block/none, see
+  // index.html), so there's no animation to interrupt. A successful
+  // Add/Remove shows no prompt of its own (success is silent), so an
+  // earlier failure's message could otherwise sit in the DOM
+  // indefinitely and read as if it described whatever the player just
+  // did, well after it had actually faded from view.
+  hudPromptTimer = setTimeout(() => {
+    el.classList.remove('visible');
+    el.textContent = '';
+  }, ms);
 }
 
 // The HUD's icon-only toggles (Duality, Sculpture Mode, Cyborg, X-Ray,
