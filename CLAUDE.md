@@ -107,9 +107,9 @@ build order:
   reverted.
 
 - **Rhombis** (2026-09-03, `docs/RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md`)
-  — **Stages 1-4 done** (one piece; octahedron/2 pieces; cube/6 pieces;
-  rhombic dodecahedron/12 pieces): a standalone geometric-packing intro
-  puzzle, `rhombis.html` + `src/
+  — **Stages 1-5 done** (one piece; octahedron/2 pieces; cube/6 pieces;
+  rhombic dodecahedron/12 pieces; conjoined pieces): a standalone
+  geometric-packing intro puzzle, `rhombis.html` + `src/
   rhombis/`. `geometry.js`'s `pyramidGeometry()` is the one mesh every
   stage reuses (`ConvexGeometry` over `core/lattice.js`'s already-real,
   already-tested `pyramidPieces(s).pyramids['y+']`, re-centered to the
@@ -174,8 +174,38 @@ build order:
   friction on a small isometric render, not any suspected app issue;
   `tests/unit/rhombis-puzzle-state.test.mjs` separately proves all 12
   placeable in shuffled order and that an axis's inward/outward voids
-  are independent. Stages 5-7 (conjoined pieces, multi-cell, procedural
-  content/polish) are NOT yet built. Stage 7's own scoring/timer slot
+  are independent. **Stage 5** (conjoined pieces) is the first REAL
+  architecture extension, not just new content on the existing engine:
+  `puzzle-state.js` gains `groupId` (a void) and `fillsGroup` (a piece),
+  both optional and additive -- a "fused" piece placed by tapping any
+  void in its group fills every void sharing that `groupId` in one
+  placement, but only if none of them are filled yet (a fused piece
+  physically can't fit where a loose piece already sits), giving the
+  spec's own required "more than one valid decomposition of the same
+  volume". Stage 5's actual puzzle reuses Stage 3's 6-void cube
+  untouched, adding one pre-fused `THREE.BoxGeometry` piece (a real
+  cube, not 6 stitched copies of the shared pyramid mesh -- it's
+  honestly a different physical object) as an alternate for all 6 at
+  once. `main.js` changes: `remainingCount()` now counts open VOIDS
+  rather than unplaced pieces (a fused placement can clear several
+  voids while its own loose siblings never get used, so the two
+  diverge); `revealNextTrayPiece()` only queues loose pieces -- a fused
+  piece is its own always-visible tray slot, not part of the "one at a
+  time" queue; placement resolves its target position/quaternion from
+  the piece's GROUP (cube center, identity) rather than from whichever
+  void was actually tapped, and colors every void the placement filled,
+  not just one. Verified live: fused piece placed with one tap solves
+  the whole cube instantly (correct position, correct "Solved!"); after
+  one loose piece claims part of the group, selecting the fused piece
+  turns every remaining void red (not just not-green) and a tap on any
+  of them is rejected without disturbing what's already placed; the
+  loose path was independently re-confirmed too (4 of 6 placed live,
+  reusing Stage 3's own already-fully-verified void positions
+  unchanged). `tests/unit/rhombis-puzzle-state.test.mjs` (23 cases total
+  now) separately proves both full decompositions solve the puzzle and
+  that a partially-loose-filled group rejects the fused piece with
+  `reason: 'group-partially-filled'`. Stages 6-7 (multi-cell puzzles,
+  procedural content/polish) are NOT yet built. Stage 7's own scoring/timer slot
   is the intended home for a later "spatial reasoning" score (direct
   suggestion 2026-09-03: NOT literally IQ -- that implies a validated
   psychometric claim this can't back up) -- not scoped or built yet.

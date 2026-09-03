@@ -144,12 +144,17 @@ function loadStage(index) {
   built.pieces.forEach((p) => scene.add(p.mesh));
 
   const state = createPuzzleState({
-    pieces: built.pieces.map((p) => ({ id: p.id, orientation: p.orientation, orientationOptions: p.orientationOptions })),
-    voids: built.voids.map((v) => ({ id: v.id, requiredOrientation: v.requiredOrientation })),
+    pieces: built.pieces.map((p) => ({
+      id: p.id,
+      orientation: p.orientation,
+      orientationOptions: p.orientationOptions,
+      fillsGroup: p.fillsGroup,
+    })),
+    voids: built.voids.map((v) => ({ id: v.id, requiredOrientation: v.requiredOrientation, groupId: v.groupId })),
   });
 
   const boundingRadius = boundingRadiusFromOrigin([built.skeletonGroup, ...built.pieces.map((p) => p.mesh)]);
-  current = { ...built, state, boundingRadius };
+  current = { ...built, groups: built.groups ?? [], state, boundingRadius };
   applyCameraFraming();
   solvedBanner.hidden = true;
   stageLabel.textContent = `Stage ${stageDef.id}: ${stageDef.name}`;
@@ -164,12 +169,21 @@ function currentStatePiece(id) {
   return current.state.pieces.find((p) => p.id === id);
 }
 
+// Counts open VOIDS, not unplaced pieces -- the two diverge as soon as
+// a stage offers alternates (Stage 5's fused piece can clear several
+// voids in one placement while its own loose siblings never get used
+// at all), and "how much of the shape is left to fill" is what the
+// player actually wants to know either way.
 function remainingCount() {
-  return current.state.pieces.filter((p) => !p.placed).length;
+  return current.state.voids.filter((v) => !v.filled).length;
 }
 
+// Only ever queues LOOSE pieces (no `fillsGroup`) -- a fused piece is
+// its own separate, always-available tray slot (stages.js sets its
+// mesh visible from construction), not part of the "one at a time"
+// queue the count-tracked loose pieces share.
 function revealNextTrayPiece() {
-  const next = current.pieces.find((p) => !currentStatePiece(p.id).placed);
+  const next = current.pieces.find((p) => !p.fillsGroup && !currentStatePiece(p.id).placed);
   if (!next) return;
   next.mesh.visible = true;
   next.mesh.position.copy(next.homePosition);
@@ -178,25 +192,27 @@ function revealNextTrayPiece() {
 function updateHud() {
   const selectedId = current.state.selectedPieceId;
   const flippable = current.pieces.some((p) => p.orientationOptions);
-  const multiplePieces = current.pieces.length > 1 && !flippable;
+  const multipleVoids = current.voids.length > 1 && !flippable;
   const remaining = remainingCount();
 
   if (!selectedId) {
     if (flippable) {
       hud.textContent = 'Tap a piece, then tap its void (tap the same piece again to flip it)';
-    } else if (multiplePieces) {
-      hud.textContent = `Tap the piece, then tap a void to place it (${remaining} left)`;
+    } else if (multipleVoids) {
+      hud.textContent = `Tap a piece, then tap a void to place it (${remaining} left)`;
     } else {
       hud.textContent = 'Tap the piece, then tap the skeleton to place it';
     }
     return;
   }
 
-  const orientation = currentStatePiece(selectedId).orientation;
-  if (orientation) {
-    const label = ORIENTATION_LABELS[orientation] ?? orientation;
+  const selectedPiece = currentStatePiece(selectedId);
+  if (selectedPiece.orientation) {
+    const label = ORIENTATION_LABELS[selectedPiece.orientation] ?? selectedPiece.orientation;
     hud.textContent = `Piece selected (${label}) -- tap it again to flip, or tap a void to place`;
-  } else if (multiplePieces) {
+  } else if (selectedPiece.fillsGroup) {
+    hud.textContent = 'Fused piece selected -- tap anywhere on that region to fill it all at once';
+  } else if (multipleVoids) {
     hud.textContent = `Piece selected (${remaining} left) -- tap a void to place it`;
   } else {
     hud.textContent = 'Piece selected -- tap the skeleton to place it';
@@ -352,16 +368,27 @@ function handleTap(clientX, clientY) {
   }
 
   const placedPiece = pieceById(result.pieceId);
+  // A loose piece snaps to the one void it was tapped onto; a fused
+  // piece (Stage 5) snaps to its GROUP's own shared placement instead
+  // (e.g. the cube's own center, identity rotation) -- it's a single
+  // physical object standing in for every void it just filled at once,
+  // not oriented to any one of them.
+  const target = placedPiece.fillsGroup
+    ? current.groups.find((g) => g.id === placedPiece.fillsGroup)
+    : hitVoid;
   // Reparent tray -> skeleton (Object3D.add() detaches from its current
   // parent automatically) so this piece rotates together with the rest
   // of the assembled shape from now on, instead of staying pinned to
   // the tray's fixed position in world space.
   current.skeletonGroup.add(placedPiece.mesh);
-  placedPiece.mesh.position.copy(hitVoid.position);
-  placedPiece.mesh.quaternion.copy(hitVoid.quaternion);
-  placedPiece.mesh.userData.targetQuaternion = hitVoid.quaternion;
+  placedPiece.mesh.position.copy(target.position);
+  placedPiece.mesh.quaternion.copy(target.quaternion);
+  placedPiece.mesh.userData.targetQuaternion = target.quaternion;
   setPieceSelectedVisual(placedPiece, false);
-  hitVoid.wire.material.color.setHex(FILLED_WIRE_COLOR);
+  for (const filledId of result.filledVoidIds) {
+    const filledVoid = current.voids.find((v) => v.id === filledId);
+    if (filledVoid) filledVoid.wire.material.color.setHex(FILLED_WIRE_COLOR);
+  }
   revealNextTrayPiece();
   refreshVoidHighlights();
   updateHud();

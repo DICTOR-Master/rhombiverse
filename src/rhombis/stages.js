@@ -29,7 +29,7 @@ function pieceMaterial() {
 // fix landed (apex ended up at -AXIS_NORMALS*scale/2, base at the
 // origin). The real fix is a translation by +AXIS_NORMALS*(scale/2)
 // alongside the rotation, which is what buildStage3 now passes.
-function makeVoid(geometry, { id, requiredOrientation, quaternion = IDENTITY_QUATERNION, position = ORIGIN }) {
+function makeVoid(geometry, { id, requiredOrientation, quaternion = IDENTITY_QUATERNION, position = ORIGIN, groupId }) {
   const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({ color: WIRE_COLOR }));
   wire.quaternion.copy(quaternion);
   wire.position.copy(position);
@@ -40,6 +40,7 @@ function makeVoid(geometry, { id, requiredOrientation, quaternion = IDENTITY_QUA
   return {
     id,
     requiredOrientation,
+    groupId,
     wire,
     hitTarget,
     quaternion: quaternion.clone(),
@@ -59,6 +60,19 @@ function makePiece(geometry, { id, orientation, orientationOptions, homePosition
   if (orientation) mesh.quaternion.copy(outwardQuaternion(orientation));
   mesh.userData.pieceId = id;
   return { id, orientation, orientationOptions, mesh, homePosition: homePosition.clone() };
+}
+
+// A "fused" piece (Stage 5): a genuinely different physical object, not
+// a transform of the shared pyramid mesh -- stands in for every void in
+// `fillsGroup` at once. Always visible in the tray from the start (see
+// main.js's revealNextTrayPiece, which only ever queues loose pieces),
+// since the player CHOOSES between it and the loose pieces rather than
+// receiving it in sequence.
+function makeFusedPiece(geometry, { id, fillsGroup, homePosition }) {
+  const mesh = new THREE.Mesh(geometry, pieceMaterial());
+  mesh.position.copy(homePosition);
+  mesh.userData.pieceId = id;
+  return { id, fillsGroup, mesh, homePosition: homePosition.clone() };
 }
 
 // Stage 1 -- engine + one piece. Direct instruction (2026-09-03): even
@@ -223,9 +237,64 @@ function buildStage4(scale) {
   };
 }
 
+// Stage 5 -- conjoined pieces: the SAME 6-void cube as Stage 3, but the
+// tray now also offers a single pre-fused "cube" piece as an alternate
+// fill for all 6 at once (RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md:
+// "a fused six for a cube... optional fill for part of a larger void").
+// Demonstrates the spec's own Stage 5 "Done when" directly: solvable
+// either by placing 6 loose pyramids one at a time (exactly Stage 3's
+// own flow, still fully available) OR by selecting the fused piece and
+// tapping once -- both are real, independent decompositions of the
+// identical cube volume (puzzle-state.js's own `fillsGroup`/`groupId`
+// mechanism, unit tested for both paths plus the "fused piece rejected
+// once a loose piece has claimed part of the group" case). The fused
+// piece is a genuine `THREE.BoxGeometry` -- a real cube, not 6 stitched
+// copies of the shared pyramid mesh -- since it's honestly a DIFFERENT
+// physical object, not a transform of the one shared piece the rest of
+// Rhombis reuses.
+function buildStage5(scale) {
+  const geometry = pyramidGeometry(scale);
+  const skeletonGroup = new THREE.Group();
+  const GROUP_ID = 'cube';
+
+  const voids = PYRAMID_AXES.map((axisKey) => {
+    const v = makeVoid(geometry, {
+      id: `v-${axisKey}`,
+      quaternion: inwardQuaternion(axisKey),
+      position: AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2),
+      groupId: GROUP_ID,
+    });
+    skeletonGroup.add(...v.sceneObjects);
+    return v;
+  });
+
+  const homePosition = new THREE.Vector3(scale * 2.6, 0, 0);
+  const loosePieces = PYRAMID_AXES.map((axisKey, i) => {
+    const p = makePiece(geometry, { id: `p${i}`, homePosition });
+    p.mesh.visible = i === 0; // only the next available copy shows in the tray
+    return p;
+  });
+
+  const fusedGeometry = new THREE.BoxGeometry(scale, scale, scale);
+  const fusedHomePosition = new THREE.Vector3(scale * 2.6, -scale * 1.7, 0);
+  const fusedPiece = makeFusedPiece(fusedGeometry, {
+    id: 'fused',
+    fillsGroup: GROUP_ID,
+    homePosition: fusedHomePosition,
+  });
+
+  return {
+    skeletonGroup,
+    pieces: [...loosePieces, fusedPiece],
+    voids,
+    groups: [{ id: GROUP_ID, position: new THREE.Vector3(0, 0, 0), quaternion: new THREE.Quaternion() }],
+  };
+}
+
 export const STAGES = [
   { id: 1, name: 'One Piece', build: buildStage1 },
   { id: 2, name: 'Octahedron', build: buildStage2 },
   { id: 3, name: 'Cube', build: buildStage3 },
   { id: 4, name: 'Rhombic Dodecahedron', build: buildStage4 },
+  { id: 5, name: 'Conjoined Pieces', build: buildStage5 },
 ];

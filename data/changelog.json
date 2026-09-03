@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-09-03",
+    "title": "Rhombis: Two Ways to Build a Cube",
+    "items": [
+      "Rhombis' fifth puzzle: the same cube as before, but now with a choice -- build it from 6 loose pyramids one at a time, or grab the single pre-fused cube piece sitting right next to them and drop the whole thing in with one tap. Both are real, equally valid solutions to the exact same shape."
+    ]
+  },
+  {
+    "date": "2026-09-03",
     "title": "Rhombis Grows a Rhombic Dodecahedron",
     "items": [
       "Rhombis' fourth puzzle: build a full rhombic dodecahedron from 12 pieces, 2 per cube face -- one pointing in toward the shared center, one pointing out as the RD's own spike. Same rotate-and-tap flow as every earlier puzzle, just twice as many pieces to place."

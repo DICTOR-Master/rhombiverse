@@ -14,6 +14,17 @@
 // a void), both optional -- a piece/void with neither set behaves
 // exactly as Stage 1 did (no orientation gate), so this is additive,
 // not a schema change to what Stage 1 already relies on.
+//
+// Stage 5 adds `groupId` (on a void) and `fillsGroup` (on a piece),
+// both optional too. A normal ("loose") piece never sets `fillsGroup`
+// and behaves exactly as before -- fills the one void it's tapped
+// onto. A "fused" piece's `fillsGroup` names a groupId; placing it
+// fills EVERY void sharing that groupId in one placement, but only if
+// none of them are filled yet (a fused piece physically can't fit
+// where a loose piece already sits) -- the spec's own "more than one
+// valid decomposition of the same volume": the group's voids stay
+// individually fillable by loose pieces too, right up until a fused
+// piece claims the whole group at once.
 
 export function createPuzzleState({ pieces, voids }) {
   return {
@@ -55,12 +66,17 @@ export function flipPiece(state, pieceId) {
   return { ...state, pieces };
 }
 
-// Returns { state, placed, pieceId, voidId, reason } -- `placed` false
-// means the tap was rejected and the caller should show reject
-// feedback rather than a placement. `reason` distinguishes *why*
-// ('nothing-selected', 'already-filled', 'wrong-orientation') since
-// Stage 2's own "Done when" criterion is specifically that a wrong
-// orientation is "visibly rejected", not just any rejection.
+// Returns { state, placed, pieceId, voidId, filledVoidIds, reason } --
+// `placed` false means the tap was rejected and the caller should show
+// reject feedback rather than a placement. `reason` distinguishes *why*
+// ('nothing-selected', 'already-filled', 'wrong-orientation', 'group-
+// partially-filled') since Stage 2's own "Done when" criterion is
+// specifically that a wrong orientation is "visibly rejected", not just
+// any rejection. `filledVoidIds` is every void actually filled by a
+// successful placement -- always length 1 for a loose piece (the
+// tapped void itself), but every member of the group for a fused piece
+// (Stage 5), so callers don't need to special-case which kind of piece
+// just fired.
 export function placeSelected(state, voidId) {
   const voidEntry = state.voids.find((v) => v.id === voidId);
   const pieceId = state.selectedPieceId;
@@ -69,6 +85,28 @@ export function placeSelected(state, voidId) {
   if (!pieceId || !piece || !voidEntry) {
     return { state, placed: false, pieceId, voidId, reason: 'nothing-selected' };
   }
+
+  if (piece.fillsGroup) {
+    if (voidEntry.groupId !== piece.fillsGroup) {
+      return { state, placed: false, pieceId, voidId, reason: 'nothing-selected' };
+    }
+    const groupVoids = state.voids.filter((v) => v.groupId === piece.fillsGroup);
+    if (groupVoids.some((v) => v.filled)) {
+      return { state, placed: false, pieceId, voidId, reason: 'group-partially-filled' };
+    }
+    const groupVoidIds = groupVoids.map((v) => v.id);
+    const fillSet = new Set(groupVoidIds);
+    const pieces = state.pieces.map((p) => (p.id === pieceId ? { ...p, placed: true } : p));
+    const voids = state.voids.map((v) => (fillSet.has(v.id) ? { ...v, filled: true } : v));
+    return {
+      state: { pieces, voids, selectedPieceId: null },
+      placed: true,
+      pieceId,
+      voidId,
+      filledVoidIds: groupVoidIds,
+    };
+  }
+
   if (voidEntry.filled) {
     return { state, placed: false, pieceId, voidId, reason: 'already-filled' };
   }
@@ -83,6 +121,7 @@ export function placeSelected(state, voidId) {
     placed: true,
     pieceId,
     voidId,
+    filledVoidIds: [voidId],
   };
 }
 
@@ -94,19 +133,31 @@ export function isSolved(state) {
 // the given piece, at its CURRENT orientation -- direct instruction
 // (2026-09-03): the skeleton itself should show green/red per-void
 // while a piece is selected, not just react after a rejected tap.
-// Surfaces the exact same rule placeSelected()'s own orientation check
-// enforces, so a void that reads green here is guaranteed to succeed if
-// tapped next, and one that reads red is guaranteed to hit
-// 'wrong-orientation'. Filled voids are omitted (the caller already
-// renders those as "filled", not valid/invalid).
+// Surfaces the exact same rules placeSelected() itself enforces, so a
+// void that reads green here is guaranteed to succeed if tapped next,
+// and one that reads red is guaranteed to reject. Filled voids are
+// omitted (the caller already renders those as "filled", not
+// valid/invalid). For a fused piece (Stage 5), every void in ITS group
+// reads valid together or not at all -- matches placeSelected()'s own
+// all-or-nothing group check -- and a void outside that group always
+// reads invalid for it.
 export function voidValidityForPiece(state, pieceId) {
   const piece = state.pieces.find((p) => p.id === pieceId);
   const validByVoidId = {};
+  const canAct = Boolean(piece && !piece.placed);
+  const groupAllOpen = canAct && piece.fillsGroup
+    ? state.voids.filter((v) => v.groupId === piece.fillsGroup).every((v) => !v.filled)
+    : false;
+
   for (const v of state.voids) {
     if (v.filled) continue;
-    validByVoidId[v.id] = Boolean(
-      piece && !piece.placed && (!v.requiredOrientation || v.requiredOrientation === piece.orientation),
-    );
+    if (!canAct) {
+      validByVoidId[v.id] = false;
+    } else if (piece.fillsGroup) {
+      validByVoidId[v.id] = v.groupId === piece.fillsGroup && groupAllOpen;
+    } else {
+      validByVoidId[v.id] = !v.requiredOrientation || v.requiredOrientation === piece.orientation;
+    }
   }
   return validByVoidId;
 }

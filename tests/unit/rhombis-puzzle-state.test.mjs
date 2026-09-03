@@ -260,3 +260,77 @@ test('Stage 4: the inward and outward void on the same axis are independent -- f
   assert.equal(state.voids.find((v) => v.id === 'v-out-x+').filled, false);
   assert.equal(isSolved(state), false);
 });
+
+// Stage 5's real shape: the same 6-void cube as Stage 3, but the tray
+// also has one pre-fused piece that fills the whole group in a single
+// placement -- see stages.js's buildStage5. Both are real, independent
+// decompositions of the identical volume.
+function stage5State() {
+  return createPuzzleState({
+    pieces: [
+      ...[0, 1, 2, 3, 4, 5].map((i) => ({ id: `p${i}` })),
+      { id: 'fused', fillsGroup: 'cube' },
+    ],
+    voids: ['x+', 'x-', 'y+', 'y-', 'z+', 'z-'].map((axis) => ({ id: `v-${axis}`, groupId: 'cube' })),
+  });
+}
+
+test('Stage 5: the fused piece fills every void in its group from a single tap', () => {
+  let state = stage5State();
+  state = selectPiece(state, 'fused');
+  const result = placeSelected(state, 'v-y+');
+  assert.equal(result.placed, true);
+  assert.deepEqual(
+    result.filledVoidIds.sort(),
+    ['v-x+', 'v-x-', 'v-y+', 'v-y-', 'v-z+', 'v-z-'],
+  );
+  assert.equal(isSolved(result.state), true);
+  assert.equal(result.state.pieces.find((p) => p.id === 'fused').placed, true);
+  // The 6 loose pieces were never individually used.
+  for (let i = 0; i < 6; i++) {
+    assert.equal(result.state.pieces.find((p) => p.id === `p${i}`).placed, false);
+  }
+});
+
+test('Stage 5: the cube is ALSO solvable the loose way, one pyramid at a time (the other valid decomposition)', () => {
+  let state = stage5State();
+  const voidIds = state.voids.map((v) => v.id);
+  voidIds.forEach((voidId, i) => {
+    state = selectPiece(state, `p${i}`);
+    const result = placeSelected(state, voidId);
+    assert.equal(result.placed, true);
+    state = result.state;
+  });
+  assert.equal(isSolved(state), true);
+  assert.equal(state.pieces.find((p) => p.id === 'fused').placed, false);
+});
+
+test('Stage 5: the fused piece is rejected once any loose piece has claimed part of the group', () => {
+  let state = stage5State();
+  state = selectPiece(state, 'p0');
+  state = placeSelected(state, 'v-x+').state;
+
+  state = selectPiece(state, 'fused');
+  const result = placeSelected(state, 'v-y+');
+  assert.equal(result.placed, false);
+  assert.equal(result.reason, 'group-partially-filled');
+  // The 5 still-open voids must be untouched by the rejected attempt.
+  assert.equal(state.voids.filter((v) => v.filled).length, 1);
+});
+
+test('voidValidityForPiece: the fused piece reads all-green when the group is fully open, and turns all-red once any member is claimed', () => {
+  let state = stage5State();
+  let validity = voidValidityForPiece(state, 'fused');
+  for (const axis of ['x+', 'x-', 'y+', 'y-', 'z+', 'z-']) {
+    assert.equal(validity[`v-${axis}`], true);
+  }
+
+  state = selectPiece(state, 'p0');
+  state = placeSelected(state, 'v-x+').state;
+  validity = voidValidityForPiece(state, 'fused');
+  // v-x+ is now filled -- omitted entirely, not just false.
+  assert.equal('v-x+' in validity, false);
+  for (const axis of ['x-', 'y+', 'y-', 'z+', 'z-']) {
+    assert.equal(validity[`v-${axis}`], false);
+  }
+});
