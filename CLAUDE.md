@@ -516,8 +516,42 @@ build order:
   succeeds where it previously would have been swallowed by the
   closer-but-invalid outward wedge.
 
-  Full `node --test tests/unit/*.test.mjs` clean (275/275) after both
-  fixes -- both are pure THREE-rendering/raycasting-side changes, no
+  **Third real bug, found the same day investigating "1 left over
+  couldnt fill" / "only outside were green on last few" / "something
+  stuck"** -- NOT a logic bug. Proven by writing a scripted solver
+  (temporary debug hook exposing `camera`/`renderer`/`current` on
+  `window`, real perspective-projection math to convert each void's
+  world position to exact screen pixels, removed again before
+  committing) that placed all 12 pieces correctly using precise
+  projected coordinates -- zero failures, confirming
+  `voidValidityForPiece`/`placeSelected`/the raycast-priority fix above
+  are all completely correct. The real cause: late in a stage, most
+  voids already hold real SOLID opaque placed pieces. A remaining valid
+  target's ghost is still correctly computed as green, but it can end
+  up fully behind one of those already-placed pieces from whatever angle
+  the shape currently sits at -- normal WebGL depth testing means the
+  player literally cannot SEE it to know where to tap, even though the
+  underlying match is completely correct (confirmed live: screenshotted
+  a real endgame state -- 2 voids left, 10 solid pieces already placed
+  -- and the valid target was invisible with normal depth testing on).
+  Fixed in `main.js`'s `refreshVoidHighlights()`: the currently-VALID
+  ghost specifically gets `depthTest = false` (invalid/idle ghosts keep
+  normal depth testing -- they're not worth punching through solid
+  geometry to see, only the one thing that actually matters right now
+  is). Verified live: the same endgame screenshot now clearly shows the
+  green target through the solid orange pieces in front of it, and a
+  tap at that same screen position places correctly (2 left -> 1 left).
+  A related but ultimately unnecessary idea raised the same
+  conversation ("maybe pieces should only be offered in order that can
+  be completed" / "available spaces should only be offered in order")
+  doesn't actually apply here -- every piece in a stage is geometrically
+  IDENTICAL and interchangeable (any piece fits any void once correctly
+  oriented), so queue/reveal ORDER was never what made the reported
+  scenario unsolvable; visibility was the whole problem, and this fix
+  addresses it directly rather than constraining player choice.
+
+  Full `node --test tests/unit/*.test.mjs` clean (275/275) after all
+  three fixes -- all pure THREE-rendering/raycasting-side changes, no
   `puzzle-state.js` edits.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.

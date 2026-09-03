@@ -402,15 +402,33 @@ function refreshVoidHighlights() {
       v.wire.visible = !current.hideIdleVoidWires;
       v.wire.material.color.setHex(WIRE_COLOR);
       v.wire.material.opacity = GHOST_OPACITY;
+      v.wire.material.depthTest = true;
     } else if (validity) {
       const valid = validity[v.id];
       v.wire.visible = true;
       v.wire.material.color.setHex(valid ? VALID_TARGET_COLOR : INVALID_TARGET_COLOR);
       v.wire.material.opacity = valid ? VALID_GHOST_OPACITY : INVALID_GHOST_OPACITY;
+      // Real live bug (2026-09-03, "1 left over couldnt fill" / "only
+      // outside were green on last few"): late in a stage, most voids
+      // are already filled with real SOLID opaque pieces. A remaining
+      // valid target can end up sitting fully behind one of those from
+      // whatever angle the shape is currently at -- the raycast/match
+      // logic is entirely correct (proven by a scripted solve using
+      // exact projected screen coordinates, which placed all 12 without
+      // a single failure), but the PLAYER can't see where to tap
+      // because solid geometry is literally drawn in front of it, and
+      // may not think to rotate to hunt for the one angle that shows a
+      // gap. The single valid target is the most important thing on
+      // screen right now, so it draws through everything else:
+      // depthTest off only for the valid one specifically (kept on for
+      // invalid/idle ghosts -- they're not worth punching through solid
+      // pieces to see).
+      v.wire.material.depthTest = !valid;
     } else {
       v.wire.visible = !current.hideIdleVoidWires;
       v.wire.material.color.setHex(WIRE_COLOR);
       v.wire.material.opacity = GHOST_OPACITY;
+      v.wire.material.depthTest = true;
     }
   }
 }
