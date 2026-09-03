@@ -687,23 +687,71 @@ build order:
   two are unrelated; don't conflate a comment referencing "Stage 7's
   undo" with this actual playable Stage 7.
 
-  **Next planned work, not yet started** (direct instruction 2026-09-04,
+  **Cell-arrangement enumerator, built 2026-09-04** (direct instruction,
   "from here forward all mathematical possibilities in any cell
-  arrangement" / "then 3 cell arrangements"): rather than hand-picking a
-  few named 3-cell shapes ("a line," "a triangle"), write a genuine
-  symmetry-based enumerator -- the FCC lattice's 12 `NEIGHBOR_OFFSETS`
-  are invariant under the full 48-operation octahedral symmetry group
-  (all coordinate permutations x all sign flips); BFS-grow every
-  connected N-cell cluster from a seed cell, canonicalize each one
-  (apply all 48 symmetries, keep the lexicographically-smallest
-  coordinate representation) to collapse rotations/reflections of the
-  same shape into one entry, exactly the "free polyomino" counting
-  problem adapted to this lattice. For N=2 this providably yields
-  exactly 1 shape (matches Stage 6/7 already being the same geometry,
-  a real sanity check once built); for N=3 it'll yield the REAL,
-  complete list (not a guess) to build the next stage(s) from. Scoped as
-  reusable infrastructure, not a one-off -- meant to power N=3 and any
-  later N without more hand design.
+  arrangement" / "go ahead, start the enumerator"): `src/rhombis/
+  cell-arrangements.js`, pure math, no THREE/DOM -- generates the
+  COMPLETE, symmetry-deduplicated set of connected N-cell FCC shapes
+  directly from `core/lattice.js`'s own `NEIGHBOR_OFFSETS`, rather than
+  hand-picking a few named shapes ("a line," "a triangle") the way Stage
+  7 reused an already-known 2-cell layout. `SYMMETRY_OPERATIONS`: the
+  FCC lattice's full symmetry group is exactly the 48-operation
+  octahedral group (6 axis permutations x 8 sign combinations) --
+  verified directly (own test suite), not assumed: every one of the 48
+  maps `NEIGHBOR_OFFSETS` bijectively onto itself, preserves the
+  lattice's own even-sum parity constraint, and the group closes under
+  composition. `canonicalForm(cells)`: tries all 48 operations, keeps
+  the lexicographically-smallest translated-and-sorted representation,
+  so two shapes that are just rotations/reflections of each other
+  collapse to the identical canonical key -- exactly the "free
+  polyomino" counting problem, adapted from a square grid to this
+  lattice. `enumerateShapes(maxN)`: BFS-grows every connected N-cell
+  cluster from a seed cell, deduping via canonical form at each size
+  before growing further, so N=k's own complete deduped list is real
+  input to generating N=k+1.
+
+  **Real, verified results, not guesses**: N=1 gives 1 shape (trivial);
+  N=2 gives exactly 1 shape (the lattice symmetry group acts
+  transitively on all 12 neighbor offsets -- confirms Stage 6/7 really
+  are "the" 2-cell shape, not just "a" 2-cell shape); **N=3 gives
+  exactly 4 distinct shapes**, not the 2-3 guessed by hand the day
+  before -- characterized by their real pairwise cell distances (in
+  edge-length units, edge = sqrt(2)):
+  - **Triangle**: (1, 1, 1) -- equilateral, all three cells mutually
+    adjacent, a real face of the FCC close-packing.
+  - **Straight line**: (1, 1, 2*sqrt(2)) -- the two end cells at
+    exactly double the edge length apart (the SAME offset applied
+    twice), the maximum possible end-to-end spread for 3 connected
+    cells.
+  - **Wide bend**: (1, 1, sqrt(6)) -- an open (non-triangular) chain,
+    ends farther apart than the narrow bend.
+  - **Narrow bend**: (1, 1, 2) -- an open chain, ends closer together
+    than the wide bend, tighter turn than the straight line.
+  N=4 was also computed as a further sanity check on the generator's
+  own scaling behavior: 20 distinct shapes (not yet characterized in
+  detail -- no N=4 stage work has started).
+
+  12 tests in `tests/unit/rhombis-cell-arrangements.test.mjs` cover the
+  symmetry group's own correctness (count, bijectivity, parity
+  preservation, closure under composition) independently from the
+  enumeration results, plus `canonicalForm`'s translation/symmetry
+  invariance, the N=1/N=2/N=3 counts, two hand-built shapes (a real
+  triangle, a real straight line) provably appearing among the N=3
+  results and being provably distinct from each other, and that every
+  generated shape at every size is genuinely connected (no
+  reachability bugs slipping through). Full `node --test
+  tests/unit/*.test.mjs` clean.
+
+  **Not yet built**: turning any of the 4 real N=3 shapes into an
+  actual playable stage -- this file only generates the shape data
+  (which cells, at which lattice coordinates), not stage content. Two
+  further direct notes for whenever that stage-building work starts:
+  decoy pieces should vary in size as levels progress (not just
+  single-cell decoys), and a 3-cell stage's tray should offer the
+  singles-only path ALONGSIDE a 2-piece-joined option (a joined pair
+  covering 2 of the 3 cells, plus 1 single for the third) -- echoing
+  Stage 6/7's own "more than one valid decomposition" spec requirement
+  at 3-cell scale, not just "all loose vs. all fused".
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
