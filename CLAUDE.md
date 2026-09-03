@@ -553,6 +553,37 @@ build order:
   Full `node --test tests/unit/*.test.mjs` clean (275/275) after all
   three fixes -- all pure THREE-rendering/raycasting-side changes, no
   `puzzle-state.js` edits.
+
+  **Fourth real bug, found live the same day after completing every
+  stage anyway** ("one highly frustrating thing was that genuinely
+  aligned spaces dont light up as you rotate target and successful
+  orientations are in completely different directions"). Root cause: an
+  unplaced (tray) piece is a child of `scene`, not `skeletonGroup` --
+  its fixed tray POSITION depends on that (Stage 3's own header comment
+  already explains why: an orbiting camera or a fully-parented tray both
+  swing the tray around unacceptably). But dragging to rotate the target
+  shape spins `skeletonGroup` (and every void with it) while the held
+  piece's own facing never moved at all -- its orientation quaternion
+  (`quaternionForOrientationKey`) is a fixed LOCAL-axis label with no
+  relationship to the skeleton's current on-screen rotation. So "does
+  this piece look aligned with that hole from here" was never a
+  trustworthy cue the moment you rotated even slightly, exactly matching
+  the report. Fixed in `main.js`'s `animate()`: for an unplaced piece
+  with a real `orientation` (Stage 1/2/4 currently), the per-frame slerp
+  target is now `skeletonGroup.quaternion * quaternionForOrientationKey
+  (orientation)`, recomputed every frame -- the piece's POSITION stays
+  fixed in the tray (unaffected), but its FACING now visually spins
+  along with the target shape in real time, so alignment is a genuine
+  visual cue again at any rotation. Placed pieces need none of this --
+  already children of `skeletonGroup`, the scene graph composes their
+  rotation with the group automatically, which is exactly why this bug
+  was invisible for anything already placed. Verified live
+  (screenshotted before/after a drag with a piece selected: the held
+  piece's own silhouette visibly changes shape as the target rotates,
+  where before it stayed static) and re-confirmed placement still works
+  correctly immediately after rotating mid-selection (a real
+  select-rotate-flip-place sequence, not just visual inspection). Full
+  suite re-run clean (275/275) after this fix too.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

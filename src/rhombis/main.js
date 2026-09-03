@@ -638,8 +638,32 @@ function animate() {
   requestAnimationFrame(animate);
   if (current) {
     for (const p of current.pieces) {
-      const target = p.mesh.userData.targetQuaternion;
-      if (target) p.mesh.quaternion.slerp(target, ROTATION_DAMPING);
+      const sp = currentStatePiece(p.id);
+      if (sp && !sp.placed && sp.orientation) {
+        // Real live report (2026-09-03): "genuinely aligned spaces dont
+        // light up as you rotate... successful orientations are in
+        // completely different directions". Root cause: an unplaced
+        // piece lives in the fixed tray as a child of `scene`, not
+        // `skeletonGroup` -- dragging to rotate the target shape spins
+        // the skeleton (and every void with it), but the held piece's
+        // own facing never moved, so "does this look aligned with that
+        // hole" stopped being a trustworthy cue the moment you rotated
+        // at all (the piece's orientation is a fixed local-axis label,
+        // meaningless as a SCREEN direction until composed with
+        // whatever the skeleton's current rotation actually is). Fixed
+        // by composing the piece's own orientation with the skeleton's
+        // live rotation every frame, so the held piece visually spins
+        // along with the target shape and stays a real visual match for
+        // whichever void it's actually compatible with, at any camera
+        // angle. Placed pieces need none of this -- they're already
+        // children of skeletonGroup, so the scene graph composes their
+        // rotation with the group's automatically.
+        const desired = current.skeletonGroup.quaternion.clone().multiply(quaternionForOrientationKey(sp.orientation));
+        p.mesh.quaternion.slerp(desired, ROTATION_DAMPING);
+      } else {
+        const target = p.mesh.userData.targetQuaternion;
+        if (target) p.mesh.quaternion.slerp(target, ROTATION_DAMPING);
+      }
     }
   }
   renderer.render(scene, camera);
