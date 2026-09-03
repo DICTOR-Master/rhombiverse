@@ -7,7 +7,7 @@
 // so adding Stage 4+ is a new build function here, not a main.js
 // rewrite.
 import * as THREE from 'three';
-import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry } from './geometry.js';
+import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey } from './geometry.js';
 import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld } from '../core/lattice.js';
 
 export const WIRE_COLOR = 0x6ad0ff;
@@ -50,14 +50,16 @@ function makeVoid(geometry, { id, requiredOrientation, quaternion = IDENTITY_QUA
 }
 
 // `orientation`/`orientationOptions` are only set for a piece the player
-// can flip themselves (Stage 2). A piece without them (Stage 1's single
-// piece, Stage 3's cube pieces) starts in the plain identity pose and
-// gets its final rotation set programmatically on placement instead --
-// no player-driven flip needed for a piece that only ever goes one way.
+// can flip themselves (Stage 1/2's up/down flip; Stage 4's manual-
+// orientation prototype, the full 12-way in/out space). A piece without
+// them (Stage 3's cube pieces, Stage 6's loose RD pieces) starts in the
+// plain identity pose and gets its final rotation set programmatically
+// on placement instead -- no player-driven flip needed for a piece that
+// only ever goes one way.
 function makePiece(geometry, { id, orientation, orientationOptions, homePosition }) {
   const mesh = new THREE.Mesh(geometry, pieceMaterial());
   mesh.position.copy(homePosition);
-  if (orientation) mesh.quaternion.copy(outwardQuaternion(orientation));
+  if (orientation) mesh.quaternion.copy(quaternionForOrientationKey(orientation));
   mesh.userData.pieceId = id;
   return { id, orientation, orientationOptions, mesh, homePosition: homePosition.clone() };
 }
@@ -184,6 +186,11 @@ function buildStage3(scale) {
   };
 }
 
+// Every orientation a Stage 4 piece can be turned to: all 6 axes, both
+// directions -- 'x+:in', 'x+:out', 'x-:in', ... 12 total (geometry.js's
+// quaternionForOrientationKey resolves each to its real quaternion).
+const RD_ORIENTATIONS = PYRAMID_AXES.flatMap((axisKey) => [`${axisKey}:in`, `${axisKey}:out`]);
+
 // Stage 4 -- rhombic dodecahedron: 12 of the same pyramid, 2 per cube
 // face (RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md's own RD row: "a
 // cube's 6 inward pyramids, plus 6 more of the same pyramid mirrored
@@ -194,15 +201,22 @@ function buildStage3(scale) {
 // spike. Verified numerically before landing (outward 'y+' at scale=2:
 // base world (0,1,0), apex world (0,2,0), exactly the spec's own stated
 // "(0,±s,0)" outward cap coordinate) rather than assumed from the
-// Stage 3 pattern. "Inward and outward pyramids look identical but sit
-// differently" (the spec's own Stage 4 note) is handled for free by
-// plain 3D occlusion -- an inward void's hit-target volume is INSIDE
-// the cube envelope, an outward one is OUTSIDE it as a spike, so they
-// never compete for the same raycast hit despite sharing a base
-// position; no extra disambiguation logic needed. Like Stage 3, no
-// player-driven orientation choice -- 12 identical, non-flippable tray
-// pieces that auto-snap to whichever void is tapped, count-tracked the
-// same way.
+// Stage 3 pattern.
+//
+// Manual-orientation PROTOTYPE (direct instruction 2026-09-03, "let's
+// prototype manual orientation on stage 4 and feel it out"): unlike
+// Stage 3's auto-snap loose pieces, every piece here starts at a fixed
+// wrong orientation ('x+:in', matching Stage 1's own "starts wrong"
+// design) and must be cycled through RD_ORIENTATIONS (tap the selected
+// piece again, same flip mechanic Stage 1/2 already use, just a 12-way
+// cycle instead of binary) to the void's own `requiredOrientation`
+// before it will place. "Inward and outward pyramids look identical
+// but sit differently" (the spec's own Stage 4 note) now genuinely
+// means the PLAYER has to tell them apart and orient for it, not just
+// the raycaster resolving which region was tapped. Needed zero
+// puzzle-state.js changes: flipPiece()/placeSelected() only ever
+// compare `orientation` strings for equality, the same mechanism
+// Stage 1/2 already exercise at 2-state scale.
 function buildStage4(scale) {
   const geometry = pyramidGeometry(scale);
   const skeletonGroup = new THREE.Group();
@@ -213,11 +227,13 @@ function buildStage4(scale) {
       id: `v-in-${axisKey}`,
       quaternion: inwardQuaternion(axisKey),
       position: facePosition,
+      requiredOrientation: `${axisKey}:in`,
     });
     const vOut = makeVoid(geometry, {
       id: `v-out-${axisKey}`,
       quaternion: outwardQuaternion(axisKey),
       position: facePosition.clone(),
+      requiredOrientation: `${axisKey}:out`,
     });
     skeletonGroup.add(...vIn.sceneObjects, ...vOut.sceneObjects);
     return [vIn, vOut];
@@ -225,7 +241,12 @@ function buildStage4(scale) {
 
   const homePosition = new THREE.Vector3(scale * 3.2, 0, 0);
   const pieces = voids.map((_, i) => {
-    const p = makePiece(geometry, { id: `p${i}`, homePosition });
+    const p = makePiece(geometry, {
+      id: `p${i}`,
+      orientation: 'x+:in',
+      orientationOptions: RD_ORIENTATIONS,
+      homePosition,
+    });
     p.mesh.visible = i === 0; // only the next available copy shows in the tray
     return p;
   });

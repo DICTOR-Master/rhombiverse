@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-09-03",
+    "title": "Rhombis: A Steadier Tray",
+    "items": [
+      "Fixed a subtle bug that could occasionally let a tap on a piece you're rotating affect the wrong copy behind it instead -- tray pieces you haven't reached yet no longer take part in taps at all until they're actually revealed."
+    ]
+  },
+  {
+    "date": "2026-09-03",
     "title": "Rhombis Gets an Undo Button",
     "items": [
       "Made a wrong move in Rhombis? Tap Undo (bottom-left) to take back your last placement -- works whether it was a single loose piece or a whole pre-fused piece that filled several spots at once, and cancels an in-progress \"Solved!\" transition too if you catch it in time."

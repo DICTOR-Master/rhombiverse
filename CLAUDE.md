@@ -143,38 +143,96 @@ build order:
   not import `render.js` or touch the Core/Modules boundary), linked
   from the welcome screen (`welcome.js`'s `.rhombis-link`), built mobile/
   touch-first (capped pixel ratio, safe-area CSS, `touch-action`/tap-
-  highlight hardening). A real geometry bug was caught and fixed during
+  highlight hardening). `rhombis.html?stage=<id>` jumps straight to that
+  stage on load (dev/testing convenience only, never surfaced in the
+  UI, silently falls back to Stage 1 for a missing/invalid id) -- added
+  so comparing stage variants (e.g. Stage 4's auto-snap vs. manual-
+  orientation prototype) doesn't need editing source and remembering to
+  revert it, which is exactly how earlier stages in this same session
+  got tested before this existed. A real geometry bug was caught and fixed during
   Stage 3 verification (not shipped broken): the cube's 6 void positions
   were rotated but never translated, leaving apex/base swapped relative
   to spec (verified numerically before AND after the fix). Verified via
   real headless-Chromium runs, including real iPhone-viewport touch
   taps, across Stages 1-3 end to end. **Stage 4** (RD, 12 pieces) needed
-  zero new geometry primitives -- per axis, the existing Stage 3 inward
-  void and a new outward one share the exact same `position` (both have
+  zero new geometry primitives -- per axis, the inward void (Stage 3's
+  own) and a new outward one share the exact same `position` (both have
   their base on that cube face) and differ only in `quaternion`
   (`inwardQuaternion`/`outwardQuaternion`, both already built for
   Stages 2-3); verified numerically before landing (outward 'y+' at
   scale=2: base world (0,1,0), apex world (0,2,0), matching the spec's
   own stated outward-cap coordinate exactly) rather than assumed from
-  the Stage 3 pattern. "Inward and outward pyramids look identical but
-  sit differently" (the spec's own Stage 4 note) needed no extra
-  disambiguation code -- an inward void's hit-target volume is inside
-  the cube envelope, an outward one is outside it as a spike, so plain
-  3D raycasting already tells them apart despite sharing a base
-  position. No player-driven orientation choice, same as Stage 3 (12
-  identical, non-flippable, count-tracked tray pieces that auto-snap to
-  whichever void is tapped). Verified live in a real headless-Chromium
-  run: correct RD silhouette, camera auto-framed the larger geometry
-  with zero manual tuning (the same derived-bounding-radius fit Stages
-  1-3 already used), 7 of 12 real distinct placements confirmed
-  successful across multiple rotations (auto-orientation, red/green
-  highlighting, count-decrement all correct each time) -- the
-  remaining 5 were not each individually re-confirmed live purely
-  because of this session's own screenshot-coordinate-picking
-  friction on a small isometric render, not any suspected app issue;
-  `tests/unit/rhombis-puzzle-state.test.mjs` separately proves all 12
-  placeable in shuffled order and that an axis's inward/outward voids
-  are independent. **Stage 5** (conjoined pieces) is the first REAL
+  the Stage 3 pattern.
+
+  **Stage 4 is currently a manual-orientation PROTOTYPE, not the
+  original auto-snap design** (direct instruction 2026-09-03, "let's
+  prototype manual orientation on stage 4 and feel it out" -- a real
+  question the user raised about whether auto-snapping every loose
+  piece from Stage 3 onward was quietly turning "assemble a jigsaw"
+  into "revolve one big complicated shape and tap obvious holes",
+  making Stage 3+ less of a genuine spatial-reasoning puzzle than
+  Stage 1/2 already were, and specifically undermining what a later
+  spatial-reasoning score would even be measuring). Every Stage 4 piece
+  now starts at a fixed wrong orientation ('x+:in', matching Stage 1's
+  own "starts wrong" design) and must be cycled -- tap the selected
+  piece again, same mechanic Stage 1/2 already use -- through all 12
+  real targets (`geometry.js`'s new `quaternionForOrientationKey()`,
+  which unifies Stage 1/2's bare axis-key orientations and Stage 4's
+  new compound 'axisKey:in'/'axisKey:out' ones behind one resolver) to
+  the void's own `requiredOrientation` before it will place. Needed
+  ZERO `puzzle-state.js` changes -- `flipPiece()`'s N-way cycling and
+  `placeSelected()`'s orientation gate already generalized from Stage
+  2's 2-state case to Stage 4's 12-state one for free, proof the
+  earlier design held up. `tests/unit/rhombis-puzzle-state.test.mjs`
+  covers the 12-way cycle (wraps back to the start after exactly 12
+  flips), a wrong-orientation placement rejecting cleanly, and all 12
+  solvable once correctly oriented.
+
+  **Real bug found and fixed while building this** (2026-09-03,
+  general, not Stage-4-specific): `THREE.Raycaster` does NOT skip
+  invisible objects on its own -- verified directly against the
+  library source (neither `Raycaster.js` nor `Mesh.js` check
+  `.visible`). Every earlier count-tracked tray (Stage 3/5/6) passed
+  ALL its own not-yet-revealed pieces to the raycaster right alongside
+  the one visible piece, and never caught this: those pieces sit at the
+  exact same UNROTATED pose as the visible one, so tied-distance
+  intersections happened to stably resolve to array order (index 0) by
+  coincidence, not because visibility was actually respected. Stage 4's
+  flip mechanic broke that coincidence the moment a piece rotates away
+  from the shared pose -- the raycaster would then find the NEXT
+  queued, still-unrotated, still-invisible piece instead, silently
+  flipping the wrong one (caught via a live repro: flip cycled p0 once
+  correctly, then the very next tap flipped p1 instead, confirmed with
+  temporary debug logging before the fix). Fixed in `main.js`'s
+  `handleTap`: `pieceTargets` now filters `p.mesh.visible` explicitly
+  rather than relying on the raycaster to do it. This was a real,
+  latent bug in every stage with a count-tracked tray, not something
+  Stage 4 introduced -- it simply never had a chance to manifest until
+  a piece could rotate while still queued.
+
+  **Real secondary UX finding, not yet acted on**: because the
+  canonical pyramid mesh's local origin is at its base center (not its
+  visual centroid), flipping a piece rotates it around a point well
+  behind its own apex -- the piece visibly SHIFTS position on screen
+  with each flip, not just its facing. Confirmed via screenshot
+  (compare the tray piece's on-screen position before vs. after a
+  flip). This could make repeatedly tapping to cycle through
+  orientations feel like "chasing" the piece rather than a stable,
+  precise action -- flagged for direct hands-on feel, not fixed
+  preemptively; the fix, if wanted, would be re-centering the piece
+  mesh's own pivot to its bounding-box centroid before it's used as a
+  flippable tray piece.
+
+  Not yet re-verified live end-to-end for a full 12-piece solve (the
+  select-flip-place LOOP was confirmed once, real placement, real
+  count decrement, correct snap) -- pending the user's own hands-on
+  "feel it out" pass before deciding whether to keep, tune (e.g. a
+  smarter cycle order, or fewer discrete steps), or revert to Stage 3's
+  auto-snap style. Stage 3, 5, 6's loose pieces are UNCHANGED
+  (still auto-snap) -- this prototype is deliberately scoped to Stage 4
+  only, per the direct instruction.
+
+  **Stage 5** (conjoined pieces) is the first REAL
   architecture extension, not just new content on the existing engine:
   `puzzle-state.js` gains `groupId` (a void) and `fillsGroup` (a piece),
   both optional and additive -- a "fused" piece placed by tapping any

@@ -82,3 +82,24 @@ export function outwardQuaternion(axisKey) {
 export function inwardQuaternion(axisKey) {
   return quaternionForApexDirection(AXIS_NORMALS[axisKey].clone().negate());
 }
+
+// Resolves a piece's `orientation` string to the quaternion it should
+// currently show -- the single place that understands BOTH orientation
+// vocabularies in play, so callers never need to know which one a given
+// piece uses. Stage 1/2 use a bare axis key ('y+', 'y-') and always mean
+// outward (their own up/down flip); Stage 4's manual-orientation
+// prototype (direct instruction 2026-09-03: "prototype manual
+// orientation on stage 4 and feel it out") needs the FULL 12-way space
+// (a loose piece can be turned to any of the RD's 6 inward or 6 outward
+// targets, not just flip), so it uses a compound 'axisKey:in'/
+// 'axisKey:out' key instead. Two formats, not two functions, so
+// puzzle-state.js's own flipPiece()/placeSelected() (which only ever
+// compare `orientation` strings for equality, never interpret them)
+// needed zero changes to support this.
+export function quaternionForOrientationKey(key) {
+  if (key.includes(':')) {
+    const [axisKey, direction] = key.split(':');
+    return direction === 'in' ? inwardQuaternion(axisKey) : outwardQuaternion(axisKey);
+  }
+  return outwardQuaternion(key);
+}

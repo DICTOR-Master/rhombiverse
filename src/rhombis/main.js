@@ -33,7 +33,7 @@
 // together with the rest of the assembled shape, exactly as a real
 // placed piece should.
 import * as THREE from 'three';
-import { outwardQuaternion } from './geometry.js';
+import { quaternionForOrientationKey } from './geometry.js';
 import { STAGES, WIRE_COLOR } from './stages.js';
 import { createPuzzleState, selectPiece, flipPiece, placeSelected, isSolved, voidValidityForPiece } from './puzzle-state.js';
 
@@ -50,7 +50,20 @@ const VALID_TARGET_COLOR = 0x6dff9e;
 const INVALID_TARGET_COLOR = REJECT_FLASH_COLOR;
 const STAGE_ADVANCE_DELAY_MS = 1400;
 const ROTATION_DAMPING = 0.25;
+// Friendlier labels for the small, named set of orientations that have
+// one; anything else (Stage 4's 12-way 'axisKey:in'/'axisKey:out') gets
+// a generic fallback from orientationLabel() below instead of an entry
+// here -- see that function's own comment.
 const ORIENTATION_LABELS = { 'y+': 'apex up', 'y-': 'apex down' };
+
+function orientationLabel(key) {
+  if (ORIENTATION_LABELS[key]) return ORIENTATION_LABELS[key];
+  if (key.includes(':')) {
+    const [axisKey, direction] = key.split(':');
+    return `${axisKey} face, ${direction === 'in' ? 'inward' : 'outward'}`;
+  }
+  return key;
+}
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05050a);
@@ -127,7 +140,15 @@ const solvedBanner = document.getElementById('rhombis-solved');
 const stageLabel = document.getElementById('rhombis-stage');
 const undoButton = document.getElementById('rhombis-undo');
 
-let stageIndex = 0;
+// Dev/testing convenience only, never surfaced in the UI: ?stage=4
+// jumps straight to that stage's own id (STAGES' own `id` field, not
+// the array index) on load, so trying out a specific stage -- e.g.
+// comparing Stage 4's manual-orientation prototype against Stage 3 --
+// doesn't need editing source and remembering to revert it. Silently
+// falls back to Stage 1 for a missing/invalid value.
+const requestedStageId = Number(new URLSearchParams(window.location.search).get('stage'));
+const requestedStageIndex = STAGES.findIndex((s) => s.id === requestedStageId);
+let stageIndex = requestedStageIndex >= 0 ? requestedStageIndex : 0;
 let current = null; // { skeletonGroup, pieces, voids, state, boundingRadius, history, advanceTimer }
 
 function clearCurrentStage() {
@@ -190,7 +211,7 @@ function syncVisualsToState() {
     } else {
       scene.add(p.mesh); // detach from skeletonGroup back to the fixed tray, if it was there
       p.mesh.position.copy(p.homePosition);
-      const restQuaternion = sp.orientation ? outwardQuaternion(sp.orientation) : new THREE.Quaternion();
+      const restQuaternion = sp.orientation ? quaternionForOrientationKey(sp.orientation) : new THREE.Quaternion();
       p.mesh.quaternion.copy(restQuaternion);
       p.mesh.userData.targetQuaternion = restQuaternion;
       p.mesh.visible = Boolean(p.fillsGroup); // fused: always shown; loose: fixed by revealNextTrayPiece below
@@ -252,14 +273,20 @@ function revealNextTrayPiece() {
 function updateHud() {
   const selectedId = current.state.selectedPieceId;
   const flippable = current.pieces.some((p) => p.orientationOptions);
-  const multipleVoids = current.voids.length > 1 && !flippable;
+  // Was mutually exclusive with `flippable` until Stage 4's manual-
+  // orientation prototype made a stage BOTH flippable and 12-void at
+  // once -- the remaining count is still worth showing there, so it's
+  // folded into every branch below as a suffix instead of its own
+  // separate branch.
+  const multipleVoids = current.voids.length > 1;
   const remaining = remainingCount();
+  const countSuffix = multipleVoids ? ` (${remaining} left)` : '';
 
   if (!selectedId) {
     if (flippable) {
-      hud.textContent = 'Tap a piece, then tap its void (tap the same piece again to flip it)';
+      hud.textContent = `Tap a piece, then tap its void (tap again to flip)${countSuffix}`;
     } else if (multipleVoids) {
-      hud.textContent = `Tap a piece, then tap a void to place it (${remaining} left)`;
+      hud.textContent = `Tap a piece, then tap a void to place it${countSuffix}`;
     } else {
       hud.textContent = 'Tap the piece, then tap the skeleton to place it';
     }
@@ -268,12 +295,12 @@ function updateHud() {
 
   const selectedPiece = currentStatePiece(selectedId);
   if (selectedPiece.orientation) {
-    const label = ORIENTATION_LABELS[selectedPiece.orientation] ?? selectedPiece.orientation;
-    hud.textContent = `Piece selected (${label}) -- tap it again to flip, or tap a void to place`;
+    const label = orientationLabel(selectedPiece.orientation);
+    hud.textContent = `Piece selected (${label}) -- tap it again to flip, or tap a void to place${countSuffix}`;
   } else if (selectedPiece.fillsGroup) {
     hud.textContent = 'Fused piece selected -- tap anywhere on that region to fill it all at once';
   } else if (multipleVoids) {
-    hud.textContent = `Piece selected (${remaining} left) -- tap a void to place it`;
+    hud.textContent = `Piece selected${countSuffix} -- tap a void to place it`;
   } else {
     hud.textContent = 'Piece selected -- tap the skeleton to place it';
   }
@@ -388,8 +415,22 @@ function handleTap(clientX, clientY) {
   pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(pointerNDC, camera);
 
+  // .visible is filtered explicitly, not left to the raycaster -- real
+  // bug, caught building Stage 4's manual-orientation prototype
+  // (2026-09-03): THREE.Raycaster does NOT skip invisible objects on
+  // its own (verified directly against the library source, neither
+  // Raycaster.js nor Mesh.js check `.visible`). The count-tracked tray
+  // queue (Stage 3/5/6) never surfaced this: every not-yet-revealed
+  // piece sits at the exact same UNROTATED pose as the visible one, so
+  // tied-distance intersections happened to stably resolve to array
+  // order (index 0) by coincidence, not because visibility was actually
+  // respected. Stage 4 breaks that coincidence -- flipping the visible
+  // piece rotates it away from the shared pose, so the next queued
+  // (still-identity-rotated, still invisible) piece could resolve
+  // nearer the ray than the one actually on screen, silently flipping
+  // the WRONG piece.
   const pieceTargets = current.pieces
-    .filter((p) => !currentStatePiece(p.id).placed)
+    .filter((p) => !currentStatePiece(p.id).placed && p.mesh.visible)
     .map((p) => p.mesh);
   const voidTargets = current.voids.map((v) => v.hitTarget);
   const hits = raycaster.intersectObjects([...pieceTargets, ...voidTargets], false);
@@ -399,14 +440,15 @@ function handleTap(clientX, clientY) {
   const hitPiece = current.pieces.find((p) => p.mesh === hitObj);
   if (hitPiece) {
     if (current.state.selectedPieceId === hitPiece.id) {
-      // A piece with no orientationOptions (Stage 1's/Stage 3's pieces)
-      // has nothing to flip -- flipPiece() is already a no-op for it,
-      // but skip the rotation-target update too rather than calling
-      // outwardQuaternion(undefined) for a piece with no orientation.
+      // A piece with no orientationOptions (Stage 3's pieces) has
+      // nothing to flip -- flipPiece() is already a no-op for it, but
+      // skip the rotation-target update too rather than calling
+      // quaternionForOrientationKey(undefined) for a piece with no
+      // orientation.
       if (hitPiece.orientationOptions) {
         current.state = flipPiece(current.state, hitPiece.id);
         hitPiece.orientation = currentStatePiece(hitPiece.id).orientation;
-        hitPiece.mesh.userData.targetQuaternion = outwardQuaternion(hitPiece.orientation);
+        hitPiece.mesh.userData.targetQuaternion = quaternionForOrientationKey(hitPiece.orientation);
       }
     } else {
       current.state = selectPiece(current.state, hitPiece.id);

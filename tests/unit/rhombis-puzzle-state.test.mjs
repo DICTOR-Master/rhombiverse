@@ -42,16 +42,28 @@ function stage3State() {
   });
 }
 
-// Stage 4's real shape: 12 identical, non-flippable pieces (same as
-// Stage 3) and 12 voids, 2 per axis (inward/outward) -- see stages.js's
-// buildStage4. No orientation gate on the voids either: which of the 2
-// per axis you fill is resolved by which one you actually raycast-hit
-// in 3D (their hit-target volumes don't overlap), not by puzzle-state.
+// Stage 4's real shape (manual-orientation prototype, 2026-09-03: "feel
+// out" whether requiring real orientation work at Stage 4 makes the
+// puzzle read as a genuine jigsaw rather than "revolve one big shape
+// until it fits"). 12 flippable pieces, all starting at the SAME wrong
+// orientation ('x+:in', matching Stage 1's own "starts wrong" design),
+// cycling through RD_ORIENTATIONS (see stages.js) to match whichever
+// void they're headed for -- no auto-snap. Each void now has exactly
+// one correct `requiredOrientation` (12 voids, 12 distinct required
+// orientations, a real 1:1).
+const RD_ORIENTATIONS = ['x+', 'x-', 'y+', 'y-', 'z+', 'z-'].flatMap((axis) => [`${axis}:in`, `${axis}:out`]);
+
 function stage4State() {
-  const axes = ['x+', 'x-', 'y+', 'y-', 'z+', 'z-'];
   return createPuzzleState({
-    pieces: Array.from({ length: 12 }, (_, i) => ({ id: `p${i}` })),
-    voids: axes.flatMap((axis) => [{ id: `v-in-${axis}` }, { id: `v-out-${axis}` }]),
+    pieces: Array.from({ length: 12 }, (_, i) => ({
+      id: `p${i}`,
+      orientation: 'x+:in',
+      orientationOptions: RD_ORIENTATIONS,
+    })),
+    voids: RD_ORIENTATIONS.map((orientation) => {
+      const [axis, dir] = orientation.split(':');
+      return { id: `v-${dir}-${axis}`, requiredOrientation: orientation };
+    }),
   });
 }
 
@@ -232,7 +244,20 @@ test('voidValidityForPiece: filled voids are omitted, and no piece selected repo
   assert.equal(noSelection['v-down'], false);
 });
 
-test('Stage 4: all 12 identical pieces placeable in any order, filling all 12 voids solves it', () => {
+// Cycles the given piece (flipPiece) until it reaches targetOrientation,
+// bounded by the piece's own orientationOptions length so a real bug
+// (never reaching the target) fails loudly instead of looping forever.
+function flipUntilOriented(state, pieceId, targetOrientation) {
+  const options = state.pieces.find((p) => p.id === pieceId).orientationOptions;
+  for (let i = 0; i < options.length; i++) {
+    const piece = state.pieces.find((p) => p.id === pieceId);
+    if (piece.orientation === targetOrientation) return state;
+    state = flipPiece(state, pieceId);
+  }
+  throw new Error(`${pieceId} never reached ${targetOrientation} within ${options.length} flips`);
+}
+
+test('Stage 4: all 12 identical pieces placeable in any order, once flipped to each void\'s own required orientation', () => {
   let state = stage4State();
   const voidIds = state.voids.map((v) => v.id);
   // Deliberately shuffle (reverse plus an interior swap) rather than
@@ -242,23 +267,40 @@ test('Stage 4: all 12 identical pieces placeable in any order, filling all 12 vo
   const pieceIds = state.pieces.map((p) => p.id);
 
   shuffled.forEach((voidId, i) => {
-    state = selectPiece(state, pieceIds[i]);
+    const pieceId = pieceIds[i];
+    const requiredOrientation = state.voids.find((v) => v.id === voidId).requiredOrientation;
+    state = selectPiece(state, pieceId);
+    state = flipUntilOriented(state, pieceId, requiredOrientation);
     const result = placeSelected(state, voidId);
-    assert.equal(result.placed, true, `placing ${pieceIds[i]} into ${voidId} should succeed`);
+    assert.equal(result.placed, true, `placing ${pieceId} into ${voidId} should succeed once oriented`);
     state = result.state;
   });
 
   assert.equal(isSolved(state), true);
 });
 
+test('Stage 4: placing an un-flipped piece into a void that needs a different orientation is rejected', () => {
+  let state = stage4State();
+  state = selectPiece(state, 'p0'); // starts at 'x+:in'
+  const result = placeSelected(state, 'v-out-x+'); // wants 'x+:out'
+  assert.equal(result.placed, false);
+  assert.equal(result.reason, 'wrong-orientation');
+});
+
 test('Stage 4: the inward and outward void on the same axis are independent -- filling one leaves the other open', () => {
   let state = stage4State();
-  state = selectPiece(state, 'p0');
+  state = selectPiece(state, 'p0'); // already 'x+:in', matches v-in-x+ with no flip needed
   state = placeSelected(state, 'v-in-x+').state;
 
   assert.equal(state.voids.find((v) => v.id === 'v-in-x+').filled, true);
   assert.equal(state.voids.find((v) => v.id === 'v-out-x+').filled, false);
   assert.equal(isSolved(state), false);
+});
+
+test('Stage 4: flipping cycles through all 12 orientations and wraps back to the start', () => {
+  let state = stage4State();
+  for (let i = 0; i < 12; i++) state = flipPiece(state, 'p0');
+  assert.equal(state.pieces.find((p) => p.id === 'p0').orientation, 'x+:in');
 });
 
 // Stage 5's real shape: the same 6-void cube as Stage 3, but the tray
