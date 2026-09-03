@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-09-03",
+    "title": "Rhombis Grows a Rhombic Dodecahedron",
+    "items": [
+      "Rhombis' fourth puzzle: build a full rhombic dodecahedron from 12 pieces, 2 per cube face -- one pointing in toward the shared center, one pointing out as the RD's own spike. Same rotate-and-tap flow as every earlier puzzle, just twice as many pieces to place."
+    ]
+  },
+  {
+    "date": "2026-09-03",
     "title": "Rhombis: A New Way In",
     "items": [
       "New: Rhombis, a short geometric-packing puzzle that introduces the game's core pyramid-to-cube-to-rhombic-dodecahedron relationships -- rotate a target shape, tap pieces into place, and watch it build from a single pyramid up through an octahedron and a cube. Wrong orientations are flagged red, valid ones green, right on the shape itself. Linked from the welcome screen; built mobile/touch-first from the start.",

@@ -42,6 +42,19 @@ function stage3State() {
   });
 }
 
+// Stage 4's real shape: 12 identical, non-flippable pieces (same as
+// Stage 3) and 12 voids, 2 per axis (inward/outward) -- see stages.js's
+// buildStage4. No orientation gate on the voids either: which of the 2
+// per axis you fill is resolved by which one you actually raycast-hit
+// in 3D (their hit-target volumes don't overlap), not by puzzle-state.
+function stage4State() {
+  const axes = ['x+', 'x-', 'y+', 'y-', 'z+', 'z-'];
+  return createPuzzleState({
+    pieces: Array.from({ length: 12 }, (_, i) => ({ id: `p${i}` })),
+    voids: axes.flatMap((axis) => [{ id: `v-in-${axis}` }, { id: `v-out-${axis}` }]),
+  });
+}
+
 test('placing into a void with no piece selected is rejected', () => {
   const state = stage1State();
   const result = placeSelected(state, 'v0');
@@ -217,4 +230,33 @@ test('voidValidityForPiece: filled voids are omitted, and no piece selected repo
 
   const noSelection = voidValidityForPiece(state, 'does-not-exist');
   assert.equal(noSelection['v-down'], false);
+});
+
+test('Stage 4: all 12 identical pieces placeable in any order, filling all 12 voids solves it', () => {
+  let state = stage4State();
+  const voidIds = state.voids.map((v) => v.id);
+  // Deliberately shuffle (reverse plus an interior swap) rather than
+  // filling in construction order.
+  const shuffled = [...voidIds].reverse();
+  [shuffled[2], shuffled[9]] = [shuffled[9], shuffled[2]];
+  const pieceIds = state.pieces.map((p) => p.id);
+
+  shuffled.forEach((voidId, i) => {
+    state = selectPiece(state, pieceIds[i]);
+    const result = placeSelected(state, voidId);
+    assert.equal(result.placed, true, `placing ${pieceIds[i]} into ${voidId} should succeed`);
+    state = result.state;
+  });
+
+  assert.equal(isSolved(state), true);
+});
+
+test('Stage 4: the inward and outward void on the same axis are independent -- filling one leaves the other open', () => {
+  let state = stage4State();
+  state = selectPiece(state, 'p0');
+  state = placeSelected(state, 'v-in-x+').state;
+
+  assert.equal(state.voids.find((v) => v.id === 'v-in-x+').filled, true);
+  assert.equal(state.voids.find((v) => v.id === 'v-out-x+').filled, false);
+  assert.equal(isSolved(state), false);
 });

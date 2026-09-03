@@ -107,8 +107,9 @@ build order:
   reverted.
 
 - **Rhombis** (2026-09-03, `docs/RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md`)
-  — **Stages 1-3 done** (one piece; octahedron/2 pieces; cube/6 pieces):
-  a standalone geometric-packing intro puzzle, `rhombis.html` + `src/
+  — **Stages 1-4 done** (one piece; octahedron/2 pieces; cube/6 pieces;
+  rhombic dodecahedron/12 pieces): a standalone geometric-packing intro
+  puzzle, `rhombis.html` + `src/
   rhombis/`. `geometry.js`'s `pyramidGeometry()` is the one mesh every
   stage reuses (`ConvexGeometry` over `core/lattice.js`'s already-real,
   already-tested `pyramidPieces(s).pyramids['y+']`, re-centered to the
@@ -147,8 +148,34 @@ build order:
   were rotated but never translated, leaving apex/base swapped relative
   to spec (verified numerically before AND after the fix). Verified via
   real headless-Chromium runs, including real iPhone-viewport touch
-  taps, across all 3 stages end to end. Stages 4-7 (RD/conjoined/multi-
-  cell/procedural) are NOT yet built. Stage 7's own scoring/timer slot
+  taps, across Stages 1-3 end to end. **Stage 4** (RD, 12 pieces) needed
+  zero new geometry primitives -- per axis, the existing Stage 3 inward
+  void and a new outward one share the exact same `position` (both have
+  their base on that cube face) and differ only in `quaternion`
+  (`inwardQuaternion`/`outwardQuaternion`, both already built for
+  Stages 2-3); verified numerically before landing (outward 'y+' at
+  scale=2: base world (0,1,0), apex world (0,2,0), matching the spec's
+  own stated outward-cap coordinate exactly) rather than assumed from
+  the Stage 3 pattern. "Inward and outward pyramids look identical but
+  sit differently" (the spec's own Stage 4 note) needed no extra
+  disambiguation code -- an inward void's hit-target volume is inside
+  the cube envelope, an outward one is outside it as a spike, so plain
+  3D raycasting already tells them apart despite sharing a base
+  position. No player-driven orientation choice, same as Stage 3 (12
+  identical, non-flippable, count-tracked tray pieces that auto-snap to
+  whichever void is tapped). Verified live in a real headless-Chromium
+  run: correct RD silhouette, camera auto-framed the larger geometry
+  with zero manual tuning (the same derived-bounding-radius fit Stages
+  1-3 already used), 7 of 12 real distinct placements confirmed
+  successful across multiple rotations (auto-orientation, red/green
+  highlighting, count-decrement all correct each time) -- the
+  remaining 5 were not each individually re-confirmed live purely
+  because of this session's own screenshot-coordinate-picking
+  friction on a small isometric render, not any suspected app issue;
+  `tests/unit/rhombis-puzzle-state.test.mjs` separately proves all 12
+  placeable in shuffled order and that an axis's inward/outward voids
+  are independent. Stages 5-7 (conjoined pieces, multi-cell, procedural
+  content/polish) are NOT yet built. Stage 7's own scoring/timer slot
   is the intended home for a later "spatial reasoning" score (direct
   suggestion 2026-09-03: NOT literally IQ -- that implies a validated
   psychometric claim this can't back up) -- not scoped or built yet.

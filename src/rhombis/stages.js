@@ -170,8 +170,62 @@ function buildStage3(scale) {
   };
 }
 
+// Stage 4 -- rhombic dodecahedron: 12 of the same pyramid, 2 per cube
+// face (RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md's own RD row: "a
+// cube's 6 inward pyramids, plus 6 more of the same pyramid mirrored
+// outward on each face"). Per axis, the inward void (Stage 3's own) and
+// the new outward void share the exact same `position` (both have their
+// base on that same cube face) and differ only in `quaternion` --
+// inward apex meets the shared center, outward apex is the RD's own
+// spike. Verified numerically before landing (outward 'y+' at scale=2:
+// base world (0,1,0), apex world (0,2,0), exactly the spec's own stated
+// "(0,±s,0)" outward cap coordinate) rather than assumed from the
+// Stage 3 pattern. "Inward and outward pyramids look identical but sit
+// differently" (the spec's own Stage 4 note) is handled for free by
+// plain 3D occlusion -- an inward void's hit-target volume is INSIDE
+// the cube envelope, an outward one is OUTSIDE it as a spike, so they
+// never compete for the same raycast hit despite sharing a base
+// position; no extra disambiguation logic needed. Like Stage 3, no
+// player-driven orientation choice -- 12 identical, non-flippable tray
+// pieces that auto-snap to whichever void is tapped, count-tracked the
+// same way.
+function buildStage4(scale) {
+  const geometry = pyramidGeometry(scale);
+  const skeletonGroup = new THREE.Group();
+
+  const voids = PYRAMID_AXES.flatMap((axisKey) => {
+    const facePosition = AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2);
+    const vIn = makeVoid(geometry, {
+      id: `v-in-${axisKey}`,
+      quaternion: inwardQuaternion(axisKey),
+      position: facePosition,
+    });
+    const vOut = makeVoid(geometry, {
+      id: `v-out-${axisKey}`,
+      quaternion: outwardQuaternion(axisKey),
+      position: facePosition.clone(),
+    });
+    skeletonGroup.add(...vIn.sceneObjects, ...vOut.sceneObjects);
+    return [vIn, vOut];
+  });
+
+  const homePosition = new THREE.Vector3(scale * 3.2, 0, 0);
+  const pieces = voids.map((_, i) => {
+    const p = makePiece(geometry, { id: `p${i}`, homePosition });
+    p.mesh.visible = i === 0; // only the next available copy shows in the tray
+    return p;
+  });
+
+  return {
+    skeletonGroup,
+    pieces,
+    voids,
+  };
+}
+
 export const STAGES = [
   { id: 1, name: 'One Piece', build: buildStage1 },
   { id: 2, name: 'Octahedron', build: buildStage2 },
   { id: 3, name: 'Cube', build: buildStage3 },
+  { id: 4, name: 'Rhombic Dodecahedron', build: buildStage4 },
 ];
