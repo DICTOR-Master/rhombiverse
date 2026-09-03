@@ -764,36 +764,67 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
 // 2026-09-04, "you havent wired enumerator": the import existed but
 // was never called, so this array was a frozen literal that would have
 // silently drifted from the real generator the moment its internals
-// ever changed). Each shape's own name is derived by classifying its
-// real pairwise cell distances (in edge-length units, edge = sqrt(2)):
-// the 4 real N=3 shapes have distinct maximum pairwise distances --
-// Triangle sqrt(2) (equilateral, all sides equal, the most compact
-// possible), Narrow Bend 2, Wide Bend sqrt(6), Straight Line 2*sqrt(2)
-// (the two ends of a straight 3-chain are the farthest apart of any
-// N=3 shape) -- verified directly against `cell-arrangements.js`'s own
-// hand-built-shape tests, not just eyeballed. Each shape's own
-// adjacent joined-pair indices are likewise computed directly from its
-// real cell coordinates (a bent chain's two END cells are NOT adjacent
-// to each other even though both are adjacent to the middle one, so
-// "any two of three" is never a safe default) rather than hardcoded
-// per shape.
-const EDGE_LENGTH = Math.sqrt(2);
+// ever changed). Each shape's own adjacent joined-pair indices are
+// computed directly from its real cell coordinates (a bent chain's two
+// END cells are NOT adjacent to each other even though both are
+// adjacent to the middle one, so "any two of three" is never a safe
+// default) rather than hardcoded per shape.
+const NEIGHBOR_OFFSET_KEYS = new Set(NEIGHBOR_OFFSETS.map((v) => v.join(',')));
+
+// Classifies a shape by its REAL geometric hinge angle, not an
+// indirect proxy like raw max pairwise distance -- direct live
+// correction (2026-09-04, "you missed right angle bend as option"):
+// the original distance-based naming called the LARGER-max-distance
+// shape "Wide Bend", which happens to be the 90-degree right-angle
+// bend -- a name that gave no hint it was a right angle at all, while
+// the real 120-degree (genuinely wider) bend was called "Narrow".
+// Verified directly (this file's own hand-computed angles, cross-
+// checked against cell-arrangements.js's own hand-built-shape tests):
+// 60 degrees (Triangle, its own real internal angle -- every cell
+// qualifies as "the hinge" since all three are mutually adjacent), 90
+// degrees (a genuine right angle), 120 degrees (a wider, more open
+// bend), 180 degrees (Straight Line, no bend at all). All 4 real N=3
+// shapes were always correctly enumerated and built (direct
+// instruction "all 4" was already fulfilled) -- this only fixes what
+// they're CALLED.
 const THREE_CELL_SIGNATURES = [
-  { name: 'Triangle', maxDistance: EDGE_LENGTH },
-  { name: 'Narrow Bend', maxDistance: 2 },
-  { name: 'Wide Bend', maxDistance: Math.sqrt(6) },
-  { name: 'Straight Line', maxDistance: 2 * EDGE_LENGTH },
+  { name: 'Triangle', angle: 60 },
+  { name: 'Right-Angle Bend', angle: 90 },
+  { name: 'Wide Bend', angle: 120 },
+  { name: 'Straight Line', angle: 180 },
 ];
 
-function classifyThreeCellShape(cells) {
-  const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
-  const maxDistance = Math.max(dist(cells[0], cells[1]), dist(cells[0], cells[2]), dist(cells[1], cells[2]));
-  const match = THREE_CELL_SIGNATURES.find((s) => Math.abs(s.maxDistance - maxDistance) < 0.01);
-  if (!match) throw new Error(`Unrecognized 3-cell shape: max pairwise distance ${maxDistance}`);
-  return match.name;
+function threeCellHingeAngle(cells) {
+  // The hinge is whichever cell is adjacent to BOTH others -- for a
+  // closed triangle every cell qualifies (any one gives the triangle's
+  // own real 60-degree internal angle); for an open chain exactly one
+  // does (the other two, its "ends", are adjacent to the hinge but not
+  // to each other).
+  for (let hinge = 0; hinge < cells.length; hinge++) {
+    const others = [0, 1, 2].filter((i) => i !== hinge);
+    const isAdjacentToHinge = (i) => {
+      const d = [cells[i][0] - cells[hinge][0], cells[i][1] - cells[hinge][1], cells[i][2] - cells[hinge][2]];
+      return NEIGHBOR_OFFSET_KEYS.has(d.join(','));
+    };
+    if (others.every(isAdjacentToHinge)) {
+      const [a, b] = others;
+      const va = [cells[a][0] - cells[hinge][0], cells[a][1] - cells[hinge][1], cells[a][2] - cells[hinge][2]];
+      const vb = [cells[b][0] - cells[hinge][0], cells[b][1] - cells[hinge][1], cells[b][2] - cells[hinge][2]];
+      const dot = va[0] * vb[0] + va[1] * vb[1] + va[2] * vb[2];
+      const magA = Math.hypot(...va);
+      const magB = Math.hypot(...vb);
+      return Math.acos(dot / (magA * magB)) * (180 / Math.PI);
+    }
+  }
+  throw new Error('No hinge cell found -- shape is not actually connected');
 }
 
-const NEIGHBOR_OFFSET_KEYS = new Set(NEIGHBOR_OFFSETS.map((v) => v.join(',')));
+function classifyThreeCellShape(cells) {
+  const angle = threeCellHingeAngle(cells);
+  const match = THREE_CELL_SIGNATURES.find((s) => Math.abs(s.angle - angle) < 0.5);
+  if (!match) throw new Error(`Unrecognized 3-cell shape: hinge angle ${angle}`);
+  return match.name;
+}
 
 function findAdjacentCellPair(cells) {
   for (let i = 0; i < cells.length; i++) {

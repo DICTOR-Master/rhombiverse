@@ -982,6 +982,27 @@ build order:
   `node --test tests/unit/*.test.mjs` clean -- pure THREE-rendering-
   side, no puzzle-state.js surface.
 
+  **N=3 stage naming fixed to use the real geometric angle, same day**
+  (direct live correction: "you missed right angle bend as option").
+  All 4 real N=3 shapes were always correctly enumerated and built --
+  this was a naming bug, not a missing shape. `classifyThreeCellShape`
+  previously named shapes by raw max pairwise distance (a valid
+  DISTINGUISHING signature, but not an intuitive one): the shape with
+  the LARGER max-distance got called "Wide Bend", which happens to be
+  the 90-degree right-angle bend -- a name giving no hint it was a
+  right angle, while the real 120-degree (genuinely wider) bend got
+  called "Narrow". Fixed by classifying on the shape's own real hinge
+  angle instead (`threeCellHingeAngle` -- finds whichever cell is
+  adjacent to both others, computes the real angle between the two
+  vectors from it): verified directly, the 4 real shapes have hinge
+  angles 60 (Triangle, its own true internal angle), 90 (now correctly
+  named "Right-Angle Bend"), 120 (now "Wide Bend", genuinely justified
+  since 120 > 90), 180 (Straight Line). Verified live: Stage 10 now
+  reads "3 Cells: Right-Angle Bend". Full `node --test
+  tests/unit/*.test.mjs` clean -- pure naming/classification change, no
+  behavioral surface, no new tests needed (existing N=3 tests never
+  asserted on specific names, only on counts/placement behavior).
+
   **Open design conversation, same live-testing session, not yet
   acted on**: several related pieces of direct feedback arrived
   together and are being treated as one upcoming redesign pass rather
