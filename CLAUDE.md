@@ -325,6 +325,59 @@ build order:
   reasoning" score (direct suggestion 2026-09-03: NOT literally IQ --
   that implies a validated psychometric claim this can't back up) --
   not scoped or built yet.
+
+  **Idle-state lattice decluttering, Stages 3-6** (2026-09-03, direct
+  live-testing report: "far too many lines visible on RD I placed all
+  six outer shell but couldnt see how to fit in inner ones" -- confirms
+  the earlier-decided Option B was a real necessity, not a nice-to-have).
+  Each of Stages 3-6 now gets its own permanent, always-visible outer
+  boundary silhouette (`stages.js`'s new `makeOuterBoundary()`, a plain
+  `THREE.LineSegments`/`EdgesGeometry` outline of the stage's cube/RD/
+  composite shape, added once to the skeleton group) while every
+  individual void's own wire defaults to HIDDEN until it's actually
+  relevant (`hideIdleVoidWires: true` on those 4 stages' return objects;
+  Stage 1/2 unflagged, unchanged). `main.js`'s `refreshVoidHighlights()`
+  now sets each unfilled void wire's `.visible` from selection state --
+  hidden when idle (nothing selected) and `hideIdleVoidWires` is set,
+  shown red/green the moment a piece is selected -- while a FILLED void's
+  wire always stays visible (a real seam in the completed shape, not
+  clutter). `flashRejectWire()` was also fixed to force-show a wire
+  during its reject flash even on a normally-hidden stage, restoring
+  `.visible` to what it was before afterward, so a rejected placement is
+  never invisible. Verified live via headless Chromium: Stage 4/6's idle
+  view now shows only the clean outer silhouette(s), not the previous
+  criss-cross of all 12 (or 24) individual void wires; selecting a piece
+  still correctly lights up every remaining OPEN void red/green (fewer
+  of them as more get placed/filled, which is what actually solves the
+  reported problem -- the count shown at once shrinks as you progress
+  instead of staying at the stage's full total). Full `node --test
+  tests/unit/*.test.mjs` suite re-run clean (275/275) -- this change is
+  purely visual/THREE-side, no `puzzle-state.js` changes.
+
+  **Bigger goal-shape redesign, decided but NOT yet built** (2026-09-03,
+  direct follow-up after the above fix landed): replace the wireframe
+  skeleton entirely with the stage's real SOLID geometry rendered
+  translucent, reusing the main app's own already-established World View
+  translucent treatment verbatim rather than inventing new material
+  logic (`render.js`'s `applyWorldViewMaterials()`/`TRANSLUCENT_OPACITY
+  = 0.55`: `transparent: true, opacity: 0.55, depthWrite: false`). A
+  placed piece stays fully solid/opaque and visually "fills in" the
+  translucent ghost -- this is also the answer to a separate suggestion
+  ("goal piece should grow incrementally") that arrived the same
+  conversation: no separate reveal/growth logic needed, solidification
+  falls out of real geometry filling real voids. Per direct decision
+  when asked how void-targeting should work without wireframe voids to
+  color: a translucent GHOST COPY of the selected piece is shown sitting
+  in each candidate void's position/orientation, tinted green if it
+  would place validly there and red if not -- not a tint on the goal
+  mesh's own faces, and not dropping validity highlighting. Also covers
+  a separate related note ("no situation where 12 identical pieces are
+  waiting to be added"): the tray should show one instance per distinct
+  piece TYPE with a count badge, not N queued duplicate meshes -- this
+  matches the already-decided "countdown, no need to show all identical
+  pieces" call from earlier the same day. None of this is implemented
+  yet -- flagged here so it isn't lost, but the wireframe-based system
+  above is the current shipped state.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

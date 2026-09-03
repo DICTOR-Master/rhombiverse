@@ -19,6 +19,25 @@ function pieceMaterial() {
   return new THREE.MeshStandardMaterial({ color: PIECE_COLOR, roughness: 0.5, metalness: 0.1 });
 }
 
+// A stage's permanent, always-visible reference frame -- the outer
+// cube/RD silhouette ONLY (a real THREE.BoxGeometry or
+// rhombicDodecahedronGeometry, its own clean edge set, no internal
+// pyramid diagonals) -- direct instruction (2026-09-03), confirming the
+// spec's own "no grid, no internal lines beyond the target's own
+// silhouette" rule after live feedback: with every void's own wire
+// visible from the start (Stage 3-6's earlier behavior), the RD's 12
+// pyramids' worth of crisscrossing internal seams made the inward voids
+// unreadable ("far too many lines... couldn't see how to fit in inner
+// ones"). Individual void wires now default to hidden (main.js's
+// refreshVoidHighlights) and only show red/green while a piece that
+// could go there is selected, or once actually filled -- this object is
+// what's left to look at otherwise.
+function makeOuterBoundary(geometry, position = ORIGIN) {
+  const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({ color: WIRE_COLOR }));
+  wire.position.copy(position);
+  return wire;
+}
+
 // `position` is a real translation, not just cosmetic -- Stage 1/2's
 // shared-base voids correctly need none (the canonical mesh's own base
 // already sits at local y=0, exactly where those voids want it), but
@@ -161,6 +180,7 @@ function buildStage2(scale) {
 function buildStage3(scale) {
   const geometry = pyramidGeometry(scale);
   const skeletonGroup = new THREE.Group();
+  skeletonGroup.add(makeOuterBoundary(new THREE.BoxGeometry(scale, scale, scale)));
 
   const voids = PYRAMID_AXES.map((axisKey) => {
     const v = makeVoid(geometry, {
@@ -183,6 +203,7 @@ function buildStage3(scale) {
     skeletonGroup,
     pieces,
     voids,
+    hideIdleVoidWires: true,
   };
 }
 
@@ -220,6 +241,7 @@ const RD_ORIENTATIONS = PYRAMID_AXES.flatMap((axisKey) => [`${axisKey}:in`, `${a
 function buildStage4(scale) {
   const geometry = pyramidGeometry(scale);
   const skeletonGroup = new THREE.Group();
+  skeletonGroup.add(makeOuterBoundary(rhombicDodecahedronGeometry(scale)));
 
   const voids = PYRAMID_AXES.flatMap((axisKey) => {
     const facePosition = AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2);
@@ -255,6 +277,7 @@ function buildStage4(scale) {
     skeletonGroup,
     pieces,
     voids,
+    hideIdleVoidWires: true,
   };
 }
 
@@ -276,6 +299,7 @@ function buildStage4(scale) {
 function buildStage5(scale) {
   const geometry = pyramidGeometry(scale);
   const skeletonGroup = new THREE.Group();
+  skeletonGroup.add(makeOuterBoundary(new THREE.BoxGeometry(scale, scale, scale)));
   const GROUP_ID = 'cube';
 
   const voids = PYRAMID_AXES.map((axisKey) => {
@@ -309,6 +333,7 @@ function buildStage5(scale) {
     pieces: [...loosePieces, fusedPiece],
     voids,
     groups: [{ id: GROUP_ID, position: new THREE.Vector3(0, 0, 0), quaternion: new THREE.Quaternion() }],
+    hideIdleVoidWires: true,
   };
 }
 
@@ -324,7 +349,9 @@ function buildStage5(scale) {
 //
 // Each cell independently offers Stage 5's own loose-vs-fused choice,
 // now at 12-piece scale: 12 loose pyramids (auto-orienting to whichever
-// void is tapped, exactly like Stage 4) OR one real, whole rhombic-
+// void is tapped -- unlike Stage 4's own pieces, which since the
+// manual-orientation prototype no longer auto-orient) OR one real,
+// whole rhombic-
 // dodecahedron piece (geometry.js's rhombicDodecahedronGeometry,
 // reusing core/lattice.js's own rdRawVerts -- the exact same mesh the
 // main app places for a real RD cell) that fills that cell's own 12
@@ -353,6 +380,7 @@ function buildStage6(scale) {
   cellCenters.forEach((cellCenter, cellIndex) => {
     const groupId = `cell-${cellIndex}`;
     groups.push({ id: groupId, position: cellCenter.clone(), quaternion: new THREE.Quaternion() });
+    skeletonGroup.add(makeOuterBoundary(rhombicDodecahedronGeometry(scale), cellCenter));
 
     PYRAMID_AXES.forEach((axisKey) => {
       const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
@@ -389,6 +417,7 @@ function buildStage6(scale) {
     pieces: [...loosePieces, ...fusedPieces],
     voids,
     groups,
+    hideIdleVoidWires: true,
   };
 }
 

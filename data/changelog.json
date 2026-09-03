@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-09-03",
+    "title": "Rhombis: A Clearer View of the Goal",
+    "items": [
+      "Rhombis' bigger puzzles (rhombic dodecahedron and beyond) now show a clean outer outline of the goal shape until you actually pick up a piece -- no more staring at a tangle of every internal void line at once. Select a piece and the spots it could go light up red or green as before; deselect and the clutter drops away again."
+    ]
+  },
+  {
+    "date": "2026-09-03",
     "title": "Rhombis: A Steadier Tray",
     "items": [
       "Fixed a subtle bug that could occasionally let a tap on a piece you're rotating affect the wrong copy behind it instead -- tray pieces you haven't reached yet no longer take part in taps at all until they're actually revealed."

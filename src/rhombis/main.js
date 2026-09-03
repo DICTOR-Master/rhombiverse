@@ -181,6 +181,7 @@ function loadStage(index) {
   applyCameraFraming();
   solvedBanner.hidden = true;
   stageLabel.textContent = `Stage ${stageDef.id}: ${stageDef.name}`;
+  refreshVoidHighlights(); // sets each void wire's correct idle visibility
   updateHud();
   updateUndoButton();
 }
@@ -312,25 +313,53 @@ function setPieceSelectedVisual(piece, isSelected) {
   }
 }
 
+// Also toggles visibility, not just color -- on a stage where void
+// wires are hidden until relevant (hideIdleVoidWires), a reject can
+// happen on a wire that's currently invisible (tapping a void with
+// nothing selected), and a color-only flash on an invisible line gives
+// no feedback at all. Briefly force it visible for the flash, then
+// restore whatever visibility it actually had.
 function flashRejectWire(wire) {
-  const original = wire.material.color.getHex();
+  const originalColor = wire.material.color.getHex();
+  const originalVisible = wire.visible;
+  wire.visible = true;
   wire.material.color.setHex(REJECT_FLASH_COLOR);
-  setTimeout(() => wire.material.color.setHex(original), 180);
+  setTimeout(() => {
+    wire.material.color.setHex(originalColor);
+    wire.visible = originalVisible;
+  }, 180);
 }
 
 // Recolors every unfilled void's wire: green if the currently selected
 // piece (at its current orientation) would fit there right now, red if
-// not, or back to the plain default when nothing is selected. Filled
-// voids are left alone (they already show FILLED_WIRE_COLOR). Call this
-// any time selection, orientation, or fill state changes.
+// not. Filled voids are left alone (they already show
+// FILLED_WIRE_COLOR, set once at placement time). Call this any time
+// selection, orientation, or fill state changes.
+//
+// Also controls IDLE visibility for stages that opt into it
+// (`hideIdleVoidWires` -- Stage 3+, direct instruction 2026-09-03 after
+// live feedback: with every void's wire always on, an RD's 12 pyramids'
+// worth of crisscrossing internal seams made the inward voids
+// unreadable, contradicting the spec's own "no grid, no internal lines
+// beyond the target's own silhouette" rule). With nothing selected,
+// those stages hide every unfilled void's wire entirely -- the
+// stage's own makeOuterBoundary() (stages.js) is what's left on
+// screen. Stage 1/2 don't set the flag: their void wire already IS the
+// target's own outer silhouette (no separate boundary object, nothing
+// "internal" to hide), so it stays visible exactly as before.
 function refreshVoidHighlights() {
   const selectedId = current.state.selectedPieceId;
   const validity = selectedId ? voidValidityForPiece(current.state, selectedId) : null;
   for (const v of current.voids) {
     const stateVoid = current.state.voids.find((sv) => sv.id === v.id);
     if (stateVoid.filled) continue;
-    const color = validity ? (validity[v.id] ? VALID_TARGET_COLOR : INVALID_TARGET_COLOR) : WIRE_COLOR;
-    v.wire.material.color.setHex(color);
+    if (validity) {
+      v.wire.visible = true;
+      v.wire.material.color.setHex(validity[v.id] ? VALID_TARGET_COLOR : INVALID_TARGET_COLOR);
+    } else {
+      v.wire.visible = !current.hideIdleVoidWires;
+      v.wire.material.color.setHex(WIRE_COLOR);
+    }
   }
 }
 
@@ -492,7 +521,9 @@ function handleTap(clientX, clientY) {
   setPieceSelectedVisual(placedPiece, false);
   for (const filledId of result.filledVoidIds) {
     const filledVoid = current.voids.find((v) => v.id === filledId);
-    if (filledVoid) filledVoid.wire.material.color.setHex(FILLED_WIRE_COLOR);
+    if (!filledVoid) continue;
+    filledVoid.wire.material.color.setHex(FILLED_WIRE_COLOR);
+    filledVoid.wire.visible = true; // a real seam -- stays visible even on hideIdleVoidWires stages
   }
   revealNextTrayPiece();
   refreshVoidHighlights();
