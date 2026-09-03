@@ -426,6 +426,38 @@ build order:
   2026-09-03**: only add an entry for something that actually, currently
   affects reachable users -- not every internal iteration on a WIP/beta
   feature, given this tagline mechanism's real reach.
+
+  **Real deploy-time 404, found immediately after the above "fixed"
+  the accessibility gap** (2026-09-03, direct live report on the
+  production site: "still not accessible showing 404 not found"). Root
+  cause: `scripts/build.mjs` (the Vercel `buildCommand`, producing
+  `dist/` as the real deployed output -- see its own header, "Production-
+  only build") copies an explicit ALLOWLIST of top-level static files
+  into `dist/`, and `rhombis.html` was never added to it -- every local
+  verification this whole session used `python3 -m http.server` directly
+  against the repo root (this repo's own established dev-testing
+  pattern), which serves the raw tree and so never exercised this
+  allowlist at all. `rhombis.html`'s own JS (`src/rhombis/*.js`) WAS
+  always fine (the build's separate `findJsFiles(src/)` walk picks up
+  everything under `src/` unconditionally) -- only the HTML entry point
+  itself was missing. Fixed: added `'rhombis.html'` to
+  `staticEntries`. Verified for real, not just by reading the script:
+  ran `node scripts/build.mjs` locally (this script has zero Vercel-
+  specific dependencies, runs standalone), confirmed `dist/rhombis.html`
+  and `dist/src/rhombis/*.js` now exist, served `dist/` directly via a
+  second local static server (a real stand-in for what Vercel actually
+  serves, not the dev-only raw-tree server), and re-ran the SAME live
+  Playwright checks against port 8124 instead of the usual dev port:
+  `rhombis.html` loads and runs cleanly against the real MINIFIED
+  production build (Stage 1 renders, HUD text correct, zero console/page
+  errors), and the Settings-panel link added earlier this session
+  resolves and navigates correctly from `dist/index.html` too. This is
+  the real, first end-to-end confirmation that Rhombis is reachable on
+  the actual deployed site, not just in local dev -- everything reported
+  "verified live" earlier this session was only ever checked against the
+  raw-tree dev server, a real gap in this session's own verification
+  method that's worth remembering for anything else added to the repo
+  root (a new top-level HTML entry point, in particular) going forward.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
