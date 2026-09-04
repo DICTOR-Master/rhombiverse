@@ -1047,8 +1047,23 @@ function animate() {
   const trayY = window.innerHeight - rect.top - rect.height; // CSS top-down -> WebGL bottom-up
   renderer.setViewport(trayX, trayY, rect.width, rect.height);
   renderer.setScissor(trayX, trayY, rect.width, rect.height);
-  renderer.clearDepth(); // a fresh depth buffer for this pass -- the target's own depth values must not bleed into the tray's
+  renderer.clearDepth(); // depth only -- the target's own depth values must not bleed into the tray's, but its
+  // COLOR should: direct instruction (2026-09-04, "still view part of
+  // target shape through picker tray in the background, so shape is
+  // completer... but not interfere with it") -- the target's own
+  // already-rendered pixels are left in place as a backdrop (autoClear
+  // would otherwise wipe them to plain background here, same as it
+  // already did for the color clear at the top of this function),
+  // dimmed by the tray panel's own translucent DOM background
+  // (`rgba(8,10,16,0.35)` in rhombis.html) so the target's outline
+  // reads through continuously behind the tray rather than being cut
+  // off by a hard black box. The tray's own pieces still draw fully
+  // opaque on top either way (a real depth clear + normal depth test
+  // against THEIR OWN fresh values), so they're never dimmed or
+  // visually mixed with the target showing through around them.
+  renderer.autoClearColor = false;
   renderer.render(scene, trayCamera);
+  renderer.autoClearColor = true; // restore for the next frame's own full-screen target clear
 
   renderer.setScissorTest(false);
 }

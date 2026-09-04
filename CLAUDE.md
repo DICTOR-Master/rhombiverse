@@ -1279,6 +1279,34 @@ build order:
   two-viewport rewrite (the camera-layers one and this one) went
   through multiple rounds of thorough-seeming desktop-only verification
   before shipping.
+
+  **Tray shows the target through it now, 2026-09-04**: direct
+  instruction after the pixelRatio fix landed and the game was playable
+  again -- "cuts across shape the picker screen obscures outline...
+  still view part of target shape through picker tray in the
+  background, so shape is completer... but not interfere with it".
+  Previously the tray pass's `renderer.render(scene, trayCamera)` used
+  `WebGLRenderer`'s own default `autoClear` behavior, which fully wipes
+  color (to `scene.background`) within the active scissor rect before
+  drawing -- meaning the target's own already-rendered pixels behind the
+  tray panel were always replaced with plain background, reading as a
+  hard cut rather than a continuation of the shape. Fix: `renderer.
+  autoClearColor = false` for just this one `render()` call (restored
+  to `true` immediately after, since the NEXT frame's full-screen target
+  clear still needs it), while `renderer.clearDepth()` still runs
+  explicitly beforehand as before -- the target's color stays as a
+  backdrop, dimmed by the tray panel's own translucent DOM background
+  (`rgba(8,10,16,0.35)`), while the tray's own pieces still draw fully
+  opaque on top via a genuinely fresh depth buffer, so they're never
+  visually mixed with what shows through around them. Verified live: a
+  rotated Stage 12 (Tetrahedron) shows its blue shape continuing
+  unbroken behind the tray corner while the tray's own orange pieces
+  stay crisp and undisturbed; re-confirmed the pixelRatio fix above
+  still holds (mobile viewport + `deviceScaleFactor:3`, Stage 9's tray
+  still fully correct) since this change touches the exact same render
+  passes. Full `node --test tests/unit/*.test.mjs` clean (295/295,
+  unchanged -- pure rendering-state change, no `puzzle-state.js` surface
+  touched).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
