@@ -1402,7 +1402,7 @@ const FOUR_CELL_STAGES = FOUR_CELL_STAGE_DEFS.map((def, i) => {
 // confusable with an accept/reject flash.
 const COLOR_MATCH_PALETTE = [0x4a90e2, 0xf5a623, 0x9013fe, 0x2ecc71, 0xe91e8c, 0x1abc9c];
 
-function buildColorMatchStage(scale, cellOffsets, decoyOption) {
+function buildColorMatchStage(scale, cellOffsets, decoyOption, decoyColor) {
   const skeletonGroup = new THREE.Group();
   const rdGeometry = rhombicDodecahedronGeometry(scale);
 
@@ -1427,14 +1427,18 @@ function buildColorMatchStage(scale, cellOffsets, decoyOption) {
   // with no decoys at all, unlike everywhere else in the game. Reuses
   // THREE_CELL_STAGES' own alternating pattern (asCubes on odd stages)
   // so the two decoy "sets" (RD-shaped, cube-shaped) both show up
-  // across the 4 stages, not just one kind. Left at the DEFAULT
-  // PIECE_COLOR, not a palette color -- a decoy that's ALSO plausibly
-  // colored would defeat the tier's own point (color IS the answer
-  // here); staying neutral keeps it a real "wrong shape" decoy, same
-  // spirit as every other tier's own decoys, just also visually
-  // distinct from the real palette by design.
+  // across the 4 stages, not just one kind.
+  //
+  // Follow-up direct instruction: "decoys should be colored too just
+  // dont want to ruin non colored by making exactly same pattern" --
+  // `decoyColor` is always drawn from a PALETTE SLOT this stage's own
+  // real cells never use (see COLOR_MATCH_STAGES' own call site), never
+  // computed by hand per-stage -- guarantees a real color, genuinely
+  // impossible to collide with any of the real per-cell colors here,
+  // without needing to track "which colors are already taken" as a
+  // fragile parallel calculation.
   if (decoyOption) {
-    pieceSpecs.push({ id: 'decoy-0', fillsGroup: DECOY_NEVER_MATCHES, geometry: buildDecoyGeometry(scale, decoyOption) });
+    pieceSpecs.push({ id: 'decoy-0', fillsGroup: DECOY_NEVER_MATCHES, geometry: buildDecoyGeometry(scale, decoyOption), color: decoyColor });
   }
 
   for (let i = pieceSpecs.length - 1; i > 0; i--) {
@@ -1459,11 +1463,17 @@ function buildColorMatchStage(scale, cellOffsets, decoyOption) {
 
 const COLOR_MATCH_STAGES = THREE_CELL_STAGE_DEFS.map((def, i) => {
   const decoyDef = THREE_CELL_STAGE_DEFS[(i + 1) % THREE_CELL_STAGE_DEFS.length];
+  // Every real cell here uses COLOR_MATCH_PALETTE[0..2] (def.cells.length
+  // is always 3 for this catalog) -- the decoy's own color is drawn from
+  // [3..5] instead, a palette slot genuinely never assigned to a real
+  // piece in THIS stage, cycling across the 4 stages for real variety
+  // rather than reusing one fixed decoy color everywhere.
+  const decoyColor = COLOR_MATCH_PALETTE[def.cells.length + (i % (COLOR_MATCH_PALETTE.length - def.cells.length))];
   return {
     id: 3 + i,
     name: `Color Match: ${def.name}`,
     derivedFrom: [{ id: 7 + i, tier: def.name }],
-    build: (scale) => buildColorMatchStage(scale, def.cells, { cells: decoyDef.cells, asCubes: i % 2 === 0 }),
+    build: (scale) => buildColorMatchStage(scale, def.cells, { cells: decoyDef.cells, asCubes: i % 2 === 0 }, decoyColor),
   };
 });
 
