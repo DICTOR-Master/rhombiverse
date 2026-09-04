@@ -35,7 +35,7 @@
 import * as THREE from 'three';
 import { quaternionForOrientationKey } from './geometry.js';
 import { STAGES, WIRE_COLOR, GHOST_OPACITY } from './stages.js';
-import { createPuzzleState, selectPiece, flipPiece, placeSelected, isSolved, voidValidityForPiece } from './puzzle-state.js';
+import { createPuzzleState, selectPiece, flipPiece, setPieceOrientation, placeSelected, isSolved, voidValidityForPiece } from './puzzle-state.js';
 
 const SCALE = 2;
 const SELECTED_EMISSIVE = 0x664422;
@@ -335,6 +335,25 @@ const stagePicker = document.getElementById('rhombis-stage-picker');
 const stagePickerToggle = document.getElementById('rhombis-stage-picker-toggle');
 const stagePickerClose = document.getElementById('rhombis-stage-picker-close');
 const stageList = document.getElementById('rhombis-stage-list');
+const trayFlash = document.getElementById('rhombis-tray-flash');
+
+// Direct instruction (2026-09-04, "success message in picker tray
+// box") -- confirmation shown right where attention already is (the
+// tray itself) on a successful placement, not just the bottom HUD text
+// that's easy to miss mid-play. Own opacity transition (CSS `.show`
+// class) rather than toggling `hidden`, and the forced reflow below
+// lets a rapid second placement restart the animation instead of it
+// looking stuck if it retriggers before the first fade-out finishes.
+let trayFlashTimer = null;
+function flashTrayPlaced() {
+  if (!trayFlash) return;
+  trayFlash.textContent = 'Placed!';
+  trayFlash.classList.remove('show');
+  void trayFlash.offsetWidth;
+  trayFlash.classList.add('show');
+  if (trayFlashTimer) clearTimeout(trayFlashTimer);
+  trayFlashTimer = setTimeout(() => trayFlash.classList.remove('show'), 700);
+}
 
 // Dev/testing convenience only, never surfaced in the UI: ?stage=4
 // jumps straight to that stage's own id (STAGES' own `id` field, not
@@ -355,6 +374,74 @@ function clearCurrentStage() {
   // (trayGroup if never placed, skeletonGroup if it was) -- removing
   // from `.parent` directly is correct either way, rather than assuming.
   current.pieces.forEach((p) => p.mesh.parent?.remove(p.mesh));
+}
+
+// A small billboarded number badge -- a canvas-texture Sprite always
+// faces the camera regardless of how the tray itself gets rotated, so
+// the number stays legible everywhere a flat 3D label wouldn't.
+function makeNumberSprite(number, radius) {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(10, 10, 16, 0.6)';
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2 - 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 68px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(number), size / 2, size / 2 + 4);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: texture, depthTest: false, depthWrite: false, transparent: true,
+  }));
+  const spriteSize = radius * 0.65;
+  sprite.scale.set(spriteSize, spriteSize, 1);
+  return sprite;
+}
+
+// Direct instruction (2026-09-04, live report: "my wife was
+// frustratedly stabbing screen with finger" -- after placing a piece,
+// whatever shows in that tray slot next can look near-identical to the
+// one just placed, so nothing on screen distinguished "stuck, unplaced"
+// from "genuinely a different piece"). Two independent cues, applied
+// uniformly to every piece of every stage from this one shared call
+// site rather than touching each of the 7 stage-builder functions:
+// a stable per-piece number (never renumbered as other pieces get
+// placed, so it stays a fixed identity for that piece's whole life in
+// the tray) and a distinct hue -- an even rotation around the piece
+// color's own hue by 360/total degrees per index, so no two pieces in
+// the same tray are ever the same shade, readable before the number
+// even needs reading. `p.mesh.material` is already a fresh instance per
+// piece (`pieceMaterial()` in stages.js), so recoloring here is a local
+// change with no cross-piece side effects.
+function applyPieceIdentity(p, index, total) {
+  const hue = (32 + (360 / total) * index) % 360;
+  p.mesh.material.color.setHSL(hue / 360, 0.72, 0.62);
+  // A bounding-BOX offset, not a bounding-sphere-radius offset from
+  // local (0,0,0) -- some piece shapes (the pyramid-based cube/RD-face
+  // pieces) have their local origin at their own BASE, not their visual
+  // centroid (a known quirk from Stage 4's own build notes), so an
+  // origin-relative offset lands the badge in empty space for those.
+  // The geometry's own real min/max corner is correct regardless of
+  // where the origin happens to sit.
+  p.mesh.geometry.computeBoundingBox();
+  const box = p.mesh.geometry.boundingBox;
+  const size = box.max.clone().sub(box.min);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const sprite = makeNumberSprite(index + 1, maxDim * 0.4);
+  // Top-left corner of the piece "when flat" -- direct instruction.
+  sprite.position.set(box.min.x, box.max.y, box.max.z * 0.5 + size.z * 0.2);
+  sprite.layers.set(TRAY_LAYER);
+  p.mesh.add(sprite);
+  p.numberSprite = sprite;
 }
 
 function loadStage(index) {
@@ -379,11 +466,12 @@ function loadStage(index) {
   const trayCentroid = built.pieces
     .reduce((sum, p) => sum.add(p.homePosition), new THREE.Vector3())
     .multiplyScalar(1 / built.pieces.length);
-  built.pieces.forEach((p) => {
+  built.pieces.forEach((p, i) => {
     p.homePosition.sub(trayCentroid);
     p.mesh.position.copy(p.homePosition);
     trayGroup.add(p.mesh);
     p.mesh.layers.set(TRAY_LAYER);
+    applyPieceIdentity(p, i, built.pieces.length);
   });
 
   const state = createPuzzleState({
@@ -478,6 +566,7 @@ function syncVisualsToState() {
       p.mesh.quaternion.copy(target.quaternion);
       p.mesh.userData.targetQuaternion = target.quaternion;
       p.mesh.scale.setScalar(1); // real full size once actually part of the assembled shape, not the capped tray-display size
+      if (p.numberSprite) p.numberSprite.visible = false; // no longer "a piece to tell apart" once it's part of the shape
     } else {
       trayGroup.add(p.mesh); // detach from skeletonGroup back to the tray, if it was there
       p.mesh.layers.set(TRAY_LAYER);
@@ -487,6 +576,7 @@ function syncVisualsToState() {
       p.mesh.userData.targetQuaternion = restQuaternion;
       p.mesh.visible = Boolean(p.fillsGroup); // fused: always shown; loose: fixed by revealNextTrayPiece below
       p.mesh.scale.setScalar(p.trayScale ?? 1);
+      if (p.numberSprite) p.numberSprite.visible = true;
     }
     setPieceSelectedVisual(p, p.id === current.state.selectedPieceId);
   }
@@ -745,11 +835,35 @@ const ROTATE_SPEED = 0.012;
 const MAX_PITCH = Math.PI / 2 - 0.02;
 const WHEEL_ZOOM_SPEED = 0.0015;
 
+// Direct instruction (2026-09-04): "three ways of matching orientation
+// 1. you tap (as now) 2. you revolve picker shape 3. you revolve
+// target" -- a live report that a selected piece showing every void
+// except its CURRENT orientation as flat red ("full of red... game
+// shouldn't upset intuitive and logic") when it could actually fit
+// several of them, just at a different orientation, read as "doesn't
+// fit" rather than "not yet". A tray-region drag with a FLIPPABLE piece
+// selected now spins THAT piece's own orientation, live, instead of
+// the whole tray view -- `animate()`'s own per-piece slerp (below) is
+// suppressed for whichever piece this names, so the drag has
+// uncontested control of it while active. Rotating the TARGET stays
+// pure camera movement, unchanged -- already a real way to compare a
+// void's required pose against however you're currently holding the
+// piece, just an indirect one (a viewing aid, not a setter).
+let orientDragPieceId = null;
+
+function selectedFlippablePiece() {
+  if (!current || !current.state.selectedPieceId) return null;
+  const sp = currentStatePiece(current.state.selectedPieceId);
+  if (!sp || sp.placed || !sp.orientationOptions || sp.orientationOptions.length < 2) return null;
+  return sp;
+}
+
 function cancelTapCandidate() {
   tapCandidateId = null;
   pointerDownPos = null;
   dragLast = null;
   dragRegion = null;
+  orientDragPieceId = null;
 }
 
 function currentPinchDistance() {
@@ -764,6 +878,7 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
     pointerDownPos = { x: e.clientX, y: e.clientY };
     dragLast = { x: e.clientX, y: e.clientY };
     dragRegion = regionAt(e.clientX, e.clientY);
+    orientDragPieceId = dragRegion === 'tray' && selectedFlippablePiece() ? current.state.selectedPieceId : null;
   } else {
     cancelTapCandidate();
     if (activePointers.size === 2) {
@@ -792,6 +907,35 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   const dx = e.clientX - dragLast.x;
   const dy = e.clientY - dragLast.y;
   dragLast = { x: e.clientX, y: e.clientY };
+  if (orientDragPieceId) {
+    // Spins the SELECTED PIECE's own mesh, not the tray view -- no
+    // pitch clamp (unlike the group-rotation branch below), since a
+    // piece may need to reach a fully upside-down pose and clamping
+    // pitch would make that orientation unreachable by dragging alone.
+    const mesh = pieceById(orientDragPieceId).mesh;
+    mesh.rotation.y += dx * ROTATE_SPEED;
+    mesh.rotation.x += dy * ROTATE_SPEED;
+    const sp = currentStatePiece(orientDragPieceId);
+    let nearestKey = sp.orientation;
+    let nearestAngle = Infinity;
+    for (const key of sp.orientationOptions) {
+      const angle = mesh.quaternion.angleTo(quaternionForOrientationKey(key));
+      if (angle < nearestAngle) {
+        nearestAngle = angle;
+        nearestKey = key;
+      }
+    }
+    // Only touches state (and re-renders the red/green highlights) when
+    // the nearest reachable orientation actually changes -- this is
+    // what makes the "wall of red" sweep to green live as you rotate,
+    // rather than only updating once on release.
+    if (nearestKey !== sp.orientation) {
+      current.state = setPieceOrientation(current.state, orientDragPieceId, nearestKey);
+      refreshVoidHighlights();
+      updateHud();
+    }
+    return;
+  }
   const rot = (dragRegion === 'tray' ? trayGroup : current.skeletonGroup).rotation;
   rot.y += dx * ROTATE_SPEED;
   rot.x = THREE.MathUtils.clamp(rot.x + dy * ROTATE_SPEED, -MAX_PITCH, MAX_PITCH);
@@ -971,6 +1115,7 @@ function handleTargetTap(clientX, clientY) {
   placedPiece.mesh.quaternion.copy(target.quaternion);
   placedPiece.mesh.userData.targetQuaternion = target.quaternion;
   placedPiece.mesh.scale.setScalar(1); // real full size once actually part of the assembled shape, not the capped tray-display size
+  if (placedPiece.numberSprite) placedPiece.numberSprite.visible = false; // no longer "a piece to tell apart" once it's part of the shape
   setPieceSelectedVisual(placedPiece, false);
   for (const filledId of result.filledVoidIds) {
     const filledVoid = current.voids.find((v) => v.id === filledId);
@@ -985,13 +1130,16 @@ function handleTargetTap(clientX, clientY) {
   refreshVoidHighlights();
   updateHud();
 
-  if (isSolved(current.state)) advanceOrFinish();
+  const justSolved = isSolved(current.state);
+  if (!justSolved) flashTrayPlaced(); // the "Solved!" banner is already strong enough feedback on its own
+  if (justSolved) advanceOrFinish();
 }
 
 function animate() {
   requestAnimationFrame(animate);
   if (current) {
     for (const p of current.pieces) {
+      if (p.id === orientDragPieceId) continue; // uncontested drag control -- see the drag handler's own comment
       const sp = currentStatePiece(p.id);
       if (sp && !sp.placed && sp.orientation) {
         // The piece's own intrinsic orientation, in LOCAL space -- no

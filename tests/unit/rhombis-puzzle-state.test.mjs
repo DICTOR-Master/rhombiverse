@@ -5,7 +5,7 @@
 // order (Stage 2); 6 identical pieces placeable in any order (Stage 3).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPuzzleState, selectPiece, deselect, flipPiece, placeSelected, isSolved, voidValidityForPiece } from '../../src/rhombis/puzzle-state.js';
+import { createPuzzleState, selectPiece, deselect, flipPiece, setPieceOrientation, placeSelected, isSolved, voidValidityForPiece } from '../../src/rhombis/puzzle-state.js';
 
 function stage1State() {
   return createPuzzleState({
@@ -160,6 +160,61 @@ test('flipping twice returns to the original orientation', () => {
   state = flipPiece(state, 'p0');
   state = flipPiece(state, 'p0');
   assert.equal(state.pieces.find((p) => p.id === 'p0').orientation, 'y+');
+});
+
+// setPieceOrientation -- a second real way to reach an orientation
+// (2026-09-04, "three ways of matching orientation... you revolve
+// picker shape") besides stepping through flipPiece() one at a time.
+// Drag-to-orient (main.js) computes the nearest of a piece's own
+// orientationOptions to wherever the player's finger left it, then
+// commits it here directly -- these tests cover the pure state-machine
+// half of that (the geometry/nearest-angle half lives in main.js, not
+// unit-testable without a real THREE.js scene).
+test('setPieceOrientation sets the piece directly to any of its own valid keys', () => {
+  let state = stage4State();
+  state = selectPiece(state, 'p0');
+  state = setPieceOrientation(state, 'p0', 'z-:out');
+  assert.equal(state.pieces.find((p) => p.id === 'p0').orientation, 'z-:out');
+});
+
+test('setPieceOrientation reaches the SAME final state flipPiece would after equivalent steps', () => {
+  let viaDrag = stage4State();
+  viaDrag = setPieceOrientation(viaDrag, 'p0', 'y-:in');
+
+  let viaTaps = stage4State();
+  const options = viaTaps.pieces[0].orientationOptions;
+  const targetIndex = options.indexOf('y-:in');
+  for (let i = 0; i < targetIndex; i++) viaTaps = flipPiece(viaTaps, 'p0');
+
+  assert.equal(viaDrag.pieces[0].orientation, viaTaps.pieces[0].orientation);
+});
+
+test('setPieceOrientation rejects a key not in the piece\'s own orientationOptions -- never silently accepts an unreachable pose', () => {
+  let state = stage4State();
+  const result = setPieceOrientation(state, 'p0', 'not-a-real-key');
+  assert.equal(result.pieces.find((p) => p.id === 'p0').orientation, 'x+:in'); // unchanged
+});
+
+test('setPieceOrientation is a no-op for an already-placed piece', () => {
+  let state = stage2State();
+  state = selectPiece(state, 'p0');
+  state = placeSelected(state, 'v-up').state;
+  const result = setPieceOrientation(state, 'p0', 'y-');
+  assert.equal(result.pieces.find((p) => p.id === 'p0').orientation, 'y+'); // unchanged, still its placed pose
+});
+
+test('setPieceOrientation is a no-op for a piece with no orientationOptions (Stage 1/3)', () => {
+  let state = stage1State();
+  const result = setPieceOrientation(state, 'p0', 'y+');
+  assert.equal(result.pieces.find((p) => p.id === 'p0').orientation, undefined);
+});
+
+test('a piece set via setPieceOrientation places into the void that key was meant for', () => {
+  let state = stage4State();
+  state = selectPiece(state, 'p0');
+  state = setPieceOrientation(state, 'p0', 'z-:out');
+  const result = placeSelected(state, 'v-out-z-');
+  assert.equal(result.placed, true);
 });
 
 test('either piece can fill either void once oriented correctly -- order does not matter', () => {

@@ -80,6 +80,25 @@ export function flipPiece(state, pieceId) {
   return { ...state, pieces };
 }
 
+// A second, real way to reach an orientation besides stepping through
+// flipPiece() one at a time -- direct instruction (2026-09-04): "three
+// ways of matching orientation... you tap (as now), you revolve picker
+// shape" (dragging a selected piece by hand should reach the SAME set
+// of valid poses flipPiece() already cycles through, just arrived at
+// by feel instead of blind tapping). Sets the orientation directly to
+// any key already in the piece's own `orientationOptions` -- a no-op
+// for a placed piece, one with no `orientationOptions`, or a key not
+// actually in that piece's own list (never silently accepts an
+// orientation the piece couldn't reach some other way).
+export function setPieceOrientation(state, pieceId, orientationKey) {
+  const piece = state.pieces.find((p) => p.id === pieceId);
+  if (!piece || piece.placed || !piece.orientationOptions || !piece.orientationOptions.includes(orientationKey)) {
+    return state;
+  }
+  const pieces = state.pieces.map((p) => (p.id === pieceId ? { ...p, orientation: orientationKey } : p));
+  return { ...state, pieces };
+}
+
 // Returns { state, placed, pieceId, voidId, filledVoidIds, reason } --
 // `placed` false means the tap was rejected and the caller should show
 // reject feedback rather than a placement. `reason` distinguishes *why*

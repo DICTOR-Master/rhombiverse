@@ -56,6 +56,23 @@
       border-radius: 14px;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
     }
+    /* Direct instruction (2026-09-04, "success message in picker tray
+       box" -- a real live report of a player repeatedly tapping the
+       tray because nothing confirmed a placement actually registered)
+       -- feedback shown right where attention already is (the tray
+       itself), not just the bottom HUD text that's easy to miss mid-
+       play. Sits INSIDE the panel div so it inherits its position
+       automatically; own opacity transition rather than toggling
+       `hidden`, so `flashTrayPlaced()` can retrigger the animation on a
+       rapid second placement without it looking stuck. */
+    #rhombis-tray-flash {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-family: system-ui, sans-serif; font-weight: 700; font-size: 1.1rem; color: #9be3ff;
+      text-shadow: 0 0 12px rgba(155, 227, 255, 0.8);
+      opacity: 0; transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+    #rhombis-tray-flash.show { opacity: 1; transition: opacity 0.1s ease; }
     #rhombis-hud {
       position: fixed; left: 50%; transform: translateX(-50%);
       bottom: calc(1.5rem + env(safe-area-inset-bottom));
@@ -147,7 +164,7 @@
 </head>
 <body>
   <div id="app"></div>
-  <div id="rhombis-tray-panel"></div>
+  <div id="rhombis-tray-panel"><div id="rhombis-tray-flash"></div></div>
   <div id="rhombis-topbar">
     <span><span id="rhombis-title">RHOMBIS</span><span id="rhombis-subtitle">3D puzzle from Rhombiverse</span><span id="rhombis-stage"></span></span>
     <span>

@@ -1307,6 +1307,135 @@ build order:
   passes. Full `node --test tests/unit/*.test.mjs` clean (295/295,
   unchanged -- pure rendering-state change, no `puzzle-state.js` surface
   touched).
+
+  **Piece identity: numbers, per-piece color, placement flash --
+  2026-09-04**: direct instruction after a real live report ("my wife
+  was frustratedly stabbing screen with finger" -- after placing a
+  piece, whatever showed in that tray slot next could look near-
+  identical to the one just placed, with nothing on screen
+  distinguishing "stuck, unplaced" from "genuinely a different piece").
+  Three complementary fixes, all suggested directly, all hooked in from
+  ONE shared call site (`loadStage()`'s own piece-population loop) so
+  every stage gets them uniformly without touching any of the 7 stage-
+  builder functions individually:
+  - A stable per-piece number badge (`makeNumberSprite()`, `main.js`) --
+    a canvas-texture `THREE.Sprite`, always billboard-faces the camera
+    regardless of how the tray itself gets rotated, unlike a flat 3D
+    label would. Positioned from the geometry's own real bounding BOX
+    (not a bounding-sphere-radius offset from local (0,0,0) -- caught
+    live before shipping: the pyramid-based cube/RD-face pieces have
+    their local origin at their own BASE, not their visual centroid, a
+    known quirk from Stage 4's own build notes, so an origin-relative
+    offset landed the badge floating in empty space for those). Hidden
+    once that piece is actually placed (no longer "a piece to tell
+    apart"), shown again on undo.
+  - A distinct hue per piece (`applyPieceIdentity()`) -- an even
+    rotation around the piece color's own hue by `360/total` degrees
+    per index, so no two pieces in the same tray are ever the same
+    shade, readable before the number even needs reading. Each piece
+    mesh already has its own fresh `MeshStandardMaterial` instance
+    (`pieceMaterial()`, `stages.js`), so recoloring here is a local
+    change with no cross-piece side effects.
+  - A "Placed!" flash inside the tray panel itself (`#rhombis-tray-
+    flash`, `rhombis.html` + `flashTrayPlaced()`, `main.js`) -- feedback
+    shown right where attention already is (the tray), not just the
+    bottom HUD text that's easy to miss mid-play. Skipped when the
+    placement also solves the stage (the "Solved!" banner is already
+    strong enough on its own).
+  Verified live: Stage 9's 5-piece tray shows 5 genuinely distinct
+  colors/numbers at both desktop and a real mobile pixel ratio (re-
+  confirming the earlier pixelRatio fix still holds against this new
+  sprite geometry); a real Stage 4 placement (flip-cycle + place) shows
+  the flash and reveals piece "2" in a clearly different color from
+  piece "1"'s. Full `node --test tests/unit/*.test.mjs` clean (295/295
+  -- pure visual/rendering addition, no `puzzle-state.js` surface
+  touched).
+
+  **Drag-to-orient: a real second way to reach an orientation --
+  2026-09-04**: direct instruction, explicitly framed as the biggest,
+  most wide-sweeping change requested this session ("i know this may be
+  the biggest widesweeping array of fixes, but it is important for
+  playability") -- "should be three ways of matching orientation: 1.
+  you tap (as now) 2. you revolve picker shape 3. you revolve target...
+  there shouldn't be a shape full of red when you have a piece that
+  fits perfectly anywhere depending on rotation". Before this, dragging
+  the tray or target was PURE camera movement -- the only way to
+  actually change a piece's orientation was the abstract tap-cycle
+  (`flipPiece`), which is why a piece that could fit several voids (at
+  different orientations) showed every void except its current one as
+  flat red: "no", not "not yet, keep looking". Presented two concrete
+  implementation options before writing any code (real drag-to-orient
+  vs. just softening the red/green feedback) -- direct instruction
+  picked the bigger one.
+  - `puzzle-state.js` gained `setPieceOrientation(state, pieceId,
+    orientationKey)` -- a second real way to reach any of a piece's own
+    `orientationOptions` besides stepping through `flipPiece()` one at a
+    time, reaching the exact same states, just settable directly (6 new
+    unit tests, including one proving it reaches the SAME final state
+    `flipPiece` would after equivalent steps).
+  - `main.js`: a tray-region drag with a FLIPPABLE piece selected
+    (`selectedFlippablePiece()`) now spins THAT piece's own mesh
+    (`mesh.rotation.x/y`, no pitch clamp -- unlike the ordinary group-
+    rotation branch, a piece may need to reach a fully upside-down pose,
+    and clamping pitch would make that unreachable by dragging alone),
+    not the whole tray view. Every pointermove during that drag computes
+    which of the piece's own `orientationOptions` keys is angularly
+    NEAREST to its current live rotation (`Quaternion.angleTo`) and,
+    only when that nearest key actually CHANGES, commits it via
+    `setPieceOrientation` and re-renders the void highlights + HUD text
+    live -- this is what makes the "wall of red" sweep to green AS you
+    rotate, not just once on release. `animate()`'s own per-piece slerp-
+    toward-canonical-pose is suppressed for whichever piece is being
+    drag-oriented (`orientDragPieceId`), so the drag has uncontested
+    control while active; once released, that suppression lifts and the
+    SAME pre-existing slerp naturally glides the piece from wherever the
+    drag left it to the exact canonical pose of the committed
+    orientation -- a "settle into place" snap animation for free,
+    reusing the existing mechanism rather than writing a new one.
+    Rotating the TARGET stays pure camera movement, unchanged -- already
+    a real (if indirect) way to compare a void's required pose against
+    however you're currently holding the piece, satisfying the third
+    "way" without needing new logic there. Tap-to-flip is fully
+    unchanged and still works as a fallback.
+  - Two real bugs found and RULED OUT during verification, both the
+    exact same root cause as an earlier bug this same session (Playwright/
+    a real cursor cannot move the pointer beyond the actual browser
+    viewport mid-gesture) -- an orientation that appeared to "change on
+    its own" during a later click traced back to an EARLIER test drag
+    whose own coordinates ran off the right edge of a 1000px viewport
+    (the tray sits near that edge already), silently dropping the
+    browser's own `pointerup` and leaving `orientDragPieceId` stuck
+    active into the NEXT gesture. Confirmed via direct tracing
+    (`document.elementFromPoint` returning nothing at the drag's final
+    off-screen position) before concluding it wasn't the feature's own
+    code -- neither report reproduces with a properly viewport-bounded
+    drag.
+  Verified live: a full bounded drag on Stage 4 sweeps through 3 real
+  orientations and PLACES successfully with zero taps at all; tap-to-
+  flip still solves Stage 1 end to end unchanged; dragging the TARGET
+  with a piece selected still only rotates the camera view (piece
+  orientation provably unchanged); real dispatched-PointerEvent touch
+  dragging (mobile) reaches a valid orientation and cleans up its own
+  drag-tracking state correctly on release. Full `node --test tests/
+  unit/*.test.mjs` clean (301/301 -- 295 + 6 new `setPieceOrientation`
+  tests).
+
+  **Stage 11 "rejecting valid solution of two conjoined and 1 single" --
+  investigated and NOT reproduced, same day**: reproduced the EXACT
+  scenario with precise coordinate clicking (place the joined-pair,
+  then the matching single into the one remaining open cell) and it
+  genuinely solves the puzzle end to end (`isSolved` true). The likely
+  real explanation, confirmed by first getting the SAME rejection myself
+  before fixing my own test: in an N-cell stage, the tray's singles are
+  NOT freely interchangeable duplicates the way Stage 3's cube pieces
+  are -- each specific single piece (`single-0`, `single-1`, ...) is
+  tied to ONE specific cell's own group and will always be rejected
+  against every other cell's void, even though every single looks
+  generically the same (now visually distinguished by the piece-
+  identity work directly above, which may on its own reduce this
+  particular confusion going forward). Not something to silently fix by
+  loosening the group-match rule -- that would let a single count toward
+  the wrong cell, which is real, load-bearing solve logic, not a bug.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
