@@ -2210,11 +2210,18 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChun
 // whole "discover by trying" point of a Burr key (the original 3-chunk
 // Burr stages avoid this because every chunk is a similarly-sized
 // irregular cluster; nothing about a chunk's own appearance singles out
-// the key). Fixed by decomposing 3 cells the same way, not 1 -- only
-// `fineCellIndexes[0]` actually carries `requiresPlacedFirst`; the other
-// 2 are real, freely-placeable content, existing purely so "small pointy
-// pieces" no longer implies "blocked" (confirmed via AskUserQuestion: 3
-// cells, 1-in-3 read, over the smaller 2-cell option).
+// the key). Fixed by decomposing 3 cells the same way, not 1 -- 18 real,
+// freely-placeable fine pieces exist purely so "small pointy piece" no
+// longer implies "blocked" (confirmed via AskUserQuestion: 3 cells,
+// 1-in-3 read, over the smaller 2-cell option).
+//
+// Second real flaw caught after the sibling `buildDisphenoidElsewhereKeyHullStage`
+// shipped (direct instruction, "mix in the non disphenoid burr key so
+// the approach is less obvious"): this stage always hid its key among
+// the fine pieces, and that sibling always hid its key in a coarse
+// chunk -- either FIXED pattern is its own exploit once noticed. Fixed
+// by drawing the real key at random, per load, from EVERY real piece
+// (coarse chunks and fine groups alike) -- see the random draw below.
 function buildDisphenoidKeyHullStage(scale, allCells, fineCellIndexes, chunkCount, decoyChunkCount) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
@@ -2266,13 +2273,12 @@ function buildDisphenoidKeyHullStage(scale, allCells, fineCellIndexes, chunkCoun
 
   // The fine cells -- buildDisphenoidRDStage's own 24-disphenoid /
   // 6-group construction, translated onto each cell's real position
-  // instead of a stage-local origin. Only fineCellIndexes[0] (the real
-  // key) gets requiresPlacedFirst; the rest place freely.
+  // instead of a stage-local origin. requiresPlacedFirst is assigned
+  // AFTER every real piece (coarse + fine) exists -- see below.
   const coarseChunkIds = pieceSpecs.map((spec) => spec.id);
   const orientationIndexes = DISPHENOID_ORIENTATIONS.map((_, i) => i);
   const apexKeyFor = (i) => disphenoidApexAxisKey(i, scale);
   fineCellIndexes.forEach((cellIndex, fineSlot) => {
-    const isKey = fineSlot === 0;
     const fineCellCenter = cellWorldPositions[cellIndex].clone().sub(centroid);
     skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), fineCellCenter));
     orientationIndexes.forEach((i) => {
@@ -2303,14 +2309,27 @@ function buildDisphenoidKeyHullStage(scale, allCells, fineCellIndexes, chunkCoun
         memberGeometries.map((g) => g.translate(-localCentroid.x, -localCentroid.y, -localCentroid.z)),
         false,
       );
-      pieceSpecs.push({
-        id: `chunk-${groupId}`,
-        fillsGroup: groupId,
-        geometry,
-        requiresPlacedFirst: isKey ? coarseChunkIds : undefined,
-      });
+      pieceSpecs.push({ id: `chunk-${groupId}`, fillsGroup: groupId, geometry });
     });
   });
+
+  // The real key -- picked at RANDOM, per load, from EVERY real piece
+  // (coarse chunks AND fine groups alike), not fixed to always be a
+  // fine piece. Direct instruction (2026-09-05, "mix in the non
+  // disphenoid burr key so the approach is less obvious"): the sibling
+  // `buildDisphenoidElsewhereKeyHullStage` always hides its key in a
+  // coarse chunk; this stage previously always hid its key in a fine
+  // group -- either fixed pattern is itself a real exploit once a
+  // player notices it ("Disphenoid Key stages always gate a fine
+  // piece"). Merging both possibilities into ONE random draw here means
+  // the key's own LOCATION TYPE, not just its identity, is unknown
+  // ahead of time -- same per-load Math.random() discipline the tray's
+  // own Fisher-Yates shuffle already uses (no position/pattern-based
+  // shortcut should ever form).
+  const allRealIds = [...coarseChunkIds, ...pieceSpecs.filter((s) => s.id.startsWith('chunk-fine')).map((s) => s.id)];
+  const keyId = allRealIds[Math.floor(Math.random() * allRealIds.length)];
+  const keySpec = pieceSpecs.find((spec) => spec.id === keyId);
+  keySpec.requiresPlacedFirst = allRealIds.filter((id) => id !== keyId);
 
   // Decoys -- same alternate-irregular-partition idea buildBigHullStage
   // already uses, over the coarse cells only (the fine cells' own groups
