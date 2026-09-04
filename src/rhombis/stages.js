@@ -36,8 +36,8 @@ const ORIGIN = new THREE.Vector3(0, 0, 0);
 const TRANSLUCENT_OPACITY = 0.35;
 export const GHOST_OPACITY = 0.65;
 
-function pieceMaterial() {
-  return new THREE.MeshStandardMaterial({ color: PIECE_COLOR, roughness: 0.5, metalness: 0.1 });
+function pieceMaterial(color = PIECE_COLOR) {
+  return new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.1 });
 }
 
 // A stage's permanent, always-visible reference frame -- a real SOLID
@@ -118,8 +118,8 @@ function makeVoid(geometry, { id, requiredOrientation, quaternion = IDENTITY_QUA
 // plain identity pose and gets its final rotation set programmatically
 // on placement instead -- no player-driven flip needed for a piece that
 // only ever goes one way.
-function makePiece(geometry, { id, orientation, orientationOptions, homePosition }) {
-  const mesh = new THREE.Mesh(geometry, pieceMaterial());
+function makePiece(geometry, { id, orientation, orientationOptions, homePosition, color }) {
+  const mesh = new THREE.Mesh(geometry, pieceMaterial(color));
   mesh.position.copy(homePosition);
   if (orientation) mesh.quaternion.copy(quaternionForOrientationKey(orientation));
   mesh.userData.pieceId = id;
@@ -132,8 +132,8 @@ function makePiece(geometry, { id, orientation, orientationOptions, homePosition
 // main.js's revealNextTrayPiece, which only ever queues loose pieces),
 // since the player CHOOSES between it and the loose pieces rather than
 // receiving it in sequence.
-function makeFusedPiece(geometry, { id, fillsGroup, homePosition, trayScale = 1, requiresPlacedFirst }) {
-  const mesh = new THREE.Mesh(geometry, pieceMaterial());
+function makeFusedPiece(geometry, { id, fillsGroup, homePosition, trayScale = 1, requiresPlacedFirst, color }) {
+  const mesh = new THREE.Mesh(geometry, pieceMaterial(color));
   mesh.position.copy(homePosition);
   mesh.scale.setScalar(trayScale);
   mesh.userData.pieceId = id;
@@ -2077,7 +2077,7 @@ function partitionIntoIrregularChunks(cells, count, seedOffset = 0) {
   return owner.map((r, i) => ({ chunkIndex: r, cell: cells[i] }));
 }
 
-function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChunkIndexes = []) {
+function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChunkIndexes = [], pieceColor = PIECE_COLOR) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
   const assignments = partitionIntoIrregularChunks(allCells, chunkCount);
@@ -2179,6 +2179,7 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChun
       homePosition: nextTrayPosition(spec.geometry, trayScale),
       trayScale,
       requiresPlacedFirst: spec.requiresPlacedFirst,
+      color: pieceColor,
     });
   });
 
@@ -2643,6 +2644,47 @@ const DISPHENOID_ELSEWHERE_KEY_HULL_STAGES = [
   },
 ];
 
+// Crystal tier (2026-09-05, direct instruction: real FCC element
+// theming, "both" real unit-cell-shaped geometry AND real names
+// throughout, confirmed via AskUserQuestion once a real mechanical
+// mismatch was flagged and the scope corrected). A literal textbook
+// "conventional unit cell" (8 corner atoms shared 1/8 each + 6
+// face-centered atoms shared 1/2 each) is a FRACTIONAL construct --
+// every other stage in this file works in WHOLE FCC lattice cells, so
+// building that literally would mean inventing fractional-cell clipping
+// geometry nothing else here does, purely to look different, a real
+// research risk for no puzzle-logic gain. The honest crystallography
+// content isn't "8 different unit-cell shapes" anyway -- FCC
+// coordination geometry (12 nearest neighbors, coordination number 12)
+// is IDENTICAL for every real FCC element; only the real color differs.
+// So this reuses `buildBigHullStage` on the already-proven
+// `CUBOCTAHEDRON_CELLS` (already documented elsewhere in this file as
+// the genuine convex hull of a lattice point's 12 real nearest
+// neighbors) completely unchanged except for `pieceColor` -- 8 real
+// FCC-crystallizing metals (verified, standard materials-science list:
+// Al, Cu, Ag, Au, Ni, Pb, Pt, Pd), each stage identical in mechanic and
+// geometry to Big Hull: Cuboctahedron (81), differing only in real name
+// and real characteristic color. Colors are standard real-world
+// reference approximations for each metal's actual appearance (exact
+// shade varies with finish/oxidation in reality) -- not invented, but
+// not exact spectrophotometry either.
+const FCC_ELEMENTS = [
+  { symbol: 'Al', name: 'Aluminum', color: 0xc8c9cb },
+  { symbol: 'Cu', name: 'Copper', color: 0xb87333 },
+  { symbol: 'Ag', name: 'Silver', color: 0xc0c0c0 },
+  { symbol: 'Au', name: 'Gold', color: 0xd4af37 },
+  { symbol: 'Ni', name: 'Nickel', color: 0x727472 },
+  { symbol: 'Pb', name: 'Lead', color: 0x5a6266 },
+  { symbol: 'Pt', name: 'Platinum', color: 0xe5e4e2 },
+  { symbol: 'Pd', name: 'Palladium', color: 0xced0dd },
+];
+const CRYSTAL_STAGES = FCC_ELEMENTS.map((el, i) => ({
+  id: 99 + i,
+  name: `Crystal: ${el.name} (${el.symbol})`,
+  derivedFrom: [{ id: 81, tier: 'Big Hull' }],
+  build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3, [], el.color),
+}));
+
 // Mirrored Molecule -- direct instruction (2026-09-04, "mirrored
 // molecules split it into 3 with 3 decoys", confirmed "both could
 // work" against two different readings): this is the FIRST reading --
@@ -2729,4 +2771,5 @@ export const STAGES = [
   ...BURR_BRANCHING_MOLECULE_STAGES,
   ...DISPHENOID_KEY_HULL_STAGES,
   ...DISPHENOID_ELSEWHERE_KEY_HULL_STAGES,
+  ...CRYSTAL_STAGES,
 ];
