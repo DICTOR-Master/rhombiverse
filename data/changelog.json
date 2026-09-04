@@ -1,5 +1,20 @@
 [
   {
+    "date": "2026-09-04",
+    "title": "RHOMBIS: Eighty-Five Puzzles Deep",
+    "link": "./rhombis.html",
+    "items": [
+      "New: RHOMBIS grew from 16 stages to 85 in one sitting, real-time play-tested the whole way through. Difficulty now genuinely ramps with stage number -- simple whole-shape arrangement first, real orientation-matching next, and increasingly large/irregular composite puzzles at the top.",
+      "New: Molecules -- two real shapes joined into one bigger piece, solved by placing exactly the two pieces that make it, against decoys drawn from the same shape family. Every possible pairing from the game's own shape catalog is a real, distinct stage.",
+      "New: Mirrored Molecule -- a molecule whose two halves are genuine mirror images of each other, not just a rotated copy. Only a handful of this lattice's real shapes are actually chiral (can't be rotated onto their own reflection); each one gets a real stage here.",
+      "New: Hulls and Big Hulls -- a single shape broken into 2-4 real sub-pieces instead of a shape being joined to another, up through a real 13-cell Cuboctahedron and a 20-cell tetrahedral stack, the biggest targets in the game.",
+      "New: Branching Molecules -- three shapes joined at a shared hub instead of two in a line, a genuine Y-shaped composite.",
+      "New: a whole rhombic dodecahedron decomposed into 24 real tetragonal disphenoids instead of the usual 12 pyramids -- a completely different way to build the same familiar shape.",
+      "New: Burr Puzzles -- the first stages where placement ORDER matters. A \"key\" piece genuinely won't seat until the others around it are in place, with a real explanation on screen if you try it out of turn, not just a silent rejection.",
+      "Fixed: several real bugs caught mid-session by actually playing the new stages, not just building them -- pieces silently missing their own tray tap target when their visual center didn't match their logical one, a tray that stacked every piece in one long column regardless of how many there were, and an orientation scheme on two stages that quietly had duplicate entries pointing at the same real pose."
+    ]
+  },
+  {
     "date": "2026-09-03",
     "title": "RHOMBIS: A New Way In",
     "link": "./rhombis.html?stage=3",

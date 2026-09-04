@@ -127,12 +127,38 @@ the full phase-by-phase build history underneath it (planetoid gravity,
 water/ice, black holes, star systems, supernovae, Penrose growth,
 evolution, animals, lattice zoom).
 
+## RHOMBIS
+
+A standalone, 85-stage geometric-packing puzzle game (`rhombis.html`,
+linked from the welcome screen) that teaches this same FCC/rhombic-
+dodecahedron geometry through play rather than exposition — rotate a
+target shape, tap pieces into place, watch it assemble. Difficulty ramps
+with stage number: simple whole-shape arrangement first (does this piece
+go here, no rotation involved), then real orientation-matching (6-way,
+12-way, and a 24-way tetragonal-disphenoid decomposition of the same
+RD), then increasingly large composite puzzles — two real shapes joined
+into one (Molecules, every real pairing from the shape catalog), a
+molecule whose two halves are genuine mirror images of each other
+(Mirrored Molecule, only possible for this lattice's handful of
+genuinely chiral shapes), a single shape broken into irregular chunks
+instead (Hulls / Big Hulls, up through a real 13-cell Cuboctahedron and
+a 20-cell tetrahedral stack), three shapes joined at a shared hub
+(Branching Molecules), and Burr Puzzles — the one tier where placement
+ORDER matters, a "key" piece genuinely blocked until the others around
+it are down. Every stage ships with decoy pieces drawn from the same
+real shape family, not obviously-wrong filler. `src/rhombis/` is its own
+small engine: `puzzle-state.js` (pure state machine, no THREE/DOM),
+`geometry.js` (mesh construction), `stages.js` (every stage's own
+content, generated from real lattice math rather than hand-placed
+wherever a generator can reach), `main.js` (input/render/camera, shared
+by every stage).
+
 ## Structure
 
 ```
 rhombiverse/
   index.html                # static entry point, Three.js via import map (no bundling; see "Running locally")
-  rhombis.html               # Rhombis: standalone geometric-packing intro puzzle, linked from the welcome screen
+  rhombis.html               # Rhombis: standalone 85-stage geometric-packing puzzle, linked from the welcome screen
   api/                       # Vercel serverless functions (AI Gateway proxy: sculpt/cultivate/cyborg-suggest)
   src/
     rhombis/                 # Rhombis' own code: puzzle-state.js (pure state machine), geometry.js
