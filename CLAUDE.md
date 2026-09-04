@@ -2034,6 +2034,24 @@ build order:
     including all 3 decoys correctly rejecting everywhere first in both.
     Full `node --test tests/unit/*.test.mjs` clean (311/311).
   - Total stage count after this: 63 (was 57).
+
+  **Hulls/Molecules resequenced -- 2026-09-04**, right after playing
+  through Hulls: "those were okay but actually all easier than molecule
+  stages so should be renumbered and sequenced before molecules",
+  confirmed "45-57 too easy" (their OLD ids) and "move to pre molecule
+  stage". 5-cell hulls are objectively smaller than Molecules' own 6-8
+  cell composites -- the original build order (Molecules 17-44, Hulls
+  45-57) put the easier tier after the harder one, purely because Hulls
+  was BUILT second, not because it was meant to be harder. Fixed by
+  renumbering: Hulls now 17-29 (was 45-57), Molecules shifts to 30-57
+  (was 17-44) to make room. Branching Molecules (58-63) needed no change
+  -- 13+28=41 stages either way, so it still starts at 17+41=58
+  regardless of which of the two comes first. Pure id/array-order
+  change, zero build-function changes -- verified live via the real
+  stage picker listing (all 63 names/ids in the correct new order) and
+  direct `?stage=N` deep-link spot checks at every tier boundary (17,
+  29, 30, 57, 58, 63). Full `node --test tests/unit/*.test.mjs` clean
+  (311/311).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

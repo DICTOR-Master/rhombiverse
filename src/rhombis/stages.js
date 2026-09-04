@@ -1409,8 +1409,19 @@ function buildHullSplitStage(scale, hullDef) {
   return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
 }
 
+// Renumbered 2026-09-04 (direct instruction, after playing through it:
+// "those were okay but actually all easier than molecule stages so
+// should be renumbered and sequenced before molecules", confirmed "45-
+// 57 too easy" at their OLD ids) -- 5-cell hulls are objectively
+// smaller than Molecules' own 6-8 cell composites, so the original
+// build order (Molecules 17-44, then Hulls 45-57) put the easier tier
+// AFTER the harder one. Now ids 17-29 (was 45-57); Molecules shifts to
+// 30-57 (was 17-44) to make room. Branching Molecules (58-63) is
+// unaffected -- 13 (Hulls) + 28 (Molecules) = 41 stages either way, so
+// it still starts at 17 + 41 = 58 regardless of which of the two comes
+// first.
 const HULL_STAGES = FIVE_CELL_HULL_DEFS.map((hullDef, i) => ({
-  id: 45 + i,
+  id: 17 + i,
   name: `Hull ${i + 1}: 5-Cell Split`,
   build: (scale) => buildHullSplitStage(scale, hullDef),
 }));
@@ -1747,8 +1758,11 @@ MOLECULE_STAGE_DEFS.sort((x, y) => (x.lobeA.cells.length + x.lobeB.cells.length)
 // exists in BOTH the N=3 and N=4 catalogs (a genuinely different real
 // shape at each size, not a duplicate), so "Straight Line + Straight
 // Line" alone would misleadingly read as the same piece twice.
+// Starts at 30, not 17 -- Hulls (17-29) got resequenced ahead of
+// Molecules after direct feedback that 5-cell hulls read easier than
+// Molecules' own 6-8 cell composites (see HULL_STAGES' own comment).
 const MOLECULE_STAGES = MOLECULE_STAGE_DEFS.map(({ lobeA, lobeB }, i) => ({
-  id: 17 + i,
+  id: 30 + i,
   name: `Molecule: ${lobeA.name} (${lobeA.cells.length}) + ${lobeB.name} (${lobeB.cells.length})`,
   build: (scale) => buildMoleculeStage(scale, lobeA, lobeB, pickMoleculeDecoys(lobeA, lobeB, i * 2)),
 }));
@@ -1815,7 +1829,7 @@ export const STAGES = [
   { id: 14, name: 'Rhombic Dodecahedron', build: buildStage4 },
   { id: 15, name: 'Conjoined Pieces', build: buildStage5 },
   { id: 16, name: 'Multi-Cell', build: buildStage6 },
-  ...MOLECULE_STAGES,
   ...HULL_STAGES,
+  ...MOLECULE_STAGES,
   ...BRANCHING_MOLECULE_STAGES,
 ];
