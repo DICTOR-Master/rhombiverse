@@ -1140,6 +1140,63 @@ build order:
   requiring stage reordering), decoy pieces varying in size as levels
   advance, an HUD shape-symbol icon, and an 80s-style blocky RD logo.
   None of this has been scoped or built yet.
+
+  **Real bug found and fixed, 2026-09-04, live report "stage picker
+  looks good but massive shape appears and then disappears as you try
+  to manipulate... when going to any stages of actual game"**: a second,
+  more subtle instance of the SAME root cause as the target/tray bleed-
+  through bug above, missed the first time because it manifested as an
+  intermittent visual glitch (dependent on rotation angle) rather than a
+  constant one. `trayCamera.layers.enable(TRAY_LAYER)` only ADDS a layer
+  to a camera's render mask, it does not REPLACE it -- a fresh
+  `PerspectiveCamera`'s mask already has layer 0 enabled by default, so
+  `trayCamera` was rendering BOTH the tray pieces (`TRAY_LAYER`) AND the
+  full target skeleton (layer 0, untouched) the entire time. Most
+  rotations/zoom levels keep the target -- much larger, positioned and
+  scaled for the FULL-SCREEN target camera's own distant framing --
+  outside the tray camera's own tiny, close-up frustum, so it stayed
+  invisible; a rotation that swung part of the target INTO that frustum
+  rendered it there hugely oversized (framed for a camera sitting close
+  to a small tray-sized box), reading as a shape suddenly appearing
+  massive in/around the tray corner, then vanishing again as the
+  rotation continued past it. Reproduced live via a bounded rotation
+  sweep (Playwright's synthetic mouse can't legally leave the actual
+  browser viewport mid-gesture -- a real cursor/finger can't either --
+  so the repro used repeated in-bounds swipes, not one long drag past
+  the window edge, after an earlier same-session attempt with an
+  out-of-bounds single drag produced a misleading false freeze that
+  traced back to the test itself, not the app). Fix: `trayCamera.layers.
+  set(TRAY_LAYER)` (replace, not add). This alone made the tray render
+  fully BLACK (a second real bug surfaced by the first fix, caught before
+  shipping): a `Light`'s own `.layers` gates which CAMERA can see it at
+  all (the renderer tests `light.layers.test(camera.layers)` for lights
+  same as any other Object3D, not just which objects a light
+  illuminates) -- both scene lights were on the untouched default layer
+  0, so once `trayCamera` no longer had layer 0 in its mask at all, it
+  couldn't see the lights either, and unlit `MeshStandardMaterial` tray
+  pieces render solid black. Fixed by introducing `STARFIELD_LAYER`
+  (also cleanly separates the starfield backdrop itself off layer 0, so
+  sharing it between cameras doesn't reintroduce the original bleed):
+  both lights and the starfield get `STARFIELD_LAYER` enabled IN
+  ADDITION to their existing layer (lights keep layer 0 too, so `camera`
+  -- the target -- is unaffected); `trayCamera` enables `STARFIELD_LAYER`
+  alongside its own `TRAY_LAYER`-only mask. Net result: `camera` sees
+  {0, STARFIELD_LAYER} (skeleton/voids + stars, lit by both lights),
+  `trayCamera` sees {TRAY_LAYER, STARFIELD_LAYER} (tray pieces + stars,
+  lit by both lights) -- neither camera can see the other's actual
+  content anymore, both share light and backdrop. Verified live before
+  shipping: a full bounded rotation sweep (6 repeated in-viewport swipes,
+  ~7 full turns) on both elongated N=4 stages (Stage 15, Straight Line)
+  with before/after screenshots of the tray corner specifically (the
+  previously-blue-tinted piece in the tray is now solid orange, con-
+  firming the bleed is gone and lighting is restored); Stage 1's full
+  solve (flip + place -> "Solved!"); Stage 4's place-then-undo cycle (12
+  left -> 11 left -> 12 left); independent target/tray rotation (a
+  target-region drag changes `skeletonGroup.rotation.y`, a subsequent
+  tray-region drag leaves it unchanged); the stage picker still opens/
+  lists/navigates correctly. Full `node --test tests/unit/*.test.mjs`
+  clean (295/295, unchanged -- pure rendering-layer fix, no `puzzle-
+  state.js` surface touched).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

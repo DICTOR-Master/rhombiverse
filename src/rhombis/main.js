@@ -76,10 +76,24 @@ function orientationLabel(key) {
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05050a);
-scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+// A light's own `.layers` gates which CAMERA can see it at all (the
+// renderer tests `light.layers.test(camera.layers)` same as any other
+// Object3D, not just which objects it illuminates) -- both lights stay
+// on the default layer 0 (so `camera`, the target, keeps lighting the
+// skeleton exactly as before) and ALSO get `STARFIELD_LAYER` enabled so
+// `trayCamera` (which, after the layer-bleed fix below, no longer has
+// layer 0 at all) still has light to render tray pieces by, rather than
+// going fully black. Declared up here, before the lights, so both can
+// reference it -- see `TRAY_LAYER`'s own comment further down for the
+// bug this whole arrangement fixes.
+const STARFIELD_LAYER = 2;
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 const sun = new THREE.DirectionalLight(0xffffff, 1.2);
 sun.position.set(3, 5, 4);
-scene.add(sun);
+ambientLight.layers.enable(STARFIELD_LAYER);
+sun.layers.enable(STARFIELD_LAYER);
+scene.add(ambientLight, sun);
 
 // Starry sky background -- direct instruction (2026-09-04, "a starry
 // sky background"). A real THREE.Points cloud, not a texture/CSS
@@ -113,8 +127,14 @@ function buildStarfield(count, radiusRange, size, opacity) {
   });
   return new THREE.Points(geometry, material);
 }
-scene.add(buildStarfield(900, [70, 85], 1.1, 0.55));
-scene.add(buildStarfield(120, [70, 85], 2.2, 0.9));
+// STARFIELD_LAYER (declared up with the lights, for the same reason) --
+// shared backdrop for BOTH cameras without pulling the target skeleton
+// into the tray's own render (see TRAY_LAYER's own comment below).
+const starfieldA = buildStarfield(900, [70, 85], 1.1, 0.55);
+const starfieldB = buildStarfield(120, [70, 85], 2.2, 0.9);
+starfieldA.layers.set(STARFIELD_LAYER);
+starfieldB.layers.set(STARFIELD_LAYER);
+scene.add(starfieldA, starfieldB);
 
 // Two independent cameras/viewports, one shared renderer -- direct
 // instruction (2026-09-04): "the main issue with target and piece
@@ -140,14 +160,30 @@ scene.add(buildStarfield(120, [70, 85], 2.2, 0.9));
 // visibly bleeding into the target's render). THREE.Layers is the
 // fix: every tray piece goes on TRAY_LAYER, `camera` (target) never
 // enables it (a camera's default layer mask is layer 0 only, so simply
-// never touching `camera.layers` already excludes it), and
-// `trayCamera` explicitly enables both 0 (lights/starfield, so the
-// tray gets the same backdrop) and TRAY_LAYER.
+// never touching `camera.layers` already excludes it).
+//
+// Second real bug, same root cause, found later (live report: "massive
+// shape appears and then disappears as you try to manipulate"):
+// `trayCamera.layers.enable(TRAY_LAYER)` only ADDS a layer to a
+// camera's mask, it doesn't replace it -- a fresh camera's mask already
+// has layer 0 enabled by default, so `trayCamera` was rendering BOTH
+// the tray pieces AND the full target skeleton (layer 0) the whole
+// time. Most rotations/zoom levels keep the (much larger, differently
+// positioned) target skeleton outside the tray camera's own narrow,
+// close-up frustum, so this stayed invisible -- until a rotation swung
+// part of it into view, where the tray's own close-focused framing
+// rendered it hugely oversized inside the small tray corner, then out
+// again as the rotation continued. `trayCamera.layers.set(TRAY_LAYER)`
+// (replace, not add) is the fix; `STARFIELD_LAYER` below exists so both
+// cameras can still share just the starfield backdrop without either
+// one pulling in the other's actual content.
 const TRAY_LAYER = 1;
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
 const trayCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-trayCamera.layers.enable(TRAY_LAYER);
+camera.layers.enable(STARFIELD_LAYER);
+trayCamera.layers.set(TRAY_LAYER);
+trayCamera.layers.enable(STARFIELD_LAYER);
 const CAMERA_DIRECTION = new THREE.Vector3(2.5, 2, 5).normalize();
 
 // All UNPLACED pieces live here (not loose children of `scene`) so the
