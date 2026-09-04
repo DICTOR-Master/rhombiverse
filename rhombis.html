@@ -14,6 +14,12 @@
        making this one clearly distinct and separately searchable
        rather than picking a new name). -->
   <meta name="description" content="RHOMBIS: the 3D geometric-packing puzzle game from Rhombiverse. Fit rhombic dodecahedron pieces together in your browser -- not the old 2D Windows game of the same name." />
+  <!-- Own distinct favicon from the rest of Rhombiverse, reinforcing
+       the same disambiguation the title/meta above already carry --
+       the real finished logo (2026-09-04), not the parent app's own
+       wireframe-RD favicon.svg. -->
+  <link rel="icon" type="image/png" href="./assets/rhombis-favicon-64.png" />
+  <link rel="apple-touch-icon" href="./assets/rhombis-apple-touch.png" />
   <style>
     html, body {
       margin: 0; height: 100%; background: #05050a; overflow: hidden;
@@ -37,6 +43,9 @@
     }
     #rhombis-topbar a:hover { text-decoration: underline; }
     #rhombis-title { font-weight: 600; letter-spacing: 0.08em; }
+    #rhombis-title-mark {
+      width: 22px; height: 22px; border-radius: 5px; vertical-align: -6px; margin-right: 0.4rem;
+    }
     /* Disambiguates from an old, unrelated 2D Windows game of the same
        name -- direct instruction 2026-09-04. Hidden below 600px so it
        doesn't crowd the stage name out on a phone-width topbar; the
@@ -166,7 +175,7 @@
   <div id="app"></div>
   <div id="rhombis-tray-panel"><div id="rhombis-tray-flash"></div></div>
   <div id="rhombis-topbar">
-    <span><span id="rhombis-title">RHOMBIS</span><span id="rhombis-subtitle">3D puzzle from Rhombiverse</span><span id="rhombis-stage"></span></span>
+    <span><img id="rhombis-title-mark" src="./assets/rhombis-favicon-64.png" alt="" /><span id="rhombis-title">RHOMBIS</span><span id="rhombis-subtitle">3D puzzle from Rhombiverse</span><span id="rhombis-stage"></span></span>
     <span>
       <button id="rhombis-stage-picker-toggle" type="button">Stages</button>
       <a href="./index.html">&larr; Rhombiverse</a>

@@ -164,6 +164,7 @@ function overlayHtml() {
         Don't show this again on this device
       </label>
       <div class="rhombis-link">
+        <img src="./assets/rhombis-favicon-64.png" alt="" width="28" height="28" />
         <a href="./rhombis.html">New here? Try RHOMBIS, our 3D intro puzzle &rarr;</a>
       </div>
       <div class="legal-links">

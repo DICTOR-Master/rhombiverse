@@ -997,6 +997,14 @@
     #welcome-card .rhombis-link {
       margin-top: 12px;
       font-size: 12px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    /* The real finished RHOMBIS logo (2026-09-04) -- small and
+       secondary here on purpose, since the big central wireframe RD
+       above (#welcome-logo-svg) is Rhombiverse's own primary mark, not
+       this sub-feature's. */
+    #welcome-card .rhombis-link img {
+      width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0;
     }
     #welcome-card .rhombis-link a { color: #9de0ff; text-decoration: none; }
     #welcome-card .rhombis-link a:hover { text-decoration: underline; }
