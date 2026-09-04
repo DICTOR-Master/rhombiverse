@@ -129,36 +129,50 @@ evolution, animals, lattice zoom).
 
 ## RHOMBIS
 
-A standalone, 85-stage geometric-packing puzzle game (`rhombis.html`,
-linked from the welcome screen) that teaches this same FCC/rhombic-
-dodecahedron geometry through play rather than exposition — rotate a
-target shape, tap pieces into place, watch it assemble. Difficulty ramps
-with stage number: simple whole-shape arrangement first (does this piece
-go here, no rotation involved), then real orientation-matching (6-way,
-12-way, and a 24-way tetragonal-disphenoid decomposition of the same
-RD), then increasingly large composite puzzles — two real shapes joined
-into one (Molecules, every real pairing from the shape catalog), a
-molecule whose two halves are genuine mirror images of each other
-(Mirrored Molecule, only possible for this lattice's handful of
-genuinely chiral shapes), a single shape broken into irregular chunks
-instead (Hulls / Big Hulls, up through a real 13-cell Cuboctahedron and
-a 20-cell tetrahedral stack), three shapes joined at a shared hub
-(Branching Molecules), and Burr Puzzles — the one tier where placement
-ORDER matters, a "key" piece genuinely blocked until the others around
-it are down. Every stage ships with decoy pieces drawn from the same
-real shape family, not obviously-wrong filler. `src/rhombis/` is its own
-small engine: `puzzle-state.js` (pure state machine, no THREE/DOM),
-`geometry.js` (mesh construction), `stages.js` (every stage's own
-content, generated from real lattice math rather than hand-placed
-wherever a generator can reach), `main.js` (input/render/camera, shared
-by every stage).
+A standalone, 114-stage geometric-packing puzzle game (`rhombis.html`,
+linked from the welcome screen) that teaches real crystal-lattice
+geometry through play rather than exposition — rotate a target shape,
+tap pieces into place, watch it assemble. Difficulty ramps with stage
+number: simple whole-shape arrangement first (does this piece go here,
+no rotation involved), then real orientation-matching (6-way, 12-way,
+and a 24-way tetragonal-disphenoid decomposition of the same RD), then
+increasingly large composite puzzles — two real shapes joined into one
+(Molecules, every real pairing from the shape catalog), a molecule whose
+two halves are genuine mirror images of each other (Mirrored Molecule,
+only possible for this lattice's handful of genuinely chiral shapes), a
+single shape broken into irregular chunks instead (Hulls / Big Hulls, up
+through a real 13-cell Cuboctahedron and a 20-cell tetrahedral stack),
+three shapes joined at a shared hub (Branching Molecules), and Burr
+Puzzles — the tier where placement ORDER matters, a "key" piece
+genuinely blocked until the others around it are down. Four crossover
+tiers combine these mechanics directly (a Burr key layered onto a
+Molecule Split, a Mirrored Molecule, and a Branching Molecule; a Big
+Hull whose key can be a plain chunk or a genuine disphenoid group,
+drawn fresh at random every playthrough so it can't be memorized by
+piece type) — any stage built this way shows its own real lineage in
+the stage picker. Two Crystal tiers reuse the same proven geometry
+(FCC's Cuboctahedron, BCC's own real truncated-octahedron Voronoi cell)
+themed across 17 real crystallizing metals total (8 FCC: aluminum,
+copper, silver, gold, nickel, lead, platinum, palladium; 9 BCC: iron,
+chromium, tungsten, molybdenum, vanadium, niobium, tantalum, sodium,
+potassium), each stage colored with that metal's own real characteristic
+color — BCC is a genuinely different real lattice from the FCC/RD
+geometry every other tier uses, not a reskin. Every stage ships with
+decoy pieces drawn from the same real shape family, not obviously-wrong
+filler. `src/rhombis/` is its own small engine: `puzzle-state.js` (pure
+state machine, no THREE/DOM), `geometry.js` (mesh construction),
+`stages.js` (every stage's own content, generated from real lattice math
+rather than hand-placed wherever a generator can reach), `main.js`
+(input/render/camera, shared by every stage) — plus real BCC lattice
+math reused directly from `geometry-extensions/dual-lattice.js` and
+`bcc-detail-lattice.js`, not re-derived.
 
 ## Structure
 
 ```
 rhombiverse/
   index.html                # static entry point, Three.js via import map (no bundling; see "Running locally")
-  rhombis.html               # Rhombis: standalone 85-stage geometric-packing puzzle, linked from the welcome screen
+  rhombis.html               # Rhombis: standalone 114-stage geometric-packing puzzle (FCC + BCC), linked from the welcome screen
   api/                       # Vercel serverless functions (AI Gateway proxy: sculpt/cultivate/cyborg-suggest)
   src/
     rhombis/                 # Rhombis' own code: puzzle-state.js (pure state machine), geometry.js

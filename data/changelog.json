@@ -1,5 +1,19 @@
 [
   {
+    "date": "2026-09-05",
+    "title": "RHOMBIS: A Second Real Lattice",
+    "link": "./rhombis.html?stage=105",
+    "items": [
+      "New: BCC -- a genuinely different real crystal lattice alongside FCC, with its own real space-filling shape (a truncated octahedron, not a rhombic dodecahedron) and its own real 8+6 neighbor geometry, not a reskin of the existing content.",
+      "New: Crystal tier -- 8 real FCC-crystallizing metals (aluminum, copper, silver, gold, nickel, lead, platinum, palladium) and 9 real BCC-crystallizing metals (iron, chromium, tungsten, molybdenum, vanadium, niobium, tantalum, sodium, potassium), each stage colored with that metal's own real characteristic color.",
+      "New: 4 crossover tiers combining mechanics that never met before -- a Burr Puzzle key layered onto a Molecule Split, a Mirrored Molecule, and a Branching Molecule composite, plus a Big Hull variant where the key can hide among either a plain chunk or genuine fine-grained disphenoid detail, drawn fresh at random every time you play.",
+      "New: any stage built by combining earlier ones now shows real lineage in the stage picker -- which tier(s) it draws from, by name and number.",
+      "Fixed: a Burr-key stage caught giving away which piece was blocked just from its own shape, before any placement was even tried -- the key is now drawn from every real piece in the stage, not always the same category of piece.",
+      "Fixed: two stage names that spelled out exactly which piece held the hidden key, defeating the whole point of a Burr puzzle.",
+      "Fixed: a redundant crossover variant, found to be a strict subset of a stronger one already shipped -- removed rather than kept as weaker filler."
+    ]
+  },
+  {
     "date": "2026-09-04",
     "title": "RHOMBIS: Eighty-Five Puzzles Deep",
     "link": "./rhombis.html",
