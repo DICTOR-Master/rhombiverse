@@ -5,7 +5,7 @@
 // order (Stage 2); 6 identical pieces placeable in any order (Stage 3).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPuzzleState, selectPiece, deselect, flipPiece, setPieceOrientation, placeSelected, isSolved, voidValidityForPiece, ANY_SINGLE_CELL_GROUP } from '../../src/rhombis/puzzle-state.js';
+import { createPuzzleState, selectPiece, deselect, flipPiece, setPieceOrientation, openOrientationOptions, placeSelected, isSolved, voidValidityForPiece, ANY_SINGLE_CELL_GROUP } from '../../src/rhombis/puzzle-state.js';
 
 function stage1State() {
   return createPuzzleState({
@@ -356,6 +356,76 @@ test('Stage 4: flipping cycles through all 12 orientations and wraps back to the
   let state = stage4State();
   for (let i = 0; i < 12; i++) state = flipPiece(state, 'p0');
   assert.equal(state.pieces.find((p) => p.id === 'p0').orientation, 'x+:in');
+});
+
+// openOrientationOptions -- direct instruction (2026-09-04, "reduce
+// amount of wrong options as faces get filled, nobody tries to put
+// something where there is something in real life generally"): as open
+// voids get filled, an orientation no open void wants anymore should
+// drop out of the tap-cycle/drag-snap set. 'c' here is never wanted by
+// ANY void, from the very start -- included to prove "worth offering"
+// really means "some open void wants it right now", not merely "in the
+// piece's own static list".
+function orientationFilterState() {
+  return createPuzzleState({
+    pieces: [
+      { id: 'p0', orientation: 'a', orientationOptions: ['a', 'b', 'c'] },
+      { id: 'p1', orientation: 'a', orientationOptions: ['a', 'b', 'c'] },
+    ],
+    voids: [
+      { id: 'v-a', requiredOrientation: 'a' },
+      { id: 'v-b', requiredOrientation: 'b' },
+    ],
+  });
+}
+
+test('openOrientationOptions: excludes an orientation no open void has ever wanted', () => {
+  const state = orientationFilterState();
+  assert.deepEqual(openOrientationOptions(state, 'p0'), ['a', 'b']);
+});
+
+test('openOrientationOptions: an orientation drops out once the only void that wanted it is filled', () => {
+  let state = orientationFilterState();
+  state = selectPiece(state, 'p0'); // already 'a', matches v-a with no flip needed
+  state = placeSelected(state, 'v-a').state;
+
+  assert.deepEqual(openOrientationOptions(state, 'p1'), ['b']);
+});
+
+test('openOrientationOptions: a void with no requiredOrientation at all keeps the full list unfiltered', () => {
+  let state = orientationFilterState();
+  state = { ...state, voids: [...state.voids, { id: 'v-any', filled: false, filledBy: null }] };
+  state = selectPiece(state, 'p0');
+  state = placeSelected(state, 'v-a').state; // v-a filled, but v-any (wildcard) is still open
+
+  assert.deepEqual(openOrientationOptions(state, 'p1'), ['a', 'b', 'c']);
+});
+
+test('openOrientationOptions: a piece with no orientationOptions returns undefined, not a crash', () => {
+  const state = stage1State();
+  assert.equal(openOrientationOptions(state, 'p0'), undefined);
+});
+
+test('flipPiece: skips a now-dead orientation entirely when cycling', () => {
+  let state = orientationFilterState();
+  state = selectPiece(state, 'p0');
+  state = placeSelected(state, 'v-a').state; // v-a filled -- 'a' is now dead, 'c' was always dead
+
+  state = flipPiece(state, 'p1'); // starts at 'a' (dead) -- should land on the one live option, 'b'
+  assert.equal(state.pieces.find((p) => p.id === 'p1').orientation, 'b');
+});
+
+test('setPieceOrientation: rejects a key still in the piece\'s static list but no longer wanted by any open void', () => {
+  let state = orientationFilterState();
+  state = selectPiece(state, 'p0');
+  state = placeSelected(state, 'v-a').state; // 'a' is now dead
+
+  const result = setPieceOrientation(state, 'p1', 'a');
+  assert.equal(result.pieces.find((p) => p.id === 'p1').orientation, 'a'); // unchanged (was already 'a') -- confirms no-op, not a crash
+  const rejectedC = setPieceOrientation(state, 'p1', 'c'); // never wanted by any void, even from the start
+  assert.equal(rejectedC.pieces.find((p) => p.id === 'p1').orientation, 'a');
+  const accepted = setPieceOrientation(state, 'p1', 'b'); // the one live option
+  assert.equal(accepted.pieces.find((p) => p.id === 'p1').orientation, 'b');
 });
 
 // Stage 5's real shape: the same 6-void cube as Stage 3, but the tray

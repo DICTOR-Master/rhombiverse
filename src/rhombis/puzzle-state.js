@@ -98,6 +98,33 @@ export function deselect(state) {
   return { ...state, selectedPieceId: null };
 }
 
+// Which of a piece's own `orientationOptions` are still worth offering,
+// given what's currently open -- direct instruction (2026-09-04,
+// "reduce amount of wrong options as faces get filled, nobody tries to
+// put something where there is something in real life generally"): an
+// orientation that no longer matches ANY open void's `requiredOrientation`
+// can never place again (every void that ever wanted it is already
+// filled), so it's dead weight in the tap-cycle/drag-snap set, not a
+// real choice. If ANY open void has no `requiredOrientation` at all (an
+// orientation-agnostic void, none exist today but this stays correct if
+// one ever did), every orientation stays offered -- that void would
+// accept the piece regardless, so nothing is provably dead. Returns the
+// full unfiltered list for a piece with no `orientationOptions`, so
+// callers can pass this straight through without a feature check.
+export function openOrientationOptions(state, pieceId) {
+  const piece = state.pieces.find((p) => p.id === pieceId);
+  if (!piece || !piece.orientationOptions) return piece?.orientationOptions;
+  const openVoids = state.voids.filter((v) => !v.filled);
+  if (openVoids.some((v) => !v.requiredOrientation)) return piece.orientationOptions;
+  const stillNeeded = new Set(openVoids.map((v) => v.requiredOrientation));
+  const filtered = piece.orientationOptions.filter((key) => stillNeeded.has(key));
+  // Never filter down to nothing -- shouldn't happen if every open void's
+  // requiredOrientation is drawn from this same piece's own option list,
+  // but falling back to the full list rather than locking the piece up
+  // is the safe failure mode if that invariant is ever violated.
+  return filtered.length ? filtered : piece.orientationOptions;
+}
+
 // Spec's "rotating the piece itself matters" (Stage 2): cycles a piece
 // through its own `orientationOptions` list (e.g. Stage 2's ['y+',
 // 'y-']) to the next entry after its current `orientation`. A no-op for
@@ -107,15 +134,25 @@ export function deselect(state) {
 // invoke this unconditionally on "tap an already-selected piece again"
 // without a feature check first. Cycling (not a hardcoded binary
 // toggle) so a piece with more than 2 valid orientations works the same
-// way without a second flip function.
+// way without a second flip function. Cycles through `openOrientationOptions`
+// (only the ones still worth offering), not the piece's full static
+// list -- see that function's own comment. Deliberately does NOT bail
+// out just because that filtered list has fewer than 2 entries: if the
+// piece's CURRENT orientation is itself dead (no open void wants it
+// anymore -- reachable if it was set before the void that wanted it got
+// filled some other way) and exactly one live option remains, moving to
+// that one option is real, useful progress, not a no-op -- only bail
+// when the next computed stop is the piece's own current orientation
+// (genuinely nothing to change).
 export function flipPiece(state, pieceId) {
   const piece = state.pieces.find((p) => p.id === pieceId);
   if (!piece || piece.placed || !piece.orientationOptions || piece.orientationOptions.length < 2) {
     return state;
   }
-  const options = piece.orientationOptions;
+  const options = openOrientationOptions(state, pieceId);
   const currentIndex = options.indexOf(piece.orientation);
   const next = options[(currentIndex + 1) % options.length];
+  if (next === piece.orientation) return state;
   const pieces = state.pieces.map((p) => (p.id === pieceId ? { ...p, orientation: next } : p));
   return { ...state, pieces };
 }
@@ -126,13 +163,13 @@ export function flipPiece(state, pieceId) {
 // shape" (dragging a selected piece by hand should reach the SAME set
 // of valid poses flipPiece() already cycles through, just arrived at
 // by feel instead of blind tapping). Sets the orientation directly to
-// any key already in the piece's own `orientationOptions` -- a no-op
-// for a placed piece, one with no `orientationOptions`, or a key not
-// actually in that piece's own list (never silently accepts an
-// orientation the piece couldn't reach some other way).
+// any key still in `openOrientationOptions` -- a no-op for a placed
+// piece, one with no `orientationOptions`, or a key that's either not
+// in that piece's own list or no longer worth offering (never silently
+// accepts an orientation the piece couldn't also reach by tap-cycling).
 export function setPieceOrientation(state, pieceId, orientationKey) {
   const piece = state.pieces.find((p) => p.id === pieceId);
-  if (!piece || piece.placed || !piece.orientationOptions || !piece.orientationOptions.includes(orientationKey)) {
+  if (!piece || piece.placed || !piece.orientationOptions || !openOrientationOptions(state, pieceId).includes(orientationKey)) {
     return state;
   }
   const pieces = state.pieces.map((p) => (p.id === pieceId ? { ...p, orientation: orientationKey } : p));

@@ -35,7 +35,7 @@
 import * as THREE from 'three';
 import { quaternionForOrientationKey } from './geometry.js';
 import { STAGES, WIRE_COLOR, GHOST_OPACITY } from './stages.js';
-import { createPuzzleState, selectPiece, flipPiece, setPieceOrientation, placeSelected, isSolved, voidValidityForPiece, smallestEnclosingGroupId, ANY_SINGLE_CELL_GROUP } from './puzzle-state.js';
+import { createPuzzleState, selectPiece, flipPiece, setPieceOrientation, openOrientationOptions, placeSelected, isSolved, voidValidityForPiece, smallestEnclosingGroupId, ANY_SINGLE_CELL_GROUP } from './puzzle-state.js';
 
 const SCALE = 2;
 const SELECTED_EMISSIVE = 0x664422;
@@ -908,7 +908,13 @@ renderer.domElement.addEventListener('pointermove', (e) => {
     const sp = currentStatePiece(orientDragPieceId);
     let nearestKey = sp.orientation;
     let nearestAngle = Infinity;
-    for (const key of sp.orientationOptions) {
+    // Only searches orientations still worth reaching (`openOrientationOptions`)
+    // -- direct instruction (2026-09-04, "reduce amount of wrong options
+    // as faces get filled"): a drag that's actually closest to a now-dead
+    // orientation (one no open void wants anymore) snaps to the nearest
+    // LIVE one instead, so dragging never lands on a pose that's
+    // guaranteed to reject.
+    for (const key of openOrientationOptions(current.state, orientDragPieceId)) {
       const angle = mesh.quaternion.angleTo(quaternionForOrientationKey(key));
       if (angle < nearestAngle) {
         nearestAngle = angle;

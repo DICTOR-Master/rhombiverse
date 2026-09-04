@@ -268,10 +268,37 @@ function buildStage3(scale) {
   };
 }
 
-// Every orientation a Stage 4 piece can be turned to: all 6 axes, both
-// directions -- 'x+:in', 'x+:out', 'x-:in', ... 12 total (geometry.js's
-// quaternionForOrientationKey resolves each to its real quaternion).
-const RD_ORIENTATIONS = PYRAMID_AXES.flatMap((axisKey) => [`${axisKey}:in`, `${axisKey}:out`]);
+// Real bug, found and fixed 2026-09-04 (direct report: "these are
+// unnecessarily challenging aspects like having two options that are
+// the same, but you say one is wrong!"): the ORIGINAL scheme here was
+// `PYRAMID_AXES.flatMap((axisKey) => [\`${axisKey}:in\`, \`${axisKey}:out\`])`
+// -- 12 distinct STRING keys, on the assumption that "inward off axis A"
+// and "outward off axis A" are always the only source of duplication (a
+// real, correctly-DIFFERENT pair -- see `inwardQuaternion`/
+// `outwardQuaternion`, they point opposite ways). What that scheme
+// missed: `quaternionForApexDirection` (geometry.js) only cares about
+// the FINAL apex direction, and inward-off-axis-A produces the exact
+// SAME direction (hence the exact same quaternion) as outward-off-the-
+// OPPOSITE-axis -- e.g. inward('x+') and outward('x-') both point the
+// apex along -x. So the 12-string scheme actually only ever produced 6
+// VISUALLY DISTINCT poses, each reachable under TWO different string
+// names. From the player's own seat, cycling a selected (not yet
+// placed) piece through 12 stops showed it visually repeating itself
+// after every 2 taps -- and worse, a piece rotated to a pose that had
+// JUST been accepted at one void could still get rejected at a
+// different void tapped right after, because the two voids happened to
+// name that same visual pose with different strings. Genuinely
+// confusing, not intentional difficulty.
+//
+// Fixed by using the ACTUAL apex direction as the orientation key --
+// `PYRAMID_AXES` itself (already exactly this vocabulary: Stage 1/2's
+// own bare 'y+'/'y-' keys, resolved by `quaternionForOrientationKey`'s
+// `outwardQuaternion(key)` fallback) -- rather than a second, redundant
+// in/out encoding. `OPPOSITE_AXIS` below is what a void definition uses
+// to convert "I want the apex pointing INWARD off axis A" into the
+// canonical key for that real direction (the opposite axis's own outward
+// pose) -- see `buildStage4`/`buildStage6`'s own void-building loops.
+const OPPOSITE_AXIS = { 'x+': 'x-', 'x-': 'x+', 'y+': 'y-', 'y-': 'y+', 'z+': 'z-', 'z-': 'z+' };
 
 // Stage 4 -- rhombic dodecahedron: 12 of the same pyramid, 2 per cube
 // face (RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md's own RD row: "a
@@ -288,14 +315,16 @@ const RD_ORIENTATIONS = PYRAMID_AXES.flatMap((axisKey) => [`${axisKey}:in`, `${a
 // Manual-orientation PROTOTYPE (direct instruction 2026-09-03, "let's
 // prototype manual orientation on stage 4 and feel it out"): unlike
 // Stage 3's auto-snap loose pieces, every piece here starts at a fixed
-// wrong orientation ('x+:in', matching Stage 1's own "starts wrong"
-// design) and must be cycled through RD_ORIENTATIONS (tap the selected
-// piece again, same flip mechanic Stage 1/2 already use, just a 12-way
-// cycle instead of binary) to the void's own `requiredOrientation`
-// before it will place. "Inward and outward pyramids look identical
-// but sit differently" (the spec's own Stage 4 note) now genuinely
-// means the PLAYER has to tell them apart and orient for it, not just
-// the raycaster resolving which region was tapped. Needed zero
+// wrong orientation ('x+', matching Stage 1's own "starts wrong" design)
+// and must be cycled through PYRAMID_AXES (tap the selected piece again,
+// same flip mechanic Stage 1/2 already use, just a 6-way cycle instead
+// of binary) to the void's own `requiredOrientation` before it will
+// place -- 6 real distinguishable poses, not the original 12-string
+// scheme's accidental duplicates (see `OPPOSITE_AXIS`'s own comment
+// above for the bug that fixed). "Inward and outward pyramids look
+// identical but sit differently" (the spec's own Stage 4 note) now
+// genuinely means the PLAYER has to tell them apart and orient for it,
+// not just the raycaster resolving which region was tapped. Needed zero
 // puzzle-state.js changes: flipPiece()/placeSelected() only ever
 // compare `orientation` strings for equality, the same mechanism
 // Stage 1/2 already exercise at 2-state scale.
@@ -310,13 +339,13 @@ function buildStage4(scale) {
       id: `v-in-${axisKey}`,
       quaternion: inwardQuaternion(axisKey),
       position: facePosition,
-      requiredOrientation: `${axisKey}:in`,
+      requiredOrientation: OPPOSITE_AXIS[axisKey],
     });
     const vOut = makeVoid(geometry, {
       id: `v-out-${axisKey}`,
       quaternion: outwardQuaternion(axisKey),
       position: facePosition.clone(),
-      requiredOrientation: `${axisKey}:out`,
+      requiredOrientation: axisKey,
     });
     skeletonGroup.add(...vIn.sceneObjects, ...vOut.sceneObjects);
     return [vIn, vOut];
@@ -326,8 +355,8 @@ function buildStage4(scale) {
   const pieces = voids.map((_, i) => {
     const p = makePiece(geometry, {
       id: `p${i}`,
-      orientation: 'x+:in',
-      orientationOptions: RD_ORIENTATIONS,
+      orientation: 'x+',
+      orientationOptions: PYRAMID_AXES,
       homePosition,
     });
     p.mesh.visible = i === 0; // only the next available copy shows in the tray
@@ -468,13 +497,13 @@ function buildStage6(scale) {
 
     PYRAMID_AXES.forEach((axisKey) => {
       const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
-      [['in', inwardQuaternion], ['out', outwardQuaternion]].forEach(([dirLabel, toQuaternion]) => {
+      [['in', inwardQuaternion, OPPOSITE_AXIS[axisKey]], ['out', outwardQuaternion, axisKey]].forEach(([dirLabel, toQuaternion, canonicalOrientation]) => {
         const v = makeVoid(pyramid, {
           id: `v-${groupId}-${dirLabel}-${axisKey}`,
           quaternion: toQuaternion(axisKey),
           position: facePosition,
           groupIds: [groupId],
-          requiredOrientation: `${axisKey}:${dirLabel}`,
+          requiredOrientation: canonicalOrientation,
         });
         skeletonGroup.add(...v.sceneObjects);
         voids.push(v);
@@ -493,10 +522,11 @@ function buildStage6(scale) {
   const looseHome = new THREE.Vector3(scale * 3.6, -scale * 1.3, scale * 2.2);
   for (let i = 0; i < voids.length; i++) {
     // Manual orientation, same reasoning as Stage 3/4/5's own headers
-    // (direct instruction 2026-09-03) -- reuses RD_ORIENTATIONS
-    // unchanged, since a Stage 6 loose piece is geometrically identical
-    // to a Stage 4 one and needs the exact same 12-way in/out cycle.
-    const p = makePiece(pyramid, { id: `p${i}`, orientation: 'x+:in', orientationOptions: RD_ORIENTATIONS, homePosition: looseHome });
+    // (direct instruction 2026-09-03) -- reuses PYRAMID_AXES unchanged,
+    // since a Stage 6 loose piece is geometrically identical to a Stage
+    // 4 one and needs the exact same 6-way cycle (see `OPPOSITE_AXIS`'s
+    // own comment for why this isn't the original 12-string scheme).
+    const p = makePiece(pyramid, { id: `p${i}`, orientation: 'x+', orientationOptions: PYRAMID_AXES, homePosition: looseHome });
     p.mesh.visible = i === 0; // only the next available copy shows in the tray
     loosePieces.push(p);
   }

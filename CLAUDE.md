@@ -1750,6 +1750,86 @@ build order:
   cells) and a visual screenshot pass confirming the chain reads as
   sharp, precise, axis-aligned cube geometry, not a wobbly approximation.
   Full `node --test tests/unit/*.test.mjs` clean (305/305).
+
+  **Real bug found and fixed: the RD/Multi-Cell orientation vocabulary
+  had accidental duplicate keys -- 2026-09-04**: direct report ("these
+  are unnecessarily challenging aspects like having two options that are
+  the same, but you say one is wrong!"), following up on a softer ask
+  the same day ("reduce amount of wrong options as faces get filled,
+  nobody tries to put something where there is something in real life
+  generally"). Investigation found a REAL correctness bug, not just a
+  difficulty-tuning question: the "Rhombic Dodecahedron" stage (id 14,
+  `buildStage4`) and "Multi-Cell" (id 16, `buildStage6`) gave their loose
+  pyramid pieces a 12-string orientation vocabulary (`RD_ORIENTATIONS =
+  PYRAMID_AXES.flatMap(axisKey => [\`${axisKey}:in\`, \`${axisKey}:out\`])`)
+  on the assumption that "inward off axis A" and "outward off axis A"
+  were the only source of overlap (a real, correctly DIFFERENT pair --
+  they point opposite ways). What that missed: `quaternionForApexDirection`
+  (geometry.js) only cares about the FINAL apex direction, and inward-
+  off-axis-A produces the exact SAME quaternion as outward-off-the-
+  OPPOSITE-axis (e.g. `inwardQuaternion('x+')` and `outwardQuaternion('x-')`
+  both point the apex along -x). So the 12-string scheme only ever
+  produced 6 visually distinct poses, each reachable under TWO different
+  names -- a piece rotated to a pose that had JUST been accepted at one
+  void could still get rejected at a different void tapped right after,
+  purely because the two voids happened to name that identical visual
+  pose with different strings. Confirmed live before fixing (mid-
+  session user message: "the user eliminates options by filling them"
+  -- confirming the RIGHT mental model: orientation options should shrink
+  as a natural consequence of the player's own placements, not as an
+  artificial difficulty knob). Fixed by using the real apex direction as
+  the canonical key -- `PYRAMID_AXES` itself (6 keys, already exactly
+  Stage 1/2's own bare 'y+'/'y-' vocabulary) -- instead of a second,
+  redundant in/out encoding; a new `OPPOSITE_AXIS` map converts "I want
+  the apex pointing INWARD off axis A" into the canonical key for that
+  real direction (the opposite axis's own outward pose) at each void's
+  own definition site. `RD_ORIENTATIONS` is gone entirely. Verified live
+  through the debug hook: exactly 6 distinct orientationOptions/
+  requiredOrientation values now exist (was 12), each canonical value
+  required by exactly 2 voids per cell (12 voids / 6 keys = 2, 24/6 = 4
+  for Multi-Cell's 2 cells) -- matching the real geometric fact that an
+  RD's "cube + 6 inward + 6 outward pyramid" decomposition only ever
+  needs 6 real apex directions, each used twice at different POSITIONS
+  (position and rotation are independent state, so this reuse is
+  correct, not a second instance of the same bug). Fully solved Stage 14
+  end-to-end (12/12 real tap-select + tap-cycle + tap-place placements,
+  scripted via Playwright) confirming the new 6-way cycle places
+  correctly at every void.
+
+  **Companion feature, same investigation and same fix session -- open
+  orientations narrow as voids fill**: `puzzle-state.js` gained
+  `openOrientationOptions(state, pieceId)`, filtering a piece's static
+  `orientationOptions` down to only the keys some currently-OPEN void
+  still wants (falls back to the full list if any open void has no
+  `requiredOrientation` at all, and never filters to empty -- both safe-
+  failure fallbacks, not reachable in practice today). `flipPiece()` and
+  `setPieceOrientation()` both cycle/accept through this filtered set
+  now, not the piece's full static list -- `flipPiece()` deliberately
+  does NOT bail out just because the filtered set has fewer than 2
+  entries (a real edge case: if the piece's CURRENT orientation is
+  itself already dead and exactly one live option remains, moving to it
+  is real progress, not a no-op -- it only bails when the computed next
+  stop equals the current orientation). `main.js`'s drag-to-orient
+  nearest-key search uses the same filtered set, so a drag that's
+  technically closest to a dead orientation snaps to the nearest LIVE
+  one instead. 6 new unit tests (`openOrientationOptions` excludes a
+  never-wanted key from the start, drops a key once its only void is
+  filled, keeps the full list when a wildcard void is still open,
+  `flipPiece` skips a dead current orientation and lands on the one live
+  option, `setPieceOrientation` rejects a now-dead key). Full `node
+  --test tests/unit/*.test.mjs` clean (311/311). A live full-solve
+  attempt on Multi-Cell (24 voids) hit repeated synthetic-click misses
+  partway through -- root-caused to the TEST script's own click-point
+  math (aiming exactly at a void ghost's flat base-plane origin, a
+  degenerate/grazing raycast target when that pyramid's on-screen
+  silhouette is thin from a given angle), not an app bug: offsetting the
+  synthetic click 0.3 units into the pyramid's own solid interior
+  (still well within the same hitTarget geometry) placed it immediately,
+  and this raycast/geometry code path is unchanged by this fix either
+  way (identical before and after, orthogonal to the orientation-key
+  change). Stage 14 (12/12) and Multi-Cell's own first cell (12/12) both
+  fully succeeded with the original unmodified click math, giving strong
+  live confidence independent of that one script artifact.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
