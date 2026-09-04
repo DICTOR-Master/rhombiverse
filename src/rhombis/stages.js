@@ -620,6 +620,17 @@ function buildStage7(scale) {
 // void can belong to its cell's single, the joined pair (if it's one
 // of that pair's own 2 cells), AND the full piece simultaneously, all
 // independent thanks to `groupIds` already being an array.
+//
+// `joinedPairIndices` is optional (null for N=1 -- direct instruction
+// 2026-09-04, "one RD to four RDs should be earliest stages... they are
+// so simple": a genuine 1-cell stage needed a starting point below the
+// existing 2-cell "Joined Pair" one, and there's no such thing as a
+// joined PAIR spanning only one cell). Every other N-cell mechanic
+// (interchangeable singles, the "full" piece past N=2) already
+// generalizes down to N=1 for free: `includeFullPiece = n > 2` is
+// already false there, and skipping the joined-pair block entirely just
+// leaves the N independent singles -- for N=1, exactly one single, one
+// cell, nothing else.
 function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
@@ -629,15 +640,16 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
   const centroid = cellWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / n);
   const cellCenters = cellWorldPositions.map((p) => p.clone().sub(centroid));
 
-  const [ji, jj] = joinedPairIndices;
-  const joinedGroupId = `joined-${ji}${jj}`;
+  const hasJoinedPair = Array.isArray(joinedPairIndices);
+  const [ji, jj] = hasJoinedPair ? joinedPairIndices : [null, null];
+  const joinedGroupId = hasJoinedPair ? `joined-${ji}${jj}` : null;
   const includeFullPiece = n > 2;
 
   const voids = [];
   cellCenters.forEach((cellCenter, cellIndex) => {
     const cellGroupId = `cell-${cellIndex}`;
     const groupIds = [cellGroupId];
-    if (cellIndex === ji || cellIndex === jj) groupIds.push(joinedGroupId);
+    if (hasJoinedPair && (cellIndex === ji || cellIndex === jj)) groupIds.push(joinedGroupId);
     if (includeFullPiece) groupIds.push('full');
     skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
     PYRAMID_AXES.forEach((axisKey) => {
@@ -662,7 +674,7 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
   // centroid-origin before merging) -- same reasoning as Stage 7's own
   // 'joined-01' group, so this snaps to the shared origin, not a
   // midpoint.
-  groups.push({ id: joinedGroupId, position: ORIGIN, quaternion: new THREE.Quaternion() });
+  if (hasJoinedPair) groups.push({ id: joinedGroupId, position: ORIGIN, quaternion: new THREE.Quaternion() });
   if (includeFullPiece) groups.push({ id: 'full', position: ORIGIN, quaternion: new THREE.Quaternion() });
 
   // Real live bug (2026-09-04, "picker tray pieces are overlapping each
@@ -739,17 +751,19 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
     }));
   }
 
-  const joinedGeometry = mergeGeometries(
-    [ji, jj].map((idx) => rhombicDodecahedronGeometry(scale).translate(cellCenters[idx].x, cellCenters[idx].y, cellCenters[idx].z)),
-    false,
-  );
-  const joinedTrayScale = trayScaleFor(joinedGeometry);
-  pieces.push(makeFusedPiece(joinedGeometry, {
-    id: 'joined-pair',
-    fillsGroup: joinedGroupId,
-    homePosition: nextTrayPosition(joinedGeometry, joinedTrayScale),
-    trayScale: joinedTrayScale,
-  }));
+  if (hasJoinedPair) {
+    const joinedGeometry = mergeGeometries(
+      [ji, jj].map((idx) => rhombicDodecahedronGeometry(scale).translate(cellCenters[idx].x, cellCenters[idx].y, cellCenters[idx].z)),
+      false,
+    );
+    const joinedTrayScale = trayScaleFor(joinedGeometry);
+    pieces.push(makeFusedPiece(joinedGeometry, {
+      id: 'joined-pair',
+      fillsGroup: joinedGroupId,
+      homePosition: nextTrayPosition(joinedGeometry, joinedTrayScale),
+      trayScale: joinedTrayScale,
+    }));
+  }
 
   if (includeFullPiece) {
     const fullGeometry = mergeGeometries(
@@ -874,6 +888,22 @@ function shapeTopology(cells) {
   return { edgeCount, degrees: [...degrees].sort((a, b) => b - a), maxDistance };
 }
 
+// The genuine start of the whole-RD progression -- direct instruction
+// (2026-09-04, "one RD to four RDs should be earliest stages... they
+// are so simple", reinforced: "knowing that the cube and RD can be
+// composed from pyramids is advanced knowledge... so broken down single
+// shapes belong at higher levels... but prior to multiple shape
+// interactions yet to come"). One cell, one always-correct single, tap
+// to place -- `buildNCellStage`'s own n=1 generalization (see its
+// header comment) makes this a real, not special-cased, instance of the
+// exact same N-cell mechanic every later whole-RD stage uses, not a
+// bespoke builder.
+const ONE_CELL_STAGE = {
+  id: 1,
+  name: '1 Cell: One RD',
+  build: (scale) => buildNCellStage(scale, [[0, 0, 0]], null),
+};
+
 const THREE_CELL_STAGE_DEFS = enumerateShapes(3)[3].map((shape) => ({
   name: classifyThreeCellShape(shape.cells),
   cells: shape.cells,
@@ -881,7 +911,7 @@ const THREE_CELL_STAGE_DEFS = enumerateShapes(3)[3].map((shape) => ({
 }));
 
 const THREE_CELL_STAGES = THREE_CELL_STAGE_DEFS.map((def, i) => ({
-  id: 8 + i,
+  id: 3 + i,
   name: `3 Cells: ${def.name}`,
   build: (scale) => buildNCellStage(scale, def.cells, def.joinedPair),
 }));
@@ -926,19 +956,33 @@ const FOUR_CELL_STAGE_DEFS = [
 }));
 
 const FOUR_CELL_STAGES = FOUR_CELL_STAGE_DEFS.map((def, i) => ({
-  id: 12 + i,
+  id: 7 + i,
   name: `4 Cells: ${def.name}`,
   build: (scale) => buildNCellStage(scale, def.cells, def.joinedPair),
 }));
 
+// Reordered 2026-09-04 (direct instruction, "one RD to four RDs should
+// be earliest stages... they are so simple", reinforced: "knowing that
+// the cube and RD can be composed from pyramids is advanced knowledge...
+// so broken down single shapes belong at higher levels... but prior to
+// multiple shape interactions yet to come") -- three tiers, in this
+// order, not the original 1-6-then-7-15 build order: whole-RD spatial
+// arrangement first (1-10, no orientation-matching at all, just "does
+// this piece go here"), THEN pyramid decomposition (11-14, the "a shape
+// is actually made of smaller pieces" reveal, requiring real 6/12-way
+// orientation matching), THEN stages that combine both ideas at once
+// (15-16). Every id below is a genuine renumbering, not just a reorder
+// of references -- `?stage=N` deep links and the picker both key off
+// `id`, not array position, so the two have to move together.
 export const STAGES = [
-  { id: 1, name: 'One Piece', build: buildStage1 },
-  { id: 2, name: 'Octahedron', build: buildStage2 },
-  { id: 3, name: 'Cube', build: buildStage3 },
-  { id: 4, name: 'Rhombic Dodecahedron', build: buildStage4 },
-  { id: 5, name: 'Conjoined Pieces', build: buildStage5 },
-  { id: 6, name: 'Multi-Cell', build: buildStage6 },
-  { id: 7, name: '2 Cells: Joined Pair', build: buildStage7 },
+  ONE_CELL_STAGE,
+  { id: 2, name: '2 Cells: Joined Pair', build: buildStage7 },
   ...THREE_CELL_STAGES,
   ...FOUR_CELL_STAGES,
+  { id: 11, name: 'One Piece', build: buildStage1 },
+  { id: 12, name: 'Octahedron', build: buildStage2 },
+  { id: 13, name: 'Cube', build: buildStage3 },
+  { id: 14, name: 'Rhombic Dodecahedron', build: buildStage4 },
+  { id: 15, name: 'Conjoined Pieces', build: buildStage5 },
+  { id: 16, name: 'Multi-Cell', build: buildStage6 },
 ];

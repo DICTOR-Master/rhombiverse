@@ -1475,6 +1475,60 @@ build order:
   full group by mistake. Verified live end to end (the exact reported
   sequence now reads "Solved!"). Full `node --test tests/unit/*.test.mjs`
   clean (305/305).
+
+  **Full stage reorder + a genuine new 1-cell stage -- 2026-09-04**:
+  direct instruction, the biggest structural change to the game's own
+  progression to date -- "one RD to four RDs should be earliest stages...
+  they are so simple", reinforced with the actual reasoning behind it:
+  "knowing that the cube and RD can be composed from pyramids is
+  advanced knowledge that I didn't know until recently after three or
+  four years working with this geometry so broken down single shapes
+  belong at higher levels... but prior to multiple shape interactions
+  yet to come". The original build order (pyramid decomposition first,
+  whole-RD arrangement stages 7-15 second) matched the order features
+  were BUILT in, not the order a first-time player should actually meet
+  them in -- understanding that a rhombic dodecahedron is itself made of
+  12 smaller pyramids is a genuine "aha", not a starting assumption, and
+  shouldn't gate the simpler "arrange a few whole blocks" puzzles behind
+  it. New order, three tiers:
+  1. **Whole-RD spatial arrangement, ids 1-10** (no orientation-matching
+     at all -- every piece here is a fused, "tap anywhere to fill"
+     whole-RD block): the brand new 1-cell stage, then the existing
+     2-cell "Joined Pair", 4 real 3-cell shapes, 4 curated 4-cell shapes
+     (previously ids 7, 8-11, 12-15 respectively -- content unchanged,
+     purely renumbered).
+  2. **Pyramid decomposition, ids 11-14** (the "a shape is actually made
+     of smaller pieces" reveal, real 2/6/12-way orientation matching):
+     the original Stages 1-4 (One Piece, Octahedron, Cube, Rhombic
+     Dodecahedron), content unchanged, renumbered from 1-4.
+  3. **Stages combining both ideas, ids 15-16**: the original Stages 5-6
+     (Conjoined Pieces, Multi-Cell), unchanged, renumbered from 5-6.
+
+  The new id-1 stage needed a real design decision, asked directly before
+  building rather than assumed: build a genuine new 1-cell stage, or
+  start the whole-RD tier at the existing 2-cell stage -- direct answer
+  was to build it. `buildNCellStage` (`stages.js`) already generalizes
+  to N=1 for free once `joinedPairIndices` is made optional (`null` for
+  N=1, since there's no such thing as a joined PAIR spanning one cell) --
+  `includeFullPiece = n > 2` was already false for n=1, so skipping the
+  joined-pair block entirely just leaves exactly one interchangeable
+  single filling exactly one cell, the simplest possible instance of the
+  SAME mechanic every later whole-RD stage already uses, not a bespoke
+  builder. `?stage=N` deep links and the stage picker both key off each
+  stage's own `id` field, not array position, so every id had to move
+  together with its content -- including `data/changelog.json`'s own
+  "Rhombis: A New Way In" welcome-screen link (`?stage=8` -> `?stage=3`,
+  same underlying "3 Cells: Triangle" content, just its new id) and a
+  stale test comment referencing the old id-7 joined-pair stage.
+  Verified live: the picker lists all 16 stages in the exact new order
+  with correct names; a full solve of the new Stage 1 (one tap, one
+  place) auto-advances correctly into Stage 2 ("2 Cells: Joined Pair");
+  `?stage=11` resolves to "One Piece" (the pyramid tier's own new first
+  stage); the welcome page's dynamic tagline link now reads
+  `?stage=3` and still points at the same "3 Cells: Triangle" content it
+  always did. Full `node --test tests/unit/*.test.mjs` clean (305/305 --
+  pure content reorder + one new, already-generalized stage instance, no
+  `puzzle-state.js` logic changed).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

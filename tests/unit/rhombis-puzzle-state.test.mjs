@@ -505,7 +505,8 @@ test('Stage 6: all 24 loose pieces (no fused pieces at all) is a third valid com
   assert.equal(state.pieces.find((p) => p.id === 'fused-cell-1').placed, false);
 });
 
-// The joined-pair stage's real shape (id 7 in STAGES, "Joined Pair" --
+// The joined-pair stage's real shape (id 2 in STAGES as of the
+// 2026-09-04 reorder, originally id 7 -- "Joined Pair" --
 // not to be confused with this file's own older "Stage 7" comments
 // below, which predate this and refer to the undo-feature milestone,
 // not a playable puzzle level; see stages.js's buildStage7). Same

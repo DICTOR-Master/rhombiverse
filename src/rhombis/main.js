@@ -355,12 +355,12 @@ function flashTrayPlaced() {
   trayFlashTimer = setTimeout(() => trayFlash.classList.remove('show'), 700);
 }
 
-// Dev/testing convenience only, never surfaced in the UI: ?stage=4
+// Dev/testing convenience only, never surfaced in the UI: ?stage=N
 // jumps straight to that stage's own id (STAGES' own `id` field, not
 // the array index) on load, so trying out a specific stage -- e.g.
-// comparing Stage 4's manual-orientation prototype against Stage 3 --
-// doesn't need editing source and remembering to revert it. Silently
-// falls back to Stage 1 for a missing/invalid value.
+// comparing two neighboring stages' own mechanics -- doesn't need
+// editing source and remembering to revert it. Silently falls back to
+// Stage 1 for a missing/invalid value.
 const requestedStageId = Number(new URLSearchParams(window.location.search).get('stage'));
 const requestedStageIndex = STAGES.findIndex((s) => s.id === requestedStageId);
 let stageIndex = requestedStageIndex >= 0 ? requestedStageIndex : 0;
@@ -455,9 +455,10 @@ function updateUndoButton() {
 // Stage picker -- direct instruction (2026-09-04): a returning player
 // shouldn't have to replay every earlier stage just to reach one they
 // already know they want. A fixed jump-in link (the welcome screen's
-// own tagline link, ?stage=8) covers exactly one destination; this
-// covers all of them, live, without a page reload. Populated directly
-// from STAGES, so a stage added later needs no picker-specific update.
+// own tagline link, `data/changelog.json`'s `link` field) covers
+// exactly one destination; this covers all of them, live, without a
+// page reload. Populated directly from STAGES, so a stage added later
+// needs no picker-specific update.
 function populateStagePicker() {
   stageList.innerHTML = '';
   STAGES.forEach((stageDef, index) => {
