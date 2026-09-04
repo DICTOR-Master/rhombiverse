@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey, disphenoidGeometry, DISPHENOID_ORIENTATIONS, quaternionForDisphenoidOrientation, disphenoidApexAxisKey } from './geometry.js';
 import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld } from '../core/lattice.js';
-import { enumerateShapes } from './cell-arrangements.js';
+import { enumerateShapes, SYMMETRY_OPERATIONS, applySymmetry } from './cell-arrangements.js';
 import { ANY_SINGLE_CELL_GROUP } from './puzzle-state.js';
 
 export const WIRE_COLOR = 0x6ad0ff;
@@ -1420,6 +1420,88 @@ const FIVE_CELL_HULL_DEFS = (() => {
   return [...bySignature.values()];
 })();
 
+// A real CHIRAL 5-cell shape -- direct instruction (2026-09-04,
+// "mirrored molecules split it into 3 with 3 decoys"): a molecule whose
+// two lobes are genuine mirror images of each other only means anything
+// if some real shape's mirror image ISN'T reachable by rotating it (a
+// piece can only be physically ROTATED into place, never reflected
+// through a mirror -- see `geometry.js`'s own Disphenoid comment for
+// the same reasoning applied to a single piece's own symmetry).
+// Checked numerically before building anything (not assumed): NONE of
+// the N=3 or N=4 catalog shapes this file already uses are chiral (0
+// of 4, 0 of 20 -- every one of them IS superimposable on its own
+// mirror via pure rotation, so mirroring any of them would produce
+// nothing new), but 8 of the 131 real N=5 shapes ARE genuinely chiral.
+// `permutationParity`/`properSymmetryOperations` mirror
+// `geometry.js`'s own disphenoid math (the 24 determinant-+1 operations
+// are real rotations; the other 24 are reflections a physical piece
+// can't use) -- reused here rather than re-derived a third way.
+function properSymmetryOperations() {
+  return SYMMETRY_OPERATIONS.filter(
+    (op) => permutationParity(op.perm) * op.signs[0] * op.signs[1] * op.signs[2] === 1,
+  );
+}
+function permutationParity(perm) {
+  let inversions = 0;
+  for (let i = 0; i < perm.length; i++) {
+    for (let j = i + 1; j < perm.length; j++) {
+      if (perm[i] > perm[j]) inversions++;
+    }
+  }
+  return inversions % 2 === 0 ? 1 : -1;
+}
+function canonicalCellsUnder(cells, ops) {
+  let best = null;
+  for (const op of ops) {
+    const transformed = cells.map((c) => applySymmetry(op, c));
+    // Numeric sort first to find a stable translation-reference corner,
+    // THEN a second lexicographic sort of the translated cells' own
+    // string keys -- numeric tuple order and string order disagree for
+    // negative/multi-digit coordinates (e.g. "-1,0,0" vs "2,0,0" sorts
+    // opposite ways numerically vs lexicographically), so skipping this
+    // second sort silently produces a non-canonical, inconsistent key
+    // (a real bug caught immediately: a first version without it made
+    // `isChiralShape` never match anything, `.find()` returning
+    // `undefined`, straight to a page-load crash).
+    const numericSorted = [...transformed].sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    const [ox, oy, oz] = numericSorted[0];
+    const key = transformed
+      .map(([x, y, z]) => `${x - ox},${y - oy},${z - oz}`)
+      .sort()
+      .join('|');
+    if (best === null || key < best) best = key;
+  }
+  return best;
+}
+function isChiralShape(cells) {
+  return canonicalCellsUnder(cells, SYMMETRY_OPERATIONS) !== canonicalCellsUnder(cells, properSymmetryOperations());
+}
+function mirrorCells(cells) {
+  return cells.map(([x, y, z]) => [-x, y, z]);
+}
+// All 8 real chiral N=5 shapes, deduped so each mirror-PAIR (a shape and
+// its own reflection) only ever contributes ONE entry -- checked
+// numerically: none of the 8 happen to be each other's own mirror image
+// (comparing canonical forms under PROPER rotation only), so all 8
+// genuinely distinct, no dedup actually needed to fire this session,
+// but kept as a real check rather than an assumption for whenever the
+// enumerator or this list's own basis ever changes. Direct instruction
+// (2026-09-04, "I thought the molecule mirroring etc would generate
+// more variants...?"): 8 real chiral shapes means 8 real Mirrored
+// Molecule stages, not one hand-picked example.
+const CHIRAL_FIVE_CELL_SHAPES = (() => {
+  const chosen = [];
+  for (const shape of ALL_ENUMERATED_SHAPES[5]) {
+    if (!isChiralShape(shape.cells)) continue;
+    const alreadyCounted = chosen.some((prev) => {
+      const key = (c) => canonicalCellsUnder(c, properSymmetryOperations());
+      return key(prev) === key(shape.cells) || key(prev) === key(mirrorCells(shape.cells));
+    });
+    if (!alreadyCounted) chosen.push(shape.cells);
+  }
+  return chosen;
+})();
+
 function buildHullSplitStage(scale, hullDef) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
@@ -1868,7 +1950,7 @@ const BRANCHING_MOLECULE_STAGE_DEFS = [
 ];
 
 const BRANCHING_MOLECULE_STAGES = BRANCHING_MOLECULE_STAGE_DEFS.map(({ hub, branch1, branch2 }, i) => ({
-  id: 58 + i,
+  id: 74 + i,
   name: `Branching Molecule: ${hub.name} (${hub.cells.length}) hub + ${branch1.name} (${branch1.cells.length}) + ${branch2.name} (${branch2.cells.length})`,
   build: (scale) => buildBranchingMoleculeStage(scale, hub, branch1, branch2, pickBranchMoleculeDecoys(hub, branch1, branch2, i * 2)),
 }));
@@ -2087,8 +2169,8 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChun
 }
 
 const BIG_HULL_STAGES = [
-  { id: 65, name: 'Big Hull: Cuboctahedron', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3) },
-  { id: 66, name: 'Big Hull: Tetrahedral Stack', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 4) },
+  { id: 81, name: 'Big Hull: Cuboctahedron', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3) },
+  { id: 82, name: 'Big Hull: Tetrahedral Stack', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 4) },
 ];
 
 // Burr Puzzle -- direct instruction (2026-09-04, "scope both... key
@@ -2111,10 +2193,59 @@ const BIG_HULL_STAGES = [
 // regular pieces are down), not one single forced sequence, which
 // would just be a strict full ordering wearing a "2 keys" label.
 const BURR_PUZZLE_STAGES = [
-  { id: 67, name: 'Burr Puzzle: Key Piece', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 2, [0]) },
-  { id: 68, name: 'Burr Puzzle: Key Piece (Tetrahedral)', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0]) },
-  { id: 69, name: 'Burr Puzzle: Two Keys', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0, 1]) },
+  { id: 83, name: 'Burr Puzzle: Key Piece', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 2, [0]) },
+  { id: 84, name: 'Burr Puzzle: Key Piece (Tetrahedral)', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0]) },
+  { id: 85, name: 'Burr Puzzle: Two Keys', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0, 1]) },
 ];
+
+// Mirrored Molecule -- direct instruction (2026-09-04, "mirrored
+// molecules split it into 3 with 3 decoys", confirmed "both could
+// work" against two different readings): this is the FIRST reading --
+// a molecule whose two lobes are genuine mirror images of each other,
+// using `CHIRAL_FIVE_CELL_SHAPES` above. Direct follow-up after the
+// first version shipped with just ONE example: "I thought the molecule
+// mirroring etc would generate more variants...?" -- there are 8 real
+// chiral shapes, not 1, so this now builds all 8, the same "generate
+// every real combination, not a hand-picked sample" principle the
+// plain Molecules tier already used for its own 28. Reuses
+// `buildMoleculeStage` completely unchanged -- it only ever needed
+// `{name, cells}` lobe defs, never actual catalog membership, so a
+// genuinely different real shape pair (not from
+// `MOLECULE_SHAPE_CATALOG` at all) works with zero new stage-building
+// code.
+const MIRRORED_MOLECULE_STAGES = CHIRAL_FIVE_CELL_SHAPES.map((cells, i) => {
+  const lobeA = { name: `Chiral Piece ${i + 1}`, cells };
+  const lobeB = { name: `Chiral Piece ${i + 1} (Mirror)`, cells: mirrorCells(cells) };
+  return {
+    id: 58 + i,
+    name: `Mirrored Molecule ${i + 1}`,
+    build: (scale) => buildMoleculeStage(scale, lobeA, lobeB, pickMoleculeDecoys(lobeA, lobeB, i * 2)),
+  };
+});
+
+// Molecule Split -- the SECOND reading of the same instruction: a
+// molecule (two real catalog shapes joined, exactly like the plain
+// Molecules tier) but reassembled via Big Hull's own irregular 3-way
+// partition instead of the clean 2-lobe split -- genuinely different
+// solving logic (an irregular region-grown 3-chunk puzzle) over
+// genuinely different SOURCE geometry (a real 2-shape composite) from
+// what Big Hulls itself uses (a single physically-motivated macro
+// shape). Reuses `buildBigHullStage` completely unchanged -- it was
+// always generic over `allCells`, never tied to Cuboctahedron/
+// Tetrahedral specifically. Same "generate more variants" follow-up as
+// Mirrored Molecule above -- 8 real lobe-pairs (a spread across
+// `MOLECULE_STAGE_DEFS`' own real 28, not one hand-picked example),
+// each joined for real via `joinTwoShapes` and split for real via
+// `partitionIntoIrregularChunks`.
+const MOLECULE_SPLIT_STAGE_DEFS = [0, 4, 8, 12, 16, 20, 24, 27].map((i) => MOLECULE_STAGE_DEFS[i]);
+const MOLECULE_SPLIT_STAGES = MOLECULE_SPLIT_STAGE_DEFS.map(({ lobeA, lobeB }, i) => {
+  const cells = joinTwoShapes(lobeA.cells, lobeB.cells);
+  return {
+    id: 66 + i,
+    name: `Molecule Split: ${lobeA.name} (${lobeA.cells.length}) + ${lobeB.name} (${lobeB.cells.length})`,
+    build: (scale) => buildBigHullStage(scale, cells, 3, 3),
+  };
+});
 
 // Reordered 2026-09-04 (direct instruction, "one RD to four RDs should
 // be earliest stages... they are so simple", reinforced: "knowing that
@@ -2142,8 +2273,10 @@ export const STAGES = [
   { id: 16, name: 'Multi-Cell', build: buildStage6 },
   ...HULL_STAGES,
   ...MOLECULE_STAGES,
+  ...MIRRORED_MOLECULE_STAGES,
+  ...MOLECULE_SPLIT_STAGES,
   ...BRANCHING_MOLECULE_STAGES,
-  { id: 64, name: 'Rhombic Dodecahedron (Disphenoids)', build: buildDisphenoidRDStage },
+  { id: 80, name: 'Rhombic Dodecahedron (Disphenoids)', build: buildDisphenoidRDStage },
   ...BIG_HULL_STAGES,
   ...BURR_PUZZLE_STAGES,
 ];

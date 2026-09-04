@@ -2270,6 +2270,82 @@ build order:
     chunks are placed, and both place correctly (in either order) once
     they are, full solve confirmed end-to-end.
   - Total stage count after this: 69 (was 67).
+
+  **Mirrored Molecule + Molecule Split (16 new stages) + full
+  resequence -- 2026-09-04**, direct instruction: "mirrored molecules
+  split it into 3 with 3 decoys", scoped via AskUserQuestion against two
+  real readings ("both could work"):
+  1. **Mirrored Molecule**: a molecule whose two lobes are genuine
+     mirror images of each other. Checked numerically before building
+     anything: NONE of the N=3/N=4 catalog shapes Molecules already
+     uses are chiral (0 of 4, 0 of 20 -- every one IS superimposable on
+     its own mirror via pure rotation, so mirroring any of them
+     produces nothing new), but 8 of the 131 real N=5 shapes ARE
+     genuinely chiral -- a piece can only be physically ROTATED into
+     place, never reflected, so a chiral shape's mirror image really is
+     a different physical piece (same reasoning `geometry.js`'s own
+     Disphenoid math already established: the 24 determinant-+1
+     symmetry operations are real rotations, the other 24 are
+     reflections a physical piece can't use). Reuses `buildMoleculeStage`
+     completely unchanged -- it only ever needed `{name, cells}` lobe
+     defs, never actual catalog membership.
+  2. **Molecule Split**: a molecule (two real catalog shapes joined,
+     exactly like plain Molecules) reassembled via Big Hull's own
+     irregular 3-way partition instead of the clean 2-lobe split.
+     Reuses `buildBigHullStage` completely unchanged -- it was always
+     generic over `allCells`, never tied to Cuboctahedron/Tetrahedral
+     specifically.
+  - **First version of each shipped with just ONE example, then
+    corrected same-session**: "I thought the molecule mirroring etc
+    would generate more variants...?" -- there are 8 real chiral
+    shapes, not 1, and Molecule Split can reuse any of Molecules' own
+    28 real lobe-pairs, not 1 hand-picked pair -- both now generate 8
+    real stages each (`CHIRAL_FIVE_CELL_SHAPES` -- all 8, deduped
+    against their own mirror pairs, though none actually collided;
+    `MOLECULE_SPLIT_STAGE_DEFS` -- a spread of 8 across
+    `MOLECULE_STAGE_DEFS`' own 28), the same "generate every real
+    combination, not a hand-picked sample" principle plain Molecules
+    already used.
+  - **Real bug found and fixed while building the chirality check**: the
+    first version of `canonicalCellsUnder` (the shared canonical-form
+    helper, mirroring `cell-arrangements.js`'s own `canonicalForm` but
+    needed locally in `stages.js` for the proper-vs-full-symmetry-group
+    comparison) sorted transformed cells NUMERICALLY once to find a
+    stable translation-reference corner, then joined the translated
+    coordinates directly WITHOUT a second sort -- numeric tuple order
+    and lexicographic string order disagree for negative/multi-digit
+    coordinates (e.g. "-1,0,0" vs "2,0,0" sorts opposite ways each
+    way), so the resulting "canonical" key wasn't actually canonical,
+    and `isChiralShape` silently never matched anything --
+    `CHIRAL_FIVE_CELL_SHAPE.find(...)` returned `undefined`, straight to
+    a page-load crash on EVERY stage (`Cannot read properties of
+    undefined (reading 'cells')`), caught immediately via a direct
+    Playwright pageerror check before it ever reached a real browser
+    test. Fixed by restoring the second lexicographic sort (the exact
+    two-sort pattern the session's own earlier scratch verification
+    script had used and proven correct, which the first in-file version
+    had NOT faithfully reproduced).
+  - **Full resequence, direct instruction**: "the big hulls and burrs
+    should stay the highest numbers probably put the molecules
+    together" -- Mirrored Molecule and Molecule Split moved to sit
+    directly after the existing Molecules block (ids 58-73, right after
+    Molecules' own 30-57), Branching Molecules shifted to 74-79 (still
+    part of the same "molecule family" run), Disphenoid RD to 80, Big
+    Hull to 81-82, Burr Puzzle to 83-85 -- Big Hull/Burr now genuinely
+    are the highest ids in the game, and every molecule-family tier
+    (Molecules, Mirrored Molecule, Molecule Split, Branching Molecules)
+    sits together as one contiguous 30-79 block.
+  - Verified live: a full structural sweep across all 85 `?stage=N`
+    values (zero runtime errors), the real stage-picker listing
+    (correct names/order at every tier boundary), and full tap-select +
+    tap-place solves confirmed end-to-end on a Mirrored Molecule (id 58,
+    decoys correctly rejected, both mirror-lobes group-fill correctly)
+    and a Molecule Split (id 66, decoys correctly rejected, all 3
+    irregular chunks group-fill correctly). Full `node --test tests/
+    unit/*.test.mjs` clean (317/317 -- no `puzzle-state.js` surface
+    touched).
+  - Total stage count after this: 85 (was 69) -- past the original
+    80-100 target range.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
