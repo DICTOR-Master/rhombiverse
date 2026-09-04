@@ -2350,6 +2350,155 @@ function buildDisphenoidKeyHullStage(scale, allCells, fineCellIndexes, chunkCoun
   return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
 }
 
+// Big Hull x Disphenoid, key elsewhere -- a second variant of the same
+// crossover (2026-09-05, direct instruction: "we could also have non
+// disphenoid burr key with other piece disphenoids", added alongside
+// `buildDisphenoidKeyHullStage` rather than replacing it -- two
+// genuinely different flavors of the same idea). Here the fine
+// disphenoid cells are pure extra content/difficulty, completely
+// decoupled from which piece is blocked -- the real Burr key is an
+// ordinary COARSE whole-cell chunk, camouflaged among its own true
+// siblings exactly the way the original Burr Puzzle tier already does
+// (every coarse chunk is a similarly-sized irregular cluster; nothing
+// about the key's own shape singles it out). Strictly better key
+// camouflage than the sibling variant (there, the key was still
+// identifiable as "one of the fine pieces," just not which one; here
+// there is ZERO shape-family cue at all) -- kept as a separate stage
+// rather than a replacement since both are legitimate, differently-
+// flavored puzzles.
+function buildDisphenoidElsewhereKeyHullStage(scale, allCells, fineCellIndexes, keyChunkIndex, chunkCount, decoyChunkCount) {
+  const skeletonGroup = new THREE.Group();
+  const pyramid = pyramidGeometry(scale);
+
+  const cellWorldPositions = allCells.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = cellWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / cellWorldPositions.length);
+
+  const fineIndexSet = new Set(fineCellIndexes);
+  const coarseCells = allCells.filter((_, i) => !fineIndexSet.has(i));
+  const coarseWorldPositions = cellWorldPositions.filter((_, i) => !fineIndexSet.has(i));
+
+  const voids = [];
+  const groups = [];
+  const pieceSpecs = [];
+
+  // Coarse chunks -- identical to buildBigHullStage's own per-chunk
+  // loop, over every cell except the fine ones; `keyChunkIndex` names
+  // which ONE of these ordinary chunks is the real Burr key.
+  const assignments = partitionIntoIrregularChunks(coarseCells, chunkCount);
+  for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+    const groupId = `chunk-${chunkIndex}`;
+    const memberCellIndexes = assignments
+      .map((a, i) => (a.chunkIndex === chunkIndex ? i : -1))
+      .filter((i) => i >= 0);
+    const chunkCenters = memberCellIndexes.map((i) => coarseWorldPositions[i].clone().sub(centroid));
+    chunkCenters.forEach((cellCenter, i) => {
+      skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
+      PYRAMID_AXES.forEach((axisKey) => {
+        const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
+        [['in', inwardQuaternion], ['out', outwardQuaternion]].forEach(([dirLabel, toQuaternion]) => {
+          const v = makeVoid(pyramid, {
+            id: `v-${groupId}-${i}-${dirLabel}-${axisKey}`,
+            quaternion: toQuaternion(axisKey),
+            position: facePosition,
+            groupIds: [groupId],
+          });
+          skeletonGroup.add(...v.sceneObjects);
+          voids.push(v);
+        });
+      });
+    });
+    const chunkCentroid = chunkCenters.reduce((sum, c) => sum.add(c), new THREE.Vector3()).multiplyScalar(1 / chunkCenters.length);
+    groups.push({ id: groupId, position: chunkCentroid, quaternion: new THREE.Quaternion() });
+    const chunkGeometry = mergeGeometries(
+      chunkCenters.map((c) => rhombicDodecahedronGeometry(scale).translate(c.x - chunkCentroid.x, c.y - chunkCentroid.y, c.z - chunkCentroid.z)),
+      false,
+    );
+    pieceSpecs.push({ id: groupId, fillsGroup: groupId, geometry: chunkGeometry });
+  }
+
+  // The real key -- an ordinary coarse chunk, blocked until every OTHER
+  // coarse chunk is placed (never the fine pieces, which never gate or
+  // get gated) -- same `requiresPlacedFirst` convention as
+  // `buildBigHullStage`'s own `keyChunkIndexes`.
+  const nonKeyChunkIds = pieceSpecs.filter((_, i) => i !== keyChunkIndex).map((spec) => spec.id);
+  pieceSpecs[keyChunkIndex].requiresPlacedFirst = nonKeyChunkIds;
+
+  // The fine cells -- buildDisphenoidRDStage's own 24-disphenoid /
+  // 6-group construction, translated onto each cell's real position.
+  // Pure extra content here -- none of these carry requiresPlacedFirst.
+  const orientationIndexes = DISPHENOID_ORIENTATIONS.map((_, i) => i);
+  const apexKeyFor = (i) => disphenoidApexAxisKey(i, scale);
+  fineCellIndexes.forEach((cellIndex, fineSlot) => {
+    const fineCellCenter = cellWorldPositions[cellIndex].clone().sub(centroid);
+    skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), fineCellCenter));
+    orientationIndexes.forEach((i) => {
+      const key = DISPHENOID_ORIENTATIONS[i];
+      const v = makeVoid(disphenoidGeometry(scale), {
+        id: `v-fine${fineSlot}-${key}`,
+        quaternion: quaternionForDisphenoidOrientation(key),
+        position: fineCellCenter,
+        groupIds: [`fine${fineSlot}-${apexKeyFor(i)}`],
+      });
+      skeletonGroup.add(...v.sceneObjects);
+      voids.push(v);
+    });
+    PYRAMID_AXES.forEach((axisKey) => {
+      const groupId = `fine${fineSlot}-${axisKey}`;
+      const memberIndexes = orientationIndexes.filter((i) => apexKeyFor(i) === axisKey);
+      const memberGeometries = memberIndexes.map((i) =>
+        disphenoidGeometry(scale).applyQuaternion(quaternionForDisphenoidOrientation(DISPHENOID_ORIENTATIONS[i])),
+      );
+      const memberCentroids = memberGeometries.map((g) => {
+        g.computeBoundingSphere();
+        return g.boundingSphere.center;
+      });
+      const localCentroid = memberCentroids.reduce((sum, c) => sum.add(c), new THREE.Vector3()).multiplyScalar(1 / memberCentroids.length);
+      const worldCentroid = fineCellCenter.clone().add(localCentroid);
+      groups.push({ id: groupId, position: worldCentroid, quaternion: new THREE.Quaternion() });
+      const geometry = mergeGeometries(
+        memberGeometries.map((g) => g.translate(-localCentroid.x, -localCentroid.y, -localCentroid.z)),
+        false,
+      );
+      pieceSpecs.push({ id: `chunk-${groupId}`, fillsGroup: groupId, geometry });
+    });
+  });
+
+  // Decoys -- same alternate-irregular-partition idea buildBigHullStage
+  // already uses, over the coarse cells only.
+  for (let d = 0; d < decoyChunkCount; d++) {
+    const decoyAssignments = partitionIntoIrregularChunks(coarseCells, chunkCount, d + 1);
+    const decoyCellIndexes = decoyAssignments
+      .map((a, i) => (a.chunkIndex === (d % chunkCount) ? i : -1))
+      .filter((i) => i >= 0);
+    const decoyWorldPositions = decoyCellIndexes.map((i) => coarseWorldPositions[i]);
+    const decoyCentroid = decoyWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / decoyWorldPositions.length);
+    const decoyGeometry = mergeGeometries(
+      decoyWorldPositions.map((p) => rhombicDodecahedronGeometry(scale).translate(p.x - decoyCentroid.x, p.y - decoyCentroid.y, p.z - decoyCentroid.z)),
+      false,
+    );
+    pieceSpecs.push({ id: `decoy-${d}`, fillsGroup: DECOY_NEVER_MATCHES, geometry: decoyGeometry });
+  }
+
+  for (let i = pieceSpecs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
+  }
+
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+      requiresPlacedFirst: spec.requiresPlacedFirst,
+    });
+  });
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+}
+
 const BIG_HULL_STAGES = [
   { id: 81, name: 'Big Hull: Cuboctahedron', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3) },
   { id: 82, name: 'Big Hull: Tetrahedral Stack', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 4) },
@@ -2457,6 +2606,24 @@ const DISPHENOID_KEY_HULL_STAGES = [
   },
 ];
 
+// Sibling variant -- same 3 real cells decomposed the same way, but the
+// Burr key is an ordinary coarse chunk instead (see
+// `buildDisphenoidElsewhereKeyHullStage`'s own header comment).
+const DISPHENOID_ELSEWHERE_KEY_HULL_STAGES = [
+  {
+    id: 97,
+    name: 'Big Hull: Cuboctahedron (Disphenoid Elsewhere)',
+    derivedFrom: [{ id: 81, tier: 'Big Hull' }, { id: 80, tier: 'Disphenoid RD' }, { id: 83, tier: 'Burr Puzzle' }],
+    build: (scale) => buildDisphenoidElsewhereKeyHullStage(scale, CUBOCTAHEDRON_CELLS, [1, 5, 9], 0, 3, 1),
+  },
+  {
+    id: 98,
+    name: 'Big Hull: Tetrahedral Stack (Disphenoid Elsewhere)',
+    derivedFrom: [{ id: 82, tier: 'Big Hull' }, { id: 80, tier: 'Disphenoid RD' }, { id: 83, tier: 'Burr Puzzle' }],
+    build: (scale) => buildDisphenoidElsewhereKeyHullStage(scale, TETRAHEDRAL_STACK_CELLS, [0, 10, 19], 0, 4, 1),
+  },
+];
+
 // Mirrored Molecule -- direct instruction (2026-09-04, "mirrored
 // molecules split it into 3 with 3 decoys", confirmed "both could
 // work" against two different readings): this is the FIRST reading --
@@ -2542,4 +2709,5 @@ export const STAGES = [
   ...BURR_MIRRORED_MOLECULE_STAGES,
   ...BURR_BRANCHING_MOLECULE_STAGES,
   ...DISPHENOID_KEY_HULL_STAGES,
+  ...DISPHENOID_ELSEWHERE_KEY_HULL_STAGES,
 ];
