@@ -2185,6 +2185,171 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChun
   return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
 }
 
+// Big Hull + Disphenoid key -- crossover (2026-09-05, direct
+// instruction, confirmed via AskUserQuestion after flagging the risk):
+// "only the key chunk gets disphenoid detail" -- Big Hull's own coarse
+// whole-cell chunks stay exactly as `buildBigHullStage` already builds
+// them for every OTHER cell; a small number of designated cells (real
+// extremities, not the macro shape's own most-connected center) get
+// decomposed into their own 6 fused disphenoid-groups instead of
+// staying a single whole-cell piece -- literally `buildDisphenoidRDStage`'s
+// own already-proven 6-groups-of-4 construction, just translated onto
+// each cell's real world position instead of a stage-local origin.
+// Deliberately NOT the literal "24 loose disphenoids per macro-shape
+// cell" reading -- that would repeat, at Big Hull's much larger 13/20-
+// cell scale, the exact "too much of an x-ray exploration" mistake
+// Disphenoid RD's own header comment already documents making and
+// reverting on a SINGLE cell.
+//
+// Real design flaw caught BEFORE shipping, not after (direct question:
+// "won't the disphenoid detail give away that it is the key, shouldn't
+// there be deep end pieces on several chunks?"): with only ONE cell
+// decomposed, the tray shows 3-4 big lumpy multi-cell chunks next to 6
+// small pointy disphenoid slivers -- the SHAPE FAMILY alone spoils which
+// piece is blocked before the player ever taps anything, defeating the
+// whole "discover by trying" point of a Burr key (the original 3-chunk
+// Burr stages avoid this because every chunk is a similarly-sized
+// irregular cluster; nothing about a chunk's own appearance singles out
+// the key). Fixed by decomposing 3 cells the same way, not 1 -- only
+// `fineCellIndexes[0]` actually carries `requiresPlacedFirst`; the other
+// 2 are real, freely-placeable content, existing purely so "small pointy
+// pieces" no longer implies "blocked" (confirmed via AskUserQuestion: 3
+// cells, 1-in-3 read, over the smaller 2-cell option).
+function buildDisphenoidKeyHullStage(scale, allCells, fineCellIndexes, chunkCount, decoyChunkCount) {
+  const skeletonGroup = new THREE.Group();
+  const pyramid = pyramidGeometry(scale);
+
+  const cellWorldPositions = allCells.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = cellWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / cellWorldPositions.length);
+
+  const fineIndexSet = new Set(fineCellIndexes);
+  const coarseCells = allCells.filter((_, i) => !fineIndexSet.has(i));
+  const coarseWorldPositions = cellWorldPositions.filter((_, i) => !fineIndexSet.has(i));
+
+  const voids = [];
+  const groups = [];
+  const pieceSpecs = [];
+
+  // Coarse chunks -- identical construction to buildBigHullStage's own
+  // per-chunk loop, over every cell except the fine ones.
+  const assignments = partitionIntoIrregularChunks(coarseCells, chunkCount);
+  for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+    const groupId = `chunk-${chunkIndex}`;
+    const memberCellIndexes = assignments
+      .map((a, i) => (a.chunkIndex === chunkIndex ? i : -1))
+      .filter((i) => i >= 0);
+    const chunkCenters = memberCellIndexes.map((i) => coarseWorldPositions[i].clone().sub(centroid));
+    chunkCenters.forEach((cellCenter, i) => {
+      skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
+      PYRAMID_AXES.forEach((axisKey) => {
+        const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
+        [['in', inwardQuaternion], ['out', outwardQuaternion]].forEach(([dirLabel, toQuaternion]) => {
+          const v = makeVoid(pyramid, {
+            id: `v-${groupId}-${i}-${dirLabel}-${axisKey}`,
+            quaternion: toQuaternion(axisKey),
+            position: facePosition,
+            groupIds: [groupId],
+          });
+          skeletonGroup.add(...v.sceneObjects);
+          voids.push(v);
+        });
+      });
+    });
+    const chunkCentroid = chunkCenters.reduce((sum, c) => sum.add(c), new THREE.Vector3()).multiplyScalar(1 / chunkCenters.length);
+    groups.push({ id: groupId, position: chunkCentroid, quaternion: new THREE.Quaternion() });
+    const chunkGeometry = mergeGeometries(
+      chunkCenters.map((c) => rhombicDodecahedronGeometry(scale).translate(c.x - chunkCentroid.x, c.y - chunkCentroid.y, c.z - chunkCentroid.z)),
+      false,
+    );
+    pieceSpecs.push({ id: groupId, fillsGroup: groupId, geometry: chunkGeometry });
+  }
+
+  // The fine cells -- buildDisphenoidRDStage's own 24-disphenoid /
+  // 6-group construction, translated onto each cell's real position
+  // instead of a stage-local origin. Only fineCellIndexes[0] (the real
+  // key) gets requiresPlacedFirst; the rest place freely.
+  const coarseChunkIds = pieceSpecs.map((spec) => spec.id);
+  const orientationIndexes = DISPHENOID_ORIENTATIONS.map((_, i) => i);
+  const apexKeyFor = (i) => disphenoidApexAxisKey(i, scale);
+  fineCellIndexes.forEach((cellIndex, fineSlot) => {
+    const isKey = fineSlot === 0;
+    const fineCellCenter = cellWorldPositions[cellIndex].clone().sub(centroid);
+    skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), fineCellCenter));
+    orientationIndexes.forEach((i) => {
+      const key = DISPHENOID_ORIENTATIONS[i];
+      const v = makeVoid(disphenoidGeometry(scale), {
+        id: `v-fine${fineSlot}-${key}`,
+        quaternion: quaternionForDisphenoidOrientation(key),
+        position: fineCellCenter,
+        groupIds: [`fine${fineSlot}-${apexKeyFor(i)}`],
+      });
+      skeletonGroup.add(...v.sceneObjects);
+      voids.push(v);
+    });
+    PYRAMID_AXES.forEach((axisKey) => {
+      const groupId = `fine${fineSlot}-${axisKey}`;
+      const memberIndexes = orientationIndexes.filter((i) => apexKeyFor(i) === axisKey);
+      const memberGeometries = memberIndexes.map((i) =>
+        disphenoidGeometry(scale).applyQuaternion(quaternionForDisphenoidOrientation(DISPHENOID_ORIENTATIONS[i])),
+      );
+      const memberCentroids = memberGeometries.map((g) => {
+        g.computeBoundingSphere();
+        return g.boundingSphere.center;
+      });
+      const localCentroid = memberCentroids.reduce((sum, c) => sum.add(c), new THREE.Vector3()).multiplyScalar(1 / memberCentroids.length);
+      const worldCentroid = fineCellCenter.clone().add(localCentroid);
+      groups.push({ id: groupId, position: worldCentroid, quaternion: new THREE.Quaternion() });
+      const geometry = mergeGeometries(
+        memberGeometries.map((g) => g.translate(-localCentroid.x, -localCentroid.y, -localCentroid.z)),
+        false,
+      );
+      pieceSpecs.push({
+        id: `chunk-${groupId}`,
+        fillsGroup: groupId,
+        geometry,
+        requiresPlacedFirst: isKey ? coarseChunkIds : undefined,
+      });
+    });
+  });
+
+  // Decoys -- same alternate-irregular-partition idea buildBigHullStage
+  // already uses, over the coarse cells only (the fine cells' own groups
+  // get no decoys, matching Disphenoid RD's own choice not to add any
+  // loose/fake disphenoid pieces either).
+  for (let d = 0; d < decoyChunkCount; d++) {
+    const decoyAssignments = partitionIntoIrregularChunks(coarseCells, chunkCount, d + 1);
+    const decoyCellIndexes = decoyAssignments
+      .map((a, i) => (a.chunkIndex === (d % chunkCount) ? i : -1))
+      .filter((i) => i >= 0);
+    const decoyWorldPositions = decoyCellIndexes.map((i) => coarseWorldPositions[i]);
+    const decoyCentroid = decoyWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / decoyWorldPositions.length);
+    const decoyGeometry = mergeGeometries(
+      decoyWorldPositions.map((p) => rhombicDodecahedronGeometry(scale).translate(p.x - decoyCentroid.x, p.y - decoyCentroid.y, p.z - decoyCentroid.z)),
+      false,
+    );
+    pieceSpecs.push({ id: `decoy-${d}`, fillsGroup: DECOY_NEVER_MATCHES, geometry: decoyGeometry });
+  }
+
+  for (let i = pieceSpecs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
+  }
+
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+      requiresPlacedFirst: spec.requiresPlacedFirst,
+    });
+  });
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+}
+
 const BIG_HULL_STAGES = [
   { id: 81, name: 'Big Hull: Cuboctahedron', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3) },
   { id: 82, name: 'Big Hull: Tetrahedral Stack', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 4) },
@@ -2267,6 +2432,30 @@ const BURR_BRANCHING_MOLECULE_STAGES = BURR_BRANCHING_MOLECULE_INDEXES.map((defI
     build: (scale) => buildBranchingMoleculeStage(scale, hub, branch1, branch2, pickBranchMoleculeDecoys(hub, branch1, branch2, defIndex * 2), true),
   };
 });
+
+// Big Hull x Disphenoid key -- the 4th crossover. `fineCellIndexes[0]`
+// is the real key; the other 2 are real extremity cells too (never the
+// macro shape's own most-connected center), decomposed the same way
+// purely so the key can't be spotted by its own shape family alone (see
+// `buildDisphenoidKeyHullStage`'s own header comment for the real bug
+// this avoids). Cuboctahedron: 3 of its 12 real nearest-neighbor cells
+// (never index 0, the shared center). Tetrahedral Stack: the real apex
+// (index 0, layer k=0) plus 2 cells from the outermost layer (k=3,
+// indices 10-19) -- all genuine extremities, not an arbitrary pick.
+const DISPHENOID_KEY_HULL_STAGES = [
+  {
+    id: 95,
+    name: 'Big Hull: Cuboctahedron (Disphenoid Key)',
+    derivedFrom: [{ id: 81, tier: 'Big Hull' }, { id: 80, tier: 'Disphenoid RD' }, { id: 83, tier: 'Burr Puzzle' }],
+    build: (scale) => buildDisphenoidKeyHullStage(scale, CUBOCTAHEDRON_CELLS, [1, 5, 9], 3, 1),
+  },
+  {
+    id: 96,
+    name: 'Big Hull: Tetrahedral Stack (Disphenoid Key)',
+    derivedFrom: [{ id: 82, tier: 'Big Hull' }, { id: 80, tier: 'Disphenoid RD' }, { id: 83, tier: 'Burr Puzzle' }],
+    build: (scale) => buildDisphenoidKeyHullStage(scale, TETRAHEDRAL_STACK_CELLS, [0, 10, 19], 4, 1),
+  },
+];
 
 // Mirrored Molecule -- direct instruction (2026-09-04, "mirrored
 // molecules split it into 3 with 3 decoys", confirmed "both could
@@ -2352,4 +2541,5 @@ export const STAGES = [
   ...BURR_MOLECULE_SPLIT_STAGES,
   ...BURR_MIRRORED_MOLECULE_STAGES,
   ...BURR_BRANCHING_MOLECULE_STAGES,
+  ...DISPHENOID_KEY_HULL_STAGES,
 ];
