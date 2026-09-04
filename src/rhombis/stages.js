@@ -8,7 +8,7 @@
 // rewrite.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey } from './geometry.js';
+import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey, disphenoidGeometry, DISPHENOID_ORIENTATIONS, quaternionForDisphenoidOrientation, disphenoidApexAxisKey } from './geometry.js';
 import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld } from '../core/lattice.js';
 import { enumerateShapes } from './cell-arrangements.js';
 import { ANY_SINGLE_CELL_GROUP } from './puzzle-state.js';
@@ -369,6 +369,102 @@ function buildStage4(scale) {
     voids,
     hideIdleVoidWires: true,
   };
+}
+
+// Disphenoid RD -- direct instruction (2026-09-04, "tetragonal
+// disphenoids to form an RD", confirmed "for the RD not just single
+// disphenoids"): the SAME RD skeleton as Stage 4, decomposed a
+// completely different way -- 24 tetragonal disphenoids instead of 12
+// pyramids (see `geometry.js`'s own `disphenoidGeometry`/
+// `DISPHENOID_ORIENTATIONS` comment for the real geometric derivation
+// and the numeric verification it was checked against before writing
+// any of this).
+//
+// FIRST version of this stage offered all 24 as loose, individually-
+// orientable pieces (Stage 4's own "one revealed at a time, tap-cycle
+// to match" mechanic, just at 24-way instead of 12-way) -- built,
+// verified live (a genuine full 24/24 solve, end to end), then
+// DELIBERATELY REPLACED after direct feedback the moment it shipped:
+// "stop its a good basis but I want lots of the pieces conjoined...
+// it would end up too much of an x-ray exploration" -- 24 nearly-
+// identical thin slivers, told apart only by careful rotation, read as
+// tedious poking rather than a real puzzle. Confirmed via
+// AskUserQuestion: group ALL 24 into a handful of fused chunks, no
+// loose singles left at all.
+//
+// The 4 disphenoids sharing the same APEX point (`disphenoidApexAxisKey`,
+// geometry.js) are always mutually face-adjacent -- verified
+// numerically (every disphenoid has degree 3 in its own face-adjacency
+// graph, exactly its 3 same-apex siblings) -- so grouping by apex axis
+// gives 6 real, connected, non-arbitrary 4-disphenoid chunks, one per
+// RD outward direction. Same self-centering discipline Molecules/Hulls
+// already needed (see `buildMoleculeStage`'s own comment for the real
+// bug that fix avoids repeating): each chunk's merged geometry is
+// centered on ITS OWN centroid, with that same centroid as the group's
+// placement anchor -- not the shared apex-convergence point at the
+// RD's own center, which is NOT each chunk's own visual center of mass.
+function buildDisphenoidRDStage(scale) {
+  const skeletonGroup = new THREE.Group();
+  skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale)));
+
+  const orientationIndexes = DISPHENOID_ORIENTATIONS.map((_, i) => i);
+  const apexKeyFor = (i) => disphenoidApexAxisKey(i, scale);
+
+  const voids = orientationIndexes.map((i) => {
+    const key = DISPHENOID_ORIENTATIONS[i];
+    return makeVoid(disphenoidGeometry(scale), {
+      id: `v-${key}`,
+      quaternion: quaternionForDisphenoidOrientation(key),
+      position: ORIGIN,
+      groupIds: [apexKeyFor(i)],
+    });
+  });
+  voids.forEach((v) => skeletonGroup.add(...v.sceneObjects));
+
+  const groups = [];
+  const pieceSpecs = PYRAMID_AXES.map((axisKey) => {
+    const memberIndexes = orientationIndexes.filter((i) => apexKeyFor(i) === axisKey);
+    const memberGeometries = memberIndexes.map((i) =>
+      disphenoidGeometry(scale).applyQuaternion(quaternionForDisphenoidOrientation(DISPHENOID_ORIENTATIONS[i])),
+    );
+    const memberCentroids = memberGeometries.map((g) => {
+      g.computeBoundingSphere();
+      return g.boundingSphere.center;
+    });
+    const chunkCentroid = memberCentroids.reduce((sum, c) => sum.add(c), new THREE.Vector3()).multiplyScalar(1 / memberCentroids.length);
+    groups.push({ id: axisKey, position: chunkCentroid, quaternion: new THREE.Quaternion() });
+    const geometry = mergeGeometries(
+      memberGeometries.map((g) => g.translate(-chunkCentroid.x, -chunkCentroid.y, -chunkCentroid.z)),
+      false,
+    );
+    return { id: `chunk-${axisKey}`, fillsGroup: axisKey, geometry };
+  });
+
+  // Same per-load Fisher-Yates as every other multi-piece tier.
+  for (let i = pieceSpecs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
+  }
+
+  const TRAY_GAP = scale * 0.5;
+  let trayCursorY = 0;
+  function nextTrayPosition(geometry) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius;
+    if (trayCursorY !== 0) trayCursorY -= TRAY_GAP;
+    trayCursorY -= radius;
+    const y = trayCursorY;
+    trayCursorY -= radius;
+    return new THREE.Vector3(scale * 4, y, 0);
+  }
+
+  const pieces = pieceSpecs.map((spec) => makeFusedPiece(spec.geometry, {
+    id: spec.id,
+    fillsGroup: spec.fillsGroup,
+    homePosition: nextTrayPosition(spec.geometry),
+  }));
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
 }
 
 // Stage 5 -- conjoined pieces: the SAME 6-void cube as Stage 3 (now also
@@ -1832,4 +1928,5 @@ export const STAGES = [
   ...HULL_STAGES,
   ...MOLECULE_STAGES,
   ...BRANCHING_MOLECULE_STAGES,
+  { id: 64, name: 'Rhombic Dodecahedron (Disphenoids)', build: buildDisphenoidRDStage },
 ];

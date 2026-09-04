@@ -2052,6 +2052,79 @@ build order:
   direct `?stage=N` deep-link spot checks at every tier boundary (17,
   29, 30, 57, 58, 63). Full `node --test tests/unit/*.test.mjs` clean
   (311/311).
+  - **Confirmed live**: "all shipped stages tested manually and passed
+    thanks for great work the molecules were really challenging".
+
+  **New stage: Disphenoid RD (id 64) -- 2026-09-04**, direct instruction
+  "tetragonal disphenoids to form an RD" (confirmed via AskUserQuestion:
+  a genuine new decomposition stage, not a description of something
+  already built; confirmed again "for the RD not just single
+  disphenoids" -- one RD target, not a standalone disphenoid piece
+  elsewhere). VERIFIED NUMERICALLY before writing any game code (a
+  throwaway Node script, pure vector math, no THREE needed): the RD's
+  center plus each of its 12 rhombic faces' own SHORT diagonal (the
+  cube-corner-to-cube-corner one -- the LONG, octa-to-octa diagonal
+  gives a real but different, non-disphenoid tetrahedron) produces 24
+  tetrahedra, each with all 3 opposite-edge pairs equal -- a genuine
+  TETRAGONAL disphenoid (a disphenoid whose isosceles faces come from a
+  square-cross-section box). Separately verified the 24 PROPER
+  (determinant +1) operations of the octahedral symmetry group
+  (`cell-arrangements.js`'s own `SYMMETRY_OPERATIONS`, reused rather
+  than re-derived) map one canonical disphenoid onto all 24 real targets,
+  each exactly once -- confirming pure rotation alone (no reflection)
+  suffices, consistent with a tetragonal disphenoid's own D2d symmetry
+  making it achiral. `geometry.js` gained `disphenoidGeometry`,
+  `DISPHENOID_ORIENTATIONS` (24 keys), `quaternionForDisphenoidOrientation`,
+  and `disphenoidApexAxisKey` (which of the RD's 6 outward directions an
+  orientation's own apex lands on) built from this real, checked math --
+  `quaternionForOrientationKey` (the app's single orientation-string
+  resolver) gained a third branch for the new 'd0'..'d23' key format,
+  alongside the existing bare-axis-key and Cube's own compound
+  'axisKey:in' formats (all three still needed -- restoring the compound
+  branch after an earlier over-eager removal broke Cube's own
+  `CUBE_ORIENTATIONS`, caught immediately via `node --check` + grep
+  before it ever shipped).
+  - **First version shipped, then deliberately replaced the same
+    session** after direct live feedback: 24 individual loose pieces
+    (Stage 4's own "12-way tap-cycle" mechanic extended to 24-way) was
+    built, verified with a genuine live 24/24 solve end-to-end, then
+    immediately corrected: "stop its a good basis but I want lots of the
+    pieces conjoined... it would end up too much of an x-ray
+    exploration" -- 24 nearly-identical thin slivers, distinguishable
+    only by careful rotation, read as tedious poking rather than a real
+    puzzle. Confirmed via AskUserQuestion: group ALL 24 into a handful
+    of fused chunks, zero loose singles left.
+  - A SECOND real geometric check (not assumed): are the 4 disphenoids
+    sharing the same apex point actually face-adjacent to each other
+    (a real connected cluster), or just incidentally co-located? Verified
+    numerically -- every disphenoid has degree 3 in its own face-
+    adjacency graph (shares a full triangular face with exactly 3
+    others), and those 3 are ALWAYS its 3 same-apex siblings. Grouping
+    by `disphenoidApexAxisKey` therefore gives exactly 6 real, connected,
+    non-arbitrary 4-disphenoid chunks, one per RD outward direction --
+    not an arbitrary or forced partition.
+  - `buildDisphenoidRDStage` (`stages.js`) builds the same 24-void
+    skeleton (now `groupIds`-tagged by apex axis instead of
+    `requiredOrientation` -- no more player-driven orientation matching,
+    this is now a pure "does this chunk go here" fused-piece puzzle like
+    Molecules/Hulls) plus 6 fused pieces, each built by rotating
+    `disphenoidGeometry` into its own 4 real member orientations
+    (`.applyQuaternion`) and merging -- self-centered on the CHUNK's own
+    centroid, with that same centroid as the group's placement anchor
+    (the same self-centering discipline Molecules/Hulls needed after
+    their own earlier bug, applied correctly from the start this time).
+    No decoys (matching Stage 3/4's own "pure decomposition" precedent,
+    which also ships without decoys) -- can add them later if real
+    play-testing wants more resistance.
+  - Verified live: 6 pieces, 24 voids, groups correctly `[x+,x-,y+,y-,
+    z+,z-]`; full 6/6 solve confirmed end-to-end (select each chunk, tap
+    any one of its own 4 voids, group-fills all 4 at once -- remaining
+    count drops 24 -> 20 -> 16 -> 12 -> 8 -> 4 -> 0, exactly 4 per
+    placement). Full `node --test tests/unit/*.test.mjs` clean
+    (311/311 -- no `puzzle-state.js` surface touched, this reuses the
+    exact same `fillsGroup`/`groupIds` mechanism as every other fused
+    piece in the game).
+  - Total stage count after this: 64 (was 63).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
