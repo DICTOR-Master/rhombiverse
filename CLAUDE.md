@@ -1308,48 +1308,66 @@ build order:
   unchanged -- pure rendering-state change, no `puzzle-state.js` surface
   touched).
 
-  **Piece identity: numbers, per-piece color, placement flash --
-  2026-09-04**: direct instruction after a real live report ("my wife
-  was frustratedly stabbing screen with finger" -- after placing a
-  piece, whatever showed in that tray slot next could look near-
-  identical to the one just placed, with nothing on screen
-  distinguishing "stuck, unplaced" from "genuinely a different piece").
-  Three complementary fixes, all suggested directly, all hooked in from
-  ONE shared call site (`loadStage()`'s own piece-population loop) so
-  every stage gets them uniformly without touching any of the 7 stage-
-  builder functions individually:
-  - A stable per-piece number badge (`makeNumberSprite()`, `main.js`) --
-    a canvas-texture `THREE.Sprite`, always billboard-faces the camera
-    regardless of how the tray itself gets rotated, unlike a flat 3D
-    label would. Positioned from the geometry's own real bounding BOX
-    (not a bounding-sphere-radius offset from local (0,0,0) -- caught
-    live before shipping: the pyramid-based cube/RD-face pieces have
-    their local origin at their own BASE, not their visual centroid, a
-    known quirk from Stage 4's own build notes, so an origin-relative
-    offset landed the badge floating in empty space for those). Hidden
-    once that piece is actually placed (no longer "a piece to tell
-    apart"), shown again on undo.
-  - A distinct hue per piece (`applyPieceIdentity()`) -- an even
-    rotation around the piece color's own hue by `360/total` degrees
-    per index, so no two pieces in the same tray are ever the same
-    shade, readable before the number even needs reading. Each piece
-    mesh already has its own fresh `MeshStandardMaterial` instance
-    (`pieceMaterial()`, `stages.js`), so recoloring here is a local
-    change with no cross-piece side effects.
-  - A "Placed!" flash inside the tray panel itself (`#rhombis-tray-
-    flash`, `rhombis.html` + `flashTrayPlaced()`, `main.js`) -- feedback
-    shown right where attention already is (the tray), not just the
-    bottom HUD text that's easy to miss mid-play. Skipped when the
-    placement also solves the stage (the "Solved!" banner is already
-    strong enough on its own).
-  Verified live: Stage 9's 5-piece tray shows 5 genuinely distinct
-  colors/numbers at both desktop and a real mobile pixel ratio (re-
-  confirming the earlier pixelRatio fix still holds against this new
-  sprite geometry); a real Stage 4 placement (flip-cycle + place) shows
-  the flash and reveals piece "2" in a clearly different color from
-  piece "1"'s. Full `node --test tests/unit/*.test.mjs` clean (295/295
-  -- pure visual/rendering addition, no `puzzle-state.js` surface
-  touched).
+  **Piece identity -- three ideas tried, two reverted, one alternative
+  added, all same day (2026-09-04)**: real live report ("my wife was
+  frustratedly stabbing screen with finger" -- after placing a piece,
+  whatever showed in that tray slot next could look near-identical to
+  the one just placed, with nothing on screen distinguishing "stuck,
+  unplaced" from "genuinely a different piece"). The user offered three
+  ideas to discuss (numbers, color, a placement-success message) --
+  process mistake, corrected directly by the user mid-session ("I
+  wanted to discuss about numbers colors or message... but you jumped
+  right in fixing everything"): all three got BUILT immediately instead
+  of talked through first, the opposite of "reason before code" this
+  project has asked for repeatedly. Final state, reached by actually
+  checking in afterward:
+  - **Numbers**: built (a billboarded canvas-texture `THREE.Sprite`
+    badge, positioned from the geometry's own real bounding box rather
+    than a bounding-sphere offset from local origin -- caught live that
+    the pyramid-based cube/RD-face pieces have their origin at their own
+    BASE, not their visual centroid, a known quirk from Stage 4's own
+    build notes), then REVERTED at direct request once seen live
+    alongside the flash ("Flash only, drop numbers").
+  - **Per-piece hue**: built (even rotation around the piece color's own
+    hue), then REVERTED same day for a real, separate reason ("multiple
+    colors on current early stages too confusing with actual red and
+    green" -- Stage 1-6's own red/green void-validity highlighting is
+    load-bearing feedback; a rotating hue could land in that same red/
+    green territory purely by index and read as a contradictory
+    validity signal, not a piece label).
+  - **"Placed!" flash** inside the tray panel itself (`#rhombis-tray-
+    flash`, `rhombis.html` + `flashTrayPlaced()`, `main.js`) -- KEPT,
+    the one idea that survived: feedback shown right where attention
+    already is (the tray), not just the bottom HUD text that's easy to
+    miss mid-play. Skipped when the placement also solves the stage (the
+    "Solved!" banner is already strong enough on its own).
+  - **Per-piece starting rotation** (`main.js`'s `loadStage()` piece-
+    population loop) -- a genuinely different, lighter-weight idea
+    raised AFTER the flash was confirmed kept, reasoned through with a
+    direct question first this time ("could be belt and braces again"
+    -- is a third mitigation worth it once the flash already confirms a
+    placement happened) before building: every FUSED piece (no
+    `orientationOptions`, so no flip mechanic and no meaningful "starts
+    wrong" pose the way a flippable piece has) otherwise rests at plain
+    identity forever, so consecutive ones in a tray looked like the
+    exact same static POSE, not just the same shape/color. Each fused
+    piece now gets a small starting Y-axis rotation spaced by the golden
+    angle (`2.399963` rad) times its own index -- well spread apart
+    regardless of tray size, never landing two adjacent pieces at a
+    near-identical angle the way a small fixed step could. Stored on the
+    piece (`p.trayRestQuaternion`) and reused by the undo/resync path
+    too, so it survives placing-then-undoing. Flippable pieces (Stage
+    1/2/4/5/6's own loose pieces) are completely untouched -- their
+    starting `orientation` is already meaningful, not something to
+    override with an arbitrary spin.
+  Verified live at every step: numbers+hue shown live before being
+  reverted; Stage 4's own flip-piece starting pose confirmed byte-
+  identical before and after the rotation-offset change (screenshot
+  comparison); a 6-piece Stage 12 tray shows visibly varied silhouettes
+  per piece instead of stacked clones. Full `node --test tests/unit/
+  *.test.mjs` clean throughout (305/305 at each step -- pure visual/
+  rendering changes, no `puzzle-state.js` surface touched by any of
+  this).
 
   **Drag-to-orient: a real second way to reach an orientation --
   2026-09-04**: direct instruction, explicitly framed as the biggest,

@@ -376,74 +376,6 @@ function clearCurrentStage() {
   current.pieces.forEach((p) => p.mesh.parent?.remove(p.mesh));
 }
 
-// A small billboarded number badge -- a canvas-texture Sprite always
-// faces the camera regardless of how the tray itself gets rotated, so
-// the number stays legible everywhere a flat 3D label wouldn't.
-function makeNumberSprite(number, radius) {
-  const size = 128;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = 'rgba(10, 10, 16, 0.6)';
-  ctx.beginPath();
-  ctx.arc(size / 2, size / 2, size / 2 - 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-  ctx.lineWidth = 5;
-  ctx.stroke();
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 68px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(number), size / 2, size / 2 + 4);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: texture, depthTest: false, depthWrite: false, transparent: true,
-  }));
-  const spriteSize = radius * 0.65;
-  sprite.scale.set(spriteSize, spriteSize, 1);
-  return sprite;
-}
-
-// Direct instruction (2026-09-04, live report: "my wife was
-// frustratedly stabbing screen with finger" -- after placing a piece,
-// whatever shows in that tray slot next can look near-identical to the
-// one just placed, so nothing on screen distinguished "stuck, unplaced"
-// from "genuinely a different piece"). Two independent cues, applied
-// uniformly to every piece of every stage from this one shared call
-// site rather than touching each of the 7 stage-builder functions:
-// a stable per-piece number (never renumbered as other pieces get
-// placed, so it stays a fixed identity for that piece's whole life in
-// the tray) and a distinct hue -- an even rotation around the piece
-// color's own hue by 360/total degrees per index, so no two pieces in
-// the same tray are ever the same shade, readable before the number
-// even needs reading. `p.mesh.material` is already a fresh instance per
-// piece (`pieceMaterial()` in stages.js), so recoloring here is a local
-// change with no cross-piece side effects.
-function applyPieceIdentity(p, index, total) {
-  const hue = (32 + (360 / total) * index) % 360;
-  p.mesh.material.color.setHSL(hue / 360, 0.72, 0.62);
-  // A bounding-BOX offset, not a bounding-sphere-radius offset from
-  // local (0,0,0) -- some piece shapes (the pyramid-based cube/RD-face
-  // pieces) have their local origin at their own BASE, not their visual
-  // centroid (a known quirk from Stage 4's own build notes), so an
-  // origin-relative offset lands the badge in empty space for those.
-  // The geometry's own real min/max corner is correct regardless of
-  // where the origin happens to sit.
-  p.mesh.geometry.computeBoundingBox();
-  const box = p.mesh.geometry.boundingBox;
-  const size = box.max.clone().sub(box.min);
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const sprite = makeNumberSprite(index + 1, maxDim * 0.4);
-  // Top-left corner of the piece "when flat" -- direct instruction.
-  sprite.position.set(box.min.x, box.max.y, box.max.z * 0.5 + size.z * 0.2);
-  sprite.layers.set(TRAY_LAYER);
-  p.mesh.add(sprite);
-  p.numberSprite = sprite;
-}
-
 function loadStage(index) {
   clearCurrentStage();
   zoomFactor = 1; // a new stage's own derived framing, not a leftover zoom from whatever was open before
@@ -471,7 +403,27 @@ function loadStage(index) {
     p.mesh.position.copy(p.homePosition);
     trayGroup.add(p.mesh);
     p.mesh.layers.set(TRAY_LAYER);
-    applyPieceIdentity(p, i, built.pieces.length);
+    // A fused piece (no `orientationOptions`, so no flip mechanic and
+    // no meaningful "starts wrong" pose the way a flippable piece has)
+    // otherwise rests at plain identity forever -- every one in a tray
+    // looks like the exact same static pose, not just the same shape/
+    // color. Direct instruction (2026-09-04, after numbers and a
+    // per-piece hue were both tried and reverted -- numbers felt like
+    // clutter, hue risked colliding with the red/green void-validity
+    // meaning): "next piece should be at a slightly different rotation
+    // to start, to avoid confusion with previous piece". The golden
+    // angle keeps consecutive pieces well spread apart regardless of
+    // how many are in the tray, never landing two adjacent ones at a
+    // near-identical angle the way a small fixed step could. Flippable
+    // pieces are untouched -- their own starting `orientation` is
+    // already meaningful (Stage 1's own "starts wrong" design), not
+    // something to override with an arbitrary spin.
+    if (!p.orientationOptions) {
+      const GOLDEN_ANGLE = 2.399963;
+      p.trayRestQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * GOLDEN_ANGLE);
+      p.mesh.quaternion.copy(p.trayRestQuaternion);
+      p.mesh.userData.targetQuaternion = p.trayRestQuaternion;
+    }
   });
 
   const state = createPuzzleState({
@@ -581,17 +533,15 @@ function syncVisualsToState() {
       p.mesh.quaternion.copy(target.quaternion);
       p.mesh.userData.targetQuaternion = target.quaternion;
       p.mesh.scale.setScalar(1); // real full size once actually part of the assembled shape, not the capped tray-display size
-      if (p.numberSprite) p.numberSprite.visible = false; // no longer "a piece to tell apart" once it's part of the shape
     } else {
       trayGroup.add(p.mesh); // detach from skeletonGroup back to the tray, if it was there
       p.mesh.layers.set(TRAY_LAYER);
       p.mesh.position.copy(p.homePosition);
-      const restQuaternion = sp.orientation ? quaternionForOrientationKey(sp.orientation) : new THREE.Quaternion();
+      const restQuaternion = sp.orientation ? quaternionForOrientationKey(sp.orientation) : (p.trayRestQuaternion ?? new THREE.Quaternion());
       p.mesh.quaternion.copy(restQuaternion);
       p.mesh.userData.targetQuaternion = restQuaternion;
       p.mesh.visible = Boolean(p.fillsGroup); // fused: always shown; loose: fixed by revealNextTrayPiece below
       p.mesh.scale.setScalar(p.trayScale ?? 1);
-      if (p.numberSprite) p.numberSprite.visible = true;
     }
     setPieceSelectedVisual(p, p.id === current.state.selectedPieceId);
   }
@@ -1134,7 +1084,6 @@ function handleTargetTap(clientX, clientY) {
   placedPiece.mesh.quaternion.copy(target.quaternion);
   placedPiece.mesh.userData.targetQuaternion = target.quaternion;
   placedPiece.mesh.scale.setScalar(1); // real full size once actually part of the assembled shape, not the capped tray-display size
-  if (placedPiece.numberSprite) placedPiece.numberSprite.visible = false; // no longer "a piece to tell apart" once it's part of the shape
   setPieceSelectedVisual(placedPiece, false);
   for (const filledId of result.filledVoidIds) {
     const filledVoid = current.voids.find((v) => v.id === filledId);
