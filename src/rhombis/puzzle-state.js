@@ -40,6 +40,46 @@
 // own target comes from its `fillsGroup` directly instead, but its
 // group's voids get `filledBy` set too, for uniformity.
 
+// A "fillsGroup" sentinel for a fused piece that's interchangeable with
+// every other geometrically-identical copy of itself -- direct
+// instruction (2026-09-04, "it doesn't make sense in real world" --
+// stage 11's own N-cell singles were each bound to ONE specific cell's
+// group at build time, so a single that physically fits any open cell
+// was rejected everywhere except the one arbitrary cell it happened to
+// be assigned, exactly the "identical pieces should be interchangeable"
+// property Stage 3's cube pieces already had). A piece with `fillsGroup
+// === ANY_SINGLE_CELL_GROUP` resolves its ACTUAL target group at
+// placement time from whichever void got tapped, rather than a group
+// id fixed on the piece -- see `smallestEnclosingGroupId`.
+export const ANY_SINGLE_CELL_GROUP = '__any-single-cell__';
+
+// A void can belong to more than one group at once (its own single
+// cell, a joined pair spanning it, "full", ...) -- the SMALLEST of
+// those (fewest total voids) is always its own single-cell group,
+// since any multi-cell group is strictly a superset of voids across
+// more than one cell. General on purpose (compares real void counts,
+// not a hardcoded 'cell-' string prefix) so it keeps working for
+// whatever group shapes a stage defines, not just today's N-cell ones.
+// Exported for `main.js`'s own undo/resync path, which needs the same
+// resolution for an already-placed interchangeable piece (no fresh
+// `placeSelected()` result to read `targetGroupId` off of there).
+export function smallestEnclosingGroupId(state, voidEntry) {
+  return voidEntry.groupIds.reduce((smallest, groupId) => {
+    const count = state.voids.filter((v) => v.groupIds.includes(groupId)).length;
+    const smallestCount = state.voids.filter((v) => v.groupIds.includes(smallest)).length;
+    return count < smallestCount ? groupId : smallest;
+  }, voidEntry.groupIds[0]);
+}
+
+// Resolves a piece's ACTUAL target group for a specific tapped void --
+// its own fixed `fillsGroup`, or (for an interchangeable piece) whatever
+// group is smallest among the tapped void's own groupIds.
+function resolveTargetGroupId(state, piece, voidEntry) {
+  return piece.fillsGroup === ANY_SINGLE_CELL_GROUP
+    ? smallestEnclosingGroupId(state, voidEntry)
+    : piece.fillsGroup;
+}
+
 export function createPuzzleState({ pieces, voids }) {
   return {
     pieces: pieces.map((p) => ({ ...p, placed: false })),
@@ -120,10 +160,11 @@ export function placeSelected(state, voidId) {
   }
 
   if (piece.fillsGroup) {
-    if (!voidEntry.groupIds.includes(piece.fillsGroup)) {
+    const targetGroupId = resolveTargetGroupId(state, piece, voidEntry);
+    if (!targetGroupId || !voidEntry.groupIds.includes(targetGroupId)) {
       return { state, placed: false, pieceId, voidId, reason: 'nothing-selected' };
     }
-    const groupVoids = state.voids.filter((v) => v.groupIds.includes(piece.fillsGroup));
+    const groupVoids = state.voids.filter((v) => v.groupIds.includes(targetGroupId));
     if (groupVoids.some((v) => v.filled)) {
       return { state, placed: false, pieceId, voidId, reason: 'group-partially-filled' };
     }
@@ -137,6 +178,12 @@ export function placeSelected(state, voidId) {
       pieceId,
       voidId,
       filledVoidIds: groupVoidIds,
+      // The group ACTUALLY filled -- same as `piece.fillsGroup` for a
+      // fixed-group piece, but for an interchangeable one (fillsGroup
+      // === ANY_SINGLE_CELL_GROUP) this is the real resolved id, not
+      // the sentinel. Callers need this (not `piece.fillsGroup`) to
+      // look up the group's own position/quaternion for visual snapping.
+      targetGroupId,
     };
   }
 
@@ -173,21 +220,25 @@ export function isSolved(state) {
 // valid/invalid). For a fused piece (Stage 5), every void in ITS group
 // reads valid together or not at all -- matches placeSelected()'s own
 // all-or-nothing group check -- and a void outside that group always
-// reads invalid for it.
+// reads invalid for it. An interchangeable piece (`fillsGroup ===
+// ANY_SINGLE_CELL_GROUP`) resolves its target group PER VOID (each
+// void may belong to a different single-cell group), rather than once
+// for the whole piece -- a fixed-group piece still resolves to the
+// exact same single group for every void, so this changed nothing
+// about its own result, just where the lookup happens.
 export function voidValidityForPiece(state, pieceId) {
   const piece = state.pieces.find((p) => p.id === pieceId);
   const validByVoidId = {};
   const canAct = Boolean(piece && !piece.placed);
-  const groupAllOpen = canAct && piece.fillsGroup
-    ? state.voids.filter((v) => v.groupIds.includes(piece.fillsGroup)).every((v) => !v.filled)
-    : false;
 
   for (const v of state.voids) {
     if (v.filled) continue;
     if (!canAct) {
       validByVoidId[v.id] = false;
     } else if (piece.fillsGroup) {
-      validByVoidId[v.id] = v.groupIds.includes(piece.fillsGroup) && groupAllOpen;
+      const targetGroupId = resolveTargetGroupId(state, piece, v);
+      const inGroup = Boolean(targetGroupId) && v.groupIds.includes(targetGroupId);
+      validByVoidId[v.id] = inGroup && state.voids.filter((vv) => vv.groupIds.includes(targetGroupId)).every((vv) => !vv.filled);
     } else {
       validByVoidId[v.id] = !v.requiredOrientation || v.requiredOrientation === piece.orientation;
     }

@@ -5,7 +5,7 @@
 // order (Stage 2); 6 identical pieces placeable in any order (Stage 3).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPuzzleState, selectPiece, deselect, flipPiece, setPieceOrientation, placeSelected, isSolved, voidValidityForPiece } from '../../src/rhombis/puzzle-state.js';
+import { createPuzzleState, selectPiece, deselect, flipPiece, setPieceOrientation, placeSelected, isSolved, voidValidityForPiece, ANY_SINGLE_CELL_GROUP } from '../../src/rhombis/puzzle-state.js';
 
 function stage1State() {
   return createPuzzleState({
@@ -591,9 +591,14 @@ function threeCellWithFullPieceState() {
   ];
   return createPuzzleState({
     pieces: [
-      { id: 'single-0', fillsGroup: 'cell-0' },
-      { id: 'single-1', fillsGroup: 'cell-1' },
-      { id: 'single-2', fillsGroup: 'cell-2' },
+      // Every single is the SAME interchangeable sentinel now (real
+      // buildNCellStage shape, 2026-09-04 fix) -- not pinned to one
+      // specific cell at build time. `placeSelected`/
+      // `voidValidityForPiece` resolve the actual target group from
+      // whichever void gets tapped.
+      { id: 'single-0', fillsGroup: ANY_SINGLE_CELL_GROUP },
+      { id: 'single-1', fillsGroup: ANY_SINGLE_CELL_GROUP },
+      { id: 'single-2', fillsGroup: ANY_SINGLE_CELL_GROUP },
       { id: 'joined-pair', fillsGroup: 'joined-01' },
       { id: 'full', fillsGroup: 'full' },
     ],
@@ -647,6 +652,60 @@ test('full piece: a joined-pair placement leaves the full piece rejected but the
   const singleResult = placeSelected(selectPiece(state, 'single-2'), 'v-cell-2-in-x+');
   assert.equal(singleResult.placed, true);
   assert.equal(isSolved(singleResult.state), true);
+});
+
+// Interchangeable singles -- direct instruction (2026-09-04, "it
+// doesn't make sense in real world... a single cell is able to occupy
+// a single cell place left over"): a live report that Stage 11
+// rejected a genuinely valid joined-pair + single solution. Root cause
+// was every single being pinned to ONE specific cell's group at build
+// time, rejecting it everywhere else even though it's geometrically
+// identical to every other single -- the same "identical pieces are
+// interchangeable" property Stage 3's cube pieces already had.
+test('interchangeable singles: ANY single fills whichever open cell you tap it onto, not just one pre-assigned cell', () => {
+  let state = threeCellWithFullPieceState();
+  // Place the joined pair (cell-0 + cell-1) first, exactly the live
+  // report's own scenario -- only cell-2 is left open.
+  state = selectPiece(state, 'joined-pair');
+  state = placeSelected(state, 'v-cell-0-in-x+').state;
+  assert.equal(state.voids.filter((v) => !v.filled).length, 12); // only cell-2's own 12 voids remain
+
+  // single-0 was "meant for" cell-0 under the old fixed-group design --
+  // that cell is long since filled, but the piece is genuinely
+  // interchangeable now, so it should ALSO work here.
+  const result = placeSelected(selectPiece(state, 'single-0'), 'v-cell-2-in-x+');
+  assert.equal(result.placed, true);
+  assert.equal(result.filledVoidIds.length, 12);
+  assert.equal(isSolved(result.state), true);
+});
+
+test('interchangeable singles: voidValidityForPiece shows the remaining open cell as valid for ANY unplaced single', () => {
+  let state = threeCellWithFullPieceState();
+  state = selectPiece(state, 'joined-pair');
+  state = placeSelected(state, 'v-cell-0-in-x+').state;
+
+  for (const singleId of ['single-0', 'single-1', 'single-2']) {
+    const validity = voidValidityForPiece(state, singleId);
+    assert.equal(validity['v-cell-2-in-x+'], true, `${singleId} should be valid against the remaining open cell`);
+  }
+});
+
+test('interchangeable singles: resolves to the SMALLEST enclosing group, never the joined-pair or full group', () => {
+  let state = threeCellWithFullPieceState();
+  const result = placeSelected(selectPiece(state, 'single-0'), 'v-cell-0-in-x+');
+  assert.equal(result.placed, true);
+  assert.equal(result.targetGroupId, 'cell-0'); // not 'joined-01' or 'full', despite the void belonging to all three
+  assert.equal(result.filledVoidIds.length, 12); // just cell-0's own voids, not the pair's 24 or the full 36
+});
+
+test('interchangeable singles: once one fills a cell, the group-partially-filled rule still blocks the joined pair/full for it', () => {
+  let state = threeCellWithFullPieceState();
+  state = selectPiece(state, 'single-0');
+  state = placeSelected(state, 'v-cell-0-in-x+').state;
+
+  const joinedResult = placeSelected(selectPiece(state, 'joined-pair'), 'v-cell-1-in-x+');
+  assert.equal(joinedResult.placed, false);
+  assert.equal(joinedResult.reason, 'group-partially-filled');
 });
 
 // Stage 7's undo needs a reverse mapping from a placed piece back to

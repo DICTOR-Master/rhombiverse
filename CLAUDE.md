@@ -1421,21 +1421,42 @@ build order:
   tests).
 
   **Stage 11 "rejecting valid solution of two conjoined and 1 single" --
-  investigated and NOT reproduced, same day**: reproduced the EXACT
-  scenario with precise coordinate clicking (place the joined-pair,
-  then the matching single into the one remaining open cell) and it
-  genuinely solves the puzzle end to end (`isSolved` true). The likely
-  real explanation, confirmed by first getting the SAME rejection myself
-  before fixing my own test: in an N-cell stage, the tray's singles are
-  NOT freely interchangeable duplicates the way Stage 3's cube pieces
-  are -- each specific single piece (`single-0`, `single-1`, ...) is
-  tied to ONE specific cell's own group and will always be rejected
-  against every other cell's void, even though every single looks
-  generically the same (now visually distinguished by the piece-
-  identity work directly above, which may on its own reduce this
-  particular confusion going forward). Not something to silently fix by
-  loosening the group-match rule -- that would let a single count toward
-  the wrong cell, which is real, load-bearing solve logic, not a bug.
+  first investigated and NOT reproduced at the exact-scenario level, then
+  genuinely FIXED once the underlying design was reconsidered, same
+  day**: the exact scenario (place the joined-pair, then the ORIGINALLY-
+  matching single into the one remaining open cell) did solve end to
+  end -- but each specific single piece (`single-0`, `single-1`, ...)
+  was tied to ONE specific cell's own group at build time, rejecting it
+  against every OTHER cell's void even though it's geometrically
+  identical to every other single. Initial read was "working as
+  designed, just confusing" -- direct pushback ("it doesn't make sense
+  in real world... a single cell is able to occupy a single cell place
+  left over... that's what live play test is for") was correct: a plain
+  unmarked single-cell RD SHOULD be interchangeable with any other, the
+  exact same property Stage 3's cube pieces already have, and the
+  original "each single tied to one cell" design was the actual bug.
+  Fixed via a new `ANY_SINGLE_CELL_GROUP` sentinel (`puzzle-state.js`):
+  a piece with `fillsGroup` set to it resolves its REAL target group at
+  placement time from whichever void got tapped (via
+  `smallestEnclosingGroupId` -- the smallest, by real void count, among
+  the tapped void's own `groupIds`, since a single cell's own group is
+  always smaller than any joined-pair/full group it might also belong
+  to; deliberately NOT a hardcoded `'cell-'` string-prefix check, so it
+  keeps working for whatever group shapes a stage defines), rather than
+  a group id fixed on the piece. `placeSelected()`'s result now also
+  returns the resolved `targetGroupId` explicitly, so callers (`main.js`'s
+  live placement code) never need to re-derive it; the undo/resync path
+  (no fresh `placeSelected` result to read) re-derives it from any one
+  void the piece already filled, via the same exported
+  `smallestEnclosingGroupId`. `buildNCellStage`'s singles (stages 7-15)
+  now use the sentinel instead of a per-instance `cell-${i}` id. 6 new
+  unit tests (49 total in the puzzle-state file), including the exact
+  live scenario (joined-pair, then the "wrong" single into the actual
+  remaining cell, now placing successfully) and one proving the resolved
+  group is always the smallest enclosing one, never the joined-pair or
+  full group by mistake. Verified live end to end (the exact reported
+  sequence now reads "Solved!"). Full `node --test tests/unit/*.test.mjs`
+  clean (305/305).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

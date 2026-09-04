@@ -11,6 +11,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey } from './geometry.js';
 import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld } from '../core/lattice.js';
 import { enumerateShapes } from './cell-arrangements.js';
+import { ANY_SINGLE_CELL_GROUP } from './puzzle-state.js';
 
 export const WIRE_COLOR = 0x6ad0ff;
 const PIECE_COLOR = 0xffb35c;
@@ -719,12 +720,21 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
     return new THREE.Vector3(scale * 4, y, 0);
   }
 
+  // Every single here is a geometrically identical whole-RD piece --
+  // direct instruction (2026-09-04, "doesn't make sense in real world"):
+  // a plain, unmarked single cell should fit ANY open single-cell void,
+  // not just the ONE cell it happened to be assigned at build time, the
+  // same "identical pieces are interchangeable" property Stage 3's cube
+  // pieces already have. ANY_SINGLE_CELL_GROUP (puzzle-state.js) makes
+  // placeSelected()/voidValidityForPiece() resolve the ACTUAL target
+  // group from whichever void gets tapped, instead of a group id fixed
+  // on the piece.
   const pieces = [];
   for (let i = 0; i < n; i++) {
     const geometry = rhombicDodecahedronGeometry(scale);
     pieces.push(makeFusedPiece(geometry, {
       id: `single-${i}`,
-      fillsGroup: `cell-${i}`,
+      fillsGroup: ANY_SINGLE_CELL_GROUP,
       homePosition: nextTrayPosition(geometry),
     }));
   }

@@ -35,7 +35,7 @@
 import * as THREE from 'three';
 import { quaternionForOrientationKey } from './geometry.js';
 import { STAGES, WIRE_COLOR, GHOST_OPACITY } from './stages.js';
-import { createPuzzleState, selectPiece, flipPiece, setPieceOrientation, placeSelected, isSolved, voidValidityForPiece } from './puzzle-state.js';
+import { createPuzzleState, selectPiece, flipPiece, setPieceOrientation, placeSelected, isSolved, voidValidityForPiece, smallestEnclosingGroupId, ANY_SINGLE_CELL_GROUP } from './puzzle-state.js';
 
 const SCALE = 2;
 const SELECTED_EMISSIVE = 0x664422;
@@ -553,12 +553,27 @@ stagePicker.addEventListener('click', (e) => {
 // every time. Only placements go on the history stack (selecting or
 // flipping a piece is already trivially reversible by tapping again),
 // so this is genuinely "undo my last placement", not a full action log.
+// A placed fused piece's ACTUAL target group -- `p.fillsGroup` directly
+// for a fixed-group piece, but an interchangeable one's own
+// `fillsGroup` is just the ANY_SINGLE_CELL_GROUP sentinel, not a real
+// id (there's no fresh `placeSelected()` result to read `targetGroupId`
+// off of here, unlike the live placement code -- this is the undo/
+// resync path, re-derived purely from current state). Any one void this
+// piece filled unambiguously identifies the real group, since every
+// void in that group got the SAME `filledBy` together.
+function resolvedGroupIdForPlacedFusedPiece(p) {
+  if (p.fillsGroup !== ANY_SINGLE_CELL_GROUP) return p.fillsGroup;
+  const filledVoidId = current.state.voids.find((sv) => sv.filledBy === p.id).id;
+  const filledVoid = current.voids.find((v) => v.id === filledVoidId);
+  return smallestEnclosingGroupId(current.state, filledVoid);
+}
+
 function syncVisualsToState() {
   for (const p of current.pieces) {
     const sp = currentStatePiece(p.id);
     if (sp.placed) {
       const target = p.fillsGroup
-        ? current.groups.find((g) => g.id === p.fillsGroup)
+        ? current.groups.find((g) => g.id === resolvedGroupIdForPlacedFusedPiece(p))
         : current.voids.find((v) => current.state.voids.find((sv) => sv.id === v.id).filledBy === p.id);
       current.skeletonGroup.add(p.mesh);
       p.mesh.layers.set(0);
@@ -1101,9 +1116,13 @@ function handleTargetTap(clientX, clientY) {
   // piece (Stage 5) snaps to its GROUP's own shared placement instead
   // (e.g. the cube's own center, identity rotation) -- it's a single
   // physical object standing in for every void it just filled at once,
-  // not oriented to any one of them.
+  // not oriented to any one of them. `result.targetGroupId` (not
+  // `placedPiece.fillsGroup`) -- an interchangeable piece's own
+  // `fillsGroup` is just the ANY_SINGLE_CELL_GROUP sentinel, not a real
+  // group id; `targetGroupId` is whichever group placeSelected() ACTUALLY
+  // resolved and filled.
   const target = placedPiece.fillsGroup
-    ? current.groups.find((g) => g.id === placedPiece.fillsGroup)
+    ? current.groups.find((g) => g.id === result.targetGroupId)
     : hitVoid;
   // Reparent tray -> skeleton (Object3D.add() detaches from its current
   // parent automatically) so this piece rotates together with the rest
