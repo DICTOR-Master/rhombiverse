@@ -1046,30 +1046,100 @@ build order:
   re-checking once the independent-viewport work below lands and tray
   pieces are large enough to tap precisely.
 
-  **Open design conversation, same live-testing session, not yet
-  acted on**: several related pieces of direct feedback arrived
-  together and are being treated as one upcoming redesign pass rather
-  than four separate patches --
-  - A first-time player ("my wife played earliest stages") found that
-    target and tray should be independently rotatable/viewable, not
-    coupled through one shared drag gesture.
-  - Layout: picker/tray pieces should move to top-right, target should
-    sit left-of-center (not the current roughly-centered-target,
-    tray-to-the-side layout).
-  - The target shell should be MORE transparent than its current 0.55
-    opacity.
-  - A deeper game-design critique of the N=3/N=4 tray content itself:
-    "alternatives should be different configurations of four... not
-    one perfect one and oddments only too obvious no skill" -- the
-    current "N singles + 1 joined-pair + 1 full-solve piece" structure
-    means the full piece trivializes the puzzle (tap the one obvious
-    piece, done, no spatial reasoning required) while the leftover
-    singles carry no real challenge either (fused pieces have no
-    orientation concept at all). The suggested fix is real alternate
-    DECOMPOSITIONS (different genuine sub-groupings of the N cells,
-    not one dominant shortcut piece plus filler) -- echoes the
-    project's own original Day 1 "genuine jigsaw, not revolve one big
-    piece" design question. None of this has been scoped or built yet.
+  **Independent target/tray viewports, layout, and transparency --
+  shipped 2026-09-04**, closing 3 of the 4 items raised in the prior
+  session's open design conversation (layout, independence, and
+  transparency; the 4th, tray-content redesign, remains open -- see
+  below). Direct feedback driving this: "target and tray should move
+  independently" (from a first-time player, "my wife played earliest
+  stages"), "picker pieces should be top right target should be left
+  of center", "as you enlarge picker pieces disappear", and "target
+  more transparent please". Architecture: two independent
+  `THREE.PerspectiveCamera`s (`camera` for the target, `trayCamera` for
+  the tray) rendering the same shared `scene` via two-pass scissored
+  rendering (`renderer.setScissorTest`/`setViewport`/`setScissor`/
+  `clearDepth`, explicit `renderer.getPixelRatio()` multiplication since
+  those calls operate in raw drawing-buffer pixels not CSS pixels, and
+  WebGL's viewport Y-origin is bottom-up so the tray rect's screen-space
+  top has to be flipped to `window.innerHeight - cssTop - cssHeight`
+  before use). The tray sits in a small fixed-size top-right panel
+  (`trayViewportRect()`, capped to `min(300, 42vw)` x `min(380, 48vh)`),
+  mirrored by a real DOM div (`#rhombis-tray-panel` in `rhombis.html`,
+  `pointer-events: none`, kept in sync every frame via `syncTrayPanel()`
+  so the visual frame never drifts from the actual scissored region it's
+  meant to outline) since the WebGL canvas itself has no way to draw a
+  bordered panel chrome. Pointer routing (`regionAt()`) decides once per
+  gesture (at pointerdown, or when a second finger joins for a pinch)
+  which viewport a drag/pinch/tap belongs to and holds that for the
+  whole gesture, so a drag that wanders outside its own starting rect
+  mid-motion keeps controlling what it started controlling. Framing math
+  was upgraded from a bounding-SPHERE approximation (which under-fit
+  elongated/asymmetric shapes, like Straight Line's "full" piece, from a
+  fixed viewing angle) to true camera-relative (anisotropic) framing --
+  `cameraRelativeDistance()` decomposes each of a bounding box's 8
+  corners onto the camera's own right/up basis vectors (derived from
+  `CAMERA_FORWARD`/a world-up cross product, not assumed axis-aligned)
+  and solves for the true minimum distance per axis, so the frame fits
+  tightly regardless of shape proportions or viewing angle.
+
+  **Two real bugs found and fixed while building this.** (1) After
+  splitting into two cameras, Stage 8/12 screenshots showed the target
+  clipped top/bottom -- first hypothesis was the framing math itself,
+  investigated via temporary debug logging and hand-verified against
+  manual trigonometry (computed distance matched the manual calculation
+  exactly), which disproved a math bug. Re-examining the same screenshot
+  showed piece-colored (orange) content bleeding into the target view --
+  the real bug was that rendering one shared `scene` through two
+  different cameras means each camera renders EVERYTHING in it unless
+  objects are explicitly excluded; nothing had segregated tray pieces
+  away from the target camera. Fixed via THREE.js's `Layers` system:
+  `TRAY_LAYER = 1`, `trayCamera.layers.enable(TRAY_LAYER)`, every tray-
+  piece mesh gets `.layers.set(TRAY_LAYER)` when parented into
+  `trayGroup` and `.layers.set(0)` when moved to the target's
+  `skeletonGroup` on placement (all 4 reparenting call sites: initial
+  tray population, both branches of `syncVisualsToState`, and the live
+  placement code). (2) Fixing that surfaced a second, related gotcha:
+  `THREE.Raycaster.layers` defaults to layer 0 only and is checked IN
+  ADDITION to whatever explicit object list `intersectObjects()` is
+  given -- without `raycaster.layers.enableAll()`, a raycast against
+  TRAY_LAYER pieces would have silently found nothing even with the
+  right objects passed explicitly. Verified via a temporary debug hook
+  (`window.__rhombisDebug` exposing `camera`/`trayCamera`/`renderer`/
+  `current`, removed before committing) driving real perspective-
+  projection math to click exact screen coordinates for pieces/voids
+  rather than guessing pixels: Stage 1's full solve (tap piece, flip
+  apex-down to apex-up, tap void) now reads "Solved!"; Stage 4's
+  place-then-undo cycle correctly goes 12 left -> 11 left -> back to 12;
+  a real pointer drag centered on the target rotates only the target
+  (`skeletonGroup.rotation.y` changes) and is fully unaffected by a
+  subsequent drag centered on the tray (same value before and after);
+  the Stages picker still opens/lists/navigates correctly on top of the
+  new layout. Full `node --test tests/unit/*.test.mjs` clean (295/295,
+  unchanged -- this was a rendering/input-routing rewrite, no
+  `puzzle-state.js` surface touched). `TRANSLUCENT_OPACITY` (`stages.js`)
+  lowered from 0.55 to 0.35 for the "target more transparent please"
+  request, verified visually against Stage 8's 3-cell target.
+
+  **Open design conversation, not yet acted on**: a deeper game-design
+  critique of the N=3/N=4 tray content itself remains unaddressed --
+  "alternatives should be different configurations of four... not one
+  perfect one and oddments only too obvious no skill" -- the current "N
+  singles + 1 joined-pair + 1 full-solve piece" structure means the full
+  piece trivializes the puzzle (tap the one obvious piece, done, no
+  spatial reasoning required) while the leftover singles carry no real
+  challenge either (fused pieces have no orientation concept at all).
+  The suggested fix is real alternate DECOMPOSITIONS (different genuine
+  sub-groupings of the N cells, not one dominant shortcut piece plus
+  filler) -- echoes the project's own original Day 1 "genuine jigsaw,
+  not revolve one big piece" design question. Also still open from
+  earlier sessions: introducing octahedron/pyramid/tetragonal-disphenoid
+  piece types as decoys ("scramble in the octahedron, pyramid, and
+  tetragonal disphenoid into the mix"), making decoys more visually
+  similar to increase difficulty ("making the picker tray more similar
+  pieces"), the "six octahedrons could fill single RD" idea (possibly
+  requiring stage reordering), decoy pieces varying in size as levels
+  advance, an HUD shape-symbol icon, and an 80s-style blocky RD logo.
+  None of this has been scoped or built yet.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

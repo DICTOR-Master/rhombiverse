@@ -20,7 +20,12 @@ const ORIGIN = new THREE.Vector3(0, 0, 0);
 // (applyWorldViewMaterials(), TRANSLUCENT_OPACITY) rather than inventing
 // a second translucency convention -- direct instruction (2026-09-03,
 // "we have all software in rhombiverse... in world view translucent").
-const TRANSLUCENT_OPACITY = 0.55;
+// Lowered from the World View default of 0.55 -- direct instruction
+// (2026-09-04, "target more transparent please") once the target had its
+// own full-screen viewport (the two-viewport rewrite) and read as more
+// solid/opaque at that larger size than it had at the old shared, smaller
+// scale.
+const TRANSLUCENT_OPACITY = 0.35;
 export const GHOST_OPACITY = 0.65;
 
 function pieceMaterial() {

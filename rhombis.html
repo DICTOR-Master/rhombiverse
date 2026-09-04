@@ -31,6 +31,17 @@
     #rhombis-topbar a:hover { text-decoration: underline; }
     #rhombis-title { font-weight: 600; letter-spacing: 0.08em; }
     #rhombis-stage { font-size: 0.85rem; opacity: 0.75; margin-left: 0.75rem; }
+    /* Visual frame ONLY -- pointer-events stays none, real interaction
+       is the canvas's own WebGL raycasting underneath (main.js's
+       trayViewportRect(), kept in sync via JS so this never drifts from
+       the actual scissored render region it's meant to frame). */
+    #rhombis-tray-panel {
+      position: fixed; z-index: 5; pointer-events: none;
+      background: rgba(8, 10, 16, 0.35);
+      border: 1px solid rgba(106, 208, 255, 0.35);
+      border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    }
     #rhombis-hud {
       position: fixed; left: 50%; transform: translateX(-50%);
       bottom: calc(1.5rem + env(safe-area-inset-bottom));
@@ -122,6 +133,7 @@
 </head>
 <body>
   <div id="app"></div>
+  <div id="rhombis-tray-panel"></div>
   <div id="rhombis-topbar">
     <span><span id="rhombis-title">RHOMBIS</span><span id="rhombis-stage"></span></span>
     <span>

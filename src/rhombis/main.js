@@ -116,8 +116,46 @@ function buildStarfield(count, radiusRange, size, opacity) {
 scene.add(buildStarfield(900, [70, 85], 1.1, 0.55));
 scene.add(buildStarfield(120, [70, 85], 2.2, 0.9));
 
+// Two independent cameras/viewports, one shared renderer -- direct
+// instruction (2026-09-04): "the main issue with target and piece
+// picker tray is that because they are all in a line you can only view
+// them at a small size" / "target and tray should move independently"
+// / "picker pieces should be top right target should be left of
+// center" / "as you enlarge picker pieces disappear". The ORIGINAL
+// design (both in one shared camera, tray offset far to the side) is
+// exactly what caused all four of those: a shared "fit everything"
+// distance means neither the target nor the tray can ever be big, a
+// single rotation/zoom couldn't touch one without touching the other,
+// and zooming toward the target pushed the far-off tray out of the
+// same camera's frustum entirely. Splitting into two cameras -- each
+// with its own derived framing, its own rotation group, its own zoom --
+// removes the coupling at the root instead of patching each symptom.
+// Real bug caught live during this same rewrite: rendering the SAME
+// scene through two different cameras means EITHER camera renders
+// everything in it by default, including whichever pieces are
+// currently sitting in the OTHER camera's own group -- confirmed
+// directly (temporary debug logging of the target camera's own
+// computed distance matched hand-verified math exactly, ruling out a
+// framing-math bug; the real cause was the tray's own solid pieces
+// visibly bleeding into the target's render). THREE.Layers is the
+// fix: every tray piece goes on TRAY_LAYER, `camera` (target) never
+// enables it (a camera's default layer mask is layer 0 only, so simply
+// never touching `camera.layers` already excludes it), and
+// `trayCamera` explicitly enables both 0 (lights/starfield, so the
+// tray gets the same backdrop) and TRAY_LAYER.
+const TRAY_LAYER = 1;
+
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+const trayCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+trayCamera.layers.enable(TRAY_LAYER);
 const CAMERA_DIRECTION = new THREE.Vector3(2.5, 2, 5).normalize();
+
+// All UNPLACED pieces live here (not loose children of `scene`) so the
+// tray can be rotated as its own independent group, exactly paralleling
+// how `skeletonGroup` already works for the target -- a placed piece
+// reparents OUT of this into `skeletonGroup`, same as before.
+const trayGroup = new THREE.Group();
+scene.add(trayGroup);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -126,47 +164,68 @@ document.getElementById('app').appendChild(renderer.domElement);
 
 camera.lookAt(0, 0, 0);
 
-// Camera distance is DERIVED, not hand-tuned per stage: measure how far
-// the farthest point of the scene (skeleton + tray, at their initial
-// layout) sits from the origin, then back-solve the distance that puts
-// that point exactly at the tighter of the horizontal/vertical FOV
-// edges (with a margin). This is what actually fixed the real bug an
-// empirical "distance * fudge-factor for narrow aspect" approach kept
-// getting wrong: on an iPhone-width portrait viewport the tray (offset
-// to the side of the skeleton) was running off the right edge of the
-// screen because the fudge factor was tuned by eye against a desktop
-// window, not derived from real geometry. Correct for any aspect ratio
-// or stage layout without per-stage magic numbers.
+// Camera distance is DERIVED, not hand-tuned per stage -- and, since
+// the target/tray viewport split, derived from the TRUE camera-relative
+// extent of the content, not a generic bounding-SPHERE approximation.
+// A sphere-based fit (this file's own earlier version) is only exactly
+// right for a spherical object; for an elongated/asymmetric shape
+// (Stage 8's Triangle, N=4's Tetrahedron/Straight Line) viewed from a
+// fixed angle, it can under-estimate the distance actually needed and
+// let real corners clip past the frame edge. This was ALWAYS true of
+// the sphere math, but invisible before the viewport split: framing
+// the target and tray together in one shared sphere (the tray sitting
+// far off to the side) made that shared sphere's radius dominated by
+// the tray's own distance, which accidentally gave the target far more
+// margin than its own real extent needed. Splitting the two cameras
+// removed that accidental slack and made the real gap visible
+// (confirmed live: Stage 8/12's target visibly clipped top and bottom
+// with the sphere-based fit). Fixed properly, not by inflating the
+// margin further: `cameraRelativeDistance` decomposes each of the
+// object's real 8 bounding-box corners into components along the
+// camera's own actual right/up axes (not an isotropic radius), and
+// solves for the distance that keeps EVERY corner inside both the
+// vertical and horizontal FOV -- correct for any shape from this fixed
+// viewing angle, not just spheres.
 const FRAME_MARGIN = 1.12;
+const CAMERA_FORWARD = CAMERA_DIRECTION.clone().negate(); // camera looks back toward its target, opposite of the direction it's offset along
+const CAMERA_RIGHT = new THREE.Vector3().crossVectors(CAMERA_FORWARD, new THREE.Vector3(0, 1, 0)).normalize();
+const CAMERA_UP = new THREE.Vector3().crossVectors(CAMERA_RIGHT, CAMERA_FORWARD).normalize();
 
-function boundingRadiusFromOrigin(objects) {
+function boundingBoxCenterAndCorners(objects) {
   const box = new THREE.Box3();
   for (const obj of objects) box.expandByObject(obj);
-  const corners = [
+  const center = box.getCenter(new THREE.Vector3());
+  const cornerOffsets = [
     [box.min.x, box.min.y, box.min.z], [box.min.x, box.min.y, box.max.z],
     [box.min.x, box.max.y, box.min.z], [box.min.x, box.max.y, box.max.z],
     [box.max.x, box.min.y, box.min.z], [box.max.x, box.min.y, box.max.z],
     [box.max.x, box.max.y, box.min.z], [box.max.x, box.max.y, box.max.z],
-  ];
-  let maxDistSq = 0;
-  for (const [x, y, z] of corners) maxDistSq = Math.max(maxDistSq, x * x + y * y + z * z);
-  return Math.sqrt(maxDistSq);
+  ].map(([x, y, z]) => new THREE.Vector3(x, y, z).sub(center));
+  return { center, cornerOffsets };
+}
+
+function cameraRelativeDistance(cornerOffsets, cam) {
+  const vFov = THREE.MathUtils.degToRad(cam.fov);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * cam.aspect);
+  const tanV = Math.tan(vFov / 2);
+  const tanH = Math.tan(hFov / 2);
+  let maxDistance = 0;
+  for (const offset of cornerOffsets) {
+    const rightComp = Math.abs(offset.dot(CAMERA_RIGHT));
+    const upComp = Math.abs(offset.dot(CAMERA_UP));
+    maxDistance = Math.max(maxDistance, rightComp / tanH, upComp / tanV);
+  }
+  return maxDistance;
 }
 
 // Pinch-to-zoom/wheel-zoom multiply the DERIVED distance rather than
 // replacing it -- direct instruction (2026-09-04, "need pinch and
-// expand gestures to make puzzle bigger"), fulfilling a gap this
-// file's own pointer-handling comment already flagged ("no pinch
-// gesture is defined for two fingers yet"). Keeping the derivation
-// (real bounding-radius math, not a hand-tuned distance) as the base
-// and treating zoom as a multiplier on top preserves the "always
-// frames correctly regardless of aspect ratio or stage size" property
-// that fixed a real narrow-viewport bug earlier -- zoom is a per-
-// session interactive adjustment layered over a still-correct default,
-// not a replacement for it. Reset to 1 on every stage load (a stage
-// with a very different bounding radius shouldn't inherit an
-// unrelated previous zoom level).
+// expand gestures to make puzzle bigger"). Target and tray get their
+// OWN independent zoom now (part of the same split as the two cameras
+// above) -- zooming the target no longer affects the tray's own size
+// at all. Both reset to 1 on every stage load.
 let zoomFactor = 1;
+let trayZoomFactor = 1;
 const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 2.5;
 
@@ -175,17 +234,53 @@ function applyCameraFraming() {
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
   if (!current) return;
-  const vFov = THREE.MathUtils.degToRad(camera.fov);
-  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
-  const limitingHalfFov = Math.min(vFov, hFov) / 2;
-  const distance = (current.boundingRadius / Math.sin(limitingHalfFov)) * FRAME_MARGIN * zoomFactor;
-  camera.position.copy(CAMERA_DIRECTION).multiplyScalar(distance);
-  camera.lookAt(0, 0, 0);
+  const distance = cameraRelativeDistance(current.targetBox.cornerOffsets, camera) * FRAME_MARGIN * zoomFactor;
+  camera.position.copy(current.targetBox.center).add(CAMERA_DIRECTION.clone().multiplyScalar(distance));
+  camera.lookAt(current.targetBox.center);
+}
+
+function applyTrayFraming() {
+  const rect = trayViewportRect();
+  trayCamera.aspect = rect.width / rect.height;
+  trayCamera.updateProjectionMatrix();
+  if (!current) return;
+  const distance = cameraRelativeDistance(current.trayBox.cornerOffsets, trayCamera) * FRAME_MARGIN * trayZoomFactor;
+  trayCamera.position.copy(current.trayBox.center).add(CAMERA_DIRECTION.clone().multiplyScalar(distance));
+  trayCamera.lookAt(current.trayBox.center);
+}
+
+// Tray viewport: a fixed corner overlay, top-right (direct instruction
+// "picker pieces should be top right"), rendered as a second scissored
+// pass over the target's own full-screen render. Kept well clear of
+// the topbar (RHOMBIS wordmark/Stages button) and safe-area insets.
+const TRAY_MARGIN = 16;
+function trayViewportRect() {
+  const topInset = 64; // clears the topbar in the common case without reading its live layout every frame
+  const width = Math.min(300, window.innerWidth * 0.42);
+  const height = Math.min(380, window.innerHeight * 0.48);
+  return {
+    left: window.innerWidth - width - TRAY_MARGIN,
+    top: topInset,
+    width,
+    height,
+  };
+}
+
+function syncTrayPanel() {
+  const rect = trayViewportRect();
+  const panel = document.getElementById('rhombis-tray-panel');
+  if (!panel) return;
+  panel.style.left = `${rect.left}px`;
+  panel.style.top = `${rect.top}px`;
+  panel.style.width = `${rect.width}px`;
+  panel.style.height = `${rect.height}px`;
 }
 
 function handleViewportChange() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   applyCameraFraming();
+  applyTrayFraming();
+  syncTrayPanel();
 }
 
 window.addEventListener('resize', handleViewportChange);
@@ -214,23 +309,46 @@ const stageList = document.getElementById('rhombis-stage-list');
 const requestedStageId = Number(new URLSearchParams(window.location.search).get('stage'));
 const requestedStageIndex = STAGES.findIndex((s) => s.id === requestedStageId);
 let stageIndex = requestedStageIndex >= 0 ? requestedStageIndex : 0;
-let current = null; // { skeletonGroup, pieces, voids, state, boundingRadius, history, advanceTimer }
+let current = null; // { skeletonGroup, pieces, voids, state, targetBox, trayBox, history, advanceTimer }
 
 function clearCurrentStage() {
   if (!current) return;
   if (current.advanceTimer) clearTimeout(current.advanceTimer);
   scene.remove(current.skeletonGroup);
-  current.pieces.forEach((p) => scene.remove(p.mesh));
+  // A piece's current parent is whichever group it was actually in
+  // (trayGroup if never placed, skeletonGroup if it was) -- removing
+  // from `.parent` directly is correct either way, rather than assuming.
+  current.pieces.forEach((p) => p.mesh.parent?.remove(p.mesh));
 }
 
 function loadStage(index) {
   clearCurrentStage();
   zoomFactor = 1; // a new stage's own derived framing, not a leftover zoom from whatever was open before
+  trayZoomFactor = 1;
   const stageDef = STAGES[index];
   const built = stageDef.build(SCALE);
 
   scene.add(built.skeletonGroup);
-  built.pieces.forEach((p) => scene.add(p.mesh));
+
+  // Recenter the tray stack around ITS OWN centroid before adding
+  // pieces to trayGroup -- every stage's own home positions were
+  // chosen back when the tray shared one camera with the target and
+  // needed to sit visibly "off to the side" of it; now that the tray
+  // gets its own independent camera and its own independently-
+  // rotatable group, rotating trayGroup around ITS local origin
+  // (unchanged, at world (0,0,0)) would swing pieces sitting far from
+  // there wildly across the screen instead of spinning them in place.
+  // Recentering here means no stage's own home-position choices needed
+  // to change at all.
+  const trayCentroid = built.pieces
+    .reduce((sum, p) => sum.add(p.homePosition), new THREE.Vector3())
+    .multiplyScalar(1 / built.pieces.length);
+  built.pieces.forEach((p) => {
+    p.homePosition.sub(trayCentroid);
+    p.mesh.position.copy(p.homePosition);
+    trayGroup.add(p.mesh);
+    p.mesh.layers.set(TRAY_LAYER);
+  });
 
   const state = createPuzzleState({
     pieces: built.pieces.map((p) => ({
@@ -242,9 +360,11 @@ function loadStage(index) {
     voids: built.voids.map((v) => ({ id: v.id, requiredOrientation: v.requiredOrientation, groupIds: v.groupIds })),
   });
 
-  const boundingRadius = boundingRadiusFromOrigin([built.skeletonGroup, ...built.pieces.map((p) => p.mesh)]);
-  current = { ...built, groups: built.groups ?? [], state, boundingRadius, history: [], advanceTimer: null };
+  const targetBox = boundingBoxCenterAndCorners([built.skeletonGroup]);
+  const trayBox = boundingBoxCenterAndCorners(built.pieces.map((p) => p.mesh));
+  current = { ...built, groups: built.groups ?? [], state, targetBox, trayBox, history: [], advanceTimer: null };
   applyCameraFraming();
+  applyTrayFraming();
   solvedBanner.hidden = true;
   stageLabel.textContent = `Stage ${stageDef.id}: ${stageDef.name}`;
   refreshVoidHighlights(); // sets each void wire's correct idle visibility
@@ -317,12 +437,14 @@ function syncVisualsToState() {
         ? current.groups.find((g) => g.id === p.fillsGroup)
         : current.voids.find((v) => current.state.voids.find((sv) => sv.id === v.id).filledBy === p.id);
       current.skeletonGroup.add(p.mesh);
+      p.mesh.layers.set(0);
       p.mesh.position.copy(target.position);
       p.mesh.quaternion.copy(target.quaternion);
       p.mesh.userData.targetQuaternion = target.quaternion;
       p.mesh.scale.setScalar(1); // real full size once actually part of the assembled shape, not the capped tray-display size
     } else {
-      scene.add(p.mesh); // detach from skeletonGroup back to the fixed tray, if it was there
+      trayGroup.add(p.mesh); // detach from skeletonGroup back to the tray, if it was there
+      p.mesh.layers.set(TRAY_LAYER);
       p.mesh.position.copy(p.homePosition);
       const restQuaternion = sp.orientation ? quaternionForOrientationKey(sp.orientation) : new THREE.Quaternion();
       p.mesh.quaternion.copy(restQuaternion);
@@ -550,22 +672,38 @@ function advanceOrFinish() {
   }
 }
 
+// --- Region routing: which viewport (tray vs. target) a pointer event
+// belongs to, decided once per gesture (at pointerdown, or at the
+// moment a second finger joins for a pinch) and held for that whole
+// gesture -- a drag/pinch that wanders outside its own starting rect
+// mid-gesture (a finger sliding past the tray's own small corner, say)
+// should keep controlling whatever it started controlling, not switch
+// targets mid-motion.
+function regionAt(clientX, clientY) {
+  const rect = trayViewportRect();
+  const inTray = clientX >= rect.left && clientX <= rect.left + rect.width
+    && clientY >= rect.top && clientY <= rect.top + rect.height;
+  return inTray ? 'tray' : 'target';
+}
+
 // --- Tap vs. drag-to-rotate vs. pinch-to-zoom: a SINGLE pointer that
-// moves past the threshold spins the skeleton (updated live on every
-// move); one that comes back up without moving far is a tap instead. A
-// second pointer joining mid-gesture cancels the single-finger
-// candidate (no fighting a one-finger drag already in progress) and
-// starts tracking a pinch instead -- direct instruction (2026-09-04,
-// "need pinch and expand gestures to make puzzle bigger"), fulfilling
-// a gap this comment used to flag as not-yet-built. `activePointers`
-// is a Map (id -> last known {x,y}), not just a Set, since pinch needs
-// both fingers' actual positions, not just a count.
+// moves past the threshold spins the region it started in (target's
+// skeletonGroup, or the tray's own trayGroup -- direct instruction
+// 2026-09-04, "target and tray should move independently"); one that
+// comes back up without moving far is a tap instead. A second pointer
+// joining mid-gesture cancels the single-finger candidate (no fighting
+// a one-finger drag already in progress) and starts tracking a pinch
+// instead, scoped to whichever region the pinch itself started in.
+// `activePointers` is a Map (id -> last known {x,y}), not just a Set,
+// since pinch needs both fingers' actual positions, not just a count.
 const activePointers = new Map();
 let tapCandidateId = null;
 let pointerDownPos = null;
 let dragLast = null;
+let dragRegion = null;
 let pinchStartDistance = null;
 let pinchStartZoom = null;
+let pinchRegion = null;
 const TAP_MOVE_THRESHOLD = 10;
 const ROTATE_SPEED = 0.012;
 const MAX_PITCH = Math.PI / 2 - 0.02;
@@ -575,6 +713,7 @@ function cancelTapCandidate() {
   tapCandidateId = null;
   pointerDownPos = null;
   dragLast = null;
+  dragRegion = null;
 }
 
 function currentPinchDistance() {
@@ -588,11 +727,14 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
     tapCandidateId = e.pointerId;
     pointerDownPos = { x: e.clientX, y: e.clientY };
     dragLast = { x: e.clientX, y: e.clientY };
+    dragRegion = regionAt(e.clientX, e.clientY);
   } else {
     cancelTapCandidate();
     if (activePointers.size === 2) {
+      const [a, b] = [...activePointers.values()];
+      pinchRegion = regionAt((a.x + b.x) / 2, (a.y + b.y) / 2);
       pinchStartDistance = currentPinchDistance();
-      pinchStartZoom = zoomFactor;
+      pinchStartZoom = pinchRegion === 'tray' ? trayZoomFactor : zoomFactor;
     }
   }
 });
@@ -601,58 +743,88 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   if (activePointers.has(e.pointerId)) activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (activePointers.size === 2 && pinchStartDistance) {
     // Fingers spreading apart (expand) shrinks the distance ratio,
-    // shrinking zoomFactor -- a smaller camera distance means a
+    // shrinking the zoom factor -- a smaller camera distance means a
     // BIGGER/closer view, matching "expand to make it bigger" as a
     // real, not just labeled, effect.
     const ratio = pinchStartDistance / currentPinchDistance();
-    zoomFactor = THREE.MathUtils.clamp(pinchStartZoom * ratio, MIN_ZOOM, MAX_ZOOM);
-    applyCameraFraming();
+    const newZoom = THREE.MathUtils.clamp(pinchStartZoom * ratio, MIN_ZOOM, MAX_ZOOM);
+    if (pinchRegion === 'tray') { trayZoomFactor = newZoom; applyTrayFraming(); }
+    else { zoomFactor = newZoom; applyCameraFraming(); }
     return;
   }
   if (e.pointerId !== tapCandidateId || !dragLast || !current) return;
   const dx = e.clientX - dragLast.x;
   const dy = e.clientY - dragLast.y;
   dragLast = { x: e.clientX, y: e.clientY };
-  const rot = current.skeletonGroup.rotation;
+  const rot = (dragRegion === 'tray' ? trayGroup : current.skeletonGroup).rotation;
   rot.y += dx * ROTATE_SPEED;
   rot.x = THREE.MathUtils.clamp(rot.x + dy * ROTATE_SPEED, -MAX_PITCH, MAX_PITCH);
 });
 
 renderer.domElement.addEventListener('pointerup', (e) => {
   activePointers.delete(e.pointerId);
-  if (activePointers.size < 2) pinchStartDistance = null;
+  if (activePointers.size < 2) { pinchStartDistance = null; pinchRegion = null; }
   if (e.pointerId !== tapCandidateId || !pointerDownPos) return;
   const dx = e.clientX - pointerDownPos.x;
   const dy = e.clientY - pointerDownPos.y;
   const moved = Math.hypot(dx, dy) > TAP_MOVE_THRESHOLD;
+  const tapRegion = dragRegion;
   cancelTapCandidate();
   if (moved) return; // was a drag/rotate
-  handleTap(e.clientX, e.clientY);
+  handleTap(e.clientX, e.clientY, tapRegion);
 });
 
 renderer.domElement.addEventListener('pointercancel', (e) => {
   activePointers.delete(e.pointerId);
-  if (activePointers.size < 2) pinchStartDistance = null;
+  if (activePointers.size < 2) { pinchStartDistance = null; pinchRegion = null; }
   if (e.pointerId === tapCandidateId) cancelTapCandidate();
 });
 
-// Desktop equivalent of pinch -- same zoomFactor, same clamped range.
+// Desktop equivalent of pinch -- same zoom factors, same clamped range,
+// scoped to whichever region the wheel event itself landed in.
 // preventDefault stops the page itself from scrolling under a wheel
 // event landing on the canvas.
 renderer.domElement.addEventListener('wheel', (e) => {
   e.preventDefault();
-  zoomFactor = THREE.MathUtils.clamp(zoomFactor * (1 + e.deltaY * WHEEL_ZOOM_SPEED), MIN_ZOOM, MAX_ZOOM);
-  applyCameraFraming();
+  if (regionAt(e.clientX, e.clientY) === 'tray') {
+    trayZoomFactor = THREE.MathUtils.clamp(trayZoomFactor * (1 + e.deltaY * WHEEL_ZOOM_SPEED), MIN_ZOOM, MAX_ZOOM);
+    applyTrayFraming();
+  } else {
+    zoomFactor = THREE.MathUtils.clamp(zoomFactor * (1 + e.deltaY * WHEEL_ZOOM_SPEED), MIN_ZOOM, MAX_ZOOM);
+    applyCameraFraming();
+  }
 }, { passive: false });
 
 const raycaster = new THREE.Raycaster();
+// Raycaster.layers defaults to layer 0 only and is checked in ADDITION
+// to whatever explicit object list intersectObjects() is given -- since
+// tray pieces now live on TRAY_LAYER (see the camera-layer comment
+// above), a raycast against them would silently find nothing without
+// this. The explicit pieceTargets/voidTargets lists already do the
+// real filtering, so just accept every layer here rather than
+// duplicating that logic on the raycaster's own mask.
+raycaster.layers.enableAll();
 const pointerNDC = new THREE.Vector2();
 
-function handleTap(clientX, clientY) {
-  const rect = renderer.domElement.getBoundingClientRect();
+// Splits by region rather than one combined raycast against both
+// cameras -- pieces only ever live in the tray viewport now, voids
+// only ever live in the target viewport, so a tray tap need only ever
+// test pieces and a target tap need only ever test voids. Simpler than
+// the old single-camera version, not just relocated.
+function handleTap(clientX, clientY, region) {
+  if (region === 'tray') handleTrayTap(clientX, clientY);
+  else handleTargetTap(clientX, clientY);
+}
+
+function screenToNDC(clientX, clientY, rect) {
   pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
   pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(pointerNDC, camera);
+  return pointerNDC;
+}
+
+function handleTrayTap(clientX, clientY) {
+  const rect = trayViewportRect();
+  raycaster.setFromCamera(screenToNDC(clientX, clientY, rect), trayCamera);
 
   // .visible is filtered explicitly, not left to the raycaster -- real
   // bug, caught building Stage 4's manual-orientation prototype
@@ -671,8 +843,36 @@ function handleTap(clientX, clientY) {
   const pieceTargets = current.pieces
     .filter((p) => !currentStatePiece(p.id).placed && p.mesh.visible)
     .map((p) => p.mesh);
+  const hits = raycaster.intersectObjects(pieceTargets, false);
+  if (hits.length === 0) return;
+  const hitPiece = current.pieces.find((p) => p.mesh === hits[0].object);
+  if (!hitPiece) return;
+
+  if (current.state.selectedPieceId === hitPiece.id) {
+    // A piece with no orientationOptions (Stage 3's pieces) has nothing
+    // to flip -- flipPiece() is already a no-op for it, but skip the
+    // rotation-target update too rather than calling
+    // quaternionForOrientationKey(undefined) for a piece with no
+    // orientation.
+    if (hitPiece.orientationOptions) {
+      current.state = flipPiece(current.state, hitPiece.id);
+      hitPiece.orientation = currentStatePiece(hitPiece.id).orientation;
+      hitPiece.mesh.userData.targetQuaternion = quaternionForOrientationKey(hitPiece.orientation);
+    }
+  } else {
+    current.state = selectPiece(current.state, hitPiece.id);
+    current.pieces.forEach((p) => setPieceSelectedVisual(p, p.id === current.state.selectedPieceId));
+  }
+  refreshVoidHighlights();
+  updateHud();
+}
+
+function handleTargetTap(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  raycaster.setFromCamera(screenToNDC(clientX, clientY, rect), camera);
+
   const voidTargets = current.voids.map((v) => v.hitTarget);
-  const hits = raycaster.intersectObjects([...pieceTargets, ...voidTargets], false);
+  const hits = raycaster.intersectObjects(voidTargets, false);
   if (hits.length === 0) return;
 
   // Real live bug (2026-09-03, "third green inside piece in RD will not
@@ -688,11 +888,11 @@ function handleTap(clientX, clientY) {
   // dimly see) the valid target through it. A filled void's hitTarget
   // has the same problem -- nothing excluded it once its ghost was
   // hidden. Fixed by walking the sorted hit list for the first hit
-  // that's actually usable (a piece, or an unfilled void that's valid
-  // when validity is known) before falling back to the closest hit of
-  // any kind -- preserves the reject-flash for a genuine miss (nothing
-  // valid anywhere along the ray) while no longer letting an invisible-
-  // ish invalid/filled void silently eat a tap meant for something valid
+  // that's actually usable (an unfilled void that's valid when validity
+  // is known) before falling back to the closest hit of any kind --
+  // preserves the reject-flash for a genuine miss (nothing valid
+  // anywhere along the ray) while no longer letting an invisible-ish
+  // invalid/filled void silently eat a tap meant for something valid
   // behind it.
   const selectedId = current.state.selectedPieceId;
   const validity = selectedId ? voidValidityForPiece(current.state, selectedId) : null;
@@ -702,32 +902,8 @@ function handleTap(clientX, clientY) {
     if (current.state.voids.find((sv) => sv.id === v.id).filled) return false;
     return validity ? Boolean(validity[v.id]) : true;
   };
-  const bestHit = hits.find((h) => pieceTargets.includes(h.object) || isUsableVoidHit(h.object)) || hits[0];
-  const hitObj = bestHit.object;
-
-  const hitPiece = current.pieces.find((p) => p.mesh === hitObj);
-  if (hitPiece) {
-    if (current.state.selectedPieceId === hitPiece.id) {
-      // A piece with no orientationOptions (Stage 3's pieces) has
-      // nothing to flip -- flipPiece() is already a no-op for it, but
-      // skip the rotation-target update too rather than calling
-      // quaternionForOrientationKey(undefined) for a piece with no
-      // orientation.
-      if (hitPiece.orientationOptions) {
-        current.state = flipPiece(current.state, hitPiece.id);
-        hitPiece.orientation = currentStatePiece(hitPiece.id).orientation;
-        hitPiece.mesh.userData.targetQuaternion = quaternionForOrientationKey(hitPiece.orientation);
-      }
-    } else {
-      current.state = selectPiece(current.state, hitPiece.id);
-      current.pieces.forEach((p) => setPieceSelectedVisual(p, p.id === current.state.selectedPieceId));
-    }
-    refreshVoidHighlights();
-    updateHud();
-    return;
-  }
-
-  const hitVoid = current.voids.find((v) => v.hitTarget === hitObj);
+  const bestHit = hits.find((h) => isUsableVoidHit(h.object)) || hits[0];
+  const hitVoid = current.voids.find((v) => v.hitTarget === bestHit.object);
   if (!hitVoid) return;
 
   const previousState = current.state;
@@ -754,6 +930,7 @@ function handleTap(clientX, clientY) {
   // of the assembled shape from now on, instead of staying pinned to
   // the tray's fixed position in world space.
   current.skeletonGroup.add(placedPiece.mesh);
+  placedPiece.mesh.layers.set(0); // visible to the target camera now, not TRAY_LAYER
   placedPiece.mesh.position.copy(target.position);
   placedPiece.mesh.quaternion.copy(target.quaternion);
   placedPiece.mesh.userData.targetQuaternion = target.quaternion;
@@ -781,25 +958,17 @@ function animate() {
     for (const p of current.pieces) {
       const sp = currentStatePiece(p.id);
       if (sp && !sp.placed && sp.orientation) {
-        // Real live report (2026-09-03): "genuinely aligned spaces dont
-        // light up as you rotate... successful orientations are in
-        // completely different directions". Root cause: an unplaced
-        // piece lives in the fixed tray as a child of `scene`, not
-        // `skeletonGroup` -- dragging to rotate the target shape spins
-        // the skeleton (and every void with it), but the held piece's
-        // own facing never moved, so "does this look aligned with that
-        // hole" stopped being a trustworthy cue the moment you rotated
-        // at all (the piece's orientation is a fixed local-axis label,
-        // meaningless as a SCREEN direction until composed with
-        // whatever the skeleton's current rotation actually is). Fixed
-        // by composing the piece's own orientation with the skeleton's
-        // live rotation every frame, so the held piece visually spins
-        // along with the target shape and stays a real visual match for
-        // whichever void it's actually compatible with, at any camera
-        // angle. Placed pieces need none of this -- they're already
-        // children of skeletonGroup, so the scene graph composes their
-        // rotation with the group's automatically.
-        const desired = current.skeletonGroup.quaternion.clone().multiply(quaternionForOrientationKey(sp.orientation));
+        // The piece's own intrinsic orientation, in LOCAL space -- no
+        // longer composed with a parent group's rotation by hand (real
+        // live report 2026-09-03, "genuinely aligned spaces dont light
+        // up as you rotate", needed that composition back when unplaced
+        // pieces were loose children of `scene`). Now that every
+        // unplaced piece is a real child of `trayGroup`, rotating
+        // trayGroup already composes its children's world rotation
+        // automatically via the ordinary scene graph -- exactly how a
+        // PLACED piece (a child of skeletonGroup) already worked, no
+        // special case needed for either anymore.
+        const desired = quaternionForOrientationKey(sp.orientation);
         p.mesh.quaternion.slerp(desired, ROTATION_DAMPING);
       } else {
         const target = p.mesh.userData.targetQuaternion;
@@ -807,8 +976,40 @@ function animate() {
       }
     }
   }
+
+  // Two scissored passes, one shared renderer/scene -- the target gets
+  // the full screen, the tray overlays a fixed top-right corner on top
+  // of it (direct instruction "picker pieces should be top right").
+  // setViewport/setScissor operate in the renderer's own raw drawing-
+  // buffer pixels, not CSS pixels, hence the explicit pixelRatio
+  // multiplication -- easy to get a correctly-positioned viewport on a
+  // 1x display and a silently-wrong one on a real (2x+) phone otherwise.
+  const pr = renderer.getPixelRatio();
+  const fullW = window.innerWidth * pr;
+  const fullH = window.innerHeight * pr;
+
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, fullW, fullH);
+  renderer.clear();
+
+  renderer.setScissorTest(true);
+  renderer.setViewport(0, 0, fullW, fullH);
+  renderer.setScissor(0, 0, fullW, fullH);
   renderer.render(scene, camera);
+
+  const rect = trayViewportRect();
+  const trayX = rect.left * pr;
+  const trayY = (window.innerHeight - rect.top - rect.height) * pr; // CSS top-down -> WebGL bottom-up
+  const trayW = rect.width * pr;
+  const trayH = rect.height * pr;
+  renderer.setViewport(trayX, trayY, trayW, trayH);
+  renderer.setScissor(trayX, trayY, trayW, trayH);
+  renderer.clearDepth(); // a fresh depth buffer for this pass -- the target's own depth values must not bleed into the tray's
+  renderer.render(scene, trayCamera);
+
+  renderer.setScissorTest(false);
 }
 
 loadStage(stageIndex);
+syncTrayPanel();
 animate();
