@@ -345,14 +345,30 @@ const trayFlash = document.getElementById('rhombis-tray-flash');
 // lets a rapid second placement restart the animation instead of it
 // looking stuck if it retriggers before the first fade-out finishes.
 let trayFlashTimer = null;
-function flashTrayPlaced() {
+// Generalized (2026-09-04) to take arbitrary text/duration, not just
+// "Placed!" -- direct report on the Burr Puzzle stage, "I didnt really
+// get the difference with burr... it felt similar to how I solved
+// others": the mechanic was real (verified: the key piece IS genuinely
+// rejected out of order) but completely SILENT about WHY -- a blocked
+// placement got the exact same generic reject-flash as a decoy or a
+// wrong orientation, so a player who happened to place pieces in a
+// working order never even noticed anything was different, and one who
+// didn't just saw an unexplained rejection. Reuses this SAME "right
+// where attention already is" element (originally added for the same
+// reason: bottom HUD text is easy to miss mid-play) rather than a new
+// UI element.
+function flashTrayMessage(text, durationMs = 700) {
   if (!trayFlash) return;
-  trayFlash.textContent = 'Placed!';
+  trayFlash.textContent = text;
   trayFlash.classList.remove('show');
   void trayFlash.offsetWidth;
   trayFlash.classList.add('show');
   if (trayFlashTimer) clearTimeout(trayFlashTimer);
-  trayFlashTimer = setTimeout(() => trayFlash.classList.remove('show'), 700);
+  trayFlashTimer = setTimeout(() => trayFlash.classList.remove('show'), durationMs);
+}
+
+function flashTrayPlaced() {
+  flashTrayMessage('Placed!');
 }
 
 // Dev/testing convenience only, never surfaced in the UI: ?stage=N
@@ -1088,6 +1104,15 @@ function handleTargetTap(clientX, clientY) {
   current.state = result.state;
   if (!result.placed) {
     flashRejectWire(hitVoid.wire);
+    // The one rejection reason that isn't self-explanatory from the
+    // void itself -- a wrong orientation or wrong shape is visible on
+    // the piece the player is holding, but "blocked" depends on OTHER
+    // pieces' own state, invisible without saying so explicitly.
+    if (result.reason === 'blocked') {
+      const blockedPiece = currentStatePiece(result.pieceId);
+      const stillNeeded = blockedPiece.requiresPlacedFirst.filter((id) => !currentStatePiece(id).placed).length;
+      flashTrayMessage(`Needs ${stillNeeded} other piece${stillNeeded === 1 ? '' : 's'} placed first`, 1800);
+    }
     return;
   }
   current.history.push(previousState);

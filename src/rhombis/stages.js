@@ -1978,7 +1978,7 @@ function partitionIntoIrregularChunks(cells, count, seedOffset = 0) {
   return owner.map((r, i) => ({ chunkIndex: r, cell: cells[i] }));
 }
 
-function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChunkIndex = null) {
+function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChunkIndexes = []) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
   const assignments = partitionIntoIrregularChunks(allCells, chunkCount);
@@ -2026,19 +2026,22 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChun
     pieceSpecs.push({ id: groupId, fillsGroup: groupId, geometry: chunkGeometry });
   }
 
-  // Burr-puzzle "key piece" -- direct instruction (2026-09-04, "a key
-  // piece must go last... most pieces place freely, one or two key
-  // pieces are blocked until everything else is in"). Optional
-  // (`keyChunkIndex === null` for the two plain Big Hull stages, which
-  // stay exactly as they were) -- when set, that one chunk's own
-  // `requiresPlacedFirst` names every OTHER real chunk (never the
-  // decoys, which never place at all) -- puzzle-state.js's own
-  // `isPieceBlocked` rejects it, same visible reject-flash as any other
-  // invalid placement, until all of those are placed.
-  if (keyChunkIndex !== null) {
-    const keySpec = pieceSpecs[keyChunkIndex];
-    keySpec.requiresPlacedFirst = pieceSpecs
-      .filter((spec, i) => i !== keyChunkIndex)
+  // Burr-puzzle "key piece(s)" -- direct instruction (2026-09-04, "a
+  // key piece must go last... most pieces place freely, one or two key
+  // pieces are blocked until everything else is in"). Optional (`[]`
+  // for the two plain Big Hull stages, which stay exactly as they
+  // were) -- each key chunk's own `requiresPlacedFirst` names every
+  // OTHER *non-key* real chunk (never the decoys, which never place at
+  // all, and never another key -- two keys don't block each other, so
+  // a 2-key stage still has a real final choice: either key can go in
+  // either order once the regular pieces are down, not one single
+  // forced sequence) -- puzzle-state.js's own `isPieceBlocked` rejects
+  // a key exactly until all of those are placed, same visible reject-
+  // flash as any other invalid placement.
+  const keyIndexSet = new Set(keyChunkIndexes);
+  for (const keyIndex of keyChunkIndexes) {
+    pieceSpecs[keyIndex].requiresPlacedFirst = pieceSpecs
+      .filter((spec, i) => i < chunkCount && !keyIndexSet.has(i))
       .map((spec) => spec.id);
   }
 
@@ -2098,8 +2101,19 @@ const BIG_HULL_STAGES = [
 // this one refusing to go in" moment reads clearly against a shape
 // small enough to hold in mind, rather than getting lost in Big Hull's
 // own much bigger 156/240-void scale.
+// Extended 2026-09-04 (direct instruction, "where to next" -> "Burr
+// variety" -> "all tested... no issues" on the first one): the SAME
+// machinery generalizes past a single key -- `buildBigHullStage`'s own
+// `keyChunkIndexes` now takes an ARRAY, so a 2-key stage is just
+// passing 2 indexes, not a separate mechanic. Two keys deliberately
+// don't block EACH OTHER (only the non-key pieces) -- a 2-key stage
+// still has a real final choice (either key, in either order, once the
+// regular pieces are down), not one single forced sequence, which
+// would just be a strict full ordering wearing a "2 keys" label.
 const BURR_PUZZLE_STAGES = [
-  { id: 67, name: 'Burr Puzzle: Key Piece', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 2, 0) },
+  { id: 67, name: 'Burr Puzzle: Key Piece', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 2, [0]) },
+  { id: 68, name: 'Burr Puzzle: Key Piece (Tetrahedral)', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0]) },
+  { id: 69, name: 'Burr Puzzle: Two Keys', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0, 1]) },
 ];
 
 // Reordered 2026-09-04 (direct instruction, "one RD to four RDs should

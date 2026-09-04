@@ -2239,6 +2239,37 @@ build order:
     after the shared-layout refactor touched every multi-piece builder
     in the file.
   - Total stage count after this: 67 (was 66).
+
+  **Burr feedback fix + 2 more Burr stages -- 2026-09-04**, direct
+  report right after playing Stage 67: "I didnt really get the
+  difference with burr... it felt similar to how I solved others". Real
+  gap, not a fake report: the mechanic WAS genuinely working (verified
+  live the same session -- a blocked key piece is provably rejected),
+  but a blocked placement got the EXACT SAME generic reject-flash as a
+  decoy or a wrong orientation, with nothing explaining WHY -- a player
+  who happened to place pieces in a working order never even noticed
+  anything was different, and one who didn't just saw an unexplained
+  rejection. Fixed by generalizing the existing "Placed!" tray-flash
+  (`flashTrayPlaced`, already built for the same "bottom HUD text is
+  easy to miss mid-play" reason) into `flashTrayMessage(text, duration)`,
+  and showing `"Needs N other pieces placed first"` right there in the
+  tray on a `'blocked'` rejection specifically -- the ONE rejection
+  reason that isn't self-explanatory from the piece/void themselves (a
+  wrong orientation or wrong shape is visible on what you're holding;
+  "needs other pieces placed" depends on state you can't see any other
+  way). Verified live: the message shows correctly, legible, right
+  where attention already is.
+  - `buildBigHullStage`'s `keyChunkIndex` generalized to
+    `keyChunkIndexes` (an array) -- 2 keys don't block EACH OTHER, only
+    the non-key pieces, so a 2-key stage still has a real final choice
+    (either key, either order) rather than one single forced sequence.
+  - 2 new stages: id 68 (Tetrahedral Stack, 1 key) and id 69
+    (Tetrahedral Stack, 2 keys) -- both reuse the same, already-proven
+    `buildBigHullStage` machinery, zero new geometry. Verified live: id
+    69's two keys are both correctly rejected before the 2 non-key
+    chunks are placed, and both place correctly (in either order) once
+    they are, full solve confirmed end-to-end.
+  - Total stage count after this: 69 (was 67).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
