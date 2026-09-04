@@ -1909,10 +1909,90 @@ build order:
     correctly rejecting everywhere first. Full `node --test tests/unit/
     *.test.mjs` clean (311/311 -- no `puzzle-state.js` surface touched,
     this tier reuses 100% existing group-fill/decoy-rejection logic).
-  - Not yet done: the user is about to play-test this tier live on their
-    own phone -- treat the very next message in this vein as live
-    feedback on a just-shipped, not-yet-field-tested tier, same as every
-    other "played it, here's what I found" report this whole session.
+  - **Confirmed live same day**: user played through most of the 28 on
+    their phone, "no complaints so far... enjoyable but challenging" --
+    validates the whole design approach (real difficulty ramp, same-size
+    decoys, no shortcut piece, no singles) as landing correctly, not
+    just theoretically sound.
+
+  **New tier: Hulls (ids 45-57, 13 stages) -- 2026-09-04**, added the
+  same day, right after that Molecules confirmation, toward an explicit
+  "80-100 or more stages" target (not needed that same night, an
+  ongoing goal). Direct instruction: "minimal hulls and skeletons of
+  geometric solids broken into 3 with 4 minimally different decoys" --
+  confirmed via AskUserQuestion against a real ambiguity (does "broken
+  into 3" mean splitting one of the pyramid-decomposition solids'
+  own sub-pyramids into 3 groups, or splitting a compact multi-cell
+  cluster's own CELLS into 3 sub-pieces?): the latter -- ONE compact
+  5-cell whole-RD shape, split into 3 real sub-pieces that reassemble it
+  exactly, distinct from Molecules' "two DIFFERENT shapes joined."
+  - `partitionIntoTwoPairsAndSingle(cells)` splits a shape's 5 cells into
+    two disjoint adjacent PAIRS plus one leftover single -- the ONLY way
+    to split 5 cells into exactly 3 non-empty pieces without a group of
+    3+ (5 = 2+2+1 is the sole option; 3+1+1 would leave two singles,
+    worse for "no singles as a general rule"). Not every 5-cell shape
+    has two disjoint edges in its own adjacency graph (e.g. a hub cell
+    adjacent to all 4 others, none of which touch each other) --
+    filtered out rather than forced.
+  - Curated via the exact same real-topology-signature method this file
+    already uses for N=3/4 (edge count + sorted degree sequence, see
+    `fiveCellShapeSignature`) -- one representative per DISTINCT
+    topology among the real, partition-admitting N=5 shapes, computed
+    from `enumerateShapes(5)[5]` for real (never a hardcoded literal --
+    this file's own git history already has one bug from doing that the
+    first time). 13 real, topologically distinct 5-cell hulls came out
+    of this, ids 45-57.
+  - **Consolidated the file's 3 separate `enumerateShapes` calls into
+    ONE** (`ALL_ENUMERATED_SHAPES = enumerateShapes(5)`, reused for
+    N=3/4/5) -- each call independently re-ran the same BFS growth from
+    N=1 up to its own max, so 3 separate calls at 3/4/5 would redo N=1-3
+    twice over and N=1-4 again for N=5. One consolidated call is
+    actually CHEAPER than the previous 2-call baseline, not just
+    "cheaper than 3 separate calls" -- confirmed by direct timing
+    (`enumerateShapes(3)` + `enumerateShapes(4)` separately: ~34ms;
+     `enumerateShapes(5)` alone, which now also covers 3 and 4:
+     ~133ms -- a real ~100ms one-time module-load cost added by N=5
+     itself, not a redundant-recompute tax on top of it). N=6 was
+     considered and rejected specifically for this reason: it jumps to
+     1211 raw shapes and ~900ms, table-stakes at a scale that would be
+     a genuinely noticeable page-load regression, especially on the
+     phone this user actually tests on -- N=5's 131 raw shapes (129
+     partition-admitting, 13 after topology dedup) was the right stopping
+     point for a "minimal" tier.
+  - `buildHullSplitStage(scale, hullDef)` builds the skeleton (same
+    per-cell 12-void pyramid-notch pattern as Molecules/Multi-Cell,
+    `groupIds` scoped to `'chunk-a'`/`'chunk-b'`/`'chunk-c'`), the 3 real
+    chunk pieces, and 4 decoys. Hit the EXACT SAME self-centering bug
+    Molecules already found and fixed (see that entry's own writeup) --
+    caught immediately this time since the fix was already known, not
+    rediscovered from scratch: each chunk's own piece geometry is
+    self-centered on ITS OWN centroid, with the group's placement anchor
+    set to that same centroid, not the whole hull's shared one.
+  - **Decoys deliberately rendered in CUBES, not RDs** -- direct
+    instruction ("4 minimally different decoys"). Every real 2-cell RD
+    pair in this lattice is geometrically IDENTICAL to every other one
+    (established fact from Molecules' own decoy notes) -- an RD-rendered
+    2-cell decoy here would have been visually INDISTINGUISHABLE from
+    this stage's own real chunk-a/chunk-b pieces, not just "minimally"
+    different, which risks exactly the "two options that are the same
+    but you say one is wrong" complaint the RD-orientation bug already
+    drew once this session. Cube-rendered decoys, SIZE-matched to the
+    real chunks (two pair-sized via `buildDecoyGeometry`'s existing
+    `asCubes` branch, two single-sized), stay genuinely distinguishable
+    up close -- the same "wrong material" idea every other decoy in this
+    file already uses -- while the matched size is what actually makes
+    them "minimally different" rather than an obvious mismatch. Zero new
+    decoy-geometry code needed, purely a reuse of `buildDecoyGeometry`.
+  - Verified live: all 13 stages build with zero runtime errors and the
+    correct piece composition (exactly 7 pieces: 3 real chunks + 4
+    decoys, 60 voids = 5 cells x 12); full tap-select + tap-place solve
+    confirmed end-to-end on the first (id 45), a middle (id 50), and the
+    last (id 57) stage, including all 4 decoys correctly rejecting
+    everywhere first, in every one of those 3 stages. Full `node --test
+    tests/unit/*.test.mjs` clean (311/311 -- no `puzzle-state.js`
+    surface touched).
+  - Total stage count after this: 57 (was 44) -- past the halfway point
+    toward the 80-100 target.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

@@ -1132,7 +1132,15 @@ const ONE_CELL_STAGE = {
   build: (scale) => buildNCellStage(scale, [[0, 0, 0]], null, {}),
 };
 
-const THREE_CELL_STAGE_DEFS = enumerateShapes(3)[3].map((shape) => ({
+// One real call, reused for every N this file needs (3, 4, 5) -- each
+// separate `enumerateShapes(k)` call used to redundantly recompute
+// every smaller N from scratch (BFS grows N=1 -> N=2 -> ... -> N=k), so
+// calling it three times at N=3/4/5 separately would redo N=1-3's work
+// twice over and N=1-4's work again for N=5. `enumerateShapes(5)`
+// already returns every smaller N's own list too.
+const ALL_ENUMERATED_SHAPES = enumerateShapes(5);
+
+const THREE_CELL_STAGE_DEFS = ALL_ENUMERATED_SHAPES[3].map((shape) => ({
   name: classifyThreeCellShape(shape.cells),
   cells: shape.cells,
   joinedPair: findAdjacentCellPair(shape.cells),
@@ -1177,7 +1185,7 @@ const THREE_CELL_STAGES = THREE_CELL_STAGE_DEFS.map((def, i) => {
 // impossible at N=3, since that needs a degree-3 cell), and Straight
 // Line (the single shape with the greatest possible cell-to-cell
 // distance for N=4, direct continuation of the N=3 pattern).
-const fourCellShapesRaw = enumerateShapes(4)[4];
+const fourCellShapesRaw = ALL_ENUMERATED_SHAPES[4];
 function pickFourCellShape(matchSignature, tiebreakSmallestDistance) {
   const matches = fourCellShapesRaw.filter((s) => matchSignature(shapeTopology(s.cells)));
   if (matches.length === 0) throw new Error('No N=4 shape matched the requested signature');
@@ -1217,6 +1225,195 @@ const FOUR_CELL_STAGES = FOUR_CELL_STAGE_DEFS.map((def, i) => {
     }),
   };
 });
+
+// Hulls -- direct instruction (2026-09-04, after playing through
+// Molecules on a real phone, "no complaints so far... enjoyable but
+// challenging" then "minimal hulls and skeletons of geometric solids
+// broken into 3 with 4 minimally different decoys"), confirmed via
+// AskUserQuestion: NOT two different shapes joined (that's Molecules)
+// -- ONE compact 5-cell whole-RD shape, split into 3 real sub-pieces
+// that reassemble it exactly.
+//
+// Splits a shape's own N=5 cells into two disjoint adjacent PAIRS and
+// one leftover single cell -- the only way to split 5 cells into
+// exactly 3 non-empty pieces without a group of 3+ (5 = 2+2+1 is the
+// sole option; 3+1+1 would leave two singles, worse for "no singles as
+// a general rule"). Finds two disjoint edges in the shape's own
+// adjacency graph (an "edge" = two cells that are real FCC neighbors);
+// not every 5-cell shape has two disjoint edges (e.g., one hub cell
+// adjacent to all 4 others, none of which are adjacent to each other)
+// -- `FIVE_CELL_HULL_DEFS` below filters those out rather than force an
+// invalid split.
+function partitionIntoTwoPairsAndSingle(cells) {
+  const edges = [];
+  for (let i = 0; i < cells.length; i++) {
+    for (let j = i + 1; j < cells.length; j++) {
+      const d = [cells[j][0] - cells[i][0], cells[j][1] - cells[i][1], cells[j][2] - cells[i][2]];
+      if (NEIGHBOR_OFFSET_KEYS.has(d.join(','))) edges.push([i, j]);
+    }
+  }
+  for (let e1 = 0; e1 < edges.length; e1++) {
+    for (let e2 = e1 + 1; e2 < edges.length; e2++) {
+      const [a, b] = edges[e1];
+      const [c, d] = edges[e2];
+      if (a !== c && a !== d && b !== c && b !== d) {
+        const used = new Set([a, b, c, d]);
+        const singleIdx = cells.findIndex((_, i) => !used.has(i));
+        return { pairA: [cells[a], cells[b]], pairB: [cells[c], cells[d]], single: cells[singleIdx] };
+      }
+    }
+  }
+  return null;
+}
+
+// Same real-shape-signature curation this file already uses for N=3/4
+// (edge count + sorted degree sequence -- ignores absolute position/
+// orientation, only real graph topology), applied to N=5 -- one
+// representative per DISTINCT topology among the shapes that actually
+// admit a 2-pair-plus-single split, computed for real from
+// `ALL_ENUMERATED_SHAPES[5]` (not a hardcoded literal -- this file's
+// own git history already has one real bug from doing that the first
+// time, see THREE_CELL_STAGE_DEFS's own comment above). 13 real,
+// topologically distinct 5-cell hulls came out of this.
+function fiveCellShapeSignature(cells) {
+  const degrees = cells.map(() => 0);
+  let edgeCount = 0;
+  for (let i = 0; i < cells.length; i++) {
+    for (let j = i + 1; j < cells.length; j++) {
+      const d = [cells[j][0] - cells[i][0], cells[j][1] - cells[i][1], cells[j][2] - cells[i][2]];
+      if (NEIGHBOR_OFFSET_KEYS.has(d.join(','))) { degrees[i]++; degrees[j]++; edgeCount++; }
+    }
+  }
+  return `${edgeCount}:${degrees.slice().sort((a, b) => b - a).join('')}`;
+}
+
+const FIVE_CELL_HULL_DEFS = (() => {
+  const bySignature = new Map();
+  for (const shape of ALL_ENUMERATED_SHAPES[5]) {
+    const partition = partitionIntoTwoPairsAndSingle(shape.cells);
+    if (!partition) continue;
+    const signature = fiveCellShapeSignature(shape.cells);
+    if (!bySignature.has(signature)) bySignature.set(signature, { cells: shape.cells, partition });
+  }
+  return [...bySignature.values()];
+})();
+
+function buildHullSplitStage(scale, hullDef) {
+  const skeletonGroup = new THREE.Group();
+  const pyramid = pyramidGeometry(scale);
+  const { pairA, pairB, single } = hullDef.partition;
+
+  const cellWorldPositions = hullDef.cells.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = cellWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / cellWorldPositions.length);
+  const cellIndexByKey = new Map(hullDef.cells.map((c, i) => [c.join(','), i]));
+  const centerFor = (cell) => cellWorldPositions[cellIndexByKey.get(cell.join(','))].clone().sub(centroid);
+
+  const chunks = [
+    { groupId: 'chunk-a', cells: pairA },
+    { groupId: 'chunk-b', cells: pairB },
+    { groupId: 'chunk-c', cells: [single] },
+  ];
+
+  const voids = [];
+  const groups = [];
+  const pieceSpecs = [];
+  for (const chunk of chunks) {
+    const chunkCenters = chunk.cells.map(centerFor);
+    chunkCenters.forEach((cellCenter, i) => {
+      skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
+      PYRAMID_AXES.forEach((axisKey) => {
+        const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
+        [['in', inwardQuaternion], ['out', outwardQuaternion]].forEach(([dirLabel, toQuaternion]) => {
+          const v = makeVoid(pyramid, {
+            id: `v-${chunk.groupId}-${i}-${dirLabel}-${axisKey}`,
+            quaternion: toQuaternion(axisKey),
+            position: facePosition,
+            groupIds: [chunk.groupId],
+          });
+          skeletonGroup.add(...v.sceneObjects);
+          voids.push(v);
+        });
+      });
+    });
+    // Self-centered on this CHUNK's own centroid, not the whole hull's
+    // shared one -- the exact bug found and fixed in Molecules (see
+    // buildMoleculeStage's own comment): a chunk's real solid mass sits
+    // off to one side of the hull's shared origin, so building its
+    // piece geometry relative to that shared origin would silently
+    // break tray-select raycasting again.
+    const chunkCentroid = chunkCenters.reduce((sum, c) => sum.add(c), new THREE.Vector3()).multiplyScalar(1 / chunkCenters.length);
+    groups.push({ id: chunk.groupId, position: chunkCentroid, quaternion: new THREE.Quaternion() });
+    const chunkGeometry = mergeGeometries(
+      chunkCenters.map((c) => rhombicDodecahedronGeometry(scale).translate(c.x - chunkCentroid.x, c.y - chunkCentroid.y, c.z - chunkCentroid.z)),
+      false,
+    );
+    pieceSpecs.push({ id: chunk.groupId, fillsGroup: chunk.groupId, geometry: chunkGeometry });
+  }
+
+  // 4 decoys, deliberately rendered in CUBES, not RDs -- direct
+  // instruction ("4 minimally different decoys"). Every real 2-cell RD
+  // pair in this lattice is geometrically IDENTICAL to every other one
+  // (the symmetry group acts transitively on nearest-neighbor
+  // directions -- see the Molecules tier's own decoy notes) -- an
+  // RD-rendered 2-cell decoy here would be visually INDISTINGUISHABLE
+  // from this stage's own real chunk-a/chunk-b pieces, not just
+  // "minimally" different, which risks exactly the "two options that
+  // are the same but you say one is wrong" complaint the RD-orientation
+  // bug already drew once this session. Cube-rendered decoys, sized to
+  // match the real chunks (two pair-sized, two single-sized), stay
+  // genuinely distinguishable up close -- the same "wrong material"
+  // idea every other decoy in this file already uses -- while their
+  // matched SIZE is what makes them "minimally different" rather than
+  // an obvious mismatch.
+  pieceSpecs.push({ id: 'decoy-pair-0', fillsGroup: DECOY_NEVER_MATCHES, geometry: buildDecoyGeometry(scale, { cells: pairA, asCubes: true }) });
+  pieceSpecs.push({ id: 'decoy-pair-1', fillsGroup: DECOY_NEVER_MATCHES, geometry: buildDecoyGeometry(scale, { cells: pairB, asCubes: true }) });
+  pieceSpecs.push({ id: 'decoy-single-0', fillsGroup: DECOY_NEVER_MATCHES, geometry: buildDecoyGeometry(scale, {}) });
+  pieceSpecs.push({ id: 'decoy-single-1', fillsGroup: DECOY_NEVER_MATCHES, geometry: buildDecoyGeometry(scale, {}) });
+
+  // Same per-load Fisher-Yates as every other tier.
+  for (let i = pieceSpecs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
+  }
+
+  const singleRDGeometry = rhombicDodecahedronGeometry(scale);
+  singleRDGeometry.computeBoundingSphere();
+  const MAX_TRAY_RADIUS = singleRDGeometry.boundingSphere.radius * 2.2;
+  function trayScaleFor(geometry) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius;
+    return radius > MAX_TRAY_RADIUS ? MAX_TRAY_RADIUS / radius : 1;
+  }
+  const TRAY_GAP = scale * 0.5;
+  let trayCursorY = 0;
+  function nextTrayPosition(geometry, trayScale) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius * trayScale;
+    if (trayCursorY !== 0) trayCursorY -= TRAY_GAP;
+    trayCursorY -= radius;
+    const y = trayCursorY;
+    trayCursorY -= radius;
+    return new THREE.Vector3(scale * 4, y, 0);
+  }
+
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+    });
+  });
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+}
+
+const HULL_STAGES = FIVE_CELL_HULL_DEFS.map((hullDef, i) => ({
+  id: 45 + i,
+  name: `Hull ${i + 1}: 5-Cell Split`,
+  build: (scale) => buildHullSplitStage(scale, hullDef),
+}));
 
 // Molecules -- direct instruction (2026-09-04, after playing through the
 // pyramid-decomposition tier on a real phone, "no group to scope should
@@ -1465,4 +1662,5 @@ export const STAGES = [
   { id: 15, name: 'Conjoined Pieces', build: buildStage5 },
   { id: 16, name: 'Multi-Cell', build: buildStage6 },
   ...MOLECULE_STAGES,
+  ...HULL_STAGES,
 ];
