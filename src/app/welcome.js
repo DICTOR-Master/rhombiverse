@@ -164,7 +164,7 @@ function overlayHtml() {
         Don't show this again on this device
       </label>
       <div class="rhombis-link">
-        <a href="./rhombis.html">New here? Try Rhombis, a short intro puzzle &rarr;</a>
+        <a href="./rhombis.html">New here? Try RHOMBIS, our 3D intro puzzle &rarr;</a>
       </div>
       <div class="legal-links">
         <a href="./TERMS.md" target="_blank" rel="noopener">Terms</a>

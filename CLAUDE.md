@@ -1197,6 +1197,23 @@ build order:
   lists/navigates correctly. Full `node --test tests/unit/*.test.mjs`
   clean (295/295, unchanged -- pure rendering-layer fix, no `puzzle-
   state.js` surface touched).
+
+  **Name disambiguation, 2026-09-04**: a real, unrelated, long-defunct
+  2D Windows game also used the name "Rhombis" -- direct instruction to
+  make this game clearly distinguishable/separately searchable rather
+  than pick a new name (no copyright found on the old game anywhere,
+  and "rhombis" is a fairly generic word). `rhombis.html`'s `<title>`
+  ("RHOMBIS -- 3D Puzzle Game from Rhombiverse") and a new `<meta
+  name="description">` carry the actual disambiguation for search
+  engines/browser tabs, which matters regardless of screen size; a small
+  `#rhombis-subtitle` ("3D puzzle from Rhombiverse") was also added next
+  to the in-game topbar wordmark, hidden below 600px so it doesn't crowd
+  the stage name out on a phone-width topbar. `welcome.js`'s own link
+  text updated to "Try RHOMBIS, our 3D intro puzzle" (was "Try Rhombis,
+  a short intro puzzle") for the same reason, consistent with the
+  in-game wordmark's own ALL-CAPS styling. Pure content/copy change, no
+  logic touched; full `node --test tests/unit/*.test.mjs` re-run clean
+  regardless (295/295).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

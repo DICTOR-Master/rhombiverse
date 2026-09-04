@@ -6,7 +6,14 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>Rhombis -- a Rhombiverse introduction</title>
+  <title>RHOMBIS -- 3D Puzzle Game from Rhombiverse</title>
+  <!-- Disambiguation, not just SEO copy -- direct instruction
+       (2026-09-04): an old, unrelated, defunct 2D Windows game also
+       used the name "Rhombis" (no copyright found on it anywhere, and
+       the word itself is fairly generic, so keeping the name -- just
+       making this one clearly distinct and separately searchable
+       rather than picking a new name). -->
+  <meta name="description" content="RHOMBIS: the 3D geometric-packing puzzle game from Rhombiverse. Fit rhombic dodecahedron pieces together in your browser -- not the old 2D Windows game of the same name." />
   <style>
     html, body {
       margin: 0; height: 100%; background: #05050a; overflow: hidden;
@@ -30,6 +37,13 @@
     }
     #rhombis-topbar a:hover { text-decoration: underline; }
     #rhombis-title { font-weight: 600; letter-spacing: 0.08em; }
+    /* Disambiguates from an old, unrelated 2D Windows game of the same
+       name -- direct instruction 2026-09-04. Hidden below 600px so it
+       doesn't crowd the stage name out on a phone-width topbar; the
+       page <title>/meta description (search results, browser tab)
+       carry the same disambiguation regardless of screen size. */
+    #rhombis-subtitle { font-size: 0.7rem; opacity: 0.55; margin-left: 0.5rem; font-weight: 400; letter-spacing: 0.02em; }
+    @media (max-width: 600px) { #rhombis-subtitle { display: none; } }
     #rhombis-stage { font-size: 0.85rem; opacity: 0.75; margin-left: 0.75rem; }
     /* Visual frame ONLY -- pointer-events stays none, real interaction
        is the canvas's own WebGL raycasting underneath (main.js's
@@ -135,7 +149,7 @@
   <div id="app"></div>
   <div id="rhombis-tray-panel"></div>
   <div id="rhombis-topbar">
-    <span><span id="rhombis-title">RHOMBIS</span><span id="rhombis-stage"></span></span>
+    <span><span id="rhombis-title">RHOMBIS</span><span id="rhombis-subtitle">3D puzzle from Rhombiverse</span><span id="rhombis-stage"></span></span>
     <span>
       <button id="rhombis-stage-picker-toggle" type="button">Stages</button>
       <a href="./index.html">&larr; Rhombiverse</a>
