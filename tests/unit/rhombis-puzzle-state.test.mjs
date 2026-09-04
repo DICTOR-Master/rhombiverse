@@ -797,3 +797,72 @@ test('filledBy: a fused placement records the SAME piece id on every void it fil
     assert.equal(v.filledBy, 'fused');
   }
 });
+
+// requiresPlacedFirst -- burr-puzzle-style ordering gate (2026-09-04,
+// "a key piece must go last"). Fixture: two ordinary independent loose
+// pieces (p0/v0, p1/v1) plus a "key" piece that needs BOTH placed first.
+function burrKeyState() {
+  return createPuzzleState({
+    pieces: [
+      { id: 'p0' },
+      { id: 'p1' },
+      { id: 'key', requiresPlacedFirst: ['p0', 'p1'] },
+    ],
+    voids: [{ id: 'v0' }, { id: 'v1' }, { id: 'v-key' }],
+  });
+}
+
+test('requiresPlacedFirst: the key piece is rejected before its prerequisites are placed', () => {
+  let state = burrKeyState();
+  state = selectPiece(state, 'key');
+  const result = placeSelected(state, 'v-key');
+  assert.equal(result.placed, false);
+  assert.equal(result.reason, 'blocked');
+});
+
+test('requiresPlacedFirst: still rejected with only ONE of two prerequisites placed', () => {
+  let state = burrKeyState();
+  state = selectPiece(state, 'p0');
+  state = placeSelected(state, 'v0').state;
+  state = selectPiece(state, 'key');
+  const result = placeSelected(state, 'v-key');
+  assert.equal(result.placed, false);
+  assert.equal(result.reason, 'blocked');
+});
+
+test('requiresPlacedFirst: places successfully once every prerequisite is placed', () => {
+  let state = burrKeyState();
+  state = selectPiece(state, 'p0');
+  state = placeSelected(state, 'v0').state;
+  state = selectPiece(state, 'p1');
+  state = placeSelected(state, 'v1').state;
+  state = selectPiece(state, 'key');
+  const result = placeSelected(state, 'v-key');
+  assert.equal(result.placed, true);
+  assert.equal(isSolved(result.state), true);
+});
+
+test('requiresPlacedFirst: a piece WITHOUT the field is never gated by it', () => {
+  let state = burrKeyState();
+  state = selectPiece(state, 'p0');
+  const result = placeSelected(state, 'v0');
+  assert.equal(result.placed, true);
+});
+
+test('requiresPlacedFirst: voidValidityForPiece reads false everywhere for a still-blocked key piece', () => {
+  let state = burrKeyState();
+  state = selectPiece(state, 'p0');
+  state = placeSelected(state, 'v0').state;
+  const validity = voidValidityForPiece(state, 'key');
+  assert.equal(validity['v-key'], false);
+});
+
+test('requiresPlacedFirst: voidValidityForPiece reads true once unblocked', () => {
+  let state = burrKeyState();
+  state = selectPiece(state, 'p0');
+  state = placeSelected(state, 'v0').state;
+  state = selectPiece(state, 'p1');
+  state = placeSelected(state, 'v1').state;
+  const validity = voidValidityForPiece(state, 'key');
+  assert.equal(validity['v-key'], true);
+});

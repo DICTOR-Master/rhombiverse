@@ -432,6 +432,7 @@ function loadStage(index) {
       orientation: p.orientation,
       orientationOptions: p.orientationOptions,
       fillsGroup: p.fillsGroup,
+      requiresPlacedFirst: p.requiresPlacedFirst,
     })),
     voids: built.voids.map((v) => ({ id: v.id, requiredOrientation: v.requiredOrientation, groupIds: v.groupIds })),
   });

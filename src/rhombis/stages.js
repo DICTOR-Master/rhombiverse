@@ -132,12 +132,12 @@ function makePiece(geometry, { id, orientation, orientationOptions, homePosition
 // main.js's revealNextTrayPiece, which only ever queues loose pieces),
 // since the player CHOOSES between it and the loose pieces rather than
 // receiving it in sequence.
-function makeFusedPiece(geometry, { id, fillsGroup, homePosition, trayScale = 1 }) {
+function makeFusedPiece(geometry, { id, fillsGroup, homePosition, trayScale = 1, requiresPlacedFirst }) {
   const mesh = new THREE.Mesh(geometry, pieceMaterial());
   mesh.position.copy(homePosition);
   mesh.scale.setScalar(trayScale);
   mesh.userData.pieceId = id;
-  return { id, fillsGroup, mesh, homePosition: homePosition.clone(), trayScale };
+  return { id, fillsGroup, mesh, homePosition: homePosition.clone(), trayScale, requiresPlacedFirst };
 }
 
 // Stage 1 -- engine + one piece. Direct instruction (2026-09-03): even
@@ -446,18 +446,7 @@ function buildDisphenoidRDStage(scale) {
     [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
   }
 
-  const TRAY_GAP = scale * 0.5;
-  let trayCursorY = 0;
-  function nextTrayPosition(geometry) {
-    geometry.computeBoundingSphere();
-    const radius = geometry.boundingSphere.radius;
-    if (trayCursorY !== 0) trayCursorY -= TRAY_GAP;
-    trayCursorY -= radius;
-    const y = trayCursorY;
-    trayCursorY -= radius;
-    return new THREE.Vector3(scale * 4, y, 0);
-  }
-
+  const { nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
   const pieces = pieceSpecs.map((spec) => makeFusedPiece(spec.geometry, {
     id: spec.id,
     fillsGroup: spec.fillsGroup,
@@ -889,6 +878,64 @@ function buildDecoyGeometry(scale, decoyOption) {
   );
 }
 
+// Shared tray layout for every multi-piece stage builder in this file
+// -- lays pieces out in a roughly SQUARE grid of columns instead of one
+// long vertical line, direct instruction (2026-09-04, "with multiple
+// picker pieces more than one row makes sense spacewise... too many
+// pieces in a line"): the tray camera frames its own content by
+// DISTANCE alone (`main.js`'s own `applyTrayFraming`), so a long single
+// column forces it to zoom out much further than a compact grid of the
+// SAME pieces would need -- every piece ends up smaller and harder to
+// tap precisely, not just visually cluttered. `columns` is
+// `round(sqrt(pieceCount))` so the arrangement stays close to square
+// regardless of how many pieces a given stage happens to have, rather
+// than a fixed column count that would look fine for one stage and
+// terrible for another. Replaces the identical (previously duplicated
+// six times across this file) single-column `trayCursorY` cursor.
+function createTrayLayout(scale, pieceCount) {
+  const columns = Math.max(1, Math.round(Math.sqrt(pieceCount)));
+  const perColumn = Math.ceil(pieceCount / columns);
+  const TRAY_GAP = scale * 0.5;
+  const singleRDGeometry = rhombicDodecahedronGeometry(scale);
+  singleRDGeometry.computeBoundingSphere();
+  const MAX_TRAY_RADIUS = singleRDGeometry.boundingSphere.radius * 2.2;
+  // Every piece's own RENDERED (post-trayScale-cap) radius never exceeds
+  // MAX_TRAY_RADIUS -- that's the whole point of the cap just below --
+  // so a column only ever needs to be wide enough for the WORST case,
+  // not each piece's own real (possibly much bigger) geometry. A fixed
+  // `scale`-based gap here was the actual bug behind "too many pieces
+  // in a line" persisting even after adding columns at all: it worked
+  // fine for small pieces but was imperceptibly thin next to Big Hull's
+  // own much larger merged chunks, once the tray camera had zoomed out
+  // far enough to fit them -- the SAME absolute gap reads as a huge gap
+  // up close and a rounding error from far away.
+  const COLUMN_GAP = MAX_TRAY_RADIUS * 2 + TRAY_GAP;
+
+  let placedCount = 0;
+  let columnCursorY = 0;
+
+  function trayScaleFor(geometry) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius;
+    return radius > MAX_TRAY_RADIUS ? MAX_TRAY_RADIUS / radius : 1;
+  }
+
+  function nextTrayPosition(geometry, trayScale = 1) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius * trayScale;
+    const columnIndex = Math.floor(placedCount / perColumn);
+    if (placedCount % perColumn === 0) columnCursorY = 0;
+    if (columnCursorY !== 0) columnCursorY -= TRAY_GAP;
+    columnCursorY -= radius;
+    const y = columnCursorY;
+    columnCursorY -= radius;
+    placedCount++;
+    return new THREE.Vector3(scale * 4 + columnIndex * COLUMN_GAP, y, 0);
+  }
+
+  return { trayScaleFor, nextTrayPosition };
+}
+
 function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices, decoyOption) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
@@ -968,28 +1015,6 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices, decoyOpti
   // compact N=4 "full" pieces (Tetrahedron/Ring/Star) stay full scale
   // (comfortably under the cap), only a genuinely oversized piece like
   // Straight Line's own full piece gets visually shrunk in the tray.
-  const singleRDGeometry = rhombicDodecahedronGeometry(scale);
-  singleRDGeometry.computeBoundingSphere();
-  const MAX_TRAY_RADIUS = singleRDGeometry.boundingSphere.radius * 2.2;
-
-  function trayScaleFor(geometry) {
-    geometry.computeBoundingSphere();
-    const radius = geometry.boundingSphere.radius;
-    return radius > MAX_TRAY_RADIUS ? MAX_TRAY_RADIUS / radius : 1;
-  }
-
-  const TRAY_GAP = scale * 0.5;
-  let trayCursorY = 0;
-  function nextTrayPosition(geometry, trayScale = 1) {
-    geometry.computeBoundingSphere();
-    const radius = geometry.boundingSphere.radius * trayScale;
-    if (trayCursorY !== 0) trayCursorY -= TRAY_GAP;
-    trayCursorY -= radius;
-    const y = trayCursorY;
-    trayCursorY -= radius;
-    return new THREE.Vector3(scale * 4, y, 0);
-  }
-
   // Every single here is a geometrically identical whole-RD piece --
   // direct instruction (2026-09-04, "doesn't make sense in real world"):
   // a plain, unmarked single cell should fit ANY open single-cell void,
@@ -1065,6 +1090,7 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices, decoyOpti
     [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
   }
 
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
   const pieces = [];
   for (const spec of pieceSpecs) {
     if (spec.isSingleGroup) {
@@ -1472,25 +1498,7 @@ function buildHullSplitStage(scale, hullDef) {
     [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
   }
 
-  const singleRDGeometry = rhombicDodecahedronGeometry(scale);
-  singleRDGeometry.computeBoundingSphere();
-  const MAX_TRAY_RADIUS = singleRDGeometry.boundingSphere.radius * 2.2;
-  function trayScaleFor(geometry) {
-    geometry.computeBoundingSphere();
-    const radius = geometry.boundingSphere.radius;
-    return radius > MAX_TRAY_RADIUS ? MAX_TRAY_RADIUS / radius : 1;
-  }
-  const TRAY_GAP = scale * 0.5;
-  let trayCursorY = 0;
-  function nextTrayPosition(geometry, trayScale) {
-    geometry.computeBoundingSphere();
-    const radius = geometry.boundingSphere.radius * trayScale;
-    if (trayCursorY !== 0) trayCursorY -= TRAY_GAP;
-    trayCursorY -= radius;
-    const y = trayCursorY;
-    trayCursorY -= radius;
-    return new THREE.Vector3(scale * 4, y, 0);
-  }
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
 
   const pieces = pieceSpecs.map((spec) => {
     const trayScale = trayScaleFor(spec.geometry);
@@ -1654,25 +1662,7 @@ function buildMoleculeStage(scale, lobeADef, lobeBDef, decoyDefs) {
     [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
   }
 
-  const singleRDGeometry = rhombicDodecahedronGeometry(scale);
-  singleRDGeometry.computeBoundingSphere();
-  const MAX_TRAY_RADIUS = singleRDGeometry.boundingSphere.radius * 2.2;
-  function trayScaleFor(geometry) {
-    geometry.computeBoundingSphere();
-    const radius = geometry.boundingSphere.radius;
-    return radius > MAX_TRAY_RADIUS ? MAX_TRAY_RADIUS / radius : 1;
-  }
-  const TRAY_GAP = scale * 0.5;
-  let trayCursorY = 0;
-  function nextTrayPosition(geometry, trayScale) {
-    geometry.computeBoundingSphere();
-    const radius = geometry.boundingSphere.radius * trayScale;
-    if (trayCursorY !== 0) trayCursorY -= TRAY_GAP;
-    trayCursorY -= radius;
-    const y = trayCursorY;
-    trayCursorY -= radius;
-    return new THREE.Vector3(scale * 4, y, 0);
-  }
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
 
   const pieces = pieceSpecs.map((spec) => {
     const trayScale = trayScaleFor(spec.geometry);
@@ -1761,25 +1751,7 @@ function buildBranchingMoleculeStage(scale, hubDef, branch1Def, branch2Def, deco
     [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
   }
 
-  const singleRDGeometry = rhombicDodecahedronGeometry(scale);
-  singleRDGeometry.computeBoundingSphere();
-  const MAX_TRAY_RADIUS = singleRDGeometry.boundingSphere.radius * 2.2;
-  function trayScaleFor(geometry) {
-    geometry.computeBoundingSphere();
-    const radius = geometry.boundingSphere.radius;
-    return radius > MAX_TRAY_RADIUS ? MAX_TRAY_RADIUS / radius : 1;
-  }
-  const TRAY_GAP = scale * 0.5;
-  let trayCursorY = 0;
-  function nextTrayPosition(geometry, trayScale) {
-    geometry.computeBoundingSphere();
-    const radius = geometry.boundingSphere.radius * trayScale;
-    if (trayCursorY !== 0) trayCursorY -= TRAY_GAP;
-    trayCursorY -= radius;
-    const y = trayCursorY;
-    trayCursorY -= radius;
-    return new THREE.Vector3(scale * 4, y, 0);
-  }
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
 
   const pieces = pieceSpecs.map((spec) => {
     const trayScale = trayScaleFor(spec.geometry);
@@ -2006,7 +1978,7 @@ function partitionIntoIrregularChunks(cells, count, seedOffset = 0) {
   return owner.map((r, i) => ({ chunkIndex: r, cell: cells[i] }));
 }
 
-function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount) {
+function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChunkIndex = null) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
   const assignments = partitionIntoIrregularChunks(allCells, chunkCount);
@@ -2054,6 +2026,22 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount) {
     pieceSpecs.push({ id: groupId, fillsGroup: groupId, geometry: chunkGeometry });
   }
 
+  // Burr-puzzle "key piece" -- direct instruction (2026-09-04, "a key
+  // piece must go last... most pieces place freely, one or two key
+  // pieces are blocked until everything else is in"). Optional
+  // (`keyChunkIndex === null` for the two plain Big Hull stages, which
+  // stay exactly as they were) -- when set, that one chunk's own
+  // `requiresPlacedFirst` names every OTHER real chunk (never the
+  // decoys, which never place at all) -- puzzle-state.js's own
+  // `isPieceBlocked` rejects it, same visible reject-flash as any other
+  // invalid placement, until all of those are placed.
+  if (keyChunkIndex !== null) {
+    const keySpec = pieceSpecs[keyChunkIndex];
+    keySpec.requiresPlacedFirst = pieceSpecs
+      .filter((spec, i) => i !== keyChunkIndex)
+      .map((spec) => spec.id);
+  }
+
   // Decoys: genuine ALTERNATE irregular partitions of the SAME shape
   // (same growth algorithm, different seed offset so the split lands
   // differently), tagged DECOY_NEVER_MATCHES -- a real, similarly-sized,
@@ -2079,25 +2067,7 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount) {
     [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
   }
 
-  const singleRDGeometry = rhombicDodecahedronGeometry(scale);
-  singleRDGeometry.computeBoundingSphere();
-  const MAX_TRAY_RADIUS = singleRDGeometry.boundingSphere.radius * 2.2;
-  function trayScaleFor(geometry) {
-    geometry.computeBoundingSphere();
-    const radius = geometry.boundingSphere.radius;
-    return radius > MAX_TRAY_RADIUS ? MAX_TRAY_RADIUS / radius : 1;
-  }
-  const TRAY_GAP = scale * 0.5;
-  let trayCursorY = 0;
-  function nextTrayPosition(geometry, trayScale) {
-    geometry.computeBoundingSphere();
-    const radius = geometry.boundingSphere.radius * trayScale;
-    if (trayCursorY !== 0) trayCursorY -= TRAY_GAP;
-    trayCursorY -= radius;
-    const y = trayCursorY;
-    trayCursorY -= radius;
-    return new THREE.Vector3(scale * 4, y, 0);
-  }
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
 
   const pieces = pieceSpecs.map((spec) => {
     const trayScale = trayScaleFor(spec.geometry);
@@ -2106,6 +2076,7 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount) {
       fillsGroup: spec.fillsGroup,
       homePosition: nextTrayPosition(spec.geometry, trayScale),
       trayScale,
+      requiresPlacedFirst: spec.requiresPlacedFirst,
     });
   });
 
@@ -2115,6 +2086,20 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount) {
 const BIG_HULL_STAGES = [
   { id: 65, name: 'Big Hull: Cuboctahedron', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3) },
   { id: 66, name: 'Big Hull: Tetrahedral Stack', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 4) },
+];
+
+// Burr Puzzle -- direct instruction (2026-09-04, "scope both... key
+// piece must go last"): the SAME Big Hull machinery (irregular region-
+// grown chunks), on a smaller, faster-to-read shape, with ONE chunk
+// designated the "key" -- genuinely unplaceable until the other 2 are
+// already in, a real order-dependent constraint, not just a visual
+// theme. Reuses the Cuboctahedron's own 13-cell shape (already proven,
+// no new geometry needed) at a smaller 3-chunk split so the "why is
+// this one refusing to go in" moment reads clearly against a shape
+// small enough to hold in mind, rather than getting lost in Big Hull's
+// own much bigger 156/240-void scale.
+const BURR_PUZZLE_STAGES = [
+  { id: 67, name: 'Burr Puzzle: Key Piece', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 2, 0) },
 ];
 
 // Reordered 2026-09-04 (direct instruction, "one RD to four RDs should
@@ -2146,4 +2131,5 @@ export const STAGES = [
   ...BRANCHING_MOLECULE_STAGES,
   { id: 64, name: 'Rhombic Dodecahedron (Disphenoids)', build: buildDisphenoidRDStage },
   ...BIG_HULL_STAGES,
+  ...BURR_PUZZLE_STAGES,
 ];

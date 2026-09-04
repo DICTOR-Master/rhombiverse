@@ -2176,6 +2176,69 @@ build order:
     cells). Full `node --test tests/unit/*.test.mjs` clean (311/311 --
     no `puzzle-state.js` surface touched).
   - Total stage count after this: 66 (was 64).
+
+  **New mechanic: Burr Puzzle ordering (id 67) + shared tray grid layout
+  -- 2026-09-04**, both scoped together via AskUserQuestion before
+  building ("scope both - nt heard of burr, but am intrigued" -> real
+  burr puzzles are defined by ASSEMBLY ORDER mattering, not just final-
+  position validity; confirmed design: "a key piece must go last...
+  most pieces place freely, one or two key pieces are blocked until
+  everything else is in").
+  - `puzzle-state.js` gained `requiresPlacedFirst` (optional, on a
+    piece -- an array of other piece ids) and `isPieceBlocked(state,
+    piece)`, checked in BOTH `placeSelected()` (new rejection reason
+    `'blocked'`, same visible reject-flash as every other rejection --
+    `main.js` never branches on `result.reason` at all, so this needed
+    zero UI code) and `voidValidityForPiece()` (folded into the
+    existing `canAct` check, so a still-blocked piece reads red
+    everywhere, same as an already-placed one). Additive like every
+    earlier field -- a piece without it is never gated. 6 new unit
+    tests (rejected before prerequisites, still rejected with only ONE
+    of two satisfied, places once both are, a piece WITHOUT the field
+    is never gated, `voidValidityForPiece` reflects blocked/unblocked).
+  - `buildBigHullStage` gained an optional `keyChunkIndex` param --
+    when set, that chunk's own `requiresPlacedFirst` names every OTHER
+    real chunk (never the decoys, which never place at all). Reuses the
+    Cuboctahedron's own proven 13-cell shape at a smaller 3-chunk split
+    (2 decoys, not 3) so the "why won't this go in" moment reads
+    clearly on a shape small enough to hold in mind, rather than
+    getting lost in Big Hull's own much bigger 156/240-void scale.
+  - Verified live: the key piece is genuinely rejected when tried
+    first (remaining count provably unchanged), places correctly once
+    both other chunks are down, full solve confirmed end-to-end.
+  - **Separately, live feedback while testing the above**: "with
+    multiple picker pieces more than one row makes sense spacewise...
+    too many pieces in a line" -- every multi-piece stage in this file
+    laid its tray out as a single vertical column (`trayCursorY`,
+    independently duplicated six times across `buildNCellStage`/
+    `buildMoleculeStage`/`buildHullSplitStage`/
+    `buildBranchingMoleculeStage`/`buildBigHullStage`/
+    `buildDisphenoidRDStage`). Factored into one shared
+    `createTrayLayout(scale, pieceCount)`, replacing all six
+    duplicates, that lays pieces into a `round(sqrt(pieceCount))`-column
+    grid instead. Real bug found and fixed WHILE building this, not
+    after: the first version used a fixed `scale`-based gap between
+    columns, which worked fine for small stages but was imperceptibly
+    thin next to Big Hull's own much larger merged chunks once the tray
+    camera zoomed out far enough to fit them (confirmed live -- a
+    screenshot showed only 3 of 6 pieces visibly separated, the other 3
+    overlapping almost exactly behind them). Root cause: `trayScaleFor`
+    already caps every piece's RENDERED radius at a fixed
+    `MAX_TRAY_RADIUS`, so the column gap should be derived from that
+    same cap, not from `scale` directly -- fixed by setting
+    `COLUMN_GAP = MAX_TRAY_RADIUS * 2 + TRAY_GAP`, correct regardless of
+    how large a stage's own underlying geometry gets. Verified live
+    across several stages after the fix (5-piece Molecule: clean 2-3
+    grid; 6-piece Big Hull: clean 2x3 grid; 8-piece Big Hull: clean 3x3
+    grid with one gap; 5-piece Burr Puzzle: clean grid) -- pieces read
+    noticeably BIGGER too, not just better arranged, since a more
+    square-shaped tray bounding box needs less camera zoom-out than a
+    long thin column did. Full `node --test tests/unit/*.test.mjs`
+    clean (317/317), and a full 67-stage structural sweep (every
+    `?stage=N` from 1-67, checking for runtime errors) confirmed clean
+    after the shared-layout refactor touched every multi-piece builder
+    in the file.
+  - Total stage count after this: 67 (was 66).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

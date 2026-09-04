@@ -33,6 +33,16 @@
 // existing single-group void just gets a one-element array; nothing
 // about the single-group case changed semantically.
 //
+// The Disphenoid/Molecule/Hull family adds `requiresPlacedFirst` (on a
+// piece, an array of other piece ids) -- direct instruction (2026-09-04,
+// "a key piece must go last"): a genuine order-dependent "burr puzzle"
+// gate, distinct from every earlier check (which only ever look at the
+// TARGET void's own state, never at OTHER pieces). A piece with this
+// set is rejected -- same visible reject-flash as any other invalid
+// placement, reason `'blocked'` -- until every referenced piece is
+// already placed. Optional and additive like every earlier field: a
+// piece without it is never gated by this at all.
+//
 // Every void also tracks `filledBy` (a piece id, or null while open) --
 // Stage 7's undo needs a reverse mapping from a placed piece back to
 // where it went (a loose piece's own one void's position/quaternion) to
@@ -187,6 +197,24 @@ export function setPieceOrientation(state, pieceId, orientationKey) {
 // tapped void itself), but every member of the group for a fused piece
 // (Stage 5), so callers don't need to special-case which kind of piece
 // just fired.
+// Burr-puzzle-style ordering gate -- direct instruction (2026-09-04,
+// "a key piece must go last... most pieces place freely, one or two
+// key pieces are blocked until everything else is in"): an OPTIONAL
+// `requiresPlacedFirst` on a piece (an array of other piece ids) is
+// satisfied only once every one of those pieces is already placed.
+// Every existing piece (no `requiresPlacedFirst` at all) is unaffected
+// -- `every()` on an empty/absent array is vacuously true, so a piece
+// that doesn't use this feature never gets gated by it, the same
+// "additive, not a schema change" pattern every earlier field
+// (`orientation`, `fillsGroup`, ...) already followed.
+function isPieceBlocked(state, piece) {
+  if (!piece.requiresPlacedFirst) return false;
+  return !piece.requiresPlacedFirst.every((requiredId) => {
+    const required = state.pieces.find((p) => p.id === requiredId);
+    return Boolean(required && required.placed);
+  });
+}
+
 export function placeSelected(state, voidId) {
   const voidEntry = state.voids.find((v) => v.id === voidId);
   const pieceId = state.selectedPieceId;
@@ -194,6 +222,10 @@ export function placeSelected(state, voidId) {
 
   if (!pieceId || !piece || !voidEntry) {
     return { state, placed: false, pieceId, voidId, reason: 'nothing-selected' };
+  }
+
+  if (isPieceBlocked(state, piece)) {
+    return { state, placed: false, pieceId, voidId, reason: 'blocked' };
   }
 
   if (piece.fillsGroup) {
@@ -266,7 +298,7 @@ export function isSolved(state) {
 export function voidValidityForPiece(state, pieceId) {
   const piece = state.pieces.find((p) => p.id === pieceId);
   const validByVoidId = {};
-  const canAct = Boolean(piece && !piece.placed);
+  const canAct = Boolean(piece && !piece.placed && !isPieceBlocked(state, piece));
 
   for (const v of state.voids) {
     if (v.filled) continue;
