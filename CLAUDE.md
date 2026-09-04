@@ -1563,32 +1563,64 @@ build order:
   quoting the unrelated OLD game's real name, both deliberately left
   alone, not user-facing).
 
-  **First real decoy pass for the new whole-RD tier, in progress**:
+  **Real decoys across the whole new whole-RD tier -- 2026-09-04**:
   direct instruction ("some better decoys on new early stages a cube
   for 1 other connections of 2 for 2 etc", "with the decoys dont always
-  make the real one last") -- `buildNCellStage` (`stages.js`) refactored
-  to collect every real piece as a `{id, fillsGroup, geometry}` SPEC
-  before assigning tray positions, specifically so an optional new
-  `decoyOption` 4th parameter can splice a "wrong shape" decoy spec in
-  at an arbitrary index and still get the same real `nextTrayPosition`/
-  `trayScaleFor` spacing treatment every other piece already gets, no
-  hand-placed coordinates needed. A new `DECOY_NEVER_MATCHES` group-id
-  sentinel (reusing the existing group-match machinery, no `puzzle-
-  state.js` changes) makes a shape decoy reject against EVERY void in
-  the stage, not just the "wrong" ones -- distinct from Stage 2's
+  make the real one last", later "cubes can be among decoys at all
+  levels"). `buildNCellStage` (`stages.js`) refactored to collect every
+  real piece as a `{id, fillsGroup, geometry}` SPEC before assigning
+  tray positions, so an optional new `decoyOption` 4th parameter can
+  splice a "wrong shape" decoy spec in at an arbitrary index and still
+  get the same real `nextTrayPosition`/`trayScaleFor` spacing every
+  other piece already gets, no hand-placed coordinates needed. A new
+  `DECOY_NEVER_MATCHES` group-id sentinel (reusing the existing group-
+  match machinery, no `puzzle-state.js` changes) makes a shape decoy
+  reject against EVERY void in the stage -- distinct from Stage 2's
   existing single-cell decoy (genuinely placeable, a strategic trap, not
-  a shape mismatch). Stage 2 (`buildStage7`) already has its own new
-  "other connection of 2" decoy live: two whole RDs joined along
-  `NEIGHBOR_OFFSETS[1]` instead of the real pair's `[0]` -- a genuinely
-  different, equally-plausible-LOOKING 2-cell shape, verified live to
-  reject against every void sampled. `buildNCellStage`'s own
-  `decoyOption` plumbing is built and verified inert (no call site
-  passes a 4th argument yet, confirmed via a full stage-by-stage replay
-  showing zero behavior change) -- wiring an actual decoy shape into
-  each of the 1/3/4-cell stage definitions is the next step, not done
-  yet. Full `node --test tests/unit/*.test.mjs` clean (305/305) and a
-  live Stage 2 check (tapping the new decoy against 6 sampled voids,
-  every one correctly rejected) before this checkpoint.
+  a shape mismatch). `decoyOption.cells` is another real N-cell lattice
+  arrangement (a genuinely different enumerated shape, not this stage's
+  own), `decoyOption.asCubes` renders that same arrangement in plain
+  cubes instead of RDs for material variety, and `decoyOption.trayIndex`
+  (hand-varied per stage, not a formula, so it can't become its own
+  learnable tell) controls where it lands in the tray.
+
+  **A "different connection of 2" decoy for Stage 2 was tried and
+  reverted the same day** -- direct live report ("stage 2 2 cells they
+  are exactly the same even rejected one"): in this lattice, EVERY
+  2-cell joined pair is congruent to every other one (the symmetry group
+  acts transitively on nearest-neighbor pairs), so two RDs joined along
+  a different lattice direction isn't a genuinely different SHAPE, just
+  the same shape at a different rotation -- confirmed live, visually
+  indistinguishable from the real piece. Replaced with the actual
+  follow-up suggestion ("put two cube together joined along edge"): two
+  plain cubes flush face-to-face, a genuinely different PRIMITIVE, the
+  same "wrong material" idea as Stage 1's own single-cube decoy.
+
+  **A second real bug, caught live before shipping**: the Tetrahedron
+  stage's own cube-rendered decoy (all 4 cells mutually adjacent, the
+  most compact possible N=4 arrangement) left a visible HOLE at the
+  cluster's own geometric center -- cubes, unlike RDs, aren't shaped to
+  fill space at FCC neighbor spacing, so 4 plain `scale`-sized cubes
+  arranged tetrahedrally don't actually touch in the middle. A raycast
+  aimed at the piece's own centroid (exactly where a player's tap would
+  naturally land) hit nothing there -- confirmed by a failing "does the
+  decoy actually get selected" check across a full stage sweep, then
+  isolated to this one stage and reproduced consistently across 5
+  repeated trials before the fix. Fixed by sizing decoy cubes at 1.5x
+  `scale` (enough overlap to close the gap for every real N-cell
+  arrangement, not just the loose ones) -- re-verified with the same 5
+  trials, decoy now selects correctly every time.
+
+  Final shape: Stage 1 gets a single cube; Stage 2 gets its original
+  single-cell trap decoy PLUS two joined cubes; every 3-cell and 4-cell
+  stage gets another real enumerated shape from the same N (never its
+  own), alternating RD-rendered and cube-rendered across the 4 stages in
+  each tier so the decoy TYPE itself varies, not just its tray position.
+  Verified live end to end: all 9 stages' decoys correctly reject
+  against every void sampled, at both desktop and a real mobile pixel
+  ratio; screenshots confirm each decoy renders as a genuinely distinct,
+  gap-free shape. Full `node --test tests/unit/*.test.mjs` clean
+  (305/305 -- pure content addition, no `puzzle-state.js` changes).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

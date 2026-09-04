@@ -444,8 +444,8 @@ function buildStage5(scale) {
 // filling only its own cell, never both at once) adds a genuinely new
 // "joined pair" piece that fills both cells in a single placement,
 // which needed no new cell-position math, only a new piece.
-function twoCellCenters(scale, neighborIndex = 0) {
-  const cellOffsets = [[0, 0, 0], NEIGHBOR_OFFSETS[neighborIndex]];
+function twoCellCenters(scale) {
+  const cellOffsets = [[0, 0, 0], NEIGHBOR_OFFSETS[0]];
   const cellWorldPositions = cellOffsets.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
   const centroid = cellWorldPositions[0].clone().add(cellWorldPositions[1]).multiplyScalar(0.5);
   return cellWorldPositions.map((p) => p.clone().sub(centroid));
@@ -588,29 +588,34 @@ function buildStage7(scale) {
     homePosition: new THREE.Vector3(scale * 4, -scale * 2.6, 0),
   });
 
-  // A genuinely different "connection of 2" -- direct instruction
-  // (2026-09-04, "other connections of 2 for 2"): two whole RDs joined
-  // along a DIFFERENT real lattice direction (`NEIGHBOR_OFFSETS[1]`,
-  // not the target's own `[0]`) rather than another same-cell decoy.
-  // Looks like a perfectly plausible joined pair at a glance -- it just
-  // isn't shaped like THIS target's own pair, so it can never actually
-  // seat against it. Placed AFTER the joined-pair here, not appended
-  // last, so "last piece = fake" isn't a learnable shortcut (direct
-  // instruction, "with the decoys dont always make the real one last").
-  const wrongConnectionCenters = twoCellCenters(scale, 1);
-  const wrongConnectionGeometry = mergeGeometries([
-    rhombicDodecahedronGeometry(scale).translate(wrongConnectionCenters[0].x, wrongConnectionCenters[0].y, wrongConnectionCenters[0].z),
-    rhombicDodecahedronGeometry(scale).translate(wrongConnectionCenters[1].x, wrongConnectionCenters[1].y, wrongConnectionCenters[1].z),
+  // A "different connection of 2" decoy was tried here and reverted the
+  // same day -- direct live report ("stage 2 2 cells they are exactly
+  // the same even rejected one"): in this lattice, EVERY 2-cell joined
+  // pair is congruent to every other one (the symmetry group acts
+  // transitively on nearest-neighbor pairs), so two RDs joined along a
+  // different lattice direction isn't a genuinely different SHAPE at
+  // all, just the same shape at a different rotation -- confirmed live,
+  // it was visually indistinguishable from the real joined-pair, not a
+  // real decoy.
+  //
+  // Replaced with the actual follow-up suggestion ("put two cube
+  // together joined along edge"): two plain cubes, flush face-to-face
+  // -- a genuinely different PRIMITIVE (cube, not RD), same "wrong
+  // material" idea Stage 1's own single-cube decoy already uses,
+  // extended to 2 cells instead of trying to make a false RD variant.
+  const cubeDecoyGeometry = mergeGeometries([
+    new THREE.BoxGeometry(scale, scale, scale).translate(-scale / 2, 0, 0),
+    new THREE.BoxGeometry(scale, scale, scale).translate(scale / 2, 0, 0),
   ], false);
-  const wrongConnectionDecoy = makeFusedPiece(wrongConnectionGeometry, {
-    id: 'decoy-connection',
+  const cubeDecoy = makeFusedPiece(cubeDecoyGeometry, {
+    id: 'decoy-cubes',
     fillsGroup: DECOY_NEVER_MATCHES,
     homePosition: new THREE.Vector3(scale * 4, -scale * 5.4, 0),
   });
 
   return {
     skeletonGroup,
-    pieces: [decoyPiece, joinedPiece, wrongConnectionDecoy],
+    pieces: [decoyPiece, joinedPiece, cubeDecoy],
     voids,
     groups,
     hideIdleVoidWires: true,
@@ -798,26 +803,51 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices, decoyOpti
 
   // A "wrong shape" decoy -- direct instruction (2026-09-04, "some
   // better decoys on new early stages... a cube for 1[cell]... other
-  // connections... etc"): a piece that LOOKS plausible (same rough
-  // size, same orange material) but is shaped wrong for every group in
-  // THIS stage, so it can never actually seat anywhere -- distinct from
-  // Stage 2's own single-cell decoy (genuinely placeable, just a
-  // strategic trap). `decoyOption.cells` is another real N-cell lattice
-  // arrangement (typically a DIFFERENT enumerated shape than this
-  // stage's own target), merged into one piece the exact same way the
-  // "full" piece is; `decoyOption.trayIndex` controls where in the
-  // tray it lands, so it isn't always in the same relative slot across
-  // stages (direct instruction, "dont always make the real one last").
+  // connections... etc", later "cubes can be among decoys at all
+  // levels"): a piece that LOOKS plausible (same rough size, same
+  // orange material) but is shaped wrong for every group in THIS stage,
+  // so it can never actually seat anywhere -- distinct from Stage 2's
+  // own single-cell decoy (genuinely placeable, just a strategic trap).
+  // `decoyOption.cells` is another real N-cell lattice arrangement
+  // (typically a DIFFERENT enumerated shape than this stage's own
+  // target); `decoyOption.asCubes` renders that SAME arrangement in
+  // plain cubes instead of RDs -- a genuinely different primitive, not
+  // just a different topology, same "wrong material" idea as Stage 1's
+  // own cube decoy and Stage 2's own two-cubes one, extended to N>=3
+  // for variety rather than every stage using the same kind of decoy.
+  // `decoyOption.trayIndex` controls where in the tray it lands, so it
+  // isn't always in the same relative slot across stages (direct
+  // instruction, "dont always make the real one last").
   if (decoyOption) {
-    const decoyGeometry = decoyOption.cells
-      ? mergeGeometries(
-        decoyOption.cells.map(([cx, cy, cz]) => {
-          const p = new THREE.Vector3(...cellToWorld(cx, cy, cz, scale));
-          return rhombicDodecahedronGeometry(scale).translate(p.x - centroid.x, p.y - centroid.y, p.z - centroid.z);
-        }),
+    let decoyGeometry;
+    if (!decoyOption.cells) {
+      decoyGeometry = new THREE.BoxGeometry(scale, scale, scale);
+    } else {
+      // A real bug, caught live before shipping: a compact, all-
+      // mutually-adjacent arrangement (e.g. the Tetrahedron shape)
+      // rendered in plain scale-sized cubes left a visible HOLE at the
+      // cluster's own geometric center -- cubes, unlike RDs, aren't
+      // shaped to fill space at FCC neighbor spacing, so 4 of them
+      // arranged tetrahedrally don't actually touch in the middle. A
+      // raycast (or a real tap) aimed at the piece's own centroid hit
+      // nothing there. 1.5x sized cubes overlap enough to close that
+      // gap for every real N-cell arrangement, not just the loose ones.
+      const CUBE_DECOY_SCALE = 1.5;
+      const makePieceGeometry = decoyOption.asCubes
+        ? () => new THREE.BoxGeometry(scale * CUBE_DECOY_SCALE, scale * CUBE_DECOY_SCALE, scale * CUBE_DECOY_SCALE)
+        : () => rhombicDodecahedronGeometry(scale);
+      // Centered on the DECOY shape's own centroid, not this stage's
+      // target centroid -- the two are different real shapes and can
+      // have different centroids, so reusing the target's would leave
+      // the decoy mesh visually off-center within its own bounding
+      // volume (its local origin not at its own visual middle).
+      const decoyWorldPositions = decoyOption.cells.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+      const decoyCentroid = decoyWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / decoyWorldPositions.length);
+      decoyGeometry = mergeGeometries(
+        decoyWorldPositions.map((p) => makePieceGeometry().translate(p.x - decoyCentroid.x, p.y - decoyCentroid.y, p.z - decoyCentroid.z)),
         false,
-      )
-      : new THREE.BoxGeometry(scale, scale, scale);
+      );
+    }
     const insertAt = Math.min(decoyOption.trayIndex ?? pieceSpecs.length, pieceSpecs.length);
     pieceSpecs.splice(insertAt, 0, { id: 'decoy', fillsGroup: DECOY_NEVER_MATCHES, geometry: decoyGeometry });
   }
@@ -951,10 +981,17 @@ function shapeTopology(cells) {
 // header comment) makes this a real, not special-cased, instance of the
 // exact same N-cell mechanic every later whole-RD stage uses, not a
 // bespoke builder.
+// A single decoy cube -- direct instruction (2026-09-04, "some better
+// decoys on new early stages... a cube for 1[cell]"). No `cells` key on
+// the decoy option at all (buildNCellStage's own decoy branch falls
+// back to a plain BoxGeometry when there's none) -- an N=1 stage has no
+// OTHER real 1-cell shape to borrow as a decoy the way N>=2 stages can,
+// so a genuinely different primitive (a cube, not an RD) is the natural
+// "wrong shape" here instead.
 const ONE_CELL_STAGE = {
   id: 1,
   name: '1 Cell: One RD',
-  build: (scale) => buildNCellStage(scale, [[0, 0, 0]], null),
+  build: (scale) => buildNCellStage(scale, [[0, 0, 0]], null, { trayIndex: 0 }),
 };
 
 const THREE_CELL_STAGE_DEFS = enumerateShapes(3)[3].map((shape) => ({
@@ -963,11 +1000,35 @@ const THREE_CELL_STAGE_DEFS = enumerateShapes(3)[3].map((shape) => ({
   joinedPair: findAdjacentCellPair(shape.cells),
 }));
 
-const THREE_CELL_STAGES = THREE_CELL_STAGE_DEFS.map((def, i) => ({
-  id: 3 + i,
-  name: `3 Cells: ${def.name}`,
-  build: (scale) => buildNCellStage(scale, def.cells, def.joinedPair),
-}));
+// Varied per stage, not a fixed formula -- direct instruction ("with
+// the decoys dont always make the real one last"): a constant offset
+// (e.g. "always insert 2 before the end") would just become a new
+// learnable tell in its own right, so these are hand-picked to land in
+// genuinely different relative slots (early middle, right after the
+// singles, before the very first single, etc.) across the 4 stages.
+const THREE_CELL_DECOY_TRAY_INDEXES = [2, 0, 4, 1];
+
+const THREE_CELL_STAGES = THREE_CELL_STAGE_DEFS.map((def, i) => {
+  // Another of the SAME real N=3 shapes, never this stage's own --
+  // direct instruction ("other connections of 2 for 2... etc",
+  // generalized past N=2). Genuinely plausible at a glance (same cell
+  // count, a real enumerated shape, not an arbitrary blob) but the
+  // wrong overall geometry, so DECOY_NEVER_MATCHES correctly rejects it
+  // everywhere in THIS stage's own skeleton.
+  const decoyDef = THREE_CELL_STAGE_DEFS[(i + 1) % THREE_CELL_STAGE_DEFS.length];
+  return {
+    id: 3 + i,
+    name: `3 Cells: ${def.name}`,
+    // Alternates RD-shaped vs. cube-shaped decoys across the 4 stages
+    // (direct instruction, "cubes can be among decoys at all levels")
+    // rather than every stage using the same kind.
+    build: (scale) => buildNCellStage(scale, def.cells, def.joinedPair, {
+      cells: decoyDef.cells,
+      asCubes: i % 2 === 1,
+      trayIndex: THREE_CELL_DECOY_TRAY_INDEXES[i],
+    }),
+  };
+});
 
 // A CURATED subset of the 20 real N=4 shapes, not all of them (direct
 // instruction 2026-09-04: N=3's "all 4" doesn't scale the same way to
@@ -1008,11 +1069,28 @@ const FOUR_CELL_STAGE_DEFS = [
   joinedPair: findAdjacentCellPair(shape.cells),
 }));
 
-const FOUR_CELL_STAGES = FOUR_CELL_STAGE_DEFS.map((def, i) => ({
-  id: 7 + i,
-  name: `4 Cells: ${def.name}`,
-  build: (scale) => buildNCellStage(scale, def.cells, def.joinedPair),
-}));
+// Same reasoning/pattern as THREE_CELL_DECOY_TRAY_INDEXES above -- hand-
+// varied, not a formula, so the decoy's own tray slot isn't a learnable
+// tell across stages.
+const FOUR_CELL_DECOY_TRAY_INDEXES = [1, 5, 0, 3];
+
+const FOUR_CELL_STAGES = FOUR_CELL_STAGE_DEFS.map((def, i) => {
+  // Another of the SAME 4 curated N=4 shapes, never this stage's own --
+  // same "other connections... etc" reasoning as the N=3 tier.
+  const decoyDef = FOUR_CELL_STAGE_DEFS[(i + 1) % FOUR_CELL_STAGE_DEFS.length];
+  return {
+    id: 7 + i,
+    name: `4 Cells: ${def.name}`,
+    // Opposite parity from the N=3 tier's own alternation, purely so
+    // the SAME cube-vs-RD pattern doesn't repeat identically stage-
+    // after-stage across the two tiers.
+    build: (scale) => buildNCellStage(scale, def.cells, def.joinedPair, {
+      cells: decoyDef.cells,
+      asCubes: i % 2 === 0,
+      trayIndex: FOUR_CELL_DECOY_TRAY_INDEXES[i],
+    }),
+  };
+});
 
 // Reordered 2026-09-04 (direct instruction, "one RD to four RDs should
 // be earliest stages... they are so simple", reinforced: "knowing that
