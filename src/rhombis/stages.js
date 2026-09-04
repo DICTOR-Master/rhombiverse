@@ -1901,6 +1901,222 @@ const BRANCHING_MOLECULE_STAGES = BRANCHING_MOLECULE_STAGE_DEFS.map(({ hub, bran
   build: (scale) => buildBranchingMoleculeStage(scale, hub, branch1, branch2, pickBranchMoleculeDecoys(hub, branch1, branch2, i * 2)),
 }));
 
+// Big Hulls -- direct instruction (2026-09-04, correcting the earlier
+// "Hulls" tier which turned out to mean something smaller than intended):
+// "when I said hulls i meant structures like a Cube octahedron, or
+// tetrahedral hull made from many pieces but broken into three or four
+// irregular pieces so more like a building broken up in terms of blocks
+// ... some grouped in different clusters". Two real, physically-motivated
+// macro shapes, not curated/enumerated ones like every earlier tier:
+//
+// CUBOCTAHEDRON: 1 center cell + all 12 of its real nearest-neighbor
+// cells (`NEIGHBOR_OFFSETS` itself) -- this is the genuine FCC
+// "coordination shape" (already documented in `core/lattice.js`'s own
+// comments: "the convex hull of a lattice point's 12 nearest neighbors
+// ... is exactly a cuboctahedron"), so this needed no curation or
+// enumeration at all, just the lattice's own real structure. 13 cells.
+//
+// TETRAHEDRAL STACK: real FCC "cannonball stacking" -- 3 lattice
+// directions that are mutually adjacent to each other (verified: their
+// pairwise differences are themselves real neighbor offsets, i.e. genuine
+// close-packed triangular-layer basis vectors) build successive
+// triangular layers (1, 3, 6, 10 cells) offset along a third mutually-
+// adjacent direction, the same construction real tetrahedral-number ball
+// stacking uses. 4 layers = 20 cells, verified connected (every cell
+// reachable from any other via real neighbor steps) and non-degenerate
+// (real extent along all 3 axes, not a flat slab).
+const CUBOCTAHEDRON_CELLS = [[0, 0, 0], ...NEIGHBOR_OFFSETS];
+
+const TETRA_STACK_BASIS = { a: [1, 1, 0], b: [1, 0, 1], c: [0, 1, 1] };
+function tetrahedralStackCells(layers) {
+  const { a, b, c } = TETRA_STACK_BASIS;
+  const cells = [];
+  for (let k = 0; k < layers; k++) {
+    for (let i = 0; i <= k; i++) {
+      for (let j = 0; i + j <= k; j++) {
+        cells.push([
+          i * a[0] + j * b[0] + k * c[0],
+          i * a[1] + j * b[1] + k * c[1],
+          i * a[2] + j * b[2] + k * c[2],
+        ]);
+      }
+    }
+  }
+  return cells;
+}
+const TETRAHEDRAL_STACK_CELLS = tetrahedralStackCells(4);
+
+// Splits a connected cell cluster into `count` genuinely IRREGULAR
+// connected chunks -- direct instruction ("broken into three or four
+// irregular pieces... like a building broken into blocks... some
+// grouped in different clusters"), a deliberately different shape of
+// split than the earlier (small, neat, symmetric 2+2+1) Hulls tier.
+// Round-robin multi-source BFS (a real, deterministic "Voronoi growth"
+// from spread-out seeds, not a hand-picked partition): `seedIndexes`
+// picks `count` cells maximally spread apart (greedy farthest-point,
+// starting from cell 0), then each region takes turns claiming
+// whichever of its OWN frontier's unclaimed neighbors comes first in
+// cell order -- since the whole shape is connected, this always
+// terminates with every cell claimed by exactly one region, each region
+// itself guaranteed connected (grown outward from a single seed one
+// step at a time), sizes naturally UNEVEN (a region boxed in early by
+// its neighbors' own growth simply stops early) rather than forced into
+// equal shares -- exactly the "irregular blocks" character asked for.
+function farthestPointSeeds(cells, count) {
+  const dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+  const seeds = [0];
+  while (seeds.length < count) {
+    let best = -1;
+    let bestDist = -1;
+    for (let i = 0; i < cells.length; i++) {
+      if (seeds.includes(i)) continue;
+      const minDistToSeeds = Math.min(...seeds.map((s) => dist2(cells[i], cells[s])));
+      if (minDistToSeeds > bestDist) { bestDist = minDistToSeeds; best = i; }
+    }
+    seeds.push(best);
+  }
+  return seeds;
+}
+
+function partitionIntoIrregularChunks(cells, count, seedOffset = 0) {
+  const key = (c) => c.join(',');
+  const indexByKey = new Map(cells.map((c, i) => [key(c), i]));
+  const seeds = farthestPointSeeds(cells, count).map((s) => (s + seedOffset) % cells.length);
+  const owner = new Array(cells.length).fill(-1);
+  const frontiers = seeds.map((s) => [s]);
+  seeds.forEach((s, r) => { owner[s] = r; });
+  let remaining = cells.length - count;
+  while (remaining > 0) {
+    for (let r = 0; r < count && remaining > 0; r++) {
+      while (frontiers[r].length > 0) {
+        const cur = frontiers[r].shift();
+        const cellCoord = cells[cur];
+        const unclaimedNeighbor = NEIGHBOR_OFFSETS
+          .map(([dx, dy, dz]) => indexByKey.get(key([cellCoord[0] + dx, cellCoord[1] + dy, cellCoord[2] + dz])))
+          .find((idx) => idx !== undefined && owner[idx] === -1);
+        if (unclaimedNeighbor !== undefined) {
+          owner[unclaimedNeighbor] = r;
+          frontiers[r].push(cur, unclaimedNeighbor);
+          remaining--;
+          break;
+        }
+      }
+    }
+  }
+  return owner.map((r, i) => ({ chunkIndex: r, cell: cells[i] }));
+}
+
+function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount) {
+  const skeletonGroup = new THREE.Group();
+  const pyramid = pyramidGeometry(scale);
+  const assignments = partitionIntoIrregularChunks(allCells, chunkCount);
+
+  const cellWorldPositions = allCells.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = cellWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / cellWorldPositions.length);
+
+  const voids = [];
+  const groups = [];
+  const pieceSpecs = [];
+  for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+    const groupId = `chunk-${chunkIndex}`;
+    const memberCellIndexes = assignments
+      .map((a, i) => (a.chunkIndex === chunkIndex ? i : -1))
+      .filter((i) => i >= 0);
+    const chunkCenters = memberCellIndexes.map((i) => cellWorldPositions[i].clone().sub(centroid));
+    chunkCenters.forEach((cellCenter, i) => {
+      skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
+      PYRAMID_AXES.forEach((axisKey) => {
+        const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
+        [['in', inwardQuaternion], ['out', outwardQuaternion]].forEach(([dirLabel, toQuaternion]) => {
+          const v = makeVoid(pyramid, {
+            id: `v-${groupId}-${i}-${dirLabel}-${axisKey}`,
+            quaternion: toQuaternion(axisKey),
+            position: facePosition,
+            groupIds: [groupId],
+          });
+          skeletonGroup.add(...v.sceneObjects);
+          voids.push(v);
+        });
+      });
+    });
+    // Same self-centering discipline every fused multi-cell piece in
+    // this file needs (see `buildMoleculeStage`'s own comment for the
+    // real bug this avoids repeating) -- doubly important here since
+    // these chunks are IRREGULAR (not a clean symmetric pair), so their
+    // own centroid is even less likely to coincide with the shared
+    // shape centroid than usual.
+    const chunkCentroid = chunkCenters.reduce((sum, c) => sum.add(c), new THREE.Vector3()).multiplyScalar(1 / chunkCenters.length);
+    groups.push({ id: groupId, position: chunkCentroid, quaternion: new THREE.Quaternion() });
+    const chunkGeometry = mergeGeometries(
+      chunkCenters.map((c) => rhombicDodecahedronGeometry(scale).translate(c.x - chunkCentroid.x, c.y - chunkCentroid.y, c.z - chunkCentroid.z)),
+      false,
+    );
+    pieceSpecs.push({ id: groupId, fillsGroup: groupId, geometry: chunkGeometry });
+  }
+
+  // Decoys: genuine ALTERNATE irregular partitions of the SAME shape
+  // (same growth algorithm, different seed offset so the split lands
+  // differently), tagged DECOY_NEVER_MATCHES -- a real, similarly-sized,
+  // similarly-irregular chunk shape, just not one this stage's own
+  // assembly actually needs, same "plausible but wrong" idea every
+  // other decoy in this file already uses.
+  for (let d = 0; d < decoyChunkCount; d++) {
+    const decoyAssignments = partitionIntoIrregularChunks(allCells, chunkCount, d + 1);
+    const decoyCellIndexes = decoyAssignments
+      .map((a, i) => (a.chunkIndex === (d % chunkCount) ? i : -1))
+      .filter((i) => i >= 0);
+    const decoyWorldPositions = decoyCellIndexes.map((i) => cellWorldPositions[i]);
+    const decoyCentroid = decoyWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / decoyWorldPositions.length);
+    const decoyGeometry = mergeGeometries(
+      decoyWorldPositions.map((p) => rhombicDodecahedronGeometry(scale).translate(p.x - decoyCentroid.x, p.y - decoyCentroid.y, p.z - decoyCentroid.z)),
+      false,
+    );
+    pieceSpecs.push({ id: `decoy-${d}`, fillsGroup: DECOY_NEVER_MATCHES, geometry: decoyGeometry });
+  }
+
+  for (let i = pieceSpecs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
+  }
+
+  const singleRDGeometry = rhombicDodecahedronGeometry(scale);
+  singleRDGeometry.computeBoundingSphere();
+  const MAX_TRAY_RADIUS = singleRDGeometry.boundingSphere.radius * 2.2;
+  function trayScaleFor(geometry) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius;
+    return radius > MAX_TRAY_RADIUS ? MAX_TRAY_RADIUS / radius : 1;
+  }
+  const TRAY_GAP = scale * 0.5;
+  let trayCursorY = 0;
+  function nextTrayPosition(geometry, trayScale) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius * trayScale;
+    if (trayCursorY !== 0) trayCursorY -= TRAY_GAP;
+    trayCursorY -= radius;
+    const y = trayCursorY;
+    trayCursorY -= radius;
+    return new THREE.Vector3(scale * 4, y, 0);
+  }
+
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+    });
+  });
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+}
+
+const BIG_HULL_STAGES = [
+  { id: 65, name: 'Big Hull: Cuboctahedron', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3) },
+  { id: 66, name: 'Big Hull: Tetrahedral Stack', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 4) },
+];
+
 // Reordered 2026-09-04 (direct instruction, "one RD to four RDs should
 // be earliest stages... they are so simple", reinforced: "knowing that
 // the cube and RD can be composed from pyramids is advanced knowledge...
@@ -1929,4 +2145,5 @@ export const STAGES = [
   ...MOLECULE_STAGES,
   ...BRANCHING_MOLECULE_STAGES,
   { id: 64, name: 'Rhombic Dodecahedron (Disphenoids)', build: buildDisphenoidRDStage },
+  ...BIG_HULL_STAGES,
 ];

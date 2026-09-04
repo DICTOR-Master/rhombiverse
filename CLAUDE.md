@@ -2125,6 +2125,57 @@ build order:
     exact same `fillsGroup`/`groupIds` mechanism as every other fused
     piece in the game).
   - Total stage count after this: 64 (was 63).
+
+  **New tier: Big Hulls (ids 65-66, 2 stages) -- 2026-09-04**, direct
+  correction of the earlier "Hulls" tier: "when I said hulls i meant
+  structures like a Cube octahedron, or tetrahedral hull made from many
+  pieces but broken into three or four irregular pieces so more like a
+  building broken up in terms of blocks... some grouped in different
+  clusters". Scoped explicitly (AskUserQuestion) before building: both
+  shape families at once, region-grown IRREGULAR chunks (not a neat
+  symmetric split like the earlier Hulls tier keeps for itself, still
+  valid at ids 17-29 -- this is a genuinely different tier, not a
+  replacement).
+  - **Cuboctahedron** (13 cells): 1 center cell + all 12 of its real
+    FCC nearest-neighbors (`NEIGHBOR_OFFSETS` itself) -- this needed NO
+    curation or enumeration at all, since it's already documented
+    elsewhere in this codebase as the genuine FCC coordination shape
+    (`core/lattice.js`: "the convex hull of a lattice point's 12
+    nearest neighbors ... is exactly a cuboctahedron").
+  - **Tetrahedral Stack** (20 cells, 4 layers): real FCC "cannonball
+    stacking" -- verified numerically that 3 lattice directions
+    ((1,1,0), (1,0,1), (0,1,1)) are mutually adjacent to EACH OTHER
+    (their pairwise differences are themselves real neighbor offsets,
+    confirming a genuine close-packed triangular-layer basis, not an
+    arbitrary triple), then stacked 4 layers deep (1+3+6+10 cells).
+    Separately verified the result is fully connected (every cell
+    reachable from any other via real neighbor steps) and has real
+    extent along all 3 axes (not a degenerate flat slab).
+  - `partitionIntoIrregularChunks` -- a real, deterministic round-robin
+    multi-source BFS ("Voronoi growth") from farthest-point-spread
+    seeds: each region takes turns claiming an unclaimed neighbor of
+    its own current frontier, so regions end up connected by
+    construction and NATURALLY uneven in size (a region boxed in early
+    by its neighbors' own growth just stops growing) -- confirmed live:
+    Cuboctahedron split 5/4/4, Tetrahedral Stack split 3/6/6/5, neither
+    an even/forced split. Decoys reuse the SAME algorithm with a
+    different seed offset (a genuine alternate partition of the same
+    shape, one slice of it shown as a decoy), not a separately
+    hand-built decoy shape.
+  - Same self-centering discipline every fused multi-cell piece in this
+    file needs by now (Molecules/Hulls/Disphenoid RD all hit variants of
+    the same real bug earlier this session) -- applied correctly from
+    the start here.
+  - Verified live: both stages build with zero runtime errors and the
+    correct piece composition (3 real chunks + 3 decoys for
+    Cuboctahedron, 4 + 4 for Tetrahedral Stack); full solve confirmed
+    end-to-end on both (every decoy correctly rejects first, then every
+    real chunk group-fills its own cells). By far the biggest stages in
+    the game now -- 156 voids (13 cells) and 240 voids (20 cells)
+    respectively, vs. Branching Molecules' own previous high of 132 (11
+    cells). Full `node --test tests/unit/*.test.mjs` clean (311/311 --
+    no `puzzle-state.js` surface touched).
+  - Total stage count after this: 66 (was 64).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
