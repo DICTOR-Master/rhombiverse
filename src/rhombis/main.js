@@ -486,6 +486,23 @@ function updateUndoButton() {
 // exactly one destination; this covers all of them, live, without a
 // page reload. Populated directly from STAGES, so a stage added later
 // needs no picker-specific update.
+// `derivedFrom` (2026-09-05, direct instruction: "add for transparency
+// original order ID numbers showing what came first in conception /
+// creation and what has been generated derived later") -- `id` itself
+// is a difficulty-ramp/menu-order number, already resequenced more than
+// once (see STAGES' own header comment), not a creation-order record.
+// Rather than retroactively guessing a "true" conception order for all
+// 85 pre-existing stages, this tags only the genuinely DERIVED stages
+// (the 2026-09-05 crossover tiers, each explicitly built by combining
+// two earlier tiers' own machinery) with the real `id` of one
+// representative stage from each source TIER plus that tier's own name
+// -- NOT that representative stage's own specific puzzle content name.
+// Real bug caught live: labelling by the representative stage's own
+// name (e.g. "#66 (Molecule Split: Triangle + Wide Bend)") falsely
+// implied a crossover stage reused that EXACT molecule pairing, when
+// most of these deliberately draw a different pairing from the same
+// tier so they read as fresh content rather than a re-skin (see
+// BURR_MOLECULE_SPLIT_STAGE_DEFS' own comment in stages.js).
 function populateStagePicker() {
   stageList.innerHTML = '';
   STAGES.forEach((stageDef, index) => {
@@ -493,7 +510,10 @@ function populateStagePicker() {
     option.type = 'button';
     option.className = 'rhombis-stage-option';
     option.dataset.stageIndex = String(index);
-    option.innerHTML = `<span class="stage-num">${stageDef.id}</span><span>${stageDef.name}</span>`;
+    const lineage = stageDef.derivedFrom
+      ? `<span class="stage-lineage">derived from ${stageDef.derivedFrom.map(({ id, tier }) => `#${id} (${tier})`).join(' + ')}</span>`
+      : '';
+    option.innerHTML = `<span class="stage-num">${stageDef.id}</span><span class="stage-name-wrap"><span class="stage-name">${stageDef.name}</span>${lineage}</span>`;
     option.addEventListener('click', () => {
       stageIndex = index;
       loadStage(stageIndex);

@@ -1773,7 +1773,7 @@ function buildMoleculeStage(scale, lobeADef, lobeBDef, decoyDefs) {
 // new 3-lobe shape risks a regression in already-tested content for a
 // DRY win, not worth it here (same reasoning `buildStage7` already
 // stayed its own function instead of folding into `buildNCellStage`).
-function buildBranchingMoleculeStage(scale, hubDef, branch1Def, branch2Def, decoyDefs) {
+function buildBranchingMoleculeStage(scale, hubDef, branch1Def, branch2Def, decoyDefs, hubIsKey = false) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
   const branch1Cells = joinTwoShapes(hubDef.cells, branch1Def.cells);
@@ -1822,6 +1822,16 @@ function buildBranchingMoleculeStage(scale, hubDef, branch1Def, branch2Def, deco
     pieceSpecs.push({ id: lobe.groupId, fillsGroup: lobe.groupId, geometry: lobeGeometry });
   }
 
+  // Burr-style hub key -- optional (default false leaves the 6 plain
+  // Branching Molecule stages exactly as they were). A real Y-joint's
+  // hub genuinely can't seat until both arms are in, so this is the
+  // same `requiresPlacedFirst` machinery `buildBigHullStage` already
+  // uses, just naming the two branch lobe ids instead of chunk ids.
+  if (hubIsKey) {
+    const hubSpec = pieceSpecs.find((spec) => spec.id === 'lobe-hub');
+    hubSpec.requiresPlacedFirst = ['lobe-branch1', 'lobe-branch2'];
+  }
+
   // Still exactly 3 decoys -- same "similar decoys" reasoning as the
   // 2-lobe tier, just against 3 real pieces instead of 2 this time.
   for (const decoyDef of decoyDefs) {
@@ -1835,6 +1845,12 @@ function buildBranchingMoleculeStage(scale, hubDef, branch1Def, branch2Def, deco
 
   const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
 
+  // `requiresPlacedFirst` forwarded to makeFusedPiece -- real bug caught
+  // live (2026-09-05): this map originally omitted it entirely (this
+  // function never needed it before `hubIsKey`), which silently dropped
+  // the hub's key constraint set above -- verified fixed by inspecting
+  // built.pieces directly (Stage 92 now shows lobe-hub really carrying
+  // requiresPlacedFirst, matching buildBigHullStage's own equivalent map).
   const pieces = pieceSpecs.map((spec) => {
     const trayScale = trayScaleFor(spec.geometry);
     return makeFusedPiece(spec.geometry, {
@@ -1842,6 +1858,7 @@ function buildBranchingMoleculeStage(scale, hubDef, branch1Def, branch2Def, deco
       fillsGroup: spec.fillsGroup,
       homePosition: nextTrayPosition(spec.geometry, trayScale),
       trayScale,
+      requiresPlacedFirst: spec.requiresPlacedFirst,
     });
   });
 
@@ -2198,6 +2215,59 @@ const BURR_PUZZLE_STAGES = [
   { id: 85, name: 'Burr Puzzle: Two Keys', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0, 1]) },
 ];
 
+// --- Crossover tiers (2026-09-05, direct instruction: "Burr + Molecule
+// Split", "Burr + Mirrored Molecule", "Branching Molecule + Burr hub-
+// key", picked from an AskUserQuestion menu against real gaps in the
+// existing 9-tier taxonomy). Each one is a genuine combination two
+// existing tiers never did together, built entirely from unmodified or
+// minimally-extended existing machinery -- no new geometry primitives.
+
+// Burr + Molecule Split: 3 of Molecule Split's own two-real-shape
+// composites (different MOLECULE_STAGE_DEFS indexes than Molecule
+// Split itself uses, so this reads as fresh content, not a re-skin),
+// with a Burr key chunk added on top -- `buildBigHullStage` completely
+// unchanged, `keyChunkIndexes` is the only new argument.
+const BURR_MOLECULE_SPLIT_STAGE_DEFS = [2, 14, 26].map((i) => MOLECULE_STAGE_DEFS[i]);
+const BURR_MOLECULE_SPLIT_STAGES = BURR_MOLECULE_SPLIT_STAGE_DEFS.map(({ lobeA, lobeB }, i) => {
+  const cells = joinTwoShapes(lobeA.cells, lobeB.cells);
+  return {
+    id: 86 + i,
+    name: `Burr Puzzle: Molecule Split (${lobeA.name} + ${lobeB.name})`,
+    derivedFrom: [{ id: 66, tier: 'Molecule Split' }, { id: 83, tier: 'Burr Puzzle' }],
+    build: (scale) => buildBigHullStage(scale, cells, 3, 3, [0]),
+  };
+});
+
+// Burr + Mirrored Molecule: same crossover, on a genuine chiral mirror-
+// pair lobe (CHIRAL_FIVE_CELL_SHAPES, same source Mirrored Molecule
+// itself draws from) instead of two different catalog shapes.
+const BURR_MIRRORED_MOLECULE_INDEXES = [0, 3, 6];
+const BURR_MIRRORED_MOLECULE_STAGES = BURR_MIRRORED_MOLECULE_INDEXES.map((shapeIndex, i) => {
+  const cellsA = CHIRAL_FIVE_CELL_SHAPES[shapeIndex];
+  const cells = joinTwoShapes(cellsA, mirrorCells(cellsA));
+  return {
+    id: 89 + i,
+    name: `Burr Puzzle: Mirrored Molecule ${shapeIndex + 1}`,
+    derivedFrom: [{ id: 58, tier: 'Mirrored Molecule' }, { id: 83, tier: 'Burr Puzzle' }],
+    build: (scale) => buildBigHullStage(scale, cells, 3, 3, [0]),
+  };
+});
+
+// Branching Molecule + Burr hub-key: a Y-joint's shared hub genuinely
+// can't seat until both arms are already in, so making the hub a Burr
+// key is the natural extension, not an arbitrary pairing -- see
+// `buildBranchingMoleculeStage`'s own `hubIsKey` param.
+const BURR_BRANCHING_MOLECULE_INDEXES = [0, 2, 4];
+const BURR_BRANCHING_MOLECULE_STAGES = BURR_BRANCHING_MOLECULE_INDEXES.map((defIndex, i) => {
+  const { hub, branch1, branch2 } = BRANCHING_MOLECULE_STAGE_DEFS[defIndex];
+  return {
+    id: 92 + i,
+    name: `Branching Molecule (Hub Key): ${hub.name} hub + ${branch1.name} + ${branch2.name}`,
+    derivedFrom: [{ id: 74, tier: 'Branching Molecule' }, { id: 83, tier: 'Burr Puzzle' }],
+    build: (scale) => buildBranchingMoleculeStage(scale, hub, branch1, branch2, pickBranchMoleculeDecoys(hub, branch1, branch2, defIndex * 2), true),
+  };
+});
+
 // Mirrored Molecule -- direct instruction (2026-09-04, "mirrored
 // molecules split it into 3 with 3 decoys", confirmed "both could
 // work" against two different readings): this is the FIRST reading --
@@ -2279,4 +2349,7 @@ export const STAGES = [
   { id: 80, name: 'Rhombic Dodecahedron (Disphenoids)', build: buildDisphenoidRDStage },
   ...BIG_HULL_STAGES,
   ...BURR_PUZZLE_STAGES,
+  ...BURR_MOLECULE_SPLIT_STAGES,
+  ...BURR_MIRRORED_MOLECULE_STAGES,
+  ...BURR_BRANCHING_MOLECULE_STAGES,
 ];
