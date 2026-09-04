@@ -1214,6 +1214,71 @@ build order:
   in-game wordmark's own ALL-CAPS styling. Pure content/copy change, no
   logic touched; full `node --test tests/unit/*.test.mjs` re-run clean
   regardless (295/295).
+
+  **Real, fundamental rendering bug found and fixed, 2026-09-04, live
+  report "shape appears half out of shot in upper right and cant be
+  coaxed down... when going to any stages of actual game"**: this
+  turned out to be a SEPARATE, more serious bug than the camera-layers
+  one above, hiding behind it. Every `renderer.setViewport()`/
+  `setScissor()`/`clear()` call in the two-pass render loop was being
+  pre-multiplied by `renderer.getPixelRatio()` (`const pr = ...; const
+  fullW = window.innerWidth * pr; ...`) under the assumption that these
+  methods take raw drawing-buffer (device) pixels -- they don't.
+  `WebGLRenderer.setViewport`/`setScissor` take LOGICAL (CSS) pixel
+  coordinates and apply the renderer's own tracked pixelRatio
+  internally before touching the GL state. Pre-multiplying by `pr`
+  meant the ACTUAL GL viewport/scissor ended up scaled by `pr` a SECOND
+  time -- on any real device with `devicePixelRatio > 1` (essentially
+  every phone), the tray's small rect was computed at roughly 2x its
+  intended size and position, extending past the real drawing buffer's
+  own bounds entirely.
+  
+  This was completely invisible in EVERY desktop test this whole
+  session (`devicePixelRatio` 1 there, so doubling was a mathematical
+  no-op), and the full-screen TARGET pass masked its own half of the
+  same bug too: an oversized full-screen rect still covers the whole
+  canvas either way, so only the TRAY -- the one pass where the exact
+  rect actually matters -- showed any visible symptom. Reproduced for
+  the first time only after deliberately testing a real mobile viewport
+  + device scale factor (`deviceScaleFactor: 3`, matching a real
+  phone) rather than only desktop viewports, confirmed with
+  `gl.getParameter(gl.VIEWPORT)`: the live GL state was exactly 2x the
+  intended tray rect in every dimension and extended past the real
+  drawing buffer's actual width/height. Ruled out several other
+  hypotheses first via direct evidence before finding this, in order:
+  color bleed from the tray pass's `clearDepth()`-only call (disproved
+  -- `renderer.autoClear` already fully clears color+depth within the
+  active scissor rect on every `render()` call, confirmed by extreme-
+  zoom testing showing zero bleed even with the target filling the
+  whole screen); stale depth-buffer values blocking the tray's own
+  geometry (disproved -- swapping to an explicit scissored `clear()`
+  changed nothing); THREE's per-object frustum culling wrongly
+  excluding tray pieces (disproved -- forcing `frustumCulled = false`
+  changed nothing); the render call not being issued at all (disproved
+  -- `renderer.info.render` showed real draw calls and triangle counts
+  for the tray pass). Only checking the RAW GL viewport/scissor state
+  directly surfaced the actual 2x mismatch. Fix: removed the pixelRatio
+  pre-multiplication everywhere in the render loop -- `setViewport`/
+  `setScissor`/`clear` now receive plain CSS-pixel coordinates
+  (`window.innerWidth`/`window.innerHeight`, and `trayViewportRect()`'s
+  own rect, untouched) and let the renderer handle device-pixel scaling
+  itself, matching what its own API actually expects. Verified live
+  after the fix: a direct pixel-level crop of the tray panel's exact
+  CSS rect on a 390x844/deviceScaleFactor:3 mobile viewport shows all 5
+  of Stage 9's pieces correctly lit and contained, zero target bleed;
+  re-checked across Stages 1/9/15 and after real dispatched-PointerEvent
+  touch-drag rotation (6 repeated swipes); re-confirmed zero regression
+  on the original desktop (pixelRatio 1) test matrix used throughout
+  this whole session. Full `node --test tests/unit/*.test.mjs` clean
+  (295/295, unchanged -- pure rendering-pixel-math fix, no `puzzle-
+  state.js` surface touched). **Lesson for this codebase going
+  forward**: any WebGL viewport/scissor/rendering change MUST be
+  verified against a real mobile viewport + a `deviceScaleFactor` > 1,
+  not just desktop -- pixelRatio-dependent bugs are structurally
+  invisible at `pixelRatio === 1` and both real bugs in this session's
+  two-viewport rewrite (the camera-layers one and this one) went
+  through multiple rounds of thorough-seeming desktop-only verification
+  before shipping.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

@@ -1016,30 +1016,37 @@ function animate() {
   // Two scissored passes, one shared renderer/scene -- the target gets
   // the full screen, the tray overlays a fixed top-right corner on top
   // of it (direct instruction "picker pieces should be top right").
-  // setViewport/setScissor operate in the renderer's own raw drawing-
-  // buffer pixels, not CSS pixels, hence the explicit pixelRatio
-  // multiplication -- easy to get a correctly-positioned viewport on a
-  // 1x display and a silently-wrong one on a real (2x+) phone otherwise.
-  const pr = renderer.getPixelRatio();
-  const fullW = window.innerWidth * pr;
-  const fullH = window.innerHeight * pr;
-
+  // setViewport/setScissor/clear all take LOGICAL (CSS) pixel
+  // coordinates -- WebGLRenderer applies its own tracked pixelRatio
+  // internally before touching the actual drawing buffer, so passing
+  // already-multiplied device-pixel values here double-scales
+  // everything. Real bug, live report (2026-09-04, "shape appears half
+  // out of shot in upper right and cant be coaxed down"): every call
+  // below used to be pre-multiplied by `renderer.getPixelRatio()`,
+  // which silently doubled on any real device with pixelRatio > 1 --
+  // completely invisible in desktop testing (pixelRatio 1, so doubling
+  // was a no-op) and only surfaced testing a real mobile viewport +
+  // device scale factor. The full-screen target pass masked its own
+  // half of the bug too: an oversized full-screen rect still covers the
+  // whole canvas, so only the tray -- a small sub-rect that actually
+  // needs to land in the RIGHT place -- showed any visible symptom.
+  // Confirmed via `gl.getParameter(gl.VIEWPORT)`: the actual GL state
+  // was exactly 2x the intended tray rect and extended past the real
+  // drawing buffer's own width/height entirely.
   renderer.setScissorTest(false);
-  renderer.setViewport(0, 0, fullW, fullH);
+  renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
   renderer.clear();
 
   renderer.setScissorTest(true);
-  renderer.setViewport(0, 0, fullW, fullH);
-  renderer.setScissor(0, 0, fullW, fullH);
+  renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+  renderer.setScissor(0, 0, window.innerWidth, window.innerHeight);
   renderer.render(scene, camera);
 
   const rect = trayViewportRect();
-  const trayX = rect.left * pr;
-  const trayY = (window.innerHeight - rect.top - rect.height) * pr; // CSS top-down -> WebGL bottom-up
-  const trayW = rect.width * pr;
-  const trayH = rect.height * pr;
-  renderer.setViewport(trayX, trayY, trayW, trayH);
-  renderer.setScissor(trayX, trayY, trayW, trayH);
+  const trayX = rect.left;
+  const trayY = window.innerHeight - rect.top - rect.height; // CSS top-down -> WebGL bottom-up
+  renderer.setViewport(trayX, trayY, rect.width, rect.height);
+  renderer.setScissor(trayX, trayY, rect.width, rect.height);
   renderer.clearDepth(); // a fresh depth buffer for this pass -- the target's own depth values must not bleed into the tray's
   renderer.render(scene, trayCamera);
 
