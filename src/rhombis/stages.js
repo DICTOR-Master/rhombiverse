@@ -15,6 +15,13 @@ import { ANY_SINGLE_CELL_GROUP } from './puzzle-state.js';
 
 export const WIRE_COLOR = 0x6ad0ff;
 const PIECE_COLOR = 0xffb35c;
+// A group id no real void ever has -- gives a "wrong shape" decoy piece
+// (one whose SHAPE itself doesn't match any group here, not just a
+// piece that's technically valid but a bad move) a `fillsGroup` that
+// placeSelected() will always reject, regardless of which void it's
+// tapped against, reusing the existing group-match machinery rather
+// than adding a special case for "this piece can never be placed".
+const DECOY_NEVER_MATCHES = '__decoy_shape_mismatch__';
 const IDENTITY_QUATERNION = new THREE.Quaternion();
 const ORIGIN = new THREE.Vector3(0, 0, 0);
 // Verbatim reuse of render.js's own World View "translucent" treatment
@@ -437,8 +444,8 @@ function buildStage5(scale) {
 // filling only its own cell, never both at once) adds a genuinely new
 // "joined pair" piece that fills both cells in a single placement,
 // which needed no new cell-position math, only a new piece.
-function twoCellCenters(scale) {
-  const cellOffsets = [[0, 0, 0], NEIGHBOR_OFFSETS[0]];
+function twoCellCenters(scale, neighborIndex = 0) {
+  const cellOffsets = [[0, 0, 0], NEIGHBOR_OFFSETS[neighborIndex]];
   const cellWorldPositions = cellOffsets.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
   const centroid = cellWorldPositions[0].clone().add(cellWorldPositions[1]).multiplyScalar(0.5);
   return cellWorldPositions.map((p) => p.clone().sub(centroid));
@@ -581,9 +588,29 @@ function buildStage7(scale) {
     homePosition: new THREE.Vector3(scale * 4, -scale * 2.6, 0),
   });
 
+  // A genuinely different "connection of 2" -- direct instruction
+  // (2026-09-04, "other connections of 2 for 2"): two whole RDs joined
+  // along a DIFFERENT real lattice direction (`NEIGHBOR_OFFSETS[1]`,
+  // not the target's own `[0]`) rather than another same-cell decoy.
+  // Looks like a perfectly plausible joined pair at a glance -- it just
+  // isn't shaped like THIS target's own pair, so it can never actually
+  // seat against it. Placed AFTER the joined-pair here, not appended
+  // last, so "last piece = fake" isn't a learnable shortcut (direct
+  // instruction, "with the decoys dont always make the real one last").
+  const wrongConnectionCenters = twoCellCenters(scale, 1);
+  const wrongConnectionGeometry = mergeGeometries([
+    rhombicDodecahedronGeometry(scale).translate(wrongConnectionCenters[0].x, wrongConnectionCenters[0].y, wrongConnectionCenters[0].z),
+    rhombicDodecahedronGeometry(scale).translate(wrongConnectionCenters[1].x, wrongConnectionCenters[1].y, wrongConnectionCenters[1].z),
+  ], false);
+  const wrongConnectionDecoy = makeFusedPiece(wrongConnectionGeometry, {
+    id: 'decoy-connection',
+    fillsGroup: DECOY_NEVER_MATCHES,
+    homePosition: new THREE.Vector3(scale * 4, -scale * 5.4, 0),
+  });
+
   return {
     skeletonGroup,
-    pieces: [decoyPiece, joinedPiece],
+    pieces: [decoyPiece, joinedPiece, wrongConnectionDecoy],
     voids,
     groups,
     hideIdleVoidWires: true,
@@ -631,7 +658,7 @@ function buildStage7(scale) {
 // already false there, and skipping the joined-pair block entirely just
 // leaves the N independent singles -- for N=1, exactly one single, one
 // cell, nothing else.
-function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
+function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices, decoyOption) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
   const n = cellLatticeOffsets.length;
@@ -741,14 +768,16 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
   // placeSelected()/voidValidityForPiece() resolve the ACTUAL target
   // group from whichever void gets tapped, instead of a group id fixed
   // on the piece.
-  const pieces = [];
+  //
+  // Every real piece is first collected as a {id, fillsGroup, geometry}
+  // SPEC, not built/positioned immediately -- `decoyOption` (below)
+  // needs to splice a decoy spec in at an arbitrary point in this same
+  // list BEFORE tray positions get assigned, so the decoy gets real
+  // spacing from `nextTrayPosition()` like every other piece instead of
+  // needing its own hand-placed coordinates.
+  const pieceSpecs = [];
   for (let i = 0; i < n; i++) {
-    const geometry = rhombicDodecahedronGeometry(scale);
-    pieces.push(makeFusedPiece(geometry, {
-      id: `single-${i}`,
-      fillsGroup: ANY_SINGLE_CELL_GROUP,
-      homePosition: nextTrayPosition(geometry),
-    }));
+    pieceSpecs.push({ id: `single-${i}`, fillsGroup: ANY_SINGLE_CELL_GROUP, geometry: rhombicDodecahedronGeometry(scale) });
   }
 
   if (hasJoinedPair) {
@@ -756,13 +785,7 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
       [ji, jj].map((idx) => rhombicDodecahedronGeometry(scale).translate(cellCenters[idx].x, cellCenters[idx].y, cellCenters[idx].z)),
       false,
     );
-    const joinedTrayScale = trayScaleFor(joinedGeometry);
-    pieces.push(makeFusedPiece(joinedGeometry, {
-      id: 'joined-pair',
-      fillsGroup: joinedGroupId,
-      homePosition: nextTrayPosition(joinedGeometry, joinedTrayScale),
-      trayScale: joinedTrayScale,
-    }));
+    pieceSpecs.push({ id: 'joined-pair', fillsGroup: joinedGroupId, geometry: joinedGeometry });
   }
 
   if (includeFullPiece) {
@@ -770,14 +793,44 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices) {
       cellCenters.map((center) => rhombicDodecahedronGeometry(scale).translate(center.x, center.y, center.z)),
       false,
     );
-    const fullTrayScale = trayScaleFor(fullGeometry);
-    pieces.push(makeFusedPiece(fullGeometry, {
-      id: 'full',
-      fillsGroup: 'full',
-      homePosition: nextTrayPosition(fullGeometry, fullTrayScale),
-      trayScale: fullTrayScale,
-    }));
+    pieceSpecs.push({ id: 'full', fillsGroup: 'full', geometry: fullGeometry });
   }
+
+  // A "wrong shape" decoy -- direct instruction (2026-09-04, "some
+  // better decoys on new early stages... a cube for 1[cell]... other
+  // connections... etc"): a piece that LOOKS plausible (same rough
+  // size, same orange material) but is shaped wrong for every group in
+  // THIS stage, so it can never actually seat anywhere -- distinct from
+  // Stage 2's own single-cell decoy (genuinely placeable, just a
+  // strategic trap). `decoyOption.cells` is another real N-cell lattice
+  // arrangement (typically a DIFFERENT enumerated shape than this
+  // stage's own target), merged into one piece the exact same way the
+  // "full" piece is; `decoyOption.trayIndex` controls where in the
+  // tray it lands, so it isn't always in the same relative slot across
+  // stages (direct instruction, "dont always make the real one last").
+  if (decoyOption) {
+    const decoyGeometry = decoyOption.cells
+      ? mergeGeometries(
+        decoyOption.cells.map(([cx, cy, cz]) => {
+          const p = new THREE.Vector3(...cellToWorld(cx, cy, cz, scale));
+          return rhombicDodecahedronGeometry(scale).translate(p.x - centroid.x, p.y - centroid.y, p.z - centroid.z);
+        }),
+        false,
+      )
+      : new THREE.BoxGeometry(scale, scale, scale);
+    const insertAt = Math.min(decoyOption.trayIndex ?? pieceSpecs.length, pieceSpecs.length);
+    pieceSpecs.splice(insertAt, 0, { id: 'decoy', fillsGroup: DECOY_NEVER_MATCHES, geometry: decoyGeometry });
+  }
+
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+    });
+  });
 
   return {
     skeletonGroup,

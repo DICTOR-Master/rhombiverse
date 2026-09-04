@@ -61,8 +61,11 @@
     #rhombis-tray-panel {
       position: fixed; z-index: 5; pointer-events: none;
       background: rgba(8, 10, 16, 0.35);
-      border: 1px solid rgba(106, 208, 255, 0.35);
       border-radius: 14px;
+      /* Direct instruction (2026-09-04, "can we make the boundary
+         around the picker invisible please") -- the visible border line
+         is gone; the background tint + soft shadow alone still read as
+         a distinct region without a hard outline. */
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
     }
     /* Direct instruction (2026-09-04, "success message in picker tray

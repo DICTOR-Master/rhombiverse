@@ -1529,6 +1529,66 @@ build order:
   always did. Full `node --test tests/unit/*.test.mjs` clean (305/305 --
   pure content reorder + one new, already-generalized stage instance, no
   `puzzle-state.js` logic changed).
+
+  **Real production-only bug: the logo never actually deployed --
+  2026-09-04**: the user's own finished logo (assets/rhombis-logo.jpg,
+  favicon/topbar/welcome-link PNGs derived from it) was added to the
+  repo and worked correctly in every local test -- then genuinely didn't
+  show up live at all ("RHOmbis logo not showing just a QM in a sqare"),
+  a real gap between local dev and production this project's own
+  zero-build-step local workflow can't catch by itself. Root cause:
+  `scripts/build.mjs` (Vercel's own `buildCommand`, see `vercel.json`)
+  copies a HARDCODED list of top-level entries into `dist/` -- the new
+  top-level `assets/` folder simply wasn't in that list, so it never
+  reached the deployed output at all, while `python3 -m http.server`
+  directly against the repo root (every local test this whole session)
+  serves the raw repo and has no such allowlist to miss. Fixed by adding
+  `'assets'` to `staticEntries`; verified by actually running `node
+  scripts/build.mjs` locally (not just editing and assuming) and
+  confirming `dist/assets/` contains all 5 files. **Lesson for this
+  codebase going forward**: a new top-level static folder needs adding
+  to `scripts/build.mjs`'s own `staticEntries` list, or it silently
+  never reaches production regardless of how many local tests pass --
+  local dev and the Vercel build are two genuinely different code paths
+  here, not just "docs vs. code" drift.
+
+  Also shipped in the same pass: the tray panel's own visible border
+  removed (`rhombis.html`, direct instruction, "make the boundary around
+  the picker invisible" -- background tint + shadow alone still read as
+  a distinct region); every remaining user-facing "Rhombis" capitalized
+  to "RHOMBIS" for consistency with the logo's own styling (the
+  settings-panel link in `index.html`, and `data/changelog.json`'s own
+  "RHOMBIS: A New Way In" entry title/body -- source-code comments
+  quoting the project name in prose, and `rhombis.html`'s own comment
+  quoting the unrelated OLD game's real name, both deliberately left
+  alone, not user-facing).
+
+  **First real decoy pass for the new whole-RD tier, in progress**:
+  direct instruction ("some better decoys on new early stages a cube
+  for 1 other connections of 2 for 2 etc", "with the decoys dont always
+  make the real one last") -- `buildNCellStage` (`stages.js`) refactored
+  to collect every real piece as a `{id, fillsGroup, geometry}` SPEC
+  before assigning tray positions, specifically so an optional new
+  `decoyOption` 4th parameter can splice a "wrong shape" decoy spec in
+  at an arbitrary index and still get the same real `nextTrayPosition`/
+  `trayScaleFor` spacing treatment every other piece already gets, no
+  hand-placed coordinates needed. A new `DECOY_NEVER_MATCHES` group-id
+  sentinel (reusing the existing group-match machinery, no `puzzle-
+  state.js` changes) makes a shape decoy reject against EVERY void in
+  the stage, not just the "wrong" ones -- distinct from Stage 2's
+  existing single-cell decoy (genuinely placeable, a strategic trap, not
+  a shape mismatch). Stage 2 (`buildStage7`) already has its own new
+  "other connection of 2" decoy live: two whole RDs joined along
+  `NEIGHBOR_OFFSETS[1]` instead of the real pair's `[0]` -- a genuinely
+  different, equally-plausible-LOOKING 2-cell shape, verified live to
+  reject against every void sampled. `buildNCellStage`'s own
+  `decoyOption` plumbing is built and verified inert (no call site
+  passes a 4th argument yet, confirmed via a full stage-by-stage replay
+  showing zero behavior change) -- wiring an actual decoy shape into
+  each of the 1/3/4-cell stage definitions is the next step, not done
+  yet. Full `node --test tests/unit/*.test.mjs` clean (305/305) and a
+  live Stage 2 check (tapping the new decoy against 6 sampled voids,
+  every one correctly rejected) before this checkpoint.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

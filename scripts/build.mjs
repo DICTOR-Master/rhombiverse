@@ -43,7 +43,7 @@ async function main() {
   // repo (docs, tests, CI config, api/'s own source) is either not
   // client-servable or handled separately by Vercel (api/ serverless
   // functions deploy independent of the static outputDirectory).
-  const staticEntries = ['index.html', 'rhombis.html', 'favicon.svg', 'data', 'TERMS.md', 'PRIVACY.md', 'SECURITY.md'];
+  const staticEntries = ['index.html', 'rhombis.html', 'favicon.svg', 'assets', 'data', 'TERMS.md', 'PRIVACY.md', 'SECURITY.md'];
   for (const entry of staticEntries) {
     await cp(path.join(root, entry), path.join(dist, entry), { recursive: true });
   }
