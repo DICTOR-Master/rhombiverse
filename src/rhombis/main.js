@@ -59,6 +59,16 @@ const VALID_GHOST_OPACITY = 0.85;
 const INVALID_GHOST_OPACITY = 0.12;
 const STAGE_ADVANCE_DELAY_MS = 1400;
 const ROTATION_DAMPING = 0.25;
+// Tactile-feel additions (2026-09-05, direct instruction: placement
+// felt flat/lifeless compared to games family members actually play --
+// an instant teleport + color-only change on both select and place).
+// Mirrors the existing targetQuaternion/slerp pattern for POSITION:
+// setting `mesh.userData.targetPosition` makes animate() ease the mesh
+// toward it every frame instead of snapping there instantly. Slightly
+// slower than rotation's own damping (0.25) -- a piece physically
+// traveling reads better a little more deliberate than a quick spin.
+const POSITION_DAMPING = 0.18;
+const SELECTED_LIFT = SCALE * 0.8; // relative to a single RD's own size -- tuned up from an initial 0.35 after a real screenshot comparison showed that read as barely perceptible
 // Friendlier labels for the small, named set of orientations that have
 // one; anything else (Stage 4's 12-way 'axisKey:in'/'axisKey:out') gets
 // a generic fallback from orientationLabel() below instead of an entry
@@ -704,6 +714,19 @@ function setPieceSelectedVisual(piece, isSelected) {
   if (piece.mesh.material.emissive) {
     piece.mesh.material.emissive.setHex(isSelected ? SELECTED_EMISSIVE : 0x000000);
   }
+  // Real lift on selection, real settle back down on deselection -- see
+  // POSITION_DAMPING's own comment. Gated to unplaced (still-in-tray)
+  // pieces only: an already-placed piece also runs through this same
+  // function to clear its glow on deselection, but `piece.homePosition`
+  // is its OLD tray slot, meaningless once it's a real part of the
+  // assembled shape (a real live bug would otherwise yank it back
+  // toward the tray on every future select/deselect elsewhere).
+  const sp = currentStatePiece(piece.id);
+  if (sp && !sp.placed) {
+    piece.mesh.userData.targetPosition = isSelected
+      ? piece.homePosition.clone().add(new THREE.Vector3(0, SELECTED_LIFT, 0))
+      : piece.homePosition.clone();
+  }
 }
 
 // Also toggles visibility, not just color -- on a stage where void
@@ -1151,13 +1174,20 @@ function handleTargetTap(clientX, clientY) {
   const target = placedPiece.fillsGroup
     ? current.groups.find((g) => g.id === result.targetGroupId)
     : hitVoid;
-  // Reparent tray -> skeleton (Object3D.add() detaches from its current
-  // parent automatically) so this piece rotates together with the rest
-  // of the assembled shape from now on, instead of staying pinned to
-  // the tray's fixed position in world space.
-  current.skeletonGroup.add(placedPiece.mesh);
+  // Reparent tray -> skeleton. `.attach()`, not `.add()` -- preserves
+  // the mesh's current WORLD transform across the reparent (THREE's own
+  // built-in for exactly this), so it stays visually right where it
+  // was (its lifted tray position) for this first frame instead of
+  // jumping to whatever its old LOCAL position means under the NEW
+  // parent. `targetPosition` (not an instant position.copy) is what
+  // actually carries it from there to `target.position` -- the real
+  // "slide and settle into place" motion, POSITION_DAMPING's own
+  // comment. Rotation stays instant (the piece already holds whatever
+  // orientation got it accepted here; animating that too risks reading
+  // as tumbling rather than sliding).
+  current.skeletonGroup.attach(placedPiece.mesh);
   placedPiece.mesh.layers.set(0); // visible to the target camera now, not TRAY_LAYER
-  placedPiece.mesh.position.copy(target.position);
+  placedPiece.mesh.userData.targetPosition = target.position.clone();
   placedPiece.mesh.quaternion.copy(target.quaternion);
   placedPiece.mesh.userData.targetQuaternion = target.quaternion;
   placedPiece.mesh.scale.setScalar(1); // real full size once actually part of the assembled shape, not the capped tray-display size
@@ -1203,6 +1233,8 @@ function animate() {
         const target = p.mesh.userData.targetQuaternion;
         if (target) p.mesh.quaternion.slerp(target, ROTATION_DAMPING);
       }
+      const targetPosition = p.mesh.userData.targetPosition;
+      if (targetPosition) p.mesh.position.lerp(targetPosition, POSITION_DAMPING);
     }
   }
 
