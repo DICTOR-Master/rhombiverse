@@ -1621,6 +1621,69 @@ build order:
   ratio; screenshots confirm each decoy renders as a genuinely distinct,
   gap-free shape. Full `node --test tests/unit/*.test.mjs` clean
   (305/305 -- pure content addition, no `puzzle-state.js` changes).
+
+  **Stage 2's cube decoy corrected twice more, same day**: first
+  direct correction ("cubes should be joined at edges or corners not on
+  flats") -- the initial two-cubes decoy was actually built flush FACE-
+  to-face despite its own comment claiming "edge" (a real implementation
+  mistake, not just unclear wording); fixed by offsetting the two cubes
+  along TWO axes at once instead of one, so they share exactly the 1D
+  edge where their corners meet, not a full 2D face -- a visibly
+  "twisted" silhouette that reads as clearly non-standard rather than a
+  flush block that could pass for a plausible piece shape-wise. Direct
+  follow-up acknowledged even an edge join can look a little like how
+  the game's own RD pieces connect, but confirmed that's an acceptable
+  tradeoff since most players won't have enough RD-geometry familiarity
+  for the resemblance to actually confuse them -- edge/corner joins are
+  now the standing preference for any future multi-primitive decoy,
+  not something to keep refining further.
+
+  Second addition, same day ("if yo do flush block decoy cubes rotate
+  them slightly.. to look more plausible"): the existing FLUSH cube-
+  chain decoys (the 3-cell/4-cell stages' own `asCubes` decoys, placed
+  at real lattice neighbor spacing) now get a small per-cube tilt
+  (`sin`/`cos` of the cube's own index, ~7 degrees) so a chain of
+  perfectly axis-aligned identical cubes doesn't read as an obvious
+  placeholder. Re-verified the Tetrahedron gap-close fix still holds
+  with the added rotation (5/5 trials selected correctly, same as
+  before) before shipping -- rotation is a rigid transform and doesn't
+  reduce the 1.5x overlap enough to reopen the hole, but this was
+  confirmed directly rather than assumed.
+
+  **Tray panel's own drop-shadow removed** (`rhombis.html`, direct
+  instruction, "can the picker tray be on a clear background so shadow
+  isnt cast on target?") -- it extended past the panel's own edges and
+  visibly darkened the target shape showing through just outside the
+  tray corner; the background tint alone (no border, no shadow now)
+  still reads as a distinct region. Full `node --test tests/unit/
+  *.test.mjs` clean (305/305) after all of the above.
+
+  **Real per-load tray shuffle, replacing the hand-picked decoy-slot
+  arrays -- 2026-09-04**: direct instruction ("there still seems to be
+  a lot of the right answers is the last piece") -- the earlier
+  `THREE_CELL_DECOY_TRAY_INDEXES`/`FOUR_CELL_DECOY_TRAY_INDEXES` fix
+  only varied where the DECOY landed; the underlying REAL pieces
+  (singles, then joined-pair, then "full") were still built in the SAME
+  fixed order every time, so "full" -- the one piece that solves an
+  entire stage in a single tap -- stayed predictably near the end
+  regardless of the decoy's own position, the exact same learnable-
+  shortcut problem in a different piece. Replaced with a genuine
+  Fisher-Yates shuffle of the WHOLE piece list (`buildNCellStage`) --
+  every load, not a fixed-but-varied order per stage, so even replaying
+  the SAME stage repeatedly never lets a position-based shortcut form.
+  Removed both hand-maintained index arrays and the `decoyOption.
+  trayIndex` option entirely -- the shuffle makes them redundant, not
+  just unused. Stage 2 (`buildStage7`), which doesn't go through
+  `buildNCellStage` and previously hand-placed each piece's own fixed Y
+  coordinate, got the equivalent fix: build piece specs first, shuffle,
+  THEN assign the 3 fixed tray Y-slots in the new shuffled order.
+  Verified live: loading the same stage 8 times in a row shows 8/8
+  distinct piece orders for Stage 7 (7 pieces), 5/8 for Stage 2 (3
+  pieces, 6 possible permutations), correctly alternating between the
+  only 2 possible orders for Stage 1 (2 pieces) -- genuine randomness,
+  not a fixed rotation. Full `node --test tests/unit/*.test.mjs` clean
+  (305/305 -- pure tray-layout change, no `puzzle-state.js` surface
+  touched, solving logic is unaffected by array order).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

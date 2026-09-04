@@ -64,9 +64,12 @@
       border-radius: 14px;
       /* Direct instruction (2026-09-04, "can we make the boundary
          around the picker invisible please") -- the visible border line
-         is gone; the background tint + soft shadow alone still read as
-         a distinct region without a hard outline. */
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+         is gone; the background tint alone still reads as a distinct
+         region without a hard outline. The soft drop-shadow that used
+         to sit alongside it is gone too (2026-09-04, "can the picker
+         tray be on a clear background so shadow isnt cast on target?")
+         -- it extended past the panel's own edges and visibly darkened
+         the target shape showing through just outside the tray corner. */
     }
     /* Direct instruction (2026-09-04, "success message in picker tray
        box" -- a real live report of a player repeatedly tapping the
