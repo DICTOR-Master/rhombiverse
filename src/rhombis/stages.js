@@ -678,6 +678,29 @@ function buildStage7(scale) {
 // already false there, and skipping the joined-pair block entirely just
 // leaves the N independent singles -- for N=1, exactly one single, one
 // cell, nothing else.
+// N cubes chained together via a real, exact edge-only join -- the same
+// two-axis offset (a full `scale` along each of two axes, so consecutive
+// cubes share only the 1D edge where their corners meet, never a flush
+// face) that Stage 2's own hand-built 2-cube decoy already uses. Cycling
+// through axis pairs keeps a longer chain from reading as one boring
+// straight diagonal. Every join is exact by construction -- no gap to
+// patch, no tilt needed to sell it. See its call site for the direct
+// instruction ("banknote forgery level, not monopoly money") this
+// replaced a fudgier (oversized + randomly tilted) version of.
+function cubeEdgeChainOffsets(n, scale) {
+  const AXIS_PAIRS = [['x', 'y'], ['y', 'z'], ['z', 'x']];
+  const offsets = [new THREE.Vector3(0, 0, 0)];
+  for (let i = 1; i < n; i++) {
+    const [a, b] = AXIS_PAIRS[(i - 1) % AXIS_PAIRS.length];
+    const step = new THREE.Vector3();
+    step[a] = scale;
+    step[b] = scale;
+    offsets.push(offsets[i - 1].clone().add(step));
+  }
+  const centroid = offsets.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / offsets.length);
+  return offsets.map((p) => p.clone().sub(centroid));
+}
+
 function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices, decoyOption) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
@@ -796,8 +819,22 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices, decoyOpti
   // spacing from `nextTrayPosition()` like every other piece instead of
   // needing its own hand-placed coordinates.
   const pieceSpecs = [];
-  for (let i = 0; i < n; i++) {
-    pieceSpecs.push({ id: `single-${i}`, fillsGroup: ANY_SINGLE_CELL_GROUP, geometry: rhombicDodecahedronGeometry(scale) });
+  // The N singles are collected as ONE group entry, not N separate
+  // pieceSpecs -- direct instruction (2026-09-04, "really dont want four
+  // single RDs in a row taking up space in picker tray"): since they're
+  // all the exact same interchangeable shape (see above), there's no
+  // reason each one needs its OWN tray slot. `isSingleGroup` marks this
+  // entry for the tray-position pass below to hand out ONE shared
+  // homePosition to every single it contains, instead of the normal one-
+  // slot-per-spec layout -- main.js's own revealNextTrayPiece() then
+  // shows only one of them at a time in that shared slot, the same "one
+  // at a time" queue it already runs for loose (non-fused) pieces.
+  if (n > 0) {
+    const singleSpecs = [];
+    for (let i = 0; i < n; i++) {
+      singleSpecs.push({ id: `single-${i}`, fillsGroup: ANY_SINGLE_CELL_GROUP, geometry: rhombicDodecahedronGeometry(scale) });
+    }
+    pieceSpecs.push({ isSingleGroup: true, specs: singleSpecs });
   }
 
   if (hasJoinedPair) {
@@ -837,32 +874,36 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices, decoyOpti
     let decoyGeometry;
     if (!decoyOption.cells) {
       decoyGeometry = new THREE.BoxGeometry(scale, scale, scale);
+    } else if (decoyOption.asCubes) {
+      // Cube decoys used to reuse the RD lattice's own cell positions
+      // (right for the RD-rendered branch below, since that geometry
+      // genuinely tiles at FCC neighbor spacing) -- but cubes DON'T tile
+      // at that spacing, so the first version had to fake its way past
+      // that: oversized 1.5x cubes to close a real raycast-missable hole
+      // at a compact cluster's center, plus a small per-cube random tilt
+      // "to look more plausible". Direct correction (2026-09-04): "make
+      // the cubes look like they are really trying to pretend to be RDs
+      // not just badly joined.. clean geometric shapes look right...
+      // roughly joined looks bogus straight away we are going for
+      // banknote forgery level not monopoly money level". A convincing
+      // forgery is precise, not fudged -- so this now builds a genuinely
+      // clean cube-native shape instead of forcing RD-spaced cubes to
+      // fake it: `cubeEdgeChainOffsets` chains N cubes together with the
+      // exact same edge-only join Stage 2's own 2-cube decoy already
+      // uses (offset by a full `scale` along TWO axes, so consecutive
+      // cubes share only the 1D edge where their corners meet, never a
+      // flush face) -- every join is exact by construction, so there's
+      // no gap to patch and nothing to tilt.
+      const chainOffsets = cubeEdgeChainOffsets(decoyOption.cells.length, scale);
+      decoyGeometry = mergeGeometries(
+        chainOffsets.map((offset) => new THREE.BoxGeometry(scale, scale, scale).translate(offset.x, offset.y, offset.z)),
+        false,
+      );
     } else {
-      // A real bug, caught live before shipping: a compact, all-
-      // mutually-adjacent arrangement (e.g. the Tetrahedron shape)
-      // rendered in plain scale-sized cubes left a visible HOLE at the
-      // cluster's own geometric center -- cubes, unlike RDs, aren't
-      // shaped to fill space at FCC neighbor spacing, so 4 of them
-      // arranged tetrahedrally don't actually touch in the middle. A
-      // raycast (or a real tap) aimed at the piece's own centroid hit
-      // nothing there. 1.5x sized cubes overlap enough to close that
-      // gap for every real N-cell arrangement, not just the loose ones.
-      const CUBE_DECOY_SCALE = 1.5;
-      // A small, varying tilt per cube -- direct instruction (2026-09-04,
-      // "if yo do flush block decoy cubes rotate them slightly.. to
-      // look more plausible"): a chain of PERFECTLY axis-aligned,
-      // identical cubes reads as an obvious placeholder rather than a
-      // deliberately-shaped alternate piece. `sin`/`cos` of the cube's
-      // own index gives each one a genuinely different (not identical,
-      // not fully random either) small tilt, subtle enough that the
-      // overall arrangement -- and DECOY_NEVER_MATCHES' own rejection --
-      // still reads clearly, not so much it looks broken.
-      const CUBE_DECOY_TILT = 0.12;
-      const makePieceGeometry = decoyOption.asCubes
-        ? (i) => new THREE.BoxGeometry(scale * CUBE_DECOY_SCALE, scale * CUBE_DECOY_SCALE, scale * CUBE_DECOY_SCALE)
-          .rotateX(CUBE_DECOY_TILT * Math.sin(i * 2.4))
-          .rotateY(CUBE_DECOY_TILT * Math.cos(i * 1.7))
-        : () => rhombicDodecahedronGeometry(scale);
+      // The RD-rendered branch: an actual different real N-cell lattice
+      // arrangement, rendered in genuine RD geometry -- this already
+      // tiles cleanly at FCC neighbor spacing, so it needs none of the
+      // cube branch's own fakery above.
       // Centered on the DECOY shape's own centroid, not this stage's
       // target centroid -- the two are different real shapes and can
       // have different centroids, so reusing the target's would leave
@@ -871,7 +912,7 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices, decoyOpti
       const decoyWorldPositions = decoyOption.cells.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
       const decoyCentroid = decoyWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / decoyWorldPositions.length);
       decoyGeometry = mergeGeometries(
-        decoyWorldPositions.map((p, i) => makePieceGeometry(i).translate(p.x - decoyCentroid.x, p.y - decoyCentroid.y, p.z - decoyCentroid.z)),
+        decoyWorldPositions.map((p) => rhombicDodecahedronGeometry(scale).translate(p.x - decoyCentroid.x, p.y - decoyCentroid.y, p.z - decoyCentroid.z)),
         false,
       );
     }
@@ -894,15 +935,36 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices, decoyOpti
     [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
   }
 
-  const pieces = pieceSpecs.map((spec) => {
-    const trayScale = trayScaleFor(spec.geometry);
-    return makeFusedPiece(spec.geometry, {
-      id: spec.id,
-      fillsGroup: spec.fillsGroup,
-      homePosition: nextTrayPosition(spec.geometry, trayScale),
-      trayScale,
-    });
-  });
+  const pieces = [];
+  for (const spec of pieceSpecs) {
+    if (spec.isSingleGroup) {
+      // One shared homePosition for the whole group -- the tray cursor
+      // only advances once here, not once per single, which is the
+      // actual space saving (main.js only ever shows one at a time in
+      // it regardless, but a shared slot is what lets the OTHER pieces
+      // below it in the shuffled order sit right underneath instead of
+      // leaving dead space where the hidden singles would have been).
+      const representativeGeometry = spec.specs[0].geometry;
+      const trayScale = trayScaleFor(representativeGeometry);
+      const homePosition = nextTrayPosition(representativeGeometry, trayScale);
+      for (const single of spec.specs) {
+        pieces.push(makeFusedPiece(single.geometry, {
+          id: single.id,
+          fillsGroup: single.fillsGroup,
+          homePosition: homePosition.clone(),
+          trayScale,
+        }));
+      }
+    } else {
+      const trayScale = trayScaleFor(spec.geometry);
+      pieces.push(makeFusedPiece(spec.geometry, {
+        id: spec.id,
+        fillsGroup: spec.fillsGroup,
+        homePosition: nextTrayPosition(spec.geometry, trayScale),
+        trayScale,
+      }));
+    }
+  }
 
   return {
     skeletonGroup,

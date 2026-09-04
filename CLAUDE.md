@@ -1684,6 +1684,72 @@ build order:
   not a fixed rotation. Full `node --test tests/unit/*.test.mjs` clean
   (305/305 -- pure tray-layout change, no `puzzle-state.js` surface
   touched, solving logic is unaffected by array order).
+
+  **Interchangeable singles share ONE tray slot now, revealed one at a
+  time -- 2026-09-04**: direct instruction ("really dont want four
+  single RDs in a row taking up space in picker tray"). Every N-cell
+  stage's interchangeable singles (`ANY_SINGLE_CELL_GROUP`) used to each
+  get their OWN tray slot from `nextTrayPosition()`, so a 4-cell stage
+  showed 4 visually-identical RDs stacked in the tray even though only
+  ONE of them is ever meaningfully distinct at a time. `buildNCellStage`
+  (`stages.js`) now collects the N singles as a single `isSingleGroup`
+  spec entry -- the tray-position pass hands out exactly ONE shared
+  `homePosition` to the whole group (only the cursor for a normal slot
+  advances once, not N times), while still creating N separate real
+  piece objects underneath (each needs its own id/mesh for
+  `placeSelected`). `main.js`'s existing "one loose piece at a time"
+  queue (`revealNextTrayPiece()`, already used for Stage 3/5/6's plain
+  loose pieces) was broadened to also cover `ANY_SINGLE_CELL_GROUP`
+  pieces, and `syncVisualsToState()`'s blanket "fused pieces are always
+  visible" rule got the same carve-out -- both by the same `fillsGroup
+  !== ANY_SINGLE_CELL_GROUP` check. Needed one more fix to actually take
+  effect on a FRESH stage load, not just after the first placement/undo:
+  `loadStage()` never called `syncVisualsToState()` at all (a fresh mesh
+  defaults to `visible = true`, so every single stayed visible until
+  something else happened to trigger a sync) -- it now calls
+  `syncVisualsToState()` directly at the end (which already runs
+  `refreshVoidHighlights()`/`updateHud()` itself, so the two standalone
+  calls that used to sit there are gone). Verified live end-to-end
+  (Playwright, a fresh Python venv against the already-cached Chromium
+  build, project-and-tap through both independent cameras): every 3/4-
+  cell stage shows exactly one visible single on load; tapping it into
+  an open void correctly reveals the next one in the shared slot;
+  undoing a single's placement correctly restores the previous one;
+  fully solving a 3-cell stage by only ever tapping the currently-
+  revealed single works end to end. Full `node --test tests/unit/
+  *.test.mjs` clean (305/305 -- pure tray-visibility/layout change, no
+  `puzzle-state.js` surface touched).
+
+  **Cube decoys rebuilt as a genuinely precise edge-joined chain, not a
+  fudged one -- 2026-09-04**: direct instruction, live mid-review of the
+  above ("try and make the cubes look like they are really trying to
+  pretend to be RDs not just badly joined.. clean geometric shapes look
+  right... roughly joined looks bogus straight away we are going for
+  banknote forgery level not monopoly money level"). The prior cube-
+  decoy version (see "Real decoys..." entry above) reused the RD
+  lattice's own cell positions for an N-cube cluster, which only worked
+  by faking past a real geometric mismatch: cubes don't tile at FCC
+  neighbor spacing the way RDs do, so it needed 1.5x-oversized cubes to
+  close a real center gap PLUS a small per-cube random tilt "to look
+  more plausible" -- exactly the kind of fudge that reads as sloppy up
+  close rather than as a deliberately different, well-made piece. Fixed
+  by dropping the RD-lattice positions entirely for the cube branch: a
+  new `cubeEdgeChainOffsets(n, scale)` chains N cubes together using the
+  exact same edge-only join Stage 2's own hand-built 2-cube decoy
+  already uses (offset a full `scale` along TWO axes, so consecutive
+  cubes share only the 1D edge where their corners meet, never a flush
+  face), cycling through axis pairs so a longer chain doesn't read as
+  one flat diagonal line. Every join is now exact by construction --
+  nothing to patch, nothing to tilt. The RD-rendered decoy branch (a
+  genuinely different real N-cell arrangement, alternating with the cube
+  branch per stage for variety) was untouched -- it already tiles
+  cleanly since it's real RD geometry at real lattice spacing. Verified
+  live via geometry vertex counts through the debug hook (RD = 72 verts/
+  cell, cube = 24 verts/cell -- both cube- and RD-branch decoys came out
+  at exactly N times their per-cell count, confirming no stray/missing
+  cells) and a visual screenshot pass confirming the chain reads as
+  sharp, precise, axis-aligned cube geometry, not a wobbly approximation.
+  Full `node --test tests/unit/*.test.mjs` clean (305/305).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

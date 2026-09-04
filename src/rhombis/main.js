@@ -443,8 +443,18 @@ function loadStage(index) {
   applyTrayFraming();
   solvedBanner.hidden = true;
   stageLabel.textContent = `Stage ${stageDef.id}: ${stageDef.name}`;
-  refreshVoidHighlights(); // sets each void wire's correct idle visibility
-  updateHud();
+  // A fresh piece mesh defaults to visible (THREE.Object3D's own
+  // default) -- fine for a fixed-group fused piece (always meant to be
+  // shown), but WRONG for the interchangeable singles, which now share
+  // one tray slot and need exactly one of them picked to start (the
+  // same "reveal next" logic syncVisualsToState() already runs on every
+  // placement/undo). Calling it here too, on a fresh load, is what
+  // actually applies that same one-at-a-time rule from the very first
+  // frame -- without this, every single stayed visible until the FIRST
+  // placement or undo happened to trigger a sync. It already runs
+  // refreshVoidHighlights()/updateHud() itself, so those standalone
+  // calls are gone.
+  syncVisualsToState();
   updateUndoButton();
 }
 
@@ -541,7 +551,16 @@ function syncVisualsToState() {
       const restQuaternion = sp.orientation ? quaternionForOrientationKey(sp.orientation) : (p.trayRestQuaternion ?? new THREE.Quaternion());
       p.mesh.quaternion.copy(restQuaternion);
       p.mesh.userData.targetQuaternion = restQuaternion;
-      p.mesh.visible = Boolean(p.fillsGroup); // fused: always shown; loose: fixed by revealNextTrayPiece below
+      // Fused pieces with a FIXED group (joined-pair, full, decoy) are
+      // always shown -- each is its own distinct slot. Interchangeable
+      // singles (ANY_SINGLE_CELL_GROUP) are the exception: direct
+      // instruction (2026-09-04, "really dont want four single RDs in a
+      // row taking up space in picker tray") -- they're all the same
+      // shape sharing one tray slot (stages.js gives them a shared
+      // homePosition), so only one should ever be visible at a time,
+      // same "one at a time" queue revealNextTrayPiece already runs for
+      // loose pieces below.
+      p.mesh.visible = Boolean(p.fillsGroup) && p.fillsGroup !== ANY_SINGLE_CELL_GROUP;
       p.mesh.scale.setScalar(p.trayScale ?? 1);
     }
     setPieceSelectedVisual(p, p.id === current.state.selectedPieceId);
@@ -592,12 +611,17 @@ function remainingCount() {
   return current.state.voids.filter((v) => !v.filled).length;
 }
 
-// Only ever queues LOOSE pieces (no `fillsGroup`) -- a fused piece is
-// its own separate, always-available tray slot (stages.js sets its
-// mesh visible from construction), not part of the "one at a time"
-// queue the count-tracked loose pieces share.
+// Queues LOOSE pieces (no `fillsGroup`) -- a fused piece with a FIXED
+// group is its own separate, always-available tray slot (stages.js sets
+// its mesh visible from construction). Interchangeable singles
+// (ANY_SINGLE_CELL_GROUP) join this same "one at a time" queue too
+// (2026-09-04, see syncVisualsToState's own comment) -- they all share
+// one tray slot/homePosition, so revealing them one at a time is what
+// actually frees up the space, not just deciding WHICH single shows.
 function revealNextTrayPiece() {
-  const next = current.pieces.find((p) => !p.fillsGroup && !currentStatePiece(p.id).placed);
+  const next = current.pieces.find(
+    (p) => (!p.fillsGroup || p.fillsGroup === ANY_SINGLE_CELL_GROUP) && !currentStatePiece(p.id).placed,
+  );
   if (!next) return;
   next.mesh.visible = true;
   next.mesh.position.copy(next.homePosition);
