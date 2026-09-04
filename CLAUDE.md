@@ -1830,6 +1830,89 @@ build order:
   change). Stage 14 (12/12) and Multi-Cell's own first cell (12/12) both
   fully succeeded with the original unmodified click math, giving strong
   live confidence independent of that one script artifact.
+
+  **New tier: Molecules (ids 17-44, 28 stages) -- 2026-09-04**, added
+  after the user play-tested the RD/Multi-Cell fix live on their own
+  phone ("all good so far thanks"). Direct instruction: "simple
+  interesting molecule shapes created by two joined sets, some shapes
+  already featured can be reused but main feature is formed from two
+  different picker shapes and there should be three similar decoys
+  mixed in, no singles as a general rule" -- confirmed via AskUserQuestion
+  that there's deliberately NO all-in-one "whole molecule" shortcut
+  piece either, so solving genuinely requires placing both real lobes.
+  Same "no orientation-matching, just does this shape go here" spirit as
+  the whole-RD tier (ids 1-10), reusing its own `THREE_CELL_STAGE_DEFS`/
+  `FOUR_CELL_STAGE_DEFS` catalog (8 real shapes total) as both the lobes
+  AND the decoy pool, per "some shapes already featured can be reused".
+  - `joinTwoShapes(cellsA, cellsB)` (`stages.js`) finds a real, non-
+    overlapping, FCC-adjacent join between two shapes' own cell-lattice
+    offsets by trying every (cell in A, cell in B, one of the 12 real
+    neighbor directions) combination and returning the first placement
+    that touches without occupying the same cells -- not a hand-picked
+    join point per shape pair, which would need a bespoke case for every
+    combination and silently break if either shape's own cell list ever
+    changed.
+  - `buildMoleculeStage(scale, lobeADef, lobeBDef, decoyDefs)` builds the
+    combined skeleton (reusing the exact same per-cell 12-void pyramid-
+    notch pattern `buildNCellStage`/`buildStage6` already use, just
+    scoped `groupIds` to `'lobe-a'`/`'lobe-b'` instead of per-cell ids),
+    the two real lobe pieces (`fillsGroup` = their own lobe's group,
+    group-filling every void in that lobe at once, same mechanic as
+    every other fused piece in this file), and exactly 3 decoys.
+  - `buildDecoyGeometry` (decoy geometry construction) was factored OUT
+    of `buildNCellStage`'s own inline decoy block into its own top-level
+    function specifically so this new tier's 3 decoys could reuse the
+    exact same, already-proven construction rather than a second copy.
+  - **Real bug found and fixed before shipping** (a synthetic tray-select
+    tap on a lobe piece silently missed, traced down rather than
+    dismissed as another test-precision artifact like the RD-stage one
+    above): a molecule has TWO real centroids in play -- the whole
+    assembled shape's shared centroid, and each LOBE's own centroid,
+    which is generally NOT the shared one (two joined clusters sit on
+    opposite sides of their shared midpoint, not centered on it
+    individually). The first version built each lobe's own piece
+    geometry translated relative to the SHARED centroid (copying
+    `buildNCellStage`'s "full" piece, where that's correct since there's
+    only one centroid in play there) -- this put a lobe piece's real
+    solid mass well off to one side of its own mesh's LOCAL origin,
+    silently breaking every downstream assumption that a piece's visual
+    center of mass sits at its own `mesh.position` (tray layout spacing,
+    raycast/tap targeting -- NOT a rendering bug, the shape looked fine,
+    only interaction targeting was wrong). Fixed by self-centering each
+    lobe's geometry on its OWN centroid, and using that same centroid
+    (not the shared origin) as the group's own placement anchor.
+  - Decoys prefer same-cell-count catalog entries over the two lobes'
+    own sizes when picking which 3 to show (`pickMoleculeDecoys`) --
+    direct instruction ("three similar decoys", reinforced "I want the
+    upper ones to be challenging to higher IQ individuals"): a decoy
+    sized like one of the real lobes is genuinely confusable at a
+    glance, not just topologically different -- applied uniformly
+    across every stage, not just the hardest ones.
+  - **Every one of the 28 possible lobe-pair combinations** the 8-shape
+    catalog can form (`C(8,2) = 28`, not a small hand-picked sample --
+    direct instruction "generate as many different ones as you can"),
+    sorted by total cell count ascending (6 -> 7 -> 8) so stage ORDER
+    itself is the real difficulty ramp ("making the higher stages truly
+    challenging") -- more cells is a legitimate difficulty lever (bigger
+    silhouette, more to hold in mind), the same one the whole-RD tier's
+    own 1->2->3->4 cell progression already uses, not an artificial
+    trick. Stage names include each lobe's own cell count in parens
+    (e.g. "Straight Line (3) + Straight Line (4)") since that shape name
+    exists in BOTH the N=3 and N=4 catalogs as two genuinely different
+    real shapes -- without the count, the name alone would misleadingly
+    read as the same piece twice.
+  - Verified live: all 28 stages build with zero runtime errors and the
+    correct piece composition (exactly 5 pieces: 2 real lobes + 3
+    decoys, 0 singles); full tap-select + tap-place solve confirmed
+    end-to-end on the easiest (id 17, 6 cells), a middle (id 33, 7
+    cells), and the hardest (id 44, 8 cells) stage, including a decoy
+    correctly rejecting everywhere first. Full `node --test tests/unit/
+    *.test.mjs` clean (311/311 -- no `puzzle-state.js` surface touched,
+    this tier reuses 100% existing group-fill/decoy-rejection logic).
+  - Not yet done: the user is about to play-test this tier live on their
+    own phone -- treat the very next message in this vein as live
+    feedback on a just-shipped, not-yet-field-tested tier, same as every
+    other "played it, here's what I found" report this whole session.
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in

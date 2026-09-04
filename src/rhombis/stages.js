@@ -731,6 +731,68 @@ function cubeEdgeChainOffsets(n, scale) {
   return offsets.map((p) => p.clone().sub(centroid));
 }
 
+// A "wrong shape" decoy piece's own geometry -- direct instruction
+// (2026-09-04, "some better decoys on new early stages... a cube for
+// 1[cell]... other connections... etc", later "cubes can be among
+// decoys at all levels"): a piece that LOOKS plausible (same rough
+// size, same orange material) but is shaped wrong for every group in
+// its own stage, so it can never actually seat anywhere -- distinct
+// from Stage 2's own single-cell decoy (genuinely placeable, just a
+// strategic trap). `decoyOption.cells` is another real N-cell lattice
+// arrangement (typically a DIFFERENT enumerated shape than the calling
+// stage's own target); `decoyOption.asCubes` renders that SAME
+// arrangement in plain cubes instead of RDs -- a genuinely different
+// primitive, not just a different topology. Factored out of
+// `buildNCellStage` (2026-09-04) so `buildMoleculeStage` (below) can
+// build its own 3 decoys from the exact same, already-proven
+// construction rather than a second copy of this logic.
+function buildDecoyGeometry(scale, decoyOption) {
+  if (!decoyOption.cells) {
+    return new THREE.BoxGeometry(scale, scale, scale);
+  }
+  if (decoyOption.asCubes) {
+    // Cube decoys used to reuse the RD lattice's own cell positions
+    // (right for the RD-rendered branch below, since that geometry
+    // genuinely tiles at FCC neighbor spacing) -- but cubes DON'T tile
+    // at that spacing, so the first version had to fake its way past
+    // that: oversized 1.5x cubes to close a real raycast-missable hole
+    // at a compact cluster's center, plus a small per-cube random tilt
+    // "to look more plausible". Direct correction (2026-09-04): "make
+    // the cubes look like they are really trying to pretend to be RDs
+    // not just badly joined.. clean geometric shapes look right...
+    // roughly joined looks bogus straight away we are going for
+    // banknote forgery level not monopoly money level". A convincing
+    // forgery is precise, not fudged -- so this now builds a genuinely
+    // clean cube-native shape instead of forcing RD-spaced cubes to
+    // fake it: `cubeEdgeChainOffsets` chains N cubes together with the
+    // exact same edge-only join Stage 2's own 2-cube decoy already
+    // uses (offset by a full `scale` along TWO axes, so consecutive
+    // cubes share only the 1D edge where their corners meet, never a
+    // flush face) -- every join is exact by construction, so there's
+    // no gap to patch and nothing to tilt.
+    const chainOffsets = cubeEdgeChainOffsets(decoyOption.cells.length, scale);
+    return mergeGeometries(
+      chainOffsets.map((offset) => new THREE.BoxGeometry(scale, scale, scale).translate(offset.x, offset.y, offset.z)),
+      false,
+    );
+  }
+  // The RD-rendered branch: an actual different real N-cell lattice
+  // arrangement, rendered in genuine RD geometry -- this already tiles
+  // cleanly at FCC neighbor spacing, so it needs none of the cube
+  // branch's own fakery above.
+  // Centered on the DECOY shape's own centroid, not the calling stage's
+  // target centroid -- the two are different real shapes and can have
+  // different centroids, so reusing the target's would leave the decoy
+  // mesh visually off-center within its own bounding volume (its local
+  // origin not at its own visual middle).
+  const decoyWorldPositions = decoyOption.cells.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const decoyCentroid = decoyWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / decoyWorldPositions.length);
+  return mergeGeometries(
+    decoyWorldPositions.map((p) => rhombicDodecahedronGeometry(scale).translate(p.x - decoyCentroid.x, p.y - decoyCentroid.y, p.z - decoyCentroid.z)),
+    false,
+  );
+}
+
 function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices, decoyOption) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
@@ -883,70 +945,12 @@ function buildNCellStage(scale, cellLatticeOffsets, joinedPairIndices, decoyOpti
     pieceSpecs.push({ id: 'full', fillsGroup: 'full', geometry: fullGeometry });
   }
 
-  // A "wrong shape" decoy -- direct instruction (2026-09-04, "some
-  // better decoys on new early stages... a cube for 1[cell]... other
-  // connections... etc", later "cubes can be among decoys at all
-  // levels"): a piece that LOOKS plausible (same rough size, same
-  // orange material) but is shaped wrong for every group in THIS stage,
-  // so it can never actually seat anywhere -- distinct from Stage 2's
-  // own single-cell decoy (genuinely placeable, just a strategic trap).
-  // `decoyOption.cells` is another real N-cell lattice arrangement
-  // (typically a DIFFERENT enumerated shape than this stage's own
-  // target); `decoyOption.asCubes` renders that SAME arrangement in
-  // plain cubes instead of RDs -- a genuinely different primitive, not
-  // just a different topology, same "wrong material" idea as Stage 1's
-  // own cube decoy and Stage 2's own two-cubes one, extended to N>=3
-  // for variety rather than every stage using the same kind of decoy.
-  // Where it lands in the tray is decided below, by a real per-load
-  // shuffle of the WHOLE piece order (not just the decoy's own slot --
-  // see that shuffle's own comment for why).
+  // A "wrong shape" decoy -- see `buildDecoyGeometry`'s own comment for
+  // the construction detail. Where it lands in the tray is decided
+  // below, by a real per-load shuffle of the WHOLE piece order (not
+  // just the decoy's own slot -- see that shuffle's own comment for why).
   if (decoyOption) {
-    let decoyGeometry;
-    if (!decoyOption.cells) {
-      decoyGeometry = new THREE.BoxGeometry(scale, scale, scale);
-    } else if (decoyOption.asCubes) {
-      // Cube decoys used to reuse the RD lattice's own cell positions
-      // (right for the RD-rendered branch below, since that geometry
-      // genuinely tiles at FCC neighbor spacing) -- but cubes DON'T tile
-      // at that spacing, so the first version had to fake its way past
-      // that: oversized 1.5x cubes to close a real raycast-missable hole
-      // at a compact cluster's center, plus a small per-cube random tilt
-      // "to look more plausible". Direct correction (2026-09-04): "make
-      // the cubes look like they are really trying to pretend to be RDs
-      // not just badly joined.. clean geometric shapes look right...
-      // roughly joined looks bogus straight away we are going for
-      // banknote forgery level not monopoly money level". A convincing
-      // forgery is precise, not fudged -- so this now builds a genuinely
-      // clean cube-native shape instead of forcing RD-spaced cubes to
-      // fake it: `cubeEdgeChainOffsets` chains N cubes together with the
-      // exact same edge-only join Stage 2's own 2-cube decoy already
-      // uses (offset by a full `scale` along TWO axes, so consecutive
-      // cubes share only the 1D edge where their corners meet, never a
-      // flush face) -- every join is exact by construction, so there's
-      // no gap to patch and nothing to tilt.
-      const chainOffsets = cubeEdgeChainOffsets(decoyOption.cells.length, scale);
-      decoyGeometry = mergeGeometries(
-        chainOffsets.map((offset) => new THREE.BoxGeometry(scale, scale, scale).translate(offset.x, offset.y, offset.z)),
-        false,
-      );
-    } else {
-      // The RD-rendered branch: an actual different real N-cell lattice
-      // arrangement, rendered in genuine RD geometry -- this already
-      // tiles cleanly at FCC neighbor spacing, so it needs none of the
-      // cube branch's own fakery above.
-      // Centered on the DECOY shape's own centroid, not this stage's
-      // target centroid -- the two are different real shapes and can
-      // have different centroids, so reusing the target's would leave
-      // the decoy mesh visually off-center within its own bounding
-      // volume (its local origin not at its own visual middle).
-      const decoyWorldPositions = decoyOption.cells.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
-      const decoyCentroid = decoyWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / decoyWorldPositions.length);
-      decoyGeometry = mergeGeometries(
-        decoyWorldPositions.map((p) => rhombicDodecahedronGeometry(scale).translate(p.x - decoyCentroid.x, p.y - decoyCentroid.y, p.z - decoyCentroid.z)),
-        false,
-      );
-    }
-    pieceSpecs.push({ id: 'decoy', fillsGroup: DECOY_NEVER_MATCHES, geometry: decoyGeometry });
+    pieceSpecs.push({ id: 'decoy', fillsGroup: DECOY_NEVER_MATCHES, geometry: buildDecoyGeometry(scale, decoyOption) });
   }
 
   // Real shuffle of the WHOLE tray order, every load -- direct
@@ -1214,6 +1218,228 @@ const FOUR_CELL_STAGES = FOUR_CELL_STAGE_DEFS.map((def, i) => {
   };
 });
 
+// Molecules -- direct instruction (2026-09-04, after playing through the
+// pyramid-decomposition tier on a real phone, "no group to scope should
+// be based on simple interesting molecule shapes created by two joined
+// sets some shapes already featured can be reused but main feature is
+// formed from two different picker shapes and there should be three
+// similar decoys mixed in no singles as a general rule"): a genuinely
+// new composite -- two already-enumerated N-cell shapes (reused directly
+// from `THREE_CELL_STAGE_DEFS`/`FOUR_CELL_STAGE_DEFS` above, not new
+// geometry) joined into one bigger connected cluster, solved by placing
+// exactly the two REAL lobe pieces (each a genuine fused RD-cluster,
+// `fillsGroup` scoped to its own lobe's cells) against 3 decoys drawn
+// from the SAME catalog. Direct instruction, confirmed via a follow-up
+// question (2026-09-04): NO all-in-one "whole molecule" shortcut piece
+// and NO interchangeable singles at all -- solving genuinely requires
+// placing both real lobes, nothing else offered. Same "no orientation-
+// matching, just does this shape go here" spirit as the whole-RD tier
+// (ids 1-10) this reuses so much of, not the pyramid-decomposition
+// tier's own 6/12-way rotation mechanic.
+//
+// Finds a real, non-overlapping, FCC-adjacent join between two shapes'
+// own cell-lattice offsets -- tries every (cell in A, cell in B, one of
+// the 12 real neighbor directions) combination in a fixed order and
+// returns shapeB's cells translated to the FIRST placement that touches
+// A without occupying any of the same cells, rather than a hand-picked
+// join point per shape pair (would need one bespoke case per lobe
+// combination, and silently break the moment either shape's own cell
+// list changes).
+function joinTwoShapes(cellsA, cellsB) {
+  const key = (c) => c.join(',');
+  const aKeys = new Set(cellsA.map(key));
+  for (let ai = 0; ai < cellsA.length; ai++) {
+    for (let bi = 0; bi < cellsB.length; bi++) {
+      for (const [dx, dy, dz] of NEIGHBOR_OFFSETS) {
+        const anchor = [cellsA[ai][0] + dx, cellsA[ai][1] + dy, cellsA[ai][2] + dz];
+        const translation = [anchor[0] - cellsB[bi][0], anchor[1] - cellsB[bi][1], anchor[2] - cellsB[bi][2]];
+        const translatedB = cellsB.map(([x, y, z]) => [x + translation[0], y + translation[1], z + translation[2]]);
+        if (!translatedB.some((c) => aKeys.has(key(c)))) return translatedB;
+      }
+    }
+  }
+  throw new Error('joinTwoShapes: no non-overlapping adjacent placement found');
+}
+
+function buildMoleculeStage(scale, lobeADef, lobeBDef, decoyDefs) {
+  const skeletonGroup = new THREE.Group();
+  const pyramid = pyramidGeometry(scale);
+  const lobeBCells = joinTwoShapes(lobeADef.cells, lobeBDef.cells);
+  const lobes = [
+    { groupId: 'lobe-a', cells: lobeADef.cells },
+    { groupId: 'lobe-b', cells: lobeBCells },
+  ];
+
+  const allWorldPositions = [...lobeADef.cells, ...lobeBCells]
+    .map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = allWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / allWorldPositions.length);
+
+  const voids = [];
+  const groups = [];
+  let cursor = 0;
+  const pieceSpecs = [];
+  for (const lobe of lobes) {
+    const lobeCenters = lobe.cells.map(() => allWorldPositions[cursor++].clone().sub(centroid));
+    lobeCenters.forEach((cellCenter, i) => {
+      skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
+      PYRAMID_AXES.forEach((axisKey) => {
+        const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
+        [['in', inwardQuaternion], ['out', outwardQuaternion]].forEach(([dirLabel, toQuaternion]) => {
+          const v = makeVoid(pyramid, {
+            id: `v-${lobe.groupId}-${i}-${dirLabel}-${axisKey}`,
+            quaternion: toQuaternion(axisKey),
+            position: facePosition,
+            groupIds: [lobe.groupId],
+          });
+          skeletonGroup.add(...v.sceneObjects);
+          voids.push(v);
+        });
+      });
+    });
+    // Real bug, caught live before shipping (a tray-select tap on a
+    // lobe piece silently missed): a molecule has TWO real centroids in
+    // play -- the whole assembled shape's own shared centroid (what
+    // `lobeCenters` is expressed relative to, correctly, for the
+    // SKELETON's own void positions above) and each LOBE's own centroid
+    // (which is generally NOT the shared one -- two joined clusters sit
+    // on opposite sides of their shared midpoint, not centered on it
+    // individually). Building this piece's own geometry from
+    // `lobeCenters` directly, like `buildNCellStage`'s "full" piece
+    // does, put its real solid mass well off to one side of the mesh's
+    // own LOCAL origin -- everything downstream that assumes a piece's
+    // visual center of mass sits at its own `mesh.position` (tray
+    // layout spacing, raycast/tap targeting) was silently aimed at the
+    // wrong point. Fixed by self-centering the geometry on the LOBE's
+    // own centroid instead, and placing that centroid (not the shared
+    // origin) as the group's own placement anchor -- `mesh.position +
+    // (cell - lobeCentroid)` still lands on the correct shared-skeleton
+    // `cell` position once placed, exactly like every other fused piece
+    // in this file, just with the right centroid for THIS piece.
+    const lobeCentroid = lobeCenters.reduce((sum, c) => sum.add(c), new THREE.Vector3()).multiplyScalar(1 / lobeCenters.length);
+    groups.push({ id: lobe.groupId, position: lobeCentroid, quaternion: new THREE.Quaternion() });
+    const lobeGeometry = mergeGeometries(
+      lobeCenters.map((c) => rhombicDodecahedronGeometry(scale).translate(c.x - lobeCentroid.x, c.y - lobeCentroid.y, c.z - lobeCentroid.z)),
+      false,
+    );
+    pieceSpecs.push({ id: lobe.groupId, fillsGroup: lobe.groupId, geometry: lobeGeometry });
+  }
+
+  // Exactly 3 decoys, no more/fewer -- direct instruction ("three similar
+  // decoys mixed in"). Each is a genuine OTHER real shape from the same
+  // catalog these two lobes came from, rendered as a real RD cluster
+  // (never `asCubes`, unlike the whole-RD tier's own alternation) -- a
+  // different primitive here would stand out as obviously fake rather
+  // than reading as "similar" to the two real lobe pieces.
+  for (const decoyDef of decoyDefs) {
+    pieceSpecs.push({ id: `decoy-${decoyDef.name}`, fillsGroup: DECOY_NEVER_MATCHES, geometry: buildDecoyGeometry(scale, { cells: decoyDef.cells, asCubes: false }) });
+  }
+
+  // Same per-load Fisher-Yates as every other tier -- see buildNCellStage's
+  // own comment for why (no position-based shortcut should ever form).
+  for (let i = pieceSpecs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
+  }
+
+  const singleRDGeometry = rhombicDodecahedronGeometry(scale);
+  singleRDGeometry.computeBoundingSphere();
+  const MAX_TRAY_RADIUS = singleRDGeometry.boundingSphere.radius * 2.2;
+  function trayScaleFor(geometry) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius;
+    return radius > MAX_TRAY_RADIUS ? MAX_TRAY_RADIUS / radius : 1;
+  }
+  const TRAY_GAP = scale * 0.5;
+  let trayCursorY = 0;
+  function nextTrayPosition(geometry, trayScale) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius * trayScale;
+    if (trayCursorY !== 0) trayCursorY -= TRAY_GAP;
+    trayCursorY -= radius;
+    const y = trayCursorY;
+    trayCursorY -= radius;
+    return new THREE.Vector3(scale * 4, y, 0);
+  }
+
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+    });
+  });
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+}
+
+// The shared catalog every molecule stage's lobes AND decoys draw from
+// -- direct instruction ("some shapes already featured can be reused").
+// 4 real N=3 shapes + 4 curated N=4 shapes, 8 total.
+const MOLECULE_SHAPE_CATALOG = [...THREE_CELL_STAGE_DEFS, ...FOUR_CELL_STAGE_DEFS];
+
+// 3 other real shapes from the catalog, never the two this molecule's
+// own lobes already used -- a fixed rotating offset per stage (not
+// random at build-registration time, which only runs once at module
+// load) keeps each molecule stage's own decoy set stable and distinct
+// from its neighbors', while the ACTUAL tray position/order still gets
+// a genuine per-load shuffle above like everything else. Candidates
+// whose own cell count matches EITHER lobe sort first -- direct
+// instruction (2026-09-04, "three similar decoys", reinforced "I want
+// the upper ones to be challenging to higher IQ individuals"): a decoy
+// sized like one of the two real lobes is genuinely confusable at a
+// glance; one with a wildly different cell count gives itself away by
+// bulk alone before a player even looks at its actual topology. This
+// makes every stage's own decoys as similar as the catalog allows,
+// rather than only the later/harder ones -- the real difficulty ramp
+// across stages comes from `MOLECULE_STAGE_DEFS`' own cell-count
+// ordering below, not from making early stages easier to spot fakes in.
+function pickMoleculeDecoys(lobeA, lobeB, startIndex) {
+  const excluded = new Set([lobeA, lobeB]);
+  const lobeSizes = new Set([lobeA.cells.length, lobeB.cells.length]);
+  const pool = MOLECULE_SHAPE_CATALOG.filter((d) => !excluded.has(d));
+  const bySimilarity = [...pool].sort((a, b) => {
+    const aMatch = lobeSizes.has(a.cells.length) ? 0 : 1;
+    const bMatch = lobeSizes.has(b.cells.length) ? 0 : 1;
+    return aMatch - bMatch;
+  });
+  return [0, 1, 2].map((i) => bySimilarity[(startIndex + i) % bySimilarity.length]);
+}
+
+// Every real, distinct lobe-pair combination the current 8-shape catalog
+// can form -- direct instruction (2026-09-04, "generate as many
+// different ones as you can"): C(8,2) = 28 unique unordered pairs (order
+// doesn't matter -- "Triangle + Ring" and "Ring + Triangle" are the same
+// physical molecule), not a small hand-picked sample. Sorted by total
+// cell count ascending (6 -> 7 -> 8) so the stage ORDER itself is the
+// real difficulty ramp -- direct instruction ("making the higher stages
+// truly challenging... challenging to higher IQ individuals"): more
+// cells means more real spatial complexity to hold in mind at once
+// (bigger silhouette, more possible rotations to check against), the
+// same legitimate difficulty lever the whole-RD tier's own 1 -> 2 -> 3
+// -> 4 cell progression already uses, not an artificial trick. `sort`
+// is stable (guaranteed since ES2019), so pairs tied on cell count keep
+// their generation order (catalog index order) rather than reshuffling
+// unpredictably on every module load.
+const MOLECULE_STAGE_DEFS = [];
+for (let a = 0; a < MOLECULE_SHAPE_CATALOG.length; a++) {
+  for (let b = a + 1; b < MOLECULE_SHAPE_CATALOG.length; b++) {
+    MOLECULE_STAGE_DEFS.push({ lobeA: MOLECULE_SHAPE_CATALOG[a], lobeB: MOLECULE_SHAPE_CATALOG[b] });
+  }
+}
+MOLECULE_STAGE_DEFS.sort((x, y) => (x.lobeA.cells.length + x.lobeB.cells.length) - (y.lobeA.cells.length + y.lobeB.cells.length));
+
+// Each lobe's own cell count is part of its name -- "Straight Line"
+// exists in BOTH the N=3 and N=4 catalogs (a genuinely different real
+// shape at each size, not a duplicate), so "Straight Line + Straight
+// Line" alone would misleadingly read as the same piece twice.
+const MOLECULE_STAGES = MOLECULE_STAGE_DEFS.map(({ lobeA, lobeB }, i) => ({
+  id: 17 + i,
+  name: `Molecule: ${lobeA.name} (${lobeA.cells.length}) + ${lobeB.name} (${lobeB.cells.length})`,
+  build: (scale) => buildMoleculeStage(scale, lobeA, lobeB, pickMoleculeDecoys(lobeA, lobeB, i * 2)),
+}));
+
 // Reordered 2026-09-04 (direct instruction, "one RD to four RDs should
 // be earliest stages... they are so simple", reinforced: "knowing that
 // the cube and RD can be composed from pyramids is advanced knowledge...
@@ -1238,4 +1464,5 @@ export const STAGES = [
   { id: 14, name: 'Rhombic Dodecahedron', build: buildStage4 },
   { id: 15, name: 'Conjoined Pieces', build: buildStage5 },
   { id: 16, name: 'Multi-Cell', build: buildStage6 },
+  ...MOLECULE_STAGES,
 ];
