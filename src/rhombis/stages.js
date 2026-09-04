@@ -1442,13 +1442,22 @@ const HULL_STAGES = FIVE_CELL_HULL_DEFS.map((hullDef, i) => ({
 // join point per shape pair (would need one bespoke case per lobe
 // combination, and silently break the moment either shape's own cell
 // list changes).
-function joinTwoShapes(cellsA, cellsB) {
+// `anchorCells` (2026-09-04, added for branching molecules below) lets
+// a caller restrict WHERE the join is allowed to attach, separately
+// from what counts as already-occupied space -- e.g. a second branch
+// joining a hub must avoid overlapping the hub AND the first branch
+// (`cellsA` = both, for the overlap check) while still being required
+// to attach to the HUB specifically, not the first branch (`anchorCells`
+// = hub only). Defaults to `cellsA` itself, so every existing 2-lobe
+// caller (`buildMoleculeStage`) is unchanged -- same overlap set and
+// attachment set as before this parameter existed.
+function joinTwoShapes(cellsA, cellsB, anchorCells = cellsA) {
   const key = (c) => c.join(',');
   const aKeys = new Set(cellsA.map(key));
-  for (let ai = 0; ai < cellsA.length; ai++) {
+  for (let ai = 0; ai < anchorCells.length; ai++) {
     for (let bi = 0; bi < cellsB.length; bi++) {
       for (const [dx, dy, dz] of NEIGHBOR_OFFSETS) {
-        const anchor = [cellsA[ai][0] + dx, cellsA[ai][1] + dy, cellsA[ai][2] + dz];
+        const anchor = [anchorCells[ai][0] + dx, anchorCells[ai][1] + dy, anchorCells[ai][2] + dz];
         const translation = [anchor[0] - cellsB[bi][0], anchor[1] - cellsB[bi][1], anchor[2] - cellsB[bi][2]];
         const translatedB = cellsB.map(([x, y, z]) => [x + translation[0], y + translation[1], z + translation[2]]);
         if (!translatedB.some((c) => aKeys.has(key(c)))) return translatedB;
@@ -1571,6 +1580,113 @@ function buildMoleculeStage(scale, lobeADef, lobeBDef, decoyDefs) {
   return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
 }
 
+// A Y-shaped molecule -- direct instruction (2026-09-04, "plus more
+// molecules maybe some with two branching ends"): THREE real shapes,
+// not two -- a hub plus two separate branches, each joined to the HUB
+// specifically (not to each other, not to one another in a chain) via
+// `joinTwoShapes`' own `anchorCells` parameter (restricts branch2's
+// attachment points to the hub's own cells, while its overlap check
+// still spans hub+branch1 so it can't land on branch1's own cells
+// either). Deliberately a near-duplicate of `buildMoleculeStage` rather
+// than a shared generalized N-lobe builder -- the 28 existing 2-lobe
+// stages are already shipped and the user is actively playing through
+// them; refactoring that working, verified builder to also serve this
+// new 3-lobe shape risks a regression in already-tested content for a
+// DRY win, not worth it here (same reasoning `buildStage7` already
+// stayed its own function instead of folding into `buildNCellStage`).
+function buildBranchingMoleculeStage(scale, hubDef, branch1Def, branch2Def, decoyDefs) {
+  const skeletonGroup = new THREE.Group();
+  const pyramid = pyramidGeometry(scale);
+  const branch1Cells = joinTwoShapes(hubDef.cells, branch1Def.cells);
+  const occupiedSoFar = [...hubDef.cells, ...branch1Cells];
+  const branch2Cells = joinTwoShapes(occupiedSoFar, branch2Def.cells, hubDef.cells);
+  const lobes = [
+    { groupId: 'lobe-hub', cells: hubDef.cells },
+    { groupId: 'lobe-branch1', cells: branch1Cells },
+    { groupId: 'lobe-branch2', cells: branch2Cells },
+  ];
+
+  const allWorldPositions = [...hubDef.cells, ...branch1Cells, ...branch2Cells]
+    .map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = allWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / allWorldPositions.length);
+
+  const voids = [];
+  const groups = [];
+  let cursor = 0;
+  const pieceSpecs = [];
+  for (const lobe of lobes) {
+    const lobeCenters = lobe.cells.map(() => allWorldPositions[cursor++].clone().sub(centroid));
+    lobeCenters.forEach((cellCenter, i) => {
+      skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
+      PYRAMID_AXES.forEach((axisKey) => {
+        const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
+        [['in', inwardQuaternion], ['out', outwardQuaternion]].forEach(([dirLabel, toQuaternion]) => {
+          const v = makeVoid(pyramid, {
+            id: `v-${lobe.groupId}-${i}-${dirLabel}-${axisKey}`,
+            quaternion: toQuaternion(axisKey),
+            position: facePosition,
+            groupIds: [lobe.groupId],
+          });
+          skeletonGroup.add(...v.sceneObjects);
+          voids.push(v);
+        });
+      });
+    });
+    // Same self-centering fix `buildMoleculeStage` needed -- see its own
+    // comment for the real bug this avoids repeating.
+    const lobeCentroid = lobeCenters.reduce((sum, c) => sum.add(c), new THREE.Vector3()).multiplyScalar(1 / lobeCenters.length);
+    groups.push({ id: lobe.groupId, position: lobeCentroid, quaternion: new THREE.Quaternion() });
+    const lobeGeometry = mergeGeometries(
+      lobeCenters.map((c) => rhombicDodecahedronGeometry(scale).translate(c.x - lobeCentroid.x, c.y - lobeCentroid.y, c.z - lobeCentroid.z)),
+      false,
+    );
+    pieceSpecs.push({ id: lobe.groupId, fillsGroup: lobe.groupId, geometry: lobeGeometry });
+  }
+
+  // Still exactly 3 decoys -- same "similar decoys" reasoning as the
+  // 2-lobe tier, just against 3 real pieces instead of 2 this time.
+  for (const decoyDef of decoyDefs) {
+    pieceSpecs.push({ id: `decoy-${decoyDef.name}`, fillsGroup: DECOY_NEVER_MATCHES, geometry: buildDecoyGeometry(scale, { cells: decoyDef.cells, asCubes: false }) });
+  }
+
+  for (let i = pieceSpecs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
+  }
+
+  const singleRDGeometry = rhombicDodecahedronGeometry(scale);
+  singleRDGeometry.computeBoundingSphere();
+  const MAX_TRAY_RADIUS = singleRDGeometry.boundingSphere.radius * 2.2;
+  function trayScaleFor(geometry) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius;
+    return radius > MAX_TRAY_RADIUS ? MAX_TRAY_RADIUS / radius : 1;
+  }
+  const TRAY_GAP = scale * 0.5;
+  let trayCursorY = 0;
+  function nextTrayPosition(geometry, trayScale) {
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere.radius * trayScale;
+    if (trayCursorY !== 0) trayCursorY -= TRAY_GAP;
+    trayCursorY -= radius;
+    const y = trayCursorY;
+    trayCursorY -= radius;
+    return new THREE.Vector3(scale * 4, y, 0);
+  }
+
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+    });
+  });
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+}
+
 // The shared catalog every molecule stage's lobes AND decoys draw from
 // -- direct instruction ("some shapes already featured can be reused").
 // 4 real N=3 shapes + 4 curated N=4 shapes, 8 total.
@@ -1637,6 +1753,44 @@ const MOLECULE_STAGES = MOLECULE_STAGE_DEFS.map(({ lobeA, lobeB }, i) => ({
   build: (scale) => buildMoleculeStage(scale, lobeA, lobeB, pickMoleculeDecoys(lobeA, lobeB, i * 2)),
 }));
 
+// Same same-size-preferred decoy picking as `pickMoleculeDecoys`, just
+// excluding 3 real shapes (hub + both branches) instead of 2.
+function pickBranchMoleculeDecoys(hub, branch1, branch2, startIndex) {
+  const excluded = new Set([hub, branch1, branch2]);
+  const lobeSizes = new Set([hub.cells.length, branch1.cells.length, branch2.cells.length]);
+  const pool = MOLECULE_SHAPE_CATALOG.filter((d) => !excluded.has(d));
+  const bySimilarity = [...pool].sort((a, b) => {
+    const aMatch = lobeSizes.has(a.cells.length) ? 0 : 1;
+    const bMatch = lobeSizes.has(b.cells.length) ? 0 : 1;
+    return aMatch - bMatch;
+  });
+  return [0, 1, 2].map((i) => bySimilarity[(startIndex + i) % bySimilarity.length]);
+}
+
+// A curated batch of Y-shaped (branching) molecules, not every possible
+// hub+2-branch combination the catalog could form (C(8,3) x 3 hub
+// choices is a lot, and many combinations -- e.g. two 4-cell branches
+// off a 4-cell hub -- would produce a 12-cell composite bigger than
+// anything else in the game, more unwieldy than genuinely harder).
+// Hand-picked for a reasonable total-cell-count spread (9-11 cells,
+// past Molecules' own 6-8 range -- another real step up the difficulty
+// ramp) while keeping each one a real, distinct topology. Direct
+// instruction: "plus more molecules maybe some with two branching ends".
+const BRANCHING_MOLECULE_STAGE_DEFS = [
+  { hub: THREE_CELL_STAGE_DEFS[0], branch1: THREE_CELL_STAGE_DEFS[1], branch2: THREE_CELL_STAGE_DEFS[2] }, // Triangle hub + Right-Angle Bend + Wide Bend (9 cells)
+  { hub: THREE_CELL_STAGE_DEFS[2], branch1: FOUR_CELL_STAGE_DEFS[0], branch2: THREE_CELL_STAGE_DEFS[3] }, // Wide Bend hub + Tetrahedron + Straight Line-3 (10 cells)
+  { hub: THREE_CELL_STAGE_DEFS[1], branch1: FOUR_CELL_STAGE_DEFS[1], branch2: FOUR_CELL_STAGE_DEFS[2] }, // Right-Angle Bend hub + Ring + Star (11 cells)
+  { hub: FOUR_CELL_STAGE_DEFS[0], branch1: THREE_CELL_STAGE_DEFS[0], branch2: THREE_CELL_STAGE_DEFS[1] }, // Tetrahedron hub + Triangle + Right-Angle Bend (10 cells)
+  { hub: FOUR_CELL_STAGE_DEFS[2], branch1: THREE_CELL_STAGE_DEFS[2], branch2: THREE_CELL_STAGE_DEFS[3] }, // Star hub + Wide Bend + Straight Line-3 (10 cells)
+  { hub: FOUR_CELL_STAGE_DEFS[3], branch1: THREE_CELL_STAGE_DEFS[0], branch2: FOUR_CELL_STAGE_DEFS[0] }, // Straight Line-4 hub + Triangle + Tetrahedron (11 cells)
+];
+
+const BRANCHING_MOLECULE_STAGES = BRANCHING_MOLECULE_STAGE_DEFS.map(({ hub, branch1, branch2 }, i) => ({
+  id: 58 + i,
+  name: `Branching Molecule: ${hub.name} (${hub.cells.length}) hub + ${branch1.name} (${branch1.cells.length}) + ${branch2.name} (${branch2.cells.length})`,
+  build: (scale) => buildBranchingMoleculeStage(scale, hub, branch1, branch2, pickBranchMoleculeDecoys(hub, branch1, branch2, i * 2)),
+}));
+
 // Reordered 2026-09-04 (direct instruction, "one RD to four RDs should
 // be earliest stages... they are so simple", reinforced: "knowing that
 // the cube and RD can be composed from pyramids is advanced knowledge...
@@ -1663,4 +1817,5 @@ export const STAGES = [
   { id: 16, name: 'Multi-Cell', build: buildStage6 },
   ...MOLECULE_STAGES,
   ...HULL_STAGES,
+  ...BRANCHING_MOLECULE_STAGES,
 ];

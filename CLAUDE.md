@@ -1993,6 +1993,47 @@ build order:
     surface touched).
   - Total stage count after this: 57 (was 44) -- past the halfway point
     toward the 80-100 target.
+  - **Confirmed live same day, right as Hulls shipped**: user played
+    through all 28 Molecule stages (ids 17-44), "all stages up to 44
+    solved... no issues".
+
+  **New tier: Branching Molecules (ids 58-63, 6 stages) -- 2026-09-04**,
+  same day, direct instruction: "plus more molecules maybe some with two
+  branching ends". A real 3-lobe extension of Molecules -- a HUB shape
+  plus two separate BRANCHES, each joined to the hub specifically (a Y
+  shape), not to each other and not to one another in a chain.
+  - `joinTwoShapes` gained an optional third `anchorCells` parameter
+    (defaults to the first argument, so every existing 2-lobe caller is
+    byte-for-byte unchanged) -- restricts WHERE a join may attach,
+    separate from what counts as already-occupied space: branch2's own
+    join call passes `hub.cells + branch1Cells` as the overlap-check set
+    but `hub.cells` alone as `anchorCells`, so it's forced to attach to
+    the HUB specifically (a real Y), never allowed to land on branch1's
+    own cells (overlap) or silently chain off branch1 instead (anchor
+    restriction).
+  - `buildBranchingMoleculeStage` is a deliberate near-duplicate of
+    `buildMoleculeStage` (3 lobes instead of 2, otherwise the same
+    skeleton/piece/decoy/tray-layout pattern) rather than a shared
+    generalized N-lobe builder -- refactoring the already-shipped,
+    already-verified, ACTIVELY BEING PLAYED 2-lobe builder into a shared
+    abstraction risked a regression in live content for a DRY win that
+    wasn't worth it here (same reasoning `buildStage7` stayed its own
+    function instead of folding into `buildNCellStage`, much earlier
+    this project).
+  - 6 hand-curated hub+branch1+branch2 combinations (not an exhaustive
+    sweep -- C(8,3) x 3 possible hub choices is a lot, and many
+    combinations, e.g. two 4-cell branches off a 4-cell hub, would
+    produce a 12-cell composite bigger and more unwieldy than genuinely
+    harder), spanning 9-11 total cells -- a real step up from Molecules'
+    own 6-8 cell range, still 3 real pieces + 3 decoys (6 total) like
+    the 2-lobe tier.
+  - Verified live: all 6 stages build with zero runtime errors and the
+    correct piece composition (exactly 6 pieces: 3 real lobes + 3
+    decoys); full tap-select + tap-place solve confirmed end-to-end on
+    the smallest (id 58, 9 cells) and largest (id 63, 11 cells) stage,
+    including all 3 decoys correctly rejecting everywhere first in both.
+    Full `node --test tests/unit/*.test.mjs` clean (311/311).
+  - Total stage count after this: 63 (was 57).
 - **Phases 1–4** (renderer, build tool, local persistence, public deploy)
   — done, live.
 - **Phase 5** (Shared World / Supabase realtime sync) — done, opt-in
