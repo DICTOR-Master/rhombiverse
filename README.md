@@ -38,10 +38,28 @@ geometry itself:
   Shared World sync, plus BCC/TO Build, Cuboctahedron Build (now growable
   onto both lattice parities, so cuboctahedra can touch face-to-face, not
   just vertex-to-vertex — the Piece picker's "Octahedron" fills the gaps
-  that opens up, a real zero-gap rectified cubic honeycomb, verified
+  that opens up, a real zero-gap **rectified cubic honeycomb**, verified
   numerically), Lattice Quick-View, and Dualize (FCC↔BCC space-group
   dual, `dual-lattice.js`) — view-only overlay, always visible whenever
   Crystal Core cells exist.
+  - **The cubic lattice this is a rectification of is real and already
+    reachable, not a separate hidden system** — spelled out explicitly
+    here since it wasn't obvious before: "rectified cubic honeycomb"
+    means the cuboctahedron+octahedron combination above is the
+    vertex-truncated version of the plain **cubic honeycomb** — the same
+    doubled-parity lattice points, filled with ordinary cubes instead.
+    Lattice Quick-View's own `cube` mode already renders each built
+    cell's inscribed cube (`pyramidPieces(SCALE).cube`, edge = `SCALE`)
+    at the single FCC parity; placed at BOTH parities (the same two
+    positions `cubocta`/`octahedron` Quick-View modes already preview)
+    those cubes touch face-to-face with zero gap and zero overlap — no
+    new geometry needed anywhere, only combining pieces that already
+    exist. `geometry-extensions/rock-salt-lattice.js` (added for
+    Rhombis's own real NaCl puzzle) is the same real structure again,
+    proven independently and numerically: rock salt's own two ion
+    sublattices, combined, are provably this identical simple-cubic
+    lattice (real coordination number 6), which is exactly why each
+    ion's own natural piece shape there is a plain cube too.
 - **Geometry Extensions (opt-in, still shape-focused):** radial gravity &
   planetoids (`gravity.js`, `planetoidgen.js`), Penrose/Ammann growth
   (`growth.js`), Duality Mode (periodic↔aperiodic tiling dual,
@@ -150,22 +168,33 @@ Molecule Split, a Mirrored Molecule, and a Branching Molecule; a Big
 Hull whose key can be a plain chunk or a genuine disphenoid group,
 drawn fresh at random every playthrough so it can't be memorized by
 piece type) — any stage built this way shows its own real lineage in
-the stage picker. Two Crystal tiers reuse the same proven geometry
-(FCC's Cuboctahedron, BCC's own real truncated-octahedron Voronoi cell)
-themed across 17 real crystallizing metals total (8 FCC: aluminum,
-copper, silver, gold, nickel, lead, platinum, palladium; 9 BCC: iron,
-chromium, tungsten, molybdenum, vanadium, niobium, tantalum, sodium,
-potassium), each stage colored with that metal's own real characteristic
-color — BCC is a genuinely different real lattice from the FCC/RD
-geometry every other tier uses, not a reskin. Every stage ships with
-decoy pieces drawn from the same real shape family, not obviously-wrong
-filler. `src/rhombis/` is its own small engine: `puzzle-state.js` (pure
-state machine, no THREE/DOM), `geometry.js` (mesh construction),
-`stages.js` (every stage's own content, generated from real lattice math
-rather than hand-placed wherever a generator can reach), `main.js`
-(input/render/camera, shared by every stage) — plus real BCC lattice
-math reused directly from `geometry-extensions/dual-lattice.js` and
-`bcc-detail-lattice.js`, not re-derived.
+the stage picker. Two merged Crystal stages (real FCC and BCC
+coordination geometry) each carry the other real crystallizing metals
+as attributions rather than shipping a separate near-identical stage
+per element. A real Alloy tier sits alongside them: 3 ordered B2
+intermetallics (NiAl, FeAl, beta brass), 2 dilute substitutional alloy
+steels (chromium, molybdenum — the dopant sites drawn at random every
+playthrough), a real interstitial Carbon Steel (the actual octahedral
+site carbon occupies in alpha-iron, a genuinely different piece of
+geometry rather than a recolored cell), 4 real FCC dilute alloys
+(electrum, white gold, rose gold, bronze), and a real Salt (NaCl)
+puzzle — 1 cation and its 6 real anion neighbors, the one stage built
+on cross-species octahedral coordination rather than same-species
+substitution. A Color Match tier duplicates the earliest 3-cell shapes
+with a genuinely different puzzle logic (each piece tied to one real
+cell by color, not shape) as an easier on-ramp, positioned before its
+own uncolored siblings. Every stage ships with decoy pieces drawn from
+the same real shape family, not obviously-wrong filler. `src/rhombis/`
+is its own small engine: `puzzle-state.js` (pure state machine, no
+THREE/DOM), `geometry.js` (mesh construction), `stages.js` (every
+stage's own content, generated from real lattice math rather than
+hand-placed wherever a generator can reach), `main.js` (input/render/
+camera, shared by every stage) — plus real lattice math reused directly
+from `geometry-extensions/dual-lattice.js`, `bcc-detail-lattice.js`,
+`interstitial-lattice.js` (the real BCC interstitial site), and
+`rock-salt-lattice.js` (the real NaCl structure, proven to be the FCC
+lattice with its own octahedral holes filled — a genuine simple-cubic
+lattice, needing no new mesh geometry at all), never re-derived.
 
 ## Structure
 

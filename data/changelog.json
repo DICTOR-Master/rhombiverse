@@ -1,11 +1,23 @@
 [
   {
     "date": "2026-09-05",
+    "title": "RHOMBIS: Real Alloys and Salt",
+    "link": "./rhombis.html?stage=100",
+    "items": [
+      "New: a real Alloy tier -- 3 ordered intermetallics (nickel aluminide, iron aluminide, beta brass), 2 dilute alloy steels (chromium, molybdenum -- which cells are the alloying metal is drawn fresh at random every playthrough), a real interstitial Carbon Steel (the actual octahedral gap carbon occupies in iron, a genuinely different piece of geometry, not a recolored cell), and 4 real gold/copper alloys (electrum, white gold, rose gold, bronze) -- every composition a real, verified ratio, not an invented one.",
+      "New: Salt -- a real sodium chloride puzzle, 1 ion and its 6 real neighbors in a genuine octahedral cross. Built on a brand new shared math module proving something real, not assumed: table salt's own crystal structure is the same FCC lattice already used everywhere else in this game, just with its own internal gaps filled by a second ion -- so every ion's own natural shape turns out to be a plain cube, nothing new to build.",
+      "New: the previous 17 near-identical single-metal stages merged down to 2, each one now honestly naming every other real metal it also represents instead of shipping a separate stage per element.",
+      "New: an easier Color Match tier duplicating the very first shapes with real colored pieces instead of shape-matching alone, positioned right before the harder originals rather than after everything else.",
+      "Fixed: two real color bugs caught by actually playing -- a colored piece's own background region wasn't tinted to match it (reading as visually clashing, especially on darker metals), and the colored-match tier's own palette was getting overridden by the game's ordinary right/wrong flash the moment you picked up a piece, which also secretly gave the answer away."
+    ]
+  },
+  {
+    "date": "2026-09-05",
     "title": "RHOMBIS: A Second Real Lattice",
     "link": "./rhombis.html?stage=105",
     "items": [
       "New: BCC -- a genuinely different real crystal lattice alongside FCC, with its own real space-filling shape (a truncated octahedron, not a rhombic dodecahedron) and its own real 8+6 neighbor geometry, not a reskin of the existing content.",
-      "New: Crystal tier -- 8 real FCC-crystallizing metals (aluminum, copper, silver, gold, nickel, lead, platinum, palladium) and 9 real BCC-crystallizing metals (iron, chromium, tungsten, molybdenum, vanadium, niobium, tantalum, sodium, potassium), each stage colored with that metal's own real characteristic color.",
+      "New: Crystal tier -- real FCC and BCC coordination geometry, each colored with a real crystallizing metal's own characteristic color (later merged into 2 stages carrying the other real metals as attributions, and followed by a dedicated Alloy tier -- see the next update).",
       "New: 4 crossover tiers combining mechanics that never met before -- a Burr Puzzle key layered onto a Molecule Split, a Mirrored Molecule, and a Branching Molecule composite, plus a Big Hull variant where the key can hide among either a plain chunk or genuine fine-grained disphenoid detail, drawn fresh at random every time you play.",
       "New: any stage built by combining earlier ones now shows real lineage in the stage picker -- which tier(s) it draws from, by name and number.",
       "Fixed: a Burr-key stage caught giving away which piece was blocked just from its own shape, before any placement was even tried -- the key is now drawn from every real piece in the stage, not always the same category of piece.",
