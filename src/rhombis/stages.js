@@ -13,6 +13,7 @@ import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rho
 import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld, cellsInShells } from '../core/lattice.js';
 import { BCC_NEIGHBOR_OFFSETS, truncatedOctahedronVertices, isBCC } from '../geometry-extensions/dual-lattice.js';
 import { bccShapeScaleFor } from '../geometry-extensions/bcc-detail-lattice.js';
+import { octahedronVerts } from '../geometry-extensions/interstitial-lattice.js';
 import { enumerateShapes, SYMMETRY_OPERATIONS, applySymmetry } from './cell-arrangements.js';
 import { ANY_SINGLE_CELL_GROUP } from './puzzle-state.js';
 
@@ -2881,6 +2882,186 @@ const BCC_ALLOY_STAGES = BCC_ALLOY_DEFS.map((def, i) => ({
   build: (scale) => buildBCCAlloyStage(scale, BCC_ALLOY_CELLS, def.colorEven, def.colorOdd),
 }));
 
+// Dilute alloy steels (2026-09-05, direct instruction: "different grade
+// steels including carbon, ... chrome, molybidenum"): real Chrome/
+// Molybdenum steels are NOT ordered 50/50 compounds like NiAl/FeAl/CuZn
+// above -- they're DILUTE substitutional solid solutions, a small
+// random fraction of Cr or Mo atoms replacing Fe at otherwise-ordinary
+// BCC lattice sites, real alpha-iron everywhere else. Genuinely
+// different real structure from the B2 alloys, not a reskin -- a
+// near-duplicate of buildBCCAlloyStage rather than a shared function,
+// same reasoning this file already applies elsewhere (see
+// buildBranchingMoleculeStage's own header) -- the coloring rule itself
+// is fundamentally different (real per-load RANDOM site selection, not
+// a fixed deterministic parity split), not just a parameter change.
+function buildBCCDiluteAlloyStage(scale, cellOffsets, baseColor, dopantColor, dopantCount) {
+  const skeletonGroup = new THREE.Group();
+  const shapeScale = bccShapeScaleFor(scale);
+  const toGeometry = truncatedOctahedronGeometry(shapeScale);
+
+  const cellWorldPositions = cellOffsets.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = cellWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / cellWorldPositions.length);
+  const cellCenters = cellWorldPositions.map((p) => p.clone().sub(centroid));
+
+  // Real per-load randomness (same Math.random() discipline the tray's
+  // own Fisher-Yates shuffle already uses elsewhere in this file) --
+  // real dilute alloys don't favor any particular site, so which cells
+  // are the dopant genuinely varies every time this stage loads.
+  const indices = cellOffsets.map((_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  const dopantIndexSet = new Set(indices.slice(0, dopantCount));
+  const cellColors = cellOffsets.map((_, i) => (dopantIndexSet.has(i) ? dopantColor : baseColor));
+
+  const voids = [];
+  cellCenters.forEach((cellCenter, i) => {
+    skeletonGroup.add(makeOuterSolid(toGeometry, cellCenter, cellColors[i]));
+    const v = makeVoid(toGeometry, { id: `v-cell-${i}`, position: cellCenter, groupIds: [`cell-${i}`] });
+    skeletonGroup.add(...v.sceneObjects);
+    voids.push(v);
+  });
+
+  const groups = cellCenters.map((center, i) => ({ id: `cell-${i}`, position: center.clone(), quaternion: new THREE.Quaternion() }));
+  const pieceSpecs = cellCenters.map((_, i) => ({ id: `single-${i}`, fillsGroup: `cell-${i}`, geometry: toGeometry, color: cellColors[i] }));
+
+  // Same physically-motivated key as the ordered alloys above (the
+  // shared coordination center can't be recognized as seated until its
+  // whole real neighbor shell surrounds it) -- true regardless of
+  // which cell happens to be the dopant this time.
+  const neighborIds = pieceSpecs.slice(1).map((spec) => spec.id);
+  pieceSpecs[0].requiresPlacedFirst = neighborIds;
+  pieceSpecs.push({ id: 'decoy-0', fillsGroup: DECOY_NEVER_MATCHES, geometry: toGeometry, color: PIECE_COLOR });
+
+  for (let i = pieceSpecs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
+  }
+
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+      color: spec.color,
+      requiresPlacedFirst: spec.requiresPlacedFirst,
+    });
+  });
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+}
+
+const DILUTE_ALLOY_DEFS = [
+  { name: 'Chromium Steel', formula: 'Fe + Cr', dopantColor: 0xc6c7c8, dopantCount: 2 }, // Cr, real color from BCC_ELEMENTS
+  { name: 'Molybdenum Steel', formula: 'Fe + Mo', dopantColor: 0x8c92ac, dopantCount: 2 }, // Mo, real color from BCC_ELEMENTS
+];
+const DILUTE_ALLOY_STAGES = DILUTE_ALLOY_DEFS.map((def, i) => ({
+  id: 107 + i,
+  name: `Alloy: ${def.name} (${def.formula})`,
+  derivedFrom: [{ id: 102, tier: 'BCC' }],
+  build: (scale) => buildBCCDiluteAlloyStage(scale, BCC_ALLOY_CELLS, BCC_ELEMENTS[0].color, def.dopantColor, def.dopantCount),
+}));
+
+// Carbon Steel (2026-09-05, direct instruction): real carbon in
+// alpha-iron is NOT a substitutional alloy at all -- it's an
+// INTERSTITIAL solute, sitting in the real octahedral "hole" between
+// lattice points, not replacing one. `geometry-extensions/
+// interstitial-lattice.js`'s own `octahedronVerts` is exactly this real
+// site (numerically verified there via a real Delaunay triangulation of
+// a real BCC lattice patch -- "the same distorted sites carbon occupies
+// in alpha-iron", that file's own header), already wired into real
+// production rendering (render.js's own buildInterstitialGeometry, the
+// same ConvexGeometry-from-real-vertices pattern this file already
+// reuses for the plain truncated-octahedron cells) -- reused directly,
+// not re-derived, per the standing "if it isn't in rhombiverse and we
+// need it, it should be in rhombiverse" principle. A genuinely
+// different PIECE OF GEOMETRY, not a recolored cell -- the real
+// physical reason carbon steel is a distinct real material from pure
+// iron, not just "iron with a different paint job".
+function buildCarbonSteelStage(scale, cellOffsets, baseColor, carbonColor) {
+  const skeletonGroup = new THREE.Group();
+  const shapeScale = bccShapeScaleFor(scale);
+  const toGeometry = truncatedOctahedronGeometry(shapeScale);
+
+  const cellWorldPositions = cellOffsets.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = cellWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / cellWorldPositions.length);
+  const cellCenters = cellWorldPositions.map((p) => p.clone().sub(centroid));
+
+  const voids = [];
+  cellCenters.forEach((cellCenter, i) => {
+    skeletonGroup.add(makeOuterSolid(toGeometry, cellCenter, baseColor));
+    const v = makeVoid(toGeometry, { id: `v-cell-${i}`, position: cellCenter, groupIds: [`cell-${i}`] });
+    skeletonGroup.add(...v.sceneObjects);
+    voids.push(v);
+  });
+
+  const groups = cellCenters.map((center, i) => ({ id: `cell-${i}`, position: center.clone(), quaternion: new THREE.Quaternion() }));
+  const pieceSpecs = cellCenters.map((_, i) => ({ id: `single-${i}`, fillsGroup: `cell-${i}`, geometry: toGeometry, color: baseColor }));
+
+  // The real interstitial site: one real octahedral hole (anchor at the
+  // shared coordination center, axis offset [2,0,0] -- one of
+  // dual-lattice.js's own 6 real BCC axis neighbor directions, already
+  // part of this shell) built from octahedronVerts' own real 6 vertices,
+  // converted through the SAME cellToWorld this whole file already uses
+  // for every other lattice coordinate (both math libraries share one
+  // real coordinate frame, confirmed in bcc-detail-lattice.js's own
+  // header). Self-centered on its own real centroid, same discipline
+  // every other fused/merged piece in this file needs.
+  const interstitialLatticeVerts = octahedronVerts([0, 0, 0], [2, 0, 0]);
+  const interstitialWorldVerts = interstitialLatticeVerts.map(([x, y, z]) => new THREE.Vector3(...cellToWorld(x, y, z, scale)).sub(centroid));
+  const interstitialCentroid = interstitialWorldVerts.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / interstitialWorldVerts.length);
+  const interstitialGeometry = new ConvexGeometry(interstitialWorldVerts.map((p) => p.clone().sub(interstitialCentroid)));
+
+  skeletonGroup.add(makeOuterSolid(interstitialGeometry, interstitialCentroid, carbonColor));
+  const carbonVoid = makeVoid(interstitialGeometry, { id: 'v-carbon', position: interstitialCentroid, groupIds: ['carbon'] });
+  skeletonGroup.add(...carbonVoid.sceneObjects);
+  voids.push(carbonVoid);
+  groups.push({ id: 'carbon', position: interstitialCentroid.clone(), quaternion: new THREE.Quaternion() });
+  pieceSpecs.push({ id: 'carbon-atom', fillsGroup: 'carbon', geometry: interstitialGeometry, color: carbonColor });
+
+  // Same physically-motivated key as the other Alloy stages -- the
+  // shared coordination center can't be recognized as seated until its
+  // whole real neighbor shell (now including the real interstitial
+  // site) surrounds it.
+  const nonKeyIds = pieceSpecs.filter((spec) => spec.id !== 'single-0').map((spec) => spec.id);
+  pieceSpecs[0].requiresPlacedFirst = nonKeyIds;
+  pieceSpecs.push({ id: 'decoy-0', fillsGroup: DECOY_NEVER_MATCHES, geometry: toGeometry, color: PIECE_COLOR });
+
+  for (let i = pieceSpecs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
+  }
+
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+      color: spec.color,
+      requiresPlacedFirst: spec.requiresPlacedFirst,
+    });
+  });
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+}
+
+// Real graphite/carbon color (a very dark, slightly warm near-black --
+// standard reference for elemental carbon/graphite).
+const CARBON_COLOR = 0x2b2b2b;
+const CARBON_STEEL_STAGE = {
+  id: 109,
+  name: 'Alloy: Carbon Steel (Fe + C, interstitial)',
+  derivedFrom: [{ id: 102, tier: 'BCC' }],
+  build: (scale) => buildCarbonSteelStage(scale, BCC_ALLOY_CELLS, BCC_ELEMENTS[0].color, CARBON_COLOR),
+};
+
 // Mirrored Molecule -- direct instruction (2026-09-04, "mirrored
 // molecules split it into 3 with 3 decoys", confirmed "both could
 // work" against two different readings): this is the FIRST reading --
@@ -2971,4 +3152,6 @@ export const STAGES = [
   ONE_BCC_STAGE,
   ...BCC_CRYSTAL_STAGES,
   ...BCC_ALLOY_STAGES,
+  ...DILUTE_ALLOY_STAGES,
+  CARBON_STEEL_STAGE,
 ];
