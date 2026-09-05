@@ -1,6 +1,18 @@
 [
   {
     "date": "2026-09-05",
+    "title": "RHOMBIS: A Real Difficulty Curve",
+    "link": "./rhombis.html?stage=16",
+    "items": [
+      "Fixed: stage order is a whole-game difficulty curve now, not a per-tier one -- BCC's own 1- and 2-piece introduction had ended up stranded as the SECOND-TO-LAST and LAST stages in the entire game, right after two 22/23-piece crossover puzzles, so a player sampling \"the hard end\" could land on a 1-piece stage and reasonably conclude the whole game was trivial. Moved beside the equivalent FCC introduction near the very start instead.",
+      "Fixed: the same real problem, smaller scale -- the Alloy tier's own Salt and Calcite puzzles (8 real pieces each) sat AFTER the larger 14-17 piece metal alloys purely because of which real-world family got scoped first, not because they were harder. Reordered the whole tier to genuinely ascend by real piece count.",
+      "Fixed: Crystal: Copper (a real recolored Big Hull: Cuboctahedron, no key, identical mechanism) was stranded at the very end alongside the hardest crossover puzzles despite matching its own un-recolored twin's difficulty exactly -- moved to sit right beside it.",
+      "Redesigned: the Big Hull + Disphenoid crossover puzzles. The previous version decomposed a whole cell into 18-24 separate small disphenoid pieces, which read as a second, unrelated mini-jigsaw bolted onto one lucky cell rather than a real interlocking key. Chunks now interlock directly at real crossing points instead: a genuine boundary cell between two chunks (found via the same real lattice adjacency the chunk partition itself grows through) splits along its own 3 real axis-pairs, and each slice is folded straight into whichever neighboring chunk actually borders it there -- a real \"half a cell missing, supplied by its neighbor\" seam, with zero new pieces added.",
+      "Fixed: two real instances of the same underlying mistake -- a piece bound to one arbitrary matching location when an identical piece should be able to fill ANY identical open location (Multi-Cell's two identical fused whole-cell pieces, and would-be duplicate disphenoid pieces in the redesign above) -- found and corrected across the file, not just where first reported."
+    ]
+  },
+  {
+    "date": "2026-09-05",
     "title": "Naming a Real Honeycomb",
     "items": [
       "Documentation only, no behavior change: Cuboctahedron Build growing face-to-face plus its own Octahedron gap-fill piece (shipped 2026-08-31, \"Cuboctahedra, Face to Face\") has a real, established name in solid geometry we'd never actually stated -- a rectified cubic honeycomb, the vertex-truncated form of the plain cubic honeycomb, built here as a real, numerically zero-gap tiling rather than an approximation.",

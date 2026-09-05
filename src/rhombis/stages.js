@@ -615,9 +615,17 @@ function buildStage6(scale) {
 
     const fusedGeometry = rhombicDodecahedronGeometry(scale);
     const fusedHome = new THREE.Vector3(scale * 4, -scale * 2.6 * cellIndex, -scale * 1.6);
+    // ANY_SINGLE_CELL_GROUP, not a fixed `groupId` -- direct instruction
+    // (2026-09-05, "when pieces are all the same it is tiresome to
+    // exclude them from fitting in other identical locations"): the two
+    // fused RD pieces here are the exact same geometry, so either one
+    // must be able to fill either cell, resolved dynamically from
+    // whichever cell's void actually gets tapped (`smallestEnclosingGroupId`
+    // in puzzle-state.js), same fix already applied to the N-cell single-
+    // RD-piece tier -- a real recurring pattern, not a one-off.
     fusedPieces.push(makeFusedPiece(fusedGeometry, {
       id: `fused-${groupId}`,
-      fillsGroup: groupId,
+      fillsGroup: ANY_SINGLE_CELL_GROUP,
       homePosition: fusedHome,
     }));
   });
@@ -1752,7 +1760,7 @@ function buildHullSplitStage(scale, hullDef) {
 // it still starts at 17 + 41 = 58 regardless of which of the two comes
 // first.
 const HULL_STAGES = FIVE_CELL_HULL_DEFS.map((hullDef, i) => ({
-  id: 21 + i,
+  id: 23 + i,
   name: `Hull ${i + 1}: 5-Cell Split`,
   build: (scale) => buildHullSplitStage(scale, hullDef),
 }));
@@ -2074,7 +2082,7 @@ MOLECULE_STAGE_DEFS.sort((x, y) => (x.lobeA.cells.length + x.lobeB.cells.length)
 // Molecules after direct feedback that 5-cell hulls read easier than
 // Molecules' own 6-8 cell composites (see HULL_STAGES' own comment).
 const MOLECULE_STAGES = MOLECULE_STAGE_DEFS.map(({ lobeA, lobeB }, i) => ({
-  id: 34 + i,
+  id: 36 + i,
   name: `Molecule: ${lobeA.name} (${lobeA.cells.length}) + ${lobeB.name} (${lobeB.cells.length})`,
   build: (scale) => buildMoleculeStage(scale, lobeA, lobeB, pickMoleculeDecoys(lobeA, lobeB, i * 2)),
 }));
@@ -2112,7 +2120,7 @@ const BRANCHING_MOLECULE_STAGE_DEFS = [
 ];
 
 const BRANCHING_MOLECULE_STAGES = BRANCHING_MOLECULE_STAGE_DEFS.map(({ hub, branch1, branch2 }, i) => ({
-  id: 78 + i,
+  id: 80 + i,
   name: `Branching Molecule: ${hub.name} (${hub.cells.length}) hub + ${branch1.name} (${branch1.cells.length}) + ${branch2.name} (${branch2.cells.length})`,
   build: (scale) => buildBranchingMoleculeStage(scale, hub, branch1, branch2, pickBranchMoleculeDecoys(hub, branch1, branch2, i * 2)),
 }));
@@ -2331,74 +2339,179 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChun
   return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
 }
 
-// Big Hull + Disphenoid key -- crossover (2026-09-05, direct
-// instruction, confirmed via AskUserQuestion after flagging the risk):
-// "only the key chunk gets disphenoid detail" -- Big Hull's own coarse
-// whole-cell chunks stay exactly as `buildBigHullStage` already builds
-// them for every OTHER cell; a small number of designated cells (real
-// extremities, not the macro shape's own most-connected center) get
-// decomposed into their own 6 fused disphenoid-groups instead of
-// staying a single whole-cell piece -- literally `buildDisphenoidRDStage`'s
-// own already-proven 6-groups-of-4 construction, just translated onto
-// each cell's real world position instead of a stage-local origin.
-// Deliberately NOT the literal "24 loose disphenoids per macro-shape
-// cell" reading -- that would repeat, at Big Hull's much larger 13/20-
-// cell scale, the exact "too much of an x-ray exploration" mistake
-// Disphenoid RD's own header comment already documents making and
-// reverting on a SINGLE cell.
+// Big Hull + Disphenoid key -- crossover, REDESIGNED 2026-09-05 on
+// direct real-time correction (kept below as the actual reasoning, not
+// smoothed over): "the purpose of adding disphenoids is not just to
+// make single pieces tiresome jigsaws while leaving the other grouped
+// pieces as normal. the idea is to make crossing points of the big
+// pieces lock into place with the smaller disphenoids creating this
+// key aspect" -> "junction point RDs dividing into three or four using
+// smaller pieces to achieve this is the way to go" -> "but attached to
+// bigger groups not singly doing this" -> "a junction RD comes into
+// being by the grouped pieces meeting there... half an RD missing from
+// a four piece or three piece" -> "never multiple small pieces making
+// up one [[cell]] except the one puzzle demonstrating this" (that's
+// Disphenoid RD's own real job, id 86 -- not repeated here).
 //
-// Real design flaw caught BEFORE shipping, not after (direct question:
-// "won't the disphenoid detail give away that it is the key, shouldn't
-// there be deep end pieces on several chunks?"): with only ONE cell
-// decomposed, the tray shows 3-4 big lumpy multi-cell chunks next to 6
-// small pointy disphenoid slivers -- the SHAPE FAMILY alone spoils which
-// piece is blocked before the player ever taps anything, defeating the
-// whole "discover by trying" point of a Burr key (the original 3-chunk
-// Burr stages avoid this because every chunk is a similarly-sized
-// irregular cluster; nothing about a chunk's own appearance singles out
-// the key). Fixed by decomposing 3 cells the same way, not 1 -- 18 real,
-// freely-placeable fine pieces exist purely so "small pointy piece" no
-// longer implies "blocked" (confirmed via AskUserQuestion: 3 cells,
-// 1-in-3 read, over the smaller 2-cell option).
+// Real mechanism: a small number of REAL crossing points (genuine
+// boundary cells between two different Big-Hull chunks, found via the
+// exact same NEIGHBOR_OFFSETS adjacency `partitionIntoIrregularChunks`
+// itself already grows through -- not an arbitrary fixed cell index)
+// each split along their own 3 real axis-pairs (JUNCTION_AXIS_GROUPS:
+// x, y, z) between whichever chunks actually border them there. Each
+// slice is folded DIRECTLY into that chunk's own single fused piece
+// geometry as a real interlocking tab -- literally "half an RD" missing
+// from one chunk, supplied by its neighbor -- rather than existing as
+// its own separate loose piece. No new piece count versus the plain
+// Big Hull tier: still exactly `chunkCount` real fused chunks, each a
+// single tray item, just with a genuinely interlocking real shape at
+// real junctions instead of a clean whole-cell boundary everywhere.
+// The upside DICTO named directly: "by spelling this out we get more
+// potential puzzles from what is already created" -- this is a real,
+// reusable geometric relationship (real neighbor adjacency decomposed
+// onto the disphenoid's own axis frame), not a one-off hack for these
+// two stages.
 //
-// Second real flaw caught after the sibling `buildDisphenoidElsewhereKeyHullStage`
-// shipped (direct instruction, "mix in the non disphenoid burr key so
-// the approach is less obvious"): this stage always hid its key among
-// the fine pieces, and that sibling always hid its key in a coarse
-// chunk -- either FIXED pattern is its own exploit once noticed. Fixed
-// by drawing the real key at random, per load, from EVERY real piece
-// (coarse chunks and fine groups alike) -- see the random draw below.
-function buildDisphenoidKeyHullStage(scale, allCells, fineCellIndexes, chunkCount, decoyChunkCount) {
+// The real key is still drawn at RANDOM, per load, from every real
+// chunk piece (unchanged in spirit from the original design, just
+// simpler now that there's no separate fine/coarse split to draw from)
+// -- same per-load Math.random() discipline the tray's own Fisher-Yates
+// shuffle already uses, so no position/pattern-based shortcut can form.
+const JUNCTION_AXIS_GROUPS = [['x+', 'x-'], ['y+', 'y-'], ['z+', 'z-']];
+
+// A real boundary cell: one with at least one real lattice neighbor
+// (NEIGHBOR_OFFSETS -- the exact adjacency the partition itself grows
+// through) assigned to a DIFFERENT chunk.
+function findChunkBoundaryCellIndexes(cells, assignments) {
+  const key = (c) => c.join(',');
+  const indexByKey = new Map(cells.map((c, i) => [key(c), i]));
+  return assignments
+    .map((a, i) => {
+      const isBoundary = NEIGHBOR_OFFSETS.some(([dx, dy, dz]) => {
+        const neighborIndex = indexByKey.get(key([a.cell[0] + dx, a.cell[1] + dy, a.cell[2] + dz]));
+        return neighborIndex !== undefined && assignments[neighborIndex].chunkIndex !== a.chunkIndex;
+      });
+      return isBoundary ? i : -1;
+    })
+    .filter((i) => i >= 0);
+}
+
+// Spreads the chosen junction cells across as many DISTINCT bordering
+// chunk-pairs as real boundaries exist, rather than clustering every
+// junction on the same one or two chunks touching.
+function pickDiverseJunctionCells(cells, assignments, boundaryIndexes, count) {
+  const key = (c) => c.join(',');
+  const indexByKey = new Map(cells.map((c, i) => [key(c), i]));
+  const pairKeysFor = (i) => {
+    const a = assignments[i];
+    return NEIGHBOR_OFFSETS
+      .map(([dx, dy, dz]) => indexByKey.get(key([a.cell[0] + dx, a.cell[1] + dy, a.cell[2] + dz])))
+      .filter((idx) => idx !== undefined && assignments[idx].chunkIndex !== a.chunkIndex)
+      .map((idx) => [a.chunkIndex, assignments[idx].chunkIndex].sort().join('-'));
+  };
+  const seenPairs = new Set();
+  const picked = [];
+  for (const i of boundaryIndexes) {
+    if (picked.length >= count) break;
+    const pairs = pairKeysFor(i);
+    if (pairs.some((p) => !seenPairs.has(p))) {
+      picked.push(i);
+      pairs.forEach((p) => seenPairs.add(p));
+    }
+  }
+  for (const i of boundaryIndexes) {
+    if (picked.length >= count) break;
+    if (!picked.includes(i)) picked.push(i);
+  }
+  return picked;
+}
+
+// For one junction cell, which chunk owns each of its 3 real axis-pair
+// slices (JUNCTION_AXIS_GROUPS order: x, y, z). The REAL world-space
+// direction from the junction cell to each differently-chunked real
+// neighbor (NEIGHBOR_OFFSETS + cellToWorld, not PYRAMID_AXES/
+// AXIS_NORMALS' own unrelated cube-face scheme -- a genuinely different
+// 6-direction set with no 1:1 correspondence to the FCC lattice's real
+// 12-neighbor coordination) is decomposed onto global x/y/z -- the
+// SAME frame the disphenoid's own pyramid-axis groups are already built
+// along -- and whichever axis has that direction's LARGEST component
+// names the slice this neighbor claims. Strongest-aligned neighbor
+// claims first; a slice nobody claims (or only a weaker duplicate
+// wants) stays with the junction cell's own default/home chunk -- not
+// every direction out of a junction cell is a real crossing.
+function resolveJunctionAxisOwners(allCells, assignments, cellIndex, scale) {
+  const key = (c) => c.join(',');
+  const indexByKey = new Map(allCells.map((c, i) => [key(c), i]));
+  const homeChunk = assignments[cellIndex].chunkIndex;
+  const [cx, cy, cz] = allCells[cellIndex];
+  const homeWorld = new THREE.Vector3(...cellToWorld(cx, cy, cz, scale));
+
+  const candidates = [];
+  NEIGHBOR_OFFSETS.forEach(([dx, dy, dz]) => {
+    const neighborIndex = indexByKey.get(key([cx + dx, cy + dy, cz + dz]));
+    if (neighborIndex === undefined) return;
+    const neighborChunk = assignments[neighborIndex].chunkIndex;
+    if (neighborChunk === homeChunk) return;
+    const neighborWorld = new THREE.Vector3(...cellToWorld(cx + dx, cy + dy, cz + dz, scale));
+    const dir = neighborWorld.clone().sub(homeWorld).normalize();
+    const abs = [Math.abs(dir.x), Math.abs(dir.y), Math.abs(dir.z)];
+    const pairIndex = abs.indexOf(Math.max(...abs));
+    candidates.push({ pairIndex, strength: abs[pairIndex], chunk: neighborChunk });
+  });
+  candidates.sort((a, b) => b.strength - a.strength);
+
+  const owners = [homeChunk, homeChunk, homeChunk];
+  const claimed = [false, false, false];
+  candidates.forEach(({ pairIndex, chunk }) => {
+    if (!claimed[pairIndex]) {
+      owners[pairIndex] = chunk;
+      claimed[pairIndex] = true;
+    }
+  });
+  return owners;
+}
+
+function buildDisphenoidKeyHullStage(scale, allCells, junctionCellCount, chunkCount, decoyChunkCount) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
 
   const cellWorldPositions = allCells.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
   const centroid = cellWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / cellWorldPositions.length);
 
-  const fineIndexSet = new Set(fineCellIndexes);
-  const coarseCells = allCells.filter((_, i) => !fineIndexSet.has(i));
-  const coarseWorldPositions = cellWorldPositions.filter((_, i) => !fineIndexSet.has(i));
+  const assignments = partitionIntoIrregularChunks(allCells, chunkCount);
+  const boundaryIndexes = findChunkBoundaryCellIndexes(allCells, assignments);
+  const junctionCellIndexes = pickDiverseJunctionCells(allCells, assignments, boundaryIndexes, junctionCellCount);
+  const junctionIndexSet = new Set(junctionCellIndexes);
+  const junctionOwners = new Map(junctionCellIndexes.map((i) => [i, resolveJunctionAxisOwners(allCells, assignments, i, scale)]));
+
+  const orientationIndexes = DISPHENOID_ORIENTATIONS.map((_, i) => i);
+  const apexKeyFor = (i) => disphenoidApexAxisKey(i, scale);
+
+  // One real ghost outline per junction cell, drawn once regardless of
+  // how many chunks its slices end up split across.
+  junctionCellIndexes.forEach((cellIndex) => {
+    skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellWorldPositions[cellIndex].clone().sub(centroid)));
+  });
 
   const voids = [];
   const groups = [];
   const pieceSpecs = [];
 
-  // Coarse chunks -- identical construction to buildBigHullStage's own
-  // per-chunk loop, over every cell except the fine ones.
-  const assignments = partitionIntoIrregularChunks(coarseCells, chunkCount);
   for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
     const groupId = `chunk-${chunkIndex}`;
-    const memberCellIndexes = assignments
-      .map((a, i) => (a.chunkIndex === chunkIndex ? i : -1))
+    const contributions = []; // { anchor: Vector3, geometry: local-origin-centered BufferGeometry }
+
+    const wholeCellIndexes = assignments
+      .map((a, i) => (a.chunkIndex === chunkIndex && !junctionIndexSet.has(i) ? i : -1))
       .filter((i) => i >= 0);
-    const chunkCenters = memberCellIndexes.map((i) => coarseWorldPositions[i].clone().sub(centroid));
-    chunkCenters.forEach((cellCenter, i) => {
+    wholeCellIndexes.forEach((cellIndex, i) => {
+      const cellCenter = cellWorldPositions[cellIndex].clone().sub(centroid);
       skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
       PYRAMID_AXES.forEach((axisKey) => {
         const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
         [['in', inwardQuaternion], ['out', outwardQuaternion]].forEach(([dirLabel, toQuaternion]) => {
           const v = makeVoid(pyramid, {
-            id: `v-${groupId}-${i}-${dirLabel}-${axisKey}`,
+            id: `v-${groupId}-w${i}-${dirLabel}-${axisKey}`,
             quaternion: toQuaternion(axisKey),
             position: facePosition,
             groupIds: [groupId],
@@ -2407,86 +2520,57 @@ function buildDisphenoidKeyHullStage(scale, allCells, fineCellIndexes, chunkCoun
           voids.push(v);
         });
       });
+      contributions.push({ anchor: cellCenter, geometry: rhombicDodecahedronGeometry(scale) });
     });
-    const chunkCentroid = chunkCenters.reduce((sum, c) => sum.add(c), new THREE.Vector3()).multiplyScalar(1 / chunkCenters.length);
+
+    junctionCellIndexes.forEach((cellIndex, jSlot) => {
+      const owners = junctionOwners.get(cellIndex);
+      const ownedPairIndexes = owners.map((owner, pairIndex) => (owner === chunkIndex ? pairIndex : -1)).filter((i) => i >= 0);
+      if (!ownedPairIndexes.length) return;
+      const cellCenter = cellWorldPositions[cellIndex].clone().sub(centroid);
+      const ownedOrientationIndexes = orientationIndexes.filter((oi) => ownedPairIndexes.includes(JUNCTION_AXIS_GROUPS.findIndex((pair) => pair.includes(apexKeyFor(oi)))));
+      ownedOrientationIndexes.forEach((oi) => {
+        const key = DISPHENOID_ORIENTATIONS[oi];
+        const v = makeVoid(disphenoidGeometry(scale), {
+          id: `v-${groupId}-j${jSlot}-${key}`,
+          quaternion: quaternionForDisphenoidOrientation(key),
+          position: cellCenter,
+          groupIds: [groupId],
+        });
+        skeletonGroup.add(...v.sceneObjects);
+        voids.push(v);
+      });
+      const sliceGeometry = mergeGeometries(
+        ownedOrientationIndexes.map((oi) => disphenoidGeometry(scale).applyQuaternion(quaternionForDisphenoidOrientation(DISPHENOID_ORIENTATIONS[oi]))),
+        false,
+      );
+      contributions.push({ anchor: cellCenter, geometry: sliceGeometry });
+    });
+
+    const chunkCentroid = contributions.reduce((sum, c) => sum.add(c.anchor), new THREE.Vector3()).multiplyScalar(1 / contributions.length);
     groups.push({ id: groupId, position: chunkCentroid, quaternion: new THREE.Quaternion() });
     const chunkGeometry = mergeGeometries(
-      chunkCenters.map((c) => rhombicDodecahedronGeometry(scale).translate(c.x - chunkCentroid.x, c.y - chunkCentroid.y, c.z - chunkCentroid.z)),
+      contributions.map((c) => c.geometry.translate(c.anchor.x - chunkCentroid.x, c.anchor.y - chunkCentroid.y, c.anchor.z - chunkCentroid.z)),
       false,
     );
     pieceSpecs.push({ id: groupId, fillsGroup: groupId, geometry: chunkGeometry });
   }
 
-  // The fine cells -- buildDisphenoidRDStage's own 24-disphenoid /
-  // 6-group construction, translated onto each cell's real position
-  // instead of a stage-local origin. requiresPlacedFirst is assigned
-  // AFTER every real piece (coarse + fine) exists -- see below.
-  const coarseChunkIds = pieceSpecs.map((spec) => spec.id);
-  const orientationIndexes = DISPHENOID_ORIENTATIONS.map((_, i) => i);
-  const apexKeyFor = (i) => disphenoidApexAxisKey(i, scale);
-  fineCellIndexes.forEach((cellIndex, fineSlot) => {
-    const fineCellCenter = cellWorldPositions[cellIndex].clone().sub(centroid);
-    skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), fineCellCenter));
-    orientationIndexes.forEach((i) => {
-      const key = DISPHENOID_ORIENTATIONS[i];
-      const v = makeVoid(disphenoidGeometry(scale), {
-        id: `v-fine${fineSlot}-${key}`,
-        quaternion: quaternionForDisphenoidOrientation(key),
-        position: fineCellCenter,
-        groupIds: [`fine${fineSlot}-${apexKeyFor(i)}`],
-      });
-      skeletonGroup.add(...v.sceneObjects);
-      voids.push(v);
-    });
-    PYRAMID_AXES.forEach((axisKey) => {
-      const groupId = `fine${fineSlot}-${axisKey}`;
-      const memberIndexes = orientationIndexes.filter((i) => apexKeyFor(i) === axisKey);
-      const memberGeometries = memberIndexes.map((i) =>
-        disphenoidGeometry(scale).applyQuaternion(quaternionForDisphenoidOrientation(DISPHENOID_ORIENTATIONS[i])),
-      );
-      const memberCentroids = memberGeometries.map((g) => {
-        g.computeBoundingSphere();
-        return g.boundingSphere.center;
-      });
-      const localCentroid = memberCentroids.reduce((sum, c) => sum.add(c), new THREE.Vector3()).multiplyScalar(1 / memberCentroids.length);
-      const worldCentroid = fineCellCenter.clone().add(localCentroid);
-      groups.push({ id: groupId, position: worldCentroid, quaternion: new THREE.Quaternion() });
-      const geometry = mergeGeometries(
-        memberGeometries.map((g) => g.translate(-localCentroid.x, -localCentroid.y, -localCentroid.z)),
-        false,
-      );
-      pieceSpecs.push({ id: `chunk-${groupId}`, fillsGroup: groupId, geometry });
-    });
-  });
-
-  // The real key -- picked at RANDOM, per load, from EVERY real piece
-  // (coarse chunks AND fine groups alike), not fixed to always be a
-  // fine piece. Direct instruction (2026-09-05, "mix in the non
-  // disphenoid burr key so the approach is less obvious"): the sibling
-  // `buildDisphenoidElsewhereKeyHullStage` always hides its key in a
-  // coarse chunk; this stage previously always hid its key in a fine
-  // group -- either fixed pattern is itself a real exploit once a
-  // player notices it ("Disphenoid Key stages always gate a fine
-  // piece"). Merging both possibilities into ONE random draw here means
-  // the key's own LOCATION TYPE, not just its identity, is unknown
-  // ahead of time -- same per-load Math.random() discipline the tray's
-  // own Fisher-Yates shuffle already uses (no position/pattern-based
-  // shortcut should ever form).
-  const allRealIds = [...coarseChunkIds, ...pieceSpecs.filter((s) => s.id.startsWith('chunk-fine')).map((s) => s.id)];
+  const allRealIds = pieceSpecs.map((spec) => spec.id);
   const keyId = allRealIds[Math.floor(Math.random() * allRealIds.length)];
   const keySpec = pieceSpecs.find((spec) => spec.id === keyId);
   keySpec.requiresPlacedFirst = allRealIds.filter((id) => id !== keyId);
 
   // Decoys -- same alternate-irregular-partition idea buildBigHullStage
-  // already uses, over the coarse cells only (the fine cells' own groups
-  // get no decoys, matching Disphenoid RD's own choice not to add any
-  // loose/fake disphenoid pieces either).
+  // already uses, over every cell (junction cells included -- a decoy
+  // never needs to be a real interlocking shape, just a plausible-sized
+  // whole-cell cluster that never matches).
   for (let d = 0; d < decoyChunkCount; d++) {
-    const decoyAssignments = partitionIntoIrregularChunks(coarseCells, chunkCount, d + 1);
+    const decoyAssignments = partitionIntoIrregularChunks(allCells, chunkCount, d + 1);
     const decoyCellIndexes = decoyAssignments
       .map((a, i) => (a.chunkIndex === (d % chunkCount) ? i : -1))
       .filter((i) => i >= 0);
-    const decoyWorldPositions = decoyCellIndexes.map((i) => coarseWorldPositions[i]);
+    const decoyWorldPositions = decoyCellIndexes.map((i) => cellWorldPositions[i]);
     const decoyCentroid = decoyWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / decoyWorldPositions.length);
     const decoyGeometry = mergeGeometries(
       decoyWorldPositions.map((p) => rhombicDodecahedronGeometry(scale).translate(p.x - decoyCentroid.x, p.y - decoyCentroid.y, p.z - decoyCentroid.z)),
@@ -2516,8 +2600,8 @@ function buildDisphenoidKeyHullStage(scale, allCells, fineCellIndexes, chunkCoun
 }
 
 const BIG_HULL_STAGES = [
-  { id: 85, name: 'Big Hull: Cuboctahedron', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3) },
-  { id: 86, name: 'Big Hull: Tetrahedral Stack', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 4) },
+  { id: 87, name: 'Big Hull: Cuboctahedron', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3) },
+  { id: 89, name: 'Big Hull: Tetrahedral Stack', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 4) },
 ];
 
 // Burr Puzzle -- direct instruction (2026-09-04, "scope both... key
@@ -2540,9 +2624,9 @@ const BIG_HULL_STAGES = [
 // regular pieces are down), not one single forced sequence, which
 // would just be a strict full ordering wearing a "2 keys" label.
 const BURR_PUZZLE_STAGES = [
-  { id: 87, name: 'Burr Puzzle: Key Piece', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 2, [0]) },
-  { id: 88, name: 'Burr Puzzle: Key Piece (Tetrahedral)', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0]) },
-  { id: 89, name: 'Burr Puzzle: Two Keys', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0, 1]) },
+  { id: 90, name: 'Burr Puzzle: Key Piece', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 2, [0]) },
+  { id: 91, name: 'Burr Puzzle: Key Piece (Tetrahedral)', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0]) },
+  { id: 92, name: 'Burr Puzzle: Two Keys', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0, 1]) },
 ];
 
 // --- Crossover tiers (2026-09-05, direct instruction: "Burr + Molecule
@@ -2561,9 +2645,9 @@ const BURR_MOLECULE_SPLIT_STAGE_DEFS = [2, 14, 26].map((i) => MOLECULE_STAGE_DEF
 const BURR_MOLECULE_SPLIT_STAGES = BURR_MOLECULE_SPLIT_STAGE_DEFS.map(({ lobeA, lobeB }, i) => {
   const cells = joinTwoShapes(lobeA.cells, lobeB.cells);
   return {
-    id: 102 + i,
+    id: 105 + i,
     name: `Burr Puzzle: Molecule Split (${lobeA.name} + ${lobeB.name})`,
-    derivedFrom: [{ id: 70, tier: 'Molecule Split' }, { id: 87, tier: 'Burr Puzzle' }],
+    derivedFrom: [{ id: 72, tier: 'Molecule Split' }, { id: 90, tier: 'Burr Puzzle' }],
     build: (scale) => buildBigHullStage(scale, cells, 3, 3, [0]),
   };
 });
@@ -2576,9 +2660,9 @@ const BURR_MIRRORED_MOLECULE_STAGES = BURR_MIRRORED_MOLECULE_INDEXES.map((shapeI
   const cellsA = CHIRAL_FIVE_CELL_SHAPES[shapeIndex];
   const cells = joinTwoShapes(cellsA, mirrorCells(cellsA));
   return {
-    id: 105 + i,
+    id: 108 + i,
     name: `Burr Puzzle: Mirrored Molecule ${shapeIndex + 1}`,
-    derivedFrom: [{ id: 62, tier: 'Mirrored Molecule' }, { id: 87, tier: 'Burr Puzzle' }],
+    derivedFrom: [{ id: 64, tier: 'Mirrored Molecule' }, { id: 90, tier: 'Burr Puzzle' }],
     build: (scale) => buildBigHullStage(scale, cells, 3, 3, [0]),
   };
 });
@@ -2591,9 +2675,9 @@ const BURR_BRANCHING_MOLECULE_INDEXES = [0, 2, 4];
 const BURR_BRANCHING_MOLECULE_STAGES = BURR_BRANCHING_MOLECULE_INDEXES.map((defIndex, i) => {
   const { hub, branch1, branch2 } = BRANCHING_MOLECULE_STAGE_DEFS[defIndex];
   return {
-    id: 108 + i,
+    id: 111 + i,
     name: `Branching Molecule: ${hub.name} hub + ${branch1.name} + ${branch2.name} (II)`,
-    derivedFrom: [{ id: 78, tier: 'Branching Molecule' }, { id: 87, tier: 'Burr Puzzle' }],
+    derivedFrom: [{ id: 80, tier: 'Branching Molecule' }, { id: 90, tier: 'Burr Puzzle' }],
     build: (scale) => buildBranchingMoleculeStage(scale, hub, branch1, branch2, pickBranchMoleculeDecoys(hub, branch1, branch2, defIndex * 2), true),
   };
 });
@@ -2609,16 +2693,16 @@ const BURR_BRANCHING_MOLECULE_STAGES = BURR_BRANCHING_MOLECULE_INDEXES.map((defI
 // indices 10-19) -- all genuine extremities, not an arbitrary pick.
 const DISPHENOID_KEY_HULL_STAGES = [
   {
-    id: 111,
+    id: 114,
     name: 'Big Hull: Cuboctahedron (Disphenoid)',
-    derivedFrom: [{ id: 85, tier: 'Big Hull' }, { id: 84, tier: 'Disphenoid RD' }, { id: 87, tier: 'Burr Puzzle' }],
-    build: (scale) => buildDisphenoidKeyHullStage(scale, CUBOCTAHEDRON_CELLS, [1, 5, 9], 3, 1),
+    derivedFrom: [{ id: 87, tier: 'Big Hull' }, { id: 86, tier: 'Disphenoid RD' }, { id: 90, tier: 'Burr Puzzle' }],
+    build: (scale) => buildDisphenoidKeyHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3, 1),
   },
   {
-    id: 112,
+    id: 115,
     name: 'Big Hull: Tetrahedral Stack (Disphenoid)',
-    derivedFrom: [{ id: 86, tier: 'Big Hull' }, { id: 84, tier: 'Disphenoid RD' }, { id: 87, tier: 'Burr Puzzle' }],
-    build: (scale) => buildDisphenoidKeyHullStage(scale, TETRAHEDRAL_STACK_CELLS, [0, 10, 19], 4, 1),
+    derivedFrom: [{ id: 89, tier: 'Big Hull' }, { id: 86, tier: 'Disphenoid RD' }, { id: 90, tier: 'Burr Puzzle' }],
+    build: (scale) => buildDisphenoidKeyHullStage(scale, TETRAHEDRAL_STACK_CELLS, 3, 4, 1),
   },
 ];
 
@@ -2681,10 +2765,10 @@ const FCC_ELEMENTS = [
   { symbol: 'Pd', name: 'Palladium' },
 ];
 const CRYSTAL_STAGES = [{
-  id: 113,
+  id: 88,
   name: `Crystal: ${FCC_ELEMENTS[0].name} (${FCC_ELEMENTS[0].symbol})`,
   attributions: FCC_ELEMENTS.map((el) => `${el.name} (${el.symbol})`),
-  derivedFrom: [{ id: 85, tier: 'Big Hull' }],
+  derivedFrom: [{ id: 87, tier: 'Big Hull' }],
   build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3, [], FCC_ELEMENTS[0].color, FCC_ELEMENTS[0].color),
 }];
 
@@ -2751,7 +2835,7 @@ function buildBCCCellsStage(scale, cellOffsets, pieceColor = PIECE_COLOR, skelet
 // with real execution before any element theming was added on top.
 const BCC_TWO_CELL_OFFSETS = [[0, 0, 0], ...BCC_NEIGHBOR_OFFSETS.slice(0, 1)];
 const ONE_BCC_STAGE = {
-  id: 114,
+  id: 16,
   name: 'BCC: One Cell',
   build: (scale) => buildBCCCellsStage(scale, [[0, 0, 0]]),
 };
@@ -2775,10 +2859,10 @@ const BCC_ELEMENTS = [
   { symbol: 'K', name: 'Potassium' },
 ];
 const BCC_CRYSTAL_STAGES = [{
-  id: 115,
+  id: 18,
   name: `BCC Crystal: ${BCC_ELEMENTS[0].name} (${BCC_ELEMENTS[0].symbol})`,
   attributions: BCC_ELEMENTS.map((el) => `${el.name} (${el.symbol})`),
-  derivedFrom: [{ id: 114, tier: 'BCC' }],
+  derivedFrom: [{ id: 16, tier: 'BCC' }],
   build: (scale) => buildBCCCellsStage(scale, BCC_TWO_CELL_OFFSETS, BCC_ELEMENTS[0].color, BCC_ELEMENTS[0].color),
 }];
 
@@ -2878,9 +2962,9 @@ const BCC_ALLOY_DEFS = [
   { name: 'Beta Brass', formula: 'CuZn', colorEven: 0xb87333, colorOdd: 0xd0d3c8 }, // Cu (even/corner), Zn (odd/body-center) -- Zn: real pale blue-white metal color
 ];
 const BCC_ALLOY_STAGES = BCC_ALLOY_DEFS.map((def, i) => ({
-  id: 90 + i,
+  id: 99 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 114, tier: 'BCC' }],
+  derivedFrom: [{ id: 16, tier: 'BCC' }],
   build: (scale) => buildBCCAlloyStage(scale, BCC_ALLOY_CELLS, def.colorEven, def.colorOdd),
 }));
 
@@ -2962,9 +3046,9 @@ const DILUTE_ALLOY_DEFS = [
   { name: 'Molybdenum Steel', formula: 'Fe + Mo', dopantColor: 0x8c92ac, dopantCount: 2 }, // Mo, real color from BCC_ELEMENTS
 ];
 const DILUTE_ALLOY_STAGES = DILUTE_ALLOY_DEFS.map((def, i) => ({
-  id: 93 + i,
+  id: 102 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 114, tier: 'BCC' }],
+  derivedFrom: [{ id: 16, tier: 'BCC' }],
   build: (scale) => buildBCCDiluteAlloyStage(scale, BCC_ALLOY_CELLS, BCC_ELEMENTS[0].color, def.dopantColor, def.dopantCount),
 }));
 
@@ -3058,9 +3142,9 @@ function buildCarbonSteelStage(scale, cellOffsets, baseColor, carbonColor) {
 // standard reference for elemental carbon/graphite).
 const CARBON_COLOR = 0x2b2b2b;
 const CARBON_STEEL_STAGE = {
-  id: 95,
+  id: 104,
   name: 'Alloy: Carbon Steel (Fe + C, interstitial)',
-  derivedFrom: [{ id: 114, tier: 'BCC' }],
+  derivedFrom: [{ id: 16, tier: 'BCC' }],
   build: (scale) => buildCarbonSteelStage(scale, BCC_ALLOY_CELLS, BCC_ELEMENTS[0].color, CARBON_COLOR),
 };
 
@@ -3154,9 +3238,9 @@ const FCC_ALLOY_DEFS = [
   { name: 'Bronze', formula: 'Cu + Sn', baseColor: COPPER_COLOR, dopantColor: 0xd8d8d0, dopantCount: 2 }, // Sn in Cu -- Sn: real pale tin color
 ];
 const FCC_ALLOY_STAGES = FCC_ALLOY_DEFS.map((def, i) => ({
-  id: 96 + i,
+  id: 95 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 85, tier: 'Big Hull' }],
+  derivedFrom: [{ id: 87, tier: 'Big Hull' }],
   build: (scale) => buildFCCDiluteAlloyStage(scale, CUBOCTAHEDRON_CELLS, def.baseColor, def.dopantColor, def.dopantCount),
 }));
 
@@ -3231,9 +3315,9 @@ function buildRockSaltStage(scale, cellOffsets, cationColor, anionColor) {
 // for consistency); chlorine gas is a real, well-documented pale
 // yellow-green.
 const SALT_STAGE = {
-  id: 100,
+  id: 93,
   name: 'Salt: Sodium Chloride (NaCl)',
-  derivedFrom: [{ id: 85, tier: 'Big Hull' }],
+  derivedFrom: [{ id: 87, tier: 'Big Hull' }],
   build: (scale) => buildRockSaltStage(scale, ROCK_SALT_CELLS, 0xd8d8d0, 0xc9d67a),
 };
 
@@ -3356,9 +3440,9 @@ function buildCalciteStage(scale, cellOffsets, cationColor, anionColor) {
 // clean white/off-white (real calcite's own common appearance); the
 // CO3 anion rendered as a contrasting real mineral blue-gray.
 const CALCITE_STAGE = {
-  id: 101,
+  id: 94,
   name: 'Calcite: Calcium Carbonate (CaCO3)',
-  derivedFrom: [{ id: 100, tier: 'Salt' }],
+  derivedFrom: [{ id: 93, tier: 'Salt' }],
   build: (scale) => buildCalciteStage(scale, ROCK_SALT_CELLS, 0xf2f0e6, 0x7a8b99),
 };
 
@@ -3381,7 +3465,7 @@ const MIRRORED_MOLECULE_STAGES = CHIRAL_FIVE_CELL_SHAPES.map((cells, i) => {
   const lobeA = { name: `Chiral Piece ${i + 1}`, cells };
   const lobeB = { name: `Chiral Piece ${i + 1} (Mirror)`, cells: mirrorCells(cells) };
   return {
-    id: 62 + i,
+    id: 64 + i,
     name: `Mirrored Molecule ${i + 1}`,
     build: (scale) => buildMoleculeStage(scale, lobeA, lobeB, pickMoleculeDecoys(lobeA, lobeB, i * 2)),
   };
@@ -3405,7 +3489,7 @@ const MOLECULE_SPLIT_STAGE_DEFS = [0, 4, 8, 12, 16, 20, 24, 27].map((i) => MOLEC
 const MOLECULE_SPLIT_STAGES = MOLECULE_SPLIT_STAGE_DEFS.map(({ lobeA, lobeB }, i) => {
   const cells = joinTwoShapes(lobeA.cells, lobeB.cells);
   return {
-    id: 70 + i,
+    id: 72 + i,
     name: `Molecule Split: ${lobeA.name} (${lobeA.cells.length}) + ${lobeB.name} (${lobeB.cells.length})`,
     build: (scale) => buildBigHullStage(scale, cells, 3, 3),
   };
@@ -3431,40 +3515,60 @@ export const STAGES = [
   ...THREE_CELL_STAGES,
   ...FOUR_CELL_STAGES,
   { id: 15, name: 'One Piece', build: buildStage1 },
-  { id: 16, name: 'Octahedron', build: buildStage2 },
-  { id: 17, name: 'Cube', build: buildStage3 },
-  { id: 18, name: 'Rhombic Dodecahedron', build: buildStage4 },
-  { id: 19, name: 'Conjoined Pieces', build: buildStage5 },
-  { id: 20, name: 'Multi-Cell', build: buildStage6 },
+  // BCC's own single-cell/two-cell introduction sits right here, as a
+  // direct peer of the FCC "One Piece"/"Octahedron" pair immediately
+  // around it -- not stranded at the very end of the whole game where
+  // it previously sat. Whole-game instruction (2026-09-05): stage
+  // ORDER must track real structural/mechanism difficulty across the
+  // entire 115-stage list, not just within a tier -- a 1- or 2-piece,
+  // no-key stage has zero business sitting near the hardest end where
+  // a player sampling "the hard stuff" would hit it and wrongly
+  // conclude the whole game is trivial.
+  ONE_BCC_STAGE,
+  { id: 17, name: 'Octahedron', build: buildStage2 },
+  ...BCC_CRYSTAL_STAGES,
+  { id: 19, name: 'Cube', build: buildStage3 },
+  { id: 20, name: 'Rhombic Dodecahedron', build: buildStage4 },
+  { id: 21, name: 'Conjoined Pieces', build: buildStage5 },
+  { id: 22, name: 'Multi-Cell', build: buildStage6 },
   ...HULL_STAGES,
   ...MOLECULE_STAGES,
   ...MIRRORED_MOLECULE_STAGES,
   ...MOLECULE_SPLIT_STAGES,
   ...BRANCHING_MOLECULE_STAGES,
-  { id: 84, name: 'Rhombic Dodecahedron (Disphenoids)', build: buildDisphenoidRDStage },
-  ...BIG_HULL_STAGES,
+  { id: 86, name: 'Rhombic Dodecahedron (Disphenoids)', build: buildDisphenoidRDStage },
+  BIG_HULL_STAGES[0],
+  // Crystal: Copper is literally Big Hull: Cuboctahedron itself, real-
+  // metal-colored, no key -- same real shape and same zero-mechanism
+  // difficulty as its neighbor here, so it belongs right beside it,
+  // not stranded after every crossover tier at the far end of the game
+  // (see the BCC one-cell/two-cell note above -- same whole-game
+  // ordering principle, not a one-off fix).
+  ...CRYSTAL_STAGES,
+  BIG_HULL_STAGES[1],
   ...BURR_PUZZLE_STAGES,
-  // Alloy tier sits here, not after the crossover tiers -- direct
-  // instruction/self-assessment (2026-09-05, "is insertion position
-  // valid for difficulty/challenge level?"): these puzzles' real
-  // difficulty comes from the same levers as the plain Burr Puzzle
-  // tier right above (a key + a decoy + precise per-slot matching),
-  // not the deeper two-mechanisms-at-once complexity of the crossover
-  // tiers below -- more pieces, not more reasoning depth. Positioning
-  // them after Burr Puzzle (their real difficulty peer) rather than
-  // after every crossover tier is the honest read, same principle
-  // already applied to Color Match's own positioning earlier.
+  // Alloy/Salt/Calcite tier sits here, not after the crossover tiers --
+  // direct instruction/self-assessment (2026-09-05, "is insertion
+  // position valid for difficulty/challenge level?"): these puzzles'
+  // real difficulty comes from the same levers as the plain Burr
+  // Puzzle tier right above (a key + a decoy + precise per-slot
+  // matching), not the deeper two-mechanisms-at-once complexity of the
+  // crossover tiers below -- more pieces, not more reasoning depth.
+  // Internally ordered by real piece count (8 -> 14 -> 16 -> 17), not
+  // by which real-world family was scoped first -- Salt/Calcite (8
+  // pieces) are genuinely simpler than the full metal alloys (14-17
+  // pieces) despite sharing the same key mechanism, a real distinction
+  // the original grouping-by-family order was masking (2026-09-05,
+  // "why are fundamentally simple puzzles... sitting at the highest
+  // point... its a gamewide principle not a sectionwise one").
+  SALT_STAGE,
+  CALCITE_STAGE,
+  ...FCC_ALLOY_STAGES,
   ...BCC_ALLOY_STAGES,
   ...DILUTE_ALLOY_STAGES,
   CARBON_STEEL_STAGE,
-  ...FCC_ALLOY_STAGES,
-  SALT_STAGE,
-  CALCITE_STAGE,
   ...BURR_MOLECULE_SPLIT_STAGES,
   ...BURR_MIRRORED_MOLECULE_STAGES,
   ...BURR_BRANCHING_MOLECULE_STAGES,
   ...DISPHENOID_KEY_HULL_STAGES,
-  ...CRYSTAL_STAGES,
-  ONE_BCC_STAGE,
-  ...BCC_CRYSTAL_STAGES,
 ];

@@ -147,7 +147,7 @@ evolution, animals, lattice zoom).
 
 ## RHOMBIS
 
-A standalone, 114-stage geometric-packing puzzle game (`rhombis.html`,
+A standalone, 115-stage geometric-packing puzzle game (`rhombis.html`,
 linked from the welcome screen) that teaches real crystal-lattice
 geometry through play rather than exposition — rotate a target shape,
 tap pieces into place, watch it assemble. Difficulty ramps with stage
@@ -165,10 +165,13 @@ Puzzles — the tier where placement ORDER matters, a "key" piece
 genuinely blocked until the others around it are down. Four crossover
 tiers combine these mechanics directly (a Burr key layered onto a
 Molecule Split, a Mirrored Molecule, and a Branching Molecule; a Big
-Hull whose key can be a plain chunk or a genuine disphenoid group,
-drawn fresh at random every playthrough so it can't be memorized by
-piece type) — any stage built this way shows its own real lineage in
-the stage picker. Two merged Crystal stages (real FCC and BCC
+Hull whose chunks interlock at real crossing points — a boundary cell
+between two chunks splits along its own 3 real axis-pairs and each
+slice is folded directly into whichever chunk borders it there, a real
+"half a cell missing, supplied by its neighbor" seam rather than a
+clean whole-cell boundary — with the Burr key drawn fresh at random
+from the chunks themselves every playthrough) — any stage built this
+way shows its own real lineage in the stage picker. Two merged Crystal stages (real FCC and BCC
 coordination geometry) each carry the other real crystallizing metals
 as attributions rather than shipping a separate near-identical stage
 per element. A real Alloy tier sits alongside them: 3 ordered B2
@@ -177,14 +180,28 @@ steels (chromium, molybdenum — the dopant sites drawn at random every
 playthrough), a real interstitial Carbon Steel (the actual octahedral
 site carbon occupies in alpha-iron, a genuinely different piece of
 geometry rather than a recolored cell), 4 real FCC dilute alloys
-(electrum, white gold, rose gold, bronze), and a real Salt (NaCl)
+(electrum, white gold, rose gold, bronze), a real Salt (NaCl)
 puzzle — 1 cation and its 6 real anion neighbors, the one stage built
 on cross-species octahedral coordination rather than same-species
-substitution. A Color Match tier duplicates the earliest 3-cell shapes
-with a genuinely different puzzle logic (each piece tied to one real
-cell by color, not shape) as an easier on-ramp, positioned before its
-own uncolored siblings. Every stage ships with decoy pieces drawn from
-the same real shape family, not obviously-wrong filler. `src/rhombis/`
+substitution — and a real Calcite/magnesite (CaCO3) puzzle one stage
+later, the same rock-salt topology genuinely distorted along a trigonal
+axis (a real, algebraically-derived ~101.5° rhombohedral angle) with a
+flat CO3 triangular anion that flips orientation between layers, the
+actual real reason this space group is rhombohedral rather than cubic.
+Stage ORDER across the whole 115-stage main sequence tracks real
+structural/mechanism difficulty end to end, not just within a tier —
+BCC's own single-cell and two-cell introduction sits beside the FCC
+"One Piece"/"Octahedron" pair near the very start (not at the end,
+where a 1-piece stage would look like the "final boss" and undersell
+everything harder before it), and Salt/Calcite (8 pieces) sit before
+the larger 14-17 piece Alloy stages despite sharing the same key
+mechanism, since piece count is real difficulty too, not just which
+mechanism a stage uses. A Color Match tier duplicates the earliest
+3-cell shapes with a genuinely different puzzle logic (each piece tied
+to one real cell by color, not shape) as an easier on-ramp, positioned
+before its own uncolored siblings. Every stage ships with decoy pieces
+drawn from the same real shape family, not obviously-wrong filler.
+`src/rhombis/`
 is its own small engine: `puzzle-state.js` (pure state machine, no
 THREE/DOM), `geometry.js` (mesh construction), `stages.js` (every
 stage's own content, generated from real lattice math rather than
@@ -201,7 +218,7 @@ lattice, needing no new mesh geometry at all), never re-derived.
 ```
 rhombiverse/
   index.html                # static entry point, Three.js via import map (no bundling; see "Running locally")
-  rhombis.html               # Rhombis: standalone 114-stage geometric-packing puzzle (FCC + BCC), linked from the welcome screen
+  rhombis.html               # Rhombis: standalone 115-stage geometric-packing puzzle (FCC + BCC), linked from the welcome screen
   api/                       # Vercel serverless functions (AI Gateway proxy: sculpt/cultivate/cyborg-suggest)
   src/
     rhombis/                 # Rhombis' own code: puzzle-state.js (pure state machine), geometry.js
