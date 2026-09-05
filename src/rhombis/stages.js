@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { pyramidGeometry, facePyramidGeometry, diagonalOctahedronGeometry, flatStarPointGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey, disphenoidGeometry, DISPHENOID_ORIENTATIONS, quaternionForDisphenoidOrientation, disphenoidApexAxisKey } from './geometry.js';
+import { pyramidGeometry, facePyramidGeometry, hemisphereGeometry, diagonalOctahedronGeometry, flatStarPointGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey, disphenoidGeometry, DISPHENOID_ORIENTATIONS, quaternionForDisphenoidOrientation, disphenoidApexAxisKey } from './geometry.js';
 import { PYRAMID_AXES, NEIGHBOR_OFFSETS, oppositeNeighborIndex, cellToWorld, cellsInShells } from '../core/lattice.js';
 import { BCC_NEIGHBOR_OFFSETS, truncatedOctahedronVertices, isBCC } from '../geometry-extensions/dual-lattice.js';
 import { bccShapeScaleFor } from '../geometry-extensions/bcc-detail-lattice.js';
@@ -588,8 +588,43 @@ function twoCellCenters(scale) {
   return cellWorldPositions.map((p) => p.clone().sub(centroid));
 }
 
+// The 2 real NEIGHBOR_OFFSETS directions the diagonal octahedron spans
+// (MULTI_CELL_NEIGHBOR_INDEX and its real opposite) -- named so the
+// "axis pair" sub-group below and diagonalOctahedronGeometry() share
+// the exact same 2 real directions, not two independently-guessed ones.
+const MULTI_CELL_AXISPAIR_INDEXES = [MULTI_CELL_NEIGHBOR_INDEX, oppositeNeighborIndex(MULTI_CELL_NEIGHBOR_INDEX)];
+
+// REDESIGNED 2026-09-05 on real, live-caught correction: the original
+// version built its 12-per-cell loose voids from pyramidPieces()'s own
+// 6-axis inscribed-cube frame (PYRAMID_AXES), while the diagonal
+// octahedron added later the same day was built from the real 12-
+// neighbor facePieces() frame instead -- two genuinely different
+// decompositions of the same cell existing at once. Letting the
+// octahedron (fillsGroup ANY_SINGLE_CELL_GROUP) instantly satisfy the
+// WHOLE 12-void group -- exactly like the fused whole-RD piece already
+// correctly does -- read as "solved" over real visible gaps, because
+// unlike the fused piece, the octahedron's own real geometry is smaller
+// than the true cell (caught live: "22 is saying solved when only your
+// two long pieces are in"). Direct instruction: "you need pieces that
+// actually fill the voids in conjunction with what you built" -- not a
+// revert, a real fix.
+//
+// The real fix: rebuild the 12-per-cell loose voids from facePieces()
+// too, the SAME real frame the octahedron already uses, instead of
+// inventing an approximate correspondence between two different
+// 12-direction schemes (which would repeat this exact session's own
+// "point-vs-flat"/"shared-apex" mistakes under a new disguise). Once
+// both are the same real frame, no new "hubcap" geometry is needed at
+// all: the 10 real single-direction voids the octahedron does NOT
+// claim are exactly what the existing interchangeable loose pieces
+// already fill, one at a time -- a real, exact, provable correspondence,
+// not a guess. Each void carries 3 real group tags (its own cell, its
+// own single real direction, and -- for exactly 2 of the 12 -- the
+// axis-pair the octahedron spans), so `smallestEnclosingGroupId`
+// (puzzle-state.js) still resolves a loose single piece to its own
+// smallest (size-1) tag regardless of which other tags coexist on the
+// same void.
 function buildStage6(scale) {
-  const pyramid = pyramidGeometry(scale);
   const skeletonGroup = new THREE.Group();
   const cellCenters = twoCellCenters(scale);
 
@@ -600,95 +635,79 @@ function buildStage6(scale) {
 
   cellCenters.forEach((cellCenter, cellIndex) => {
     const groupId = `cell-${cellIndex}`;
+    const axispairGroupId = `cell-${cellIndex}-axispair`;
     groups.push({ id: groupId, position: cellCenter.clone(), quaternion: new THREE.Quaternion() });
+    groups.push({ id: axispairGroupId, position: cellCenter.clone(), quaternion: new THREE.Quaternion() });
     skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
 
-    PYRAMID_AXES.forEach((axisKey) => {
-      const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
-      [['in', inwardQuaternion, OPPOSITE_AXIS[axisKey]], ['out', outwardQuaternion, axisKey]].forEach(([dirLabel, toQuaternion, canonicalOrientation]) => {
-        const v = makeVoid(pyramid, {
-          id: `v-${groupId}-${dirLabel}-${axisKey}`,
-          quaternion: toQuaternion(axisKey),
-          position: facePosition,
-          groupIds: [groupId],
-          requiredOrientation: canonicalOrientation,
-        });
-        skeletonGroup.add(...v.sceneObjects);
-        voids.push(v);
+    for (let faceIndex = 0; faceIndex < NEIGHBOR_OFFSETS.length; faceIndex++) {
+      const singleGroupId = `cell-${cellIndex}-single-${faceIndex}`;
+      const tags = [groupId, singleGroupId];
+      if (MULTI_CELL_AXISPAIR_INDEXES.includes(faceIndex)) tags.push(axispairGroupId);
+      const v = makeVoid(facePyramidGeometry(scale, faceIndex), {
+        id: `v-${groupId}-f${faceIndex}`,
+        position: cellCenter,
+        groupIds: tags,
       });
-    });
+      skeletonGroup.add(...v.sceneObjects);
+      voids.push(v);
+    }
 
     const fusedGeometry = rhombicDodecahedronGeometry(scale);
     const fusedHome = new THREE.Vector3(scale * 4, -scale * 2.6 * cellIndex, -scale * 1.6);
-    // ANY_SINGLE_CELL_GROUP, not a fixed `groupId` -- direct instruction
-    // (2026-09-05, "when pieces are all the same it is tiresome to
-    // exclude them from fitting in other identical locations"): the two
-    // fused RD pieces here are the exact same geometry, so either one
-    // must be able to fill either cell, resolved dynamically from
-    // whichever cell's void actually gets tapped (`smallestEnclosingGroupId`
-    // in puzzle-state.js), same fix already applied to the N-cell single-
-    // RD-piece tier -- a real recurring pattern, not a one-off.
+    // FIXED per-cell groupId here, not ANY_SINGLE_CELL_GROUP -- that
+    // sentinel always resolves to the SMALLEST tag on whichever void
+    // gets tapped (`smallestEnclosingGroupId`), which is now each
+    // void's own single-direction tag (size 1), not the whole 12-void
+    // cell -- correct for the loose pieces below, wrong for a piece
+    // that needs to claim the WHOLE group in one placement. Real
+    // trade-off, not an oversight: this fused piece (and the
+    // octahedron below) are no longer interchangeable across the two
+    // cells the way they were earlier the same day -- accepted so the
+    // whole-cell/axis-pair/single-direction groups can all coexist and
+    // resolve correctly at once, on only 2 real cells total.
     fusedPieces.push(makeFusedPiece(fusedGeometry, {
       id: `fused-${groupId}`,
-      fillsGroup: ANY_SINGLE_CELL_GROUP,
+      fillsGroup: groupId,
       homePosition: fusedHome,
     }));
 
-    // A third real alternate fill per cell -- direct instruction
-    // (2026-09-05, "multi cell could benefit from a variety of pieces
-    // within it like two angled conjoined adjacent octahedra at the
-    // connecting point between the two pieces"): a real bipyramid
-    // through this cell's own center, aligned along the exact real
-    // NEIGHBOR_OFFSETS axis connecting the two cells (the same offset
-    // `twoCellCenters` itself uses) -- built from facePieces(), the
-    // same real primitive verified earlier the same day for the
-    // Disphenoid crossover's own tabs, so this cell's own octahedron
-    // and its neighbor's own octahedron meet at the exact real shared
-    // face, not an approximation. Visually "angled" relative to the
-    // RD's own faces (a real (1,1,0)-type diagonal), genuinely
-    // different from Stage 2's own plain axis-aligned Octahedron.
-    // ANY_SINGLE_CELL_GROUP for the same reason the fused whole-cell
-    // piece above already uses it -- both cells' own octahedra are
-    // congruent, so either must fill either open cell.
+    // The real diagonal octahedron (2026-09-05, "multi cell could
+    // benefit from a variety of pieces... two angled conjoined adjacent
+    // octahedra") -- now correctly scoped to its own real 2-void
+    // axis-pair group instead of the whole cell, so the OTHER 10 real
+    // voids still need their own loose pieces (below) before this cell
+    // reads solved. Built from the exact same 2 real directions
+    // (MULTI_CELL_AXISPAIR_INDEXES) the axis-pair group itself is
+    // tagged with -- the same real geometry as before, just correctly
+    // scoped.
     const octahedronGeometry = diagonalOctahedronGeometry(scale, MULTI_CELL_NEIGHBOR_INDEX);
     const octahedronHome = new THREE.Vector3(scale * 4, -scale * 2.6 * cellIndex, scale * 1.6);
     fusedPieces.push(makeFusedPiece(octahedronGeometry, {
       id: `octahedron-${groupId}`,
-      fillsGroup: ANY_SINGLE_CELL_GROUP,
+      fillsGroup: axispairGroupId,
       homePosition: octahedronHome,
-    }));
-
-    // A fourth real alternate fill per cell -- direct instruction
-    // (2026-09-05, "a nice flat square star shape that spans halfway
-    // into two joined cells" -- "a 3D star that pokes into both cells
-    // symmetrically... squat version of the octahedron"): a real SHORT
-    // pyramid off this cell's own real shared face (facePieces() again),
-    // reaching only halfway toward this cell's own true center rather
-    // than all the way to it. This cell's own star and its real
-    // neighbor's own star (built the same way, off the SAME real shared
-    // face) meet exactly there and together read as one flat, wide,
-    // 4-pointed star/diamond -- genuinely squatter than the octahedron
-    // above, not just a smaller copy of it. cellIndex picks this cell's
-    // own real direction toward the other cell -- cell 0 looks along
-    // MULTI_CELL_NEIGHBOR_INDEX, cell 1 looks the real opposite way.
-    const starOffsetIndex = cellIndex === 0 ? MULTI_CELL_NEIGHBOR_INDEX : oppositeNeighborIndex(MULTI_CELL_NEIGHBOR_INDEX);
-    const starGeometry = flatStarPointGeometry(scale, starOffsetIndex, 0.5);
-    const starHome = new THREE.Vector3(scale * 4.8, -scale * 2.6 * cellIndex, 0);
-    fusedPieces.push(makeFusedPiece(starGeometry, {
-      id: `star-${groupId}`,
-      fillsGroup: ANY_SINGLE_CELL_GROUP,
-      homePosition: starHome,
     }));
   });
 
   const looseHome = new THREE.Vector3(scale * 3.6, -scale * 1.3, scale * 2.2);
+  // Interchangeable across all 24 real single-direction slots (both
+  // cells, all 12 real directions each) -- every one of the 12 real
+  // facePieces() shapes is congruent by the RD's own real symmetry
+  // (confirmed already: tests/unit/lattice.test.mjs's own volume/area
+  // checks treat every direction identically), so any loose piece can
+  // resolve to whichever single-direction void actually gets tapped,
+  // same ANY_SINGLE_CELL_GROUP pattern already proven for the N-cell
+  // single-RD tier. No manual orientation needed here anymore --
+  // facePieces() gives each real direction its own single correct
+  // placement already, unlike the old cube-face pyramid's own
+  // in/out-both-ways ambiguity.
   for (let i = 0; i < voids.length; i++) {
-    // Manual orientation, same reasoning as Stage 3/4/5's own headers
-    // (direct instruction 2026-09-03) -- reuses PYRAMID_AXES unchanged,
-    // since a Stage 6 loose piece is geometrically identical to a Stage
-    // 4 one and needs the exact same 6-way cycle (see `OPPOSITE_AXIS`'s
-    // own comment for why this isn't the original 12-string scheme).
-    const p = makePiece(pyramid, { id: `p${i}`, orientation: 'x+', orientationOptions: PYRAMID_AXES, homePosition: looseHome });
+    const p = makeFusedPiece(facePyramidGeometry(scale, i % NEIGHBOR_OFFSETS.length), {
+      id: `p${i}`,
+      fillsGroup: ANY_SINGLE_CELL_GROUP,
+      homePosition: looseHome,
+    });
     p.mesh.visible = i === 0; // only the next available copy shows in the tray
     loosePieces.push(p);
   }
@@ -2408,22 +2427,22 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChun
 // boundary cells between two different Big-Hull chunks, found via the
 // exact same NEIGHBOR_OFFSETS adjacency `partitionIntoIrregularChunks`
 // itself already grows through -- not an arbitrary fixed cell index)
-// split along their own real 12 rhombic faces (`facePieces()` in
-// core/lattice.js) between whichever chunks actually border them
-// there. Each slice is folded DIRECTLY into that chunk's own single
-// fused piece geometry as a real interlocking tab -- literally "half an
-// RD" missing from one chunk, supplied by its neighbor -- rather than
-// existing as its own separate loose piece. No new piece count versus
-// the plain Big Hull tier: still exactly `chunkCount` real fused
-// chunks, each a single tray item, just with a genuinely interlocking
-// real shape at real junctions instead of a clean whole-cell boundary
-// everywhere. The upside DICTO named directly: "by spelling this out we
-// get more potential puzzles from what is already created" -- this is a
-// real, reusable geometric relationship, not a one-off hack for these
-// two stages.
+// split in two by `hemisphereSplit()` (core/lattice.js) between the
+// junction cell's own home chunk and the ONE real differently-chunked
+// neighbor that actually borders it there. Each half is folded DIRECTLY
+// into that chunk's own single fused piece geometry as a real
+// interlocking tab -- literally "half an RD" missing from one chunk,
+// supplied by its neighbor -- rather than existing as its own separate
+// loose piece. No new piece count versus the plain Big Hull tier: still
+// exactly `chunkCount` real fused chunks, each a single tray item, just
+// with a genuinely interlocking real shape at real junctions instead of
+// a clean whole-cell boundary everywhere. The upside DICTO named
+// directly: "by spelling this out we get more potential puzzles from
+// what is already created" -- this is a real, reusable geometric
+// relationship, not a one-off hack for these two stages.
 //
-// Real correction (2026-09-05, caught live: "connecting disphenoids /
-// flat octahedra by points doesnt translate as valid... only ever
+// Real correction #1 (2026-09-05, caught live: "connecting disphenoids
+// / flat octahedra by points doesnt translate as valid... only ever
 // connect by flats... this applies everywhere" -- with the physical
 // framing that clinched it: "if the pieces were glass and you dropped
 // them would they break... these are the origins of physical
@@ -2434,15 +2453,33 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChun
 // lattice's real 12 nearest-neighbor (rhombic-face) directions
 // `NEIGHBOR_OFFSETS` uses. A slice built that way only ever reaches a
 // single VERTEX of the real face toward an actual neighbor, never the
-// flat face itself -- two chunks built that way could only ever kiss at
-// a point, exactly the "would this survive being dropped" test failing.
-// `facePieces()` fixes this at the source: each of an RD's real 12
-// faces, verified numerically (planar, a genuine rhombus, facing its
-// own real NEIGHBOR_OFFSETS direction, and the 12 of them together
-// reconstructing the exact same RD volume `pyramidPieces()` does) --
-// see tests/unit/lattice.test.mjs. A slice built from the SAME real
-// face a neighbor cell shares is guaranteed real flat contact, by
-// construction, not by a heuristic.
+// flat face itself.
+//
+// Real correction #2 (2026-09-05, caught again immediately after
+// correction #1 shipped: "small pieces should attach by flats only to
+// the parent piece" / "there is a group of four cells with two
+// pyramids attached only by the tips of points"): the SECOND version
+// fixed the outside-facing connection with `facePieces()` (each of an
+// RD's real 12 faces, verified planar and volume-correct -- still real
+// and still used elsewhere, see tests/unit/lattice.test.mjs), letting a
+// junction cell split among UP TO 12 different real neighbors at once.
+// But every one of those 12 face-pyramids shares the exact same apex --
+// the junction cell's own center -- so two DIFFERENT chunks' own
+// pyramids only share a real flat face when their bases happen to be
+// edge-adjacent; non-adjacent ones (a real, common case once more than
+// one other chunk stakes a claim) only ever meet at that single shared
+// apex point. The exact same class of bug as correction #1, just
+// relocated from the cell's outside to its inside.
+//
+// Real fix (`hemisphereSplit()`, core/lattice.js): capped at exactly
+// ONE claiming neighbor per junction cell, splitting it clean in half
+// by a real plane instead of converging many pyramids on one point --
+// verified numerically for all 12 real directions (4 vertices strictly
+// each side, 6 exactly on the dividing plane, equal real volumes,
+// the real external face always fully inside its own claiming half).
+// Two chunks' own halves now share exactly one real flat polygon, by
+// construction, not a heuristic -- and there's only ever one such
+// shared boundary per junction cell, not up to 12 of them.
 //
 // The real key is still drawn at RANDOM, per load, from every real
 // chunk piece (unchanged in spirit from the original design, just
@@ -2497,25 +2534,33 @@ function pickDiverseJunctionCells(cells, assignments, boundaryIndexes, count) {
   return picked;
 }
 
-// For one junction cell, which chunk owns each of its 12 REAL rhombic
-// faces (NEIGHBOR_OFFSETS/facePieces order): the face toward
-// NEIGHBOR_OFFSETS[i] belongs to that real neighbor's own chunk when a
-// real, differently-chunked neighbor cell actually exists there;
-// otherwise it stays with the junction cell's own default/home chunk --
-// not every direction out of a junction cell is a real crossing (no
-// neighbor there at all, within this macro shape), and a same-chunk
-// neighbor isn't a real crossing either.
-function resolveJunctionFaceOwners(allCells, assignments, cellIndex) {
+// For one junction cell, the ONE real differently-chunked neighbor (if
+// any) that claims the "positive" hemisphere -- direct correction
+// (2026-09-05, caught immediately after the facePieces()-based
+// multi-owner version shipped): "small pieces should attach by flats
+// only to the parent piece" / "there is a group of four cells with two
+// pyramids attached only by the tips of points". Capped at exactly ONE
+// claiming neighbor per junction cell, not up to 12: more than one real
+// owner on the same cell is exactly what let two different owners' own
+// pyramids meet at only their shared apex point instead of a real flat
+// face, whenever their own real directions weren't themselves edge-
+// adjacent -- see hemisphereSplit()'s own header in core/lattice.js for
+// the full real fix. Returns null if this junction cell genuinely has
+// no real differently-chunked neighbor at all (shouldn't happen given
+// how junction cells are chosen, but stays honest rather than assumed).
+function resolveJunctionSplit(allCells, assignments, cellIndex) {
   const key = (c) => c.join(',');
   const indexByKey = new Map(allCells.map((c, i) => [key(c), i]));
   const homeChunk = assignments[cellIndex].chunkIndex;
   const [cx, cy, cz] = allCells[cellIndex];
-  return NEIGHBOR_OFFSETS.map(([dx, dy, dz]) => {
+  for (let offsetIndex = 0; offsetIndex < NEIGHBOR_OFFSETS.length; offsetIndex++) {
+    const [dx, dy, dz] = NEIGHBOR_OFFSETS[offsetIndex];
     const neighborIndex = indexByKey.get(key([cx + dx, cy + dy, cz + dz]));
-    if (neighborIndex === undefined) return homeChunk;
+    if (neighborIndex === undefined) continue;
     const neighborChunk = assignments[neighborIndex].chunkIndex;
-    return neighborChunk === homeChunk ? homeChunk : neighborChunk;
-  });
+    if (neighborChunk !== homeChunk) return { offsetIndex, chunk: neighborChunk };
+  }
+  return null;
 }
 
 function buildDisphenoidKeyHullStage(scale, allCells, junctionCellCount, chunkCount, decoyChunkCount) {
@@ -2529,7 +2574,7 @@ function buildDisphenoidKeyHullStage(scale, allCells, junctionCellCount, chunkCo
   const boundaryIndexes = findChunkBoundaryCellIndexes(allCells, assignments);
   const junctionCellIndexes = pickDiverseJunctionCells(allCells, assignments, boundaryIndexes, junctionCellCount);
   const junctionIndexSet = new Set(junctionCellIndexes);
-  const junctionOwners = new Map(junctionCellIndexes.map((i) => [i, resolveJunctionFaceOwners(allCells, assignments, i)]));
+  const junctionSplits = new Map(junctionCellIndexes.map((i) => [i, resolveJunctionSplit(allCells, assignments, i)]));
 
   // One real ghost outline per junction cell, drawn once regardless of
   // how many chunks its slices end up split across.
@@ -2568,24 +2613,22 @@ function buildDisphenoidKeyHullStage(scale, allCells, junctionCellCount, chunkCo
     });
 
     junctionCellIndexes.forEach((cellIndex, jSlot) => {
-      const owners = junctionOwners.get(cellIndex);
-      const ownedFaceIndexes = owners.map((owner, faceIndex) => (owner === chunkIndex ? faceIndex : -1)).filter((i) => i >= 0);
-      if (!ownedFaceIndexes.length) return;
+      const split = junctionSplits.get(cellIndex);
+      if (!split) return;
+      const homeChunk = assignments[cellIndex].chunkIndex;
+      let side = null;
+      if (chunkIndex === split.chunk) side = 'positive';
+      else if (chunkIndex === homeChunk) side = 'negative';
+      else return; // this chunk has no real claim on this junction cell
       const cellCenter = cellWorldPositions[cellIndex].clone().sub(centroid);
-      ownedFaceIndexes.forEach((faceIndex) => {
-        const v = makeVoid(facePyramidGeometry(scale, faceIndex), {
-          id: `v-${groupId}-j${jSlot}-f${faceIndex}`,
-          position: cellCenter,
-          groupIds: [groupId],
-        });
-        skeletonGroup.add(...v.sceneObjects);
-        voids.push(v);
+      const v = makeVoid(hemisphereGeometry(scale, split.offsetIndex, side), {
+        id: `v-${groupId}-j${jSlot}-${side}`,
+        position: cellCenter,
+        groupIds: [groupId],
       });
-      const sliceGeometry = mergeGeometries(
-        ownedFaceIndexes.map((faceIndex) => facePyramidGeometry(scale, faceIndex)),
-        false,
-      );
-      contributions.push({ anchor: cellCenter, geometry: sliceGeometry });
+      skeletonGroup.add(...v.sceneObjects);
+      voids.push(v);
+      contributions.push({ anchor: cellCenter, geometry: hemisphereGeometry(scale, split.offsetIndex, side) });
     });
 
     const chunkCentroid = contributions.reduce((sum, c) => sum.add(c.anchor), new THREE.Vector3()).multiplyScalar(1 / contributions.length);

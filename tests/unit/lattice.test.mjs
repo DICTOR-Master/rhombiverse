@@ -15,6 +15,7 @@ import {
   nearestValidCell,
   facePieces,
   pyramidPieces,
+  hemisphereSplit,
 } from '../../src/core/lattice.js';
 
 function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
@@ -143,4 +144,34 @@ test('cellsInShells: minShell skips inner shells but still returns outer ones', 
   assert.equal(hollow.some((c) => c.shell === 1), false);
   assert.equal(hollow.filter((c) => c.shell === 2).length, shellCount(2));
   assert.equal(hollow.filter((c) => c.shell === 3).length, shellCount(3));
+});
+
+// hemisphereSplit() exists specifically because facePieces()-based
+// multi-owner junction slicing (Rhombis, 2026-09-05) let two DIFFERENT
+// pieces' own pyramids -- both sharing one apex, the cell's own center
+// -- meet at only that single point whenever their own real directions
+// weren't edge-adjacent. These tests are the real guarantee that a
+// junction cell only ever splits into two real, flat-bounded halves.
+test('hemisphereSplit: every one of the 12 real directions splits the RD into exactly 4+6 and 4+6 real vertices', () => {
+  for (let i = 0; i < NEIGHBOR_OFFSETS.length; i++) {
+    const { positive, negative } = hemisphereSplit(2, i);
+    assert.equal(positive.length, 10, `direction ${i} positive side`);
+    assert.equal(negative.length, 10, `direction ${i} negative side`);
+    // Exactly 6 real vertices are shared between the two halves (the
+    // ones sitting exactly on the dividing plane) -- confirmed by
+    // counting how many of "positive" are found (by value) in "negative".
+    const shared = positive.filter((pv) => negative.some((nv) => norm(sub(pv, nv)) < 1e-9));
+    assert.equal(shared.length, 6, `direction ${i} shared boundary vertices`);
+  }
+});
+
+test('hemisphereSplit: the 6 shared vertices are exactly coplanar, on the real plane through center normal to that direction', () => {
+  for (let i = 0; i < NEIGHBOR_OFFSETS.length; i++) {
+    const D = NEIGHBOR_OFFSETS[i];
+    const { positive, negative } = hemisphereSplit(2, i);
+    const shared = positive.filter((pv) => negative.some((nv) => norm(sub(pv, nv)) < 1e-9));
+    shared.forEach((v) => {
+      assert.ok(Math.abs(dot(v, D)) < 1e-9, `direction ${i} shared vertex not on the real dividing plane`);
+    });
+  }
 });

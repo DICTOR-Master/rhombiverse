@@ -166,12 +166,13 @@ genuinely blocked until the others around it are down. Four crossover
 tiers combine these mechanics directly (a Burr key layered onto a
 Molecule Split, a Mirrored Molecule, and a Branching Molecule; a Big
 Hull whose chunks interlock at real crossing points — a boundary cell
-between two chunks splits along its own real rhombic faces (the exact
-faces two adjacent lattice cells actually share, not an unrelated
-6-axis frame that would only ever meet at a single point) and each
-slice is folded directly into whichever chunk borders it there, a real
-"half a cell missing, supplied by its neighbor" seam rather than a
-clean whole-cell boundary — with the Burr key drawn fresh at random
+splits clean in half, by a real plane through its own center, between
+its home chunk and the one real neighboring chunk that actually borders
+it there (not the exact faces of every possible neighbor at once, which
+turned out to let two different chunks' own tabs meet at only a shared
+point rather than a real flat seam whenever they weren't edge-adjacent)
+— a real "half a cell missing, supplied by its neighbor" seam rather
+than a clean whole-cell boundary, with the Burr key drawn fresh at random
 from the chunks themselves every playthrough) — any stage built this
 way shows its own real lineage in the stage picker. Two merged Crystal stages (real FCC and BCC
 coordination geometry) each carry the other real crystallizing metals
@@ -195,13 +196,16 @@ structural/mechanism difficulty end to end, not just within a tier —
 BCC's own single-cell and two-cell introduction sits beside the FCC
 "One Piece"/"Octahedron" pair near the very start (not at the end,
 where a 1-piece stage would look like the "final boss" and undersell
-everything harder before it), Multi-Cell (30 pieces, the single
-highest piece count in the whole game — including a real diagonal
-octahedron alternate fill per cell, a genuine bipyramid built along the
-exact real neighbor axis the two cells share, angled relative to the
-RD's own faces rather than axis-aligned like Stage 2's own Octahedron;
-plus a shorter, squatter "flat star" alternate reaching only halfway
-toward each cell's own center, off the exact same real shared face)
+everything harder before it), Multi-Cell (28 pieces, the single
+highest piece count in the whole game — its two real cells' own 24 loose
+pieces and 2 whole-cell alternates now built from the RD's own real 12
+rhombic faces (facePieces(), the same primitive verified for the
+Disphenoid crossover's own tabs) rather than the cube-face frame the
+rest of this tier still uses, so a real diagonal-octahedron alternate
+per cell — a genuine bipyramid along the exact real axis the two cells
+share, angled relative to the RD's own faces rather than axis-aligned
+like Stage 2's own Octahedron — can be scoped to its own real 2-face
+slice of a cell instead of falsely completing the whole thing)
 sits last within its own real family of same-mechanism stages rather
 than off among unrelated crossover puzzles just because it has more
 pieces, and Salt/Calcite (8 pieces) sit before the larger 14-17 piece

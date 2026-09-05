@@ -20,7 +20,7 @@
 // base plane) rather than needing a second geometry variant.
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { pyramidPieces, facePieces, oppositeNeighborIndex, rdRawVerts } from '../core/lattice.js';
+import { pyramidPieces, facePieces, oppositeNeighborIndex, hemisphereSplit, rdRawVerts } from '../core/lattice.js';
 import { SYMMETRY_OPERATIONS } from './cell-arrangements.js';
 
 export function pyramidGeometry(scale = 1) {
@@ -45,6 +45,21 @@ export function facePyramidGeometry(scale, offsetIndex) {
   const { base, apex } = facePieces(scale)[offsetIndex];
   const points = [...base, apex].map(([x, y, z]) => new THREE.Vector3(x, y, z));
   const geometry = new ConvexGeometry(points);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+// One real half of a cell, split by hemisphereSplit() (core/lattice.js
+// -- see its own header for why this replaced facePyramidGeometry() for
+// junction interlocking specifically). `side` is 'positive' (the half
+// touching the real neighbor at NEIGHBOR_OFFSETS[offsetIndex]) or
+// 'negative' (the opposite half) -- both real, non-degenerate,
+// verified-equal-volume convex hulls sharing one genuine flat internal
+// face (the 6 real vertices exactly on the dividing plane), never a
+// shared point.
+export function hemisphereGeometry(scale, offsetIndex, side) {
+  const verts = hemisphereSplit(scale, offsetIndex)[side];
+  const geometry = new ConvexGeometry(verts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
   geometry.computeVertexNormals();
   return geometry;
 }

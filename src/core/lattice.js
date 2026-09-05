@@ -99,6 +99,45 @@ export function facePieces(s = 1) {
   });
 }
 
+// A real, flat bisection of the RD into exactly two halves along one of
+// the 12 real NEIGHBOR_OFFSETS directions -- direct correction
+// (2026-09-05, caught immediately after facePieces()-based multi-owner
+// junction slicing shipped): "small pieces should attach by flats only
+// to the parent piece" / "there is a group of four cells with two
+// pyramids attached only by the tips of points" -- multiple owners'
+// own facePieces() pyramids all share ONE apex (the cell's own center),
+// so two pyramids belonging to DIFFERENT pieces only share a real flat
+// face when their bases are edge-adjacent; non-adjacent ones (e.g.
+// opposite-ish real directions claimed by two different chunks) only
+// ever meet at that single shared apex point -- the exact same class of
+// bug facePieces() itself was built to fix, just relocated to the
+// INSIDE of a junction cell instead of its outside.
+//
+// hemisphereSplit() fixes this at the root by never converging multiple
+// owners on one shared point at all: classify the RD's own real 14
+// vertices (rdRawVerts) by which side of the plane through the center,
+// normal to NEIGHBOR_OFFSETS[i], they fall on. Verified numerically
+// (all 12 real directions, not assumed by symmetry): EXACTLY 4 vertices
+// strictly positive, 4 strictly negative, 6 exactly on the plane, for
+// every single one of the 12 directions -- a genuinely flat, planar,
+// non-degenerate internal boundary (the 6 shared vertices), with the
+// real external face towards NEIGHBOR_OFFSETS[i] (facePieces(s)[i])
+// always fully contained in the positive half. Real volumes verified
+// equal (8 + 8 = 16, the same known total pyramidPieces() itself
+// produces) via THREE.ConvexGeometry in the browser, not assumed from
+// the vertex count alone. Only ever splits a cell in two -- a real,
+// deliberate simplification versus facePieces()'s own up-to-12-way
+// split, precisely because more than 2 real owners on one cell is what
+// reintroduces the shared-point risk above.
+export function hemisphereSplit(s, offsetIndex) {
+  const D = NEIGHBOR_OFFSETS[offsetIndex];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const verts = rdRawVerts(s);
+  const positive = verts.filter((v) => dot(v, D) >= -1e-9);
+  const negative = verts.filter((v) => dot(v, D) <= 1e-9);
+  return { positive, negative };
+}
+
 export const NEIGHBOR_OFFSETS = [
   [1, 1, 0], [1, -1, 0], [-1, 1, 0], [-1, -1, 0],
   [1, 0, 1], [1, 0, -1], [-1, 0, 1], [-1, 0, -1],
