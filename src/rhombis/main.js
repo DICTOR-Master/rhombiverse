@@ -794,6 +794,7 @@ function flashRejectWire(wire) {
 function refreshVoidHighlights() {
   const selectedId = current.suppressValidityHighlight ? null : current.state.selectedPieceId;
   const validity = selectedId ? voidValidityForPiece(current.state, selectedId) : null;
+  const selectedPiece = selectedId ? pieceById(selectedId) : null;
   // Real live bug (2026-09-03, "cube isnt translucent it is opaque so
   // blocks view"): an auto-orienting piece (Stage 3/5/6's loose pieces,
   // no orientationOptions -- any open void takes it) makes EVERY open
@@ -818,10 +819,38 @@ function refreshVoidHighlights() {
   // orientation" -- real, meaningful feedback with nothing to stack, not
   // the many-layers-of-green problem this guard exists for.
   const everyOpenVoidValid = validity && openVoidIds.length > 1 && validCount === openVoidIds.length;
+  // Real fix (2026-09-05, Multi-Cell's own facePieces()-based voids --
+  // "its triggering wrong green areas"/"no hubcaps", a real "stained
+  // glass" mess caught live): a FIXED-group piece (fillsGroup set and
+  // not the ANY_SINGLE_CELL_GROUP sentinel -- the diagonal octahedron,
+  // Big Hull chunks, Stage 5's cube, etc.) has one unambiguous real
+  // target, unlike an interchangeable loose piece -- there's nothing to
+  // disambiguate by reddening every void OUTSIDE that target. The
+  // `everyOpenVoidValid` guard above already covers the case where a
+  // fixed piece's own target happens to BE every open void (the plain
+  // fused whole-cell piece); it does nothing when the target is a real
+  // SUBSET of a bigger cell's own voids (the octahedron's own 2-of-12).
+  // Multi-Cell's own 12 real single-direction voids per cell all share
+  // one apex point, so their ghosts visually overlap when all shown at
+  // once -- 10 stacked reds plus 2 greens reads as confusing noise, not
+  // real information (a fixed piece was never going anywhere else
+  // regardless of what color its non-targets show). Hidden instead of
+  // reddened for a fixed-group piece specifically; loose/
+  // ANY_SINGLE_CELL_GROUP pieces are untouched and keep the real
+  // per-void red feedback they still need (which SPECIFIC open slot
+  // among several is and isn't valid remains real information there).
+  const fixedTargetGroupId = selectedPiece && selectedPiece.fillsGroup && selectedPiece.fillsGroup !== ANY_SINGLE_CELL_GROUP
+    ? selectedPiece.fillsGroup
+    : null;
   for (const v of current.voids) {
     const stateVoid = current.state.voids.find((sv) => sv.id === v.id);
     if (stateVoid.filled) continue;
     if (validity && everyOpenVoidValid) {
+      v.wire.visible = !current.hideIdleVoidWires;
+      v.wire.material.color.setHex(WIRE_COLOR);
+      v.wire.material.opacity = GHOST_OPACITY;
+      v.wire.material.depthTest = true;
+    } else if (validity && fixedTargetGroupId && !v.groupIds.includes(fixedTargetGroupId)) {
       v.wire.visible = !current.hideIdleVoidWires;
       v.wire.material.color.setHex(WIRE_COLOR);
       v.wire.material.opacity = GHOST_OPACITY;
