@@ -14,6 +14,7 @@ import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld, cellsInShells } from '../c
 import { BCC_NEIGHBOR_OFFSETS, truncatedOctahedronVertices, isBCC } from '../geometry-extensions/dual-lattice.js';
 import { bccShapeScaleFor } from '../geometry-extensions/bcc-detail-lattice.js';
 import { octahedronVerts } from '../geometry-extensions/interstitial-lattice.js';
+import { isCationSite, CATION_ANION_OFFSETS } from '../geometry-extensions/rock-salt-lattice.js';
 import { enumerateShapes, SYMMETRY_OPERATIONS, applySymmetry } from './cell-arrangements.js';
 import { ANY_SINGLE_CELL_GROUP } from './puzzle-state.js';
 
@@ -2559,7 +2560,7 @@ const BURR_MOLECULE_SPLIT_STAGE_DEFS = [2, 14, 26].map((i) => MOLECULE_STAGE_DEF
 const BURR_MOLECULE_SPLIT_STAGES = BURR_MOLECULE_SPLIT_STAGE_DEFS.map(({ lobeA, lobeB }, i) => {
   const cells = joinTwoShapes(lobeA.cells, lobeB.cells);
   return {
-    id: 100 + i,
+    id: 101 + i,
     name: `Burr Puzzle: Molecule Split (${lobeA.name} + ${lobeB.name})`,
     derivedFrom: [{ id: 70, tier: 'Molecule Split' }, { id: 87, tier: 'Burr Puzzle' }],
     build: (scale) => buildBigHullStage(scale, cells, 3, 3, [0]),
@@ -2574,7 +2575,7 @@ const BURR_MIRRORED_MOLECULE_STAGES = BURR_MIRRORED_MOLECULE_INDEXES.map((shapeI
   const cellsA = CHIRAL_FIVE_CELL_SHAPES[shapeIndex];
   const cells = joinTwoShapes(cellsA, mirrorCells(cellsA));
   return {
-    id: 103 + i,
+    id: 104 + i,
     name: `Burr Puzzle: Mirrored Molecule ${shapeIndex + 1}`,
     derivedFrom: [{ id: 62, tier: 'Mirrored Molecule' }, { id: 87, tier: 'Burr Puzzle' }],
     build: (scale) => buildBigHullStage(scale, cells, 3, 3, [0]),
@@ -2589,7 +2590,7 @@ const BURR_BRANCHING_MOLECULE_INDEXES = [0, 2, 4];
 const BURR_BRANCHING_MOLECULE_STAGES = BURR_BRANCHING_MOLECULE_INDEXES.map((defIndex, i) => {
   const { hub, branch1, branch2 } = BRANCHING_MOLECULE_STAGE_DEFS[defIndex];
   return {
-    id: 106 + i,
+    id: 107 + i,
     name: `Branching Molecule: ${hub.name} hub + ${branch1.name} + ${branch2.name} (II)`,
     derivedFrom: [{ id: 78, tier: 'Branching Molecule' }, { id: 87, tier: 'Burr Puzzle' }],
     build: (scale) => buildBranchingMoleculeStage(scale, hub, branch1, branch2, pickBranchMoleculeDecoys(hub, branch1, branch2, defIndex * 2), true),
@@ -2607,13 +2608,13 @@ const BURR_BRANCHING_MOLECULE_STAGES = BURR_BRANCHING_MOLECULE_INDEXES.map((defI
 // indices 10-19) -- all genuine extremities, not an arbitrary pick.
 const DISPHENOID_KEY_HULL_STAGES = [
   {
-    id: 109,
+    id: 110,
     name: 'Big Hull: Cuboctahedron (Disphenoid)',
     derivedFrom: [{ id: 85, tier: 'Big Hull' }, { id: 84, tier: 'Disphenoid RD' }, { id: 87, tier: 'Burr Puzzle' }],
     build: (scale) => buildDisphenoidKeyHullStage(scale, CUBOCTAHEDRON_CELLS, [1, 5, 9], 3, 1),
   },
   {
-    id: 110,
+    id: 111,
     name: 'Big Hull: Tetrahedral Stack (Disphenoid)',
     derivedFrom: [{ id: 86, tier: 'Big Hull' }, { id: 84, tier: 'Disphenoid RD' }, { id: 87, tier: 'Burr Puzzle' }],
     build: (scale) => buildDisphenoidKeyHullStage(scale, TETRAHEDRAL_STACK_CELLS, [0, 10, 19], 4, 1),
@@ -2679,7 +2680,7 @@ const FCC_ELEMENTS = [
   { symbol: 'Pd', name: 'Palladium' },
 ];
 const CRYSTAL_STAGES = [{
-  id: 111,
+  id: 112,
   name: `Crystal: ${FCC_ELEMENTS[0].name} (${FCC_ELEMENTS[0].symbol})`,
   attributions: FCC_ELEMENTS.map((el) => `${el.name} (${el.symbol})`),
   derivedFrom: [{ id: 85, tier: 'Big Hull' }],
@@ -2749,7 +2750,7 @@ function buildBCCCellsStage(scale, cellOffsets, pieceColor = PIECE_COLOR, skelet
 // with real execution before any element theming was added on top.
 const BCC_TWO_CELL_OFFSETS = [[0, 0, 0], ...BCC_NEIGHBOR_OFFSETS.slice(0, 1)];
 const ONE_BCC_STAGE = {
-  id: 112,
+  id: 113,
   name: 'BCC: One Cell',
   build: (scale) => buildBCCCellsStage(scale, [[0, 0, 0]]),
 };
@@ -2773,10 +2774,10 @@ const BCC_ELEMENTS = [
   { symbol: 'K', name: 'Potassium' },
 ];
 const BCC_CRYSTAL_STAGES = [{
-  id: 113,
+  id: 114,
   name: `BCC Crystal: ${BCC_ELEMENTS[0].name} (${BCC_ELEMENTS[0].symbol})`,
   attributions: BCC_ELEMENTS.map((el) => `${el.name} (${el.symbol})`),
-  derivedFrom: [{ id: 112, tier: 'BCC' }],
+  derivedFrom: [{ id: 113, tier: 'BCC' }],
   build: (scale) => buildBCCCellsStage(scale, BCC_TWO_CELL_OFFSETS, BCC_ELEMENTS[0].color, BCC_ELEMENTS[0].color),
 }];
 
@@ -2878,7 +2879,7 @@ const BCC_ALLOY_DEFS = [
 const BCC_ALLOY_STAGES = BCC_ALLOY_DEFS.map((def, i) => ({
   id: 90 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 112, tier: 'BCC' }],
+  derivedFrom: [{ id: 113, tier: 'BCC' }],
   build: (scale) => buildBCCAlloyStage(scale, BCC_ALLOY_CELLS, def.colorEven, def.colorOdd),
 }));
 
@@ -2962,7 +2963,7 @@ const DILUTE_ALLOY_DEFS = [
 const DILUTE_ALLOY_STAGES = DILUTE_ALLOY_DEFS.map((def, i) => ({
   id: 93 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 112, tier: 'BCC' }],
+  derivedFrom: [{ id: 113, tier: 'BCC' }],
   build: (scale) => buildBCCDiluteAlloyStage(scale, BCC_ALLOY_CELLS, BCC_ELEMENTS[0].color, def.dopantColor, def.dopantCount),
 }));
 
@@ -3058,7 +3059,7 @@ const CARBON_COLOR = 0x2b2b2b;
 const CARBON_STEEL_STAGE = {
   id: 95,
   name: 'Alloy: Carbon Steel (Fe + C, interstitial)',
-  derivedFrom: [{ id: 112, tier: 'BCC' }],
+  derivedFrom: [{ id: 113, tier: 'BCC' }],
   build: (scale) => buildCarbonSteelStage(scale, BCC_ALLOY_CELLS, BCC_ELEMENTS[0].color, CARBON_COLOR),
 };
 
@@ -3158,6 +3159,83 @@ const FCC_ALLOY_STAGES = FCC_ALLOY_DEFS.map((def, i) => ({
   build: (scale) => buildFCCDiluteAlloyStage(scale, CUBOCTAHEDRON_CELLS, def.baseColor, def.dopantColor, def.dopantCount),
 }));
 
+// Salt (NaCl, rock-salt/B1 structure) -- 2026-09-05, direct instruction
+// ("household materials like salt etc"), built on the new
+// `geometry-extensions/rock-salt-lattice.js` (scoped, created, and
+// numerically self-verified this same session -- see that file's own
+// standalone sanity gate). A GENUINELY different real structure from
+// every Alloy stage above: those are all real coordination shells of
+// ONE species (BCC or FCC) with a second element substituted in or
+// interstitially inserted; NaCl's own defining feature is real
+// CROSS-species octahedral coordination -- 1 real cation + its 6 real
+// nearest anion neighbors, not same-species neighbors at all. Each
+// ion's own real Voronoi cell in this structure is an ordinary CUBE
+// (rock-salt-lattice.js's own header explains why: combined, both
+// sublattices are a genuine simple-cubic lattice) -- needs no new mesh
+// derivation, `THREE.BoxGeometry(scale, scale, scale)` is exactly
+// correct at this same `scale` cellToWorld already uses everywhere
+// else (cation-anion spacing here is exactly 1 raw lattice unit).
+const ROCK_SALT_CELLS = [[0, 0, 0], ...CATION_ANION_OFFSETS];
+
+function buildRockSaltStage(scale, cellOffsets, cationColor, anionColor) {
+  const skeletonGroup = new THREE.Group();
+  const cubeGeometry = new THREE.BoxGeometry(scale, scale, scale);
+
+  const cellWorldPositions = cellOffsets.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = cellWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / cellWorldPositions.length);
+  const cellCenters = cellWorldPositions.map((p) => p.clone().sub(centroid));
+  const cellColors = cellOffsets.map(([cx, cy, cz]) => (isCationSite(cx, cy, cz) ? cationColor : anionColor));
+
+  const voids = [];
+  cellCenters.forEach((cellCenter, i) => {
+    skeletonGroup.add(makeOuterSolid(cubeGeometry, cellCenter, cellColors[i]));
+    const v = makeVoid(cubeGeometry, { id: `v-cell-${i}`, position: cellCenter, groupIds: [`cell-${i}`] });
+    skeletonGroup.add(...v.sceneObjects);
+    voids.push(v);
+  });
+
+  const groups = cellCenters.map((center, i) => ({ id: `cell-${i}`, position: center.clone(), quaternion: new THREE.Quaternion() }));
+  const pieceSpecs = cellCenters.map((_, i) => ({ id: `single-${i}`, fillsGroup: `cell-${i}`, geometry: cubeGeometry, color: cellColors[i] }));
+
+  // Same physically-motivated key as every other Alloy stage -- the
+  // shared central ion can't be recognized as correctly seated until
+  // its whole real neighbor shell surrounds it.
+  const neighborIds = pieceSpecs.slice(1).map((spec) => spec.id);
+  pieceSpecs[0].requiresPlacedFirst = neighborIds;
+  pieceSpecs.push({ id: 'decoy-0', fillsGroup: DECOY_NEVER_MATCHES, geometry: cubeGeometry, color: PIECE_COLOR });
+
+  for (let i = pieceSpecs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
+  }
+
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+      color: spec.color,
+      requiresPlacedFirst: spec.requiresPlacedFirst,
+    });
+  });
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+}
+
+// Real reference colors: sodium metal is a soft, bright silvery-white
+// (same value already used for BCC_ELEMENTS' own Sodium entry, reused
+// for consistency); chlorine gas is a real, well-documented pale
+// yellow-green.
+const SALT_STAGE = {
+  id: 100,
+  name: 'Salt: Sodium Chloride (NaCl)',
+  derivedFrom: [{ id: 85, tier: 'Big Hull' }],
+  build: (scale) => buildRockSaltStage(scale, ROCK_SALT_CELLS, 0xd8d8d0, 0xc9d67a),
+};
+
 // Mirrored Molecule -- direct instruction (2026-09-04, "mirrored
 // molecules split it into 3 with 3 decoys", confirmed "both could
 // work" against two different readings): this is the FIRST reading --
@@ -3254,6 +3332,7 @@ export const STAGES = [
   ...DILUTE_ALLOY_STAGES,
   CARBON_STEEL_STAGE,
   ...FCC_ALLOY_STAGES,
+  SALT_STAGE,
   ...BURR_MOLECULE_SPLIT_STAGES,
   ...BURR_MIRRORED_MOLECULE_STAGES,
   ...BURR_BRANCHING_MOLECULE_STAGES,
