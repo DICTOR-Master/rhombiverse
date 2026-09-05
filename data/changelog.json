@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-09-05",
+    "title": "RHOMBIS: Multi-Cell Was Out of Place",
+    "link": "./rhombis.html?stage=104",
+    "items": [
+      "Fixed: Multi-Cell -- 26 real pieces to place, the single highest piece count of any stage in the entire game (every other stage tops out at 17) -- had been sitting right after the game's own intro tier, ahead of dozens of genuinely simpler stages, including the entire Hull, Molecule, and Alloy tiers. Caught directly: \"stage 22 is more complex than several of the puzzles following it by amount of pieces to place.\"",
+      "Moved to sit right after the Alloy tier's own hardest stage (Carbon Steel, 17 pieces) instead -- ahead of the deeper-reasoning crossover tiers that follow, since Multi-Cell has no key/decoy mechanism of its own, purely a real piece-count/time-to-complete difficulty rather than a reasoning one."
+    ]
+  },
+  {
+    "date": "2026-09-05",
     "title": "RHOMBIS: Real Flat Contact, Not Points",
     "link": "./rhombis.html?stage=114",
     "items": [
