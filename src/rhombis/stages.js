@@ -854,6 +854,105 @@ const HOURGLASS_STAGE = {
   build: buildHourglassStage,
 };
 
+// 3 real cells in a straight line (the SAME "Straight Line" 3-cell
+// shape THREE_CELL_STAGES already builds via the generic N-cell fused-
+// piece mechanic -- see THREE_CELL_SIGNATURES), decomposed a genuinely
+// different way: chained Hourglass hemispheres, direct extension of
+// HOURGLASS_STAGE above rather than folded into it (same reasoning
+// Hourglass itself used against Multi-Cell -- a different real
+// decomposition earns its own stage). The middle cell needs no third
+// "spine" piece of its own: hemisphereSplit() already bisects it
+// cleanly along the one straight chain axis, so its two natural halves
+// -- one facing each neighbor -- are each simply absorbed into that
+// neighbor's own hourglass piece, with nothing left over at its center.
+// (An earlier idea floated reusing diagonalOctahedronGeometry as the
+// middle cell's own "spine" -- wrong on reflection: that shape only
+// ever represents 2 of a cell's 12 real face-pyramids, so using it here
+// would mean re-decomposing the middle cell via the SAME fragile
+// 12-face-pyramid scheme Multi-Cell's octahedron was just retired from,
+// for zero benefit over the hemisphere split already doing the whole
+// job in one piece. diagonalOctahedronGeometry stays in geometry.js
+// unused for now, not deleted -- its real reuse candidate is a future
+// stage that actually needs a single-cell diagonal spike, not this one.)
+// Zero new geometry beyond what Hourglass already introduced.
+function threeCellChainCenters(scale) {
+  const [dx, dy, dz] = NEIGHBOR_OFFSETS[MULTI_CELL_NEIGHBOR_INDEX];
+  const cellOffsets = [[0, 0, 0], [dx, dy, dz], [dx * 2, dy * 2, dz * 2]];
+  const cellWorldPositions = cellOffsets.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = cellWorldPositions[0].clone().add(cellWorldPositions[1]).add(cellWorldPositions[2]).multiplyScalar(1 / 3);
+  return cellWorldPositions.map((p) => p.clone().sub(centroid));
+}
+
+function buildHourglassChainStage(scale) {
+  const skeletonGroup = new THREE.Group();
+  const [cellA, cellB, cellC] = threeCellChainCenters(scale);
+  const fwdIndex = MULTI_CELL_NEIGHBOR_INDEX;
+  const backIndex = oppositeNeighborIndex(fwdIndex);
+
+  [cellA, cellB, cellC].forEach((c) => skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), c)));
+
+  const voids = [];
+  [
+    { id: 'v-a-fwd', geometry: hemisphereGeometry(scale, fwdIndex, 'positive'), position: cellA, groupIds: ['chain-ab'] },
+    { id: 'v-a-back', geometry: hemisphereGeometry(scale, fwdIndex, 'negative'), position: cellA, groupIds: ['end-a'] },
+    { id: 'v-b-fwd', geometry: hemisphereGeometry(scale, fwdIndex, 'positive'), position: cellB, groupIds: ['chain-bc'] },
+    { id: 'v-b-back', geometry: hemisphereGeometry(scale, fwdIndex, 'negative'), position: cellB, groupIds: ['chain-ab'] },
+    { id: 'v-c-fwd', geometry: hemisphereGeometry(scale, fwdIndex, 'positive'), position: cellC, groupIds: ['end-c'] },
+    { id: 'v-c-back', geometry: hemisphereGeometry(scale, fwdIndex, 'negative'), position: cellC, groupIds: ['chain-bc'] },
+  ].forEach(({ id, geometry, position, groupIds }) => {
+    const v = makeVoid(geometry, { id, position, groupIds });
+    skeletonGroup.add(...v.sceneObjects);
+    voids.push(v);
+  });
+
+  const groups = [
+    { id: 'chain-ab', position: cellA.clone().add(cellB).multiplyScalar(0.5), quaternion: new THREE.Quaternion() },
+    { id: 'chain-bc', position: cellB.clone().add(cellC).multiplyScalar(0.5), quaternion: new THREE.Quaternion() },
+    { id: 'end-a', position: cellA.clone(), quaternion: new THREE.Quaternion() },
+    { id: 'end-c', position: cellC.clone(), quaternion: new THREE.Quaternion() },
+  ];
+
+  const pieceSpecs = [
+    {
+      id: 'chain-ab-piece',
+      fillsGroup: 'chain-ab',
+      geometry: mergeGeometries([
+        hemisphereGeometry(scale, fwdIndex, 'positive').translate(cellA.x, cellA.y, cellA.z),
+        hemisphereGeometry(scale, fwdIndex, 'negative').translate(cellB.x, cellB.y, cellB.z),
+      ], false),
+    },
+    {
+      id: 'chain-bc-piece',
+      fillsGroup: 'chain-bc',
+      geometry: mergeGeometries([
+        hemisphereGeometry(scale, fwdIndex, 'positive').translate(cellB.x, cellB.y, cellB.z),
+        hemisphereGeometry(scale, fwdIndex, 'negative').translate(cellC.x, cellC.y, cellC.z),
+      ], false),
+    },
+    { id: 'end-a-piece', fillsGroup: 'end-a', geometry: hemisphereGeometry(scale, fwdIndex, 'negative') },
+    { id: 'end-c-piece', fillsGroup: 'end-c', geometry: hemisphereGeometry(scale, fwdIndex, 'positive') },
+  ];
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+    });
+  });
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+}
+
+const HOURGLASS_CHAIN_STAGE = {
+  id: 4,
+  name: 'Hourglass Chain: 3 in a Row',
+  derivedFrom: [{ id: 3, tier: 'Hourglass' }, { id: 12, tier: '3 Cells' }],
+  build: buildHourglassChainStage,
+};
+
 // Stage 7 -- joined pair: the SAME 2-cell composite as Stage 6
 // (`twoCellCenters`, provably identical geometry), but a genuinely
 // different puzzle, not more content on Stage 6's own engine. Direct
@@ -1513,7 +1612,7 @@ const THREE_CELL_STAGES = THREE_CELL_STAGE_DEFS.map((def, i) => {
     // ruins the non colored playing" -- one full group before the
     // other, not pairwise, so the uncolored tier still plays as its own
     // coherent set once a player reaches it.
-    id: 8 + i,
+    id: 9 + i,
     name: `3 Cells: ${def.name}`,
     // Alternates RD-shaped vs. cube-shaped decoys across the 4 stages
     // (direct instruction, "cubes can be among decoys at all levels")
@@ -1571,7 +1670,7 @@ const FOUR_CELL_STAGES = FOUR_CELL_STAGE_DEFS.map((def, i) => {
   // same "other connections... etc" reasoning as the N=3 tier.
   const decoyDef = FOUR_CELL_STAGE_DEFS[(i + 1) % FOUR_CELL_STAGE_DEFS.length];
   return {
-    id: 12 + i,
+    id: 13 + i,
     name: `4 Cells: ${def.name}`,
     // Opposite parity from the N=3 tier's own alternation, purely so
     // the SAME cube-vs-RD pattern doesn't repeat identically stage-
@@ -1697,9 +1796,9 @@ const COLOR_MATCH_STAGES = THREE_CELL_STAGE_DEFS.map((def, i) => {
   // rather than reusing one fixed decoy color everywhere.
   const decoyColor = COLOR_MATCH_PALETTE[def.cells.length + (i % (COLOR_MATCH_PALETTE.length - def.cells.length))];
   return {
-    id: 4 + i,
+    id: 5 + i,
     name: `Color Match: ${def.name}`,
-    derivedFrom: [{ id: 8 + i, tier: def.name }],
+    derivedFrom: [{ id: 9 + i, tier: def.name }],
     build: (scale) => buildColorMatchStage(scale, def.cells, { cells: decoyDef.cells, asCubes: i % 2 === 0 }, decoyColor),
   };
 });
@@ -1963,7 +2062,7 @@ function buildHullSplitStage(scale, hullDef) {
 // it still starts at 17 + 41 = 58 regardless of which of the two comes
 // first.
 const HULL_STAGES = FIVE_CELL_HULL_DEFS.map((hullDef, i) => ({
-  id: 24 + i,
+  id: 25 + i,
   name: `Hull ${i + 1}: 5-Cell Split`,
   build: (scale) => buildHullSplitStage(scale, hullDef),
 }));
@@ -2285,7 +2384,7 @@ MOLECULE_STAGE_DEFS.sort((x, y) => (x.lobeA.cells.length + x.lobeB.cells.length)
 // Molecules after direct feedback that 5-cell hulls read easier than
 // Molecules' own 6-8 cell composites (see HULL_STAGES' own comment).
 const MOLECULE_STAGES = MOLECULE_STAGE_DEFS.map(({ lobeA, lobeB }, i) => ({
-  id: 37 + i,
+  id: 38 + i,
   name: `Molecule: ${lobeA.name} (${lobeA.cells.length}) + ${lobeB.name} (${lobeB.cells.length})`,
   build: (scale) => buildMoleculeStage(scale, lobeA, lobeB, pickMoleculeDecoys(lobeA, lobeB, i * 2)),
 }));
@@ -2323,7 +2422,7 @@ const BRANCHING_MOLECULE_STAGE_DEFS = [
 ];
 
 const BRANCHING_MOLECULE_STAGES = BRANCHING_MOLECULE_STAGE_DEFS.map(({ hub, branch1, branch2 }, i) => ({
-  id: 81 + i,
+  id: 82 + i,
   name: `Branching Molecule: ${hub.name} (${hub.cells.length}) hub + ${branch1.name} (${branch1.cells.length}) + ${branch2.name} (${branch2.cells.length})`,
   build: (scale) => buildBranchingMoleculeStage(scale, hub, branch1, branch2, pickBranchMoleculeDecoys(hub, branch1, branch2, i * 2)),
 }));
@@ -2817,8 +2916,8 @@ function buildDisphenoidKeyHullStage(scale, allCells, junctionCellCount, chunkCo
 }
 
 const BIG_HULL_STAGES = [
-  { id: 88, name: 'Big Hull: Cuboctahedron', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3) },
-  { id: 90, name: 'Big Hull: Tetrahedral Stack', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 4) },
+  { id: 89, name: 'Big Hull: Cuboctahedron', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3) },
+  { id: 91, name: 'Big Hull: Tetrahedral Stack', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 4) },
 ];
 
 // Burr Puzzle -- direct instruction (2026-09-04, "scope both... key
@@ -2841,9 +2940,9 @@ const BIG_HULL_STAGES = [
 // regular pieces are down), not one single forced sequence, which
 // would just be a strict full ordering wearing a "2 keys" label.
 const BURR_PUZZLE_STAGES = [
-  { id: 91, name: 'Burr Puzzle: Key Piece', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 2, [0]) },
-  { id: 92, name: 'Burr Puzzle: Key Piece (Tetrahedral)', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0]) },
-  { id: 93, name: 'Burr Puzzle: Two Keys', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0, 1]) },
+  { id: 92, name: 'Burr Puzzle: Key Piece', build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 2, [0]) },
+  { id: 93, name: 'Burr Puzzle: Key Piece (Tetrahedral)', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0]) },
+  { id: 94, name: 'Burr Puzzle: Two Keys', build: (scale) => buildBigHullStage(scale, TETRAHEDRAL_STACK_CELLS, 4, 3, [0, 1]) },
 ];
 
 // --- Crossover tiers (2026-09-05, direct instruction: "Burr + Molecule
@@ -2862,9 +2961,9 @@ const BURR_MOLECULE_SPLIT_STAGE_DEFS = [2, 14, 26].map((i) => MOLECULE_STAGE_DEF
 const BURR_MOLECULE_SPLIT_STAGES = BURR_MOLECULE_SPLIT_STAGE_DEFS.map(({ lobeA, lobeB }, i) => {
   const cells = joinTwoShapes(lobeA.cells, lobeB.cells);
   return {
-    id: 106 + i,
+    id: 107 + i,
     name: `Burr Puzzle: Molecule Split (${lobeA.name} + ${lobeB.name})`,
-    derivedFrom: [{ id: 73, tier: 'Molecule Split' }, { id: 91, tier: 'Burr Puzzle' }],
+    derivedFrom: [{ id: 74, tier: 'Molecule Split' }, { id: 92, tier: 'Burr Puzzle' }],
     build: (scale) => buildBigHullStage(scale, cells, 3, 3, [0]),
   };
 });
@@ -2877,9 +2976,9 @@ const BURR_MIRRORED_MOLECULE_STAGES = BURR_MIRRORED_MOLECULE_INDEXES.map((shapeI
   const cellsA = CHIRAL_FIVE_CELL_SHAPES[shapeIndex];
   const cells = joinTwoShapes(cellsA, mirrorCells(cellsA));
   return {
-    id: 109 + i,
+    id: 110 + i,
     name: `Burr Puzzle: Mirrored Molecule ${shapeIndex + 1}`,
-    derivedFrom: [{ id: 65, tier: 'Mirrored Molecule' }, { id: 91, tier: 'Burr Puzzle' }],
+    derivedFrom: [{ id: 66, tier: 'Mirrored Molecule' }, { id: 92, tier: 'Burr Puzzle' }],
     build: (scale) => buildBigHullStage(scale, cells, 3, 3, [0]),
   };
 });
@@ -2892,9 +2991,9 @@ const BURR_BRANCHING_MOLECULE_INDEXES = [0, 2, 4];
 const BURR_BRANCHING_MOLECULE_STAGES = BURR_BRANCHING_MOLECULE_INDEXES.map((defIndex, i) => {
   const { hub, branch1, branch2 } = BRANCHING_MOLECULE_STAGE_DEFS[defIndex];
   return {
-    id: 112 + i,
+    id: 113 + i,
     name: `Branching Molecule: ${hub.name} hub + ${branch1.name} + ${branch2.name} (II)`,
-    derivedFrom: [{ id: 81, tier: 'Branching Molecule' }, { id: 91, tier: 'Burr Puzzle' }],
+    derivedFrom: [{ id: 82, tier: 'Branching Molecule' }, { id: 92, tier: 'Burr Puzzle' }],
     build: (scale) => buildBranchingMoleculeStage(scale, hub, branch1, branch2, pickBranchMoleculeDecoys(hub, branch1, branch2, defIndex * 2), true),
   };
 });
@@ -2910,15 +3009,15 @@ const BURR_BRANCHING_MOLECULE_STAGES = BURR_BRANCHING_MOLECULE_INDEXES.map((defI
 // indices 10-19) -- all genuine extremities, not an arbitrary pick.
 const DISPHENOID_KEY_HULL_STAGES = [
   {
-    id: 115,
+    id: 116,
     name: 'Big Hull: Cuboctahedron (Disphenoid)',
-    derivedFrom: [{ id: 88, tier: 'Big Hull' }, { id: 87, tier: 'Disphenoid RD' }, { id: 91, tier: 'Burr Puzzle' }],
+    derivedFrom: [{ id: 89, tier: 'Big Hull' }, { id: 88, tier: 'Disphenoid RD' }, { id: 92, tier: 'Burr Puzzle' }],
     build: (scale) => buildDisphenoidKeyHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3, 1),
   },
   {
-    id: 116,
+    id: 117,
     name: 'Big Hull: Tetrahedral Stack (Disphenoid)',
-    derivedFrom: [{ id: 90, tier: 'Big Hull' }, { id: 87, tier: 'Disphenoid RD' }, { id: 91, tier: 'Burr Puzzle' }],
+    derivedFrom: [{ id: 91, tier: 'Big Hull' }, { id: 88, tier: 'Disphenoid RD' }, { id: 92, tier: 'Burr Puzzle' }],
     build: (scale) => buildDisphenoidKeyHullStage(scale, TETRAHEDRAL_STACK_CELLS, 3, 4, 1),
   },
 ];
@@ -2982,10 +3081,10 @@ const FCC_ELEMENTS = [
   { symbol: 'Pd', name: 'Palladium' },
 ];
 const CRYSTAL_STAGES = [{
-  id: 89,
+  id: 90,
   name: `Crystal: ${FCC_ELEMENTS[0].name} (${FCC_ELEMENTS[0].symbol})`,
   attributions: FCC_ELEMENTS.map((el) => `${el.name} (${el.symbol})`),
-  derivedFrom: [{ id: 88, tier: 'Big Hull' }],
+  derivedFrom: [{ id: 89, tier: 'Big Hull' }],
   build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3, [], FCC_ELEMENTS[0].color, FCC_ELEMENTS[0].color),
 }];
 
@@ -3052,7 +3151,7 @@ function buildBCCCellsStage(scale, cellOffsets, pieceColor = PIECE_COLOR, skelet
 // with real execution before any element theming was added on top.
 const BCC_TWO_CELL_OFFSETS = [[0, 0, 0], ...BCC_NEIGHBOR_OFFSETS.slice(0, 1)];
 const ONE_BCC_STAGE = {
-  id: 17,
+  id: 18,
   name: 'BCC: One Cell',
   build: (scale) => buildBCCCellsStage(scale, [[0, 0, 0]]),
 };
@@ -3076,10 +3175,10 @@ const BCC_ELEMENTS = [
   { symbol: 'K', name: 'Potassium' },
 ];
 const BCC_CRYSTAL_STAGES = [{
-  id: 19,
+  id: 20,
   name: `BCC Crystal: ${BCC_ELEMENTS[0].name} (${BCC_ELEMENTS[0].symbol})`,
   attributions: BCC_ELEMENTS.map((el) => `${el.name} (${el.symbol})`),
-  derivedFrom: [{ id: 17, tier: 'BCC' }],
+  derivedFrom: [{ id: 18, tier: 'BCC' }],
   build: (scale) => buildBCCCellsStage(scale, BCC_TWO_CELL_OFFSETS, BCC_ELEMENTS[0].color, BCC_ELEMENTS[0].color),
 }];
 
@@ -3179,9 +3278,9 @@ const BCC_ALLOY_DEFS = [
   { name: 'Beta Brass', formula: 'CuZn', colorEven: 0xb87333, colorOdd: 0xd0d3c8 }, // Cu (even/corner), Zn (odd/body-center) -- Zn: real pale blue-white metal color
 ];
 const BCC_ALLOY_STAGES = BCC_ALLOY_DEFS.map((def, i) => ({
-  id: 100 + i,
+  id: 101 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 17, tier: 'BCC' }],
+  derivedFrom: [{ id: 18, tier: 'BCC' }],
   build: (scale) => buildBCCAlloyStage(scale, BCC_ALLOY_CELLS, def.colorEven, def.colorOdd),
 }));
 
@@ -3263,9 +3362,9 @@ const DILUTE_ALLOY_DEFS = [
   { name: 'Molybdenum Steel', formula: 'Fe + Mo', dopantColor: 0x8c92ac, dopantCount: 2 }, // Mo, real color from BCC_ELEMENTS
 ];
 const DILUTE_ALLOY_STAGES = DILUTE_ALLOY_DEFS.map((def, i) => ({
-  id: 103 + i,
+  id: 104 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 17, tier: 'BCC' }],
+  derivedFrom: [{ id: 18, tier: 'BCC' }],
   build: (scale) => buildBCCDiluteAlloyStage(scale, BCC_ALLOY_CELLS, BCC_ELEMENTS[0].color, def.dopantColor, def.dopantCount),
 }));
 
@@ -3359,9 +3458,9 @@ function buildCarbonSteelStage(scale, cellOffsets, baseColor, carbonColor) {
 // standard reference for elemental carbon/graphite).
 const CARBON_COLOR = 0x2b2b2b;
 const CARBON_STEEL_STAGE = {
-  id: 105,
+  id: 106,
   name: 'Alloy: Carbon Steel (Fe + C, interstitial)',
-  derivedFrom: [{ id: 17, tier: 'BCC' }],
+  derivedFrom: [{ id: 18, tier: 'BCC' }],
   build: (scale) => buildCarbonSteelStage(scale, BCC_ALLOY_CELLS, BCC_ELEMENTS[0].color, CARBON_COLOR),
 };
 
@@ -3455,9 +3554,9 @@ const FCC_ALLOY_DEFS = [
   { name: 'Bronze', formula: 'Cu + Sn', baseColor: COPPER_COLOR, dopantColor: 0xd8d8d0, dopantCount: 2 }, // Sn in Cu -- Sn: real pale tin color
 ];
 const FCC_ALLOY_STAGES = FCC_ALLOY_DEFS.map((def, i) => ({
-  id: 96 + i,
+  id: 97 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 88, tier: 'Big Hull' }],
+  derivedFrom: [{ id: 89, tier: 'Big Hull' }],
   build: (scale) => buildFCCDiluteAlloyStage(scale, CUBOCTAHEDRON_CELLS, def.baseColor, def.dopantColor, def.dopantCount),
 }));
 
@@ -3532,9 +3631,9 @@ function buildRockSaltStage(scale, cellOffsets, cationColor, anionColor) {
 // for consistency); chlorine gas is a real, well-documented pale
 // yellow-green.
 const SALT_STAGE = {
-  id: 94,
+  id: 95,
   name: 'Salt: Sodium Chloride (NaCl)',
-  derivedFrom: [{ id: 88, tier: 'Big Hull' }],
+  derivedFrom: [{ id: 89, tier: 'Big Hull' }],
   build: (scale) => buildRockSaltStage(scale, ROCK_SALT_CELLS, 0xd8d8d0, 0xc9d67a),
 };
 
@@ -3657,9 +3756,9 @@ function buildCalciteStage(scale, cellOffsets, cationColor, anionColor) {
 // clean white/off-white (real calcite's own common appearance); the
 // CO3 anion rendered as a contrasting real mineral blue-gray.
 const CALCITE_STAGE = {
-  id: 95,
+  id: 96,
   name: 'Calcite: Calcium Carbonate (CaCO3)',
-  derivedFrom: [{ id: 94, tier: 'Salt' }],
+  derivedFrom: [{ id: 95, tier: 'Salt' }],
   build: (scale) => buildCalciteStage(scale, ROCK_SALT_CELLS, 0xf2f0e6, 0x7a8b99),
 };
 
@@ -3682,7 +3781,7 @@ const MIRRORED_MOLECULE_STAGES = CHIRAL_FIVE_CELL_SHAPES.map((cells, i) => {
   const lobeA = { name: `Chiral Piece ${i + 1}`, cells };
   const lobeB = { name: `Chiral Piece ${i + 1} (Mirror)`, cells: mirrorCells(cells) };
   return {
-    id: 65 + i,
+    id: 66 + i,
     name: `Mirrored Molecule ${i + 1}`,
     build: (scale) => buildMoleculeStage(scale, lobeA, lobeB, pickMoleculeDecoys(lobeA, lobeB, i * 2)),
   };
@@ -3706,7 +3805,7 @@ const MOLECULE_SPLIT_STAGE_DEFS = [0, 4, 8, 12, 16, 20, 24, 27].map((i) => MOLEC
 const MOLECULE_SPLIT_STAGES = MOLECULE_SPLIT_STAGE_DEFS.map(({ lobeA, lobeB }, i) => {
   const cells = joinTwoShapes(lobeA.cells, lobeB.cells);
   return {
-    id: 73 + i,
+    id: 74 + i,
     name: `Molecule Split: ${lobeA.name} (${lobeA.cells.length}) + ${lobeB.name} (${lobeB.cells.length})`,
     build: (scale) => buildBigHullStage(scale, cells, 3, 3),
   };
@@ -3729,10 +3828,11 @@ export const STAGES = [
   ONE_CELL_STAGE,
   { id: 2, name: '2 Cells: Joined Pair', build: buildStage7 },
   HOURGLASS_STAGE,
+  HOURGLASS_CHAIN_STAGE,
   ...COLOR_MATCH_STAGES,
   ...THREE_CELL_STAGES,
   ...FOUR_CELL_STAGES,
-  { id: 16, name: 'One Piece', build: buildStage1 },
+  { id: 17, name: 'One Piece', build: buildStage1 },
   // BCC's own single-cell/two-cell introduction sits right here, as a
   // direct peer of the FCC "One Piece"/"Octahedron" pair immediately
   // around it -- not stranded at the very end of the whole game where
@@ -3743,11 +3843,11 @@ export const STAGES = [
   // a player sampling "the hard stuff" would hit it and wrongly
   // conclude the whole game is trivial.
   ONE_BCC_STAGE,
-  { id: 18, name: 'Octahedron', build: buildStage2 },
+  { id: 19, name: 'Octahedron', build: buildStage2 },
   ...BCC_CRYSTAL_STAGES,
-  { id: 20, name: 'Cube', build: buildStage3 },
-  { id: 21, name: 'Conjoined Pieces', build: buildStage5 },
-  { id: 22, name: 'Rhombic Dodecahedron', build: buildStage4 },
+  { id: 21, name: 'Cube', build: buildStage3 },
+  { id: 22, name: 'Conjoined Pieces', build: buildStage5 },
+  { id: 23, name: 'Rhombic Dodecahedron', build: buildStage4 },
   // Multi-Cell belongs back here, not off among the Alloy/crossover
   // tiers -- direct correction (2026-09-05, "it should have still been
   // in same group as before, as its only a repeated procedure and
@@ -3763,13 +3863,13 @@ export const STAGES = [
   // vs. the larger Alloy stages were ordered) -- comparing it ACROSS
   // unrelated families, as the previous move did, was the real mistake.
   // Positioned last in this family, by piece count (1, 2, 6, 7, 12, 26).
-  { id: 23, name: 'Multi-Cell', build: buildStage6 },
+  { id: 24, name: 'Multi-Cell', build: buildStage6 },
   ...HULL_STAGES,
   ...MOLECULE_STAGES,
   ...MIRRORED_MOLECULE_STAGES,
   ...MOLECULE_SPLIT_STAGES,
   ...BRANCHING_MOLECULE_STAGES,
-  { id: 87, name: 'Rhombic Dodecahedron (Disphenoids)', build: buildDisphenoidRDStage },
+  { id: 88, name: 'Rhombic Dodecahedron (Disphenoids)', build: buildDisphenoidRDStage },
   BIG_HULL_STAGES[0],
   // Crystal: Copper is literally Big Hull: Cuboctahedron itself, real-
   // metal-colored, no key -- same real shape and same zero-mechanism

@@ -1,6 +1,25 @@
 [
   {
     "date": "2026-09-05",
+    "title": "RHOMBIS: Hourglass Chain",
+    "link": "./rhombis.html?stage=4",
+    "items": [
+      "New: Hourglass Chain, a real 3-cell straight-line extension of Hourglass -- the same \"Straight Line\" 3-cell shape the N-cell tier already builds, decomposed a genuinely different way, its own stage rather than folded into either (same reasoning Hourglass itself used against Multi-Cell). The middle cell needs no piece of its own: hemisphereSplit() already bisects it cleanly along the one straight chain axis, so its two natural halves -- one facing each neighbor -- are simply absorbed into that neighbor's own hourglass piece, with nothing left over at its center. 4 pieces total (2 hourglasses, 2 end half-RDs), zero new geometry. Verified: real per-triangle volume of a full solve is exactly 6.0 (3 whole RD cells), zero gaps or overlaps.",
+      "An earlier idea floated reusing the diagonal-octahedron piece (Multi-Cell's own real bipyramid-through-a-cell's-center) as this stage's middle-cell \"spine\" -- reconsidered before building: that shape only ever represents 2 of a cell's 12 real face-pyramids, so using it here would mean re-decomposing the middle cell via the same fragile 12-face-pyramid scheme Multi-Cell's octahedron needed several real bug fixes to get right, for zero benefit over the hemisphere split already doing the whole job in one piece. The geometry function stays in the codebase unused for now, not deleted, for whichever future stage genuinely needs a single-cell diagonal spike."
+    ]
+  },
+  {
+    "date": "2026-09-05",
+    "title": "RHOMBIS: Multi-Cell Down to 8 Real Pieces",
+    "link": "./rhombis.html?stage=24",
+    "items": [
+      "Fixed: the diagonal octahedron's own geometry was built from a single ConvexGeometry call over both pyramids' combined 9 points -- two pyramids sharing one apex with bases splayed to opposite sides form a genuinely non-convex \"bowtie\" pinch at that shared point, which a convex hull can't represent and instead fills in, fattening the real shape to exactly 3x its correct volume. Caught live: \"the disphenoid was burying into the octahedron in order to match the face\" / \"disphenoids were burrowing in\" -- the octahedron's own real bulk was genuinely oversized and eating into neighboring space. Fixed by merging two already-correct facePyramidGeometry meshes instead of hulling their combined points.",
+      "Fixed: the 24 loose single-direction pieces that filled the other 10 real faces per cell (10 per cell, 2 per cell already claimed by the octahedron) still read \"says solved but still obviously wrong\" once the above was fixed -- treating them as fully interchangeable assumed they're congruent the way the N-cell tier's own single RD pieces are, but each one's own mesh is baked with a specific real orientation, not a generic rotatable wedge. Direct instruction: \"the whole point of this exercise was to reduce unnecessary complication\" / \"needs to be down to ten pieces\" -- 24 fiddly look-alike pieces was itself the complication, not a bug to patch in place. Replaced with 4 merged \"hubcap\" pieces (2 per cell, 5 real edge-adjacent faces each, verified by dot-product adjacency against all 12 real directions) built via the same safe merge technique. Whole stage total: 8 real pieces (down from 26), comfortably under the 10-piece ceiling.",
+      "Verified end to end: full solve via octahedra+hubcaps only (skipping the trivial fused-whole-cell shortcut) reports exactly 4.0 total real volume (2 whole RD cells, zero gaps/overlaps), and real click-driven UI interaction (not just state-API calls) produced zero page errors."
+    ]
+  },
+  {
+    "date": "2026-09-05",
     "title": "RHOMBIS: The Hourglass",
     "link": "./rhombis.html?stage=3",
     "items": [
@@ -11,7 +30,7 @@
   {
     "date": "2026-09-05",
     "title": "RHOMBIS: No More Point-Only Junctions",
-    "link": "./rhombis.html?stage=115",
+    "link": "./rhombis.html?stage=116",
     "items": [
       "Fixed: a real structural flaw in the Disphenoid crossover puzzles' interlocking tabs, caught immediately after the same-day facePieces() fix (which solved a different, real problem -- see the earlier entry below): letting a junction cell split among more than one real neighbor at once meant two DIFFERENT pieces' own tabs, both built as pyramids to the exact same shared point (the junction cell's own center), only ever touched each other at that single point whenever their own real directions weren't next to each other -- a real 'would this survive being picked up' failure, caught directly: \"small pieces should attach by flats only to the parent piece\" / \"there is a group of four cells with two pyramids attached only by the tips of points\".",
       "Fixed properly: a junction cell now splits into exactly two real halves, by a real flat plane through its own center (hemisphereSplit(), core/lattice.js), between its home chunk and the ONE real neighboring chunk that actually borders it there -- never more than one claim per cell, which is exactly what let two different tabs meet at a point instead of a face. Verified for all 12 real directions: 4 real vertices strictly on each side, 6 exactly on the dividing plane, equal real volumes (8+8, matching the cell's own known total), and the real external face toward the claiming neighbor always fully inside its own half.",
@@ -21,7 +40,7 @@
   {
     "date": "2026-09-05",
     "title": "RHOMBIS: A Real Angled Bridge",
-    "link": "./rhombis.html?stage=23",
+    "link": "./rhombis.html?stage=24",
     "items": [
       "New: Multi-Cell's two real cells each get a real diagonal-octahedron alternate fill -- a genuine bipyramid through that cell's own center, built along the exact real neighbor axis the two cells share (facePieces(), the same real primitive verified the same day for the Disphenoid crossover's own interlocking tabs). Genuinely different from Stage 2's own plain Octahedron (built along a cube-face axis, dead straight relative to the RD's own faces) -- this one runs along a real 12-neighbor diagonal instead, so it reads as visibly tilted/angled. Direct instruction: \"multi cell could benefit from a variety of pieces within it\", generalized immediately after into a real standing idea worth reusing elsewhere: \"the bridging point of any adjacent shapes in a structure is a potential opportunity for a big odd connection.\"",
       "Fixed a real bug caught live the same day (\"22 is saying solved when only your two long pieces are in\"): the octahedron originally claimed the WHOLE cell in one placement, same as the plain fused whole-RD piece -- but unlike that piece, its own real geometry is smaller than the true cell, so the puzzle read solved over real visible gaps. Fixed by rebuilding the cell's OWN loose pieces on the exact same real facePieces() frame the octahedron already uses (instead of the older cube-face frame), so the octahedron now correctly claims only its own real 2-face slice, and the other 10 real slices still need their own loose pieces -- an exact, not approximate, correspondence between the two.",
@@ -31,7 +50,7 @@
   {
     "date": "2026-09-05",
     "title": "RHOMBIS: Multi-Cell Was Out of Place",
-    "link": "./rhombis.html?stage=23",
+    "link": "./rhombis.html?stage=24",
     "items": [
       "Fixed: Multi-Cell -- 26 real pieces to place, the single highest piece count of any stage in the entire game (every other stage tops out at 17) -- sat right after Conjoined Pieces, out of order with the rest of its own small tier (One Piece, Octahedron, Cube, Conjoined Pieces, Rhombic Dodecahedron: the same real loose-pyramid/fused-whole-cell choice at 1 or 2 real lattice cells). Caught directly: \"stage 22 is more complex than several of the puzzles following it by amount of pieces to place.\"",
       "Corrected in two passes, not one: piece count alone isn't the whole story -- comparing it against genuinely different mechanisms (key/decoy/crossover tiers) elsewhere in the game was the wrong axis (\"it should have still been in same group as before, as its only a repeated procedure and similar piece it doesnt deserve represrenting highest difficulty\"). Piece count only means something WITHIN a shared mechanism family -- exactly why Salt/Calcite were ordered ahead of the larger Alloy stages earlier the same day. Multi-Cell now sits last in its own real family instead, by real piece count (1, 2, 6, 7, 12, 26), with Conjoined Pieces and Rhombic Dodecahedron also swapped into correct ascending order along the way."
@@ -40,7 +59,7 @@
   {
     "date": "2026-09-05",
     "title": "RHOMBIS: Real Flat Contact, Not Points",
-    "link": "./rhombis.html?stage=115",
+    "link": "./rhombis.html?stage=116",
     "items": [
       "Fixed: a real geometry bug in the Big Hull + Disphenoid crossover puzzles' brand new interlocking tabs (shipped earlier the same day) -- they were built from the wrong 6-direction frame (the same one disphenoids themselves use, which is real, but for a DIFFERENT real relationship: the octahedral/BCC-interstitial directions, not the FCC lattice's own 12 real nearest-neighbor directions). Two chunks built that way could only ever touch at a single point, never a real flat face -- caught directly: \"connecting disphenoids / flat octahedra by points doesnt translate as valid... only ever connect by flats\".",
       "Fixed properly, not patched: a real new shared primitive (facePieces(), core/lattice.js) decomposes a cell into its own actual 12 rhombic faces -- the exact faces two real adjacent cells share -- verified numerically (each face a genuine planar rhombus, facing its own real neighbor direction, and the 12 of them together reconstructing the exact same cell volume the existing 6-pyramid decomposition already does) rather than trusted by eye. The interlocking tabs now come from a cell's own real shared face with its real neighbor, guaranteed flat contact by construction -- confirmed end-to-end: a cell's face slice and its neighbor's own matching slice share the exact same 4 real-world points."
@@ -49,7 +68,7 @@
   {
     "date": "2026-09-05",
     "title": "RHOMBIS: A Real Difficulty Curve",
-    "link": "./rhombis.html?stage=17",
+    "link": "./rhombis.html?stage=18",
     "items": [
       "Fixed: stage order is a whole-game difficulty curve now, not a per-tier one -- BCC's own 1- and 2-piece introduction had ended up stranded as the SECOND-TO-LAST and LAST stages in the entire game, right after two 22/23-piece crossover puzzles, so a player sampling \"the hard end\" could land on a 1-piece stage and reasonably conclude the whole game was trivial. Moved beside the equivalent FCC introduction near the very start instead.",
       "Fixed: the same real problem, smaller scale -- the Alloy tier's own Salt and Calcite puzzles (8 real pieces each) sat AFTER the larger 14-17 piece metal alloys purely because of which real-world family got scoped first, not because they were harder. Reordered the whole tier to genuinely ascend by real piece count.",
@@ -70,7 +89,7 @@
   {
     "date": "2026-09-05",
     "title": "RHOMBIS: Real Alloys and Salt",
-    "link": "./rhombis.html?stage=94",
+    "link": "./rhombis.html?stage=95",
     "items": [
       "New: a real Alloy tier -- 3 ordered intermetallics (nickel aluminide, iron aluminide, beta brass), 2 dilute alloy steels (chromium, molybdenum -- which cells are the alloying metal is drawn fresh at random every playthrough), a real interstitial Carbon Steel (the actual octahedral gap carbon occupies in iron, a genuinely different piece of geometry, not a recolored cell), and 4 real gold/copper alloys (electrum, white gold, rose gold, bronze) -- every composition a real, verified ratio, not an invented one.",
       "New: Salt -- a real sodium chloride puzzle, 1 ion and its 6 real neighbors in a genuine octahedral cross. Built on a brand new shared math module proving something real, not assumed: table salt's own crystal structure is the same FCC lattice already used everywhere else in this game, just with its own internal gaps filled by a second ion -- so every ion's own natural shape turns out to be a plain cube, nothing new to build.",
@@ -82,7 +101,7 @@
   {
     "date": "2026-09-05",
     "title": "RHOMBIS: A Second Real Lattice",
-    "link": "./rhombis.html?stage=106",
+    "link": "./rhombis.html?stage=107",
     "items": [
       "New: BCC -- a genuinely different real crystal lattice alongside FCC, with its own real space-filling shape (a truncated octahedron, not a rhombic dodecahedron) and its own real 8+6 neighbor geometry, not a reskin of the existing content.",
       "New: Crystal tier -- real FCC and BCC coordination geometry, each colored with a real crystallizing metal's own characteristic color (later merged into 2 stages carrying the other real metals as attributions, and followed by a dedicated Alloy tier -- see the next update).",
@@ -111,7 +130,7 @@
   {
     "date": "2026-09-03",
     "title": "RHOMBIS: A New Way In",
-    "link": "./rhombis.html?stage=16",
+    "link": "./rhombis.html?stage=17",
     "items": [
       "New: RHOMBIS, a short geometric-packing puzzle that introduces the game's core pyramid-to-cube-to-rhombic-dodecahedron relationships -- rotate a target shape, tap pieces into place, and watch it build from a single pyramid up through an octahedron and a cube. Wrong orientations are flagged red, valid ones green, right on the shape itself. Linked from the welcome screen; built mobile/touch-first from the start.",
       "Fixed: completing a cube's very last missing pyramid could occasionally spawn an unrelated stray piece elsewhere instead of finishing the block you were actually working on.",

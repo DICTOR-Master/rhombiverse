@@ -147,7 +147,7 @@ evolution, animals, lattice zoom).
 
 ## RHOMBIS
 
-A standalone, 116-stage geometric-packing puzzle game (`rhombis.html`,
+A standalone, 117-stage geometric-packing puzzle game (`rhombis.html`,
 linked from the welcome screen) that teaches real crystal-lattice
 geometry through play rather than exposition — rotate a target shape,
 tap pieces into place, watch it assemble. Difficulty ramps with stage
@@ -191,21 +191,19 @@ later, the same rock-salt topology genuinely distorted along a trigonal
 axis (a real, algebraically-derived ~101.5° rhombohedral angle) with a
 flat CO3 triangular anion that flips orientation between layers, the
 actual real reason this space group is rhombohedral rather than cubic.
-Stage ORDER across the whole 116-stage main sequence tracks real
+Stage ORDER across the whole 117-stage main sequence tracks real
 structural/mechanism difficulty end to end, not just within a tier —
 BCC's own single-cell and two-cell introduction sits beside the FCC
 "One Piece"/"Octahedron" pair near the very start (not at the end,
 where a 1-piece stage would look like the "final boss" and undersell
-everything harder before it), Multi-Cell (28 pieces, the single
-highest piece count in the whole game — its two real cells' own 24 loose
-pieces and 2 whole-cell alternates now built from the RD's own real 12
-rhombic faces (facePieces(), the same primitive verified for the
-Disphenoid crossover's own tabs) rather than the cube-face frame the
-rest of this tier still uses, so a real diagonal-octahedron alternate
-per cell — a genuine bipyramid along the exact real axis the two cells
-share, angled relative to the RD's own faces rather than axis-aligned
-like Stage 2's own Octahedron — can be scoped to its own real 2-face
-slice of a cell instead of falsely completing the whole thing)
+everything harder before it), Multi-Cell (8 real pieces per its own two-cell alternate fill — a fused
+whole-cell piece, a diagonal-octahedron bipyramid along the exact real
+axis the two cells share, angled relative to the RD's own faces rather
+than axis-aligned like the plain "Octahedron" stage, plus 2 merged
+"hubcap" pieces per cell covering the other 10 real faces the
+octahedron doesn't claim — all built from the RD's own real 12 rhombic
+faces, facePieces(), the same primitive verified for the Disphenoid
+crossover's own tabs)
 sits last within its own real family of same-mechanism stages rather
 than off among unrelated crossover puzzles just because it has more
 pieces, and Salt/Calcite (8 pieces) sit before the larger 14-17 piece
@@ -235,7 +233,7 @@ lattice, needing no new mesh geometry at all), never re-derived.
 ```
 rhombiverse/
   index.html                # static entry point, Three.js via import map (no bundling; see "Running locally")
-  rhombis.html               # Rhombis: standalone 116-stage geometric-packing puzzle (FCC + BCC), linked from the welcome screen
+  rhombis.html               # Rhombis: standalone 117-stage geometric-packing puzzle (FCC + BCC), linked from the welcome screen
   api/                       # Vercel serverless functions (AI Gateway proxy: sculpt/cultivate/cyborg-suggest)
   src/
     rhombis/                 # Rhombis' own code: puzzle-state.js (pure state machine), geometry.js
