@@ -11,7 +11,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey, disphenoidGeometry, DISPHENOID_ORIENTATIONS, quaternionForDisphenoidOrientation, disphenoidApexAxisKey } from './geometry.js';
 import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld, cellsInShells } from '../core/lattice.js';
-import { BCC_NEIGHBOR_OFFSETS, truncatedOctahedronVertices } from '../geometry-extensions/dual-lattice.js';
+import { BCC_NEIGHBOR_OFFSETS, truncatedOctahedronVertices, isBCC } from '../geometry-extensions/dual-lattice.js';
 import { bccShapeScaleFor } from '../geometry-extensions/bcc-detail-lattice.js';
 import { enumerateShapes, SYMMETRY_OPERATIONS, applySymmetry } from './cell-arrangements.js';
 import { ANY_SINGLE_CELL_GROUP } from './puzzle-state.js';
@@ -1458,7 +1458,20 @@ function buildColorMatchStage(scale, cellOffsets, decoyOption, decoyColor) {
     });
   });
 
-  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+  // Real bug caught live (2026-09-05, "the multicolor early stage was
+  // really confusing as colors were switching to green and red as well
+  // as having their own colors too"): `makeVoid`'s own `wire` ghost is
+  // a SEPARATE mesh at the exact same position as this stage's own
+  // per-cell palette tint, and main.js's refreshVoidHighlights()
+  // unconditionally recolors it green/red the moment a piece is
+  // selected -- stacking a generic validity color directly on top of
+  // the real identity color, AND (worse) instantly revealing the one
+  // correct void regardless of which piece you picked, defeating the
+  // entire point of matching by color in the first place.
+  // `suppressValidityHighlight` (main.js) makes refreshVoidHighlights()
+  // treat every void as idle always, so ONLY this stage's own palette
+  // tint ever shows -- real color-matching, not a green-light shortcut.
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true, suppressValidityHighlight: true };
 }
 
 const COLOR_MATCH_STAGES = THREE_CELL_STAGE_DEFS.map((def, i) => {
@@ -2206,7 +2219,7 @@ function partitionIntoIrregularChunks(cells, count, seedOffset = 0) {
   return owner.map((r, i) => ({ chunkIndex: r, cell: cells[i] }));
 }
 
-function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChunkIndexes = [], pieceColor = PIECE_COLOR) {
+function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChunkIndexes = [], pieceColor = PIECE_COLOR, skeletonColor = WIRE_COLOR) {
   const skeletonGroup = new THREE.Group();
   const pyramid = pyramidGeometry(scale);
   const assignments = partitionIntoIrregularChunks(allCells, chunkCount);
@@ -2224,7 +2237,7 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChun
       .filter((i) => i >= 0);
     const chunkCenters = memberCellIndexes.map((i) => cellWorldPositions[i].clone().sub(centroid));
     chunkCenters.forEach((cellCenter, i) => {
-      skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
+      skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter, skeletonColor));
       PYRAMID_AXES.forEach((axisKey) => {
         const facePosition = cellCenter.clone().add(AXIS_NORMALS[axisKey].clone().multiplyScalar(scale / 2));
         [['in', inwardQuaternion], ['out', outwardQuaternion]].forEach(([dirLabel, toQuaternion]) => {
@@ -2630,22 +2643,47 @@ const DISPHENOID_KEY_HULL_STAGES = [
 // reference approximations for each metal's actual appearance (exact
 // shade varies with finish/oxidation in reality) -- not invented, but
 // not exact spectrophotometry either.
+// Real bug caught live (2026-09-05, "colors werent good on metals the
+// colors seemed to be at war with themselves"): `pieceColor` only ever
+// tinted the PIECE, never the skeleton's own per-cell outer-solid ghost
+// -- so a real dark metal (Iron especially) sat right next to a
+// completely unrelated bright cyan WIRE_COLOR region for every cell not
+// yet filled, clashing badly rather than reading as "this whole space
+// is the same real metal." `buildBigHullStage`/`buildBCCCellsStage`
+// both now take a second `skeletonColor` param (default WIRE_COLOR, so
+// every OTHER call site -- plain Big Hull, Burr Puzzle, plain BCC --
+// is visually unchanged); the merged metal stages pass the same real
+// element color to both.
+// Merged 2026-09-05 (direct instruction: "I didnt realise all the
+// metals puzzles were so simple, please merge all the similar ones
+// down to one source... the single puzzle can have multiple
+// attributions dont bother with the bare attribution"): all 8 of these
+// were genuinely identical in mechanic AND geometry -- FCC coordination
+// geometry doesn't differ by element, only the real color does (see
+// the original reasoning below, kept for the record) -- so 8 stage
+// entries for a single real puzzle was real, needless duplication, not
+// 8 real puzzles. Down to ONE stage, colored as Copper (the most
+// commonly-cited real FCC textbook example), carrying the other 7 real
+// elements as `attributions` -- real names, not a placeholder list --
+// rather than shipping a second, uncolored/generic version alongside
+// it ("dont bother with the bare attribution").
 const FCC_ELEMENTS = [
-  { symbol: 'Al', name: 'Aluminum', color: 0xc8c9cb },
   { symbol: 'Cu', name: 'Copper', color: 0xb87333 },
-  { symbol: 'Ag', name: 'Silver', color: 0xc0c0c0 },
-  { symbol: 'Au', name: 'Gold', color: 0xd4af37 },
-  { symbol: 'Ni', name: 'Nickel', color: 0x727472 },
-  { symbol: 'Pb', name: 'Lead', color: 0x5a6266 },
-  { symbol: 'Pt', name: 'Platinum', color: 0xe5e4e2 },
-  { symbol: 'Pd', name: 'Palladium', color: 0xced0dd },
+  { symbol: 'Al', name: 'Aluminum' },
+  { symbol: 'Ag', name: 'Silver' },
+  { symbol: 'Au', name: 'Gold' },
+  { symbol: 'Ni', name: 'Nickel' },
+  { symbol: 'Pb', name: 'Lead' },
+  { symbol: 'Pt', name: 'Platinum' },
+  { symbol: 'Pd', name: 'Palladium' },
 ];
-const CRYSTAL_STAGES = FCC_ELEMENTS.map((el, i) => ({
-  id: 101 + i,
-  name: `Crystal: ${el.name} (${el.symbol})`,
+const CRYSTAL_STAGES = [{
+  id: 101,
+  name: `Crystal: ${FCC_ELEMENTS[0].name} (${FCC_ELEMENTS[0].symbol})`,
+  attributions: FCC_ELEMENTS.map((el) => `${el.name} (${el.symbol})`),
   derivedFrom: [{ id: 85, tier: 'Big Hull' }],
-  build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3, [], el.color),
-}));
+  build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3, [], FCC_ELEMENTS[0].color, FCC_ELEMENTS[0].color),
+}];
 
 // BCC tier (2026-09-05, following up on "would BCC or pieces that form
 // other lattices work"): a genuinely different real lattice, not
@@ -2666,7 +2704,7 @@ const CRYSTAL_STAGES = FCC_ELEMENTS.map((el, i) => ({
 // `buildBCCCellsStage` mirrors only buildNCellStage's OUTER shape --
 // whole interchangeable cells via `ANY_SINGLE_CELL_GROUP`, tap to
 // place, no orientation -- rather than risking that proven builder.
-function buildBCCCellsStage(scale, cellOffsets, pieceColor = PIECE_COLOR) {
+function buildBCCCellsStage(scale, cellOffsets, pieceColor = PIECE_COLOR, skeletonColor = WIRE_COLOR) {
   const skeletonGroup = new THREE.Group();
   const shapeScale = bccShapeScaleFor(scale);
   const toGeometry = truncatedOctahedronGeometry(shapeScale);
@@ -2677,7 +2715,7 @@ function buildBCCCellsStage(scale, cellOffsets, pieceColor = PIECE_COLOR) {
 
   const voids = [];
   cellCenters.forEach((cellCenter, i) => {
-    skeletonGroup.add(makeOuterSolid(toGeometry, cellCenter));
+    skeletonGroup.add(makeOuterSolid(toGeometry, cellCenter, skeletonColor));
     const v = makeVoid(toGeometry, {
       id: `v-cell-${i}`,
       position: cellCenter,
@@ -2710,34 +2748,137 @@ function buildBCCCellsStage(scale, cellOffsets, pieceColor = PIECE_COLOR) {
 // with real execution before any element theming was added on top.
 const BCC_TWO_CELL_OFFSETS = [[0, 0, 0], ...BCC_NEIGHBOR_OFFSETS.slice(0, 1)];
 const ONE_BCC_STAGE = {
-  id: 109,
+  id: 102,
   name: 'BCC: One Cell',
   build: (scale) => buildBCCCellsStage(scale, [[0, 0, 0]]),
 };
 
-// Real BCC-crystallizing metals (verified, standard materials-science
-// list): Fe (room-temperature alpha-iron), Cr, W, Mo, V, Nb, Ta, plus
-// the alkali metals Na and K. Same "one real shape, real per-element
-// color" reasoning as the FCC Crystal tier -- BCC coordination geometry
-// doesn't differ by element either. Reuses the 2-cell proof-of-concept
-// shape (a real BCC nearest-neighbor pair), not the bare 1-cell one, so
-// this tier reads as more than a trivial single tap.
+// Merged 2026-09-05, same real duplication caught in the FCC Crystal
+// tier and the same fix: 9 stage entries for one real puzzle (BCC
+// coordination geometry doesn't differ by element either) is real
+// duplication, not 9 real puzzles. Down to ONE stage, colored as Iron
+// (the most commonly-cited real BCC textbook example -- room-
+// temperature alpha-iron), the other 8 real elements carried as
+// `attributions`, no separate bare/generic version.
 const BCC_ELEMENTS = [
   { symbol: 'Fe', name: 'Iron', color: 0x43464b },
-  { symbol: 'Cr', name: 'Chromium', color: 0xc6c7c8 },
-  { symbol: 'W', name: 'Tungsten', color: 0x71797e },
-  { symbol: 'Mo', name: 'Molybdenum', color: 0x8c92ac },
-  { symbol: 'V', name: 'Vanadium', color: 0x9b9b9b },
-  { symbol: 'Nb', name: 'Niobium', color: 0x7c838b },
-  { symbol: 'Ta', name: 'Tantalum', color: 0x4c5b61 },
-  { symbol: 'Na', name: 'Sodium', color: 0xd8d8d0 },
-  { symbol: 'K', name: 'Potassium', color: 0xc9c0bb },
+  { symbol: 'Cr', name: 'Chromium' },
+  { symbol: 'W', name: 'Tungsten' },
+  { symbol: 'Mo', name: 'Molybdenum' },
+  { symbol: 'V', name: 'Vanadium' },
+  { symbol: 'Nb', name: 'Niobium' },
+  { symbol: 'Ta', name: 'Tantalum' },
+  { symbol: 'Na', name: 'Sodium' },
+  { symbol: 'K', name: 'Potassium' },
 ];
-const BCC_CRYSTAL_STAGES = BCC_ELEMENTS.map((el, i) => ({
-  id: 110 + i,
-  name: `BCC Crystal: ${el.name} (${el.symbol})`,
-  derivedFrom: [{ id: 109, tier: 'BCC' }],
-  build: (scale) => buildBCCCellsStage(scale, BCC_TWO_CELL_OFFSETS, el.color),
+const BCC_CRYSTAL_STAGES = [{
+  id: 103,
+  name: `BCC Crystal: ${BCC_ELEMENTS[0].name} (${BCC_ELEMENTS[0].symbol})`,
+  attributions: BCC_ELEMENTS.map((el) => `${el.name} (${el.symbol})`),
+  derivedFrom: [{ id: 102, tier: 'BCC' }],
+  build: (scale) => buildBCCCellsStage(scale, BCC_TWO_CELL_OFFSETS, BCC_ELEMENTS[0].color, BCC_ELEMENTS[0].color),
+}];
+
+// Real BCC ALLOY puzzles -- direct instruction ("lets do something
+// real with the BCC lattice and make some great alloy puzzles"),
+// following the pure-metal merge above. `isBCC`'s own parity check
+// (dual-lattice.js) already splits every real BCC lattice point into
+// exactly two sublattices -- all-even and all-odd -- and that split
+// IS the real structure of a B2 (CsCl-type) ordered intermetallic
+// alloy: one element on the "corner" sublattice, a different element
+// on the "body-center" sublattice, real second-nearest neighbors
+// (BCC_NEIGHBOR_OFFSETS' own 6 axis offsets, e.g. [2,0,0], landing
+// back on the SAME parity as the seed cell) staying the same element,
+// real nearest neighbors (the 8 body-diagonal offsets, all opposite
+// parity) always the OTHER element -- not an invented rule, the actual
+// physics of how these compounds order. Real, well-known B2 alloys:
+// NiAl and FeAl (aerospace/corrosion-resistant iron/nickel aluminides)
+// and CuZn (the beta phase of brass) -- all genuinely CsCl-structured,
+// all reusing colors already established above (Ni/Al/Fe/Cu) where
+// verified, one new real color (Zn) where not.
+function buildBCCAlloyStage(scale, cellOffsets, colorEven, colorOdd) {
+  const skeletonGroup = new THREE.Group();
+  const shapeScale = bccShapeScaleFor(scale);
+  const toGeometry = truncatedOctahedronGeometry(shapeScale);
+
+  const cellWorldPositions = cellOffsets.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = cellWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / cellWorldPositions.length);
+  const cellCenters = cellWorldPositions.map((p) => p.clone().sub(centroid));
+  const cellColors = cellOffsets.map(([cx, cy, cz]) => (isBCC(cx, cy, cz) && ((((cx % 2) + 2) % 2) === 0) ? colorEven : colorOdd));
+
+  const voids = [];
+  cellCenters.forEach((cellCenter, i) => {
+    skeletonGroup.add(makeOuterSolid(toGeometry, cellCenter, cellColors[i]));
+    const v = makeVoid(toGeometry, { id: `v-cell-${i}`, position: cellCenter, groupIds: [`cell-${i}`] });
+    skeletonGroup.add(...v.sceneObjects);
+    voids.push(v);
+  });
+
+  const groups = cellCenters.map((center, i) => ({ id: `cell-${i}`, position: center.clone(), quaternion: new THREE.Quaternion() }));
+  const pieceSpecs = cellCenters.map((_, i) => ({ id: `single-${i}`, fillsGroup: `cell-${i}`, geometry: toGeometry, color: cellColors[i] }));
+
+  // Real difficulty, not just piece count -- direct instruction ("I
+  // would like them to represent challenging as possible puzzles as
+  // well otherwise they should go down to an appropriate difficulty
+  // stage"). This engine's own green/red validity highlight already
+  // reveals the ONE correct void the instant any piece is selected, so
+  // a plain 15-piece sort (no orientation, no decoys, no order) is
+  // genuinely no harder than the game's very simplest tier despite the
+  // bigger piece count -- real difficulty here has to come from the
+  // SAME proven levers every other tier uses: a real decoy (wrong
+  // color, DECOY_NEVER_MATCHES, so it never validates against anything)
+  // and a real Burr-style key -- physically motivated, not arbitrary:
+  // the shared coordination CENTER genuinely can't be recognized as
+  // correctly seated until its entire real 14-neighbor shell surrounds
+  // it, so it's blocked (`requiresPlacedFirst`) until every neighbor is
+  // down, same mechanism `buildBigHullStage`'s own `keyChunkIndexes`
+  // already uses.
+  const neighborIds = pieceSpecs.slice(1).map((spec) => spec.id);
+  pieceSpecs[0].requiresPlacedFirst = neighborIds;
+  // Default PIECE_COLOR -- distinct from every real alloy pairing used
+  // below (verified: none of BCC_ALLOY_DEFS' own colorEven/colorOdd
+  // values are close to it), same "neutral, not plausibly a real
+  // answer" decoy convention Color Match's own decoy already uses.
+  pieceSpecs.push({ id: 'decoy-0', fillsGroup: DECOY_NEVER_MATCHES, geometry: toGeometry, color: PIECE_COLOR });
+
+  for (let i = pieceSpecs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
+  }
+
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+      color: spec.color,
+      requiresPlacedFirst: spec.requiresPlacedFirst,
+    });
+  });
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+}
+
+// 1 center (even) + all 14 real neighbors (the 8 odd body-diagonal
+// nearest + the 6 even axis second-nearest) -- the real local
+// coordination environment of one atom in a B2 alloy, not an arbitrary
+// cluster. Mirrors CUBOCTAHEDRON_CELLS' own "[0,0,0], ...NEIGHBOR_OFFSETS"
+// pattern for the analogous real FCC coordination shell.
+const BCC_ALLOY_CELLS = [[0, 0, 0], ...BCC_NEIGHBOR_OFFSETS];
+
+const BCC_ALLOY_DEFS = [
+  { name: 'Nickel Aluminide', formula: 'NiAl', colorEven: 0x727472, colorOdd: 0xc8c9cb }, // Ni (even/corner), Al (odd/body-center)
+  { name: 'Iron Aluminide', formula: 'FeAl', colorEven: 0x43464b, colorOdd: 0xc8c9cb }, // Fe (even/corner), Al (odd/body-center)
+  { name: 'Beta Brass', formula: 'CuZn', colorEven: 0xb87333, colorOdd: 0xd0d3c8 }, // Cu (even/corner), Zn (odd/body-center) -- Zn: real pale blue-white metal color
+];
+const BCC_ALLOY_STAGES = BCC_ALLOY_DEFS.map((def, i) => ({
+  id: 104 + i,
+  name: `Alloy: ${def.name} (${def.formula})`,
+  derivedFrom: [{ id: 102, tier: 'BCC' }],
+  build: (scale) => buildBCCAlloyStage(scale, BCC_ALLOY_CELLS, def.colorEven, def.colorOdd),
 }));
 
 // Mirrored Molecule -- direct instruction (2026-09-04, "mirrored
@@ -2829,4 +2970,5 @@ export const STAGES = [
   ...CRYSTAL_STAGES,
   ONE_BCC_STAGE,
   ...BCC_CRYSTAL_STAGES,
+  ...BCC_ALLOY_STAGES,
 ];

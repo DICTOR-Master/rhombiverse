@@ -771,7 +771,7 @@ function flashRejectWire(wire) {
 // target's own outer silhouette (no separate boundary object, nothing
 // "internal" to hide), so it stays visible exactly as before.
 function refreshVoidHighlights() {
-  const selectedId = current.state.selectedPieceId;
+  const selectedId = current.suppressValidityHighlight ? null : current.state.selectedPieceId;
   const validity = selectedId ? voidValidityForPiece(current.state, selectedId) : null;
   // Real live bug (2026-09-03, "cube isnt translucent it is opaque so
   // blocks view"): an auto-orienting piece (Stage 3/5/6's loose pieces,
