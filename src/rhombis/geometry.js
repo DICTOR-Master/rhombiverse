@@ -78,6 +78,31 @@ export function diagonalOctahedronGeometry(scale, offsetIndex) {
   return geometry;
 }
 
+// A real, SHORT pyramid off one cell's own real shared face (facePieces()
+// again -- same guaranteed real alignment as diagonalOctahedronGeometry
+// above), reaching only PART of the way toward the cell's own true
+// center rather than all the way there. Two of these -- one built this
+// way for each of two real adjacent cells, off the SAME real shared
+// face -- meet exactly at that face (proven by the same real-vertex
+// symmetry diagonalOctahedronGeometry already relies on) and together
+// read as one real flat, wide, 4-pointed star/diamond spanning halfway
+// into each cell, rather than a tall gem reaching all the way through
+// both (direct instruction, 2026-09-05: "a nice flat square star shape
+// that spans halfway into two joined cells" -- "a 3D star that pokes
+// into both cells symmetrically... squat version of the octahedron").
+export function flatStarPointGeometry(scale, offsetIndex, depthFraction = 0.5) {
+  const { base } = facePieces(scale)[offsetIndex];
+  const faceCentroid = base.reduce(([sx, sy, sz], [x, y, z]) => [sx + x / 4, sy + y / 4, sz + z / 4], [0, 0, 0]);
+  // apex (real) is [0,0,0] -- interpolating from the face centroid
+  // toward it by depthFraction shortens the real pyramid's own height
+  // without moving its base off the real face at all.
+  const shortApex = faceCentroid.map((c) => c * (1 - depthFraction));
+  const points = [...base, shortApex].map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  const geometry = new ConvexGeometry(points);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 // A real, whole rhombic dodecahedron mesh -- Stage 6's "fused twelve"
 // piece (a full RD standing in for a cell's own 12 loose pyramids at
 // once, RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md's "conjoined

@@ -9,8 +9,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { pyramidGeometry, facePyramidGeometry, diagonalOctahedronGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey, disphenoidGeometry, DISPHENOID_ORIENTATIONS, quaternionForDisphenoidOrientation, disphenoidApexAxisKey } from './geometry.js';
-import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld, cellsInShells } from '../core/lattice.js';
+import { pyramidGeometry, facePyramidGeometry, diagonalOctahedronGeometry, flatStarPointGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey, disphenoidGeometry, DISPHENOID_ORIENTATIONS, quaternionForDisphenoidOrientation, disphenoidApexAxisKey } from './geometry.js';
+import { PYRAMID_AXES, NEIGHBOR_OFFSETS, oppositeNeighborIndex, cellToWorld, cellsInShells } from '../core/lattice.js';
 import { BCC_NEIGHBOR_OFFSETS, truncatedOctahedronVertices, isBCC } from '../geometry-extensions/dual-lattice.js';
 import { bccShapeScaleFor } from '../geometry-extensions/bcc-detail-lattice.js';
 import { octahedronVerts } from '../geometry-extensions/interstitial-lattice.js';
@@ -656,6 +656,28 @@ function buildStage6(scale) {
       id: `octahedron-${groupId}`,
       fillsGroup: ANY_SINGLE_CELL_GROUP,
       homePosition: octahedronHome,
+    }));
+
+    // A fourth real alternate fill per cell -- direct instruction
+    // (2026-09-05, "a nice flat square star shape that spans halfway
+    // into two joined cells" -- "a 3D star that pokes into both cells
+    // symmetrically... squat version of the octahedron"): a real SHORT
+    // pyramid off this cell's own real shared face (facePieces() again),
+    // reaching only halfway toward this cell's own true center rather
+    // than all the way to it. This cell's own star and its real
+    // neighbor's own star (built the same way, off the SAME real shared
+    // face) meet exactly there and together read as one flat, wide,
+    // 4-pointed star/diamond -- genuinely squatter than the octahedron
+    // above, not just a smaller copy of it. cellIndex picks this cell's
+    // own real direction toward the other cell -- cell 0 looks along
+    // MULTI_CELL_NEIGHBOR_INDEX, cell 1 looks the real opposite way.
+    const starOffsetIndex = cellIndex === 0 ? MULTI_CELL_NEIGHBOR_INDEX : oppositeNeighborIndex(MULTI_CELL_NEIGHBOR_INDEX);
+    const starGeometry = flatStarPointGeometry(scale, starOffsetIndex, 0.5);
+    const starHome = new THREE.Vector3(scale * 4.8, -scale * 2.6 * cellIndex, 0);
+    fusedPieces.push(makeFusedPiece(starGeometry, {
+      id: `star-${groupId}`,
+      fillsGroup: ANY_SINGLE_CELL_GROUP,
+      homePosition: starHome,
     }));
   });
 
