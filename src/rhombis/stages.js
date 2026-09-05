@@ -644,6 +644,19 @@ function buildStage6(scale) {
       const singleGroupId = `cell-${cellIndex}-single-${faceIndex}`;
       const tags = [groupId, singleGroupId];
       if (MULTI_CELL_AXISPAIR_INDEXES.includes(faceIndex)) tags.push(axispairGroupId);
+      // Real bug caught live (2026-09-05, "all sorts of weird things
+      // happened" -- a real crash, `current.groups.find(...)` returning
+      // undefined): every loose single piece resolves to its own
+      // `singleGroupId` (smallestEnclosingGroupId picks the smallest
+      // tag on the tapped void), so `current.groups` needs a real entry
+      // for EACH of the 24 individual single-direction subgroups, not
+      // just the whole-cell and axis-pair ones -- main.js's own
+      // post-placement snap-to-position code (handleTargetTap) looks
+      // the resolved group up there directly. Same position/identity
+      // quaternion as the whole cell -- facePyramidGeometry() already
+      // bakes the correct real orientation into its own vertices, no
+      // separate rotation needed.
+      groups.push({ id: singleGroupId, position: cellCenter.clone(), quaternion: new THREE.Quaternion() });
       const v = makeVoid(facePyramidGeometry(scale, faceIndex), {
         id: `v-${groupId}-f${faceIndex}`,
         position: cellCenter,
