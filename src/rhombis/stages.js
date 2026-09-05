@@ -2559,7 +2559,7 @@ const BURR_MOLECULE_SPLIT_STAGE_DEFS = [2, 14, 26].map((i) => MOLECULE_STAGE_DEF
 const BURR_MOLECULE_SPLIT_STAGES = BURR_MOLECULE_SPLIT_STAGE_DEFS.map(({ lobeA, lobeB }, i) => {
   const cells = joinTwoShapes(lobeA.cells, lobeB.cells);
   return {
-    id: 90 + i,
+    id: 100 + i,
     name: `Burr Puzzle: Molecule Split (${lobeA.name} + ${lobeB.name})`,
     derivedFrom: [{ id: 70, tier: 'Molecule Split' }, { id: 87, tier: 'Burr Puzzle' }],
     build: (scale) => buildBigHullStage(scale, cells, 3, 3, [0]),
@@ -2574,7 +2574,7 @@ const BURR_MIRRORED_MOLECULE_STAGES = BURR_MIRRORED_MOLECULE_INDEXES.map((shapeI
   const cellsA = CHIRAL_FIVE_CELL_SHAPES[shapeIndex];
   const cells = joinTwoShapes(cellsA, mirrorCells(cellsA));
   return {
-    id: 93 + i,
+    id: 103 + i,
     name: `Burr Puzzle: Mirrored Molecule ${shapeIndex + 1}`,
     derivedFrom: [{ id: 62, tier: 'Mirrored Molecule' }, { id: 87, tier: 'Burr Puzzle' }],
     build: (scale) => buildBigHullStage(scale, cells, 3, 3, [0]),
@@ -2589,7 +2589,7 @@ const BURR_BRANCHING_MOLECULE_INDEXES = [0, 2, 4];
 const BURR_BRANCHING_MOLECULE_STAGES = BURR_BRANCHING_MOLECULE_INDEXES.map((defIndex, i) => {
   const { hub, branch1, branch2 } = BRANCHING_MOLECULE_STAGE_DEFS[defIndex];
   return {
-    id: 96 + i,
+    id: 106 + i,
     name: `Branching Molecule: ${hub.name} hub + ${branch1.name} + ${branch2.name} (II)`,
     derivedFrom: [{ id: 78, tier: 'Branching Molecule' }, { id: 87, tier: 'Burr Puzzle' }],
     build: (scale) => buildBranchingMoleculeStage(scale, hub, branch1, branch2, pickBranchMoleculeDecoys(hub, branch1, branch2, defIndex * 2), true),
@@ -2607,13 +2607,13 @@ const BURR_BRANCHING_MOLECULE_STAGES = BURR_BRANCHING_MOLECULE_INDEXES.map((defI
 // indices 10-19) -- all genuine extremities, not an arbitrary pick.
 const DISPHENOID_KEY_HULL_STAGES = [
   {
-    id: 99,
+    id: 109,
     name: 'Big Hull: Cuboctahedron (Disphenoid)',
     derivedFrom: [{ id: 85, tier: 'Big Hull' }, { id: 84, tier: 'Disphenoid RD' }, { id: 87, tier: 'Burr Puzzle' }],
     build: (scale) => buildDisphenoidKeyHullStage(scale, CUBOCTAHEDRON_CELLS, [1, 5, 9], 3, 1),
   },
   {
-    id: 100,
+    id: 110,
     name: 'Big Hull: Tetrahedral Stack (Disphenoid)',
     derivedFrom: [{ id: 86, tier: 'Big Hull' }, { id: 84, tier: 'Disphenoid RD' }, { id: 87, tier: 'Burr Puzzle' }],
     build: (scale) => buildDisphenoidKeyHullStage(scale, TETRAHEDRAL_STACK_CELLS, [0, 10, 19], 4, 1),
@@ -2679,7 +2679,7 @@ const FCC_ELEMENTS = [
   { symbol: 'Pd', name: 'Palladium' },
 ];
 const CRYSTAL_STAGES = [{
-  id: 101,
+  id: 111,
   name: `Crystal: ${FCC_ELEMENTS[0].name} (${FCC_ELEMENTS[0].symbol})`,
   attributions: FCC_ELEMENTS.map((el) => `${el.name} (${el.symbol})`),
   derivedFrom: [{ id: 85, tier: 'Big Hull' }],
@@ -2749,7 +2749,7 @@ function buildBCCCellsStage(scale, cellOffsets, pieceColor = PIECE_COLOR, skelet
 // with real execution before any element theming was added on top.
 const BCC_TWO_CELL_OFFSETS = [[0, 0, 0], ...BCC_NEIGHBOR_OFFSETS.slice(0, 1)];
 const ONE_BCC_STAGE = {
-  id: 102,
+  id: 112,
   name: 'BCC: One Cell',
   build: (scale) => buildBCCCellsStage(scale, [[0, 0, 0]]),
 };
@@ -2773,10 +2773,10 @@ const BCC_ELEMENTS = [
   { symbol: 'K', name: 'Potassium' },
 ];
 const BCC_CRYSTAL_STAGES = [{
-  id: 103,
+  id: 113,
   name: `BCC Crystal: ${BCC_ELEMENTS[0].name} (${BCC_ELEMENTS[0].symbol})`,
   attributions: BCC_ELEMENTS.map((el) => `${el.name} (${el.symbol})`),
-  derivedFrom: [{ id: 102, tier: 'BCC' }],
+  derivedFrom: [{ id: 112, tier: 'BCC' }],
   build: (scale) => buildBCCCellsStage(scale, BCC_TWO_CELL_OFFSETS, BCC_ELEMENTS[0].color, BCC_ELEMENTS[0].color),
 }];
 
@@ -2876,9 +2876,9 @@ const BCC_ALLOY_DEFS = [
   { name: 'Beta Brass', formula: 'CuZn', colorEven: 0xb87333, colorOdd: 0xd0d3c8 }, // Cu (even/corner), Zn (odd/body-center) -- Zn: real pale blue-white metal color
 ];
 const BCC_ALLOY_STAGES = BCC_ALLOY_DEFS.map((def, i) => ({
-  id: 104 + i,
+  id: 90 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 102, tier: 'BCC' }],
+  derivedFrom: [{ id: 112, tier: 'BCC' }],
   build: (scale) => buildBCCAlloyStage(scale, BCC_ALLOY_CELLS, def.colorEven, def.colorOdd),
 }));
 
@@ -2960,9 +2960,9 @@ const DILUTE_ALLOY_DEFS = [
   { name: 'Molybdenum Steel', formula: 'Fe + Mo', dopantColor: 0x8c92ac, dopantCount: 2 }, // Mo, real color from BCC_ELEMENTS
 ];
 const DILUTE_ALLOY_STAGES = DILUTE_ALLOY_DEFS.map((def, i) => ({
-  id: 107 + i,
+  id: 93 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 102, tier: 'BCC' }],
+  derivedFrom: [{ id: 112, tier: 'BCC' }],
   build: (scale) => buildBCCDiluteAlloyStage(scale, BCC_ALLOY_CELLS, BCC_ELEMENTS[0].color, def.dopantColor, def.dopantCount),
 }));
 
@@ -3056,11 +3056,107 @@ function buildCarbonSteelStage(scale, cellOffsets, baseColor, carbonColor) {
 // standard reference for elemental carbon/graphite).
 const CARBON_COLOR = 0x2b2b2b;
 const CARBON_STEEL_STAGE = {
-  id: 109,
+  id: 95,
   name: 'Alloy: Carbon Steel (Fe + C, interstitial)',
-  derivedFrom: [{ id: 102, tier: 'BCC' }],
+  derivedFrom: [{ id: 112, tier: 'BCC' }],
   build: (scale) => buildCarbonSteelStage(scale, BCC_ALLOY_CELLS, BCC_ELEMENTS[0].color, CARBON_COLOR),
 };
+
+// FCC dilute alloys (2026-09-05, direct instruction: "silver and gold
+// alloy, white gold, 9ct, 14ct, and 18ct gold, bronze, spelter etc").
+// Same real "dilute substitutional solid solution" mechanism as
+// Chromium/Molybdenum Steel above, on FCC's own real coordination shell
+// (CUBOCTAHEDRON_CELLS, already proven for the Crystal tier) instead of
+// BCC's -- a near-duplicate of buildBCCDiluteAlloyStage rather than a
+// shared function (whole-cell RD geometry/void construction, not TO),
+// same reasoning this file already applies to its other near-duplicate
+// builders. "Spelter" deliberately NOT included -- it's a historical/
+// informal term for zinc die-casting alloys with no one settled real
+// composition to verify against, unlike every other alloy here.
+function buildFCCDiluteAlloyStage(scale, cellOffsets, baseColor, dopantColor, dopantCount) {
+  const skeletonGroup = new THREE.Group();
+  const rdGeometry = rhombicDodecahedronGeometry(scale);
+
+  const cellWorldPositions = cellOffsets.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
+  const centroid = cellWorldPositions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).multiplyScalar(1 / cellWorldPositions.length);
+  const cellCenters = cellWorldPositions.map((p) => p.clone().sub(centroid));
+
+  const indices = cellOffsets.map((_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  const dopantIndexSet = new Set(indices.slice(0, dopantCount));
+  const cellColors = cellOffsets.map((_, i) => (dopantIndexSet.has(i) ? dopantColor : baseColor));
+
+  const voids = [];
+  cellCenters.forEach((cellCenter, i) => {
+    skeletonGroup.add(makeOuterSolid(rdGeometry, cellCenter, cellColors[i]));
+    const v = makeVoid(rdGeometry, { id: `v-cell-${i}`, position: cellCenter, groupIds: [`cell-${i}`] });
+    skeletonGroup.add(...v.sceneObjects);
+    voids.push(v);
+  });
+
+  const groups = cellCenters.map((center, i) => ({ id: `cell-${i}`, position: center.clone(), quaternion: new THREE.Quaternion() }));
+  const pieceSpecs = cellCenters.map((_, i) => ({ id: `single-${i}`, fillsGroup: `cell-${i}`, geometry: rdGeometry, color: cellColors[i] }));
+
+  // Same physically-motivated key as the BCC alloys -- the shared
+  // coordination center can't be recognized as seated until its whole
+  // real 12-neighbor shell surrounds it.
+  const neighborIds = pieceSpecs.slice(1).map((spec) => spec.id);
+  pieceSpecs[0].requiresPlacedFirst = neighborIds;
+  pieceSpecs.push({ id: 'decoy-0', fillsGroup: DECOY_NEVER_MATCHES, geometry: rdGeometry, color: PIECE_COLOR });
+
+  for (let i = pieceSpecs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieceSpecs[i], pieceSpecs[j]] = [pieceSpecs[j], pieceSpecs[i]];
+  }
+
+  const { trayScaleFor, nextTrayPosition } = createTrayLayout(scale, pieceSpecs.length);
+  const pieces = pieceSpecs.map((spec) => {
+    const trayScale = trayScaleFor(spec.geometry);
+    return makeFusedPiece(spec.geometry, {
+      id: spec.id,
+      fillsGroup: spec.fillsGroup,
+      homePosition: nextTrayPosition(spec.geometry, trayScale),
+      trayScale,
+      color: spec.color,
+      requiresPlacedFirst: spec.requiresPlacedFirst,
+    });
+  });
+
+  return { skeletonGroup, pieces, voids, groups, hideIdleVoidWires: true };
+}
+
+// Real compositions, not invented proportions -- CUBOCTAHEDRON_CELLS
+// has 13 real cells (1 center + 12 neighbors), so dopantCount is each
+// alloy's own real minority fraction rounded to the nearest whole cell:
+// - Electrum (Ag-Au): naturally occurring, fully FCC-miscible across
+//   all compositions -- ~23% Ag / 77% Au here (3 of 13), an illustrative
+//   real ratio within electrum's own well-documented natural range
+//   (roughly 10-45% Ag), not a single fixed "the" composition (there
+//   isn't one in nature).
+// - White Gold: real 18ct formulations are ~75% Au + ~25% Ni (or Pd/Pt
+//   nickel-free) -- 3 of 13 (23%) rounds to the same real 18ct fraction.
+// - 18ct Rose Gold: real 18ct is 75% Au + 25% alloying metal, Cu for
+//   the real rose/red tint -- same 3-of-13 fraction as White Gold
+//   (same karat), distinguished by real dopant COLOR, not count.
+// - Bronze (Cu-Sn): real standard bronze is ~88% Cu / 12% Sn -- 2 of 13
+//   (15%) is the nearest whole-cell match to that real ratio.
+const GOLD_COLOR = 0xd4af37;
+const COPPER_COLOR = 0xb87333;
+const FCC_ALLOY_DEFS = [
+  { name: 'Electrum', formula: 'Au + Ag', baseColor: GOLD_COLOR, dopantColor: 0xc0c0c0, dopantCount: 3 }, // Ag in Au
+  { name: 'White Gold', formula: 'Au + Ni', baseColor: GOLD_COLOR, dopantColor: 0x727472, dopantCount: 3 }, // Ni in Au
+  { name: 'Rose Gold (18ct)', formula: 'Au + Cu', baseColor: GOLD_COLOR, dopantColor: COPPER_COLOR, dopantCount: 3 }, // Cu in Au
+  { name: 'Bronze', formula: 'Cu + Sn', baseColor: COPPER_COLOR, dopantColor: 0xd8d8d0, dopantCount: 2 }, // Sn in Cu -- Sn: real pale tin color
+];
+const FCC_ALLOY_STAGES = FCC_ALLOY_DEFS.map((def, i) => ({
+  id: 96 + i,
+  name: `Alloy: ${def.name} (${def.formula})`,
+  derivedFrom: [{ id: 85, tier: 'Big Hull' }],
+  build: (scale) => buildFCCDiluteAlloyStage(scale, CUBOCTAHEDRON_CELLS, def.baseColor, def.dopantColor, def.dopantCount),
+}));
 
 // Mirrored Molecule -- direct instruction (2026-09-04, "mirrored
 // molecules split it into 3 with 3 decoys", confirmed "both could
@@ -3144,6 +3240,20 @@ export const STAGES = [
   { id: 84, name: 'Rhombic Dodecahedron (Disphenoids)', build: buildDisphenoidRDStage },
   ...BIG_HULL_STAGES,
   ...BURR_PUZZLE_STAGES,
+  // Alloy tier sits here, not after the crossover tiers -- direct
+  // instruction/self-assessment (2026-09-05, "is insertion position
+  // valid for difficulty/challenge level?"): these puzzles' real
+  // difficulty comes from the same levers as the plain Burr Puzzle
+  // tier right above (a key + a decoy + precise per-slot matching),
+  // not the deeper two-mechanisms-at-once complexity of the crossover
+  // tiers below -- more pieces, not more reasoning depth. Positioning
+  // them after Burr Puzzle (their real difficulty peer) rather than
+  // after every crossover tier is the honest read, same principle
+  // already applied to Color Match's own positioning earlier.
+  ...BCC_ALLOY_STAGES,
+  ...DILUTE_ALLOY_STAGES,
+  CARBON_STEEL_STAGE,
+  ...FCC_ALLOY_STAGES,
   ...BURR_MOLECULE_SPLIT_STAGES,
   ...BURR_MIRRORED_MOLECULE_STAGES,
   ...BURR_BRANCHING_MOLECULE_STAGES,
@@ -3151,7 +3261,4 @@ export const STAGES = [
   ...CRYSTAL_STAGES,
   ONE_BCC_STAGE,
   ...BCC_CRYSTAL_STAGES,
-  ...BCC_ALLOY_STAGES,
-  ...DILUTE_ALLOY_STAGES,
-  CARBON_STEEL_STAGE,
 ];
