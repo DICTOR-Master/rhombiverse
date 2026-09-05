@@ -600,13 +600,18 @@ function syncVisualsToState() {
       p.mesh.userData.targetQuaternion = restQuaternion;
       // Fused pieces with a FIXED group (joined-pair, full, decoy) are
       // always shown -- each is its own distinct slot. Interchangeable
-      // singles (ANY_SINGLE_CELL_GROUP) are the exception: direct
-      // instruction (2026-09-04, "really dont want four single RDs in a
-      // row taking up space in picker tray") -- they're all the same
-      // shape sharing one tray slot (stages.js gives them a shared
-      // homePosition), so only one should ever be visible at a time,
-      // same "one at a time" queue revealNextTrayPiece already runs for
-      // loose pieces below.
+      // singles (ANY_SINGLE_CELL_GROUP) default to hidden here; whether
+      // each one comes back depends on whether it actually SHARES its
+      // homePosition with a sibling (the N-cell tier's own identical
+      // singles, direct instruction 2026-09-04, "really dont want four
+      // single RDs in a row taking up space in picker tray") or has its
+      // own distinct one (Multi-Cell's fused/octahedron/star
+      // alternates, one real per-cell slot each) -- revealNextTrayPiece
+      // below decides per DISTINCT homePosition, not globally (real bug
+      // caught live, 2026-09-05, "im still only seeing pyramid as
+      // preview pice on 22": every ANY_SINGLE_CELL_GROUP piece across
+      // BOTH real cells was being swept into ONE shared reveal slot
+      // regardless of how many genuinely distinct positions existed).
       p.mesh.visible = Boolean(p.fillsGroup) && p.fillsGroup !== ANY_SINGLE_CELL_GROUP;
       p.mesh.scale.setScalar(p.trayScale ?? 1);
     }
@@ -661,17 +666,33 @@ function remainingCount() {
 // Queues LOOSE pieces (no `fillsGroup`) -- a fused piece with a FIXED
 // group is its own separate, always-available tray slot (stages.js sets
 // its mesh visible from construction). Interchangeable singles
-// (ANY_SINGLE_CELL_GROUP) join this same "one at a time" queue too
-// (2026-09-04, see syncVisualsToState's own comment) -- they all share
-// one tray slot/homePosition, so revealing them one at a time is what
-// actually frees up the space, not just deciding WHICH single shows.
+// (ANY_SINGLE_CELL_GROUP) join this same queue too (2026-09-04, see
+// syncVisualsToState's own comment) -- but grouped by their own real
+// homePosition, not as one single combined pool. The N-cell tier's own
+// identical singles genuinely SHARE one homePosition (stages.js gives
+// them all the same tray slot on purpose), so within that shared slot,
+// revealing one at a time is exactly right. Multi-Cell's own
+// fused/octahedron/star alternates do NOT share a homePosition with
+// each other -- each real cell gets its own distinct slot per shape --
+// so treating the whole tier as ONE combined queue (real bug caught
+// live, 2026-09-05, "im still only seeing pyramid as preview pice on
+// 22") silently starved every slot but the very first loose piece,
+// since it's earliest in `current.pieces` and always "next". Grouping
+// by the real homePosition itself (not by fillsGroup/type) is honest
+// either way: reveals exactly one per genuinely shared slot, and every
+// piece with its own distinct slot, always.
 function revealNextTrayPiece() {
-  const next = current.pieces.find(
+  const queued = current.pieces.filter(
     (p) => (!p.fillsGroup || p.fillsGroup === ANY_SINGLE_CELL_GROUP) && !currentStatePiece(p.id).placed,
   );
-  if (!next) return;
-  next.mesh.visible = true;
-  next.mesh.position.copy(next.homePosition);
+  const revealedSlots = new Set();
+  for (const p of queued) {
+    const slotKey = ['x', 'y', 'z'].map((axis) => p.homePosition[axis].toFixed(4)).join(',');
+    if (revealedSlots.has(slotKey)) continue;
+    revealedSlots.add(slotKey);
+    p.mesh.visible = true;
+    p.mesh.position.copy(p.homePosition);
+  }
 }
 
 function updateHud() {
