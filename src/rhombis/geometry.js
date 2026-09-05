@@ -20,7 +20,7 @@
 // base plane) rather than needing a second geometry variant.
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { pyramidPieces, facePieces, rdRawVerts } from '../core/lattice.js';
+import { pyramidPieces, facePieces, oppositeNeighborIndex, rdRawVerts } from '../core/lattice.js';
 import { SYMMETRY_OPERATIONS } from './cell-arrangements.js';
 
 export function pyramidGeometry(scale = 1) {
@@ -44,6 +44,35 @@ export function pyramidGeometry(scale = 1) {
 export function facePyramidGeometry(scale, offsetIndex) {
   const { base, apex } = facePieces(scale)[offsetIndex];
   const points = [...base, apex].map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  const geometry = new ConvexGeometry(points);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+// A real bipyramid through a cell's own center, aligned along one
+// specific real NEIGHBOR_OFFSETS direction -- two facePyramidGeometry()
+// pyramids, toward that neighbor and its real opposite, merged base-to-
+// base through the shared apex point (the cell's own center). Genuinely
+// different from pyramidGeometry()'s own "Octahedron" (Stage 2, 2
+// pyramids along a plain cube-face axis, dead straight relative to the
+// RD's own faces) -- this one runs along a real (1,1,0)-type diagonal
+// neighbor direction instead, so it reads visually as tilted/angled
+// relative to the RD's own faces, not axis-aligned. Direct instruction
+// (2026-09-05, "multi cell could benefit from a variety of pieces
+// within it like two angled conjoined adjacent octahedra at the
+// connecting point between the two pieces" -- generalized immediately
+// after: "the bridging point of any adjacent shapes in a structure is
+// a potential opportunity for a big odd connection"): built from the
+// SAME real facePieces() primitive verified earlier the same day (see
+// core/lattice.js's own header), not a new heuristic, so two adjacent
+// cells' own diagonal octahedra -- each built along the SAME real
+// shared axis -- meet at that real shared face exactly, the identical
+// "share the exact same 4 real-world vertices" guarantee already
+// proven for the Disphenoid crossover's own tabs.
+export function diagonalOctahedronGeometry(scale, offsetIndex) {
+  const near = facePieces(scale)[offsetIndex];
+  const far = facePieces(scale)[oppositeNeighborIndex(offsetIndex)];
+  const points = [...near.base, ...far.base, near.apex].map(([x, y, z]) => new THREE.Vector3(x, y, z));
   const geometry = new ConvexGeometry(points);
   geometry.computeVertexNormals();
   return geometry;

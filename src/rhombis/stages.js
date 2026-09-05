@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { pyramidGeometry, facePyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey, disphenoidGeometry, DISPHENOID_ORIENTATIONS, quaternionForDisphenoidOrientation, disphenoidApexAxisKey } from './geometry.js';
+import { pyramidGeometry, facePyramidGeometry, diagonalOctahedronGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey, disphenoidGeometry, DISPHENOID_ORIENTATIONS, quaternionForDisphenoidOrientation, disphenoidApexAxisKey } from './geometry.js';
 import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld, cellsInShells } from '../core/lattice.js';
 import { BCC_NEIGHBOR_OFFSETS, truncatedOctahedronVertices, isBCC } from '../geometry-extensions/dual-lattice.js';
 import { bccShapeScaleFor } from '../geometry-extensions/bcc-detail-lattice.js';
@@ -576,8 +576,13 @@ function buildStage5(scale) {
 // filling only its own cell, never both at once) adds a genuinely new
 // "joined pair" piece that fills both cells in a single placement,
 // which needed no new cell-position math, only a new piece.
+// The real NEIGHBOR_OFFSETS index connecting Stage 6/7's own two cells
+// -- named so buildStage6's own diagonal-octahedron piece (see its own
+// header) can share the EXACT same real axis, not a re-guessed index.
+const MULTI_CELL_NEIGHBOR_INDEX = 0;
+
 function twoCellCenters(scale) {
-  const cellOffsets = [[0, 0, 0], NEIGHBOR_OFFSETS[0]];
+  const cellOffsets = [[0, 0, 0], NEIGHBOR_OFFSETS[MULTI_CELL_NEIGHBOR_INDEX]];
   const cellWorldPositions = cellOffsets.map(([cx, cy, cz]) => new THREE.Vector3(...cellToWorld(cx, cy, cz, scale)));
   const centroid = cellWorldPositions[0].clone().add(cellWorldPositions[1]).multiplyScalar(0.5);
   return cellWorldPositions.map((p) => p.clone().sub(centroid));
@@ -627,6 +632,30 @@ function buildStage6(scale) {
       id: `fused-${groupId}`,
       fillsGroup: ANY_SINGLE_CELL_GROUP,
       homePosition: fusedHome,
+    }));
+
+    // A third real alternate fill per cell -- direct instruction
+    // (2026-09-05, "multi cell could benefit from a variety of pieces
+    // within it like two angled conjoined adjacent octahedra at the
+    // connecting point between the two pieces"): a real bipyramid
+    // through this cell's own center, aligned along the exact real
+    // NEIGHBOR_OFFSETS axis connecting the two cells (the same offset
+    // `twoCellCenters` itself uses) -- built from facePieces(), the
+    // same real primitive verified earlier the same day for the
+    // Disphenoid crossover's own tabs, so this cell's own octahedron
+    // and its neighbor's own octahedron meet at the exact real shared
+    // face, not an approximation. Visually "angled" relative to the
+    // RD's own faces (a real (1,1,0)-type diagonal), genuinely
+    // different from Stage 2's own plain axis-aligned Octahedron.
+    // ANY_SINGLE_CELL_GROUP for the same reason the fused whole-cell
+    // piece above already uses it -- both cells' own octahedra are
+    // congruent, so either must fill either open cell.
+    const octahedronGeometry = diagonalOctahedronGeometry(scale, MULTI_CELL_NEIGHBOR_INDEX);
+    const octahedronHome = new THREE.Vector3(scale * 4, -scale * 2.6 * cellIndex, scale * 1.6);
+    fusedPieces.push(makeFusedPiece(octahedronGeometry, {
+      id: `octahedron-${groupId}`,
+      fillsGroup: ANY_SINGLE_CELL_GROUP,
+      homePosition: octahedronHome,
     }));
   });
 

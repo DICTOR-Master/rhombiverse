@@ -1,6 +1,14 @@
 [
   {
     "date": "2026-09-05",
+    "title": "RHOMBIS: A Real Angled Bridge",
+    "link": "./rhombis.html?stage=22",
+    "items": [
+      "New: Multi-Cell's two real cells each get a third real alternate fill option -- a diagonal octahedron, a real bipyramid through that cell's own center, built along the exact real neighbor axis the two cells share (facePieces(), the same real primitive verified earlier the same day for the Disphenoid crossover's own interlocking tabs). Genuinely different from Stage 2's own plain Octahedron (built along a cube-face axis, dead straight relative to the RD's own faces) -- this one runs along a real 12-neighbor diagonal instead, so it reads as visibly tilted/angled. Direct instruction: \"multi cell could benefit from a variety of pieces within it\", generalized immediately after into a real standing idea worth reusing elsewhere: \"the bridging point of any adjacent shapes in a structure is a potential opportunity for a big odd connection.\""
+    ]
+  },
+  {
+    "date": "2026-09-05",
     "title": "RHOMBIS: Multi-Cell Was Out of Place",
     "link": "./rhombis.html?stage=22",
     "items": [

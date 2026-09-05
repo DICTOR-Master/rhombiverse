@@ -105,6 +105,18 @@ export const NEIGHBOR_OFFSETS = [
   [0, 1, 1], [0, 1, -1], [0, -1, 1], [0, -1, -1],
 ];
 
+// The real opposite direction of NEIGHBOR_OFFSETS[i] -- also an index
+// into NEIGHBOR_OFFSETS/facePieces (the 12 real directions are closed
+// under negation), used anywhere a real straight-through axis between
+// a cell and one specific real neighbor needs its own far side too
+// (e.g. a real bipyramid through a cell's center, aligned along that
+// exact real neighbor axis, made of that neighbor's own real face-
+// pyramid plus the opposite real face-pyramid).
+export function oppositeNeighborIndex(i) {
+  const [dx, dy, dz] = NEIGHBOR_OFFSETS[i];
+  return NEIGHBOR_OFFSETS.findIndex(([x, y, z]) => x === -dx && y === -dy && z === -dz);
+}
+
 // Valid cell: x+y+z even (FCC parity constraint).
 export function isValidCell(x, y, z) {
   return (x + y + z) % 2 === 0;

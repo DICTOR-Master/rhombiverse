@@ -195,11 +195,15 @@ structural/mechanism difficulty end to end, not just within a tier —
 BCC's own single-cell and two-cell introduction sits beside the FCC
 "One Piece"/"Octahedron" pair near the very start (not at the end,
 where a 1-piece stage would look like the "final boss" and undersell
-everything harder before it), Multi-Cell (26 pieces, the single
-highest piece count in the whole game) sits last within its own real
-family of same-mechanism stages rather than off among unrelated
-crossover puzzles just because it has more pieces, and Salt/Calcite (8
-pieces) sit before the larger 14-17 piece Alloy stages despite sharing
+everything harder before it), Multi-Cell (28 pieces, the single
+highest piece count in the whole game — including a real diagonal
+octahedron alternate fill per cell, a genuine bipyramid built along the
+exact real neighbor axis the two cells share, angled relative to the
+RD's own faces rather than axis-aligned like Stage 2's own Octahedron)
+sits last within its own real family of same-mechanism stages rather
+than off among unrelated crossover puzzles just because it has more
+pieces, and Salt/Calcite (8 pieces) sit before the larger 14-17 piece
+Alloy stages despite sharing
 the SAME key mechanism, since piece count is real difficulty too, but
 only when comparing stages that actually share a mechanism — not a
 flat count across completely different puzzle logic. A Color Match
