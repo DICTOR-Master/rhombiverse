@@ -594,6 +594,33 @@ function twoCellCenters(scale) {
 // the exact same 2 real directions, not two independently-guessed ones.
 const MULTI_CELL_AXISPAIR_INDEXES = [MULTI_CELL_NEIGHBOR_INDEX, oppositeNeighborIndex(MULTI_CELL_NEIGHBOR_INDEX)];
 
+// The 10 real NEIGHBOR_OFFSETS directions the octahedron does NOT claim,
+// split into 2 real edge-adjacent clusters of 5 -- direct correction
+// (2026-09-05, "the whole point of this exercise was to reduce
+// unnecessary complication" / "needs to be down to ten pieces", after
+// "says solved but still obviously wrong" on the previous 24-loose-
+// piece design): 24 individually-oriented loose pieces was itself the
+// unnecessary complication, not a fix. Two real faces of an RD are
+// edge-adjacent (share a flat seam, not just the center apex) exactly
+// when their NEIGHBOR_OFFSETS vectors have dot product 1 (verified
+// numerically against all 12 real directions: every face has exactly 4
+// such neighbors, 12*4/2 = 24 real edges, the RD's own real edge count).
+// Restricted to the 10 remaining directions, index 1 and index 2 (the
+// OTHER real axis-pair, [1,-1,0]/[-1,1,0]) each turn out to be
+// edge-adjacent to exactly the other 4 -- a real, exact 5-and-5 split
+// with zero overlap (confirmed with a throwaway adjacency script before
+// writing this), not an approximate grouping. Each cluster is merged
+// from 5 already-correct facePyramidGeometry() meshes via
+// mergeGeometries -- safe here (unlike diagonalOctahedronGeometry's own
+// earlier ConvexGeometry mistake) because these 5 pyramids all share the
+// same apex AND are chained edge-to-edge, a genuinely contiguous, already
+// non-self-intersecting real chunk of the RD -- no convex-hull fattening
+// risk, nothing to verify by hull because nothing is hulled.
+const MULTI_CELL_HUBCAP_CLUSTERS = [
+  [1, 4, 5, 10, 11],
+  [2, 6, 7, 8, 9],
+];
+
 // REDESIGNED 2026-09-05 on real, live-caught correction: the original
 // version built its 12-per-cell loose voids from pyramidPieces()'s own
 // 6-axis inscribed-cube frame (PYRAMID_AXES), while the diagonal
@@ -630,33 +657,33 @@ function buildStage6(scale) {
 
   const voids = [];
   const groups = [];
-  const loosePieces = [];
   const fusedPieces = [];
 
   cellCenters.forEach((cellCenter, cellIndex) => {
     const groupId = `cell-${cellIndex}`;
     const axispairGroupId = `cell-${cellIndex}-axispair`;
+    const hubcapGroupIds = MULTI_CELL_HUBCAP_CLUSTERS.map((_, clusterIndex) => `cell-${cellIndex}-hubcap-${clusterIndex}`);
     groups.push({ id: groupId, position: cellCenter.clone(), quaternion: new THREE.Quaternion() });
     groups.push({ id: axispairGroupId, position: cellCenter.clone(), quaternion: new THREE.Quaternion() });
+    for (const hubcapGroupId of hubcapGroupIds) {
+      groups.push({ id: hubcapGroupId, position: cellCenter.clone(), quaternion: new THREE.Quaternion() });
+    }
     skeletonGroup.add(makeOuterSolid(rhombicDodecahedronGeometry(scale), cellCenter));
 
     for (let faceIndex = 0; faceIndex < NEIGHBOR_OFFSETS.length; faceIndex++) {
-      const singleGroupId = `cell-${cellIndex}-single-${faceIndex}`;
-      const tags = [groupId, singleGroupId];
+      const tags = [groupId];
       if (MULTI_CELL_AXISPAIR_INDEXES.includes(faceIndex)) tags.push(axispairGroupId);
+      const clusterIndex = MULTI_CELL_HUBCAP_CLUSTERS.findIndex((cluster) => cluster.includes(faceIndex));
+      if (clusterIndex !== -1) tags.push(hubcapGroupIds[clusterIndex]);
       // Real bug caught live (2026-09-05, "all sorts of weird things
       // happened" -- a real crash, `current.groups.find(...)` returning
-      // undefined): every loose single piece resolves to its own
-      // `singleGroupId` (smallestEnclosingGroupId picks the smallest
-      // tag on the tapped void), so `current.groups` needs a real entry
-      // for EACH of the 24 individual single-direction subgroups, not
-      // just the whole-cell and axis-pair ones -- main.js's own
-      // post-placement snap-to-position code (handleTargetTap) looks
-      // the resolved group up there directly. Same position/identity
-      // quaternion as the whole cell -- facePyramidGeometry() already
-      // bakes the correct real orientation into its own vertices, no
+      // undefined): a piece's resolved target group (smallestEnclosingGroupId
+      // picks the smallest tag on the tapped void) needs a real entry in
+      // `current.groups` -- main.js's own post-placement snap-to-position
+      // code (handleTargetTap) looks it up there directly. Same
+      // position/identity quaternion as the whole cell -- facePyramidGeometry()
+      // already bakes the correct real orientation into its own vertices, no
       // separate rotation needed.
-      groups.push({ id: singleGroupId, position: cellCenter.clone(), quaternion: new THREE.Quaternion() });
       const v = makeVoid(facePyramidGeometry(scale, faceIndex), {
         id: `v-${groupId}-f${faceIndex}`,
         position: cellCenter,
@@ -703,31 +730,43 @@ function buildStage6(scale) {
     }));
   });
 
-  const looseHome = new THREE.Vector3(scale * 3.6, -scale * 1.3, scale * 2.2);
-  // Interchangeable across all 24 real single-direction slots (both
-  // cells, all 12 real directions each) -- every one of the 12 real
-  // facePieces() shapes is congruent by the RD's own real symmetry
-  // (confirmed already: tests/unit/lattice.test.mjs's own volume/area
-  // checks treat every direction identically), so any loose piece can
-  // resolve to whichever single-direction void actually gets tapped,
-  // same ANY_SINGLE_CELL_GROUP pattern already proven for the N-cell
-  // single-RD tier. No manual orientation needed here anymore --
-  // facePieces() gives each real direction its own single correct
-  // placement already, unlike the old cube-face pyramid's own
-  // in/out-both-ways ambiguity.
-  for (let i = 0; i < voids.length; i++) {
-    const p = makeFusedPiece(facePyramidGeometry(scale, i % NEIGHBOR_OFFSETS.length), {
-      id: `p${i}`,
-      fillsGroup: ANY_SINGLE_CELL_GROUP,
-      homePosition: looseHome,
+  // REDESIGNED 2026-09-05, direct correction after the 24-loose-piece
+  // version above still drew "says solved but still obviously wrong" /
+  // "pieces missing and pieces disappearing inside hull": 24
+  // individually-oriented single-direction pieces WAS itself "the
+  // unnecessary complication" the user was asking to cut, not a
+  // structural fix -- fixing each one's own orientation mismatch never
+  // addressed the real complaint that there were simply too many
+  // fiddly, look-alike pieces (10 per cell, no visual way to tell which
+  // of 10 near-identical wedges belongs where). Direct instruction
+  // ("simpler less pieces please eight hubcaps are more than enough",
+  // then "needs to be down to ten pieces", "the whole point of this
+  // exercise was to reduce unnecessary complication"): merge the 10
+  // remaining real directions per cell into MULTI_CELL_HUBCAP_CLUSTERS'
+  // 2 real edge-adjacent groups of 5, each built once via
+  // mergeGeometries (not per-direction). Whole stage total: 2 cells x
+  // (1 fused whole-cell + 1 octahedron + 2 hubcaps) = 8 real pieces,
+  // comfortably under the 10-piece ceiling.
+  cellCenters.forEach((cellCenter, cellIndex) => {
+    MULTI_CELL_HUBCAP_CLUSTERS.forEach((cluster, clusterIndex) => {
+      const hubcapGeometry = mergeGeometries(cluster.map((faceIndex) => facePyramidGeometry(scale, faceIndex)), false);
+      hubcapGeometry.computeVertexNormals();
+      const hubcapHome = new THREE.Vector3(
+        scale * 4,
+        -scale * 2.6 * cellIndex,
+        scale * (clusterIndex === 0 ? 4.6 : 6.8),
+      );
+      fusedPieces.push(makeFusedPiece(hubcapGeometry, {
+        id: `hubcap-cell-${cellIndex}-${clusterIndex}`,
+        fillsGroup: `cell-${cellIndex}-hubcap-${clusterIndex}`,
+        homePosition: hubcapHome,
+      }));
     });
-    p.mesh.visible = i === 0; // only the next available copy shows in the tray
-    loosePieces.push(p);
-  }
+  });
 
   return {
     skeletonGroup,
-    pieces: [...loosePieces, ...fusedPieces],
+    pieces: fusedPieces,
     voids,
     groups,
     hideIdleVoidWires: true,

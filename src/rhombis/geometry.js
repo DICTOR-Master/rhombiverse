@@ -20,6 +20,7 @@
 // base plane) rather than needing a second geometry variant.
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { pyramidPieces, facePieces, oppositeNeighborIndex, hemisphereSplit, rdRawVerts } from '../core/lattice.js';
 import { SYMMETRY_OPERATIONS } from './cell-arrangements.js';
 
@@ -84,11 +85,31 @@ export function hemisphereGeometry(scale, offsetIndex, side) {
 // shared axis -- meet at that real shared face exactly, the identical
 // "share the exact same 4 real-world vertices" guarantee already
 // proven for the Disphenoid crossover's own tabs.
+// Real bug caught live (2026-09-05, "it sais olved eventually but there
+// were still spaces and the disphenoid was burying into the octahedron
+// in order to match the face" / "disphenoids were burrowing in"): the
+// FIRST version ran ConvexGeometry over all 9 points (both pyramids'
+// bases plus their one shared apex) at once. Two real pyramids sharing
+// a single apex point, bases splayed to opposite sides, is genuinely
+// NON-convex right at that shared point (a real "bowtie" pinch, like
+// two cones joined tip-to-tip) -- ConvexGeometry, being a convex hull
+// by definition, can't represent that: it fills in the pinch, silently
+// connecting the two bases' own vertices directly and fattening the
+// whole shape into something LARGER than the two real pyramids it was
+// supposed to be. Verified numerically once suspected: the old
+// geometry's own real volume was exactly 3x too big (1.0 instead of
+// the real 2x-one-pyramid total of 0.333), which is exactly what a
+// real neighboring piece "burying in" / "burrowing in" looks like --
+// this piece's own real bulk was genuinely eating into their space.
+// Fixed by merging two ALREADY-CORRECT single-pyramid geometries as
+// separate triangle sets (mergeGeometries, not a shared ConvexGeometry
+// call) -- preserves the real non-convex pinch, real volume now exactly
+// 2x a single facePyramidGeometry(), confirmed numerically.
 export function diagonalOctahedronGeometry(scale, offsetIndex) {
-  const near = facePieces(scale)[offsetIndex];
-  const far = facePieces(scale)[oppositeNeighborIndex(offsetIndex)];
-  const points = [...near.base, ...far.base, near.apex].map(([x, y, z]) => new THREE.Vector3(x, y, z));
-  const geometry = new ConvexGeometry(points);
+  const geometry = mergeGeometries([
+    facePyramidGeometry(scale, offsetIndex),
+    facePyramidGeometry(scale, oppositeNeighborIndex(offsetIndex)),
+  ], false);
   geometry.computeVertexNormals();
   return geometry;
 }
