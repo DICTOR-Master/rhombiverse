@@ -147,7 +147,7 @@ evolution, animals, lattice zoom).
 
 ## RHOMBIS
 
-A standalone, 115-stage geometric-packing puzzle game (`rhombis.html`,
+A standalone, 116-stage geometric-packing puzzle game (`rhombis.html`,
 linked from the welcome screen) that teaches real crystal-lattice
 geometry through play rather than exposition — rotate a target shape,
 tap pieces into place, watch it assemble. Difficulty ramps with stage
@@ -191,7 +191,7 @@ later, the same rock-salt topology genuinely distorted along a trigonal
 axis (a real, algebraically-derived ~101.5° rhombohedral angle) with a
 flat CO3 triangular anion that flips orientation between layers, the
 actual real reason this space group is rhombohedral rather than cubic.
-Stage ORDER across the whole 115-stage main sequence tracks real
+Stage ORDER across the whole 116-stage main sequence tracks real
 structural/mechanism difficulty end to end, not just within a tier —
 BCC's own single-cell and two-cell introduction sits beside the FCC
 "One Piece"/"Octahedron" pair near the very start (not at the end,
@@ -235,7 +235,7 @@ lattice, needing no new mesh geometry at all), never re-derived.
 ```
 rhombiverse/
   index.html                # static entry point, Three.js via import map (no bundling; see "Running locally")
-  rhombis.html               # Rhombis: standalone 115-stage geometric-packing puzzle (FCC + BCC), linked from the welcome screen
+  rhombis.html               # Rhombis: standalone 116-stage geometric-packing puzzle (FCC + BCC), linked from the welcome screen
   api/                       # Vercel serverless functions (AI Gateway proxy: sculpt/cultivate/cyborg-suggest)
   src/
     rhombis/                 # Rhombis' own code: puzzle-state.js (pure state machine), geometry.js
