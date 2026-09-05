@@ -817,15 +817,43 @@ function buildHourglassStage(scale) {
     voids.push(v);
   });
 
+  // Real bug caught live (2026-09-05, on this stage's own Hourglass
+  // Chain extension -- "the two hourglasses arent meeting in the middle
+  // and are overlapping the caps but puzzle is saying solved anyway
+  // wrongly"): a placed FIXED-group piece's mesh gets positioned at its
+  // own GROUP's position (main.js's handleTargetTap/animate --
+  // `mesh.userData.targetPosition = target.position`), but this piece's
+  // geometry was ALSO pre-translated to cellA/cellB's own absolute
+  // world coordinates via mergeGeometries+.translate() -- double-
+  // counting the group's own offset on top of coordinates the geometry
+  // already had baked in. Invisible here by pure coincidence: this
+  // stage's own `twoCellCenters` centers exactly ONE cell pair around
+  // the origin, so their own midpoint (this piece's group position) is
+  // itself (0,0,0) -- adding zero changes nothing. The SAME real bug on
+  // 3 chained cells is not so lucky (the midpoint of the first PAIR
+  // isn't the origin once a third cell enters the average), which is
+  // exactly what exposed it. A real per-triangle VOLUME check (used to
+  // verify this same day) could never have caught this either: a rigid
+  // double-offset preserves a solid's own volume perfectly while moving
+  // it to the wrong place entirely -- position needs its own real
+  // check, not just volume.
+  //
+  // Fixed by translating each half by its OWN cell position MINUS the
+  // group's own position, so the group-position offset main.js adds
+  // back at placement time lands each half at its true absolute
+  // location instead of past it.
+  const hourglassGroupPosition = cellA.clone().add(cellB).multiplyScalar(0.5);
   const groups = [
-    { id: 'hourglass', position: cellA.clone().add(cellB).multiplyScalar(0.5), quaternion: new THREE.Quaternion() },
+    { id: 'hourglass', position: hourglassGroupPosition.clone(), quaternion: new THREE.Quaternion() },
     { id: 'halfrd-a', position: cellA.clone(), quaternion: new THREE.Quaternion() },
     { id: 'halfrd-b', position: cellB.clone(), quaternion: new THREE.Quaternion() },
   ];
 
+  const relA = cellA.clone().sub(hourglassGroupPosition);
+  const relB = cellB.clone().sub(hourglassGroupPosition);
   const hourglassGeometry = mergeGeometries([
-    hemisphereGeometry(scale, nearIndexA, 'positive').translate(cellA.x, cellA.y, cellA.z),
-    hemisphereGeometry(scale, nearIndexB, 'positive').translate(cellB.x, cellB.y, cellB.z),
+    hemisphereGeometry(scale, nearIndexA, 'positive').translate(relA.x, relA.y, relA.z),
+    hemisphereGeometry(scale, nearIndexB, 'positive').translate(relB.x, relB.y, relB.z),
   ], false);
 
   const pieceSpecs = [
@@ -905,28 +933,47 @@ function buildHourglassChainStage(scale) {
     voids.push(v);
   });
 
+  // Real bug caught live (2026-09-05, direct report: "the two
+  // hourglasses arent meeting in the middle and are overlapping the
+  // caps but puzzle is saying solved anyway wrongly"): see
+  // buildHourglassStage's own matching fix above for the full real root
+  // cause -- a placed piece's mesh gets moved to its own GROUP's
+  // position on top of geometry that was ALSO pre-translated to the
+  // same absolute world coordinates, double-counting the offset. Harmless
+  // there by coincidence (that stage's own 2-cell pair centers exactly
+  // on the origin); not here, where a chain group's own midpoint is
+  // genuinely non-zero. A real per-triangle volume check (already run
+  // this same day) could never have caught this: a rigid double-offset
+  // preserves a solid's own volume while moving it to the wrong place
+  // entirely.
+  const chainABPosition = cellA.clone().add(cellB).multiplyScalar(0.5);
+  const chainBCPosition = cellB.clone().add(cellC).multiplyScalar(0.5);
   const groups = [
-    { id: 'chain-ab', position: cellA.clone().add(cellB).multiplyScalar(0.5), quaternion: new THREE.Quaternion() },
-    { id: 'chain-bc', position: cellB.clone().add(cellC).multiplyScalar(0.5), quaternion: new THREE.Quaternion() },
+    { id: 'chain-ab', position: chainABPosition.clone(), quaternion: new THREE.Quaternion() },
+    { id: 'chain-bc', position: chainBCPosition.clone(), quaternion: new THREE.Quaternion() },
     { id: 'end-a', position: cellA.clone(), quaternion: new THREE.Quaternion() },
     { id: 'end-c', position: cellC.clone(), quaternion: new THREE.Quaternion() },
   ];
 
+  const relA_ab = cellA.clone().sub(chainABPosition);
+  const relB_ab = cellB.clone().sub(chainABPosition);
+  const relB_bc = cellB.clone().sub(chainBCPosition);
+  const relC_bc = cellC.clone().sub(chainBCPosition);
   const pieceSpecs = [
     {
       id: 'chain-ab-piece',
       fillsGroup: 'chain-ab',
       geometry: mergeGeometries([
-        hemisphereGeometry(scale, fwdIndex, 'positive').translate(cellA.x, cellA.y, cellA.z),
-        hemisphereGeometry(scale, fwdIndex, 'negative').translate(cellB.x, cellB.y, cellB.z),
+        hemisphereGeometry(scale, fwdIndex, 'positive').translate(relA_ab.x, relA_ab.y, relA_ab.z),
+        hemisphereGeometry(scale, fwdIndex, 'negative').translate(relB_ab.x, relB_ab.y, relB_ab.z),
       ], false),
     },
     {
       id: 'chain-bc-piece',
       fillsGroup: 'chain-bc',
       geometry: mergeGeometries([
-        hemisphereGeometry(scale, fwdIndex, 'positive').translate(cellB.x, cellB.y, cellB.z),
-        hemisphereGeometry(scale, fwdIndex, 'negative').translate(cellC.x, cellC.y, cellC.z),
+        hemisphereGeometry(scale, fwdIndex, 'positive').translate(relB_bc.x, relB_bc.y, relB_bc.z),
+        hemisphereGeometry(scale, fwdIndex, 'negative').translate(relC_bc.x, relC_bc.y, relC_bc.z),
       ], false),
     },
     { id: 'end-a-piece', fillsGroup: 'end-a', geometry: hemisphereGeometry(scale, fwdIndex, 'negative') },
