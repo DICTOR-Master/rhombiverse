@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-09-05",
+    "title": "Naming a Real Honeycomb",
+    "items": [
+      "Documentation only, no behavior change: Cuboctahedron Build growing face-to-face plus its own Octahedron gap-fill piece (shipped 2026-08-31, \"Cuboctahedra, Face to Face\") has a real, established name in solid geometry we'd never actually stated -- a rectified cubic honeycomb, the vertex-truncated form of the plain cubic honeycomb, built here as a real, numerically zero-gap tiling rather than an approximation.",
+      "Worth being explicit about since it's genuinely easy to miss otherwise: the plain (un-rectified) cubic honeycomb underneath it is itself real and already reachable in this same World, no separate system needed -- Lattice Quick-View's own Cube mode already renders the exact inscribed cube each lattice point needs; placed at both of the parities Cuboctahedron/Octahedron already use, those cubes tile with zero gap on their own.",
+      "The same real structure shows up a second time, independently: Rhombis's new Salt puzzle is built on rock-salt-lattice.js, which proves sodium chloride's own two ion sublattices are, combined, this identical simple-cubic lattice -- verified numerically there too, not assumed."
+    ]
+  },
+  {
+    "date": "2026-09-05",
     "title": "RHOMBIS: Real Alloys and Salt",
     "link": "./rhombis.html?stage=100",
     "items": [
