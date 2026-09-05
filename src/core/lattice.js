@@ -57,6 +57,48 @@ export function pyramidPieces(s = 1) {
   return { cube, pyramids };
 }
 
+// The RD's real 12 rhombic faces, each as a pyramid from the cell's own
+// center (origin) to that face's 4 real perimeter vertices, indexed in
+// the SAME order as NEIGHBOR_OFFSETS below -- facePieces(s)[i] is the
+// real face two adjacent cells share when one sits at
+// NEIGHBOR_OFFSETS[i] from the other. cellToWorld is a pure uniform
+// scale (no rotation), so a lattice offset and this function's own
+// local vertex frame are already the same Cartesian axes -- no
+// projection needed to relate the two.
+//
+// Genuinely NOT the same thing as pyramidPieces() above, and must never
+// be conflated with it: that one decomposes the RD through its
+// INSCRIBED CUBE's 6 faces, matching PYRAMID_AXES/OCTA_VERTS' 6 axis
+// directions -- the real BCC-interstitial/octahedral-hole directions,
+// NOT the 12 real face-sharing neighbor directions used here. Confirmed
+// the hard way (Rhombis, 2026-09-05): an earlier attempt at real
+// chunk-to-chunk interlocking geometry built its "tabs" from
+// pyramidPieces()'s 6-axis disphenoid frame, which only ever reaches a
+// SINGLE VERTEX of a real 12-neighbor-direction face, not the flat face
+// itself -- two chunks built that way only ever touch at a point, never
+// share a real flat seam. facePieces() exists so any future interlocking
+// geometry between two real lattice neighbors starts from their own
+// actual shared face, not an unrelated 6-direction decomposition.
+export function facePieces(s = 1) {
+  const verts = rdRawVerts(s);
+  const cube = verts.slice(0, 8);
+  const octa = verts.slice(8, 14);
+  return NEIGHBOR_OFFSETS.map(([dx, dy, dz]) => {
+    const axes = [dx, dy, dz];
+    const [a1, a2] = [0, 1, 2].filter((a) => axes[a] !== 0);
+    const s1 = Math.sign(axes[a1]);
+    const s2 = Math.sign(axes[a2]);
+    const octaVertex = (axis, sign) => octa[axis * 2 + (sign > 0 ? 0 : 1)];
+    const cubeMatches = cube.filter((v) => Math.sign(v[a1]) === s1 && Math.sign(v[a2]) === s2);
+    // Real winding order around the rhombus perimeter: an RD face's 2
+    // order-4 (octa) and 2 order-3 (cube) vertices alternate -- never
+    // two of the same type adjacent. cubeMatches' own 2 entries differ
+    // only in the third (zero) axis, so either order of the pair walks
+    // the perimeter correctly.
+    return { base: [octaVertex(a1, s1), cubeMatches[0], octaVertex(a2, s2), cubeMatches[1]], apex: [0, 0, 0] };
+  });
+}
+
 export const NEIGHBOR_OFFSETS = [
   [1, 1, 0], [1, -1, 0], [-1, 1, 0], [-1, -1, 0],
   [1, 0, 1], [1, 0, -1], [-1, 0, 1], [-1, 0, -1],

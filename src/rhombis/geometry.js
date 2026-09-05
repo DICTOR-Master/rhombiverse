@@ -20,7 +20,7 @@
 // base plane) rather than needing a second geometry variant.
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { pyramidPieces, rdRawVerts } from '../core/lattice.js';
+import { pyramidPieces, facePieces, rdRawVerts } from '../core/lattice.js';
 import { SYMMETRY_OPERATIONS } from './cell-arrangements.js';
 
 export function pyramidGeometry(scale = 1) {
@@ -28,6 +28,23 @@ export function pyramidGeometry(scale = 1) {
   const points = [...base, apex].map(([x, y, z]) => new THREE.Vector3(x, y, z));
   const geometry = new ConvexGeometry(points);
   geometry.translate(0, -scale / 2, 0);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+// A pyramid from a cell's own local center to ONE of its 12 REAL
+// rhombic faces (facePieces() in core/lattice.js -- the actual shared
+// face two adjacent cells at NEIGHBOR_OFFSETS[offsetIndex] have, unlike
+// pyramidPieces()'s own 6-axis inscribed-cube frame, which only ever
+// reaches a single vertex of a real 12-neighbor-direction face, not the
+// flat face itself). Already correctly oriented and positioned in the
+// cell's own local frame -- unlike pyramidGeometry() above, this needs
+// no canonical-mesh-plus-quaternion reuse, since facePieces() already
+// gives each of the 12 directions its own real, distinct vertices.
+export function facePyramidGeometry(scale, offsetIndex) {
+  const { base, apex } = facePieces(scale)[offsetIndex];
+  const points = [...base, apex].map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  const geometry = new ConvexGeometry(points);
   geometry.computeVertexNormals();
   return geometry;
 }

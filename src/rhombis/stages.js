@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { pyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey, disphenoidGeometry, DISPHENOID_ORIENTATIONS, quaternionForDisphenoidOrientation, disphenoidApexAxisKey } from './geometry.js';
+import { pyramidGeometry, facePyramidGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey, disphenoidGeometry, DISPHENOID_ORIENTATIONS, quaternionForDisphenoidOrientation, disphenoidApexAxisKey } from './geometry.js';
 import { PYRAMID_AXES, NEIGHBOR_OFFSETS, cellToWorld, cellsInShells } from '../core/lattice.js';
 import { BCC_NEIGHBOR_OFFSETS, truncatedOctahedronVertices, isBCC } from '../geometry-extensions/dual-lattice.js';
 import { bccShapeScaleFor } from '../geometry-extensions/bcc-detail-lattice.js';
@@ -2357,27 +2357,47 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChun
 // boundary cells between two different Big-Hull chunks, found via the
 // exact same NEIGHBOR_OFFSETS adjacency `partitionIntoIrregularChunks`
 // itself already grows through -- not an arbitrary fixed cell index)
-// each split along their own 3 real axis-pairs (JUNCTION_AXIS_GROUPS:
-// x, y, z) between whichever chunks actually border them there. Each
-// slice is folded DIRECTLY into that chunk's own single fused piece
-// geometry as a real interlocking tab -- literally "half an RD" missing
-// from one chunk, supplied by its neighbor -- rather than existing as
-// its own separate loose piece. No new piece count versus the plain
-// Big Hull tier: still exactly `chunkCount` real fused chunks, each a
-// single tray item, just with a genuinely interlocking real shape at
-// real junctions instead of a clean whole-cell boundary everywhere.
-// The upside DICTO named directly: "by spelling this out we get more
-// potential puzzles from what is already created" -- this is a real,
-// reusable geometric relationship (real neighbor adjacency decomposed
-// onto the disphenoid's own axis frame), not a one-off hack for these
+// split along their own real 12 rhombic faces (`facePieces()` in
+// core/lattice.js) between whichever chunks actually border them
+// there. Each slice is folded DIRECTLY into that chunk's own single
+// fused piece geometry as a real interlocking tab -- literally "half an
+// RD" missing from one chunk, supplied by its neighbor -- rather than
+// existing as its own separate loose piece. No new piece count versus
+// the plain Big Hull tier: still exactly `chunkCount` real fused
+// chunks, each a single tray item, just with a genuinely interlocking
+// real shape at real junctions instead of a clean whole-cell boundary
+// everywhere. The upside DICTO named directly: "by spelling this out we
+// get more potential puzzles from what is already created" -- this is a
+// real, reusable geometric relationship, not a one-off hack for these
 // two stages.
+//
+// Real correction (2026-09-05, caught live: "connecting disphenoids /
+// flat octahedra by points doesnt translate as valid... only ever
+// connect by flats... this applies everywhere" -- with the physical
+// framing that clinched it: "if the pieces were glass and you dropped
+// them would they break... these are the origins of physical
+// puzzles"): the FIRST version of this built each slice from
+// `pyramidPieces()`'s own 6-axis inscribed-cube frame (the same frame
+// `disphenoidGeometry` uses) -- but that frame's 6 directions are the
+// real BCC-interstitial/octahedral-hole directions, NOT the FCC
+// lattice's real 12 nearest-neighbor (rhombic-face) directions
+// `NEIGHBOR_OFFSETS` uses. A slice built that way only ever reaches a
+// single VERTEX of the real face toward an actual neighbor, never the
+// flat face itself -- two chunks built that way could only ever kiss at
+// a point, exactly the "would this survive being dropped" test failing.
+// `facePieces()` fixes this at the source: each of an RD's real 12
+// faces, verified numerically (planar, a genuine rhombus, facing its
+// own real NEIGHBOR_OFFSETS direction, and the 12 of them together
+// reconstructing the exact same RD volume `pyramidPieces()` does) --
+// see tests/unit/lattice.test.mjs. A slice built from the SAME real
+// face a neighbor cell shares is guaranteed real flat contact, by
+// construction, not by a heuristic.
 //
 // The real key is still drawn at RANDOM, per load, from every real
 // chunk piece (unchanged in spirit from the original design, just
 // simpler now that there's no separate fine/coarse split to draw from)
 // -- same per-load Math.random() discipline the tray's own Fisher-Yates
 // shuffle already uses, so no position/pattern-based shortcut can form.
-const JUNCTION_AXIS_GROUPS = [['x+', 'x-'], ['y+', 'y-'], ['z+', 'z-']];
 
 // A real boundary cell: one with at least one real lattice neighbor
 // (NEIGHBOR_OFFSETS -- the exact adjacency the partition itself grows
@@ -2426,49 +2446,25 @@ function pickDiverseJunctionCells(cells, assignments, boundaryIndexes, count) {
   return picked;
 }
 
-// For one junction cell, which chunk owns each of its 3 real axis-pair
-// slices (JUNCTION_AXIS_GROUPS order: x, y, z). The REAL world-space
-// direction from the junction cell to each differently-chunked real
-// neighbor (NEIGHBOR_OFFSETS + cellToWorld, not PYRAMID_AXES/
-// AXIS_NORMALS' own unrelated cube-face scheme -- a genuinely different
-// 6-direction set with no 1:1 correspondence to the FCC lattice's real
-// 12-neighbor coordination) is decomposed onto global x/y/z -- the
-// SAME frame the disphenoid's own pyramid-axis groups are already built
-// along -- and whichever axis has that direction's LARGEST component
-// names the slice this neighbor claims. Strongest-aligned neighbor
-// claims first; a slice nobody claims (or only a weaker duplicate
-// wants) stays with the junction cell's own default/home chunk -- not
-// every direction out of a junction cell is a real crossing.
-function resolveJunctionAxisOwners(allCells, assignments, cellIndex, scale) {
+// For one junction cell, which chunk owns each of its 12 REAL rhombic
+// faces (NEIGHBOR_OFFSETS/facePieces order): the face toward
+// NEIGHBOR_OFFSETS[i] belongs to that real neighbor's own chunk when a
+// real, differently-chunked neighbor cell actually exists there;
+// otherwise it stays with the junction cell's own default/home chunk --
+// not every direction out of a junction cell is a real crossing (no
+// neighbor there at all, within this macro shape), and a same-chunk
+// neighbor isn't a real crossing either.
+function resolveJunctionFaceOwners(allCells, assignments, cellIndex) {
   const key = (c) => c.join(',');
   const indexByKey = new Map(allCells.map((c, i) => [key(c), i]));
   const homeChunk = assignments[cellIndex].chunkIndex;
   const [cx, cy, cz] = allCells[cellIndex];
-  const homeWorld = new THREE.Vector3(...cellToWorld(cx, cy, cz, scale));
-
-  const candidates = [];
-  NEIGHBOR_OFFSETS.forEach(([dx, dy, dz]) => {
+  return NEIGHBOR_OFFSETS.map(([dx, dy, dz]) => {
     const neighborIndex = indexByKey.get(key([cx + dx, cy + dy, cz + dz]));
-    if (neighborIndex === undefined) return;
+    if (neighborIndex === undefined) return homeChunk;
     const neighborChunk = assignments[neighborIndex].chunkIndex;
-    if (neighborChunk === homeChunk) return;
-    const neighborWorld = new THREE.Vector3(...cellToWorld(cx + dx, cy + dy, cz + dz, scale));
-    const dir = neighborWorld.clone().sub(homeWorld).normalize();
-    const abs = [Math.abs(dir.x), Math.abs(dir.y), Math.abs(dir.z)];
-    const pairIndex = abs.indexOf(Math.max(...abs));
-    candidates.push({ pairIndex, strength: abs[pairIndex], chunk: neighborChunk });
+    return neighborChunk === homeChunk ? homeChunk : neighborChunk;
   });
-  candidates.sort((a, b) => b.strength - a.strength);
-
-  const owners = [homeChunk, homeChunk, homeChunk];
-  const claimed = [false, false, false];
-  candidates.forEach(({ pairIndex, chunk }) => {
-    if (!claimed[pairIndex]) {
-      owners[pairIndex] = chunk;
-      claimed[pairIndex] = true;
-    }
-  });
-  return owners;
 }
 
 function buildDisphenoidKeyHullStage(scale, allCells, junctionCellCount, chunkCount, decoyChunkCount) {
@@ -2482,10 +2478,7 @@ function buildDisphenoidKeyHullStage(scale, allCells, junctionCellCount, chunkCo
   const boundaryIndexes = findChunkBoundaryCellIndexes(allCells, assignments);
   const junctionCellIndexes = pickDiverseJunctionCells(allCells, assignments, boundaryIndexes, junctionCellCount);
   const junctionIndexSet = new Set(junctionCellIndexes);
-  const junctionOwners = new Map(junctionCellIndexes.map((i) => [i, resolveJunctionAxisOwners(allCells, assignments, i, scale)]));
-
-  const orientationIndexes = DISPHENOID_ORIENTATIONS.map((_, i) => i);
-  const apexKeyFor = (i) => disphenoidApexAxisKey(i, scale);
+  const junctionOwners = new Map(junctionCellIndexes.map((i) => [i, resolveJunctionFaceOwners(allCells, assignments, i)]));
 
   // One real ghost outline per junction cell, drawn once regardless of
   // how many chunks its slices end up split across.
@@ -2525,15 +2518,12 @@ function buildDisphenoidKeyHullStage(scale, allCells, junctionCellCount, chunkCo
 
     junctionCellIndexes.forEach((cellIndex, jSlot) => {
       const owners = junctionOwners.get(cellIndex);
-      const ownedPairIndexes = owners.map((owner, pairIndex) => (owner === chunkIndex ? pairIndex : -1)).filter((i) => i >= 0);
-      if (!ownedPairIndexes.length) return;
+      const ownedFaceIndexes = owners.map((owner, faceIndex) => (owner === chunkIndex ? faceIndex : -1)).filter((i) => i >= 0);
+      if (!ownedFaceIndexes.length) return;
       const cellCenter = cellWorldPositions[cellIndex].clone().sub(centroid);
-      const ownedOrientationIndexes = orientationIndexes.filter((oi) => ownedPairIndexes.includes(JUNCTION_AXIS_GROUPS.findIndex((pair) => pair.includes(apexKeyFor(oi)))));
-      ownedOrientationIndexes.forEach((oi) => {
-        const key = DISPHENOID_ORIENTATIONS[oi];
-        const v = makeVoid(disphenoidGeometry(scale), {
-          id: `v-${groupId}-j${jSlot}-${key}`,
-          quaternion: quaternionForDisphenoidOrientation(key),
+      ownedFaceIndexes.forEach((faceIndex) => {
+        const v = makeVoid(facePyramidGeometry(scale, faceIndex), {
+          id: `v-${groupId}-j${jSlot}-f${faceIndex}`,
           position: cellCenter,
           groupIds: [groupId],
         });
@@ -2541,7 +2531,7 @@ function buildDisphenoidKeyHullStage(scale, allCells, junctionCellCount, chunkCo
         voids.push(v);
       });
       const sliceGeometry = mergeGeometries(
-        ownedOrientationIndexes.map((oi) => disphenoidGeometry(scale).applyQuaternion(quaternionForDisphenoidOrientation(DISPHENOID_ORIENTATIONS[oi]))),
+        ownedFaceIndexes.map((faceIndex) => facePyramidGeometry(scale, faceIndex)),
         false,
       );
       contributions.push({ anchor: cellCenter, geometry: sliceGeometry });

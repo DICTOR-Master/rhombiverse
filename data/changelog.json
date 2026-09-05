@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-09-05",
+    "title": "RHOMBIS: Real Flat Contact, Not Points",
+    "link": "./rhombis.html?stage=114",
+    "items": [
+      "Fixed: a real geometry bug in the Big Hull + Disphenoid crossover puzzles' brand new interlocking tabs (shipped earlier the same day) -- they were built from the wrong 6-direction frame (the same one disphenoids themselves use, which is real, but for a DIFFERENT real relationship: the octahedral/BCC-interstitial directions, not the FCC lattice's own 12 real nearest-neighbor directions). Two chunks built that way could only ever touch at a single point, never a real flat face -- caught directly: \"connecting disphenoids / flat octahedra by points doesnt translate as valid... only ever connect by flats\".",
+      "Fixed properly, not patched: a real new shared primitive (facePieces(), core/lattice.js) decomposes a cell into its own actual 12 rhombic faces -- the exact faces two real adjacent cells share -- verified numerically (each face a genuine planar rhombus, facing its own real neighbor direction, and the 12 of them together reconstructing the exact same cell volume the existing 6-pyramid decomposition already does) rather than trusted by eye. The interlocking tabs now come from a cell's own real shared face with its real neighbor, guaranteed flat contact by construction -- confirmed end-to-end: a cell's face slice and its neighbor's own matching slice share the exact same 4 real-world points."
+    ]
+  },
+  {
+    "date": "2026-09-05",
     "title": "RHOMBIS: A Real Difficulty Curve",
     "link": "./rhombis.html?stage=16",
     "items": [

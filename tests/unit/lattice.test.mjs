@@ -13,7 +13,59 @@ import {
   shellCount,
   cellsInShells,
   nearestValidCell,
+  facePieces,
+  pyramidPieces,
 } from '../../src/core/lattice.js';
+
+function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function norm(a) { return Math.hypot(a[0], a[1], a[2]); }
+function tetraVolume(a, b, c, d) {
+  return Math.abs(dot(sub(b, a), cross(sub(c, a), sub(d, a)))) / 6;
+}
+function pyramidVolume({ base: [b0, b1, b2, b3], apex }) {
+  return tetraVolume(apex, b0, b1, b2) + tetraVolume(apex, b0, b2, b3);
+}
+
+// facePieces() exists specifically because an earlier real attempt at
+// chunk-to-chunk interlocking geometry (Rhombis, 2026-09-05) built its
+// tabs from pyramidPieces()'s own 6-axis frame instead -- which only
+// ever reaches a single VERTEX of a real 12-neighbor-direction face,
+// not the flat face itself, so two chunks built that way only ever
+// touched at a point. These tests are the real guarantee that never
+// happens again: every face is a genuine planar rhombus facing the
+// correct real neighbor direction, and the 12 of them together
+// reconstruct the exact same RD pyramidPieces() already builds.
+test('facePieces: each of the 12 real faces is planar, a genuine rhombus (4 equal sides), and faces its own NEIGHBOR_OFFSETS direction', () => {
+  const faces = facePieces(2);
+  assert.equal(faces.length, 12);
+  faces.forEach(({ base }, i) => {
+    const [v0, v1, v2, v3] = base;
+    const sides = [norm(sub(v1, v0)), norm(sub(v2, v1)), norm(sub(v3, v2)), norm(sub(v0, v3))];
+    sides.forEach((len) => assert.ok(Math.abs(len - sides[0]) < 1e-9, `face ${i} side lengths not equal`));
+    const planeNormal = cross(sub(v1, v0), sub(v2, v0));
+    assert.ok(Math.abs(dot(planeNormal, sub(v3, v0))) < 1e-9, `face ${i} vertices not coplanar`);
+    const centroid = [0, 1, 2].map((k) => (v0[k] + v1[k] + v2[k] + v3[k]) / 4);
+    const dir = centroid.map((c) => c / norm(centroid));
+    const expected = NEIGHBOR_OFFSETS[i].map((c) => c / norm(NEIGHBOR_OFFSETS[i]));
+    assert.ok(Math.abs(dot(dir, expected) - 1) < 1e-6, `face ${i} does not face its own NEIGHBOR_OFFSETS direction`);
+  });
+});
+
+test('facePieces: the 12 real face-pyramids reconstruct the exact same RD volume as pyramidPieces (cube + 6 pyramids)', () => {
+  const scale = 3;
+  const { cube: cubeVerts, pyramids } = pyramidPieces(scale);
+  // Cube volume via its own real edge length (cubeVerts[0] and [1]
+  // differ only in z per CUBE_VERTS' own nesting order -- a real edge,
+  // not a face or space diagonal).
+  const cubeEdge = norm(sub(cubeVerts[1], cubeVerts[0]));
+  const pyramidTotal = Object.values(pyramids).reduce((sum, p) => sum + pyramidVolume(p), 0);
+  const totalOld = cubeEdge ** 3 + pyramidTotal;
+
+  const faceTotal = facePieces(scale).reduce((sum, f) => sum + pyramidVolume(f), 0);
+  assert.ok(Math.abs(totalOld - faceTotal) < 1e-6, `expected ${totalOld}, got ${faceTotal}`);
+});
 
 test('isValidCell: FCC parity (x+y+z even)', () => {
   assert.equal(isValidCell(0, 0, 0), true);

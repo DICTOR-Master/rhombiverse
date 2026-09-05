@@ -166,7 +166,9 @@ genuinely blocked until the others around it are down. Four crossover
 tiers combine these mechanics directly (a Burr key layered onto a
 Molecule Split, a Mirrored Molecule, and a Branching Molecule; a Big
 Hull whose chunks interlock at real crossing points — a boundary cell
-between two chunks splits along its own 3 real axis-pairs and each
+between two chunks splits along its own real rhombic faces (the exact
+faces two adjacent lattice cells actually share, not an unrelated
+6-axis frame that would only ever meet at a single point) and each
 slice is folded directly into whichever chunk borders it there, a real
 "half a cell missing, supplied by its neighbor" seam rather than a
 clean whole-cell boundary — with the Burr key drawn fresh at random
