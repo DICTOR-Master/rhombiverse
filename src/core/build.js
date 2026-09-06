@@ -38,6 +38,12 @@ import {
   axisEdgeOfFace,
   octahedronDisphenoids,
 } from '../geometry-extensions/interstitial-lattice.js';
+import {
+  halfRdKey,
+  hourglassKey,
+  hourglassOffsetIndex,
+  canonicalHourglassCells,
+} from './hemisphere-build.js';
 
 const NEIGHBOR_DIRECTIONS = NEIGHBOR_OFFSETS.map(
   ([x, y, z]) => new THREE.Vector3(x, y, z).normalize()
@@ -221,6 +227,14 @@ export function createBuildController({
   interstitialStore = null,
   interstitialGroup = null,
   onInterstitialChange = () => {},
+  // Hemisphere pieces ('halfrd'/'hourglass', core/hemisphere-build.md):
+  // same "adopted family member" reasoning as the TO/interstitial params
+  // above -- a genuinely different frame (NEIGHBOR_OFFSETS' 12-direction
+  // flat-plane split, not a bitmask or a separate BCC lattice), own
+  // store, all optional/no-op by default.
+  hemisphereStore = null,
+  hemisphereGroup = null,
+  onHemisphereChange = () => {},
   onCellClicked,
   canPlaceMaterial = () => true,
   getOwnerId = () => null,
@@ -259,7 +273,12 @@ export function createBuildController({
     // tiers" reason as bccTargets above.
     const pieceType = getPieceType();
     const interstitialTargets = interstitialGroup && (pieceType === 'ioct' || pieceType === 'idis') ? [interstitialGroup] : [];
-    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...interstitialTargets], true);
+    // Same reasoning again: hemisphereGroup only enters the raycast under
+    // its own piece tiers -- needed so Remove can hit an already-placed
+    // Half RD/Hourglass mesh; harmless for Add (handleHemisphereClick's
+    // own bootstrap-only Add path explicitly no-ops if it lands there).
+    const hemisphereTargets = hemisphereGroup && (pieceType === 'halfrd' || pieceType === 'hourglass') ? [hemisphereGroup] : [];
+    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...interstitialTargets, ...hemisphereTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -414,6 +433,60 @@ export function createBuildController({
     if (onRemoved) onRemoved(cell);
   }
 
+  // Hemisphere pieces ('halfrd'/'hourglass', core/hemisphere-build.js):
+  // Add always bootstraps off an existing FCC/BCC face -- click one, and
+  // matchNeighborOffset (already proven for the main FCC Build mode)
+  // resolves the real NEIGHBOR_OFFSETS direction the click points along,
+  // same as the generic whole-cell Add path just above. Genuinely simpler
+  // than handleToClick/handleInterstitialClick's own bootstrap-vs-extend
+  // split: neither piece can be grown FROM an existing hemisphere piece's
+  // own face yet (there's no reflection/adjacency rule for that here the
+  // way disphenoids have) -- every placement starts fresh off the solid
+  // world, which is already a complete, useful mechanic on its own.
+  function handleHemisphereClick(hit, mode, pieceType) {
+    const action = mode === 'build' ? 'add' : 'remove';
+    if (mode === 'build') {
+      if (hit.object.parent === hemisphereGroup) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const anchorCell = hit.object === bccMesh ? bccCellAt(hit.instanceId) : cellAt(hit);
+      if (!anchorCell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const n = hit.face.normal;
+      const [dx, dy, dz] = matchNeighborOffset(n);
+      const nx = anchorCell.x + dx;
+      const ny = anchorCell.y + dy;
+      const nz = anchorCell.z + dz;
+      const material = getMaterial();
+      if (pieceType === 'halfrd') {
+        // The neighbor's own 'negative' half along this same direction is
+        // the one flush against the clicked cell -- same reasoning
+        // rhombis/geometry.js's buildHourglassStage already uses for its
+        // own "far" cell (hemisphereGeometry(scale, fwdIndex, 'negative')).
+        const offsetIndex = NEIGHBOR_OFFSETS.findIndex(([x, y, z]) => x === dx && y === dy && z === dz);
+        const key = halfRdKey(nx, ny, nz, offsetIndex, 'negative');
+        if (hemisphereStore.has(key)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        hemisphereStore.set(key, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex, side: 'negative', material });
+        onHemisphereChange();
+        if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
+        return;
+      }
+      // 'hourglass'
+      const [loCell, hiCell] = canonicalHourglassCells(anchorCell.x, anchorCell.y, anchorCell.z, nx, ny, nz);
+      const key = hourglassKey(...loCell, ...hiCell);
+      if (hemisphereStore.has(key)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const offsetIndex = hourglassOffsetIndex(loCell, hiCell);
+      hemisphereStore.set(key, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex, material });
+      onHemisphereChange();
+      if (onPlaced) onPlaced({ material });
+      return;
+    }
+    // mode === 'chisel' (Remove)
+    if (hit.object.parent !== hemisphereGroup || !hit.object.userData.key) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const piece = hemisphereStore.get(hit.object.userData.key);
+    if (!piece) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    hemisphereStore.remove(hit.object.userData.key);
+    onHemisphereChange();
+    if (onRemoved) onRemoved(piece);
+  }
+
   function onClick(event) {
     if (suppressNextClick) {
       suppressNextClick = false;
@@ -444,6 +517,11 @@ export function createBuildController({
     const pieceTypeForInterstitial = getPieceType();
     if ((mode === 'build' || mode === 'chisel') && (pieceTypeForInterstitial === 'ioct' || pieceTypeForInterstitial === 'idis') && interstitialStore && interstitialGroup) {
       handleInterstitialClick(hit, mode, pieceTypeForInterstitial);
+      return;
+    }
+    // Same reasoning, for the hemisphere piece tiers.
+    if ((mode === 'build' || mode === 'chisel') && (pieceTypeForInterstitial === 'halfrd' || pieceTypeForInterstitial === 'hourglass') && hemisphereStore && hemisphereGroup) {
+      handleHemisphereClick(hit, mode, pieceTypeForInterstitial);
       return;
     }
     // 'octahedron' (the NEW Cuboctahedron gap-fill piece, distinct from
@@ -774,6 +852,11 @@ export function createBuildController({
       handleInterstitialClick(hit, 'chisel', pieceTypeForInterstitialRemove);
       return;
     }
+    // Same reasoning, for the hemisphere piece tiers.
+    if (mode === 'build' && (pieceTypeForInterstitialRemove === 'halfrd' || pieceTypeForInterstitialRemove === 'hourglass') && hemisphereStore && hemisphereGroup) {
+      handleHemisphereClick(hit, 'chisel', pieceTypeForInterstitialRemove);
+      return;
+    }
     // Explicit no-op guard for 'octahedron', same reasoning/bug as
     // onClick's own -- a right-click that misses an actual octahedron
     // instance must not fall through to removing whatever real cell was
@@ -870,10 +953,13 @@ export function createBuildController({
 
     if (pointerDownPos) {
       const moved = Math.hypot(event.clientX - pointerDownPos.x, event.clientY - pointerDownPos.y);
-      // Drag-placement (Repeat) doesn't apply to the 'pyramid' or 'to'
-      // piece tiers -- same reason as the ghost preview below, neither is
-      // simple neighbor placement. 'rd'/'cube' both still drag normally.
-      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && !['pyramid', 'to', 'ioct', 'idis'].includes(getPieceType())) {
+      // Drag-placement (Repeat) doesn't apply to the 'pyramid'/'to'/'ioct'/
+      // 'idis' piece tiers -- same reason as the ghost preview below,
+      // none is simple neighbor placement. 'halfrd'/'hourglass' join them
+      // for the same reason (their own handleHemisphereClick resolves a
+      // direction + side/canonical-pair from the clicked face, not a
+      // plain "next FCC neighbor" cell). 'rd'/'cube' both still drag normally.
+      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && !['pyramid', 'to', 'ioct', 'idis', 'halfrd', 'hourglass'].includes(getPieceType())) {
         dragging = true;
         clearTimeout(holdTimer);
         holding = false;
@@ -901,12 +987,13 @@ export function createBuildController({
     }
 
     // 'pyramid' piece-tier Add doesn't place a new adjacent cell (it
-    // edits the clicked cell's own pyramids); 'to' places into a
-    // genuinely different world/lattice (bccWorld) via its own bootstrap-
-    // vs-extend logic -- neither fits the "next valid FCC position" ghost
-    // preview below, which assumes plain FCC neighbor placement. 'rd'/
+    // edits the clicked cell's own pyramids); 'to'/'ioct'/'idis' place
+    // into genuinely different worlds/lattices via their own bootstrap-
+    // vs-extend logic; 'halfrd'/'hourglass' resolve a direction + side
+    // from the clicked face rather than a plain neighbor cell -- none
+    // fits the "next valid FCC position" ghost preview below. 'rd'/
     // 'cube' both still use it identically.
-    if (mode !== 'build' || ['pyramid', 'to', 'ioct', 'idis'].includes(getPieceType())) {
+    if (mode !== 'build' || ['pyramid', 'to', 'ioct', 'idis', 'halfrd', 'hourglass'].includes(getPieceType())) {
       if (onHoverEnd) onHoverEnd();
       return;
     }

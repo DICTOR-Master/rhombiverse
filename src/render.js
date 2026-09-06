@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices, octGapVertices } from './core/lattice.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices, octGapVertices, hemisphereSplit } from './core/lattice.js';
 import { FULL_PYRAMIDS, presentAxisKeys, hasCube, effectivePyramids } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
@@ -14,6 +15,7 @@ import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NE
 import { createCuboctaBuildController, AXIS_OFFSETS as CUBOCTA_AXIS_OFFSETS } from './core/cubocta-build.js';
 import { createCuboctaGapBuildController, octGapCellToWorld, octGapCellForCOCell } from './core/cubocta-gap-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
+import { createHemisphereStore } from './core/hemisphere-build.js';
 import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
 import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extensions/spherical-toggle.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
@@ -77,6 +79,7 @@ import {
   INTERSTITIAL_STORAGE_KEY,
   CUBOCTA_STORAGE_KEY,
   CUBOCTA_GAP_STORAGE_KEY,
+  HEMISPHERE_STORAGE_KEY,
 } from './core/persistence.js';
 import {
   ensureAnonymousSession,
@@ -1274,6 +1277,8 @@ const AUTO_ASSIGN_MATERIAL_BY_PIECE = {
   idis: 'amethyst',
   octahedron: 'emerald',
   cubocta: 'citrine',
+  halfrd: 'base',
+  hourglass: 'base',
 };
 const AUTO_ASSIGN_PIECE_LABELS = {
   rd: 'RD (full block)',
@@ -1284,6 +1289,8 @@ const AUTO_ASSIGN_PIECE_LABELS = {
   idis: 'Disphenoid',
   octahedron: 'Octahedron',
   cubocta: 'Cuboctahedron',
+  halfrd: 'Hemi RD',
+  hourglass: 'Hourglass',
 };
 const AUTO_ASSIGN_STORAGE_KEY = 'rhombiverse-auto-assign-materials';
 
@@ -1541,6 +1548,69 @@ function rebuildInterstitialMeshes(store) {
     m.userData.key = key;
     interstitialGroup.add(m);
     interstitialMeshes.set(key, m);
+  }
+}
+
+// Hemisphere pieces (core/hemisphere-build.js): Hemi RD (one real
+// hemisphereSplit() half) and Hourglass (two halves from adjacent cells),
+// ported from Rhombis 2026-09-06. Same one-real-Mesh-per-piece pattern as
+// interstitialMeshes just above -- baked directly from the piece's own
+// STORED cell coordinates into absolute world-space vertices, with the
+// mesh's own .position left untouched at the group origin. This is the
+// exact fix for the real double-offset bug Rhombis's own Hourglass/
+// Hourglass Chain stages shipped with (a bridging piece's geometry was
+// pre-translated to absolute coords via mergeGeometries+.translate(), then
+// ALSO repositioned by a separate group/anchor position at real placement
+// time -- see core/hemisphere-build.js's own header): there is no second
+// position applied here, so that whole bug class can't recur by
+// construction.
+const hemisphereGroup = new THREE.Group();
+scene.add(hemisphereGroup);
+const hemisphereMeshes = new Map(); // piece key -> Mesh
+
+function buildHemisphereGeometry(piece, subScale) {
+  if (piece.type === 'halfrd') {
+    const [cx, cy, cz] = piece.cell;
+    const [wx, wy, wz] = cellToWorld(cx, cy, cz, subScale);
+    const verts = hemisphereSplit(subScale, piece.offsetIndex)[piece.side]
+      .map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
+    const geometry = new ConvexGeometry(verts);
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+  // 'hourglass': cellA's own positive half (toward cellB) merged with
+  // cellB's own negative half (toward cellA) -- same offsetIndex for
+  // both, same reasoning rhombis/geometry.js's buildHourglassStage
+  // already established (a fixed global direction, not a per-cell one).
+  const [ax, ay, az] = cellToWorld(...piece.cellA, subScale);
+  const [bx, by, bz] = cellToWorld(...piece.cellB, subScale);
+  const split = hemisphereSplit(subScale, piece.offsetIndex);
+  const vertsA = split.positive.map(([x, y, z]) => new THREE.Vector3(x + ax, y + ay, z + az));
+  const vertsB = split.negative.map(([x, y, z]) => new THREE.Vector3(x + bx, y + by, z + bz));
+  const geometry = mergeGeometries([new ConvexGeometry(vertsA), new ConvexGeometry(vertsB)], false);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function rebuildHemisphereMeshes(store) {
+  const wanted = new Map(store.entries().map((p) => [p.key, p]));
+  for (const [key, mesh] of hemisphereMeshes) {
+    if (!wanted.has(key)) {
+      hemisphereGroup.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+      hemisphereMeshes.delete(key);
+    }
+  }
+  for (const [key, piece] of wanted) {
+    if (hemisphereMeshes.has(key)) continue;
+    const geom = buildHemisphereGeometry(piece, SCALE);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
+    mat.color.copy(instanceColorFor(piece));
+    const m = new THREE.Mesh(geom, mat);
+    m.userData.key = key;
+    hemisphereGroup.add(m);
+    hemisphereMeshes.set(key, m);
   }
 }
 
@@ -1813,6 +1883,16 @@ async function init() {
   const interstitialSavedJSON = loadFromLocalStorage(INTERSTITIAL_STORAGE_KEY);
   const interstitialStore = createInterstitialStore(interstitialSavedJSON);
   rebuildInterstitialMeshes(interstitialStore);
+
+  // Hemisphere pieces (core/hemisphere-build.md): a sixth independent
+  // store, own localStorage key, same reasoning as BCC/interstitial/
+  // Cuboctahedron/gap-octahedron above. No "never truly empty" bootstrap
+  // seed needed (unlike those four) -- Hemi RD/Hourglass both bootstrap
+  // fresh off the solid FCC/BCC world's own faces, not off an existing
+  // piece of their own kind, so an empty store is a perfectly valid start.
+  const hemisphereSavedJSON = loadFromLocalStorage(HEMISPHERE_STORAGE_KEY);
+  const hemisphereStore = createHemisphereStore(hemisphereSavedJSON);
+  rebuildHemisphereMeshes(hemisphereStore);
 
   // B4b's standalone mesh -- same geometry/material recipe as the main
   // world's (a real sculpture should look identical either place), own
@@ -2414,6 +2494,7 @@ async function init() {
       else mesh.material.clippingPlanes = planes;
     }
     for (const mesh of interstitialMeshes.values()) mesh.material.clippingPlanes = planes;
+    for (const mesh of hemisphereMeshes.values()) mesh.material.clippingPlanes = planes;
     document.getElementById('section-controls-row').style.display = enabled ? '' : 'none';
     document.getElementById('xray-toggle')?.classList.toggle('active', enabled);
   }
@@ -2459,6 +2540,7 @@ async function init() {
       else mats.push(m.material);
     }
     for (const m of interstitialMeshes.values()) mats.push(m.material);
+    for (const m of hemisphereMeshes.values()) mats.push(m.material);
     return mats;
   }
   function applyWorldViewMaterials() {
@@ -2477,6 +2559,7 @@ async function init() {
     octGapMesh.visible = visible;
     partialCellGroup.visible = visible;
     interstitialGroup.visible = visible;
+    hemisphereGroup.visible = visible;
   }
   function clearWorldViewSkeleton() {
     if (skeletonMesh) {
@@ -3050,7 +3133,7 @@ async function init() {
         // this screen to stay open for.
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
-          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid' };
+          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass' };
           document.getElementById('piece-type-select').value = value;
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
@@ -4852,6 +4935,14 @@ async function init() {
           add: 'That octahedron site is already complete there.',
           remove: 'No octahedron site there to remove -- tap directly on one of its own disphenoids.',
         },
+        halfrd: {
+          add: "A Hemi RD's already there -- or you clicked on an existing Hemi RD/Hourglass piece (chaining off those isn't supported yet, click a solid face instead).",
+          remove: 'No Hemi RD there to remove -- tap directly on one you’ve placed.',
+        },
+        hourglass: {
+          add: "An Hourglass already bridges that boundary -- or you clicked on an existing Hemi RD/Hourglass piece (chaining off those isn't supported yet, click a solid face instead).",
+          remove: 'No Hourglass there to remove -- tap directly on one you’ve placed.',
+        },
       };
       showHudPrompt(messages[piece]?.[action] ?? 'Nothing to do there.', 3500);
     },
@@ -4880,6 +4971,9 @@ async function init() {
     interstitialStore,
     interstitialGroup,
     onInterstitialChange,
+    hemisphereStore,
+    hemisphereGroup,
+    onHemisphereChange,
     canPlaceMaterial,
     getOwnerId: () => myUserId ?? LOCAL_PLAYER_ID,
     mineRemote: (x, y, z) => {
@@ -4932,6 +5026,16 @@ async function init() {
     updateSectionEnabled(); // keeps newly created interstitial mesh materials in sync with X-Ray -- see that function's own header
     applyWorldViewMaterials(); // same reasoning -- see World View's own header
     saveToLocalStorage(interstitialStore.toJSON(), INTERSTITIAL_STORAGE_KEY);
+  }
+
+  // Hemisphere pieces: own change handler, same reasoning as onBCCChange/
+  // onInterstitialChange above -- no "never truly empty" seed needed, see
+  // this store's own construction comment above.
+  function onHemisphereChange() {
+    rebuildHemisphereMeshes(hemisphereStore);
+    updateSectionEnabled(); // keeps newly created hemisphere mesh materials in sync with X-Ray -- see that function's own header
+    applyWorldViewMaterials(); // same reasoning -- see World View's own header
+    saveToLocalStorage(hemisphereStore.toJSON(), HEMISPHERE_STORAGE_KEY);
   }
   // Cuboctahedron Build: own change handler, same "never truly empty"
   // reasoning as onBCCChange/onInterstitialChange above.
@@ -5852,6 +5956,11 @@ async function init() {
     clearLocalStorage(CUBOCTA_GAP_STORAGE_KEY);
     octGapWorld.replaceAll({ worldName: 'Cuboctahedron Gap Octahedra', version: 1, cells: {} });
     onOctGapChange();
+    // Hemisphere pieces: a sixth real store, same "fresh start clears it
+    // too" reasoning as BCC/interstitial/Cuboctahedron/gap above.
+    clearLocalStorage(HEMISPHERE_STORAGE_KEY);
+    hemisphereStore.replaceAll({ worldName: 'Hemisphere Pieces', version: 1, pieces: {} });
+    onHemisphereChange();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

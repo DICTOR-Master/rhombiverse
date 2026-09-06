@@ -462,7 +462,18 @@ export const WHEEL_BUILD = {
 export const WHEEL_PIECE = {
   id: "piece",
   faces: {
-    "equator|sx1sy1":   { kind: "dept", label: "RD", action: "tool:pieceType:rd", desc: "A full block -- cube plus all 6 pyramids." },
+    // RD's own true original face was a direct "tool:pieceType:rd"
+    // terminal through 2026-09-05 -- changed to a doorway into its own
+    // sub-wheel (WHEEL_RD_FAMILY below), direct user decision 2026-09-06,
+    // made right at the moment two new RD-derived pieces (Hemi RD,
+    // Hourglass, ported from Rhombis) needed a home: WHEEL_PIECE itself
+    // was found to be completely full (all 12 slots -- 8 real + the 4
+    // universal-ring ones every wheel structurally can't touch -- already
+    // spoken for), so cramming new top-level piece types in here would
+    // have meant evicting something real. A sub-wheel gives the RD family
+    // room to grow (this user: "I have some more ideas for piece
+    // variety") without reopening WHEEL_PIECE's own already-settled layout.
+    "equator|sx1sy1":   { kind: "dept", label: "RD", action: "navigateTo:rdFamily", desc: "RD and its real derived pieces -- Hemi RD, Hourglass, and more." },
     "equator|sx1sy-1":  { kind: "dept", label: "Cube", action: "tool:pieceType:cube", desc: "A bare block, no pyramids -- build up from here with the Pyramid tier." },
     "equator|sx-1sy1":  { kind: "dept", label: "Pyramid", action: "tool:pieceType:pyramid", desc: "Add or remove one pyramid on an already-placed cell." },
     "equator|sx-1sy-1": { kind: "dept", label: "TO", action: "tool:pieceType:to", desc: "Truncated Octahedron -- the BCC lattice's own real space-filling cell." },
@@ -712,8 +723,29 @@ export const WHEEL_TRADE = {
 // Build/Rhombitect/Cultivate's own real faces, cut per "one tool, one
 // doorway."
 
+// RD family: reached via WHEEL_PIECE's own "RD" face (navigateTo:rdFamily,
+// see that face's own header comment for why this exists as a sub-wheel
+// rather than more WHEEL_PIECE faces). Hemi RD/Hourglass ported from
+// Rhombis 2026-09-06 (src/rhombis/stages.js's Hourglass/Hourglass Chain
+// stages, core/lattice.js's hemisphereSplit -- see core/hemisphere-build.js
+// for the real store/key scheme). Most of this wheel is deliberately left
+// SPARE, not filled with duplicates -- this user flagged "more ideas for
+// piece variety" the same session this wheel was created, so the room is
+// meant to be used for real future RD-derived pieces, not backfilled with
+// filler the way a genuinely dead-end wheel would be.
+export const WHEEL_RD_FAMILY = {
+  id: "rdFamily",
+  faces: {
+    "equator|sx1sy1":   { kind: "dept", label: "RD", action: "tool:pieceType:rd", desc: "A full block -- cube plus all 6 pyramids." },
+    "equator|sx1sy-1":  { kind: "dept", label: "Hemi RD", action: "tool:pieceType:halfrd",
+      desc: "One real hemisphereSplit() half of an RD -- click an existing face to add the neighbor's near half." },
+    "equator|sx-1sy1":  { kind: "dept", label: "Hourglass", action: "tool:pieceType:hourglass",
+      desc: "Two matching hemisphere halves bridging a cell and its neighbor -- click an existing face to add one across that boundary." },
+  }
+};
+
 export const ALL_WHEELS = {
   home: WHEEL_HOME, build: WHEEL_BUILD, alter: WHEEL_ALTER,
   rhombitect: WHEEL_RHOMBITECT, cultivate: WHEEL_CULTIVATE, trade: WHEEL_TRADE,
-  piece: WHEEL_PIECE
+  piece: WHEEL_PIECE, rdFamily: WHEEL_RD_FAMILY
 };

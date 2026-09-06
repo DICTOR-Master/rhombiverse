@@ -44,6 +44,14 @@ const ACTION_TO_MARK = {
   // longer exists on its own now that Piece is a real wheel, not a
   // picker overlay).
   'navigateTo:piece': 'pieceType',
+  // RD's own doorway face reuses its own family's primary mark as a
+  // preview of what's inside, same convention as navigateTo:build/alter
+  // below. Half RD/Hourglass (inside WHEEL_RD_FAMILY) have no resolved
+  // mark of their own yet -- same "several real actions have no row"
+  // gap as tool:material/tool:offer/etc, not an oversight; a real icon
+  // needs its own design pass (see feedback_preview_icon_designs_before_
+  // pushing in memory), not guessed here.
+  'navigateTo:rdFamily': 'pieceRD',
   'tool:pieceType:rd': 'pieceRD',
   'tool:pieceType:cube': 'pieceCube',
   'tool:pieceType:pyramid': 'piecePyramid',

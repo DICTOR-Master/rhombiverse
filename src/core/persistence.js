@@ -25,6 +25,11 @@ export const CUBOCTA_STORAGE_KEY = 'rhombiverse-cubocta-world';
 // frame (offset cube-center addressing, not the main integer grid).
 export const CUBOCTA_GAP_STORAGE_KEY = 'rhombiverse-cubocta-gap-world';
 
+// Hemisphere pieces (core/hemisphere-build.js): same reasoning again -- a
+// sixth independent store, own key. Half RD/Hourglass ported from Rhombis,
+// direct instruction 2026-09-06.
+export const HEMISPHERE_STORAGE_KEY = 'rhombiverse-hemisphere-world';
+
 export function saveToLocalStorage(worldJSON, key = STORAGE_KEY) {
   try {
     localStorage.setItem(key, JSON.stringify(worldJSON));
