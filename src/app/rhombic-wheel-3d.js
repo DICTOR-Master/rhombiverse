@@ -46,13 +46,16 @@ const ACTION_TO_MARK = {
   'navigateTo:piece': 'pieceType',
   // RD's own doorway face reuses its own family's primary mark as a
   // preview of what's inside, same convention as navigateTo:build/alter
-  // below. Half RD/Hourglass (inside WHEEL_RD_FAMILY) have no resolved
-  // mark of their own yet -- same "several real actions have no row"
-  // gap as tool:material/tool:offer/etc, not an oversight; a real icon
-  // needs its own design pass (see feedback_preview_icon_designs_before_
-  // pushing in memory), not guessed here.
+  // below.
   'navigateTo:rdFamily': 'pieceRD',
   'tool:pieceType:rd': 'pieceRD',
+  // Real 3D-profile marks, added 2026-09-06 -- see wheel-icons.js's own
+  // pieceHalfRD/pieceHourglass/pieceHemi3/pieceHemi4 header for the full
+  // derivation (real orthographic silhouettes, not hand-drawn).
+  'tool:pieceType:halfrd': 'pieceHalfRD',
+  'tool:pieceType:hourglass': 'pieceHourglass',
+  'tool:pieceType:hemi3': 'pieceHemi3',
+  'tool:pieceType:hemi4': 'pieceHemi4',
   'tool:pieceType:cube': 'pieceCube',
   'tool:pieceType:pyramid': 'piecePyramid',
   'tool:pieceType:to': 'pieceTO',

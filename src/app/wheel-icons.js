@@ -478,6 +478,38 @@ export const MARKS = {
     <polygon points="0,0 0,-32 27.71,-16" fill="currentColor" opacity="0.55"/>
     <polygon points="0,0 27.71,16 0,32" fill="currentColor" opacity="0.55"/>
     <polygon points="0,0 -27.71,16 -27.71,-16" fill="currentColor" opacity="0.55"/>`,
+  // Hemi RD family (Hemi RD / Hourglass / Corner Cluster / Band Cluster,
+  // core/hemisphere-build.js): direct instruction 2026-09-06 ("use the
+  // real 3D artifact profiles rendered in 2D and shrunk") -- unlike every
+  // other mark in this file, these 4 are not hand-drawn: each is the
+  // REAL orthographic silhouette of the actual placed geometry (raw
+  // hemisphereSplit() points, no ConvexGeometry/3D-hull step needed --
+  // the projected 2D convex hull of a convex solid's own input points IS
+  // its true silhouette from any view, a standard property, verified via
+  // a real Playwright-rendered comparison sheet before landing here), one
+  // real polygon per sub-piece (2 for Hourglass, 3/4 for the clusters),
+  // each stroked in the app's own real dark overlay tone (#020206, same
+  // literal value rhombic-wheel-3d.js's own overlay background uses) so
+  // the individual real facets read as distinct lobes, not one fused
+  // blob -- this project's own "edges lined" convention, same reasoning
+  // as pieceOctaSite/pieceDisphenoid's internal lines above.
+  //
+  // Camera choices, all real/verified via the same comparison sheet, not
+  // eyeballed: Hemi RD views near-edge-on to its own real split plane
+  // (viewDir [1,-1,0.4], up [-1,-1,0] -- the KEPT material's own
+  // direction pointed screen-up) so the flat cut face reads as a real
+  // flat base with the solid bulk rising above it, direct instruction
+  // ("half a grapefruit, sliced plane at bottom" as a VIEW, not a fruit
+  // illustration). Hourglass aligns its own bridging axis with screen-up
+  // (up [1,1,0], viewDir perpendicular) for a genuinely upright silhouette,
+  // direct instruction ("hourglass silhouette, upright"). Corner/Band
+  // Cluster share one camera ([1,1,1], up [0,1,0]) deliberately, for
+  // family consistency -- lobe COUNT (3 vs 4) is what tells them apart,
+  // not a different angle.
+  pieceHalfRD: `<polygon points="-32.00,11.76 32.00,11.76 16.00,-11.76 -16.00,-11.76" fill="currentColor" stroke="#020206" stroke-width="1"/>`,
+  pieceHourglass: `<polygon points="-32.00,23.13 32.00,23.13 16.00,0.00 -16.00,0.00" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-32.00,-23.13 -16.00,0.00 16.00,0.00 32.00,-23.13" fill="currentColor" stroke="#020206" stroke-width="1"/>`,
+  pieceHemi3: `<polygon points="0.00,-4.57 15.84,4.57 31.67,-4.57 31.67,-22.86 15.84,-32.00 0.00,-22.86" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-15.84,22.86 0.00,32.00 15.84,22.86 15.84,4.57 0.00,-4.57 -15.84,4.57" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-31.67,-4.57 -15.84,4.57 0.00,-4.57 0.00,-22.86 -15.84,-32.00 -31.67,-22.86" fill="currentColor" stroke="#020206" stroke-width="1"/>`,
+  pieceHemi4: `<polygon points="0.00,0.00 13.86,8.00 27.71,-0.00 27.71,-16.00 13.86,-24.00 0.00,-16.00" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="0.00,32.00 13.86,24.00 27.71,16.00 13.86,8.00 0.00,16.00" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-27.71,-16.00 -13.86,-8.00 0.00,-16.00 0.00,-32.00" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-27.71,16.00 -13.86,24.00 0.00,16.00 0.00,0.00 -13.86,-8.00 -27.71,0.00" fill="currentColor" stroke="#020206" stroke-width="1"/>`,
   // World View toggle (Color / Translucent / Skeleton, render.js's
   // #world-view-toggle), direct request: "three rings overlapping."
   // Three equal circles at 120-degree symmetry around center, stroke

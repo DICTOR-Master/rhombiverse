@@ -3908,7 +3908,10 @@ async function init() {
   // MARKS entry -- same shape vocabulary the Piece wheel faces
   // themselves use (wheel-icons.js), so the quick-select icon below is
   // never a second, competing symbol for the same shape.
-  const PIECE_MARK_KEY = { rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', to: 'pieceTO', ioct: 'pieceOctaSite', octahedron: 'pieceOctahedron', idis: 'pieceDisphenoid' };
+  const PIECE_MARK_KEY = {
+    rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', to: 'pieceTO', ioct: 'pieceOctaSite', octahedron: 'pieceOctahedron', idis: 'pieceDisphenoid',
+    halfrd: 'pieceHalfRD', hourglass: 'pieceHourglass', hemi3: 'pieceHemi3', hemi4: 'pieceHemi4',
+  };
   const quickShapeEl = document.getElementById('hud-quick-shape');
   const quickMaterialEl = document.getElementById('hud-quick-material');
   // Bottom-left quick-select: always-visible current Piece/Material,
