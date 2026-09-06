@@ -56,6 +56,7 @@ const ACTION_TO_MARK = {
   'tool:pieceType:hourglass': 'pieceHourglass',
   'tool:pieceType:hemi3': 'pieceHemi3',
   'tool:pieceType:hemi4': 'pieceHemi4',
+  'tool:pieceType:hemiTri': 'pieceHemiTri',
   'tool:pieceType:cube': 'pieceCube',
   'tool:pieceType:pyramid': 'piecePyramid',
   'tool:pieceType:to': 'pieceTO',

@@ -1281,6 +1281,7 @@ const AUTO_ASSIGN_MATERIAL_BY_PIECE = {
   hourglass: 'base',
   hemi3: 'base',
   hemi4: 'base',
+  hemiTri: 'base',
 };
 const AUTO_ASSIGN_PIECE_LABELS = {
   rd: 'RD (full block)',
@@ -1295,6 +1296,7 @@ const AUTO_ASSIGN_PIECE_LABELS = {
   hourglass: 'Hourglass',
   hemi3: 'Hemi RD: Corner Cluster',
   hemi4: 'Hemi RD: Band Cluster',
+  hemiTri: 'Hemi RD: Triangle Cluster',
 };
 const AUTO_ASSIGN_STORAGE_KEY = 'rhombiverse-auto-assign-materials';
 
@@ -3137,7 +3139,7 @@ async function init() {
         // this screen to stay open for.
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
-          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass' };
+          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster' };
           document.getElementById('piece-type-select').value = value;
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
@@ -3910,7 +3912,7 @@ async function init() {
   // never a second, competing symbol for the same shape.
   const PIECE_MARK_KEY = {
     rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', to: 'pieceTO', ioct: 'pieceOctaSite', octahedron: 'pieceOctahedron', idis: 'pieceDisphenoid',
-    halfrd: 'pieceHalfRD', hourglass: 'pieceHourglass', hemi3: 'pieceHemi3', hemi4: 'pieceHemi4',
+    halfrd: 'pieceHalfRD', hourglass: 'pieceHourglass', hemi3: 'pieceHemi3', hemi4: 'pieceHemi4', hemiTri: 'pieceHemiTri',
   };
   const quickShapeEl = document.getElementById('hud-quick-shape');
   const quickMaterialEl = document.getElementById('hud-quick-material');
@@ -4951,12 +4953,24 @@ async function init() {
           remove: 'No octahedron site there to remove -- tap directly on one of its own disphenoids.',
         },
         halfrd: {
-          add: "A Hemi RD's already there -- or you clicked on an existing Hemi RD/Hourglass piece (chaining off those isn't supported yet, click a solid face instead).",
+          add: "A Hemi RD's already there.",
           remove: 'No Hemi RD there to remove -- tap directly on one you’ve placed.',
         },
         hourglass: {
-          add: "An Hourglass already bridges that boundary -- or you clicked on an existing Hemi RD/Hourglass piece (chaining off those isn't supported yet, click a solid face instead).",
+          add: 'An Hourglass already bridges that boundary.',
           remove: 'No Hourglass there to remove -- tap directly on one you’ve placed.',
+        },
+        hemi3: {
+          add: 'That corner cluster is already complete there.',
+          remove: 'No Hemi RD there to remove -- tap directly on one you’ve placed.',
+        },
+        hemi4: {
+          add: 'That band cluster is already complete there.',
+          remove: 'No Hemi RD there to remove -- tap directly on one you’ve placed.',
+        },
+        hemiTri: {
+          add: 'That triangle cluster is already complete there.',
+          remove: 'No Hemi RD there to remove -- tap directly on one you’ve placed.',
         },
       };
       showHudPrompt(messages[piece]?.[action] ?? 'Nothing to do there.', 3500);

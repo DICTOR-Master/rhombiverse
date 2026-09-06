@@ -510,6 +510,12 @@ export const MARKS = {
   pieceHourglass: `<polygon points="-32.00,23.13 32.00,23.13 16.00,0.00 -16.00,0.00" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-32.00,-23.13 -16.00,0.00 16.00,0.00 32.00,-23.13" fill="currentColor" stroke="#020206" stroke-width="1"/>`,
   pieceHemi3: `<polygon points="0.00,-4.57 15.84,4.57 31.67,-4.57 31.67,-22.86 15.84,-32.00 0.00,-22.86" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-15.84,22.86 0.00,32.00 15.84,22.86 15.84,4.57 0.00,-4.57 -15.84,4.57" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-31.67,-4.57 -15.84,4.57 0.00,-4.57 0.00,-22.86 -15.84,-32.00 -31.67,-22.86" fill="currentColor" stroke="#020206" stroke-width="1"/>`,
   pieceHemi4: `<polygon points="0.00,0.00 13.86,8.00 27.71,-0.00 27.71,-16.00 13.86,-24.00 0.00,-16.00" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="0.00,32.00 13.86,24.00 27.71,16.00 13.86,8.00 0.00,16.00" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-27.71,-16.00 -13.86,-8.00 0.00,-16.00 0.00,-32.00" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-27.71,16.00 -13.86,24.00 0.00,16.00 0.00,0.00 -13.86,-8.00 -27.71,0.00" fill="currentColor" stroke="#020206" stroke-width="1"/>`,
+  // Triangle Cluster (hemiTri), added same session: viewed straight down
+  // the triangle's OWN plane normal (one of the 4 real body-diagonal
+  // axes, [1,1,1] here) -- the canonical face-on view for a flat ring,
+  // not just the best-looking of the candidates tried (see this file's
+  // own real-projection header above hemi3/hemi4 for the shared method).
+  pieceHemiTri: `<polygon points="8.00,13.86 16.00,27.71 32.00,0.00 16.00,0.00" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-16.00,-27.71 -8.00,-13.86 8.00,-13.86 16.00,-27.71" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-32.00,0.00 -16.00,27.71 -8.00,13.86 -16.00,0.00" fill="currentColor" stroke="#020206" stroke-width="1"/>`,
   // World View toggle (Color / Translucent / Skeleton, render.js's
   // #world-view-toggle), direct request: "three rings overlapping."
   // Three equal circles at 120-degree symmetry around center, stroke

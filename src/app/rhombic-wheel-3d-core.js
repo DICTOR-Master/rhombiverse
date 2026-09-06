@@ -738,11 +738,13 @@ export const WHEEL_TRADE = {
 // own header comment already documents), so this wheel broke the
 // established "never open onto a mostly-blank wheel" rule every sibling
 // wheel deliberately upholds by filling that exact slot with real
-// content. Fixed by giving the two cluster-stamp pieces (hemi3/hemi4,
+// content. Fixed by giving the cluster-stamp pieces (hemi3/hemi4,
 // added the same session once the earlier "12-cluster" idea was dropped
 // as redundant with 'to' -- see core/hemisphere-build.js's own header)
-// real homes, one of them AT top|sy1sz1 specifically. The 3 remaining
-// bottom-ring slots are now explicit SPARE (not just left undeclared) --
+// real homes, one of them AT top|sy1sz1 specifically. A third cluster
+// (hemiTri, Triangle Cluster) filled another bottom-ring slot later the
+// same session. The 2 remaining slots are explicit SPARE (not just left
+// undeclared) --
 // this user flagged "more ideas for piece variety" the same session this
 // wheel was created, so real room is kept for future RD-derived pieces,
 // just never as an accidentally-blank face again.
@@ -758,7 +760,14 @@ export const WHEEL_RD_FAMILY = {
       desc: "3 Hemi RD halves around one real cube corner -- click a face near the corner you mean, one of 8 possible." },
     "top|sy1sz1":       { kind: "dept", label: "Band Cluster", action: "tool:pieceType:hemi4",
       desc: "4 Hemi RD halves forming a flat equatorial band around one axis -- click any face along that axis, one of 3 possible." },
-    "bottom|sy1sz-1":   SPARE,
+    // Triangle Cluster: a genuine third symmetric family, added same
+    // session -- direct user idea ("equilateral triangle with flat sides
+    // out"), verified numerically before building (see core/hemisphere-
+    // build.js's own TRIANGLE_GROUPS header) that this is a real, flat,
+    // 120-degree ring, distinct from both Corner Cluster (3D, converges
+    // to a point) and Band Cluster (a 4-fold square ring).
+    "bottom|sy1sz-1":   { kind: "dept", label: "Triangle Cluster", action: "tool:pieceType:hemiTri",
+      desc: "3 Hemi RD halves in one flat plane at 120 degrees -- click a face near the flat ring you mean, one of 8 possible." },
     "bottom|sx1sz-1":   SPARE,
     "bottom|sx-1sz-1":  SPARE,
   }

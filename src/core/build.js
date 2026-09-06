@@ -46,6 +46,7 @@ import {
   canonicalHourglassCells,
   nearestCornerGroup,
   bandGroupForOffsetIndex,
+  resolveTriangleGroup,
 } from './hemisphere-build.js';
 
 // Every piece type routed through handleHemisphereClick/hemisphereStore --
@@ -53,7 +54,7 @@ import {
 // cluster stamps of the same underlying halfrd entries, core/hemisphere-
 // build.js). One shared list so the several gates below (raycast targets,
 // onClick/onContextMenu dispatch) can't drift out of sync with each other.
-const HEMISPHERE_PIECE_TYPES = ['halfrd', 'hourglass', 'hemi3', 'hemi4'];
+const HEMISPHERE_PIECE_TYPES = ['halfrd', 'hourglass', 'hemi3', 'hemi4', 'hemiTri'];
 
 const NEIGHBOR_DIRECTIONS = NEIGHBOR_OFFSETS.map(
   ([x, y, z]) => new THREE.Vector3(x, y, z).normalize()
@@ -487,6 +488,17 @@ export function createBuildController({
       const group = nearestCornerGroup([hit.point.x - awx, hit.point.y - awy, hit.point.z - awz]);
       indices = group.indices;
       label = `Corner cluster (${group.sign.map((s) => (s > 0 ? '+' : '-')).join(',')})`;
+    } else if (pieceType === 'hemiTri') {
+      // Triangle Cluster: a clicked direction sits in 2 of the 4 real
+      // hexagonal planes, same "needs the real click point" reasoning as
+      // hemi3's corners above -- see resolveTriangleGroup's own header.
+      const [awx, awy, awz] = cellToWorld(anchorCell.x, anchorCell.y, anchorCell.z);
+      const localPoint = [hit.point.x - awx, hit.point.y - awy, hit.point.z - awz];
+      const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
+      const clickedIndex = NEIGHBOR_OFFSETS.findIndex(([x, y, z]) => x === dx && y === dy && z === dz);
+      const group = resolveTriangleGroup(clickedIndex, localPoint);
+      indices = group.indices;
+      label = `Triangle cluster (axis ${group.axis.map((s) => (s > 0 ? '+' : '-')).join(',')})`;
     } else {
       const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
       const clickedIndex = NEIGHBOR_OFFSETS.findIndex(([x, y, z]) => x === dx && y === dy && z === dz);
@@ -587,19 +599,19 @@ export function createBuildController({
     const action = mode === 'build' ? 'add' : 'remove';
     if (mode === 'build') {
       if (hit.object.parent === hemisphereGroup) {
-        // Cluster stamps ('hemi3'/'hemi4') still bootstrap off solid
-        // cells only for now -- growFromHemispherePiece's own single-
-        // direction resolution doesn't generalize to "which of 8 corners"
-        // cleanly, and every cell reachable that way is already reachable
-        // by clicking its own solid neighbor instead.
-        if (pieceType === 'hemi3' || pieceType === 'hemi4') { if (onPieceNoOp) onPieceNoOp(action); return; }
+        // Cluster stamps ('hemi3'/'hemi4'/'hemiTri') still bootstrap off
+        // solid cells only for now -- growFromHemispherePiece's own
+        // single-direction resolution doesn't generalize to "which of 8
+        // corners/8 triangles" cleanly, and every cell reachable that way
+        // is already reachable by clicking its own solid neighbor instead.
+        if (['hemi3', 'hemi4', 'hemiTri'].includes(pieceType)) { if (onPieceNoOp) onPieceNoOp(action); return; }
         const result = growFromHemispherePiece(hit, pieceType);
         if (!result || result.added === 0) { if (onPieceNoOp) onPieceNoOp(action); return; }
         onHemisphereChange();
         if (onPlaced) onPlaced({ x: result.anchor.x, y: result.anchor.y, z: result.anchor.z, material: getMaterial() });
         return;
       }
-      if (pieceType === 'hemi3' || pieceType === 'hemi4') {
+      if (['hemi3', 'hemi4', 'hemiTri'].includes(pieceType)) {
         const result = addHemisphereCluster(hit, pieceType);
         if (!result || result.added === 0) { if (onPieceNoOp) onPieceNoOp(action); return; }
         onHemisphereChange();

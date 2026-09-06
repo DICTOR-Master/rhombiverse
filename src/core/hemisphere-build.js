@@ -70,9 +70,11 @@ export function canonicalHourglassCells(ax, ay, az, bx, by, bz) {
 // whole RD plus its own near-hemisphere in all 12 real directions is
 // already exactly the shape the 'to' piece type places, not new content --
 // see feedback_make_implicit_explicit in memory for why this kind of
-// audit-before-building matters here). Only the two genuinely distinct
-// groupings below survive: a 3-direction cube-corner wedge and a
-// 4-direction flat equatorial band.
+// audit-before-building matters here). Three genuinely distinct
+// groupings survive: a 3-direction cube-corner wedge, a 4-direction flat
+// equatorial band, and (added later the same session) a 3-direction flat
+// equilateral-triangle ring -- see TRIANGLE_GROUPS below for why that one
+// is a real third family, not a variant of the corner wedge.
 
 // 3-cluster ("corner"): the NEIGHBOR_OFFSETS directions whose every
 // nonzero coordinate's sign matches one cube corner (CUBE_VERTS) -- e.g.
@@ -124,6 +126,64 @@ export const BAND_GROUPS = [0, 1, 2].map((axis) => ({
 
 export function bandGroupForOffsetIndex(offsetIndex) {
   return BAND_GROUPS.find((g) => g.indices.includes(offsetIndex));
+}
+
+// Triangle cluster ("ring"): 3 directions lying in one shared FLAT plane
+// at a genuine 120-degree spacing -- direct user idea 2026-09-06
+// ("equilateral triangle with flat sides out"), verified numerically
+// before writing this: each of the 4 real body-diagonal axes ((1,1,1)-
+// type) has exactly 6 of the 12 NEIGHBOR_OFFSETS perpendicular to it,
+// forming a real regular hexagon in that plane (a known real cross-
+// section of the cuboctahedron these 12 directions are the vertices of).
+// Every OTHER vertex of that hexagon (alternating) gives an equilateral
+// triangle at exactly 120 degrees, confirmed via real angle computation
+// for all 4 axes x 2 alternating sets = 8 groups. Genuinely distinct from
+// CORNER_GROUPS (3D, non-coplanar, converges to a point -- verified NOT
+// coplanar via a nonzero determinant) and BAND_GROUPS (a 4-fold square
+// ring, no ambiguity) -- a real third symmetric family, not a variant of
+// either.
+const TRIANGLE_AXES = [[1, 1, 1], [1, 1, -1], [1, -1, 1], [-1, 1, 1]];
+
+function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function cross3(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function normalize3(a) { const l = Math.hypot(a[0], a[1], a[2]); return [a[0] / l, a[1] / l, a[2] / l]; }
+
+function trianglesForAxis(axis) {
+  const hexIndices = NEIGHBOR_OFFSETS.map((d, i) => (dot3(d, axis) === 0 ? i : -1)).filter((i) => i >= 0);
+  // Order the 6 coplanar directions by real signed angle around the axis
+  // (atan2 of the cross-product's projection onto the axis vs. the dot
+  // product) -- not assumed, computed -- then even/odd indices are the
+  // 2 real alternating triangles.
+  const n = normalize3(axis);
+  const ref = normalize3(NEIGHBOR_OFFSETS[hexIndices[0]]);
+  const angleOf = (i) => {
+    const v = normalize3(NEIGHBOR_OFFSETS[i]);
+    return Math.atan2(dot3(cross3(ref, v), n), dot3(ref, v));
+  };
+  const ordered = hexIndices.slice().sort((a, b) => angleOf(a) - angleOf(b));
+  return [
+    { axis, indices: [ordered[0], ordered[2], ordered[4]] },
+    { axis, indices: [ordered[1], ordered[3], ordered[5]] },
+  ];
+}
+export const TRIANGLE_GROUPS = TRIANGLE_AXES.flatMap(trianglesForAxis);
+
+// A clicked direction sits in exactly 2 of the 4 hexagonal planes (real
+// consequence of the cuboctahedron's own geometry -- verified: every
+// NEIGHBOR_OFFSETS index appears in exactly 2 of TRIANGLE_GROUPS' 4
+// distinct axes), so resolving which flat triangle it belongs to needs
+// the real click point, same "nearest apex" reasoning nearestCornerGroup
+// above already uses -- picks whichever candidate axis the click point
+// lies CLOSEST to actually lying within (smallest |dot(localPoint, axis)|).
+export function resolveTriangleGroup(offsetIndex, localPoint) {
+  const candidates = TRIANGLE_GROUPS.filter((g) => g.indices.includes(offsetIndex));
+  let best = candidates[0];
+  let bestScore = Infinity;
+  for (const g of candidates) {
+    const score = Math.abs(dot3(localPoint, g.axis));
+    if (score < bestScore) { bestScore = score; best = g; }
+  }
+  return best;
 }
 
 // Same store shape/API as core/interstitial-build.js's createInterstitialStore
