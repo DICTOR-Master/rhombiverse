@@ -467,21 +467,22 @@ export function createBuildController({
   // (two overlapping bundles can share a piece; which one "owns" it for
   // removal purposes is genuinely undefined, not just unbuilt).
   //
-  // FCC-anchor only for this first ship (no bccMesh support yet, unlike
-  // 'halfrd'/'hourglass' below) -- 'hemi3' specifically needs the real
-  // click point (not just the face normal) to disambiguate which of a
-  // shared direction's 2 possible corners was meant, and BCC cells have
-  // no matching cellToWorld() this file already reaches for.
-  // Returns null on a bad hit; otherwise { anchorCell, added, label } --
-  // `label` names which of the 8 real corners ('hemi3') or 3 real axes
+  // `anchorCell` is pre-resolved by the caller via resolveClusterAnchorCell
+  // below (a solid FCC cell OR an existing hemisphere piece's own owning
+  // cell -- direct report 2026-09-06, "the cluster wont accept hourglass
+  // either"/"the clusters should be able to attach to each other"). No
+  // bccMesh support yet -- 'hemi3'/'hemiTri' specifically need the real
+  // click point (not just the face normal) to disambiguate which of
+  // several candidate corners/triangles was meant.
+  // Always returns { anchorCell, added, label } (anchorCell is already
+  // known-good by the time this is called) -- `label` names which of the
+  // 8 real corners ('hemi3') or 3 real axes
   // ('hemi4') was actually resolved, direct instruction 2026-09-06 ("just
   // 8 instead"/"8 corner clusters... not a new geometry, just naming/
   // exposing what the corner math already gives"): render.js's own
   // onPlaced surfaces this as a real HUD toast so the choice is legible
   // to the player, not just an invisible internal disambiguation detail.
-  function addHemisphereCluster(hit, pieceType) {
-    const anchorCell = cellAt(hit);
-    if (!anchorCell) return null;
+  function addHemisphereCluster(anchorCell, hit, pieceType) {
     let indices, label;
     if (pieceType === 'hemi3') {
       const [awx, awy, awz] = cellToWorld(anchorCell.x, anchorCell.y, anchorCell.z);
@@ -535,6 +536,30 @@ export function createBuildController({
     ];
   }
 
+  // Which real cell a cluster stamp ('hemi3'/'hemi4'/'hemiTri') should
+  // anchor on for a given hit -- a solid FCC cell (cellAt), or, direct
+  // report 2026-09-06 ("the clusters should be able to attach to each
+  // other"), the real OWNING cell of an already-placed hemisphere piece
+  // (nearest of its own candidate cells to the actual click point, same
+  // resolution growFromHemispherePiece uses below) when the click landed
+  // on one instead. This is what lets a cluster stamp anchor on a cell
+  // that only has another hemisphere piece touching it, not a full solid
+  // RD -- clusters chaining onto clusters, or onto a lone Hemi RD/Hourglass.
+  function resolveClusterAnchorCell(hit) {
+    if (hit.object.parent !== hemisphereGroup) return cellAt(hit);
+    const piece = hemisphereStore.get(hit.object.userData.key);
+    if (!piece) return null;
+    const candidates = hemispherePieceCandidates(piece);
+    let bestCell = candidates[0].cell;
+    let bestDist = Infinity;
+    for (const c of candidates) {
+      const [wx, wy, wz] = cellToWorld(c.cell[0], c.cell[1], c.cell[2]);
+      const d = Math.hypot(hit.point.x - wx, hit.point.y - wy, hit.point.z - wz);
+      if (d < bestDist) { bestDist = d; bestCell = c.cell; }
+    }
+    return { x: bestCell[0], y: bestCell[1], z: bestCell[2] };
+  }
+
   // Direct report 2026-09-06 ("pieces wont connect to each other...
   // pieces must connect on all surfaces"): every hemisphere piece's own
   // OUTER faces (everything but its flat cut face) are geometrically
@@ -571,6 +596,29 @@ export function createBuildController({
     const missingIndex = owner.side === 'negative' ? owner.offsetIndex : oppositeNeighborIndex(owner.offsetIndex);
     const material = getMaterial();
     if (j === missingIndex) {
+      // Direct report 2026-09-06 ("it attaches just a hemi instead"): the
+      // gap this face bounds is entirely within the OWNING cell's own
+      // territory (see this function's own header), so filling it always
+      // touches that same cell -- but WHICH real piece type fills it must
+      // still respect the tool actually selected, not silently ignore it.
+      // 'hourglass' bridges the owning cell onward into a genuinely NEW
+      // neighbor cell (same canonicalHourglassCells/hourglassOffsetIndex
+      // machinery the normal bootstrap path uses, safe regardless of
+      // which cell ends up lo/hi -- 'positive'/'negative' are defined by
+      // the real lo->hi direction, not by click order) -- this also
+      // completes the owning cell's own missing half for free, as a side
+      // effect of cellA's own 'positive' contribution, not a separate step.
+      if (pieceType === 'hourglass') {
+        const nx2 = ax + dx;
+        const ny2 = ay + dy;
+        const nz2 = az + dz;
+        const [loCell, hiCell] = canonicalHourglassCells(ax, ay, az, nx2, ny2, nz2);
+        const key2 = hourglassKey(...loCell, ...hiCell);
+        if (hemisphereStore.has(key2)) return { added: 0 };
+        const offsetIndex2 = hourglassOffsetIndex(loCell, hiCell);
+        hemisphereStore.set(key2, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex: offsetIndex2, material });
+        return { added: 1, anchor: { x: ax, y: ay, z: az } };
+      }
       const otherSide = owner.side === 'negative' ? 'positive' : 'negative';
       const key2 = halfRdKey(ax, ay, az, owner.offsetIndex, otherSide);
       if (hemisphereStore.has(key2)) return { added: 0 };
@@ -598,26 +646,28 @@ export function createBuildController({
   function handleHemisphereClick(hit, mode, pieceType) {
     const action = mode === 'build' ? 'add' : 'remove';
     if (mode === 'build') {
-      if (hit.object.parent === hemisphereGroup) {
-        // Cluster stamps ('hemi3'/'hemi4'/'hemiTri') still bootstrap off
-        // solid cells only for now -- growFromHemispherePiece's own
-        // single-direction resolution doesn't generalize to "which of 8
-        // corners/8 triangles" cleanly, and every cell reachable that way
-        // is already reachable by clicking its own solid neighbor instead.
-        if (['hemi3', 'hemi4', 'hemiTri'].includes(pieceType)) { if (onPieceNoOp) onPieceNoOp(action); return; }
-        const result = growFromHemispherePiece(hit, pieceType);
-        if (!result || result.added === 0) { if (onPieceNoOp) onPieceNoOp(action); return; }
-        onHemisphereChange();
-        if (onPlaced) onPlaced({ x: result.anchor.x, y: result.anchor.y, z: result.anchor.z, material: getMaterial() });
-        return;
-      }
+      // Cluster stamps ('hemi3'/'hemi4'/'hemiTri') can anchor on either a
+      // solid cell or an existing hemisphere piece's own owning cell --
+      // direct report 2026-09-06 ("the clusters should be able to attach
+      // to each other") -- resolveClusterAnchorCell handles both the same
+      // way, so this runs BEFORE the hemisphereGroup-hit gate below
+      // (which is only about the single-piece 'halfrd'/'hourglass' tools).
       if (['hemi3', 'hemi4', 'hemiTri'].includes(pieceType)) {
-        const result = addHemisphereCluster(hit, pieceType);
+        const anchorCell = resolveClusterAnchorCell(hit);
+        if (!anchorCell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        const result = addHemisphereCluster(anchorCell, hit, pieceType);
         if (!result || result.added === 0) { if (onPieceNoOp) onPieceNoOp(action); return; }
         onHemisphereChange();
         if (onPlaced) {
           onPlaced({ x: result.anchorCell.x, y: result.anchorCell.y, z: result.anchorCell.z, material: getMaterial(), label: result.label });
         }
+        return;
+      }
+      if (hit.object.parent === hemisphereGroup) {
+        const result = growFromHemispherePiece(hit, pieceType);
+        if (!result || result.added === 0) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        onHemisphereChange();
+        if (onPlaced) onPlaced({ x: result.anchor.x, y: result.anchor.y, z: result.anchor.z, material: getMaterial() });
         return;
       }
       const anchorCell = hit.object === bccMesh ? bccCellAt(hit.instanceId) : cellAt(hit);
