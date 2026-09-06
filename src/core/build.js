@@ -13,6 +13,7 @@ import {
   cellToWorld,
   pyramidPieces,
   PYRAMID_AXES,
+  oppositeNeighborIndex,
 } from './lattice.js';
 import {
   applyPyramidEdit,
@@ -43,7 +44,16 @@ import {
   hourglassKey,
   hourglassOffsetIndex,
   canonicalHourglassCells,
+  nearestCornerGroup,
+  bandGroupForOffsetIndex,
 } from './hemisphere-build.js';
+
+// Every piece type routed through handleHemisphereClick/hemisphereStore --
+// 'halfrd'/'hourglass' (single pieces) plus 'hemi3'/'hemi4' (bulk-add
+// cluster stamps of the same underlying halfrd entries, core/hemisphere-
+// build.js). One shared list so the several gates below (raycast targets,
+// onClick/onContextMenu dispatch) can't drift out of sync with each other.
+const HEMISPHERE_PIECE_TYPES = ['halfrd', 'hourglass', 'hemi3', 'hemi4'];
 
 const NEIGHBOR_DIRECTIONS = NEIGHBOR_OFFSETS.map(
   ([x, y, z]) => new THREE.Vector3(x, y, z).normalize()
@@ -277,7 +287,7 @@ export function createBuildController({
     // its own piece tiers -- needed so Remove can hit an already-placed
     // Half RD/Hourglass mesh; harmless for Add (handleHemisphereClick's
     // own bootstrap-only Add path explicitly no-ops if it lands there).
-    const hemisphereTargets = hemisphereGroup && (pieceType === 'halfrd' || pieceType === 'hourglass') ? [hemisphereGroup] : [];
+    const hemisphereTargets = hemisphereGroup && HEMISPHERE_PIECE_TYPES.includes(pieceType) ? [hemisphereGroup] : [];
     const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...interstitialTargets, ...hemisphereTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
@@ -443,10 +453,161 @@ export function createBuildController({
   // own face yet (there's no reflection/adjacency rule for that here the
   // way disphenoids have) -- every placement starts fresh off the solid
   // world, which is already a complete, useful mechanic on its own.
+  // Cluster bundles ('hemi3'/'hemi4', core/hemisphere-build.js): a single
+  // click bulk-adds several plain 'halfrd' entries at once into the SAME
+  // hemisphereStore -- same "identical pieces are interchangeable" rule
+  // this project holds everywhere else (feedback_identical_pieces_
+  // interchangeable): a halfrd placed via a cluster stamp is NOT a
+  // separate locked-together object, it's the exact same store entry a
+  // lone 'halfrd' click would make. That's also why Remove for these two
+  // piece types is deliberately NOT handled specially below -- it falls
+  // through to the exact same single-piece removal 'halfrd' itself uses,
+  // since there is no real "undo the whole bundle" data to recover
+  // (two overlapping bundles can share a piece; which one "owns" it for
+  // removal purposes is genuinely undefined, not just unbuilt).
+  //
+  // FCC-anchor only for this first ship (no bccMesh support yet, unlike
+  // 'halfrd'/'hourglass' below) -- 'hemi3' specifically needs the real
+  // click point (not just the face normal) to disambiguate which of a
+  // shared direction's 2 possible corners was meant, and BCC cells have
+  // no matching cellToWorld() this file already reaches for.
+  // Returns null on a bad hit; otherwise { anchorCell, added, label } --
+  // `label` names which of the 8 real corners ('hemi3') or 3 real axes
+  // ('hemi4') was actually resolved, direct instruction 2026-09-06 ("just
+  // 8 instead"/"8 corner clusters... not a new geometry, just naming/
+  // exposing what the corner math already gives"): render.js's own
+  // onPlaced surfaces this as a real HUD toast so the choice is legible
+  // to the player, not just an invisible internal disambiguation detail.
+  function addHemisphereCluster(hit, pieceType) {
+    const anchorCell = cellAt(hit);
+    if (!anchorCell) return null;
+    let indices, label;
+    if (pieceType === 'hemi3') {
+      const [awx, awy, awz] = cellToWorld(anchorCell.x, anchorCell.y, anchorCell.z);
+      const group = nearestCornerGroup([hit.point.x - awx, hit.point.y - awy, hit.point.z - awz]);
+      indices = group.indices;
+      label = `Corner cluster (${group.sign.map((s) => (s > 0 ? '+' : '-')).join(',')})`;
+    } else {
+      const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
+      const clickedIndex = NEIGHBOR_OFFSETS.findIndex(([x, y, z]) => x === dx && y === dy && z === dz);
+      const group = bandGroupForOffsetIndex(clickedIndex);
+      indices = group.indices;
+      label = `Band cluster (${['X', 'Y', 'Z'][group.axis]} axis)`;
+    }
+    const material = getMaterial();
+    let added = 0;
+    for (const offsetIndex of indices) {
+      const [dx, dy, dz] = NEIGHBOR_OFFSETS[offsetIndex];
+      const nx = anchorCell.x + dx;
+      const ny = anchorCell.y + dy;
+      const nz = anchorCell.z + dz;
+      const key = halfRdKey(nx, ny, nz, offsetIndex, 'negative');
+      if (hemisphereStore.has(key)) continue;
+      hemisphereStore.set(key, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex, side: 'negative', material });
+      added++;
+    }
+    return { anchorCell, added, label };
+  }
+
+  // Which real cell(s) a stored hemisphere piece's own geometry is built
+  // from, each tagged with the offsetIndex/side that placed it -- 1 for a
+  // lone 'halfrd', 2 for an 'hourglass' (cellA's own 'positive' half,
+  // cellB's own 'negative' half; see hemisphere-build.js's own hourglass
+  // header and buildHemisphereGeometry in render.js for why those two
+  // sides specifically).
+  function hemispherePieceCandidates(piece) {
+    if (piece.type === 'halfrd') return [{ cell: piece.cell, offsetIndex: piece.offsetIndex, side: piece.side }];
+    return [
+      { cell: piece.cellA, offsetIndex: piece.offsetIndex, side: 'positive' },
+      { cell: piece.cellB, offsetIndex: piece.offsetIndex, side: 'negative' },
+    ];
+  }
+
+  // Direct report 2026-09-06 ("pieces wont connect to each other...
+  // pieces must connect on all surfaces"): every hemisphere piece's own
+  // OUTER faces (everything but its flat cut face) are geometrically
+  // IDENTICAL to a whole solid RD's own faces at that same cell -- the
+  // split only ever removes/keeps whole faces, never reshapes a kept one
+  // -- so clicking one should bootstrap outward exactly like clicking a
+  // solid cell's face does. Clicking the flat cut face itself is the one
+  // genuinely different case: there's no "next cell over" there (it sits
+  // at the OWNING cell's own center, not a shared boundary -- see this
+  // file's own git history/commit message for the real geometry this was
+  // worked out from), so that face completes the SAME cell's missing
+  // other half instead.
+  //
+  // For an 'hourglass' (two candidate cells), which cell "owns" the hit
+  // face is resolved by nearest real cell center to the actual click
+  // point -- trivial (one candidate) for a lone 'halfrd'.
+  function growFromHemispherePiece(hit, pieceType) {
+    const piece = hemisphereStore.get(hit.object.userData.key);
+    if (!piece) return null;
+    const candidates = hemispherePieceCandidates(piece);
+    let owner = candidates[0];
+    let bestDist = Infinity;
+    for (const c of candidates) {
+      const [wx, wy, wz] = cellToWorld(c.cell[0], c.cell[1], c.cell[2]);
+      const d = Math.hypot(hit.point.x - wx, hit.point.y - wy, hit.point.z - wz);
+      if (d < bestDist) { bestDist = d; owner = c; }
+    }
+    const [ax, ay, az] = owner.cell;
+    const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
+    const j = NEIGHBOR_OFFSETS.findIndex(([x, y, z]) => x === dx && y === dy && z === dz);
+    // The missing side's own real direction: for a 'negative'-side half,
+    // the excluded material is toward +offsetIndex (same index); for a
+    // 'positive'-side half, it's toward the opposite real direction.
+    const missingIndex = owner.side === 'negative' ? owner.offsetIndex : oppositeNeighborIndex(owner.offsetIndex);
+    const material = getMaterial();
+    if (j === missingIndex) {
+      const otherSide = owner.side === 'negative' ? 'positive' : 'negative';
+      const key2 = halfRdKey(ax, ay, az, owner.offsetIndex, otherSide);
+      if (hemisphereStore.has(key2)) return { added: 0 };
+      hemisphereStore.set(key2, { type: 'halfrd', cell: [ax, ay, az], offsetIndex: owner.offsetIndex, side: otherSide, material });
+      return { added: 1, anchor: { x: ax, y: ay, z: az } };
+    }
+    const nx = ax + dx;
+    const ny = ay + dy;
+    const nz = az + dz;
+    if (pieceType === 'halfrd') {
+      const key2 = halfRdKey(nx, ny, nz, j, 'negative');
+      if (hemisphereStore.has(key2)) return { added: 0 };
+      hemisphereStore.set(key2, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex: j, side: 'negative', material });
+      return { added: 1, anchor: { x: nx, y: ny, z: nz } };
+    }
+    // pieceType === 'hourglass'
+    const [loCell, hiCell] = canonicalHourglassCells(ax, ay, az, nx, ny, nz);
+    const key2 = hourglassKey(...loCell, ...hiCell);
+    if (hemisphereStore.has(key2)) return { added: 0 };
+    const offsetIndex2 = hourglassOffsetIndex(loCell, hiCell);
+    hemisphereStore.set(key2, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex: offsetIndex2, material });
+    return { added: 1, anchor: { x: ax, y: ay, z: az } };
+  }
+
   function handleHemisphereClick(hit, mode, pieceType) {
     const action = mode === 'build' ? 'add' : 'remove';
     if (mode === 'build') {
-      if (hit.object.parent === hemisphereGroup) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      if (hit.object.parent === hemisphereGroup) {
+        // Cluster stamps ('hemi3'/'hemi4') still bootstrap off solid
+        // cells only for now -- growFromHemispherePiece's own single-
+        // direction resolution doesn't generalize to "which of 8 corners"
+        // cleanly, and every cell reachable that way is already reachable
+        // by clicking its own solid neighbor instead.
+        if (pieceType === 'hemi3' || pieceType === 'hemi4') { if (onPieceNoOp) onPieceNoOp(action); return; }
+        const result = growFromHemispherePiece(hit, pieceType);
+        if (!result || result.added === 0) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        onHemisphereChange();
+        if (onPlaced) onPlaced({ x: result.anchor.x, y: result.anchor.y, z: result.anchor.z, material: getMaterial() });
+        return;
+      }
+      if (pieceType === 'hemi3' || pieceType === 'hemi4') {
+        const result = addHemisphereCluster(hit, pieceType);
+        if (!result || result.added === 0) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        onHemisphereChange();
+        if (onPlaced) {
+          onPlaced({ x: result.anchorCell.x, y: result.anchorCell.y, z: result.anchorCell.z, material: getMaterial(), label: result.label });
+        }
+        return;
+      }
       const anchorCell = hit.object === bccMesh ? bccCellAt(hit.instanceId) : cellAt(hit);
       if (!anchorCell) { if (onPieceNoOp) onPieceNoOp(action); return; }
       const n = hit.face.normal;
@@ -475,7 +636,11 @@ export function createBuildController({
       const offsetIndex = hourglassOffsetIndex(loCell, hiCell);
       hemisphereStore.set(key, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex, material });
       onHemisphereChange();
-      if (onPlaced) onPlaced({ material });
+      // x/y/z here is the clicked (anchor) cell, purely so render.js's
+      // flashAt has a real position -- the Hourglass itself spans two
+      // cells, so this is just "where the click happened," not the
+      // piece's own center.
+      if (onPlaced) onPlaced({ x: anchorCell.x, y: anchorCell.y, z: anchorCell.z, material });
       return;
     }
     // mode === 'chisel' (Remove)
@@ -520,7 +685,7 @@ export function createBuildController({
       return;
     }
     // Same reasoning, for the hemisphere piece tiers.
-    if ((mode === 'build' || mode === 'chisel') && (pieceTypeForInterstitial === 'halfrd' || pieceTypeForInterstitial === 'hourglass') && hemisphereStore && hemisphereGroup) {
+    if ((mode === 'build' || mode === 'chisel') && HEMISPHERE_PIECE_TYPES.includes(pieceTypeForInterstitial) && hemisphereStore && hemisphereGroup) {
       handleHemisphereClick(hit, mode, pieceTypeForInterstitial);
       return;
     }
@@ -853,7 +1018,7 @@ export function createBuildController({
       return;
     }
     // Same reasoning, for the hemisphere piece tiers.
-    if (mode === 'build' && (pieceTypeForInterstitialRemove === 'halfrd' || pieceTypeForInterstitialRemove === 'hourglass') && hemisphereStore && hemisphereGroup) {
+    if (mode === 'build' && HEMISPHERE_PIECE_TYPES.includes(pieceTypeForInterstitialRemove) && hemisphereStore && hemisphereGroup) {
       handleHemisphereClick(hit, 'chisel', pieceTypeForInterstitialRemove);
       return;
     }
@@ -959,7 +1124,7 @@ export function createBuildController({
       // for the same reason (their own handleHemisphereClick resolves a
       // direction + side/canonical-pair from the clicked face, not a
       // plain "next FCC neighbor" cell). 'rd'/'cube' both still drag normally.
-      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && !['pyramid', 'to', 'ioct', 'idis', 'halfrd', 'hourglass'].includes(getPieceType())) {
+      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && !['pyramid', 'to', 'ioct', 'idis', ...HEMISPHERE_PIECE_TYPES].includes(getPieceType())) {
         dragging = true;
         clearTimeout(holdTimer);
         holding = false;
@@ -993,7 +1158,7 @@ export function createBuildController({
     // from the clicked face rather than a plain neighbor cell -- none
     // fits the "next valid FCC position" ghost preview below. 'rd'/
     // 'cube' both still use it identically.
-    if (mode !== 'build' || ['pyramid', 'to', 'ioct', 'idis', 'halfrd', 'hourglass'].includes(getPieceType())) {
+    if (mode !== 'build' || ['pyramid', 'to', 'ioct', 'idis', ...HEMISPHERE_PIECE_TYPES].includes(getPieceType())) {
       if (onHoverEnd) onHoverEnd();
       return;
     }

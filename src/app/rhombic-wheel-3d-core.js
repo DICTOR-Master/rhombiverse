@@ -725,14 +725,27 @@ export const WHEEL_TRADE = {
 
 // RD family: reached via WHEEL_PIECE's own "RD" face (navigateTo:rdFamily,
 // see that face's own header comment for why this exists as a sub-wheel
-// rather than more WHEEL_PIECE faces). Hemi RD/Hourglass ported from
-// Rhombis 2026-09-06 (src/rhombis/stages.js's Hourglass/Hourglass Chain
-// stages, core/lattice.js's hemisphereSplit -- see core/hemisphere-build.js
-// for the real store/key scheme). Most of this wheel is deliberately left
-// SPARE, not filled with duplicates -- this user flagged "more ideas for
-// piece variety" the same session this wheel was created, so the room is
-// meant to be used for real future RD-derived pieces, not backfilled with
-// filler the way a genuinely dead-end wheel would be.
+// rather than more WHEEL_PIECE faces). Hemi RD/Hourglass/the two cluster
+// stamps below all ported from Rhombis 2026-09-06 (src/rhombis/stages.js's
+// Hourglass/Hourglass Chain stages and Multi-Cell's hubcap-cluster idea,
+// core/lattice.js's hemisphereSplit -- see core/hemisphere-build.js for
+// the real store/key/cluster-group scheme).
+//
+// Real same-day bug, direct report: this wheel's first draft only
+// declared 3 of its 12 addressable faces, leaving top|sy1sz1 undeclared --
+// one of only 3 faces visible at a fresh wheel's default opening rotation
+// (equator|sx1sy1, top|sx1sz1, top|sy1sz1, same fact every OTHER wheel's
+// own header comment already documents), so this wheel broke the
+// established "never open onto a mostly-blank wheel" rule every sibling
+// wheel deliberately upholds by filling that exact slot with real
+// content. Fixed by giving the two cluster-stamp pieces (hemi3/hemi4,
+// added the same session once the earlier "12-cluster" idea was dropped
+// as redundant with 'to' -- see core/hemisphere-build.js's own header)
+// real homes, one of them AT top|sy1sz1 specifically. The 3 remaining
+// bottom-ring slots are now explicit SPARE (not just left undeclared) --
+// this user flagged "more ideas for piece variety" the same session this
+// wheel was created, so real room is kept for future RD-derived pieces,
+// just never as an accidentally-blank face again.
 export const WHEEL_RD_FAMILY = {
   id: "rdFamily",
   faces: {
@@ -741,6 +754,13 @@ export const WHEEL_RD_FAMILY = {
       desc: "One real hemisphereSplit() half of an RD -- click an existing face to add the neighbor's near half." },
     "equator|sx-1sy1":  { kind: "dept", label: "Hourglass", action: "tool:pieceType:hourglass",
       desc: "Two matching hemisphere halves bridging a cell and its neighbor -- click an existing face to add one across that boundary." },
+    "equator|sx-1sy-1": { kind: "dept", label: "Corner Cluster", action: "tool:pieceType:hemi3",
+      desc: "3 Hemi RD halves around one real cube corner -- click a face near the corner you mean, one of 8 possible." },
+    "top|sy1sz1":       { kind: "dept", label: "Band Cluster", action: "tool:pieceType:hemi4",
+      desc: "4 Hemi RD halves forming a flat equatorial band around one axis -- click any face along that axis, one of 3 possible." },
+    "bottom|sy1sz-1":   SPARE,
+    "bottom|sx1sz-1":   SPARE,
+    "bottom|sx-1sz-1":  SPARE,
   }
 };
 

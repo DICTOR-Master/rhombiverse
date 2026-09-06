@@ -1279,6 +1279,8 @@ const AUTO_ASSIGN_MATERIAL_BY_PIECE = {
   cubocta: 'citrine',
   halfrd: 'base',
   hourglass: 'base',
+  hemi3: 'base',
+  hemi4: 'base',
 };
 const AUTO_ASSIGN_PIECE_LABELS = {
   rd: 'RD (full block)',
@@ -1291,6 +1293,8 @@ const AUTO_ASSIGN_PIECE_LABELS = {
   cubocta: 'Cuboctahedron',
   halfrd: 'Hemi RD',
   hourglass: 'Hourglass',
+  hemi3: 'Hemi RD: Corner Cluster',
+  hemi4: 'Hemi RD: Band Cluster',
 };
 const AUTO_ASSIGN_STORAGE_KEY = 'rhombiverse-auto-assign-materials';
 
@@ -4890,6 +4894,14 @@ async function init() {
       flashAt(cell, 0x9de0ff);
       playPlaceSound();
       window.dispatchEvent(new CustomEvent('rhombiverse:cellPlaced', { detail: cell })); // B3
+      // Hemi RD cluster stamps ('hemi3'/'hemi4', core/build.js's own
+      // addHemisphereCluster) attach a real label naming which of the 8
+      // corners or 3 axes was actually resolved -- direct instruction
+      // 2026-09-06 ("just 8 instead"/"not a new geometry, just naming/
+      // exposing what the corner math already gives"). Surfaced as a
+      // real toast so the choice is legible, not an invisible internal
+      // disambiguation detail.
+      if (cell.label) showHudPrompt(cell.label, 2500);
       // Direct report 2026-09-02: generating a body right where you're
       // standing/looking can fill the whole screen with the new mass at
       // typical shell-fill radii -- genuinely disorienting on first use,
