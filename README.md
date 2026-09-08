@@ -335,3 +335,8 @@ esbuild minifies each file in place (no bundling, same module graph) for a
 real, measured improvement. This has no effect on local dev — the command
 above still serves raw, fully-commented source directly, zero tooling
 required.
+
+The primary dev machine is that same Pi (arm64) — fine for day-to-day
+work, but slow for anything browser-automation-heavy. Where a second
+machine is available (`dicto-node` on the LAN, reachable over SSH), it's
+worth using for that kind of task rather than waiting on the Pi.
