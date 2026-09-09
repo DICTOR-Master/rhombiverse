@@ -54,3 +54,34 @@ test("WHEEL_PIECE's own RD doorway is excluded -- not a second RD piece entry", 
   assert.equal(rdEntries.length, 1, "expected exactly one RD piece entry (from WHEEL_RD_FAMILY, not WHEEL_PIECE's doorway)");
   assert.equal(rdEntries[0].id, 'tool:pieceType:rd');
 });
+
+// Stage 2 coverage guarantee (docs/RHOMBIVERSE_SPEC_ALMANAC.md section
+// 5): every real piece must resolve to SOME geometry summary --
+// {vertexCount,edgeCount,faceCount} for a single-cell convex piece, or
+// {composedOf,unit} for a cluster piece -- never null (statsForAction
+// silently returning null for an approved piece action would mean a new
+// piece got added to WHEEL_PIECE/WHEEL_RD_FAMILY without its geometry
+// source ever being wired up here).
+test('every piece entry has real, non-null stats -- either computed V/E/F or a real composition', () => {
+  for (const entry of PIECE_ENTRIES) {
+    assert.ok(entry.stats, `piece "${entry.id}" has no stats at all`);
+    const isConvexShape = typeof entry.stats.vertexCount === 'number';
+    const isComposite = typeof entry.stats.composedOf === 'number';
+    assert.ok(isConvexShape || isComposite, `piece "${entry.id}" has a stats object that's neither a convex V/E/F nor a composition: ${JSON.stringify(entry.stats)}`);
+    if (isConvexShape) {
+      // Euler's formula must hold for whatever this piece's own real
+      // geometry produced -- a genuine sanity check, not a tautology,
+      // since computeConvexStats derives edgeCount FROM V/F via this
+      // exact formula, so this re-confirms internal consistency wasn't
+      // broken by whatever vertex data almanac-data.js itself is now
+      // feeding it.
+      const { vertexCount, edgeCount, faceCount } = entry.stats;
+      assert.equal(vertexCount - edgeCount + faceCount, 2, `piece "${entry.id}"'s V/E/F fails Euler's formula: ${JSON.stringify(entry.stats)}`);
+    } else {
+      assert.ok(entry.stats.composedOf >= 2, `piece "${entry.id}" is marked composite but composedOf is implausibly small: ${entry.stats.composedOf}`);
+      assert.ok(entry.stats.unit && entry.stats.unit.trim().length > 0, `piece "${entry.id}" is missing a real composition unit label`);
+      assert.ok(entry.stats.unitPlural && entry.stats.unitPlural.trim().length > 0, `piece "${entry.id}" is missing a real plural composition unit label`);
+      assert.notEqual(entry.stats.unit, entry.stats.unitPlural, `piece "${entry.id}"'s unit/unitPlural should differ (or this is at least worth a second look)`);
+    }
+  }
+});

@@ -76,6 +76,13 @@ const CSS = `
 .almanac-detail-icon { font-size: 48px; color: #9de0ff; text-align: center; margin-bottom: 8px; line-height: 0; }
 .almanac-detail-icon:empty { display: none; }
 .almanac-detail-title { font: 700 17px system-ui, sans-serif; color: #fff; margin-bottom: 8px; text-align: center; }
+.almanac-detail-stats {
+  text-align: center;
+  color: #9de0ff;
+  font: 700 11px system-ui, sans-serif;
+  letter-spacing: 0.03em;
+  margin-bottom: 10px;
+}
 .almanac-detail-desc { color: #ccd; font-size: 13px; }
 `;
 
@@ -95,6 +102,27 @@ const KIND_LABEL = { piece: 'Pieces', concept: 'Lattice Concepts', history: 'His
 
 function iconHtml(markKey, label) {
   return markKey && MARKS[markKey] ? iconFrame(MARKS[markKey], { title: label }) : '';
+}
+
+// Stage 2 (docs/RHOMBIVERSE_SPEC_ALMANAC.md section 5): entry.stats is
+// either a real computed {vertexCount,edgeCount,faceCount} (single-cell
+// convex pieces) or a real {composedOf,unit} (cluster pieces -- see
+// almanac-data.js's own header for why those don't get a fabricated
+// V/E/F). Lattice-concept/history entries have no stats at all, so this
+// renders nothing for them, same :empty-collapse convention the icon
+// slots already use.
+function statsHtml(stats) {
+  if (!stats) return '';
+  if (typeof stats.vertexCount === 'number') {
+    return `<div class="almanac-detail-stats">${stats.vertexCount} vertices &middot; ${stats.edgeCount} edges &middot; ${stats.faceCount} faces</div>`;
+  }
+  if (typeof stats.composedOf === 'number') {
+    // Real singular/plural forms from almanac-data.js, not a naive "+s"
+    // (a real bug found live: "Hemi RD half" -> "Hemi RD halfs").
+    const unit = stats.composedOf === 1 ? stats.unit : stats.unitPlural;
+    return `<div class="almanac-detail-stats">Composed of ${stats.composedOf} &times; ${unit}</div>`;
+  }
+  return '';
 }
 
 export function createAlmanac() {
@@ -143,6 +171,7 @@ export function createAlmanac() {
       <button type="button" class="almanac-back">&larr; Back</button>
       <div class="almanac-detail-icon">${iconHtml(entry.markKey, entry.label)}</div>
       <div class="almanac-detail-title">${entry.label}</div>
+      ${statsHtml(entry.stats)}
       <div class="almanac-detail-desc">${entry.desc}</div>`;
     detailEl.querySelector('.almanac-back').addEventListener('click', showList);
     listEl.style.display = 'none';
