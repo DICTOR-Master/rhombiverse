@@ -1,14 +1,13 @@
 // First-run welcome/entry overlay: rotating RD logo with a static
-// integrated "ENTER" label, Mode choice, legal-doc links. Purely a
-// DOM/localStorage concern, independent of render.js/world state. Full
-// design rationale/history: docs/code-notes/app/welcome.md
-import { getSettings, updateSettings } from './settings.js';
+// integrated "ENTER" label, legal-doc links. Purely a DOM/localStorage
+// concern, independent of render.js/world state. Full design
+// rationale/history: docs/code-notes/app/welcome.md. Used to also offer
+// a Pure Rhombeometry / Full World mode choice here -- removed along with
+// World Systems retirement (see features.js/settings.js); there's only
+// one mode now.
 import { buildRDFaces } from './rhombic-wheel-3d-core.js';
 
 const SKIP_KEY = 'rhombiverse-skip-intro';
-
-// Migration Path Phase C's Rhombeometry/Full World mode choice -- see
-// companion doc for why picking a different mode reloads immediately.
 
 // --- Geometry: real 3D RD wireframe, built from the SAME shared source as
 // the Rhombic Wheel 3D / HUD Wheel (buildRDFaces()) -- see companion doc.
@@ -154,11 +153,6 @@ function overlayHtml() {
       <h1>Rhombiverse</h1>
       <p class="tagline" id="welcome-tagline">${FALLBACK_TAGLINE}</p>
       ${logoSvg()}
-      <div class="mode-choice">
-        <div class="mode-choice-prompt">Mode:</div>
-        <button type="button" class="mode-choice-btn" data-mode="pure" id="mode-choice-pure">Pure Rhombeometry</button>
-        <button type="button" class="mode-choice-btn" data-mode="full" id="mode-choice-full">Full World</button>
-      </div>
       <label class="dont-show">
         <input type="checkbox" id="skip-intro-checkbox" />
         Don't show this again on this device
@@ -218,21 +212,10 @@ function init() {
     }
   });
 
-  const fullBtn = document.getElementById('mode-choice-full');
-  const pureBtn = document.getElementById('mode-choice-pure');
-  function refreshModeChoiceButtons() {
-    const isPure = getSettings().pureGeometry;
-    fullBtn.classList.toggle('active', !isPure);
-    pureBtn.classList.toggle('active', isPure);
-  }
-  refreshModeChoiceButtons();
-  function chooseMode(pureGeometry) {
-    if (getSettings().pureGeometry === pureGeometry) return;
-    updateSettings({ pureGeometry });
-    window.location.reload();
-  }
-  fullBtn.addEventListener('click', () => chooseMode(false));
-  pureBtn.addEventListener('click', () => chooseMode(true));
+  // Mode choice (Pure Rhombeometry vs. Full World) removed along with
+  // World Systems retirement -- there's only one real mode now, so
+  // there's nothing left to choose. settings.js's getSettings() forces
+  // pureGeometry true unconditionally regardless of this file.
 
   const aboutBtn = document.createElement('button');
   aboutBtn.id = 'about-btn';

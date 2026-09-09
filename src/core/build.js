@@ -47,6 +47,8 @@ import {
   nearestCornerGroup,
   bandGroupForOffsetIndex,
   resolveTriangleGroup,
+  wedge2Key,
+  triangleRingCells,
 } from './hemisphere-build.js';
 
 // Every piece type routed through handleHemisphereClick/hemisphereStore --
@@ -54,7 +56,7 @@ import {
 // cluster stamps of the same underlying halfrd entries, core/hemisphere-
 // build.js). One shared list so the several gates below (raycast targets,
 // onClick/onContextMenu dispatch) can't drift out of sync with each other.
-const HEMISPHERE_PIECE_TYPES = ['halfrd', 'hourglass', 'hemi3', 'hemi4', 'hemiTri'];
+const HEMISPHERE_PIECE_TYPES = ['halfrd', 'hourglass', 'hemi3', 'hemi4', 'hemiTri', 'hemiRing'];
 
 const NEIGHBOR_DIRECTIONS = NEIGHBOR_OFFSETS.map(
   ([x, y, z]) => new THREE.Vector3(x, y, z).normalize()
@@ -483,6 +485,29 @@ export function createBuildController({
   // onPlaced surfaces this as a real HUD toast so the choice is legible
   // to the player, not just an invisible internal disambiguation detail.
   function addHemisphereCluster(anchorCell, hit, pieceType) {
+    if (pieceType === 'hemiRing') {
+      // Triangle Ring: reuses hemi3's OWN corner-group resolution (the
+      // exact same 8 real direction-triples -- see core/hemisphere-
+      // build.js's own wedge2Key header for why these specific 8 are
+      // also the only mutually-adjacent triples in this lattice, a real
+      // fact verified before this was built, not assumed from Corner
+      // Cluster's own use of them), but places 3 real 'wedge2' pieces
+      // (each cell's own 2-axis intersection facing its 2 ring-mates)
+      // instead of 3 plain halfrd halves facing back at a shared anchor.
+      const [awx, awy, awz] = cellToWorld(anchorCell.x, anchorCell.y, anchorCell.z);
+      const group = nearestCornerGroup([hit.point.x - awx, hit.point.y - awy, hit.point.z - awz]);
+      const label = `Triangle ring (${group.sign.map((s) => (s > 0 ? '+' : '-')).join(',')})`;
+      const material = getMaterial();
+      const wedges = triangleRingCells([anchorCell.x, anchorCell.y, anchorCell.z], group.indices);
+      let added = 0;
+      for (const { cell, axisA, axisB } of wedges) {
+        const key = wedge2Key(cell[0], cell[1], cell[2], axisA, axisB);
+        if (hemisphereStore.has(key)) continue;
+        hemisphereStore.set(key, { type: 'wedge2', cell, axisA, axisB, material });
+        added++;
+      }
+      return { anchorCell, added, label };
+    }
     let indices, label;
     if (pieceType === 'hemi3') {
       const [awx, awy, awz] = cellToWorld(anchorCell.x, anchorCell.y, anchorCell.z);
@@ -530,6 +555,13 @@ export function createBuildController({
   // sides specifically).
   function hemispherePieceCandidates(piece) {
     if (piece.type === 'halfrd') return [{ cell: piece.cell, offsetIndex: piece.offsetIndex, side: piece.side }];
+    // 'wedge2' (Triangle Ring): only its own CELL is meaningful here --
+    // resolveClusterAnchorCell (a cluster attaching onto an existing
+    // wedge2 piece) only ever needs the cell, never offsetIndex/side.
+    // growFromHemispherePiece explicitly bails out on this type instead
+    // of reading these null fields -- a 2-axis wedge has no single
+    // "missing direction" the way a plain halfrd/hourglass half does.
+    if (piece.type === 'wedge2') return [{ cell: piece.cell, offsetIndex: null, side: null }];
     return [
       { cell: piece.cellA, offsetIndex: piece.offsetIndex, side: 'positive' },
       { cell: piece.cellB, offsetIndex: piece.offsetIndex, side: 'negative' },
@@ -579,6 +611,11 @@ export function createBuildController({
   function growFromHemispherePiece(hit, pieceType) {
     const piece = hemisphereStore.get(hit.object.userData.key);
     if (!piece) return null;
+    // 'wedge2' (Triangle Ring) has no single "missing direction" the way
+    // a plain halfrd/hourglass half does (it's already bounded by 2 real
+    // cuts) -- single-piece growth off one isn't supported yet, same
+    // bootstrap-only scoping the cluster stamps themselves still have.
+    if (piece.type === 'wedge2') return null;
     const candidates = hemispherePieceCandidates(piece);
     let owner = candidates[0];
     let bestDist = Infinity;
@@ -646,13 +683,14 @@ export function createBuildController({
   function handleHemisphereClick(hit, mode, pieceType) {
     const action = mode === 'build' ? 'add' : 'remove';
     if (mode === 'build') {
-      // Cluster stamps ('hemi3'/'hemi4'/'hemiTri') can anchor on either a
-      // solid cell or an existing hemisphere piece's own owning cell --
-      // direct report 2026-09-06 ("the clusters should be able to attach
-      // to each other") -- resolveClusterAnchorCell handles both the same
-      // way, so this runs BEFORE the hemisphereGroup-hit gate below
-      // (which is only about the single-piece 'halfrd'/'hourglass' tools).
-      if (['hemi3', 'hemi4', 'hemiTri'].includes(pieceType)) {
+      // Cluster stamps ('hemi3'/'hemi4'/'hemiTri'/'hemiRing') can anchor
+      // on either a solid cell or an existing hemisphere piece's own
+      // owning cell -- direct report 2026-09-06 ("the clusters should be
+      // able to attach to each other") -- resolveClusterAnchorCell
+      // handles both the same way, so this runs BEFORE the
+      // hemisphereGroup-hit gate below (which is only about the
+      // single-piece 'halfrd'/'hourglass' tools).
+      if (['hemi3', 'hemi4', 'hemiTri', 'hemiRing'].includes(pieceType)) {
         const anchorCell = resolveClusterAnchorCell(hit);
         if (!anchorCell) { if (onPieceNoOp) onPieceNoOp(action); return; }
         const result = addHemisphereCluster(anchorCell, hit, pieceType);

@@ -13,6 +13,13 @@ Rhombiverse is one **world-state**, rendered by whatever client reads it. Two sy
 
 ## 0.5. Core vs. Modules
 
+**Status update, superseding this section's original framing below: World
+Systems are now retired**, not just "secondary" — code and Supabase schema
+archived, not deleted, but permanently unreachable in the running app
+(`settings.js`/`features.js`; see `CLAUDE.md`'s "What this project is").
+The original plan text is left as-is beneath this note for historical
+record of the design that led here.
+
 The FCC lattice / rhombic dodecahedron geometry — and its planned dual
 cube-octahedron structure — is this project's core: what makes Rhombiverse
 Rhombiverse rather than another voxel builder. The continuously-simulated

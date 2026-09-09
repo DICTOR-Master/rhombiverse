@@ -6,13 +6,31 @@ the conversation that scaffolded this repo, so it can pick up cold.
 
 ## What this project is
 
-Rhombiverse is a browser-based, Three.js voxel-style world-builder where the
-"voxel" is a **rhombic dodecahedron (RD)**, packed via the real FCC lattice.
-Players build outward face-by-face from a seed cell; the world is stored as
-plain JSON, not baked geometry, so any renderer/client/future backend can
-read and write it. See `RHOMBIVERSE_PLAN.md` section 0 (Meta-Paradigm) and
+Rhombiverse is a browser-based, Three.js multi-lattice spatial editor built
+around the **rhombic dodecahedron (RD)**, packed via the real FCC lattice
+(plus BCC, Cuboctahedron, and Cuboctahedron-gap variants). Users build
+outward face-by-face from a seed cell; the world is stored as plain JSON,
+not baked geometry, so any renderer/client/future backend can read and
+write it. Twin project to Polyhedraverse
+(github.com/DICTOR-Master/polyhedraverse): there, shapes connect face-to-
+face/vertex-to-vertex with no lattice at all, and that connecting IS what
+produces space; here, the lattice exists first and constrains what can be
+placed into it. See `RHOMBIVERSE_PLAN.md` section 0 (Meta-Paradigm) and
 section 6 (Vision Statement) before touching anything else in this repo —
 they're short and everything downstream assumes you've read them.
+
+**World Systems are retired** (mining, trade, claims, achievements,
+animals, hazards, hydrosphere — `src/world-systems/*.js` and
+`achievements.js`/`animals.js`/`hydrosphere.js`/hazard modules). Code and
+Supabase schema (`claims`, `pending_trades` tables) are archived, not
+deleted, but permanently unreachable: `settings.js`'s `getSettings()`
+forces `pureGeometry: true` unconditionally regardless of any stored
+setting, which is what `features.js` reads to decide whether to even wire
+these modules in. The former Rhombeometry/Full World welcome-screen mode
+choice and the matching Settings-panel checkbox are both gone — there's
+only one mode now. Don't reintroduce a toggle back into these without an
+explicit decision to un-retire World Systems; the removal was deliberate,
+not a temporary flag flip.
 
 **This is a different project from `~/rhombispheres/`** (formerly named
 `rhombiverse` until 2026-08-11, when it was renamed to free up this name).

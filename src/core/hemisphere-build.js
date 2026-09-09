@@ -27,6 +27,61 @@ export function halfRdKey(x, y, z, offsetIndex, side) {
   return `halfrd|${cellKey(x, y, z)}|${offsetIndex}|${side}`;
 }
 
+// Two-axis wedge ("Triangle Ring", added 2026-09-06): the intersection of
+// TWO independent hemisphereSplit() cuts on the SAME cell -- direct user
+// idea after Triangle Cluster's own anchor-cell dependency was questioned
+// ("I had been thinking of equilateral cluster without whole rd in the
+// middle"). Verified numerically before building (see this file's own
+// git history for the real check): for CORNER_GROUPS' own 8 direction-
+// triples specifically, the 3 real neighbor cells are MUTUALLY adjacent
+// (each pair differs by exactly one more real NEIGHBOR_OFFSETS step, not
+// just each individually adjacent to a shared anchor) -- a genuinely
+// different fact from Triangle Cluster's own flat-but-non-adjacent ring.
+// A 2-axis wedge (dot(v,axisA)>=0 AND dot(v,axisB)>=0 over the cell's own
+// 14 raw vertices) is a real, non-degenerate, verified-for-all-4-polarity-
+// combinations convex region -- both its own cut faces are genuine flat
+// boundaries (not points), because each is independently a real
+// hemisphereSplit cut, only further clipped by the SECOND plane (which
+// passes through the same cell center, so it clips the first plane's own
+// hexagonal cut face along a line through its middle, never degenerating
+// it to a point). This is NOT the same unsafe move as the old facePieces()
+// bug (multiple SIBLING pieces meeting only at a shared apex) -- here
+// there is exactly ONE wedge per cell, not several competing quadrants;
+// the other 3 quadrants of the cell are simply never placed as content.
+export function wedge2Key(x, y, z, axisA, axisB) {
+  const [lo, hi] = axisA < axisB ? [axisA, axisB] : [axisB, axisA];
+  return `wedge2|${cellKey(x, y, z)}|${lo}|${hi}`;
+}
+
+// The real NEIGHBOR_OFFSETS index from `from` to `to` -- both must
+// already be real FCC neighbors (guaranteed for any two members of one
+// CORNER_GROUPS triple, verified above).
+function neighborIndexBetween(from, to) {
+  const d = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
+  return NEIGHBOR_OFFSETS.findIndex(([x, y, z]) => x === d[0] && y === d[1] && z === d[2]);
+}
+
+// Given one CORNER_GROUPS-style triple of real NEIGHBOR_OFFSETS indices
+// (the 3 directions from a shared anchor to its 3 real corner-adjacent
+// neighbors), returns the 3 real wedge cells for a closed Triangle Ring
+// -- each cell's own axisA/axisB point toward its OTHER two ring-mates
+// (always its own 'positive' side toward each, by construction -- see
+// this function's own header for why that's always consistent and never
+// needs a canonical lo/hi tie-break the way Hourglass's shared single key
+// does: each cell gets its OWN separate store entry here, not one shared
+// entry covering two cells).
+export function triangleRingCells(anchorCell, groupIndices) {
+  const cells = groupIndices.map((i) => {
+    const [dx, dy, dz] = NEIGHBOR_OFFSETS[i];
+    return [anchorCell[0] + dx, anchorCell[1] + dy, anchorCell[2] + dz];
+  });
+  return cells.map((cell, i) => {
+    const others = cells.filter((_, j) => j !== i);
+    const [axisA, axisB] = others.map((other) => neighborIndexBetween(cell, other));
+    return { cell, axisA, axisB };
+  });
+}
+
 function lexLess(a, b) {
   if (a[0] !== b[0]) return a[0] < b[0];
   if (a[1] !== b[1]) return a[1] < b[1];

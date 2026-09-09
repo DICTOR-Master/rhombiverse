@@ -26,12 +26,21 @@ See `RHOMBIVERSE_PLAN.md` section 6 for the full vision statement, and
 Try it at **[rhombiverse.vercel.app](https://rhombiverse.vercel.app)** — no
 install, no account required.
 
+Twin project to **[Polyhedraverse](https://polyhedraverse.vercel.app)**: here,
+the lattice makes shapes possible — placement is constrained by what the
+lattice geometrically allows. Over there, shapes make the space possible —
+there's no lattice at all, connecting polyhedra face-to-face or vertex-to-
+vertex is what produces structure in the first place. Same underlying
+geometric rigor, opposite direction.
+
 ## Core vs. Modules
 
 The project's true differentiator is the FCC lattice / rhombic dodecahedron
-geometry — not the continuously-simulated systems (mining, trade, etc.) built on top of
-it. Those systems are valuable and genuinely fun, but secondary to the
-geometry itself:
+geometry. World Systems (mining, trade, claims, achievements, animals,
+hazards, hydrosphere — see below) are retired: the code is archived, not
+deleted, but permanently unreachable in the running app. Rhombiverse is a
+geometry/spatial editor first, not a survival-game loop with geometry
+attached.
 
 - **Core (always present):** lattice math (`lattice.js`), RD rendering,
   Sculpture Mode incl. build/chisel, base world-state schema, optional
@@ -65,17 +74,18 @@ geometry itself:
   (`growth.js`), Duality Mode (periodic↔aperiodic tiling dual,
   `dual.js`, shown once grown Penrose/Ammann structures exist), lattice
   zoom (`latticezoom.js`), cultivation (`cultivation.js`).
-- **World Systems (secondary, continuously-simulated, can be disabled or
-  community-owned):** mining & resources, inventory, claims/regions
-  (`regions.js`), trade (`trade.js`), achievements (`achievements.js`),
-  animals (`animals.js`), hazards (`blackhole.js`, `supernova.js`,
-  `starsystem.js`), hydrosphere (`hydrosphere.js`). `features.js`'s flag
-  registry disconnects all of these together in Rhombeometry mode (mining,
-  economy/claims, achievements, animals, hazards, hydrosphere all flip off
-  at once) — see `RHOMBIVERSE_PLAN.md`'s Migration Path for the history.
-
-A "Rhombeometry / Full World" mode toggle exists (welcome screen and
-Lab Settings) — defaults to Rhombeometry, geometry-only.
+- **World Systems (retired — code archived, not reachable in the app):**
+  mining & resources, inventory, claims/regions (`regions.js`), trade
+  (`trade.js`), achievements (`achievements.js`), animals (`animals.js`),
+  hazards (`blackhole.js`, `supernova.js`, `starsystem.js`), hydrosphere
+  (`hydrosphere.js`). `features.js` forces all of these off permanently
+  now (`settings.js`'s `getSettings()` forces `pureGeometry: true`
+  unconditionally, so there's no live toggle back on) — see
+  `RHOMBIVERSE_PLAN.md`'s Migration Path for how this was built, and
+  this repo's own commit history for the retirement itself. The modules
+  and their Supabase tables (`claims`, `pending_trades`) are untouched —
+  archived for reference/possible future use, not deleted, but nothing
+  in the running app can reach them anymore.
 
 ## What this is (right now)
 
@@ -113,28 +123,26 @@ its own tools:
   zone appear automatically — not just a desktop-only mode.
 
 Supporting systems: **Shared World** (opt-in — Supabase realtime sync, no
-account needed beyond a lightweight anonymous session), a **pseudonymous
-display name** with live named avatars for other people connected at the
-same time, an in-world **Interact** action for two-sided drag-and-tap
-barter trades, mining/inventory/resource decay, ownership claims, an
-**achievements** toast system, **World sharing** via a compressed
-shareable link, a public **Gallery** of shared/showcase Worlds, a
-**What's New** changelog (the 🕘 button next to About), and **Cyborg
-Mode** — an optional guided walkthrough that, once finished, can also
-suggest a genuinely creative next thing to build (real AI, same
-three-tier pattern as Full-Cyborg: your own API key, the shared Vercel
-AI Gateway, or a local fallback — never required to use). Full-Cyborg
-itself (Sculpt/Cultivate's most assisted tier) uses that same AI
-pattern.
+account needed beyond a lightweight anonymous session — this is core,
+collaborative *building*, not a World System, and stays fully intact), a
+**pseudonymous display name** with live named avatars for other people
+connected at the same time, **World sharing** via a compressed shareable
+link, a public **Gallery** of shared/showcase Worlds, a **What's New**
+changelog (the 🕘 button next to About), and **Cyborg Mode** — an optional
+guided walkthrough that, once finished, can also suggest a genuinely
+creative next thing to build (real AI, same three-tier pattern as
+Full-Cyborg: your own API key, the shared Vercel AI Gateway, or a local
+fallback — never required to use). Full-Cyborg itself (Sculpt/Cultivate's
+most assisted tier) uses that same AI pattern. (An in-world Interact action
+for barter trades, plus mining/inventory/resource decay and ownership
+claims, existed here too — retired along with World Systems above.)
 
 The welcome screen is a rotating RD logo with two live antipodal ENTER
-faces and a Mode choice (Pure Rhombeometry / Full World, defaulting
-to Rhombeometry — geometry only). Picking Full World on a first-time
-visit loads the real Showcase World (a continental planetoid with growth,
-evolved organisms, and animals already in it) and walks you through
-build → open the wheel → plant something → explore, rather than a
-tutorial modal; Rhombeometry mode instead starts from a blank single-cell
-world with no systems-flavored onboarding.
+faces. It used to also offer a Rhombeometry/Full World mode choice here,
+picking Full World on a first visit loading a pre-built Showcase World
+with a systems-flavored tour — both retired along with World Systems
+above. Every visit now starts the same way: a blank single-cell world,
+geometry only, no onboarding tour.
 
 `docs/RHOMBIVERSE_UIUX_BUILD_PLAN.md` is the spec for this whole control-
 surface/onboarding/AI-assistance layer (tracks B1–B7); B1–B6 are done, and

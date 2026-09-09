@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices, octGapVertices, hemisphereSplit } from './core/lattice.js';
+import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices, octGapVertices, hemisphereSplit, NEIGHBOR_OFFSETS } from './core/lattice.js';
 import { FULL_PYRAMIDS, presentAxisKeys, hasCube, effectivePyramids } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
@@ -1015,20 +1015,9 @@ window.addEventListener('rhombiverse:personaChosen', (e) => {
   fpsMeterInput.checked = s.showFPSMeter;
   fpsMeterInput.addEventListener('change', () => updateSettings({ showFPSMeter: fpsMeterInput.checked }));
 
-  // Migration Path Phase C (RHOMBIVERSE_PLAN.md): Rhombeometry mode.
-  // features.js reads this flag once, at module-eval time, ahead of
-  // this init() ever gating a World Systems import -- there is no live
-  // way to flip World Systems on/off mid-session, so this always
-  // reloads. Nothing is lost: the current World autosaves to
-  // localStorage the same way a manual refresh already preserves it.
-  const pureGeometryInput = document.getElementById('setting-pure-geometry');
-  const pureGeometryHint = document.getElementById('pure-geometry-hint');
-  pureGeometryInput.checked = s.pureGeometry;
-  pureGeometryInput.addEventListener('change', () => {
-    updateSettings({ pureGeometry: pureGeometryInput.checked });
-    pureGeometryHint.style.display = '';
-    setTimeout(() => window.location.reload(), 400);
-  });
+  // Rhombeometry mode's Settings checkbox is gone -- World Systems are
+  // retired (see features.js/settings.js), there's no longer a real
+  // choice to expose here.
 
   // Model vs. World Separation (reframe Stage 2): unlike pureGeometry
   // above, this is a live, no-reload toggle -- workspaceMode is read

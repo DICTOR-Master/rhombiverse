@@ -31,7 +31,11 @@ const DEFAULTS = {
   byokApiKey: '',
   byokModel: '',
   // Rhombeometry mode default -- see companion doc for why this is true
-  // and why changing it needs a reload.
+  // and why changing it needs a reload. As of the World Systems retirement
+  // (mining/trade/claims/achievements/animals/hydrosphere -- see
+  // features.js), this is no longer a real choice: getSettings() below
+  // forces it true unconditionally, so this default only matters for
+  // anything reading DEFAULTS directly before that override applies.
   pureGeometry: true,
 };
 
@@ -47,8 +51,16 @@ function loadSaved() {
 let current = { ...DEFAULTS, ...loadSaved() };
 const listeners = new Set();
 
+// World Systems retirement: pureGeometry is forced true here, on every
+// read, regardless of what's stored -- this is what actually guarantees
+// no user (including someone who opted into Full World before this
+// change, and still has pureGeometry:false sitting in their own
+// localStorage) can ever reach mining/trade/claims/achievements/animals/
+// hydrosphere again. Deliberately not just a UI change (removing the
+// mode-choice button and Settings checkbox, done elsewhere) -- this is
+// the one place that can't be bypassed by any surviving or future UI path.
 export function getSettings() {
-  return current;
+  return { ...current, pureGeometry: true };
 }
 
 export function updateSettings(partial) {

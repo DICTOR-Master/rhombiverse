@@ -516,6 +516,15 @@ export const MARKS = {
   // not just the best-looking of the candidates tried (see this file's
   // own real-projection header above hemi3/hemi4 for the shared method).
   pieceHemiTri: `<polygon points="8.00,13.86 16.00,27.71 32.00,0.00 16.00,0.00" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-16.00,-27.71 -8.00,-13.86 8.00,-13.86 16.00,-27.71" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-32.00,0.00 -16.00,27.71 -8.00,13.86 -16.00,0.00" fill="currentColor" stroke="#020206" stroke-width="1"/>`,
+  // Triangle Ring (hemiRing), added same session: same viewing convention
+  // as pieceHemiTri (straight down the shared corner axis), but the 3
+  // real wedges are mutually touching (a 'wedge2' 2-axis intersection
+  // each, see core/hemisphere-build.js's own header) rather than each
+  // independently facing a shared anchor -- the real, deliberate visual
+  // difference is a SOLID gap-free hexagon here vs. pieceHemi3's 3
+  // separated lobes, since that IS the real geometric difference between
+  // these two pieces (no anchor cell needed vs. one required).
+  pieceHemiRing: `<polygon points="-32.00,0.00 -16.00,27.71 -0.00,0.00 -16.00,-27.71" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-16.00,-27.71 -0.00,0.00 32.00,0.00 16.00,-27.71" fill="currentColor" stroke="#020206" stroke-width="1"/><polygon points="-16.00,27.71 16.00,27.71 32.00,0.00 -0.00,0.00" fill="currentColor" stroke="#020206" stroke-width="1"/>`,
   // World View toggle (Color / Translucent / Skeleton, render.js's
   // #world-view-toggle), direct request: "three rings overlapping."
   // Three equal circles at 120-degree symmetry around center, stroke

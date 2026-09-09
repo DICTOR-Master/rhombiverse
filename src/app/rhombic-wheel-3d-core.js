@@ -224,6 +224,37 @@ export function applyWorkspaceModeGate(resolvedFaces, workspaceMode) {
   return gated;
 }
 
+// World Systems retirement (features.js/settings.js): a SEPARATE,
+// permanent gate from applyWorkspaceModeGate above -- that one is about
+// freezing dynamic/simulated content (Model workspace, a live toggle
+// that includes Cultivate, still a kept Geometry Extension per
+// features.js's `cultivation`/`growth` flags). This one is about
+// FEATURES.economy being permanently off. Only "Trade" is action-gated
+// here, deliberately not reusing WORLD_ONLY_FACE_ACTIONS wholesale --
+// that set also contains navigateTo:cultivate/tool:plant (kept) and
+// navigateTo:explore (ambiguous, reads as core shared-world navigation
+// ("Rhombinaut mode"), not a retired game mechanic -- left alone).
+// Mining/achievements/animals/hydrosphere have no dedicated wheel faces
+// at all (checked directly, not assumed) -- FEATURES=false alone
+// already makes them fully unreachable, no wheel-level gate needed.
+const RETIRED_WORLD_SYSTEMS_ACTIONS = new Set(["navigateTo:trade"]);
+
+export function applyRetiredWorldSystemsGate(resolvedFaces) {
+  const gated = { ...resolvedFaces };
+  for (const [key, data] of Object.entries(resolvedFaces)) {
+    if (data.action && RETIRED_WORLD_SYSTEMS_ACTIONS.has(data.action)) {
+      // Genuinely blank (matching this file's own SPARE constant), not a
+      // dimmed-but-labeled "Trade" ghost -- unlike applyWorkspaceModeGate's
+      // faces above (temporarily locked, unlocks again in World
+      // workspace), there's no toggle that ever brings this back, so
+      // keeping the real label around would just be a permanent, slightly
+      // confusing tombstone rather than an honest empty slot.
+      gated[key] = { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." };
+    }
+  }
+  return gated;
+}
+
 // BCC Lattice feature gate (added 2026-08-28, WHEEL_PIECE): the 3 BCC/
 // interstitial piece tiers only mean anything when FEATURES.bccLattice
 // is on (Rhombeometry mode) -- Full World has no BCC/interstitial
@@ -741,13 +772,13 @@ export const WHEEL_TRADE = {
 // content. Fixed by giving the cluster-stamp pieces (hemi3/hemi4,
 // added the same session once the earlier "12-cluster" idea was dropped
 // as redundant with 'to' -- see core/hemisphere-build.js's own header)
-// real homes, one of them AT top|sy1sz1 specifically. A third cluster
-// (hemiTri, Triangle Cluster) filled another bottom-ring slot later the
-// same session. The 2 remaining slots are explicit SPARE (not just left
-// undeclared) --
-// this user flagged "more ideas for piece variety" the same session this
-// wheel was created, so real room is kept for future RD-derived pieces,
-// just never as an accidentally-blank face again.
+// real homes, one of them AT top|sy1sz1 specifically. Two more clusters
+// (hemiTri Triangle Cluster, hemiRing Triangle Ring) filled the remaining
+// bottom-ring slots later the same session. The 1 remaining slot is
+// explicit SPARE (not just left undeclared) -- this user flagged "more
+// ideas for piece variety" the same session this wheel was created, so
+// real room is kept for future RD-derived pieces, just never as an
+// accidentally-blank face again.
 export const WHEEL_RD_FAMILY = {
   id: "rdFamily",
   faces: {
@@ -768,7 +799,19 @@ export const WHEEL_RD_FAMILY = {
     // to a point) and Band Cluster (a 4-fold square ring).
     "bottom|sy1sz-1":   { kind: "dept", label: "Triangle Cluster", action: "tool:pieceType:hemiTri",
       desc: "3 Hemi RD halves in one flat plane at 120 degrees -- click a face near the flat ring you mean, one of 8 possible." },
-    "bottom|sx1sz-1":   SPARE,
+    // Triangle Ring: added same session, direct follow-up once Triangle
+    // Cluster's own anchor-cell dependency got questioned ("equilateral
+    // cluster without whole rd in the middle"). Genuinely different piece
+    // type ('wedge2', core/hemisphere-build.js) -- the SAME 8 real
+    // direction-triples Corner Cluster already uses (verified: they are
+    // the only mutually-adjacent triples in this lattice), but each cell
+    // contributes a real 2-axis wedge facing its 2 ring-mates directly,
+    // so all 3 pieces genuinely touch each other with no anchor cell
+    // required at all -- confirmed by real removal test (a plain Corner/
+    // Triangle Cluster leaves gaps if you remove the anchor; this one
+    // doesn't need one in the first place).
+    "bottom|sx1sz-1":   { kind: "dept", label: "Triangle Ring", action: "tool:pieceType:hemiRing",
+      desc: "3 Hemi RD wedges that touch each other directly -- no anchor cell needed. Click a face near the ring you mean, one of 8 possible." },
     "bottom|sx-1sz-1":  SPARE,
   }
 };
