@@ -9,6 +9,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices, octGapVertices, hemisphereSplit, NEIGHBOR_OFFSETS } from './core/lattice.js';
 import { FULL_PYRAMIDS, presentAxisKeys, hasCube, effectivePyramids } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
+import { createAlmanac } from './app/almanac.js';
 import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
 import { bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
 import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS } from './geometry-extensions/dual-lattice.js';
@@ -3040,19 +3041,25 @@ async function init() {
   // No feature flag -- this is the sole navigation surface now (the
   // old 2D wheel.js was removed 2026-08-25), always on, not optional.
   const rhombicWheel3DToggleBtn = document.getElementById('rhombic-wheel-3d-toggle');
+  // Almanac (docs/RHOMBIVERSE_SPEC_ALMANAC.md, Stage 1): created once,
+  // same lifetime as wheel3D/cyborg/lab below -- its own overlay handles
+  // its open/closed state internally (open()/close()/toggle()), this
+  // scope just needs a stable reference to call into from onAction.
+  const almanac = createAlmanac();
   {
     const wheel3D = createRhombicWheel3D({
       getWorkspaceMode: () => workspaceMode,
       onAction: (action) => {
         // openCyborg/openLab reuse the real, already-shipped toggles.
-        // openAlmanac has no existing counterpart yet and is a stub.
+        // openAlmanac now opens the real Almanac overlay (Stage 1 --
+        // previously just a "not built yet" toast).
         // (openLenses/X-Ray was dropped from the universal ring
         // 2026-08-29 -- X-Ray stays reachable via the corner HUD wheel's
         // own #xray-toggle face and the Lab panel, so no wheel face
         // routes to it here any more.)
         if (action === 'openCyborg') { wheel3D.close(); cyborgToggleEl?.click(); return; }
         if (action === 'openLab') { wheel3D.close(); labToggleEl?.click(); return; }
-        if (action === 'openAlmanac') { showHudPrompt('Almanac is not built yet.', 3000); return; }
+        if (action === 'openAlmanac') { wheel3D.close(); almanac.open(); return; }
         // Explore (Rhombinaut) is a single destination, not a wheel --
         // reuses the real existing action (#walk-toggle, same trigger
         // the 2D wheel.js's own Explore item uses), then closes this

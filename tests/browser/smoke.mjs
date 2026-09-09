@@ -122,12 +122,41 @@ async function main() {
   const wheel3DClosed = await page.$eval('#rhombic-wheel-3d-overlay', (el) => !el.classList.contains('open'));
   assert.ok(wheel3DClosed, 'Tab again should close the Rhombic Wheel 3D');
 
+  // Almanac (docs/RHOMBIVERSE_SPEC_ALMANAC.md, Stage 1): same reliability
+  // reasoning as the mode-switching check above -- driving the real
+  // wheel to its Almanac face isn't a stable CI interaction, so this
+  // exercises the real createAlmanac() module directly instead (the
+  // same function render.js's own init calls once for real; this makes
+  // a second, independent instance for the test, which is fine -- the
+  // module has no singleton state to collide with). Queries are scoped
+  // to the overlay THIS call appends (the last '.almanac-overlay' in
+  // DOM order), not an unscoped selector, since render.js's own real
+  // instance is also present in the page by this point.
+  const almanacResult = await page.evaluate(async () => {
+    const { createAlmanac } = await import('./src/app/almanac.js');
+    const { ALMANAC_ENTRIES } = await import('./src/app/almanac-data.js');
+    createAlmanac().open();
+    const overlays = document.querySelectorAll('.almanac-overlay');
+    const overlay = overlays[overlays.length - 1];
+    const opened = overlay.classList.contains('open');
+    const entryCount = overlay.querySelectorAll('.almanac-entry').length;
+    overlay.querySelector('.almanac-entry')?.click();
+    const detailShown = getComputedStyle(overlay.querySelector('.almanac-detail')).display !== 'none';
+    overlay.querySelector('.almanac-close')?.click();
+    const closed = !overlay.classList.contains('open');
+    return { opened, entryCount, expectedCount: ALMANAC_ENTRIES.length, detailShown, closed };
+  });
+  assert.ok(almanacResult.opened, 'Almanac overlay should open');
+  assert.equal(almanacResult.entryCount, almanacResult.expectedCount, 'Almanac should list every ALMANAC_ENTRIES entry');
+  assert.ok(almanacResult.detailShown, 'clicking an Almanac entry should show its detail panel');
+  assert.ok(almanacResult.closed, 'the close button should close Almanac');
+
   if (errors.length > 0) {
     throw new Error(`Console/page errors during smoke test:\n${errors.join('\n')}`);
   }
 
   await browser.close();
-  console.log('smoke test passed: welcome overlay, build, and mode switching, zero console errors');
+  console.log('smoke test passed: welcome overlay, build, mode switching, and Almanac, zero console errors');
 }
 
 main().catch((err) => {
