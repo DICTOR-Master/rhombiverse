@@ -821,3 +821,101 @@ export const ALL_WHEELS = {
   rhombitect: WHEEL_RHOMBITECT, cultivate: WHEEL_CULTIVATE, trade: WHEEL_TRADE,
   piece: WHEEL_PIECE, rdFamily: WHEEL_RD_FAMILY
 };
+
+// Icon System (RHOMBIVERSE_SPEC_ICON_SYSTEM.md): only actions the spec's
+// section 4 table (or the live cross-walk's Cyborg resolution) actually
+// resolves get a real mark -- every other face keeps its existing plain
+// text label exactly as today. Deliberately NOT a guess-to-fill-every-
+// face table: the spec explicitly says not to guess silently, and
+// several real actions (tool:material, tool:repeat, tool:generateBody,
+// tool:offer/accept/inventory, tool:plant/growthParams/prune, and the
+// Build/Alter department-nav faces themselves) have no resolved row.
+// See docs/code-notes/app/wheel-icons.md for the full gap list.
+//
+// Lives here (rhombic-wheel-3d-core.js), not rhombic-wheel-3d.js, even
+// though it's only ever consumed there for real icon rendering -- moved
+// 2026-09-09 so almanac-data.js (a plain data/logic module with zero
+// npm dependencies, covered by the pure `node --test tests/unit/` suite
+// per tests/README.md) can reuse this same action -> mark mapping
+// instead of re-declaring a second copy that could drift out of sync.
+// rhombic-wheel-3d.js imports `three` for its own rendering, so ANY
+// import from that file (even of a plain object like this one) drags a
+// browser-only dependency into that pure-Node test environment, which
+// this pure "core" file (already home to WHEEL_PIECE/WHEEL_RD_FAMILY,
+// zero imports of its own) never has that problem -- real failure hit
+// and fixed while wiring almanac-data.js's Stage 0, not a hypothetical.
+// See docs/RHOMBIVERSE_SPEC_ALMANAC.md section 4.
+export const ACTION_TO_MARK = {
+  // Universal Add/Remove + Piece picker (direct instruction 2026-08-26,
+  // retiring the earlier separate Rhombi-/Pyramid-/Cube- model/sculpt
+  // marks). 'tool:symmetry' reuses the existing `symmetryMirror` modifier
+  // mark below (a real match for what that panel actually does) rather
+  // than the old generic "-" now spoken for by 'tool:remove'.
+  'tool:add': 'add',
+  'tool:remove': 'remove',
+  'tool:symmetry': 'symmetryMirror',
+  // Piece: the doorway face (WHEEL_BUILD's own "Piece") shows the
+  // clustered-shapes mark as a preview of what's inside, same pattern
+  // as navigateTo:build/alter below; each of the 6 real tiers inside
+  // WHEEL_PIECE gets its own real shape mark instead (added 2026-08-28,
+  // replacing the old bare 'tool:pieceType' -- that action string no
+  // longer exists on its own now that Piece is a real wheel, not a
+  // picker overlay).
+  'navigateTo:piece': 'pieceType',
+  // RD's own doorway face reuses its own family's primary mark as a
+  // preview of what's inside, same convention as navigateTo:build/alter
+  // below.
+  'navigateTo:rdFamily': 'pieceRD',
+  'tool:pieceType:rd': 'pieceRD',
+  // Real 3D-profile marks, added 2026-09-06 -- see wheel-icons.js's own
+  // pieceHalfRD/pieceHourglass/pieceHemi3/pieceHemi4 header for the full
+  // derivation (real orthographic silhouettes, not hand-drawn).
+  'tool:pieceType:halfrd': 'pieceHalfRD',
+  'tool:pieceType:hourglass': 'pieceHourglass',
+  'tool:pieceType:hemi3': 'pieceHemi3',
+  'tool:pieceType:hemi4': 'pieceHemi4',
+  'tool:pieceType:hemiTri': 'pieceHemiTri',
+  'tool:pieceType:hemiRing': 'pieceHemiRing',
+  'tool:pieceType:cube': 'pieceCube',
+  'tool:pieceType:pyramid': 'piecePyramid',
+  'tool:pieceType:to': 'pieceTO',
+  'tool:pieceType:ioct': 'pieceOctaSite',
+  'tool:pieceType:octahedron': 'pieceOctahedron',
+  'tool:pieceType:idis': 'pieceDisphenoid',
+  'tool:fill': 'fill',
+  'tool:dig': 'dig',
+  'tool:smooth': 'smooth',
+  'tool:replace': 'replace',
+  'navigateTo:trade': 'trade',
+  'navigateTo:rhombitect': 'rhombitect', // wheel now labeled "Blueprint"; mark/id name unchanged
+  'navigateTo:cultivate': 'rhombivate', // wheel now labeled "Cultivate"; mark/id name unchanged
+  'navigateTo:explore': 'explore',
+  openAlmanac: 'almanac',
+  openCyborg: 'cyborg',
+  // 2026-08-26 second pass -- see wheel-icons.js for full design notes
+  // on each of these (not in the spec's own table, resolved here).
+  'tool:material': 'material',
+  'tool:repeat': 'repeat',
+  'tool:pattern': 'pattern',
+  'tool:generateBody': 'generateBody',
+  'tool:plant': 'plant',
+  'tool:growthParams': 'growthParams',
+  'tool:prune': 'prune',
+  'tool:offer': 'offer',
+  'tool:accept': 'accept',
+  'tool:inventory': 'inventory',
+  // Build's department-nav face reuses its own wheel's primary tool
+  // icon -- the face is a doorway into that wheel, so Add doubles as a
+  // preview of what's inside. Alter used to do the same with Dig, but
+  // got its own real mark (a 6-arrow recycling symbol) 2026-09-02 --
+  // direct request, see wheel-icons.js's MARKS.alter for the full
+  // design-review history.
+  'navigateTo:build': 'add',
+  'navigateTo:alter': 'alter',
+  // Universal ring (every wheel): Lab/Settings and Home.
+  openLab: 'lab',
+  navigateHome: 'home',
+  // Cuboctahedron Build (Piece, 2026-08-29): reuses the same pinwheel
+  // mark Lattice Quick-View already uses for this shape.
+  'tool:cuboctaBuild': 'cuboctahedron',
+};
