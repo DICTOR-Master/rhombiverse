@@ -501,8 +501,17 @@ export function createBuildController({
       const wedges = triangleRingCells([anchorCell.x, anchorCell.y, anchorCell.z], group.indices);
       let added = 0;
       for (const { cell, axisA, axisB } of wedges) {
-        const key = wedge2Key(cell[0], cell[1], cell[2], axisA, axisB);
-        if (hemisphereStore.has(key)) continue;
+        // Real bug found live (2026-09-10, "empty space appearing in
+        // the middle" when chaining two clusters, "rd pieces are not
+        // being recognised"): this loop only ever checked
+        // hemisphereStore, never the main solid world -- a cluster
+        // stamp anchored on an existing hemisphere piece (per
+        // resolveClusterAnchorCell's own "clusters chaining onto
+        // clusters" support) can compute a target that lands back on
+        // an already-solid RD cell, which this then silently overlapped
+        // with a coincident half-piece instead of recognizing it as
+        // occupied. Same fix as the halfrd cluster loop just below.
+        if (hemisphereStore.has(key) || world.has(cell[0], cell[1], cell[2])) continue;
         hemisphereStore.set(key, { type: 'wedge2', cell, axisA, axisB, material });
         added++;
       }
@@ -540,7 +549,20 @@ export function createBuildController({
       const ny = anchorCell.y + dy;
       const nz = anchorCell.z + dz;
       const key = halfRdKey(nx, ny, nz, offsetIndex, 'negative');
-      if (hemisphereStore.has(key)) continue;
+      // Real bug found live (2026-09-10): a cluster stamp anchored on
+      // an existing hemisphere piece (resolveClusterAnchorCell's own
+      // "clusters chaining onto clusters" support) can compute a target
+      // that lands back on the ORIGINAL anchor or another already-solid
+      // RD cell -- e.g. two chained X-axis Band Clusters share exactly
+      // one target this way (each cell's own X-axis band includes the
+      // direction back toward wherever it was reached from). Checking
+      // only hemisphereStore missed this entirely (a solid RD cell was
+      // never "recognised" as occupied by this loop at all), silently
+      // overlapping a coincident half-piece onto real solid geometry --
+      // read live as "empty space in the middle" (the mismatched
+      // triangulation at that shared boundary reads as a gap/seam, not
+      // an obvious duplicate).
+      if (hemisphereStore.has(key) || world.has(nx, ny, nz)) continue;
       hemisphereStore.set(key, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex, side: 'negative', material });
       added++;
     }
@@ -651,7 +673,12 @@ export function createBuildController({
         const nz2 = az + dz;
         const [loCell, hiCell] = canonicalHourglassCells(ax, ay, az, nx2, ny2, nz2);
         const key2 = hourglassKey(...loCell, ...hiCell);
-        if (hemisphereStore.has(key2)) return { added: 0 };
+        // Same real bug as addHemisphereCluster's loops above -- a real
+        // click can legitimately hit a hemisphere piece's own OUTER face
+        // (unlike a solid cell's face, nothing culls it just because the
+        // neighbor beyond it happens to already be solid), so this genuinely
+        // needs its own world.has() check, not just hemisphereStore's.
+        if (hemisphereStore.has(key2) || world.has(nx2, ny2, nz2)) return { added: 0 };
         const offsetIndex2 = hourglassOffsetIndex(loCell, hiCell);
         hemisphereStore.set(key2, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex: offsetIndex2, material });
         return { added: 1, anchor: { x: ax, y: ay, z: az } };
@@ -665,16 +692,19 @@ export function createBuildController({
     const nx = ax + dx;
     const ny = ay + dy;
     const nz = az + dz;
+    // Same real bug as above -- a hemisphere piece's own outer face is
+    // always clickable regardless of what's beyond it, so this needs its
+    // own world.has() check too, not just hemisphereStore's.
     if (pieceType === 'halfrd') {
       const key2 = halfRdKey(nx, ny, nz, j, 'negative');
-      if (hemisphereStore.has(key2)) return { added: 0 };
+      if (hemisphereStore.has(key2) || world.has(nx, ny, nz)) return { added: 0 };
       hemisphereStore.set(key2, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex: j, side: 'negative', material });
       return { added: 1, anchor: { x: nx, y: ny, z: nz } };
     }
     // pieceType === 'hourglass'
     const [loCell, hiCell] = canonicalHourglassCells(ax, ay, az, nx, ny, nz);
     const key2 = hourglassKey(...loCell, ...hiCell);
-    if (hemisphereStore.has(key2)) return { added: 0 };
+    if (hemisphereStore.has(key2) || world.has(nx, ny, nz)) return { added: 0 };
     const offsetIndex2 = hourglassOffsetIndex(loCell, hiCell);
     hemisphereStore.set(key2, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex: offsetIndex2, material });
     return { added: 1, anchor: { x: ax, y: ay, z: az } };
@@ -723,7 +753,15 @@ export function createBuildController({
         // own "far" cell (hemisphereGeometry(scale, fwdIndex, 'negative')).
         const offsetIndex = NEIGHBOR_OFFSETS.findIndex(([x, y, z]) => x === dx && y === dy && z === dz);
         const key = halfRdKey(nx, ny, nz, offsetIndex, 'negative');
-        if (hemisphereStore.has(key)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        // Defensive, same fix as growFromHemispherePiece/addHemisphereCluster
+        // above -- this bootstrap path is likely already protected in
+        // practice (a solid-to-solid shared face is normally culled/hidden
+        // by the main world's own renderer, so clicking through to an
+        // already-solid neighbor shouldn't usually be reachable here), but
+        // nothing actually guarantees that, and the cost of checking is
+        // trivial -- never leave this one hemisphere-piece path as the
+        // sole unchecked one.
+        if (hemisphereStore.has(key) || world.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
         hemisphereStore.set(key, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex, side: 'negative', material });
         onHemisphereChange();
         if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
@@ -732,7 +770,7 @@ export function createBuildController({
       // 'hourglass'
       const [loCell, hiCell] = canonicalHourglassCells(anchorCell.x, anchorCell.y, anchorCell.z, nx, ny, nz);
       const key = hourglassKey(...loCell, ...hiCell);
-      if (hemisphereStore.has(key)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      if (hemisphereStore.has(key) || world.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
       const offsetIndex = hourglassOffsetIndex(loCell, hiCell);
       hemisphereStore.set(key, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex, material });
       onHemisphereChange();
