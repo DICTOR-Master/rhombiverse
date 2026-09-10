@@ -514,70 +514,83 @@ export function createBuildController({
   // 'wedge2' at the cell always conflicts (it's already a 2-axis cut of
   // that whole cell, never compatible with anything else being added
   // there).
-  function cellHasIncompatibleHemisphereContent(cell, offsetIndex) {
-    const [cx, cy, cz] = cell;
-    for (const piece of hemisphereStore.entries()) {
-      if (piece.type === 'halfrd') {
-        if (piece.cell[0] === cx && piece.cell[1] === cy && piece.cell[2] === cz && piece.offsetIndex !== offsetIndex) return true;
-      } else if (piece.type === 'hourglass') {
-        const ownsA = piece.cellA[0] === cx && piece.cellA[1] === cy && piece.cellA[2] === cz;
-        const ownsB = piece.cellB[0] === cx && piece.cellB[1] === cy && piece.cellB[2] === cz;
-        if ((ownsA || ownsB) && piece.offsetIndex !== offsetIndex) return true;
-      } else if (piece.type === 'wedge2') {
-        if (piece.cell[0] === cx && piece.cell[1] === cy && piece.cell[2] === cz) return true;
-      }
-    }
-    return false;
-  }
-
-  // Direct user request (2026-09-11), the follow-up to the fix above:
-  // "repeated empty place as i stack" -- refusing to place a conflicting
-  // piece was correct (no more silent overlap), but left a real hole at
-  // every convergence point instead. Two INDEPENDENTLY-reached directions
-  // converging on the same cell should instead promote it to a real,
-  // whole solid RD -- the same spirit as growFromHemispherePiece's own
-  // same-axis positive+negative completion, generalized to a different
-  // axis pair meeting there instead of the same one.
+  // Real bug, three rounds of live reports (2026-09-10/11): "empty space
+  // in the middle" -> "still propagating"/"fills in lower down stack"
+  // (a per-site pre-check for the world.has() case, then a second
+  // per-site pre-check adding classification/promotion) -> "reverted to
+  // the moving space" -- each pre-check fix covered the exact site it
+  // was written against but missed others, or missed ordering/edge
+  // cases within them, because it tried to PREDICT a conflict at the
+  // moment of placement, spread across 7 different call sites. Replaced
+  // entirely with a single POST-HOC reconciliation pass instead: after
+  // ANY hemisphere action (single piece, growth, or cluster stamp),
+  // scan the whole store for cells that ended up with incompatible
+  // content and fix them, regardless of which code path produced them.
+  // This can't miss a site the way the per-site checks could -- there's
+  // only one place left for this logic to live.
   //
-  // Scoped to halfrd/wedge2 conflicts only -- an 'hourglass' owning the
-  // cell along a different axis is deliberately left as 'blocked' (the
-  // old, safe no-op): an hourglass is ONE stored entry spanning TWO
-  // cells, so removing it to resolve a conflict at ONE of them would
-  // also strip its OTHER cell's own coverage, and there's no way to keep
-  // "half" of a stored hourglass. Rather than risk a new, harder-to-spot
-  // hole elsewhere, that case still just refuses to overlap, unchanged.
-  function classifyHemisphereTarget(cell, offsetIndex) {
-    const [cx, cy, cz] = cell;
-    let promotable = false;
+  // "Incompatible" here means: a cell owned by two 'halfrd'/'hourglass'
+  // entries with DIFFERENT offsetIndex values (two arbitrary half-space
+  // cuts don't union into anything coherent -- only a same-axis
+  // positive+negative pair does, growFromHemispherePiece's own "complete
+  // this piece's missing other half" mechanic, deliberately left alone
+  // here), or a cell touched by a 'wedge2' alongside anything else (a
+  // wedge2 is already a 2-axis cut of the whole cell, never compatible
+  // with more content there). Direct user request: resolve by promoting
+  // the cell to a real, whole solid RD -- same spirit as the same-axis
+  // completion, generalized to a different axis pair meeting there.
+  //
+  // An 'hourglass' spans TWO cells under one stored entry; if either of
+  // its cells needs promoting, BOTH do (removing the entry to resolve a
+  // conflict at one end would otherwise silently strip the other end's
+  // own real coverage) -- resolved by growing the promotion set to a
+  // fixed point before touching the store at all.
+  function reconcileHemisphereStore() {
+    const cellId = (c) => `${c[0]},${c[1]},${c[2]}`;
+    const owners = new Map(); // cellId -> [{ offsetIndex: number|null }]
+    const addOwner = (cell, offsetIndex) => {
+      const id = cellId(cell);
+      if (!owners.has(id)) owners.set(id, []);
+      owners.get(id).push(offsetIndex);
+    };
     for (const piece of hemisphereStore.entries()) {
-      if (piece.type === 'halfrd') {
-        if (piece.cell[0] === cx && piece.cell[1] === cy && piece.cell[2] === cz && piece.offsetIndex !== offsetIndex) promotable = true;
-      } else if (piece.type === 'hourglass') {
-        const ownsA = piece.cellA[0] === cx && piece.cellA[1] === cy && piece.cellA[2] === cz;
-        const ownsB = piece.cellB[0] === cx && piece.cellB[1] === cy && piece.cellB[2] === cz;
-        if ((ownsA || ownsB) && piece.offsetIndex !== offsetIndex) return 'blocked';
-      } else if (piece.type === 'wedge2') {
-        if (piece.cell[0] === cx && piece.cell[1] === cy && piece.cell[2] === cz) promotable = true;
+      if (piece.type === 'halfrd') addOwner(piece.cell, piece.offsetIndex);
+      else if (piece.type === 'hourglass') { addOwner(piece.cellA, piece.offsetIndex); addOwner(piece.cellB, piece.offsetIndex); }
+      else if (piece.type === 'wedge2') addOwner(piece.cell, null); // null never equals a real offsetIndex -- always conflicts
+    }
+
+    const toPromote = new Set();
+    for (const [id, offsetIndexes] of owners) {
+      if (new Set(offsetIndexes).size > 1) toPromote.add(id);
+    }
+    if (toPromote.size === 0) return;
+
+    // Grow the set to a fixed point so no hourglass is ever left with
+    // only one of its two cells promoted.
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const piece of hemisphereStore.entries()) {
+        if (piece.type !== 'hourglass') continue;
+        const idA = cellId(piece.cellA);
+        const idB = cellId(piece.cellB);
+        if (toPromote.has(idA) !== toPromote.has(idB)) {
+          toPromote.add(idA);
+          toPromote.add(idB);
+          grew = true;
+        }
       }
     }
-    return promotable ? 'promotable' : 'compatible';
-  }
 
-  // Clears every halfrd/wedge2 entry touching `cell` (a cell being
-  // promoted to a real solid needs nothing left owning it in
-  // hemisphereStore) and adds a real solid cell to the main world --
-  // same {material} shape/onChange() pairing the plain whole-RD growth
-  // path (this file's own default Add-mode bootstrap) already uses.
-  // Caller is responsible for onHemisphereChange() afterward (already
-  // fired once per click by handleHemisphereClick's own callers below,
-  // not duplicated here) so the now-removed meshes actually disappear.
-  function promoteCellToSolid(cell, material) {
-    const [cx, cy, cz] = cell;
+    const material = getMaterial();
     for (const piece of hemisphereStore.entries()) {
-      const ownsCell = piece.cell && piece.cell[0] === cx && piece.cell[1] === cy && piece.cell[2] === cz;
-      if ((piece.type === 'halfrd' || piece.type === 'wedge2') && ownsCell) hemisphereStore.remove(piece.key);
+      const cellsOwned = piece.type === 'hourglass' ? [piece.cellA, piece.cellB] : [piece.cell];
+      if (cellsOwned.some((c) => toPromote.has(cellId(c)))) hemisphereStore.remove(piece.key);
     }
-    world.addCell(cx, cy, cz, { material });
+    for (const id of toPromote) {
+      const [x, y, z] = id.split(',').map(Number);
+      if (!world.has(x, y, z)) world.addCell(x, y, z, { material });
+    }
     onChange();
   }
 
@@ -608,14 +621,11 @@ export function createBuildController({
         // an already-solid RD cell, which this then silently overlapped
         // with a coincident half-piece instead of recognizing it as
         // occupied. Same fix as the halfrd cluster loop just below.
-        // A wedge2 is a 2-axis cut of the WHOLE cell -- never compatible
-        // with any existing content there, same-axis or not (unlike
-        // halfrd/hourglass's own same-axis completion case below), so
-        // this passes null (matches nothing) rather than a real
-        // offsetIndex -- see cellHasIncompatibleHemisphereContent's own
-        // header.
+        // Any DIFFERENT-axis conflict this creates elsewhere is caught
+        // and resolved afterward by reconcileHemisphereStore(), not
+        // predicted here.
         const key = wedge2Key(cell[0], cell[1], cell[2], axisA, axisB);
-        if (hemisphereStore.has(key) || world.has(cell[0], cell[1], cell[2]) || cellHasIncompatibleHemisphereContent(cell, null)) continue;
+        if (hemisphereStore.has(key) || world.has(cell[0], cell[1], cell[2])) continue;
         hemisphereStore.set(key, { type: 'wedge2', cell, axisA, axisB, material });
         added++;
       }
@@ -668,17 +678,10 @@ export function createBuildController({
       // an obvious duplicate).
       if (hemisphereStore.has(key) || world.has(nx, ny, nz)) continue;
       // A target can still already hold a DIFFERENT axis's own
-      // halfrd/wedge2 -- classifyHemisphereTarget/promoteCellToSolid's
-      // own headers cover why (two arbitrary half-space cuts don't union
-      // into anything coherent) and what happens instead (promote to a
-      // real solid RD, direct user request 2026-09-11).
-      const classification = classifyHemisphereTarget([nx, ny, nz], offsetIndex);
-      if (classification === 'blocked') continue;
-      if (classification === 'promotable') {
-        promoteCellToSolid([nx, ny, nz], material);
-      } else {
-        hemisphereStore.set(key, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex, side: 'negative', material });
-      }
+      // halfrd/wedge2 -- reconcileHemisphereStore() (called once at the
+      // end of handleHemisphereClick below) catches and resolves that
+      // afterward, not predicted here.
+      hemisphereStore.set(key, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex, side: 'negative', material });
       added++;
     }
     return { anchorCell, added, label };
@@ -793,10 +796,8 @@ export function createBuildController({
         // click can legitimately hit a hemisphere piece's own OUTER face
         // (unlike a solid cell's face, nothing culls it just because the
         // neighbor beyond it happens to already be solid), so this genuinely
-        // needs its own world.has() check, not just hemisphereStore's --
-        // plus the deeper cellHasIncompatibleHemisphereContent check
-        // (see its own header) for a different-axis piece already there.
-        if (hemisphereStore.has(key2) || world.has(nx2, ny2, nz2) || cellHasIncompatibleHemisphereContent([nx2, ny2, nz2], offsetIndex2)) return { added: 0 };
+        // needs its own world.has() check, not just hemisphereStore's.
+        if (hemisphereStore.has(key2) || world.has(nx2, ny2, nz2)) return { added: 0 };
         hemisphereStore.set(key2, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex: offsetIndex2, material });
         return { added: 1, anchor: { x: ax, y: ay, z: az } };
       }
@@ -811,27 +812,20 @@ export function createBuildController({
     const nz = az + dz;
     // Same real bug as above -- a hemisphere piece's own outer face is
     // always clickable regardless of what's beyond it, so this needs its
-    // own world.has() check too, not just hemisphereStore's.
+    // own world.has() check too, not just hemisphereStore's. Any
+    // different-axis conflict this creates is caught and resolved
+    // afterward by reconcileHemisphereStore(), not predicted here.
     if (pieceType === 'halfrd') {
       const key2 = halfRdKey(nx, ny, nz, j, 'negative');
       if (hemisphereStore.has(key2) || world.has(nx, ny, nz)) return { added: 0 };
-      // A single 'halfrd' owns exactly one cell, so a promotable
-      // conflict here can safely become a real solid RD -- see
-      // classifyHemisphereTarget/promoteCellToSolid's own headers.
-      const classification = classifyHemisphereTarget([nx, ny, nz], j);
-      if (classification === 'blocked') return { added: 0 };
-      if (classification === 'promotable') {
-        promoteCellToSolid([nx, ny, nz], material);
-      } else {
-        hemisphereStore.set(key2, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex: j, side: 'negative', material });
-      }
+      hemisphereStore.set(key2, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex: j, side: 'negative', material });
       return { added: 1, anchor: { x: nx, y: ny, z: nz } };
     }
     // pieceType === 'hourglass'
     const [loCell, hiCell] = canonicalHourglassCells(ax, ay, az, nx, ny, nz);
     const key2 = hourglassKey(...loCell, ...hiCell);
     const offsetIndex2 = hourglassOffsetIndex(loCell, hiCell);
-    if (hemisphereStore.has(key2) || world.has(nx, ny, nz) || cellHasIncompatibleHemisphereContent([nx, ny, nz], offsetIndex2)) return { added: 0 };
+    if (hemisphereStore.has(key2) || world.has(nx, ny, nz)) return { added: 0 };
     hemisphereStore.set(key2, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex: offsetIndex2, material });
     return { added: 1, anchor: { x: ax, y: ay, z: az } };
   }
@@ -851,6 +845,7 @@ export function createBuildController({
         if (!anchorCell) { if (onPieceNoOp) onPieceNoOp(action); return; }
         const result = addHemisphereCluster(anchorCell, hit, pieceType);
         if (!result || result.added === 0) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        reconcileHemisphereStore();
         onHemisphereChange();
         if (onPlaced) {
           onPlaced({ x: result.anchorCell.x, y: result.anchorCell.y, z: result.anchorCell.z, material: getMaterial(), label: result.label });
@@ -860,6 +855,7 @@ export function createBuildController({
       if (hit.object.parent === hemisphereGroup) {
         const result = growFromHemispherePiece(hit, pieceType);
         if (!result || result.added === 0) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        reconcileHemisphereStore();
         onHemisphereChange();
         if (onPlaced) onPlaced({ x: result.anchor.x, y: result.anchor.y, z: result.anchor.z, material: getMaterial() });
         return;
@@ -888,13 +884,8 @@ export function createBuildController({
         // trivial -- never leave this one hemisphere-piece path as the
         // sole unchecked one.
         if (hemisphereStore.has(key) || world.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
-        const classification = classifyHemisphereTarget([nx, ny, nz], offsetIndex);
-        if (classification === 'blocked') { if (onPieceNoOp) onPieceNoOp(action); return; }
-        if (classification === 'promotable') {
-          promoteCellToSolid([nx, ny, nz], material);
-        } else {
-          hemisphereStore.set(key, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex, side: 'negative', material });
-        }
+        hemisphereStore.set(key, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex, side: 'negative', material });
+        reconcileHemisphereStore();
         onHemisphereChange();
         if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
         return;
@@ -903,8 +894,9 @@ export function createBuildController({
       const [loCell, hiCell] = canonicalHourglassCells(anchorCell.x, anchorCell.y, anchorCell.z, nx, ny, nz);
       const key = hourglassKey(...loCell, ...hiCell);
       const offsetIndex = hourglassOffsetIndex(loCell, hiCell);
-      if (hemisphereStore.has(key) || world.has(nx, ny, nz) || cellHasIncompatibleHemisphereContent([nx, ny, nz], offsetIndex)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      if (hemisphereStore.has(key) || world.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
       hemisphereStore.set(key, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex, material });
+      reconcileHemisphereStore();
       onHemisphereChange();
       // x/y/z here is the clicked (anchor) cell, purely so render.js's
       // flashAt has a real position -- the Hourglass itself spans two
