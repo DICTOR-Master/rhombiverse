@@ -126,25 +126,33 @@ original rotation/color were already a close match; the dots (not the
 geometry) were the actual mismatch. `favicon.svg` itself is untouched by
 the 2026-08-26 redesign — only this file's own logo changed.
 
-## `FALLBACK_TAGLINE`
+## `FALLBACK_TAGLINE` / `loadLatestUpdate` — removed 2026-09-10
 
-Fallback only — shown until `loadLatestUpdate()` resolves, or if the
-fetch fails outright (offline, localStorage-only dev server oddity).
-The real tagline is always sourced from `data/changelog.json`'s newest
-entry's OWN TITLE ONLY (see `init()`) — not hand-maintained here, so it
-can't go stale the way a hardcoded line already had (2026-08-23, direct
-request: "welcome should be based on changelog"). Title only, not title
-+ lead item, per direct feedback that the first attempt (which appended
-the item text) read as too wordy and too negatively framed for a
-first-impression line — the changelog panel itself is still the place
-for that fuller, more detailed wording.
+Used to show a changelog-derived tagline (`data/changelog.json`'s newest
+entry's title, see history below) directly under the `<h1>`. Cut per
+direct feedback the same day the RHOMBIS and Polyhedraverse cross-links
+were added below: with three pieces of "extra info" on the card (this
+tagline, the RHOMBIS link, the Polyhedraverse link), "two bits of extra
+info [is] enough on welcome" — this is the one that went, with the
+RHOMBIS link moved up into its old top-of-card spot instead of being
+added as a fourth item. The "What's New" changelog panel
+(`src/app/changelog.js`) is unaffected and remains the real place for
+that content; this was always just a secondary teaser of it.
 
-## `loadLatestUpdate`
-
-Fetched fire-and-forget from `init()` below — built synchronously with
-`FALLBACK_TAGLINE` first (same reasoning as `changelog.js`'s own
-overlay: don't block the welcome card's very first paint on a
-network/disk round-trip), then patched in place once this resolves.
+Prior history, superseded above: fallback-only, shown until
+`loadLatestUpdate()` resolved or if the fetch failed outright (offline,
+localStorage-only dev server oddity). The real tagline was always
+sourced from `data/changelog.json`'s newest entry's OWN TITLE ONLY (see
+`init()`) — not hand-maintained, so it couldn't go stale the way a
+hardcoded line already had (2026-08-23, direct request: "welcome should
+be based on changelog"). Title only, not title + lead item, per direct
+feedback that the first attempt (which appended the item text) read as
+too wordy and too negatively framed for a first-impression line.
+`loadLatestUpdate()` itself was fetched fire-and-forget from `init()` —
+built synchronously with `FALLBACK_TAGLINE` first (same reasoning as
+`changelog.js`'s own overlay: don't block the welcome card's very first
+paint on a network/disk round-trip), then patched in place once it
+resolved.
 
 ## The persona grid — removed 2026-08-26
 

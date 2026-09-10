@@ -1574,6 +1574,30 @@ function buildHemisphereGeometry(piece, subScale) {
     geometry.computeVertexNormals();
     return geometry;
   }
+  // 'wedge2' (Triangle Ring, core/hemisphere-build.js's own wedge2Key):
+  // real bug found live -- this branch never existed, so a wedge2 piece
+  // fell through into the 'hourglass' branch below and crashed on
+  // `...piece.cellA` (undefined, wedge2 only ever stores `cell`) the
+  // moment one was placed. Same "cell's own 14 raw vertices, dot-product
+  // filtered" technique hemisphereSplit already uses for a single cut,
+  // just intersected against BOTH of this piece's own axes at once --
+  // exactly the formula core/hemisphere-build.js's own wedge2Key header
+  // already documents and claims was verified (non-degenerate for every
+  // real CORNER_GROUPS triple), just never actually wired into a real
+  // render.
+  if (piece.type === 'wedge2') {
+    const [cx, cy, cz] = piece.cell;
+    const [wx, wy, wz] = cellToWorld(cx, cy, cz, subScale);
+    const axisA = NEIGHBOR_OFFSETS[piece.axisA];
+    const axisB = NEIGHBOR_OFFSETS[piece.axisB];
+    const dot = (v, d) => v[0] * d[0] + v[1] * d[1] + v[2] * d[2];
+    const verts = rdRawVerts(subScale)
+      .filter((v) => dot(v, axisA) >= -1e-9 && dot(v, axisB) >= -1e-9)
+      .map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
+    const geometry = new ConvexGeometry(verts);
+    geometry.computeVertexNormals();
+    return geometry;
+  }
   // 'hourglass': cellA's own positive half (toward cellB) merged with
   // cellB's own negative half (toward cellA) -- same offsetIndex for
   // both, same reasoning rhombis/geometry.js's buildHourglassStage

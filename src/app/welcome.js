@@ -143,23 +143,31 @@ function startLogoSpin(onEnterHit) {
   };
 }
 
-// Shown until loadLatestUpdate() resolves; real tagline is always the
-// newest data/changelog.json entry's title -- see companion doc.
-const FALLBACK_TAGLINE = 'One shape. Everything grows from it.';
-
+// Real user feedback (2026-09-10): the welcome card had grown to three
+// pieces of "extra info" below the title/logo (the changelog-derived
+// tagline, the RHOMBIS cross-link, the Polyhedraverse cross-link) --
+// "two bits of extra info [is] enough on welcome." The changelog tagline
+// (previously right under the h1, its own loadLatestUpdate() fetch) is
+// the one that was cut, in favor of the RHOMBIS link taking that top
+// spot instead -- the "What's New" changelog panel (src/app/changelog.js)
+// is still the real place for that content, this was always a secondary
+// teaser of it.
 function overlayHtml() {
   return `
     <div id="welcome-card">
       <h1>Rhombiverse</h1>
-      <p class="tagline" id="welcome-tagline">${FALLBACK_TAGLINE}</p>
+      <div class="rhombis-link">
+        <img src="./assets/rhombis-favicon-64.png" alt="" width="28" height="28" />
+        <a href="./rhombis.html">New here? Try RHOMBIS, our 3D intro puzzle &rarr;</a>
+      </div>
       ${logoSvg()}
       <label class="dont-show">
         <input type="checkbox" id="skip-intro-checkbox" />
         Don't show this again on this device
       </label>
-      <div class="rhombis-link">
-        <img src="./assets/rhombis-favicon-64.png" alt="" width="28" height="28" />
-        <a href="./rhombis.html">New here? Try RHOMBIS, our 3D intro puzzle &rarr;</a>
+      <div class="polyhedraverse-link">
+        <img src="./assets/polyhedraverse-favicon-64.png" alt="" width="28" height="28" />
+        <a href="https://polyhedraverse.vercel.app" target="_blank" rel="noopener">Check out Polyhedraverse, our twin shape-editing site &rarr;</a>
       </div>
       <div class="legal-links">
         <a href="./TERMS.md" target="_blank" rel="noopener">Terms</a>
@@ -170,19 +178,6 @@ function overlayHtml() {
     </div>`;
 }
 
-// Fire-and-forget from init() -- see companion doc for why it doesn't
-// block first paint.
-async function loadLatestUpdate() {
-  try {
-    const res = await fetch('./data/changelog.json');
-    const entries = await res.json();
-    return entries[0] ?? null;
-  } catch (err) {
-    console.warn('Rhombiverse: failed to load changelog for welcome tagline', err);
-    return null;
-  }
-}
-
 function init() {
   const overlay = document.createElement('div');
   overlay.id = 'welcome-overlay';
@@ -190,27 +185,6 @@ function init() {
   document.body.appendChild(overlay);
 
   let stopLogoSpin = () => {};
-
-  loadLatestUpdate().then((entry) => {
-    if (!entry) return;
-    const tagline = document.getElementById('welcome-tagline');
-    if (!tagline) return;
-    // An entry can optionally carry its own `link` (data/changelog.json)
-    // -- direct instruction (2026-09-04, wordplay intended: "Rhombis: A
-    // New Way In" becomes a literal new way in, straight to the newest
-    // enumerator-powered stages rather than the intro). Plain text
-    // when absent, exactly the prior behavior -- most entries won't
-    // have anywhere meaningful to link to.
-    if (entry.link) {
-      tagline.innerHTML = '';
-      const a = document.createElement('a');
-      a.href = entry.link;
-      a.textContent = entry.title;
-      tagline.appendChild(a);
-    } else {
-      tagline.textContent = entry.title;
-    }
-  });
 
   // Mode choice (Pure Rhombeometry vs. Full World) removed along with
   // World Systems retirement -- there's only one real mode now, so
