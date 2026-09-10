@@ -270,6 +270,27 @@ export function createBuildController({
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
+  // One-time self-heal on load (2026-09-11): reconcileHemisphereStore()
+  // (see its own header below) only runs after a NEW hemisphere action,
+  // so a save that already had bad data BEFORE that function -- or
+  // before the world.has() fix three commits before it -- existed would
+  // carry that corruption forward forever, since nothing else ever
+  // revisits already-stored pieces. Running it once right here, at
+  // controller construction (i.e. once per real page load), sweeps up
+  // and fixes any pre-existing corruption from an older save the moment
+  // it's loaded, not just conflicts created from here on.
+  // reconcileHemisphereStore() only touches the main world's own
+  // onChange() -- it never calls onHemisphereChange() itself (every
+  // OTHER call site below already calls that right afterward on its
+  // own), so this startup call must do so explicitly too, or a healed
+  // removal only ever happens in memory: never re-rendered (the stale
+  // mesh stays visible) and never re-persisted (the very next reload
+  // reads the same untouched localStorage and "heals" the identical
+  // stale piece again, forever, without it ever sticking) -- caught
+  // live, verified via a real page load against the user's own exported
+  // save before trusting this.
+  if (hemisphereStore && world && reconcileHemisphereStore()) onHemisphereChange();
+
   function pick(event) {
     const rect = renderer.domElement.getBoundingClientRect();
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -593,7 +614,22 @@ export function createBuildController({
     for (const id of wedgeCells) {
       if ((ownerCountByCell.get(id) ?? 0) > 1) toPromote.add(id);
     }
-    if (toPromote.size === 0) return;
+    // Real bug found live (2026-09-11, via the user's own exported save):
+    // a stale halfrd sitting at the SAME cell as an already-solid world
+    // RD, created by an earlier, now-fixed version of this code (before
+    // the world.has() check three commits back) -- once bad data like
+    // that exists, no forward-looking placement check ever cleans it up
+    // again on its own, so every later fix kept getting tested against
+    // an already-corrupted save and looked like it hadn't worked. Any
+    // hemisphere-owned cell that's ALREADY solid is unconditionally
+    // stale (a real solid needs nothing else there) -- swept up here too
+    // so loading an old save self-heals instead of carrying the bug
+    // forward forever.
+    for (const id of new Set([...axesByCell.keys(), ...wedgeCells])) {
+      const [x, y, z] = id.split(',').map(Number);
+      if (world.has(x, y, z)) toPromote.add(id);
+    }
+    if (toPromote.size === 0) return false;
 
     // Grow the set to a fixed point so no hourglass is ever left with
     // only one of its two cells promoted.
@@ -612,16 +648,27 @@ export function createBuildController({
       }
     }
 
-    const material = getMaterial();
+    // Prefer each promoted cell's own removed piece(s)' real material over
+    // getMaterial() (the currently-selected tool material) -- matters most
+    // for the one-time startup self-heal above, where there's no actual
+    // placement action happening to make "currently selected" meaningful,
+    // and matters generally so healing old data doesn't silently recolor
+    // it to whatever the player happens to have picked right now.
+    const materialByCell = new Map();
     for (const piece of hemisphereStore.entries()) {
       const cellsOwned = piece.type === 'hourglass' ? [piece.cellA, piece.cellB] : [piece.cell];
+      for (const c of cellsOwned) {
+        const id = cellId(c);
+        if (toPromote.has(id) && !materialByCell.has(id)) materialByCell.set(id, piece.material);
+      }
       if (cellsOwned.some((c) => toPromote.has(cellId(c)))) hemisphereStore.remove(piece.key);
     }
     for (const id of toPromote) {
       const [x, y, z] = id.split(',').map(Number);
-      if (!world.has(x, y, z)) world.addCell(x, y, z, { material });
+      if (!world.has(x, y, z)) world.addCell(x, y, z, { material: materialByCell.get(id) ?? getMaterial() });
     }
     onChange();
+    return true;
   }
 
   function addHemisphereCluster(anchorCell, hit, pieceType) {
