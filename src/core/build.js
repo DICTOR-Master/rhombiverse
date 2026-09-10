@@ -484,6 +484,52 @@ export function createBuildController({
   // exposing what the corner math already gives"): render.js's own
   // onPlaced surfaces this as a real HUD toast so the choice is legible
   // to the player, not just an invisible internal disambiguation detail.
+  // Real bug found live (2026-09-10, "still propagating" after the
+  // world.has() fix above, "as they are stacked the empty piece fills
+  // in lower down stack"): hemisphereStore's own key scheme
+  // (halfRdKey includes offsetIndex) lets a cell hold MULTIPLE
+  // independent 'halfrd' entries at once, one per direction -- nothing
+  // ever stopped two DIFFERENT chained clusters (or a cluster and a
+  // single-piece tool) from each adding their own 'negative' half at
+  // the SAME cell via two DIFFERENT offsetIndex values. Two arbitrary
+  // half-space cuts don't union into anything coherent (only a SAME-
+  // axis pair, positive+negative of one offsetIndex, does -- exactly
+  // growFromHemispherePiece's own "complete this piece's missing other
+  // half" mechanic) -- verified directly by constructing this exact
+  // state and rendering it: two overlapping lumps with a visible
+  // uncovered notch between them, not a clean partial or whole shape.
+  // Confirms "fills in lower down the stack": more independently-
+  // reached directions accumulate more overlapping wedges, so the
+  // uncovered notch visually shrinks as a chain grows, without the
+  // underlying data ever becoming a real, correct piece.
+  //
+  // This is a real gap distinct from the world.has() fix just above --
+  // that one catches "a full SOLID RD already owns this cell" (a
+  // different store entirely); this one catches "hemisphereStore
+  // itself already owns this cell along an INCOMPATIBLE axis."
+  // Same-offsetIndex entries (the legitimate same-axis completion) are
+  // deliberately let through -- checked by offsetIndex identity, not
+  // object identity or side, so growFromHemispherePiece's own "other
+  // side, same axis" call sites keep working exactly as before. A
+  // 'wedge2' at the cell always conflicts (it's already a 2-axis cut of
+  // that whole cell, never compatible with anything else being added
+  // there).
+  function cellHasIncompatibleHemisphereContent(cell, offsetIndex) {
+    const [cx, cy, cz] = cell;
+    for (const piece of hemisphereStore.entries()) {
+      if (piece.type === 'halfrd') {
+        if (piece.cell[0] === cx && piece.cell[1] === cy && piece.cell[2] === cz && piece.offsetIndex !== offsetIndex) return true;
+      } else if (piece.type === 'hourglass') {
+        const ownsA = piece.cellA[0] === cx && piece.cellA[1] === cy && piece.cellA[2] === cz;
+        const ownsB = piece.cellB[0] === cx && piece.cellB[1] === cy && piece.cellB[2] === cz;
+        if ((ownsA || ownsB) && piece.offsetIndex !== offsetIndex) return true;
+      } else if (piece.type === 'wedge2') {
+        if (piece.cell[0] === cx && piece.cell[1] === cy && piece.cell[2] === cz) return true;
+      }
+    }
+    return false;
+  }
+
   function addHemisphereCluster(anchorCell, hit, pieceType) {
     if (pieceType === 'hemiRing') {
       // Triangle Ring: reuses hemi3's OWN corner-group resolution (the
@@ -511,7 +557,14 @@ export function createBuildController({
         // an already-solid RD cell, which this then silently overlapped
         // with a coincident half-piece instead of recognizing it as
         // occupied. Same fix as the halfrd cluster loop just below.
-        if (hemisphereStore.has(key) || world.has(cell[0], cell[1], cell[2])) continue;
+        // A wedge2 is a 2-axis cut of the WHOLE cell -- never compatible
+        // with any existing content there, same-axis or not (unlike
+        // halfrd/hourglass's own same-axis completion case below), so
+        // this passes null (matches nothing) rather than a real
+        // offsetIndex -- see cellHasIncompatibleHemisphereContent's own
+        // header.
+        const key = wedge2Key(cell[0], cell[1], cell[2], axisA, axisB);
+        if (hemisphereStore.has(key) || world.has(cell[0], cell[1], cell[2]) || cellHasIncompatibleHemisphereContent(cell, null)) continue;
         hemisphereStore.set(key, { type: 'wedge2', cell, axisA, axisB, material });
         added++;
       }
@@ -562,7 +615,13 @@ export function createBuildController({
       // read live as "empty space in the middle" (the mismatched
       // triangulation at that shared boundary reads as a gap/seam, not
       // an obvious duplicate).
-      if (hemisphereStore.has(key) || world.has(nx, ny, nz)) continue;
+      // Deeper real bug, found live AFTER the world.has() fix above
+      // ("still propagating"/"fills in lower down stack"): even once a
+      // target is confirmed not-already-solid, it can still already
+      // hold a DIFFERENT axis's own halfrd/hourglass/wedge2 -- see
+      // cellHasIncompatibleHemisphereContent's own header for why two
+      // arbitrary half-space cuts don't union into anything coherent.
+      if (hemisphereStore.has(key) || world.has(nx, ny, nz) || cellHasIncompatibleHemisphereContent([nx, ny, nz], offsetIndex)) continue;
       hemisphereStore.set(key, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex, side: 'negative', material });
       added++;
     }
@@ -673,13 +732,15 @@ export function createBuildController({
         const nz2 = az + dz;
         const [loCell, hiCell] = canonicalHourglassCells(ax, ay, az, nx2, ny2, nz2);
         const key2 = hourglassKey(...loCell, ...hiCell);
+        const offsetIndex2 = hourglassOffsetIndex(loCell, hiCell);
         // Same real bug as addHemisphereCluster's loops above -- a real
         // click can legitimately hit a hemisphere piece's own OUTER face
         // (unlike a solid cell's face, nothing culls it just because the
         // neighbor beyond it happens to already be solid), so this genuinely
-        // needs its own world.has() check, not just hemisphereStore's.
-        if (hemisphereStore.has(key2) || world.has(nx2, ny2, nz2)) return { added: 0 };
-        const offsetIndex2 = hourglassOffsetIndex(loCell, hiCell);
+        // needs its own world.has() check, not just hemisphereStore's --
+        // plus the deeper cellHasIncompatibleHemisphereContent check
+        // (see its own header) for a different-axis piece already there.
+        if (hemisphereStore.has(key2) || world.has(nx2, ny2, nz2) || cellHasIncompatibleHemisphereContent([nx2, ny2, nz2], offsetIndex2)) return { added: 0 };
         hemisphereStore.set(key2, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex: offsetIndex2, material });
         return { added: 1, anchor: { x: ax, y: ay, z: az } };
       }
@@ -694,18 +755,20 @@ export function createBuildController({
     const nz = az + dz;
     // Same real bug as above -- a hemisphere piece's own outer face is
     // always clickable regardless of what's beyond it, so this needs its
-    // own world.has() check too, not just hemisphereStore's.
+    // own world.has() check too, not just hemisphereStore's -- plus the
+    // deeper cellHasIncompatibleHemisphereContent check for a different-
+    // axis piece already there.
     if (pieceType === 'halfrd') {
       const key2 = halfRdKey(nx, ny, nz, j, 'negative');
-      if (hemisphereStore.has(key2) || world.has(nx, ny, nz)) return { added: 0 };
+      if (hemisphereStore.has(key2) || world.has(nx, ny, nz) || cellHasIncompatibleHemisphereContent([nx, ny, nz], j)) return { added: 0 };
       hemisphereStore.set(key2, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex: j, side: 'negative', material });
       return { added: 1, anchor: { x: nx, y: ny, z: nz } };
     }
     // pieceType === 'hourglass'
     const [loCell, hiCell] = canonicalHourglassCells(ax, ay, az, nx, ny, nz);
     const key2 = hourglassKey(...loCell, ...hiCell);
-    if (hemisphereStore.has(key2) || world.has(nx, ny, nz)) return { added: 0 };
     const offsetIndex2 = hourglassOffsetIndex(loCell, hiCell);
+    if (hemisphereStore.has(key2) || world.has(nx, ny, nz) || cellHasIncompatibleHemisphereContent([nx, ny, nz], offsetIndex2)) return { added: 0 };
     hemisphereStore.set(key2, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex: offsetIndex2, material });
     return { added: 1, anchor: { x: ax, y: ay, z: az } };
   }
@@ -761,7 +824,7 @@ export function createBuildController({
         // nothing actually guarantees that, and the cost of checking is
         // trivial -- never leave this one hemisphere-piece path as the
         // sole unchecked one.
-        if (hemisphereStore.has(key) || world.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        if (hemisphereStore.has(key) || world.has(nx, ny, nz) || cellHasIncompatibleHemisphereContent([nx, ny, nz], offsetIndex)) { if (onPieceNoOp) onPieceNoOp(action); return; }
         hemisphereStore.set(key, { type: 'halfrd', cell: [nx, ny, nz], offsetIndex, side: 'negative', material });
         onHemisphereChange();
         if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
@@ -770,8 +833,8 @@ export function createBuildController({
       // 'hourglass'
       const [loCell, hiCell] = canonicalHourglassCells(anchorCell.x, anchorCell.y, anchorCell.z, nx, ny, nz);
       const key = hourglassKey(...loCell, ...hiCell);
-      if (hemisphereStore.has(key) || world.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
       const offsetIndex = hourglassOffsetIndex(loCell, hiCell);
+      if (hemisphereStore.has(key) || world.has(nx, ny, nz) || cellHasIncompatibleHemisphereContent([nx, ny, nz], offsetIndex)) { if (onPieceNoOp) onPieceNoOp(action); return; }
       hemisphereStore.set(key, { type: 'hourglass', cellA: loCell, cellB: hiCell, offsetIndex, material });
       onHemisphereChange();
       // x/y/z here is the clicked (anchor) cell, purely so render.js's
