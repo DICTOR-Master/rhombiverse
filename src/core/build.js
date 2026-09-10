@@ -547,21 +547,51 @@ export function createBuildController({
   // fixed point before touching the store at all.
   function reconcileHemisphereStore() {
     const cellId = (c) => `${c[0]},${c[1]},${c[2]}`;
-    const owners = new Map(); // cellId -> [{ offsetIndex: number|null }]
-    const addOwner = (cell, offsetIndex) => {
+    // Real bug found live (2026-09-11), "every time i try to attach a
+    // half it becomes a whole straight away instead of waiting for the
+    // missing half": offsetIndex and its own opposite (oppositeNeighborIndex)
+    // describe the SAME cutting plane, just referenced from the other
+    // side -- {offsetIndex:4, side:'negative'} at a cell is geometrically
+    // IDENTICAL to {offsetIndex:7, side:'positive'} (7 = opposite(4)),
+    // since hemisphereSplit's own positive/negative simply flips when the
+    // reference direction flips. This reconciliation was comparing raw
+    // offsetIndex values directly, so the legitimate "attach the missing
+    // other half" case (reached via the opposite index, exactly what
+    // growFromHemispherePiece's own same-cell completion produces when a
+    // cluster chain reaches back two levels) was misread as a genuinely
+    // different axis and promoted to solid immediately, before the pair
+    // ever got a chance to actually complete each other. Normalizing
+    // every offsetIndex to a canonical axis id (the smaller of itself and
+    // its own opposite) before comparing fixes this: same axis, either
+    // index, is compatible; only a genuinely different axis conflicts.
+    const canonicalAxis = (offsetIndex) => Math.min(offsetIndex, oppositeNeighborIndex(offsetIndex));
+    const axesByCell = new Map(); // cellId -> Set of canonical axis ids
+    const ownerCountByCell = new Map(); // cellId -> total entry count (for wedge2's own "alone is fine, alongside anything else is not" rule)
+    const bump = (id) => ownerCountByCell.set(id, (ownerCountByCell.get(id) ?? 0) + 1);
+    const addAxisOwner = (cell, offsetIndex) => {
       const id = cellId(cell);
-      if (!owners.has(id)) owners.set(id, []);
-      owners.get(id).push(offsetIndex);
+      if (!axesByCell.has(id)) axesByCell.set(id, new Set());
+      axesByCell.get(id).add(canonicalAxis(offsetIndex));
+      bump(id);
+    };
+    const wedgeCells = new Set();
+    const addWedgeOwner = (cell) => {
+      const id = cellId(cell);
+      wedgeCells.add(id);
+      bump(id);
     };
     for (const piece of hemisphereStore.entries()) {
-      if (piece.type === 'halfrd') addOwner(piece.cell, piece.offsetIndex);
-      else if (piece.type === 'hourglass') { addOwner(piece.cellA, piece.offsetIndex); addOwner(piece.cellB, piece.offsetIndex); }
-      else if (piece.type === 'wedge2') addOwner(piece.cell, null); // null never equals a real offsetIndex -- always conflicts
+      if (piece.type === 'halfrd') addAxisOwner(piece.cell, piece.offsetIndex);
+      else if (piece.type === 'hourglass') { addAxisOwner(piece.cellA, piece.offsetIndex); addAxisOwner(piece.cellB, piece.offsetIndex); }
+      else if (piece.type === 'wedge2') addWedgeOwner(piece.cell);
     }
 
     const toPromote = new Set();
-    for (const [id, offsetIndexes] of owners) {
-      if (new Set(offsetIndexes).size > 1) toPromote.add(id);
+    for (const [id, axes] of axesByCell) {
+      if (axes.size > 1) toPromote.add(id);
+    }
+    for (const id of wedgeCells) {
+      if ((ownerCountByCell.get(id) ?? 0) > 1) toPromote.add(id);
     }
     if (toPromote.size === 0) return;
 
