@@ -1,5 +1,12 @@
 # Rhombiverse — Spec Addendum: Water & Ice 9.9 (Planetoid Hydrosphere)
 
+> **ARCHIVED 2026-09-17** — this World System was retired along with the
+> rest of the game/world-building layer (mining, trade, claims,
+> achievements, hazards, hydrosphere); see README.md. Its code moved to
+> `src/world-systems-archived/hydrosphere.js` — kept intact for
+> reference, permanently unreachable in the running app, not deleted.
+> This doc is historical.
+
 Standalone addendum. Extends `RHOMBIVERSE_SPEC_ASTEROIDS.md` (resource acquisition) and `RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md` (Ice 9.9's core-adjacent behavior interacts directly with Blackstar-Glassite cores). This is a benign material system — it does not use the black hole's containment framework; see section 3 for the actual mechanic.
 
 ---

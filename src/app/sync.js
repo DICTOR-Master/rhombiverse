@@ -110,20 +110,12 @@ export async function loadSharedWorld() {
       updatedAtMs: new Date(row.updated_at).getTime(),
     };
   }
-  const claims = await loadClaims();
-  const asteroidRegrowth = await loadRegrowthQueue();
-  const playerInventory = await loadInventory();
-  const pendingTrades = await loadPendingTrades();
   const seeds = await loadSeeds();
   const now = new Date().toISOString();
   return {
     worldName: 'Rhombiverse (Shared)',
     version: 1,
     cells,
-    claims,
-    asteroidRegrowth,
-    playerInventory,
-    pendingTrades,
     seeds,
     meta: { createdAt: now, lastModified: now },
   };

@@ -74,18 +74,36 @@ attached.
   (`growth.js`), Duality Mode (periodic↔aperiodic tiling dual,
   `dual.js`, shown once grown Penrose/Ammann structures exist), lattice
   zoom (`latticezoom.js`), cultivation (`cultivation.js`).
-- **World Systems (retired — code archived, not reachable in the app):**
-  mining & resources, inventory, claims/regions (`regions.js`), trade
-  (`trade.js`), achievements (`achievements.js`), animals (`animals.js`),
-  hazards (`blackhole.js`, `supernova.js`, `starsystem.js`), hydrosphere
+- **World Systems (retired — code archived to `src/world-systems-archived/`,
+  not reachable in the app):** mining & resources (`asteroids.js`),
+  inventory, claims/regions (`regions.js`), trade (`trade.js`),
+  achievements (`achievements.js`), animals (`animals.js`), hazards
+  (`blackhole.js`, `supernova.js`, `starsystem.js`), hydrosphere
   (`hydrosphere.js`). `features.js` forces all of these off permanently
   now (`settings.js`'s `getSettings()` forces `pureGeometry: true`
   unconditionally, so there's no live toggle back on) — see
   `RHOMBIVERSE_PLAN.md`'s Migration Path for how this was built, and
   this repo's own commit history for the retirement itself. The modules
-  and their Supabase tables (`claims`, `pending_trades`) are untouched —
-  archived for reference/possible future use, not deleted, but nothing
-  in the running app can reach them anymore.
+  and their Supabase tables (`claims`, `asteroid_regrowth`,
+  `player_inventory`, `pending_trades`) are untouched — archived for
+  reference/possible future use, not deleted, but nothing in the running
+  app can reach them anymore. **2026-09-17**: went a step further than
+  the flag-off state above — removed every remaining confusing-but-
+  reachable trace, not just made them inert: the Claim/Trade/Interact/
+  asteroid-mining/inventory UI (`index.html`, `render.js`) is gone
+  entirely rather than merely hidden, the wheel menu's own "Trade"
+  doorway is a plain unlabeled Spare face now rather than a masked
+  department, `evolution.js` was found to be mis-filed under
+  `world-systems/` despite being genuinely live (the real "plant
+  something and let it grow" feature) and moved to
+  `geometry-extensions/`, and the multiplayer presence/avatar system
+  (`otherPlayers`, live name tags, the in-world "Interact" trigger) was
+  removed as unused — checked directly against the live Supabase data
+  first: `pending_trades`/`player_inventory`/`asteroid_regrowth` were
+  all empty, `claims` had only 6 rows (dev testing, not real usage).
+  Every archived spec doc (`docs/RHOMBIVERSE_SPEC_{ANIMALS,ASTEROIDS,
+  BLACKHOLE,SUPERNOVA,TRADE_INVENTORY,WATER_ICE,REGIONS,LOOPHOLES}.md`)
+  now says so at the top, rather than reading as a live, current spec.
 
 ## What this is (right now)
 
@@ -113,29 +131,35 @@ its own tools:
   World.
 - **Grow** — **Cultivate**: real Ammann-rhombohedra/Penrose aperiodic
   growth (not baked animation) unfolds a planted seed into a tree, shell, or
-  crystal cluster over time; a genome/phenotype evolution system lets
-  planted organisms reproduce, mutate, and speciate; animals have habitats,
-  mobility, and trophic relationships. **Duality Mode** shows the aperiodic
-  tiling a crystal structure casts as its shadow, reusing the same real
-  growth geometry rather than separate projection math.
+  crystal cluster over time; a genome/phenotype evolution system
+  (`geometry-extensions/evolution.js` — real, live geometry, not a World
+  System, despite once living under that directory) lets planted
+  amoeba/plant organisms reproduce, mutate, and speciate. (Animals —
+  habitats, mobility, trophic relationships — were a further species
+  profile on top of this same framework; retired along with World
+  Systems, see below.) **Duality Mode** shows the aperiodic tiling a
+  crystal structure casts as its shadow, reusing the same real growth
+  geometry rather than separate projection math.
 - **Explore** — first-person walk mode with real gravity underfoot. On
   touch devices, a real on-screen joystick, jump button, and drag-to-look
   zone appear automatically — not just a desktop-only mode.
 
 Supporting systems: **Shared World** (opt-in — Supabase realtime sync, no
 account needed beyond a lightweight anonymous session — this is core,
-collaborative *building*, not a World System, and stays fully intact), a
-**pseudonymous display name** with live named avatars for other people
-connected at the same time, **World sharing** via a compressed shareable
-link, a public **Gallery** of shared/showcase Worlds, a **What's New**
-changelog (the 🕘 button next to About), and **Cyborg Mode** — an optional
-guided walkthrough that, once finished, can also suggest a genuinely
-creative next thing to build (real AI, same three-tier pattern as
-Full-Cyborg: your own API key, the shared Vercel AI Gateway, or a local
-fallback — never required to use). Full-Cyborg itself (Sculpt/Cultivate's
-most assisted tier) uses that same AI pattern. (An in-world Interact action
-for barter trades, plus mining/inventory/resource decay and ownership
-claims, existed here too — retired along with World Systems above.)
+collaborative *building*, not a World System, and stays fully intact),
+**World sharing** via a compressed shareable link, a public **Gallery**
+of shared/showcase Worlds, a **What's New** changelog (the 🕘 button next
+to About), and **Cyborg Mode** — an optional guided walkthrough that,
+once finished, can also suggest a genuinely creative next thing to build
+(real AI, same three-tier pattern as Full-Cyborg: your own API key, the
+shared Vercel AI Gateway, or a local fallback — never required to use).
+Full-Cyborg itself (Sculpt/Cultivate's most assisted tier) uses that same
+AI pattern. (An in-world Interact action for barter trades and a live
+named-avatar presence layer for other connected users, plus mining/
+inventory/resource decay and ownership claims, existed here too —
+removed 2026-09-17, unused in practice: checked directly against the
+live Supabase data first, and every relevant table was empty or
+dev-testing-only.)
 
 The welcome screen is a rotating RD logo with two live antipodal ENTER
 faces. It used to also offer a Rhombeometry/Full World mode choice here,
@@ -261,21 +285,17 @@ rhombiverse/
     sculpture.js               # Sculpt tool: symmetry/mirror, shell brush, Assistance Spectrum
     cultivation.js             # Cultivate tool: planting assistance tiers
     growth.js                  # Penrose/Ammann-rhombohedra aperiodic growth layer
-    evolution.js                # genome/phenotype/reproduction/speciation for grown organisms
-    animals.js                  # species, habitat, mobility, trophic relationships
+    evolution.js                # genome/phenotype/reproduction/speciation for grown organisms -- LIVE geometry (geometry-extensions/, not world-systems-archived/, despite the name)
     latticezoom.js               # sub-lattice zoom rendering near organisms/plants
     planetoidgen.js               # planetoid body generation (rocky/ice/gas/ocean/etc.)
-    gravity.js, hydrosphere.js, blackhole.js, starsystem.js, supernova.js  # radial gravity + the four addenda
-    asteroids.js                 # mining/resource belts
-    regions.js                    # ownership claims
-    trade.js                      # barter/decay data model
+    gravity.js                    # radial gravity -- the one addendum still live; hydrosphere/blackhole/starsystem/supernova below are archived
     cyborg.js                      # guided-walkthrough narration engine
     byok.js                         # bring-your-own-AI-key (direct browser calls) + shared AI Gateway fallback
-    achievements.js                  # soft-goal toast system
     worldshare.js                     # compressed shareable World links
     changelog.js                       # What's New panel (fetches data/changelog.json)
-    sync.js                             # Supabase realtime: cells, claims, trades, inventory, presence, gallery
+    sync.js                             # Supabase realtime: cells, seeds, gallery (claims/trades/inventory/presence sync calls removed 2026-09-17, tables left untouched)
     sfx.js                                # menu/build sound cues
+    world-systems-archived/               # RETIRED 2026-09-17, code kept intact but unreachable (see "World Systems" above): achievements.js, animals.js, asteroids.js, blackhole.js, hydrosphere.js, regions.js, starsystem.js, supernova.js, trade.js
   data/
     starter-world.json         # single seed cell at the FCC origin
     presets/                    # loadable Worlds, incl. the Showcase World

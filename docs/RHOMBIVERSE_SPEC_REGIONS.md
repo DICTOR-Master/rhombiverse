@@ -1,5 +1,12 @@
 # Rhombiverse — Spec Addendum: Region Ownership & Claiming
 
+> **ARCHIVED 2026-09-17** — this World System was retired along with the
+> rest of the game/world-building layer (mining, trade, claims,
+> achievements, hazards, hydrosphere); see README.md. Its code moved to
+> `src/world-systems-archived/regions.js` — kept intact for reference,
+> permanently unreachable in the running app, not deleted. This doc is
+> historical.
+
 Standalone addendum. Fills a gap several existing specs already depend on (`destructible` flag, "a player's own claimed region" — referenced in `RHOMBIVERSE_SPEC_BLACKHOLE.md` and `RHOMBIVERSE_SPEC_SUPERNOVA.md`). Governed by `RHOMBIVERSE_PRINCIPLES.md`. Reuses the shell-geometry pattern already established rather than inventing a new spatial model, per Grounded Simplicity (section 0) and the project's "only best, or not best" standard — considered and rejected a fractionalizing/shrinking allocation model in favor of the simpler fixed-size approach below (see section 2 for that comparison).
 
 ---

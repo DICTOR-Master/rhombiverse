@@ -1,5 +1,12 @@
 # Rhombiverse — Spec Addendum: Black Hole Asymptotic(Containment)
 
+> **ARCHIVED 2026-09-17** — this World System was retired along with the
+> rest of the game/world-building layer (mining, trade, claims,
+> achievements, hazards, hydrosphere); see README.md. Its code moved to
+> `src/world-systems-archived/blackhole.js` — kept intact for reference,
+> permanently unreachable in the running app, not deleted. This doc is
+> historical.
+
 Standalone addendum. Extends `RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md` (black hole = extreme case of the same gravity-source mechanic) and is governed by `RHOMBIVERSE_PRINCIPLES.md` (isolation + adaptive damping both apply directly here — this spec is close to a worked example of both principles at once).
 
 ---

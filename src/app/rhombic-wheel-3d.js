@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import {
   buildRDFaces, faceKey, ensureOutwardWinding,
   SKELETON_COLOR, FACE_STYLE, computeLabelVisibility, LABEL_STYLE,
-  resolveWheelFaces, ALL_WHEELS, applyWorkspaceModeGate, applyBCCLatticeGate, applyRetiredWorldSystemsGate,
+  resolveWheelFaces, ALL_WHEELS, applyWorkspaceModeGate, applyBCCLatticeGate,
   ACTION_TO_MARK,
 } from './rhombic-wheel-3d-core.js';
 import { iconFrame, MARKS } from './wheel-icons.js';
@@ -185,11 +185,9 @@ export function createRhombicWheel3D({
     if (!wheelConfig) throw new Error(`Unknown Rhombic Wheel 3D id "${wheelId}"`);
     clearFaces();
     currentWheelId = wheelId;
-    const resolved = applyRetiredWorldSystemsGate(
-      applyBCCLatticeGate(
-        applyWorkspaceModeGate(resolveWheelFaces(wheelConfig), getWorkspaceMode?.() ?? 'world'),
-        FEATURES.bccLattice
-      )
+    const resolved = applyBCCLatticeGate(
+      applyWorkspaceModeGate(resolveWheelFaces(wheelConfig), getWorkspaceMode?.() ?? 'world'),
+      FEATURES.bccLattice
     );
     for (const face of buildRDFaces()) {
       const key = faceKey(face);

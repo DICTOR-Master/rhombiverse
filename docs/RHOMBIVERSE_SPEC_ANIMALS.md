@@ -1,5 +1,12 @@
 # Rhombiverse — Spec Addendum: Land & Sea Creature Evolution (Animals)
 
+> **ARCHIVED 2026-09-17** — this World System was retired along with the
+> rest of the game/world-building layer (mining, trade, claims,
+> achievements, hazards, hydrosphere); see README.md. Its code moved to
+> `src/world-systems-archived/animals.js` — kept intact for reference,
+> permanently unreachable in the running app, not deleted. This doc is
+> historical.
+
 Standalone addendum. Plugs into `RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md`'s species-agnostic organism framework (section 0 of that document) as two new species profiles — **land creatures** and **sea creatures** — rather than a parallel system. Everything not restated here (genome coherence bounds, deterministic catch-up simulation, isolation/blast-radius law, adaptive damping, the moderation hook) is inherited unchanged from that document. This addendum only specs what's genuinely new: mobility, sexual reproduction, a third trophic tier, habitat placement, and — cherry-picked specifically for animals — a rare grounded **habitat crossover** mechanism.
 
 Governing decisions (confirmed with the project owner):

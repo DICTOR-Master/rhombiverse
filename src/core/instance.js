@@ -1,7 +1,8 @@
 // Crystal Core "instance" primitives: pure geometry only (position,
 // generation, appearance), no genome/reproduction/survival. Shared by
-// growth.js's own player-cultivation path and world-systems/evolution.js's
-// organism path, so the seed-record shape is built in exactly one place.
+// growth.js's own player-cultivation path and geometry-extensions/
+// evolution.js's organism path, so the seed-record shape is built in
+// exactly one place.
 // See RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md section 3 (delivered
 // 2026-08-31) for the plantInstance/growInstance naming this formalizes.
 import { growSeed, VALID_TRIPLES } from '../geometry-extensions/growth.js';
@@ -28,9 +29,9 @@ export const growInstance = growSeed;
 
 // The genome-free half of evolution.js's genomeToPhenotype(): given
 // plain slider-style inputs (not a genome), produces the same
-// phenotypeOverride shape growSeed() already accepts. Lets Rhombeometry
-// mode's Cultivate flow build a phenotypeOverride without importing the
-// game-layer evolution.js at all.
+// phenotypeOverride shape growSeed() already accepts. Lets the
+// Cultivate flow build a phenotypeOverride without importing
+// evolution.js's own (heavier, genome-based) machinery at all.
 export function phenotypeFromSliders({ growthRate, maturitySize, preferType = null }) {
   return {
     facesPerTick: Math.round(1 + growthRate * 5), // 1..6

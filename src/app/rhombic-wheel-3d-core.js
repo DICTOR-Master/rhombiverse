@@ -193,7 +193,6 @@ export function resolveWheelFaces(wheelConfig) {
 // duplicate) is gated for free, with no separate list to keep in sync.
 const WORLD_ONLY_FACE_ACTIONS = new Set([
   "navigateTo:cultivate", // Cultivate -- Plant/Prune/Growth Parameters
-  "navigateTo:trade",     // Trade -- Offer/Accept/Inventory, the decay economy
   "navigateTo:explore",   // Explore -- grouped with the dynamic side per the reframe brief's own "Grow/Explore/Simulate"
   "tool:plant",           // Cultivate's Plant
   "tool:cuboctaBuild",    // Piece's Cuboctahedron Build
@@ -224,36 +223,12 @@ export function applyWorkspaceModeGate(resolvedFaces, workspaceMode) {
   return gated;
 }
 
-// World Systems retirement (features.js/settings.js): a SEPARATE,
-// permanent gate from applyWorkspaceModeGate above -- that one is about
-// freezing dynamic/simulated content (Model workspace, a live toggle
-// that includes Cultivate, still a kept Geometry Extension per
-// features.js's `cultivation`/`growth` flags). This one is about
-// FEATURES.economy being permanently off. Only "Trade" is action-gated
-// here, deliberately not reusing WORLD_ONLY_FACE_ACTIONS wholesale --
-// that set also contains navigateTo:cultivate/tool:plant (kept) and
-// navigateTo:explore (ambiguous, reads as core shared-world navigation
-// ("Rhombinaut mode"), not a retired game mechanic -- left alone).
-// Mining/achievements/animals/hydrosphere have no dedicated wheel faces
-// at all (checked directly, not assumed) -- FEATURES=false alone
-// already makes them fully unreachable, no wheel-level gate needed.
-const RETIRED_WORLD_SYSTEMS_ACTIONS = new Set(["navigateTo:trade"]);
-
-export function applyRetiredWorldSystemsGate(resolvedFaces) {
-  const gated = { ...resolvedFaces };
-  for (const [key, data] of Object.entries(resolvedFaces)) {
-    if (data.action && RETIRED_WORLD_SYSTEMS_ACTIONS.has(data.action)) {
-      // Genuinely blank (matching this file's own SPARE constant), not a
-      // dimmed-but-labeled "Trade" ghost -- unlike applyWorkspaceModeGate's
-      // faces above (temporarily locked, unlocks again in World
-      // workspace), there's no toggle that ever brings this back, so
-      // keeping the real label around would just be a permanent, slightly
-      // confusing tombstone rather than an honest empty slot.
-      gated[key] = { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." };
-    }
-  }
-  return gated;
-}
+// World Systems retirement: the "Trade" face this gate used to mask
+// (Offer/Accept/Inventory, the resource/decay economy) is now a plain
+// Spare face directly in WHEEL_HOME's own definition above -- a genuine
+// blank rather than a real department masked at render time. Mining/
+// achievements/animals/hydrosphere never had dedicated wheel faces at
+// all, so no other gate was ever needed here.
 
 // BCC Lattice feature gate (added 2026-08-28, WHEEL_PIECE): the 3 BCC/
 // interstitial piece tiers only mean anything when FEATURES.bccLattice
@@ -339,8 +314,11 @@ export const WHEEL_HOME = {
     // its own internal name and drop the invented portmanteau.
     "equator|sx-1sy1":  { kind: "dept", label: "Cultivate",  action: "navigateTo:cultivate",
       desc: "Plant, Prune, and Growth Parameters for the organic/Penrose layer." },
-    "equator|sx-1sy-1": { kind: "dept", label: "Trade",      action: "navigateTo:trade",
-      desc: "Offer, Accept, and Inventory — the resource/decay economy." },
+    // Was "Trade" (Offer/Accept/Inventory) -- the resource/decay economy
+    // was retired 2026-09-17 along with the rest of World Systems (see
+    // README.md); this face is a genuine, honest blank now rather than a
+    // real department masked at render time by a gate.
+    "equator|sx-1sy-1": { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
     "bottom|sy1sz-1":   { kind: "dept", label: "Explore",    action: "navigateTo:explore",
       desc: "Rhombinaut mode — one face, one destination, identity-framed name only." },
     // Least-adjacent-available placement (verified numerically --
@@ -694,58 +672,9 @@ export const WHEEL_CULTIVATE = {
   }
 };
 
-export const WHEEL_TRADE = {
-  id: "trade",
-  faces: {
-    // Offer/Accept are real, but only reachable via the in-world
-    // Interact trigger (walk up to another player) -- there's no
-    // menu-driven way to start a trade, so these open the Lab panel
-    // (where the real pending-trades list and inventory live) and
-    // explain the real mechanism rather than pretending a direct
-    // action exists. Judgment call -- see render.js's onAction.
-    "equator|sx1sy1":  { kind: "dept", label: "Offer", action: "tool:offer", desc: "Trades start via Interact -- walk up to another user and tap Interact." },
-    "equator|sx1sy-1": { kind: "dept", label: "Accept", action: "tool:accept", desc: "Pending trades from others show up in the Settings panel." },
-    // Direct follow-up report, same day: moving Inventory to top|sy1sz1
-    // freed up a real blank spot that's discoverable by rotating.
-    // Verified non-adjacent numerically (equator|sx-1sy1's own 4
-    // neighbors are top|sy1sz1, bottom|sy1sz-1, top|sx-1sz1, and
-    // bottom|sx-1sz-1 -- Accept's true original, equator|sx1sy-1, isn't
-    // among them). Accept balances coverage against Offer, which
-    // already has its own duplicate just below.
-    "equator|sx-1sy1": { kind: "dept", label: "Accept", action: "tool:accept", temporary: true,
-      desc: "Pending trades from others show up in the Settings panel. Duplicated here for quick access from a spare slot." },
-    // Temporary duplicate at Offer's true geometric antipode (equator|
-    // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
-    // policy: a blank face duplicates its antipode's content until
-    // real content exists for it, direct user directive 2026-08-25.
-    "equator|sx-1sy-1": { kind: "dept", label: "Offer", action: "tool:offer", temporary: true, desc: "Trades start via Interact -- walk up to another user and tap Interact. Duplicated here for quick access from a spare slot." },
-    "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
-    // Still non-adjacent to top|sy1sz1 (Inventory's new true-original
-    // slot, 2026-09-02) since this bottom-ring face isn't in top|sy1sz1's
-    // own 4-face adjacency set.
-    "bottom|sx1sz-1":  { kind: "dept", label: "Inventory", action: "tool:inventory", temporary: true,
-      desc: "Opens the Settings panel, where your real inventory is shown. Duplicated here for quick access from a spare slot." },
-    // Was a 2nd Offer copy (2026-08-25 audit fix): Offer already has its
-    // true original PLUS an equator-antipode duplicate, and this bottom
-    // slot is edge-adjacent to that duplicate (equator|sx-1sy-1) -- a
-    // 3rd copy here can't avoid touching a sibling. Accept has NO
-    // existing duplicate anywhere yet and this slot is non-adjacent to
-    // Accept's true original (equator|sx1sy-1, verified numerically),
-    // so it fills the slot with genuinely new coverage instead of a
-    // colliding 3rd copy of Offer.
-    "bottom|sx-1sz-1": { kind: "dept", label: "Accept", action: "tool:accept", temporary: true,
-      desc: "Pending trades from others show up in the Settings panel. Duplicated here for quick access from a spare slot." },
-    // Direct report 2026-09-02: top|sy1sz1 is one of only 3 faces
-    // visible at a wheel's default opening rotation -- leaving it SPARE
-    // made landing on this wheel look mostly empty (Offer + Lab/Settings
-    // + a blank). Filled by swapping in Inventory (arguably the most
-    // useful at-a-glance face here) from its old equator|sx-1sy1 slot
-    // rather than adding a new duplicate (Offer, the equator's other
-    // real face, IS adjacent to top|sy1sz1 so couldn't be used) -- see
-    // WHEEL_HOME's own top|sy1sz1 comment for the shared reasoning.
-    "top|sy1sz1":      { kind: "dept", label: "Inventory", action: "tool:inventory", desc: "Opens the Settings panel, where your real inventory is shown." }
-  }
-};
+// WHEEL_TRADE (Offer/Accept/Inventory) removed 2026-09-17 along with the
+// rest of World Systems -- see README.md. Its own "Trade" doorway on
+// WHEEL_HOME is now a plain Spare face (see that wheel's own comment).
 
 // Rhombisis (unified "genesis" doorway for Symmetry/Generate a Body/
 // Plant a Seed/BCC Build) retired 2026-09-02 -- see WHEEL_HOME's own
@@ -818,7 +747,7 @@ export const WHEEL_RD_FAMILY = {
 
 export const ALL_WHEELS = {
   home: WHEEL_HOME, build: WHEEL_BUILD, alter: WHEEL_ALTER,
-  rhombitect: WHEEL_RHOMBITECT, cultivate: WHEEL_CULTIVATE, trade: WHEEL_TRADE,
+  rhombitect: WHEEL_RHOMBITECT, cultivate: WHEEL_CULTIVATE,
   piece: WHEEL_PIECE, rdFamily: WHEEL_RD_FAMILY
 };
 
@@ -886,7 +815,6 @@ export const ACTION_TO_MARK = {
   'tool:dig': 'dig',
   'tool:smooth': 'smooth',
   'tool:replace': 'replace',
-  'navigateTo:trade': 'trade',
   'navigateTo:rhombitect': 'rhombitect', // wheel now labeled "Blueprint"; mark/id name unchanged
   'navigateTo:cultivate': 'rhombivate', // wheel now labeled "Cultivate"; mark/id name unchanged
   'navigateTo:explore': 'explore',
@@ -901,9 +829,6 @@ export const ACTION_TO_MARK = {
   'tool:plant': 'plant',
   'tool:growthParams': 'growthParams',
   'tool:prune': 'prune',
-  'tool:offer': 'offer',
-  'tool:accept': 'accept',
-  'tool:inventory': 'inventory',
   // Build's department-nav face reuses its own wheel's primary tool
   // icon -- the face is a doorway into that wheel, so Add doubles as a
   // preview of what's inside. Alter used to do the same with Dig, but

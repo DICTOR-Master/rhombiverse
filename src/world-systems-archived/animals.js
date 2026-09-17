@@ -1,9 +1,13 @@
 // RHOMBIVERSE_SPEC_ANIMALS.md Stage A -- Species Profiles & Habitat
 // Placement. animals.js imports evolution.js, never the reverse.
 // mobilityRange/huntBias live as SIBLING fields on the organism record,
-// not inside genome (see docs/code-notes/world-systems/animals.md for why).
+// not inside genome (see docs/code-notes/world-systems-archived/animals.md for why).
 // Full design rationale/history for every export below:
-// docs/code-notes/world-systems/animals.md
+// docs/code-notes/world-systems-archived/animals.md
+//
+// This file was archived 2026-09-17 (retired game/world-building system,
+// see README.md) -- evolution.js itself was NOT archived (real, live
+// geometry) and moved to geometry-extensions/, hence the path below.
 import {
   GENOME_TRAIT_RANGES,
   plantOrganism,
@@ -20,7 +24,7 @@ import {
   ORGANISM_SEED_SPECIES_PREFIX,
   localMatureSameSpeciesCount,
   BIOMASS_SEARCH_RADIUS,
-} from './evolution.js';
+} from '../geometry-extensions/evolution.js';
 import { cellToWorld } from '../core/lattice.js';
 
 export const LAND_CREATURE_SPECIES = 'landCreature';

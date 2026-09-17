@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { rdRawVerts, cellToWorld, parseCellKey, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices, octGapVertices, hemisphereSplit, NEIGHBOR_OFFSETS } from './core/lattice.js';
+import { rdRawVerts, cellToWorld, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices, octGapVertices, hemisphereSplit, NEIGHBOR_OFFSETS } from './core/lattice.js';
 import { FULL_PYRAMIDS, presentAxisKeys, hasCube, effectivePyramids } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { createAlmanac } from './app/almanac.js';
@@ -64,10 +64,9 @@ import {
   applyDualSymmetry,
   applyFullSymmetry,
   shellBrushCells,
-  setRegionsIntegration as setSculptureRegionsIntegration,
 } from './core/sculpture.js';
 import { matchNeighborOffset } from './core/build.js';
-import { computePlanetoids, gravityAt, nearestPlanetoid, setRegionsIntegration as setGravityRegionsIntegration } from './geometry-extensions/gravity.js';
+import { computePlanetoids, gravityAt, nearestPlanetoid } from './geometry-extensions/gravity.js';
 import { createPlayerController } from './app/player.js';
 import { saveCameraState, loadCameraState } from './app/camera-persistence.js';
 import {
@@ -87,30 +86,14 @@ import {
   loadSharedWorld,
   pushCellUpsert,
   pushCellDelete,
-  pushClaim,
-  pushClaimDestructible,
-  pushRegrowthSet,
-  pushRegrowthClear,
   subscribeToSharedWorld,
   setSyncErrorHandler,
-  mineAsteroidCellRemote,
-  pushTradePropose,
-  pushTradeConfirm,
-  pushTradeCancel,
   pushSeedSet,
   pushSeedClear,
   publishToGallery,
   fetchGalleryWorlds,
   fetchGalleryWorldData,
-  subscribeToPresence,
-  updatePresence,
 } from './app/sync.js';
-// trade.js's proposeTrade/confirmTrade/cancelTrade are NOT imported here --
-// local play has no second player identity; sync.js's server-backed
-// versions are used instead while Shared World is connected.
-// applyInventoryDecay/checkAchievements/applyHydrosphere/animals.js's
-// exports are also not statically imported -- flag-gated (FEATURES),
-// loaded via dynamic import() in init(), see docs/code-notes/render.md.
 import {
   compressionSupported,
   encodeWorldForUrl,
@@ -136,32 +119,18 @@ import {
   averageTraitValue,
   planetoidKeyFor,
   localBiomassAvailability,
-} from './world-systems/evolution.js';
-// Inert defaults for the dynamically-loaded World Systems bindings above.
-let applyInventoryDecay = () => {};
-let checkAchievements = () => [];
-let applyHydrosphere = () => {};
-let LAND_CREATURE_SPECIES, SEA_CREATURE_SPECIES, ANIMAL_TRAIT_RANGES;
-let plantAnimal, animalGenerationStepHook, reproduceFn, computeAnimalSurvivalProbability;
-// Mining/hazards/claims inert defaults (Migration Path Phase A) -- see
-// docs/code-notes/render.md.
-let seedAsteroidBelts = () => {};
-let applyAsteroidRegeneration = () => {};
-let applyPopulationScaledSpawning = () => {};
-let listBelts = () => [];
-let mineAsteroidCell = () => {};
-let computeClaim = () => { throw new Error('computeClaim called with FEATURES.economy off -- the Claim Land button should be disabled/hidden, see setClaimLandEnabled'); };
-let claimFootprintWorldVertices = () => [];
-let claimIdAt = () => null;
-let isClaimProtected = () => false;
-let applyBlackHoleConsumption = () => {};
-let applyAsymptoticGeneration = () => {};
-let annotateBlackHoles = (planetoids) => planetoids;
-let applyStarFusion = () => {};
-let annotateStars = (planetoids) => planetoids;
-let canPlaceForStars = () => true;
-let applyDetonationCheck = () => {};
-let annotateSupernovae = (planetoids) => planetoids;
+} from './geometry-extensions/evolution.js';
+// World-building/game systems (mining, trade, claims, achievements,
+// animals, hazards, hydrosphere) were retired and their code archived to
+// world-systems-archived/ -- see README.md. evolution.js is the one
+// exception (imported above, live): the "plant something and let it
+// grow" feature is real geometry, not game trappings.
+//
+// resolveCatchUpForAllPlanetoids (evolution.js) still takes optional
+// animal-specific hooks in its signature -- kept as permanently-undefined
+// here rather than editing that call, since evolution.js already
+// tolerates their absence (this is the exact behavior today, unchanged).
+let animalGenerationStepHook, reproduceFn, computeAnimalSurvivalProbability;
 
 const SCALE = 1;
 const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
@@ -235,8 +204,7 @@ let sculptureMesh = null; // created inside init(), once geometry/material exist
 // anyone who never touches the new toggle.
 let workspaceMode = 'world';
 // Bridges init()-scoped wheel3D.refresh() out to wireSettingsPanel()'s IIFE
-// below, which runs at module-eval time before init() (and wheel3D) exist --
-// same pattern as tickPresenceFn further down this file.
+// below, which runs at module-eval time before init() (and wheel3D) exist.
 let refreshWheel3D = () => {};
 
 const camera = new THREE.PerspectiveCamera(
@@ -498,16 +466,10 @@ function wireFirstUseHint(elementId, text) {
   el.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') reveal(); });
 }
 let planetoids = {};
-// Mirrors world.getClaims(), same module-level pattern as planetoids
-// above -- gravityAt() (RHOMBIVERSE_SPEC_LOOPHOLES.md section 5) and
-// updateGravityInfo() both need it but live outside init()'s scope where
-// `world` itself is declared, so it's kept in sync via refreshClaims()
-// (inside init()) instead of read from world directly.
-let currentClaims = {};
 // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 9: mirrors
-// world.getOrganisms(), same module-level pattern as planetoids/
-// currentClaims above -- updateEvolutionInfo() lives outside init()'s
-// Refreshed via refreshOrganismsSnapshot -- see docs/code-notes/render.md
+// world.getOrganisms(), same module-level pattern as planetoids above --
+// updateEvolutionInfo() lives outside init()'s scope. Refreshed via
+// refreshOrganismsSnapshot -- see docs/code-notes/render.md
 let organismsSnapshot = {};
 
 // Shared World (Phase 5) state -- see docs/code-notes/render.md
@@ -517,41 +479,11 @@ let unsubscribeShared = null;
 let myUserId = null; // this session's anonymous auth.uid(), set on enableSharedWorld
 const LOCAL_PLAYER_ID = 'local-player'; // B6: fallback ownerId for solo play, see notes
 
-const DISPLAY_NAME_KEY = 'rhombiverse-display-name';
-function loadDisplayName() {
-  try {
-    const saved = localStorage.getItem(DISPLAY_NAME_KEY);
-    if (saved) return saved;
-  } catch { /* localStorage unavailable -- fall through to the generated default */ }
-  return `Rhombinaut-${Math.floor(1000 + Math.random() * 9000)}`;
-}
-let displayName = loadDisplayName();
-
-// Other connected players' live presence (B6 task #40/#42).
-let otherPlayers = {};
-let unsubscribePresence = null;
-const avatarLabelEls = new Map(); // userId -> DOM element, pooled across frames
-const INTERACT_RADIUS = 6; // world units -- close enough to trade with, same spirit as BELT_DIGGABLE_RADIUS
-let nearestInteractPartnerId = null;
-
 function handleLocalAdd(x, y, z, data) {
   if (sharedWorldActive && !applyingRemote) pushCellUpsert(x, y, z, data);
 }
 function handleLocalRemove(x, y, z) {
   if (sharedWorldActive && !applyingRemote) pushCellDelete(x, y, z);
-}
-// Push-on-local-mutation, same pattern as cells -- see docs/code-notes/render.md
-function handleLocalRegrowthSet(key, entry) {
-  if (sharedWorldActive && !applyingRemote) {
-    const [x, y, z] = parseCellKey(key);
-    pushRegrowthSet(x, y, z, entry);
-  }
-}
-function handleLocalRegrowthClear(key) {
-  if (sharedWorldActive && !applyingRemote) {
-    const [x, y, z] = parseCellKey(key);
-    pushRegrowthClear(x, y, z);
-  }
 }
 // Push-on-local-mutation for seeds too -- see docs/code-notes/render.md
 function handleLocalSeedSet(seedId, seedData) {
@@ -571,12 +503,7 @@ function updateGravityInfo() {
     el.textContent = 'No planetoid yet — place a Blackstar-Glassite cell to create a gravity source.';
     return;
   }
-  const reallyActive = !!gravityAt(refPos, planetoids, currentClaims);
-  const status = !nearest.active
-    ? 'out of range (build closer to the core, or add more BSG)'
-    : reallyActive
-      ? 'active'
-      : 'blocked — you\'re in a protected claim';
+  const status = nearest.active ? 'active' : 'out of range (build closer to the core, or add more BSG)';
   const hydro = nearest.hydrosphereActive ? ' · hydrosphere+atmosphere active' : '';
   const blackHole = nearest.isBlackHole
     ? ` · BLACK HOLE — ledger ${nearest.consumedMatter} · generated ${nearest.generatedCellCount} cells through shell ${nearest.generatedThroughShell}`
@@ -651,46 +578,6 @@ function updateEvolutionInfo() {
     (pendingCount > 0 ? ` · ${pendingCount} pending review` : '');
 }
 
-// See docs/code-notes/render.md
-function updateBeltHint() {
-  const el = document.getElementById('belt-hint');
-  if (!el) return;
-  const refPos = walking && player ? player.getPosition() : controls.target;
-  let nearest = null;
-  let nearestDist = Infinity;
-  for (const belt of listBelts()) {
-    const [bx, by, bz] = belt.center;
-    const d = Math.hypot(refPos.x - bx, refPos.y - by, refPos.z - bz);
-    if (d < nearestDist) {
-      nearestDist = d;
-      nearest = belt;
-    }
-  }
-  if (!nearest) return;
-  el.textContent = `Nearest belt: ${nearest.id} · ${nearestDist.toFixed(0)}u away.`;
-  checkBeltApproachTransition(nearest, nearestDist);
-}
-
-// B6 belt-approach transition -- see docs/code-notes/render.md
-const BELT_APPROACH_RADIUS = 40; // "the lattice becoming apparent"
-const BELT_DIGGABLE_RADIUS = 15; // close enough to actually mine
-let beltApproachState = 'far'; // 'far' | 'approaching' | 'diggable'
-function checkBeltApproachTransition(nearest, dist) {
-  if (dist < BELT_DIGGABLE_RADIUS) {
-    if (beltApproachState !== 'diggable') {
-      showHudPrompt(`${nearest.id}: close enough to mine — right-click an asteroid cell to harvest it.`, 4200);
-    }
-    beltApproachState = 'diggable';
-  } else if (dist < BELT_APPROACH_RADIUS) {
-    if (beltApproachState === 'far') {
-      showHudPrompt(`${nearest.id} ahead — its lattice structure is becoming visible.`, 4200);
-    }
-    beltApproachState = 'approaching';
-  } else {
-    beltApproachState = 'far';
-  }
-}
-
 // B2 Explore transition sequence -- see docs/code-notes/render.md
 const SPACE_BG_COLOR = new THREE.Color(0x05050a);
 const WALK_BG_COLOR = new THREE.Color(0x0d1420); // stands in for "horizon change", see notes
@@ -728,7 +615,6 @@ function enterWalk() {
     walkTransitioning = false;
     window.dispatchEvent(new CustomEvent('rhombiverse:walkModeEntered')); // B6's onboarding discovery sequence
     updateGravityInfo();
-    updateBeltHint();
     updateEvolutionInfo();
     refreshHudIndicator();
   }, WALK_TRANSITION_MS);
@@ -752,7 +638,6 @@ function exitWalk() {
     document.getElementById('walk-hint').style.display = 'none';
     walkTransitioning = false;
     updateGravityInfo();
-    updateBeltHint();
     updateEvolutionInfo();
     refreshHudIndicator();
   }, WALK_TRANSITION_MS);
@@ -1683,43 +1568,7 @@ function rebuildOctGapInstances(octGapMesh, octGapWorld) {
   octGapMesh.computeBoundingSphere();
 }
 
-// World Systems dynamic imports -- see docs/code-notes/render.md
 async function init() {
-  if (FEATURES.achievements) {
-    ({ checkAchievements } = await import('./world-systems/achievements.js'));
-  }
-  if (FEATURES.economy) {
-    ({ applyInventoryDecay } = await import('./world-systems/trade.js'));
-    ({ computeClaim, claimFootprintWorldVertices, claimIdAt, isClaimProtected } = await import('./world-systems/regions.js'));
-  }
-  if (FEATURES.hydrosphere) {
-    ({ applyHydrosphere } = await import('./world-systems/hydrosphere.js'));
-  }
-  if (FEATURES.animals) {
-    ({
-      LAND_CREATURE_SPECIES,
-      SEA_CREATURE_SPECIES,
-      ANIMAL_TRAIT_RANGES,
-      plantAnimal,
-      animalGenerationStepHook,
-      reproduceFn,
-      computeAnimalSurvivalProbability,
-    } = await import('./world-systems/animals.js'));
-  }
-  if (FEATURES.mining) {
-    ({ seedAsteroidBelts, applyAsteroidRegeneration, applyPopulationScaledSpawning, listBelts, mineAsteroidCell } = await import('./world-systems/asteroids.js'));
-  }
-  if (FEATURES.hazards) {
-    ({ applyBlackHoleConsumption, applyAsymptoticGeneration, annotateBlackHoles } = await import('./world-systems/blackhole.js'));
-    ({ applyStarFusion, annotateStars, canPlaceMaterial: canPlaceForStars } = await import('./world-systems/starsystem.js'));
-    ({ applyDetonationCheck, annotateSupernovae } = await import('./world-systems/supernova.js'));
-  }
-  // Regions-integration wiring (Migration Path Phase A) -- see docs/code-notes/render.md
-  if (FEATURES.economy) {
-    setSculptureRegionsIntegration({ claimIdAt, isClaimProtected });
-    setGravityRegionsIntegration({ isClaimProtected });
-  }
-
   wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
   wireFirstUseHint('spherical-toggle', 'Spherical: renders shapes in a simplified near-spherical form -- a client-side view only, your cells are untouched.');
   wireFirstUseHint('bcc-toggle', 'Lattice View: click to cycle a preview lens through every Piece type -- RD, Cube, Pyramid (shown on your real World), then Cuboctahedron and Octahedron, then BCC/TO, Flattened Octahedron, and Disphenoid (a hypothetical patch near you), then Off.');
@@ -1775,8 +1624,6 @@ async function init() {
   const world = createWorldStore(worldJSON, {
     onAdd: handleLocalAdd,
     onRemove: handleLocalRemove,
-    onRegrowthSet: handleLocalRegrowthSet,
-    onRegrowthClear: handleLocalRegrowthClear,
     onSeedSet: handleLocalSeedSet,
     onSeedClear: handleLocalSeedClear,
   });
@@ -2141,40 +1988,19 @@ async function init() {
   scheduleSubLatticeRefresh();
 
   // See docs/code-notes/render.md
-  const claimGroup = new THREE.Group();
-  scene.add(claimGroup);
-  const CLAIM_COLOR_MINE = 0x4ade80; // green -- this session's own claims
-  const CLAIM_COLOR_OTHER = 0xf59e0b; // amber -- everyone else's
-
-  // See docs/code-notes/render.md
   const growthGroup = new THREE.Group();
   scene.add(growthGroup);
   const growthMeshesBySeed = new Map(); // seedId -> THREE.Group
 
-  seedAsteroidBelts(world);
-  applyAsteroidRegeneration(world);
-  applyPopulationScaledSpawning(world);
-  applyInventoryDecay(world);
-  applyHydrosphere(world);
-  applyBlackHoleConsumption(world);
-  applyAsymptoticGeneration(world);
-  applyStarFusion(world);
-  applyDetonationCheck(world);
   rebuildInstances(mesh, world);
 
   planetoids = computePlanetoids(world);
-  planetoids = annotateBlackHoles(planetoids, world);
-  planetoids = annotateStars(planetoids, world);
-  planetoids = annotateSupernovae(planetoids);
   player = createPlayerController({
     camera,
     domElement: renderer.domElement,
-    getGravity: (pos) => gravityAt(pos, planetoids, currentClaims),
+    getGravity: (pos) => gravityAt(pos, planetoids),
   });
   updateGravityInfo();
-  updateBeltHint();
-  updateInventoryHint();
-  renderTradePanel();
   rebuildAllGrowth();
 
   // Pre-interactivity catch-up -- see docs/code-notes/render.md
@@ -2184,24 +2010,6 @@ async function init() {
   }
   refreshOrganismsSnapshot(world);
   updateEvolutionInfo();
-
-  // See docs/code-notes/render.md
-  const beltNavRow = document.getElementById('belt-nav-row');
-  for (const belt of listBelts()) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = `Go to ${belt.id.replace('_', ' ')}`;
-    btn.addEventListener('click', () => {
-      if (walking) exitWalk();
-      const [bx, by, bz] = belt.center;
-      camera.position.set(bx + 6, by + 5, bz + 8);
-      controls.target.set(bx, by, bz);
-      updateGravityInfo();
-      updateBeltHint();
-      updateEvolutionInfo();
-    });
-    beltNavRow.appendChild(btn);
-  }
 
   // Undo stack -- see docs/code-notes/render.md
   const undoStack = [];
@@ -2349,15 +2157,6 @@ async function init() {
     }
   }
 
-  function updateInventoryHint() {
-    const el = document.getElementById('inventory-hint');
-    if (!el) return;
-    // See docs/code-notes/render.md
-    const mine = world.getInventory()[myUserId ?? LOCAL_PLAYER_ID] ?? {};
-    const parts = Object.entries(mine).map(([material, entry]) => `${material} ×${entry.quantity}`);
-    el.textContent = parts.length > 0 ? `Inventory: ${parts.join(', ')}.` : 'Inventory: empty.';
-  }
-
   function onChange() {
     // Invariant (direct instruction, 2026-08-29): the world must never
     // reach zero cells. With nothing left to click a face of, Add has no
@@ -2377,21 +2176,6 @@ async function init() {
     if (!sharedWorldActive && world.entries().length === 0) {
       world.addCell(0, 0, 0, { material: 'base' });
     }
-    applyAsteroidRegeneration(world);
-    applyPopulationScaledSpawning(world);
-    // Shared World: inventory is server-authoritative now (schema.sql's
-    // apply_inventory_decay runs on its own pg_cron schedule) -- running
-    // this local pass too would silently drift the display out of sync
-    // with the real server value between realtime updates, and
-    // setInventoryEntry here has no push hook to correct the server
-    // anyway. Local-only play has no server, so this stays the only
-    // decay mechanism there, unchanged.
-    if (!sharedWorldActive) applyInventoryDecay(world);
-    applyHydrosphere(world);
-    applyBlackHoleConsumption(world);
-    applyAsymptoticGeneration(world);
-    applyStarFusion(world);
-    applyDetonationCheck(world);
     rebuildInstances(mesh, world, currentMode === 'report');
     updateSectionEnabled(); // keeps newly created partial-cell (Pyramid) mesh materials in sync with X-Ray -- see that function's own header
     applyWorldViewMaterials(); // same reasoning as updateSectionEnabled() above -- see World View's own header
@@ -2402,12 +2186,7 @@ async function init() {
     // is active should update it too.
     if (latticeQuickViewMode !== 'off') rebuildLatticeQuickView();
     planetoids = computePlanetoids(world);
-    planetoids = annotateBlackHoles(planetoids, world);
-    planetoids = annotateStars(planetoids, world);
-    planetoids = annotateSupernovae(planetoids);
     updateGravityInfo();
-    updateBeltHint();
-    updateInventoryHint();
     refreshOrganismsSnapshot(world);
     updateEvolutionInfo();
     const afterJSON = world.toJSON();
@@ -2424,30 +2203,6 @@ async function init() {
     updateUndoButton();
     renderUndoScrubStrip();
     renderRingList();
-    toastNewAchievements(checkAchievements({ world, planetoids }));
-  }
-
-  // B6 achievements: toasted one at a time via the existing bottom
-  // contextual-prompt/toast pattern (showHudPrompt), never a new panel.
-  // A single big world load (e.g. loading the Showcase World) can
-  // legitimately earn several at once -- queued with a short stagger so
-  // they're each actually readable instead of overwriting one another.
-  let achievementQueue = [];
-  let achievementToastTimer = null;
-  function toastNewAchievements(newlyEarned) {
-    if (newlyEarned.length === 0) return;
-    achievementQueue.push(...newlyEarned);
-    if (achievementToastTimer) return;
-    const showNext = () => {
-      const next = achievementQueue.shift();
-      if (!next) {
-        achievementToastTimer = null;
-        return;
-      }
-      showHudPrompt(`🏆 Achievement: ${next.label}`, 3800);
-      achievementToastTimer = setTimeout(showNext, 4200);
-    };
-    showNext();
   }
 
   // See docs/code-notes/render.md
@@ -3332,18 +3087,6 @@ async function init() {
           return;
         }
 
-        // --- Trade: JUDGMENT CALL. Offer/Accept only exist via the
-        // in-world "Interact" trigger (walk up to another player, tap
-        // Interact) -- see index.html's #interact-btn and render.js's
-        // Interact panel comments -- there is no menu-driven way to
-        // start one, so these open the Lab panel (where #trade-panel's
-        // pending-trades list and #inventory-hint both really live)
-        // and explain the real mechanism, rather than pretending a
-        // direct action exists. ---
-        if (action === 'tool:offer') { labToggleEl?.click(); showHudPrompt('Trades start via Interact: walk up to another user and tap Interact to propose one.', 4500); wheel3D.close(); return; }
-        if (action === 'tool:accept') { labToggleEl?.click(); showHudPrompt('Pending trades from other users show up in the Settings panel -- walk up and tap Interact to respond.', 4500); wheel3D.close(); return; }
-        if (action === 'tool:inventory') { labToggleEl?.click(); wheel3D.close(); return; } // real inventory line lives in the Lab panel
-
         if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
       },
     });
@@ -4071,33 +3814,6 @@ async function init() {
       }
       const organismId = `organism_${Date.now()}_${seedCounter}`;
       ({ seed } = plantOrganism(world, organismId, seedId, evoSpecies, genome, origin));
-    } else if (species === 'evo-land' || species === 'evo-land-dino' || species === 'evo-sea') {
-      if (!FEATURES.animals) {
-        alert('Animals are currently disabled (FEATURES.animals is off).');
-        return;
-      }
-      // See docs/code-notes/render.md
-      const animalSpecies = species === 'evo-sea' ? SEA_CREATURE_SPECIES : LAND_CREATURE_SPECIES;
-      const isDino = species === 'evo-land-dino';
-      const genome = {};
-      for (const [trait, [min, max]] of Object.entries(GENOME_TRAIT_RANGES)) {
-        genome[trait] = isDino && trait === 'maturitySize' ? max - Math.random() * (max - min) * 0.3 : min + Math.random() * (max - min);
-      }
-      const animalTraits = {};
-      for (const [trait, [min, max]] of Object.entries(ANIMAL_TRAIT_RANGES)) {
-        animalTraits[trait] = isDino ? max - Math.random() * (max - min) * 0.3 : min + Math.random() * (max - min);
-      }
-      const organismId = `organism_${Date.now()}_${seedCounter}`;
-      try {
-        ({ seed } = plantAnimal(world, organismId, seedId, animalSpecies, genome, animalTraits, origin));
-      } catch (err) {
-        const habitatHint =
-          animalSpecies === LAND_CREATURE_SPECIES
-            ? 'Land creatures need dry ground, away from any Ice 9.9/liquid-permeated zone.'
-            : 'Sea creatures need a liquid-permeated zone (Ice 9.9 near a Blackstar-Glassite core).';
-        alert(`Can't plant here: ${err.message}. ${habitatHint}`);
-        return;
-      }
     } else {
       seed = plantSeed(world, seedId, species, origin);
       // See docs/code-notes/render.md
@@ -4107,7 +3823,6 @@ async function init() {
     if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
     refreshOrganismsSnapshot(world);
     updateEvolutionInfo();
-    toastNewAchievements(checkAchievements({ world, planetoids }));
     window.dispatchEvent(new CustomEvent('rhombiverse:seedPlanted'));
   });
   updateModeUI();
@@ -4367,9 +4082,7 @@ async function init() {
     input.value = '';
   });
 
-  // Frost line -- see docs/code-notes/render.md
-  const canPlaceMaterial = (material, x, y, z) =>
-    canPlaceForStars(material, x, y, z, Object.values(planetoids).filter((p) => p.isStar));
+  const canPlaceMaterial = () => true;
 
   // See docs/code-notes/render.md
   const FULL_CYBORG_INWORLD_ENABLED = false;
@@ -5025,10 +4738,6 @@ async function init() {
     onHemisphereChange,
     canPlaceMaterial,
     getOwnerId: () => myUserId ?? LOCAL_PLAYER_ID,
-    mineRemote: (x, y, z) => {
-      if (sharedWorldActive) mineAsteroidCellRemote(x, y, z);
-    },
-    mineAsteroidCell, // see docs/code-notes/render.md
     onCellClicked: (cell) => {
       focusedCenterKey = cell.shellCenter || null;
       renderRingList();
@@ -5209,24 +4918,6 @@ async function init() {
   }
 
   // See docs/code-notes/render.md
-  function applyRemoteClaim(claimId, claimData) {
-    world.addClaim(claimId, claimData);
-    refreshClaims();
-  }
-
-  // See docs/code-notes/render.md
-  function applyRemoteRegrowthSet(key, entry) {
-    applyingRemote = true;
-    world.setRegrowthEntry(key, entry);
-    applyingRemote = false;
-  }
-  function applyRemoteRegrowthClear(key) {
-    applyingRemote = true;
-    world.removeRegrowthEntry(key);
-    applyingRemote = false;
-  }
-
-  // See docs/code-notes/render.md
   function applyRemoteSeedSet(seedId, seedData) {
     applyingRemote = true;
     world.setSeed(seedId, seedData);
@@ -5239,133 +4930,16 @@ async function init() {
     applyingRemote = false;
   }
 
-  // See docs/code-notes/render.md
-  function applyRemoteInventory(ownerId, material, entry) {
-    world.setInventoryEntry(ownerId, material, entry);
-    updateInventoryHint();
-    renderTradePanel();
-  }
-
-  // See docs/code-notes/render.md
-  function interactPanelShowsTrade(tradeData) {
-    return (
-      interactOverlayEl?.classList.contains('open') &&
-      interactPartnerId &&
-      (tradeData.playerA === interactPartnerId || tradeData.playerB === interactPartnerId)
-    );
-  }
-  function applyRemoteTrade(tradeId, tradeData) {
-    world.setPendingTrade(tradeId, tradeData);
-    renderTradePanel();
-    if (interactPanelShowsTrade(tradeData)) renderInteractPanel();
-  }
-  function applyRemoteTradeClear(tradeId) {
-    const removed = world.getPendingTrades()[tradeId];
-    world.removePendingTrade(tradeId);
-    renderTradePanel();
-    if (removed && interactPanelShowsTrade(removed)) renderInteractPanel();
-  }
-
   const sharedWorldToggle = document.getElementById('shared-world-toggle');
   const sharedWorldHint = document.getElementById('shared-world-hint');
   const newWorldBtn = document.getElementById('new-world');
   const loadPresetBtn = document.getElementById('load-preset');
-  const claimLandBtn = document.getElementById('claim-land-btn');
-  const claimHint = document.getElementById('claim-hint');
-  const claimsListEl = document.getElementById('claims-list');
-  // Claims panel visibility -- see docs/code-notes/render.md
-  ['claim-land-row', 'claim-hint', 'claims-list'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = FEATURES.economy ? '' : 'none';
-  });
   // See docs/code-notes/render.md
   function updateWorldPanelVisibility() {
-    const asteroidSection = document.getElementById('asteroid-info-section');
-    if (asteroidSection) asteroidSection.style.display = FEATURES.mining && !sculptureModeActive ? '' : 'none';
     const presetsSection = document.getElementById('world-presets-section');
     if (presetsSection) presetsSection.style.display = sculptureModeActive ? 'none' : '';
   }
   updateWorldPanelVisibility();
-
-  // See docs/code-notes/render.md
-  function refreshClaims() {
-    while (claimGroup.children.length > 0) {
-      const child = claimGroup.children[0];
-      claimGroup.remove(child);
-      child.geometry.dispose();
-      child.material.dispose();
-    }
-    if (!FEATURES.economy) return;
-    const claims = world.getClaims();
-    currentClaims = claims;
-    const ids = Object.keys(claims);
-
-    if (sharedWorldActive) {
-      claimLandBtn.disabled = ids.some((id) => claims[id].ownerId === myUserId);
-    }
-
-    for (const id of ids) {
-      const claim = claims[id];
-      const [wx, wy, wz] = cellToWorld(...claim.center, SCALE);
-      const points = claimFootprintWorldVertices(claim, SCALE).map(([x, y, z]) => new THREE.Vector3(x - wx, y - wy, z - wz));
-      const hullGeom = new ConvexGeometry(points);
-      const mine = claim.ownerId === myUserId;
-      const hullMat = new THREE.MeshBasicMaterial({
-        color: mine ? CLAIM_COLOR_MINE : CLAIM_COLOR_OTHER,
-        transparent: true,
-        opacity: 0.12,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      });
-      const hull = new THREE.Mesh(hullGeom, hullMat);
-      hull.position.set(wx, wy, wz);
-      claimGroup.add(hull);
-    }
-
-    if (!claimsListEl) return;
-    claimsListEl.innerHTML = '';
-    if (ids.length === 0) {
-      claimsListEl.innerHTML = '<div class="placeholder">No claims granted yet.</div>';
-      return;
-    }
-    for (const id of ids) {
-      const claim = claims[id];
-      const mine = claim.ownerId === myUserId;
-      const row = document.createElement('div');
-      row.className = 'claim-item';
-      const label = document.createElement('span');
-      label.textContent =
-        `${mine ? '★ ' : ''}${id} — shell ${claim.shellIndex} — ` +
-        `${mine ? 'you' : claim.ownerId.slice(0, 8)}`;
-      row.appendChild(label);
-      if (mine) {
-        const toggle = document.createElement('label');
-        toggle.className = 'claim-destructible-toggle';
-        toggle.title = 'Protect this claim from black hole/supernova consumption';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = claim.destructible === false;
-        checkbox.addEventListener('change', async () => {
-          checkbox.disabled = true;
-          try {
-            const newValue = checkbox.checked ? false : true;
-            await pushClaimDestructible(id, newValue);
-            world.addClaim(id, { ...claim, destructible: newValue });
-            refreshClaims();
-          } catch (err) {
-            checkbox.checked = !checkbox.checked; // revert on failure
-            console.warn('Rhombiverse: destructible toggle failed', err);
-          } finally {
-            checkbox.disabled = false;
-          }
-        });
-        toggle.appendChild(checkbox);
-        toggle.appendChild(document.createTextNode('Protected'));
-        row.appendChild(toggle);
-      }
-      claimsListEl.appendChild(row);
-    }
-  }
 
   // See docs/code-notes/render.md
   function rebuildSeedMeshes(seedId, seed) {
@@ -5412,439 +4986,12 @@ async function init() {
     }
   }
 
-  // See docs/code-notes/render.md
-  const TRADE_MATERIALS = [
-    ['base', 'Base Rhomb'],
-    ['garnet', 'Garnet'],
-    ['ferrostone', 'Ferrostone'],
-    ['glassite', 'Glassite'],
-    ['star-glassite', 'Star-Glassite'],
-    ['blackstar-glassite', 'Blackstar-Glassite'],
-  ];
-
-  function shortId(id) {
-    return id.slice(0, 8);
-  }
-
-  function formatOffer(offer) {
-    return Object.entries(offer)
-      .map(([material, amount]) => `${amount} ${material}`)
-      .join(', ');
-  }
-
-  // Rebuilt trade UI (B6 task #40): the Lab-panel form/partner-list is
-  // gone -- proposing a NEW trade now only happens via Interact (below),
-  // triggered by proximity to another player's live avatar. This
-  // simplified renderTradePanel() keeps just the pending-trades list,
-  // useful when a trade's partner has since walked away or disconnected
-  // and you want to check/cancel/confirm it without finding them again.
-  function renderTradePanel() {
-    const panel = document.getElementById('trade-panel');
-    if (!panel) return;
-    if (!sharedWorldActive || !myUserId) {
-      panel.style.display = 'none';
-      return;
-    }
-    panel.style.display = '';
-
-    const tradesListEl = document.getElementById('pending-trades-list');
-    const trades = world.getPendingTrades();
-    const tradeIds = Object.keys(trades);
-    tradesListEl.innerHTML = '';
-    if (tradeIds.length === 0) {
-      tradesListEl.innerHTML = '<div class="placeholder">No pending trades.</div>';
-      return;
-    }
-    for (const id of tradeIds) {
-      const trade = trades[id];
-      const isA = trade.playerA === myUserId;
-      const isB = trade.playerB === myUserId;
-      if (!isA && !isB) continue; // shouldn't happen (RLS already scopes this), defensive only
-      const myConfirmed = isA ? trade.confirmedA : trade.confirmedB;
-      const partnerId = isA ? trade.playerB : trade.playerA;
-
-      const row = document.createElement('div');
-      row.className = 'ring-item';
-      const label = document.createElement('span');
-      label.textContent = `${formatOffer(trade.offerA)} ⇄ ${formatOffer(trade.offerB)} — with ${shortId(partnerId)}`;
-      row.appendChild(label);
-
-      if (!myConfirmed) {
-        const confirmBtn = document.createElement('button');
-        confirmBtn.className = 'ring-recolor';
-        confirmBtn.textContent = 'Confirm';
-        confirmBtn.addEventListener('click', async () => {
-          confirmBtn.disabled = true;
-          try {
-            await pushTradeConfirm(id, isA);
-          } catch (err) {
-            console.warn('Rhombiverse: confirm trade failed', err);
-            confirmBtn.disabled = false;
-          }
-        });
-        row.appendChild(confirmBtn);
-      } else {
-        const waiting = document.createElement('span');
-        waiting.className = 'placeholder';
-        waiting.textContent = 'waiting for them';
-        row.appendChild(waiting);
-      }
-
-      const cancelBtn = document.createElement('button');
-      cancelBtn.className = 'ring-remove';
-      cancelBtn.textContent = '×';
-      cancelBtn.title = 'Cancel this trade';
-      cancelBtn.addEventListener('click', () => pushTradeCancel(id));
-      row.appendChild(cancelBtn);
-
-      tradesListEl.appendChild(row);
-    }
-  }
-
-  // --- B6 tasks #40/#42: player presence, in-world avatars, Interact --
-
-  function currentPlayerWorldPosition() {
-    return walking && player ? player.getPosition() : camera.position;
-  }
-
-  const displayNameInput = document.getElementById('display-name-input');
-  if (displayNameInput) {
-    displayNameInput.value = displayName;
-    displayNameInput.addEventListener('change', () => {
-      const trimmed = displayNameInput.value.trim();
-      displayName = trimmed || loadDisplayName();
-      displayNameInput.value = displayName;
-      try { localStorage.setItem(DISPLAY_NAME_KEY, displayName); } catch { /* best-effort only */ }
-    });
-  }
-
-  const avatarLayerEl = document.getElementById('avatar-layer');
-  function clearAvatarLabels() {
-    avatarLayerEl.innerHTML = '';
-    avatarLabelEls.clear();
-  }
-
-  // See docs/code-notes/render.md
-  const projectVec = new THREE.Vector3();
-  function updateAvatarLabels() {
-    const seen = new Set();
-    for (const [id, presence] of Object.entries(otherPlayers)) {
-      if (!presence.walking) continue; // only walking players have a meaningful in-world position, see the module-level comment on otherPlayers
-      seen.add(id);
-      projectVec.set(presence.x, presence.y, presence.z).project(camera);
-      if (projectVec.z > 1) continue; // behind the camera
-      let el = avatarLabelEls.get(id);
-      if (!el) {
-        el = document.createElement('div');
-        el.className = 'avatar-label';
-        el.innerHTML = '<div class="avatar-dot"></div><div class="avatar-name"></div>';
-        avatarLayerEl.appendChild(el);
-        avatarLabelEls.set(id, el);
-      }
-      el.querySelector('.avatar-name').textContent = presence.name || shortId(id);
-      const x = (projectVec.x * 0.5 + 0.5) * window.innerWidth;
-      const y = (-projectVec.y * 0.5 + 0.5) * window.innerHeight;
-      el.style.left = `${x}px`;
-      el.style.top = `${y}px`;
-      el.style.display = x < -50 || x > window.innerWidth + 50 || y < -50 || y > window.innerHeight + 50 ? 'none' : '';
-    }
-    for (const [id, el] of avatarLabelEls) {
-      if (!seen.has(id)) {
-        el.remove();
-        avatarLabelEls.delete(id);
-      }
-    }
-  }
-
-  // See docs/code-notes/render.md
-  const interactBtnEl = document.getElementById('interact-btn');
-  function updateInteractProximity() {
-    if (!sharedWorldActive || !walking || !player) {
-      nearestInteractPartnerId = null;
-      interactBtnEl.classList.remove('visible');
-      return;
-    }
-    const myPos = player.getPosition();
-    let nearestId = null;
-    let nearestDist = Infinity;
-    for (const [id, presence] of Object.entries(otherPlayers)) {
-      if (!presence.walking) continue;
-      const d = Math.hypot(presence.x - myPos.x, presence.y - myPos.y, presence.z - myPos.z);
-      if (d < nearestDist) {
-        nearestDist = d;
-        nearestId = id;
-      }
-    }
-    nearestInteractPartnerId = nearestDist <= INTERACT_RADIUS ? nearestId : null;
-    interactBtnEl.classList.toggle('visible', nearestInteractPartnerId !== null && !interactOverlayEl.classList.contains('open'));
-  }
-
-  let presenceBroadcastAccum = 0;
-  const PRESENCE_BROADCAST_INTERVAL = 0.3; // seconds -- frequent enough to feel live, far below realtime rate limits
-  function tickPresence(dt) {
-    if (!sharedWorldActive) return;
-    updateAvatarLabels();
-    updateInteractProximity();
-    presenceBroadcastAccum += dt;
-    if (presenceBroadcastAccum < PRESENCE_BROADCAST_INTERVAL) return;
-    presenceBroadcastAccum = 0;
-    const pos = currentPlayerWorldPosition();
-    updatePresence({ name: displayName, x: pos.x, y: pos.y, z: pos.z, walking });
-  }
-
-  // --- The Interact panel: two-sided drag-and-accept offer view -------
-
-  const interactOverlayEl = document.getElementById('interact-overlay');
-  const interactPartnerNameEl = document.getElementById('interact-partner-name');
-  const interactExistingEl = document.getElementById('interact-existing-trade');
-  const interactProposeFormEl = document.getElementById('interact-propose-form');
-  let interactPartnerId = null;
-  let interactGiveMaterial = null;
-  let interactGetMaterial = null;
-
-  function closeInteractPanel() {
-    interactOverlayEl.classList.remove('open');
-    interactPartnerId = null;
-  }
-  document.getElementById('interact-close').addEventListener('click', closeInteractPanel);
-
-  function findPendingTradeWith(partnerId) {
-    const trades = world.getPendingTrades();
-    for (const [id, trade] of Object.entries(trades)) {
-      const involvesMe = trade.playerA === myUserId || trade.playerB === myUserId;
-      const involvesPartner = trade.playerA === partnerId || trade.playerB === partnerId;
-      if (involvesMe && involvesPartner) return [id, trade];
-    }
-    return null;
-  }
-
-  // See docs/code-notes/render.md
-  function makeChipDraggable(chipEl, onDrop) {
-    chipEl.addEventListener('pointerdown', (e) => {
-      const startX = e.clientX;
-      const startY = e.clientY;
-      let dragging = false;
-      let ghost = null;
-      const onMove = (ev) => {
-        if (!dragging && Math.hypot(ev.clientX - startX, ev.clientY - startY) > 6) {
-          dragging = true;
-          ghost = chipEl.cloneNode(true);
-          ghost.classList.add('interact-chip-ghost');
-          document.body.appendChild(ghost);
-        }
-        if (dragging && ghost) {
-          ghost.style.left = `${ev.clientX}px`;
-          ghost.style.top = `${ev.clientY}px`;
-          document.querySelectorAll('.interact-dropzone').forEach((zone) => {
-            zone.classList.toggle('drag-over', zone === document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.interact-dropzone'));
-          });
-        }
-      };
-      const onUp = (ev) => {
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-        document.querySelectorAll('.interact-dropzone').forEach((zone) => zone.classList.remove('drag-over'));
-        if (dragging && ghost) {
-          ghost.remove();
-          const zone = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.interact-dropzone');
-          onDrop(zone?.id ?? null);
-        } else {
-          onDrop(null);
-        }
-      };
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
-    });
-  }
-
-  function renderOfferZone(zoneId, material, maxQty, onQtyChange) {
-    const zone = document.getElementById(zoneId);
-    const content = zone.querySelector('.interact-dropzone-content');
-    if (!material) {
-      content.innerHTML = '';
-      content.textContent = 'drag or tap a material above';
-      return;
-    }
-    content.innerHTML = '';
-    const chip = document.createElement('div');
-    chip.className = 'interact-offer-chip';
-    const label = document.createElement('span');
-    label.textContent = TRADE_MATERIALS.find(([v]) => v === material)?.[1] ?? material;
-    const qtyInput = document.createElement('input');
-    qtyInput.type = 'number';
-    qtyInput.min = '1';
-    qtyInput.max = String(maxQty);
-    qtyInput.value = '1';
-    qtyInput.addEventListener('input', () => {
-      const clamped = Math.max(1, Math.min(maxQty, Math.floor(Number(qtyInput.value)) || 1));
-      qtyInput.value = String(clamped); // reflect the clamp -- typing a value outside min/max isn't blocked by the browser on its own
-      onQtyChange(clamped);
-    });
-    chip.appendChild(label);
-    chip.appendChild(qtyInput);
-    content.appendChild(chip);
-  }
-
-  let interactGiveQty = 1;
-  let interactGetQty = 1;
-  function updateSendButtonState() {
-    document.getElementById('interact-send-btn').disabled = !interactGiveMaterial || !interactGetMaterial;
-  }
-
-  function renderInteractProposeForm() {
-    const inventory = world.getInventory();
-    const myInv = inventory[myUserId] ?? {};
-    const theirInv = inventory[interactPartnerId] ?? {};
-
-    const yourStrip = document.getElementById('interact-your-materials');
-    yourStrip.innerHTML = '';
-    for (const [material, entry] of Object.entries(myInv)) {
-      if (entry.quantity <= 0) continue;
-      const chip = document.createElement('div');
-      chip.className = 'interact-chip';
-      chip.textContent = `${TRADE_MATERIALS.find(([v]) => v === material)?.[1] ?? material} ×${entry.quantity}`;
-      makeChipDraggable(chip, (zoneId) => {
-        if (zoneId === 'interact-get-zone') return; // your own material doesn't belong in "you get"
-        interactGiveMaterial = material;
-        interactGiveQty = 1;
-        renderOfferZone('interact-give-zone', material, entry.quantity, (q) => { interactGiveQty = q; });
-        updateSendButtonState();
-      });
-      yourStrip.appendChild(chip);
-    }
-    if (!yourStrip.children.length) yourStrip.innerHTML = '<div class="placeholder">You have nothing to offer yet.</div>';
-
-    const theirStrip = document.getElementById('interact-their-materials');
-    theirStrip.innerHTML = '';
-    for (const [material, entry] of Object.entries(theirInv)) {
-      if (entry.quantity <= 0) continue;
-      const chip = document.createElement('div');
-      chip.className = 'interact-chip';
-      chip.textContent = `${TRADE_MATERIALS.find(([v]) => v === material)?.[1] ?? material} ×${entry.quantity}`;
-      makeChipDraggable(chip, (zoneId) => {
-        if (zoneId === 'interact-give-zone') return; // their material doesn't belong in "you give"
-        interactGetMaterial = material;
-        interactGetQty = 1;
-        renderOfferZone('interact-get-zone', material, Math.max(entry.quantity, 999), (q) => { interactGetQty = q; });
-        updateSendButtonState();
-      });
-      theirStrip.appendChild(chip);
-    }
-    if (!theirStrip.children.length) theirStrip.innerHTML = '<div class="placeholder">Nothing known yet.</div>';
-
-    interactGiveMaterial = null;
-    interactGetMaterial = null;
-    renderOfferZone('interact-give-zone', null);
-    renderOfferZone('interact-get-zone', null);
-    updateSendButtonState();
-  }
-
-  document.getElementById('interact-send-btn').addEventListener('click', async () => {
-    const hint = document.getElementById('interact-propose-hint');
-    if (!interactGiveMaterial || !interactGetMaterial || !interactPartnerId) return;
-    const held = world.getInventory()[myUserId]?.[interactGiveMaterial]?.quantity ?? 0;
-    if (held < interactGiveQty) {
-      hint.textContent = `You only have ${held}.`;
-      return;
-    }
-    const tradeId = `trade_${shortId(myUserId)}_${Date.now()}`;
-    hint.textContent = 'Sending…';
-    try {
-      await pushTradePropose(tradeId, myUserId, { [interactGiveMaterial]: interactGiveQty }, interactPartnerId, { [interactGetMaterial]: interactGetQty });
-      hint.textContent = 'Offer sent — waiting for confirmation.';
-      renderInteractPanel();
-    } catch (err) {
-      console.warn('Rhombiverse: propose trade failed', err);
-      hint.textContent = 'Failed to send the offer (see console).';
-    }
-  });
-
-  function renderInteractExistingTrade(tradeId, trade) {
-    const isA = trade.playerA === myUserId;
-    const myConfirmed = isA ? trade.confirmedA : trade.confirmedB;
-    const myOffer = isA ? trade.offerA : trade.offerB;
-    const theirOffer = isA ? trade.offerB : trade.offerA;
-    document.getElementById('interact-existing-summary').textContent =
-      `You give ${formatOffer(myOffer)} for ${formatOffer(theirOffer)}.` + (myConfirmed ? ' You have confirmed -- waiting on them.' : '');
-    const confirmBtn = document.getElementById('interact-confirm-btn');
-    confirmBtn.style.display = myConfirmed ? 'none' : '';
-    confirmBtn.onclick = async () => {
-      confirmBtn.disabled = true;
-      try { await pushTradeConfirm(tradeId, isA); }
-      catch (err) { console.warn('Rhombiverse: confirm trade failed', err); confirmBtn.disabled = false; }
-    };
-    document.getElementById('interact-cancel-btn').onclick = () => { pushTradeCancel(tradeId); closeInteractPanel(); };
-  }
-
-  function renderInteractPanel() {
-    if (!interactPartnerId) return;
-    interactPartnerNameEl.textContent = otherPlayers[interactPartnerId]?.name ?? shortId(interactPartnerId);
-    const existing = findPendingTradeWith(interactPartnerId);
-    interactExistingEl.style.display = existing ? '' : 'none';
-    interactProposeFormEl.style.display = existing ? 'none' : '';
-    if (existing) renderInteractExistingTrade(existing[0], existing[1]);
-    else renderInteractProposeForm();
-  }
-
-  function openInteractPanel(partnerId) {
-    if (!partnerId) return;
-    interactPartnerId = partnerId;
-    document.getElementById('interact-propose-hint').textContent = '';
-    renderInteractPanel();
-    interactOverlayEl.classList.add('open');
-    interactBtnEl.classList.remove('visible');
-  }
-
-  interactBtnEl.addEventListener('click', () => openInteractPanel(nearestInteractPartnerId));
-  window.addEventListener('keydown', (e) => {
-    if (e.code !== 'KeyE') return;
-    const tag = document.activeElement?.tagName;
-    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-    if (interactOverlayEl.classList.contains('open')) { closeInteractPanel(); return; }
-    if (nearestInteractPartnerId) openInteractPanel(nearestInteractPartnerId);
-  });
-  tickPresenceFn = tickPresence;
-
-  // Claim Land button -- see docs/code-notes/render.md
-  claimLandBtn.addEventListener('click', async () => {
-    if (!sharedWorldActive || !myUserId) return;
-    claimLandBtn.disabled = true;
-    try {
-      const focus = walking ? camera.position : controls.target;
-      const [ox, oy, oz] = nearestValidCell(focus.x / SCALE, focus.y / SCALE, focus.z / SCALE);
-      const { claimId, claimData } = computeClaim(world, myUserId, undefined, { x: ox, y: oy, z: oz });
-      await pushClaim(claimId, claimData);
-      world.addClaim(claimId, claimData);
-      refreshClaims();
-      toastNewAchievements(checkAchievements({ world, planetoids })); // claim-granting doesn't route through onChange() either
-      claimHint.textContent =
-        `Claimed ${claimId}: center [${claimData.center.join(', ')}], ` +
-        `shell ${claimData.shellIndex}, size ${claimData.size}.`;
-    } catch (err) {
-      claimHint.textContent = `Claim failed: ${err.message}`;
-      console.warn('Rhombiverse: claim failed', err);
-    } finally {
-      claimLandBtn.disabled =
-        !FEATURES.economy || !sharedWorldActive || Object.values(world.getClaims()).some((c) => c.ownerId === myUserId);
-    }
-  });
 
   // See docs/code-notes/render.md
   function setLocalResetControlsEnabled(enabled) {
     newWorldBtn.disabled = !enabled;
     importInput.disabled = !enabled;
     loadPresetBtn.disabled = !enabled;
-  }
-
-  // claimLandBtn is the inverse of the above -- disabled OUTSIDE Shared
-  // World (ownership is meaningless in a world only you can see), enabled
-  // only while connected. Also stays disabled whenever FEATURES.economy
-  // is off, same reasoning as this panel's own display:none above --
-  // Shared World connecting shouldn't be able to re-surface a claims UI
-  // that's supposed to not exist for this session.
-  function setClaimLandEnabled(enabled) {
-    claimLandBtn.disabled = !enabled || !FEATURES.economy;
-    if (!enabled || !FEATURES.economy) claimHint.textContent = '';
   }
 
   async function enableSharedWorld() {
@@ -5864,51 +5011,24 @@ async function init() {
       myUserId = session.user.id;
       const shared = await loadSharedWorld();
       world.replaceAll(shared);
-      // Set BEFORE seedAsteroidBelts (and onChange()) -- a real bug
-      // caught only by a live two-session test, not by review: this used
-      // to be set AFTER seeding, so every seeded cell's world.addCell
-      // call fired its onAdd hook while sharedWorldActive was still
-      // false, meaning handleLocalAdd's own `if (sharedWorldActive...)`
-      // guard skipped pushCellUpsert entirely -- asteroid belts have been
-      // purely local/cosmetic in Shared World this whole time, never
-      // actually reaching Supabase. Also still needed for onChange()'s
-      // own localStorage guard and the undo button's disabled state to
-      // already reflect shared mode for this first render.
+      // Needed BEFORE onChange() -- a real bug caught only by a live
+      // two-session test, not by review: this used to be set AFTER,
+      // so world.addCell's own onAdd hook fired while sharedWorldActive
+      // was still false, meaning handleLocalAdd's own
+      // `if (sharedWorldActive...)` guard skipped pushCellUpsert
+      // entirely. Also still needed for onChange()'s own localStorage
+      // guard and the undo button's disabled state to already reflect
+      // shared mode for this first render.
       sharedWorldActive = true;
-      // Idempotent (checks for existing asteroid-tagged cells first) --
-      // safe even if a previous session already seeded this shared world.
-      // A rare race exists if two sessions connect to a truly fresh
-      // (never-seeded) Shared World simultaneously -- both could seed
-      // independently, upserting the same positions with possibly
-      // different random materials. Not catastrophic (same idempotent
-      // upsert mechanism as any other concurrent cell write), just
-      // slightly wasteful; not worth distributed-locking machinery for a
-      // one-time bootstrap case. See CLAUDE.md's asteroids status.
-      seedAsteroidBelts(world);
       onChange();
-      refreshClaims();
       unsubscribeShared = subscribeToSharedWorld({
         onRemoteUpsert: applyRemoteUpsert,
         onRemoteDelete: applyRemoteDelete,
-        onRemoteClaim: applyRemoteClaim,
-        onRemoteRegrowthSet: applyRemoteRegrowthSet,
-        onRemoteRegrowthClear: applyRemoteRegrowthClear,
-        onRemoteInventory: applyRemoteInventory,
-        onRemoteTrade: applyRemoteTrade,
-        onRemoteTradeClear: applyRemoteTradeClear,
         onRemoteSeedSet: applyRemoteSeedSet,
         onRemoteSeedClear: applyRemoteSeedClear,
       });
-      renderTradePanel();
       rebuildAllGrowth();
       setLocalResetControlsEnabled(false);
-      setClaimLandEnabled(true);
-      const startPos = currentPlayerWorldPosition();
-      unsubscribePresence = subscribeToPresence(
-        myUserId,
-        { name: displayName, x: startPos.x, y: startPos.y, z: startPos.z, walking },
-        (others) => { otherPlayers = others; }
-      );
       sharedWorldToggle.textContent = 'Disable Shared World';
       sharedWorldHint.textContent = 'Shared World: live — building here syncs to everyone in realtime.';
     } catch (err) {
@@ -5927,22 +5047,11 @@ async function init() {
       unsubscribeShared();
       unsubscribeShared = null;
     }
-    if (unsubscribePresence) {
-      unsubscribePresence();
-      unsubscribePresence = null;
-    }
-    otherPlayers = {};
-    clearAvatarLabels();
-    closeInteractPanel();
     const local = loadFromLocalStorage() ?? (await loadWorld('./data/starter-world.json'));
     world.replaceAll(local);
-    seedAsteroidBelts(world); // no-op if `local` already has its own asteroid cells -- see load-preset's own comment on why this call is needed after any replaceAll()
     onChange();
     setLocalResetControlsEnabled(true);
-    setClaimLandEnabled(false);
     myUserId = null;
-    refreshClaims();
-    renderTradePanel();
     rebuildAllGrowth();
     sharedWorldToggle.textContent = 'Enable Shared World';
     sharedWorldHint.textContent = 'Shared World: off.';
@@ -5981,7 +5090,6 @@ async function init() {
     clearLocalStorage();
     const fresh = await loadWorld('./data/starter-world.json');
     world.replaceAll(fresh);
-    seedAsteroidBelts(world); // matches what a true first visit gets, see load-preset's own comment
     onChange();
     rebuildAllGrowth();
     // BCC dual-lattice build: a real second world store, so a "fresh
@@ -6071,7 +5179,6 @@ async function init() {
           try {
             const data = await fetchGalleryWorldData(w.id);
             world.replaceAll(data);
-            seedAsteroidBelts(world); // see load-preset's own comment
             onChange();
             rebuildAllGrowth();
             galleryOverlay.classList.remove('open');
@@ -6150,7 +5257,6 @@ async function init() {
       const parsed = await importWorldFile(file);
       if (!confirmLargeWorldLoad(parsed)) return;
       world.replaceAll(parsed);
-      seedAsteroidBelts(world); // see load-preset's own comment
       onChange();
       rebuildAllGrowth();
     } catch (err) {
@@ -6183,33 +5289,22 @@ async function init() {
     const preset = await loadWorld(path);
     if (!confirmLargeWorldLoad(preset)) return;
     world.replaceAll(preset);
-    seedAsteroidBelts(world); // re-seed after the full replace -- see docs/code-notes/render.md
     onChange();
     rebuildAllGrowth();
   });
 
-  // 5s idle-time tick: asteroid regrowth, inventory decay, growth, and
-  // evolution catch-up. Deliberately does NOT go through onChange() --
-  // see docs/code-notes/render.md for why, and for a real bug history
-  // on the evolution-save condition below.
+  // 5s idle-time tick: growth and evolution catch-up. Deliberately does
+  // NOT go through onChange() -- see docs/code-notes/render.md for why,
+  // and for a real bug history on the evolution-save condition below.
   setInterval(() => {
     // Model vs. World Separation (reframe Stage 2): this tick IS "all
-    // time-based and agent-based simulation" for the whole app -- every
-    // World System with a clock (asteroid regrowth, inventory decay,
-    // growth, ecosystem/animal catch-up) funnels through this single
-    // interval, nothing else runs on a timer. Freezing model mode here,
-    // as one early return, is exhaustive rather than freezing each
-    // sub-system individually and risking missing one. Does NOT freeze
-    // hydrosphere/black-hole/star/supernova checks -- those are reactive
-    // (re-evaluated on onChange(), i.e. player action, not elapsed time)
-    // and out of this stage's scope, which named growth/ecosystem/animal
-    // specifically.
+    // time-based and agent-based simulation" for the whole app -- growth
+    // and ecosystem/animal catch-up funnel through this single interval,
+    // nothing else runs on a timer. Freezing model mode here, as one
+    // early return, is exhaustive rather than freezing each sub-system
+    // individually and risking missing one.
     if (workspaceMode !== 'world') return;
     const before = world.entries().length;
-    applyAsteroidRegeneration(world);
-    applyPopulationScaledSpawning(world);
-    applyInventoryDecay(world);
-    updateInventoryHint();
     if (applyGrowth(world, Date.now())) {
       rebuildAllGrowth();
       if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
@@ -6235,10 +5330,6 @@ function onResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 window.addEventListener('resize', onResize);
-
-// tickPresenceFn: init()-scoped logic bridged to this module-level slot --
-// see docs/code-notes/render.md.
-let tickPresenceFn = () => {};
 
 let lastFrameTime = performance.now();
 
@@ -6294,16 +5385,14 @@ function animate() {
     player.update(dt);
     // player position changes every frame, unlike Build mode's onChange-driven updates
     updateGravityInfo();
-    updateBeltHint();
     updateEvolutionInfo();
   } else {
     controls.update();
   }
-  tickPresenceFn(dt);
   // Skip the (otherwise fully-hidden) world render while the Rhombic
   // Wheel 3D is open -- its own overlay/renderer covers the whole
   // screen, so this pass would be pure wasted GPU work every frame.
-  // Everything else above (presence ticking, controls damping) still
+  // Everything else above (controls damping) still
   // runs -- only the render call itself is skipped.
   if (!isRhombicWheel3DOpen()) {
     renderer.render(sculptureModeActive ? sculptureScene : scene, camera);

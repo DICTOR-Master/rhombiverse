@@ -1,5 +1,12 @@
 # Rhombiverse — Spec Addendum: Asteroid Belts (Resource Mining)
 
+> **ARCHIVED 2026-09-17** — this World System was retired along with the
+> rest of the game/world-building layer (mining, trade, claims,
+> achievements, hazards, hydrosphere); see README.md. Its code moved to
+> `src/world-systems-archived/asteroids.js` — kept intact for reference,
+> permanently unreachable in the running app, not deleted. This doc is
+> historical.
+
 Standalone addendum. Extends `RHOMBIVERSE_PLAN.md` (Phase 2 build/delete tool, world-state schema) and is governed by `RHOMBIVERSE_PRINCIPLES.md` (population-scaled spawning below is a direct application of the adaptive-damping pattern — scaling to system load rather than a fixed constant).
 
 ---

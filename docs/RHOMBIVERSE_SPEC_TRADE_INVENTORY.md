@@ -1,5 +1,13 @@
 # Rhombiverse — Spec Addendum: Inventory, Trade & Resource Decay
 
+> **ARCHIVED 2026-09-17** — this World System was retired along with the
+> rest of the game/world-building layer (mining, trade, claims,
+> achievements, hazards, hydrosphere); see README.md. Its code moved to
+> `src/world-systems-archived/trade.js` — kept intact for reference,
+> permanently unreachable in the running app, not deleted. The wheel-menu
+> "Trade" doorway (Offer/Accept/Inventory) is gone too, a plain Spare
+> face now. This doc is historical.
+
 Standalone addendum. Extends `RHOMBIVERSE_SPEC_ASTEROIDS.md` (mining/acquisition, `playerInventory`) and is governed by `RHOMBIVERSE_PRINCIPLES.md` — the decay mechanic below is a direct reuse of the Adaptive Damping pattern (section 2) and the asteroid regeneration mechanic (`RHOMBIVERSE_SPEC_ASTEROIDS.md` section 4), not a new formula, per Grounded Simplicity (section 0).
 
 ---

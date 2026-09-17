@@ -1,5 +1,12 @@
 # Rhombiverse — Spec Addendum: Supernova Threshold
 
+> **ARCHIVED 2026-09-17** — this World System was retired along with the
+> rest of the game/world-building layer (mining, trade, claims,
+> achievements, hazards, hydrosphere); see README.md. Its code moved to
+> `src/world-systems-archived/supernova.js` — kept intact for reference,
+> permanently unreachable in the running app, not deleted. This doc is
+> historical.
+
 Standalone addendum. Extends `RHOMBIVERSE_SPEC_STAR_SYSTEM.md` (BSG-as-star, carbon-catalyzed fusion) and reuses the containment pattern from `RHOMBIVERSE_SPEC_BLACKHOLE.md` directly, per Grounded Simplicity (`RHOMBIVERSE_PRINCIPLES.md` section 0) — no new safety mechanism is invented here.
 
 ---

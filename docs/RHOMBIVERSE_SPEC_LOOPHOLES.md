@@ -1,5 +1,10 @@
 # Rhombiverse — Spec Addendum: Loophole Fixes
 
+> **ARCHIVED 2026-09-17** — every spec this doc patches (Trade/Inventory,
+> Regions/Claims, Supernova, Black Hole, Asteroids) was retired along
+> with the rest of the game/world-building layer; see README.md. This
+> doc is historical.
+
 Standalone addendum. Patches specific gaps identified across `RHOMBIVERSE_SPEC_TRADE_INVENTORY.md`, `RHOMBIVERSE_SPEC_REGIONS.md`, `RHOMBIVERSE_SPEC_SUPERNOVA.md`, `RHOMBIVERSE_SPEC_BLACKHOLE.md`, and `RHOMBIVERSE_SPEC_ASTEROIDS.md`. Each fix reuses an existing pattern where possible, per Grounded Simplicity.
 
 ---
