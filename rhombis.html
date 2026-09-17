@@ -128,6 +128,20 @@
       padding: 0.4rem 0.6rem; cursor: pointer;
     }
     #rhombis-stage-picker-toggle:hover { text-decoration: underline; }
+    /* Real bug caught by an actual click test (headless browser, not
+       just a DOM-presence check): #rhombis-topbar's own base rule is
+       `pointer-events: none` (line ~38), and every OTHER interactive
+       child (the stage-picker toggle above, the back-link) has its own
+       explicit `pointer-events: auto` override -- this button was added
+       without one, so the canvas beneath it silently absorbed every
+       click. A user could see "EN" sitting there and never be able to
+       tap it. */
+    #rhombis-lang-toggle {
+      pointer-events: auto; background: none; border: none; color: #9be3ff;
+      font: 600 0.85rem system-ui, sans-serif; letter-spacing: 0.04em;
+      padding: 0.4rem 0.6rem; cursor: pointer;
+    }
+    #rhombis-lang-toggle:hover { text-decoration: underline; }
     #rhombis-stage-picker {
       position: fixed; inset: 0; z-index: 20;
       background: rgba(2, 2, 6, 0.85); backdrop-filter: blur(4px);
@@ -187,20 +201,21 @@
   <div id="app"></div>
   <div id="rhombis-tray-panel"><div id="rhombis-tray-flash"></div></div>
   <div id="rhombis-topbar">
-    <span><img id="rhombis-title-mark" src="./assets/rhombis-favicon-64.png" alt="" /><span id="rhombis-title">RHOMBIS</span><span id="rhombis-subtitle">3D puzzle from Rhombiverse</span><span id="rhombis-stage"></span></span>
+    <span><img id="rhombis-title-mark" src="./assets/rhombis-favicon-64.png" alt="" /><span id="rhombis-title">RHOMBIS</span><span id="rhombis-subtitle" data-i18n="topbar.subtitle">3D puzzle from Rhombiverse</span><span id="rhombis-stage"></span></span>
     <span>
-      <button id="rhombis-stage-picker-toggle" type="button">Stages</button>
-      <a href="./index.html">&larr; Rhombiverse</a>
+      <button id="rhombis-lang-toggle" type="button" title="Language" data-i18n-title="topbar.language">EN</button>
+      <button id="rhombis-stage-picker-toggle" type="button" data-i18n="topbar.stages">Stages</button>
+      <a href="./index.html" data-i18n="topbar.backToRhombiverse">&larr; Rhombiverse</a>
     </span>
   </div>
   <div id="rhombis-hud"></div>
-  <button id="rhombis-undo" type="button" disabled>Undo</button>
-  <div id="rhombis-solved" hidden>Solved!</div>
+  <button id="rhombis-undo" type="button" disabled data-i18n="undo.button">Undo</button>
+  <div id="rhombis-solved" hidden data-i18n="solved.hud">Solved!</div>
   <div id="rhombis-stage-picker" hidden>
     <div id="rhombis-stage-picker-panel">
       <div id="rhombis-stage-picker-header">
-        <h2>Choose a Stage</h2>
-        <button id="rhombis-stage-picker-close" type="button" title="Close">&times;</button>
+        <h2 data-i18n="picker.title">Choose a Stage</h2>
+        <button id="rhombis-stage-picker-close" type="button" title="Close" data-i18n-title="picker.close">&times;</button>
       </div>
       <div id="rhombis-stage-list"></div>
     </div>

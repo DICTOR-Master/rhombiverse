@@ -44,6 +44,7 @@ import { loadWorld, createWorldStore } from './core/worldstate-core.js';
 import { createBuildController, removeShell, recolorShell } from './core/build.js';
 import { generatePlanetoid } from './geometry-extensions/planetoidgen.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR, QUALITY_LEVELS_ASCENDING } from './app/settings.js';
+import { t, LANG_ORDER, LANG_META } from './app/i18n.js';
 import { playPlaceSound, playRemoveSound, playMenuSound } from './app/sfx.js';
 import { createWheelPickers } from './app/wheel-pickers.js';
 import { MARKS, iconFrame, swatchMark } from './app/wheel-icons.js';
@@ -387,6 +388,35 @@ window.addEventListener('pointerup', () => {
   camRotateStart = null;
 });
 
+// UI-chrome translations (src/app/i18n.js), Phase 1 scope only -- see
+// that file's own header for exactly what's covered/deferred. Applies
+// every element tagged data-i18n/-title/-placeholder/-html; the
+// handful of JS-only dynamic strings this file sets directly (walk-
+// toggle, shared-world toggle/hint, recolor button, gallery/share
+// hints) call t() at their own assignment site instead, since their
+// text depends on live STATE, not just the current language. Called
+// once at module load and again whenever the language setting changes.
+function applyTranslations() {
+  const lang = getSettings().language;
+  document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n, lang); });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.dataset.i18nTitle, lang); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder, lang); });
+  document.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml, lang); });
+}
+applyTranslations();
+
+// One <option> per LANG_ORDER entry, generated here rather than
+// hand-written in index.html so it can never drift from the
+// dictionary's own language list.
+const languageSelect = document.getElementById('setting-language');
+if (languageSelect) {
+  languageSelect.innerHTML = LANG_ORDER.map((code) => `<option value="${code}">${LANG_META[code].native}</option>`).join('');
+  languageSelect.value = getSettings().language;
+  languageSelect.addEventListener('change', () => {
+    updateSettings({ language: languageSelect.value });
+  });
+}
+
 // Settings panel (B1, behind the Lab entry point) -- applies live, no
 // page reload needed. Quality only affects pixel ratio for now (WebGL
 // antialiasing can't be toggled after the renderer is created).
@@ -396,6 +426,8 @@ onSettingsChange((s) => {
   controls.rotateSpeed = s.sensitivity;
   renderer.setPixelRatio(window.devicePixelRatio * QUALITY_PIXEL_RATIO_FACTOR[s.quality]);
   document.getElementById('fps-meter')?.classList.toggle('visible', s.showFPSMeter);
+  applyTranslations();
+  if (languageSelect && languageSelect.value !== s.language) languageSelect.value = s.language;
 });
 
 // Walk mode (RHOMBIVERSE_PLAN.md Phase 5.5) state, module-level since
@@ -605,7 +637,7 @@ function enterWalk() {
   animateBackground(SPACE_BG_COLOR, WALK_BG_COLOR, WALK_TRANSITION_MS);
   setTimeout(() => {
     document.body.classList.remove('explore-transitioning');
-    document.getElementById('walk-toggle').textContent = 'Exit Walk Mode (Esc)';
+    document.getElementById('walk-toggle').textContent = t('walk.exit', getSettings().language);
     document.getElementById('walk-hint').style.display = '';
     document.getElementById('hud-crosshair')?.classList.add('visible');
     setWalkTouchControlsVisible(true);
@@ -634,7 +666,7 @@ function exitWalk() {
   setTimeout(() => {
     document.body.classList.remove('explore-transitioning');
     controls.enabled = true;
-    document.getElementById('walk-toggle').textContent = 'Enter Walk Mode';
+    document.getElementById('walk-toggle').textContent = t('walk.enter', getSettings().language);
     document.getElementById('walk-hint').style.display = 'none';
     walkTransitioning = false;
     updateGravityInfo();
@@ -2111,7 +2143,7 @@ async function init() {
     const container = document.getElementById('ring-list');
     container.innerHTML = '';
     if (!focusedCenterKey) {
-      container.innerHTML = '<div class="placeholder">Click a built structure to see its shells.</div>';
+      container.innerHTML = `<div class="placeholder" data-i18n="shells.emptyHint">${t('shells.emptyHint', getSettings().language)}</div>`;
       return;
     }
     const structure = world
@@ -2135,8 +2167,8 @@ async function init() {
       const recolorBtn = document.createElement('button');
       recolorBtn.type = 'button';
       recolorBtn.className = 'ring-recolor';
-      recolorBtn.textContent = 'Recolor';
-      recolorBtn.title = 'Set this shell to the selected material';
+      recolorBtn.textContent = t('shells.recolor', getSettings().language);
+      recolorBtn.title = t('shells.recolorTitle', getSettings().language);
       recolorBtn.addEventListener('click', () => {
         recolorShell(world, focusedCenterKey, shell, materialSelect.value, canPlaceMaterial);
         onChange();
@@ -4996,16 +5028,11 @@ async function init() {
 
   async function enableSharedWorld() {
     if (sharedWorldActive) return;
-    if (
-      !confirm(
-        'Switch to the shared world? This replaces your current view with the live shared build. ' +
-          'Your local save is untouched and returns automatically when you disable Shared World.'
-      )
-    ) {
+    if (!confirm(t('world.sharedConfirm', getSettings().language))) {
       return;
     }
     sharedWorldToggle.disabled = true;
-    sharedWorldHint.textContent = 'Shared World: connecting…';
+    sharedWorldHint.textContent = t('world.sharedConnecting', getSettings().language);
     try {
       const session = await ensureAnonymousSession();
       myUserId = session.user.id;
@@ -5029,11 +5056,11 @@ async function init() {
       });
       rebuildAllGrowth();
       setLocalResetControlsEnabled(false);
-      sharedWorldToggle.textContent = 'Disable Shared World';
-      sharedWorldHint.textContent = 'Shared World: live — building here syncs to everyone in realtime.';
+      sharedWorldToggle.textContent = t('world.disableShared', getSettings().language);
+      sharedWorldHint.textContent = t('world.sharedLive', getSettings().language);
     } catch (err) {
       sharedWorldActive = false;
-      sharedWorldHint.textContent = 'Shared World: failed to connect (see console).';
+      sharedWorldHint.textContent = t('world.sharedFailed', getSettings().language);
       console.warn('Rhombiverse: failed to enable Shared World', err);
     } finally {
       sharedWorldToggle.disabled = false;
@@ -5053,8 +5080,8 @@ async function init() {
     setLocalResetControlsEnabled(true);
     myUserId = null;
     rebuildAllGrowth();
-    sharedWorldToggle.textContent = 'Enable Shared World';
-    sharedWorldHint.textContent = 'Shared World: off.';
+    sharedWorldToggle.textContent = t('world.enableShared', getSettings().language);
+    sharedWorldHint.textContent = t('world.sharedOff', getSettings().language);
   }
 
   sharedWorldToggle.addEventListener('click', () => {
@@ -5215,19 +5242,19 @@ async function init() {
     const hint = document.getElementById('gallery-publish-hint');
     const title = titleInput.value.trim();
     if (!title) {
-      hint.textContent = 'Give your World a title first.';
+      hint.textContent = t('gallery.titleFirst', getSettings().language);
       return;
     }
-    hint.textContent = 'Publishing…';
+    hint.textContent = t('gallery.publishing', getSettings().language);
     try {
       const thumbnail = captureThumbnail();
       await publishToGallery(title, world.toJSON(), thumbnail);
-      hint.textContent = 'Published! Refreshing the gallery…';
+      hint.textContent = t('gallery.published', getSettings().language);
       titleInput.value = '';
       renderGalleryGrid();
     } catch (err) {
       console.warn('Rhombiverse: gallery publish failed', err);
-      hint.textContent = 'Could not publish (has the shared_worlds table been set up yet?).';
+      hint.textContent = t('gallery.publishFailed', getSettings().language);
     }
   });
 
@@ -5237,7 +5264,7 @@ async function init() {
       hint.textContent = "Your browser doesn't support the compression this needs -- try a recent Chrome/Firefox/Safari.";
       return;
     }
-    hint.textContent = 'Compressing…';
+    hint.textContent = t('share.compressing', getSettings().language);
     try {
       const encoded = await encodeWorldForUrl(world.toJSON());
       const shareUrl = buildShareUrl(encoded);
@@ -5245,7 +5272,7 @@ async function init() {
       hint.textContent = `Link copied (${shareUrl.length} chars) -- paste it anywhere; opening it loads this exact World.`;
     } catch (err) {
       console.warn('Rhombiverse: world share failed', err);
-      hint.textContent = 'Could not create a share link for this World (it may be too large).';
+      hint.textContent = t('share.failed', getSettings().language);
     }
   });
 

@@ -19,6 +19,9 @@ const DEFAULTS = {
   fov: 50,
   quality: 'high',
   volume: 0.5,
+  // UI-chrome language (src/app/i18n.js) -- shared with RHOMBIS via this
+  // same SETTINGS_KEY, so a choice made in either app is honored in both.
+  language: 'en',
   // Performance guardrail (reframe Stage 6): the meter itself is opt-in
   // ("optional FPS meter"), but the auto-degrade safety net it's
   // attached to runs regardless of whether the meter is shown -- see

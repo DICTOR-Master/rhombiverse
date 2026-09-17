@@ -161,6 +161,17 @@ removed 2026-09-17, unused in practice: checked directly against the
 live Supabase data first, and every relevant table was empty or
 dev-testing-only.)
 
+**7 languages** (English, 日本語, Español, Français, 한국어, 中文,
+Русский — `src/app/i18n.js`, matching Polyhedraverse's own set exactly)
+via the Language selector in Settings, persisted alongside the other
+Settings values and shared with RHOMBIS through that same store. Scoped
+to this app's own interface chrome only — never shape/material/species/
+world-preset names, the same discipline Polyhedraverse's own i18n uses.
+Covers the always-visible chrome (HUD, Settings basics, walk mode,
+World import/export/sharing, Shells, Gallery, Welcome overlay) as of
+2026-09-17; the Sculpt/Cultivate panels and the AI section are a
+follow-up phase, not yet translated.
+
 The welcome screen is a rotating RD logo with two live antipodal ENTER
 faces. It used to also offer a Rhombeometry/Full World mode choice here,
 picking Full World on a first visit loading a pre-built Showcase World

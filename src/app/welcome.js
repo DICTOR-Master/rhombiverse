@@ -6,6 +6,8 @@
 // World Systems retirement (see features.js/settings.js); there's only
 // one mode now.
 import { buildRDFaces } from './rhombic-wheel-3d-core.js';
+import { getSettings } from './settings.js';
+import { t } from './i18n.js';
 
 const SKIP_KEY = 'rhombiverse-skip-intro';
 
@@ -153,21 +155,22 @@ function startLogoSpin(onEnterHit) {
 // is still the real place for that content, this was always a secondary
 // teaser of it.
 function overlayHtml() {
+  const lang = getSettings().language;
   return `
     <div id="welcome-card">
       <h1>Rhombiverse</h1>
       <div class="rhombis-link">
         <img src="./assets/rhombis-favicon-64.png" alt="" width="28" height="28" />
-        <a href="./rhombis.html">New here? Try RHOMBIS, our 3D intro puzzle &rarr;</a>
+        <a href="./rhombis.html">${t('welcome.rhombisLink', lang)}</a>
       </div>
       ${logoSvg()}
       <label class="dont-show">
         <input type="checkbox" id="skip-intro-checkbox" />
-        Don't show this again on this device
+        ${t('welcome.dontShowAgain', lang)}
       </label>
       <div class="polyhedraverse-link">
         <img src="./assets/polyhedraverse-favicon-64.png" alt="" width="28" height="28" />
-        <a href="https://polyhedraverse.vercel.app" target="_blank" rel="noopener">Check out Polyhedraverse, our twin shape-editing site &rarr;</a>
+        <a href="https://polyhedraverse.vercel.app" target="_blank" rel="noopener">${t('welcome.polyhedraverseLink', lang)}</a>
       </div>
       <div class="legal-links">
         <a href="./TERMS.md" target="_blank" rel="noopener">Terms</a>
@@ -194,7 +197,7 @@ function init() {
   const aboutBtn = document.createElement('button');
   aboutBtn.id = 'about-btn';
   aboutBtn.type = 'button';
-  aboutBtn.title = 'About Rhombiverse';
+  aboutBtn.title = t('welcome.aboutTitle', getSettings().language);
   aboutBtn.textContent = 'ℹ';
   document.body.appendChild(aboutBtn);
 

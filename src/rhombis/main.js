@@ -36,6 +36,8 @@ import * as THREE from 'three';
 import { quaternionForOrientationKey } from './geometry.js';
 import { STAGES, WIRE_COLOR, GHOST_OPACITY } from './stages.js';
 import { createPuzzleState, selectPiece, flipPiece, setPieceOrientation, openOrientationOptions, placeSelected, isSolved, voidValidityForPiece, smallestEnclosingGroupId, ANY_SINGLE_CELL_GROUP } from './puzzle-state.js';
+import { getSettings, updateSettings, onSettingsChange } from '../app/settings.js';
+import { t, LANG_ORDER } from './i18n.js';
 
 const SCALE = 2;
 const SELECTED_EMISSIVE = 0x664422;
@@ -73,13 +75,13 @@ const SELECTED_LIFT = SCALE * 0.8; // relative to a single RD's own size -- tune
 // one; anything else (Stage 4's 12-way 'axisKey:in'/'axisKey:out') gets
 // a generic fallback from orientationLabel() below instead of an entry
 // here -- see that function's own comment.
-const ORIENTATION_LABELS = { 'y+': 'apex up', 'y-': 'apex down' };
-
 function orientationLabel(key) {
-  if (ORIENTATION_LABELS[key]) return ORIENTATION_LABELS[key];
+  const lang = getSettings().language;
+  if (key === 'y+') return t('orientation.apexUp', lang);
+  if (key === 'y-') return t('orientation.apexDown', lang);
   if (key.includes(':')) {
     const [axisKey, direction] = key.split(':');
-    return `${axisKey} face, ${direction === 'in' ? 'inward' : 'outward'}`;
+    return t('orientation.faceDirection', lang, { axis: axisKey, direction: t(direction === 'in' ? 'orientation.inward' : 'orientation.outward', lang) });
   }
   return key;
 }
@@ -347,6 +349,33 @@ const stagePickerClose = document.getElementById('rhombis-stage-picker-close');
 const stageList = document.getElementById('rhombis-stage-list');
 const trayFlash = document.getElementById('rhombis-tray-flash');
 
+// UI-chrome translations (./i18n.js), same Phase 1 scope/discipline as
+// the main app's own src/app/i18n.js -- stage names/lineage content
+// stay untranslated, only this file's own interface strings are
+// covered. `current`/`updateHud`/`populateStagePicker` are `let`/
+// function declarations further down this module; this function is
+// only ever CALLED after those have run (once near EOF, right after
+// the startup loadStage(), and again on later onSettingsChange
+// firings) -- calling it here at definition time would hit `current`'s
+// temporal dead zone, so the initial call is deferred, not immediate.
+const langToggle = document.getElementById('rhombis-lang-toggle');
+function applyRhombisTranslations() {
+  const lang = getSettings().language;
+  document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n, lang); });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.dataset.i18nTitle, lang); });
+  if (langToggle) langToggle.textContent = lang.toUpperCase();
+  if (current) updateHud();
+  if (stagePicker && !stagePicker.hidden) populateStagePicker();
+}
+if (langToggle) {
+  langToggle.addEventListener('click', () => {
+    const lang = getSettings().language;
+    const nextLang = LANG_ORDER[(LANG_ORDER.indexOf(lang) + 1) % LANG_ORDER.length];
+    updateSettings({ language: nextLang });
+  });
+}
+onSettingsChange(() => applyRhombisTranslations());
+
 // Direct instruction (2026-09-04, "success message in picker tray
 // box") -- confirmation shown right where attention already is (the
 // tray itself) on a successful placement, not just the bottom HUD text
@@ -469,7 +498,7 @@ function loadStage(index) {
   applyCameraFraming();
   applyTrayFraming();
   solvedBanner.hidden = true;
-  stageLabel.textContent = `Stage ${stageDef.id}: ${stageDef.name}`;
+  stageLabel.textContent = t('stage.label', getSettings().language, { id: stageDef.id, name: stageDef.name });
   // A fresh piece mesh defaults to visible (THREE.Object3D's own
   // default) -- fine for a fixed-group fused piece (always meant to be
   // shown), but WRONG for the interchangeable singles, which now share
@@ -521,7 +550,7 @@ function populateStagePicker() {
     option.className = 'rhombis-stage-option';
     option.dataset.stageIndex = String(index);
     const lineage = stageDef.derivedFrom
-      ? `<span class="stage-lineage">derived from ${stageDef.derivedFrom.map(({ id, tier }) => `#${id} (${tier})`).join(' + ')}</span>`
+      ? `<span class="stage-lineage">${t('stage.derivedFrom', getSettings().language, { list: stageDef.derivedFrom.map(({ id, tier }) => `#${id} (${tier})`).join(' + ') })}</span>`
       : '';
     option.innerHTML = `<span class="stage-num">${stageDef.id}</span><span class="stage-name-wrap"><span class="stage-name">${stageDef.name}</span>${lineage}</span>`;
     option.addEventListener('click', () => {
@@ -705,15 +734,16 @@ function updateHud() {
   // separate branch.
   const multipleVoids = current.voids.length > 1;
   const remaining = remainingCount();
-  const countSuffix = multipleVoids ? ` (${remaining} left)` : '';
+  const lang = getSettings().language;
+  const countSuffix = multipleVoids ? t('hud.leftSuffix', lang, { n: remaining }) : '';
 
   if (!selectedId) {
     if (flippable) {
-      hud.textContent = `Tap a piece, then tap its void (tap again to flip)${countSuffix}`;
+      hud.textContent = t('hud.tapVoidFlip', lang, { suffix: countSuffix });
     } else if (multipleVoids) {
-      hud.textContent = `Tap a piece, then tap a void to place it${countSuffix}`;
+      hud.textContent = t('hud.tapVoidPlace', lang, { suffix: countSuffix });
     } else {
-      hud.textContent = 'Tap the piece, then tap the skeleton to place it';
+      hud.textContent = t('hud.tapSkeletonPlace', lang);
     }
     return;
   }
@@ -721,13 +751,13 @@ function updateHud() {
   const selectedPiece = currentStatePiece(selectedId);
   if (selectedPiece.orientation) {
     const label = orientationLabel(selectedPiece.orientation);
-    hud.textContent = `Piece selected (${label}) -- tap it again to flip, or tap a void to place${countSuffix}`;
+    hud.textContent = t('hud.selectedFlipOrPlace', lang, { label, suffix: countSuffix });
   } else if (selectedPiece.fillsGroup) {
-    hud.textContent = 'Fused piece selected -- tap anywhere on that region to fill it all at once';
+    hud.textContent = t('hud.selectedFused', lang);
   } else if (multipleVoids) {
-    hud.textContent = `Piece selected${countSuffix} -- tap a void to place it`;
+    hud.textContent = t('hud.selectedPlace', lang, { suffix: countSuffix });
   } else {
-    hud.textContent = 'Piece selected -- tap the skeleton to place it';
+    hud.textContent = t('hud.selectedPlaceSkeleton', lang);
   }
 }
 
@@ -887,9 +917,10 @@ function refreshVoidHighlights() {
 
 function advanceOrFinish() {
   const next = STAGES[stageIndex + 1];
-  hud.textContent = 'Solved!';
+  const lang = getSettings().language;
+  hud.textContent = t('solved.hud', lang);
   solvedBanner.hidden = false;
-  solvedBanner.textContent = next ? 'Solved!' : 'Solved! More stages coming soon.';
+  solvedBanner.textContent = next ? t('solved.bannerFinal', lang) : t('solved.bannerMore', lang);
   if (next) {
     current.advanceTimer = setTimeout(() => {
       stageIndex += 1;
@@ -1344,5 +1375,6 @@ function animate() {
 }
 
 loadStage(stageIndex);
+applyRhombisTranslations(); // deferred until here -- see the function's own comment (needs `current` past its TDZ)
 syncTrayPanel();
 animate();

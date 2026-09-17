@@ -3,7 +3,9 @@
   "private": true,
   "description": "dependencies has the /api serverless functions' own deps (ai, zod). devDependencies has esbuild, used ONLY by scripts/build.mjs at Vercel build time to minify src/**/*.js for production -- local dev is untouched, still plain ES modules with zero build step (see README.md's 'Running locally').",
   "scripts": {
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "verify:i18n": "node scripts/verify-i18n.mjs",
+    "verify:rhombis-i18n": "node scripts/verify-rhombis-i18n.mjs"
   },
   "dependencies": {
     "ai": "^6.0.0",

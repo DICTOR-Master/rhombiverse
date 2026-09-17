@@ -969,9 +969,9 @@
   <div id="hud-crosshair"></div>
   <div id="walk-look-zone"></div>
   <div id="walk-joystick"><div id="walk-joystick-knob"></div></div>
-  <button id="walk-jump-btn" type="button">JUMP</button>
-  <div id="sculpture-mode-banner"><span>Sculpture Mode -- isolated scratch space, nothing here is saved to the shared world</span><button id="sculpture-mode-exit" type="button">Exit to Universe</button></div>
-  <div id="hud-wheel-cue" title="Tab / Space also opens this">Menu</div>
+  <button id="walk-jump-btn" type="button" data-i18n="hud.jump">JUMP</button>
+  <div id="sculpture-mode-banner"><span data-i18n="hud.sculptureModeBanner">Sculpture Mode -- isolated scratch space, nothing here is saved to the shared world</span><button id="sculpture-mode-exit" type="button" data-i18n="hud.exitToUniverse">Exit to Universe</button></div>
+  <div id="hud-wheel-cue" title="Tab / Space also opens this" data-i18n="hud.menu">Menu</div>
   <button id="hud-quick-shape" type="button" title="Shape (tap to change)"></button>
   <button id="hud-quick-material" type="button" title="Material (tap to change)"></button>
   <button id="hud-quick-lattice-view" type="button" title="Lattice View (tap to cycle)"></button>
@@ -985,26 +985,29 @@
   <button id="rhombic-wheel-3d-toggle" type="button" title="Menu (Tab / Space): navigate departments via the real RD mesh">◈</button>
   <button id="clear-world-toggle" type="button" title="Clear World: erase everything and start fresh">⊘</button>
   <button id="reload-toggle" type="button" title="Reload: hard-refresh the app (use if something looks stuck/stale)">↻</button>
-  <button id="lab-toggle" type="button" title="Settings">⚙</button>
+  <button id="lab-toggle" type="button" title="Settings" data-i18n-title="hud.settings">⚙</button>
 
   <div id="lab-panel">
-    <div id="lab-header"><span>Settings</span><button id="lab-close" type="button" title="Close">✕</button></div>
-    <div class="sculpt-hint" id="rhombis-settings-link">New here, or just want a quick puzzle? <a href="./rhombis.html">Try RHOMBIS</a> any time.</div>
-    <h2>Settings</h2>
+    <div id="lab-header"><span data-i18n="hud.settings">Settings</span><button id="lab-close" type="button" title="Close" data-i18n-title="lab.close">✕</button></div>
+    <div class="sculpt-hint" id="rhombis-settings-link" data-i18n-html="lab.rhombisLinkHint">New here, or just want a quick puzzle? <a href="./rhombis.html">Try RHOMBIS</a> any time.</div>
+    <h2 data-i18n="hud.settings">Settings</h2>
     <div id="lab-settings-section">
-      <div class="row"><label for="setting-sensitivity">Look sensitivity</label><input id="setting-sensitivity" type="range" min="0.25" max="2.5" step="0.05" value="1" /></div>
-      <div class="row"><label for="setting-invert-y">Invert Y</label><input id="setting-invert-y" type="checkbox" /></div>
-      <div class="row"><label for="setting-fov">Field of view</label><input id="setting-fov" type="range" min="40" max="90" step="1" value="50" /></div>
-      <div class="row"><label for="setting-quality">Graphics quality</label>
+      <div class="row"><label for="setting-sensitivity" data-i18n="setting.sensitivity">Look sensitivity</label><input id="setting-sensitivity" type="range" min="0.25" max="2.5" step="0.05" value="1" /></div>
+      <div class="row"><label for="setting-invert-y" data-i18n="setting.invertY">Invert Y</label><input id="setting-invert-y" type="checkbox" /></div>
+      <div class="row"><label for="setting-fov" data-i18n="setting.fov">Field of view</label><input id="setting-fov" type="range" min="40" max="90" step="1" value="50" /></div>
+      <div class="row"><label for="setting-quality" data-i18n="setting.quality">Graphics quality</label>
         <select id="setting-quality">
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high" selected>High</option>
+          <option value="low" data-i18n="setting.quality.low">Low</option>
+          <option value="medium" data-i18n="setting.quality.medium">Medium</option>
+          <option value="high" selected data-i18n="setting.quality.high">High</option>
         </select>
       </div>
-      <div class="row"><label for="setting-fps-meter">Show FPS meter</label><input id="setting-fps-meter" type="checkbox" /></div>
-      <div class="row"><label for="setting-volume">Volume</label><input id="setting-volume" type="range" min="0" max="1" step="0.05" value="0.5" /></div>
-      <div class="row"><label for="setting-workspace-mode">Model workspace (freeze growth/ecosystem/animal simulation)</label><input id="setting-workspace-mode" type="checkbox" /></div>
+      <div class="row"><label for="setting-fps-meter" data-i18n="setting.fpsMeter">Show FPS meter</label><input id="setting-fps-meter" type="checkbox" /></div>
+      <div class="row"><label for="setting-volume" data-i18n="setting.volume">Volume</label><input id="setting-volume" type="range" min="0" max="1" step="0.05" value="0.5" /></div>
+      <div class="row"><label for="setting-workspace-mode" data-i18n="setting.workspaceMode">Model workspace (freeze growth/ecosystem/animal simulation)</label><input id="setting-workspace-mode" type="checkbox" /></div>
+      <div class="row"><label for="setting-language" data-i18n="setting.language">Language</label>
+        <select id="setting-language"></select>
+      </div>
       <div class="row" id="cubocta-build-row" style="display:none;">
         <button id="cubocta-build-toggle" class="mode-btn" data-mode="cubocta" type="button">Build Cuboctahedron</button>
       </div>
@@ -1042,16 +1045,16 @@
       <button class="mode-btn" data-mode="chisel" type="button">Remove</button>
     </div>
     <div class="row">
-      <button id="walk-toggle" type="button">Enter Walk Mode</button>
+      <button id="walk-toggle" type="button" data-i18n="walk.enter">Enter Walk Mode</button>
     </div>
     <div id="gravity-info" class="hint"></div>
     <div id="evolution-info" class="hint"></div>
-    <div id="walk-hint" class="hint" style="display: none;">
+    <div id="walk-hint" class="hint" style="display: none;" data-i18n="walk.hint">
       Walking: WASD move, mouse look, Space jump/up (Shift down in open
       space), Esc to exit.
     </div>
     <div id="material-row" class="row">
-      <label>Material:
+      <label><span data-i18n="material.label">Material:</span>
         <select id="material-select">
           <option value="base">Base Rhomb</option>
           <option value="garnet">Garnet</option>
@@ -1071,11 +1074,11 @@
       </label>
     </div>
     <div id="auto-assign-row" class="row">
-      <label><input id="auto-assign-material" type="checkbox" checked /> Auto-assign material by piece type</label>
+      <label><input id="auto-assign-material" type="checkbox" checked /> <span data-i18n="material.autoAssign">Auto-assign material by piece type</span></label>
     </div>
     <div id="auto-assign-materials-row" class="row" style="display: none; flex-direction: column; align-items: stretch; gap: 4px;"></div>
     <div id="piece-type-row" class="row">
-      <label>Piece:
+      <label><span data-i18n="piece.label">Piece:</span>
         <select id="piece-type-select">
           <option value="rd">RD (full block)</option>
           <option value="cube">Cube (bare)</option>
@@ -1093,7 +1096,7 @@
         </select>
       </label>
     </div>
-    <div class="hint">Try placing 6 pyramids on a cube. Then 12. Then remove the outer 6.</div>
+    <div class="hint" data-i18n="piece.tryHint">Try placing 6 pyramids on a cube. Then 12. Then remove the outer 6.</div>
     <div id="generator-row" class="row" style="display: none;">
       <label>Body type:
         <select id="generator-type-select">
@@ -1133,10 +1136,10 @@
       </label>
     </div>
     <div id="shell-radius-row" class="row">
-      <label>Shell fill radius: <input id="shell-count" type="number" min="1" max="15" value="3" /></label>
+      <label><span data-i18n="shell.fillRadius">Shell fill radius:</span> <input id="shell-count" type="number" min="1" max="15" value="3" /></label>
     </div>
     <div id="hollow-from-row" class="row">
-      <label>Hollow from shell: <input id="hollow-from" type="number" min="1" max="15" value="1" /></label>
+      <label><span data-i18n="shell.hollowFrom">Hollow from shell:</span> <input id="hollow-from" type="number" min="1" max="15" value="1" /></label>
     </div>
     <div id="mode-hint" class="hint"></div>
     <h2>Moderation</h2>
@@ -1146,16 +1149,16 @@
     <h2>World, Import/Export &amp; Sharing</h2>
     <hr style="border-color: rgba(255,255,255,0.15); margin: 8px 0;" />
     <div class="row">
-      <label>World view:
+      <label><span data-i18n="world.view">World view:</span>
         <select id="world-view-select">
-          <option value="color">Color</option>
-          <option value="translucent">Translucent</option>
-          <option value="skeleton">Skeleton</option>
+          <option value="color" data-i18n="world.view.color">Color</option>
+          <option value="translucent" data-i18n="world.view.translucent">Translucent</option>
+          <option value="skeleton" data-i18n="world.view.skeleton">Skeleton</option>
         </select>
       </label>
     </div>
     <div class="row">
-      <label><input id="section-enable" type="checkbox" /> Section view</label>
+      <label><input id="section-enable" type="checkbox" /> <span data-i18n="world.sectionView">Section view</span></label>
     </div>
     <div id="section-controls-row" class="row" style="display: none">
       <select id="section-axis">
@@ -1164,34 +1167,34 @@
         <option value="z">Z</option>
       </select>
       <input id="section-pos" type="range" min="-20" max="20" step="0.5" value="0" />
-      <label><input id="section-flip" type="checkbox" /> Flip</label>
+      <label><input id="section-flip" type="checkbox" /> <span data-i18n="world.flip">Flip</span></label>
     </div>
-    <div class="hint">
+    <div class="hint" data-i18n="world.rightClickHint">
       Right-click always removes the clicked cell, in every mode.
     </div>
     <div class="buttons">
-      <button id="new-world" type="button">New World</button>
-      <button id="export-json" type="button">Export World</button>
-      <button id="export-rhomb" type="button" title="Pure geometry only -- cells and seeds, no claims/inventory/organisms/trades">Export Model (.rhomb)</button>
+      <button id="new-world" type="button" data-i18n="world.new">New World</button>
+      <button id="export-json" type="button" data-i18n="world.exportJson">Export World</button>
+      <button id="export-rhomb" type="button" title="Pure geometry only -- cells and seeds, no other data" data-i18n="world.exportRhomb" data-i18n-title="world.exportRhombTitle">Export Model (.rhomb)</button>
       <label class="file-btn">
-        Import World
+        <span data-i18n="world.import">Import World</span>
         <input id="import-json" type="file" accept="application/json" hidden />
       </label>
-      <button id="share-world" type="button">Share World (copy link)</button>
+      <button id="share-world" type="button" data-i18n="world.share">Share World (copy link)</button>
     </div>
     <div id="share-world-hint" class="hint"></div>
     <div class="row">
-      <button id="open-gallery" type="button">Browse Shared Worlds Gallery</button>
+      <button id="open-gallery" type="button" data-i18n="world.openGallery">Browse Shared Worlds Gallery</button>
     </div>
     <div class="row">
-      <button id="shared-world-toggle" type="button">Enable Shared World</button>
+      <button id="shared-world-toggle" type="button" data-i18n="world.enableShared">Enable Shared World</button>
     </div>
-    <div id="shared-world-hint" class="hint">Shared World: off.</div>
+    <div id="shared-world-hint" class="hint" data-i18n="world.sharedOff">Shared World: off.</div>
     <div id="world-presets-section">
     <div class="row">
-      <label>Load a World:
+      <label><span data-i18n="world.loadLabel">Load a World:</span>
         <select id="preset-select">
-          <option value="">-- choose a World --</option>
+          <option value="" data-i18n="world.loadPlaceholder">-- choose a World --</option>
           <optgroup label="Showcase">
             <option value="showcase-world">★ Showcase World (everything built together)</option>
           </optgroup>
@@ -1211,22 +1214,22 @@
           </optgroup>
         </select>
       </label>
-      <button id="load-preset" type="button">Load World</button>
+      <button id="load-preset" type="button" data-i18n="world.loadButton">Load World</button>
     </div>
-    <div class="hint">
+    <div class="hint" data-i18n="world.presetsHint">
       Worlds replace your current world with a ready-built structure --
       exact BSG/shell counts, no manual clicking needed.
     </div>
     </div>
   </div>
-  <h2 style="margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12); font: 700 13px system-ui, sans-serif; color: #9de0ff;">Shells</h2>
+  <h2 style="margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12); font: 700 13px system-ui, sans-serif; color: #9de0ff;" data-i18n="shells.header">Shells</h2>
   <div id="shells-panel">
     <div id="undo-widget">
-      <button id="undo-btn" type="button" disabled title="Click: undo one step. Hold: scrub to any past state."><span>↶</span></button>
+      <button id="undo-btn" type="button" disabled title="Click: undo one step. Hold: scrub to any past state." data-i18n-title="shells.undoTitle"><span>↶</span></button>
       <div id="undo-scrub-strip"></div>
     </div>
-    <h3>Shells (click a built cell)</h3>
-    <div id="ring-list"><div class="placeholder">Click a built structure to see its shells.</div></div>
+    <h3 data-i18n="shells.subheader">Shells (click a built cell)</h3>
+    <div id="ring-list"><div class="placeholder" data-i18n="shells.emptyHint">Click a built structure to see its shells.</div></div>
   </div>
   </div>
 
@@ -1410,13 +1413,13 @@
        Sculpt/Cultivate's own Full-Cyborg gating. -->
   <div id="gallery-overlay">
     <div id="gallery-card">
-      <div id="gallery-header"><span>Shared Worlds Gallery</span><button id="gallery-close" type="button" title="Close">✕</button></div>
+      <div id="gallery-header"><span data-i18n="gallery.title">Shared Worlds Gallery</span><button id="gallery-close" type="button" title="Close" data-i18n-title="lab.close">✕</button></div>
       <div id="gallery-publish-row" class="sculpt-row">
-        <input id="gallery-publish-title" class="assist-nl-input" type="text" placeholder="Title this World before publishing" maxlength="80" />
-        <button class="sculpt-btn" id="gallery-publish-btn" type="button">Publish current World</button>
+        <input id="gallery-publish-title" class="assist-nl-input" type="text" placeholder="Title this World before publishing" maxlength="80" data-i18n-placeholder="gallery.titlePlaceholder" />
+        <button class="sculpt-btn" id="gallery-publish-btn" type="button" data-i18n="gallery.publish">Publish current World</button>
       </div>
       <div id="gallery-publish-hint" class="sculpt-hint"></div>
-      <div id="gallery-gated" class="sculpt-hint" style="display:none;">Connect to Shared World (Settings &rarr; Enable Shared World) to browse or publish Worlds.</div>
+      <div id="gallery-gated" class="sculpt-hint" style="display:none;" data-i18n="gallery.gated">Connect to Shared World (Settings &rarr; Enable Shared World) to browse or publish Worlds.</div>
       <div id="gallery-grid"></div>
     </div>
   </div>
