@@ -1,5 +1,27 @@
 [
   {
+    "date": "2026-09-22",
+    "title": "A Real Entry Point: Pick Your Dimension",
+    "items": [
+      "New: the app now opens onto a dedicated dimension-select wheel -- a separate rotating 3D wheel, its own instance, reachable again anytime via a new \"Change Dimension\" face on Home. 3D is the only real, buildable dimension so far; 2D, 4D, 5D, and 6D are shown honestly as planned, not yet built, each with a real icon (a genuine N-vector zonogon shadow, tiled into its own real rhombic facets -- 2D is a single rhombus, 3D three, and so on) rather than a placeholder.",
+      "A second, parallel entry point: a wireframe-card list (top-left, alongside the existing bottom-left menu wheel) for browsing lattice families within whichever dimension is active -- real wireframe previews built from the same vertex data the app already places, not decorative icons."
+    ]
+  },
+  {
+    "date": "2026-09-22",
+    "title": "2D Arrives: A Real Rhombus Lattice",
+    "items": [
+      "New: 2D is real now, starting with Rhombus -- a flat layer of true rhombus tiles (two equal-length vectors, so all four sides match by construction) living in the same 3D scene as everything else, its own lattice, own store, coexisting the same way BCC already coexists with the main World. Switching dimensions now hides the other dimension's own stray content instead of leaving it cluttering the view."
+    ]
+  },
+  {
+    "date": "2026-09-22",
+    "title": "Completing the Real Five",
+    "items": [
+      "New: Elongated Dodecahedron, Hex Prism, and RD Quarter -- the remaining real parallelohedra and a genuine zonotope decomposition of RD itself, reachable from the Piece wheel's RD Family screen. Fedorov classified exactly five convex shapes that tile space by translation alone (Cube, Hexagonal Prism, Rhombic Dodecahedron, Elongated Dodecahedron, and Truncated Octahedron) -- this app already had two; now it has all five. RD Quarter is a different, equally real fact: RD is the zonotope of the cube's own four body-diagonal directions, which always splits into exactly four congruent rhombohedra -- click a corner to fill one in."
+    ]
+  },
+  {
     "date": "2026-09-05",
     "title": "RHOMBIS: Hourglass Chain",
     "link": "./rhombis.html?stage=4",
@@ -209,14 +231,6 @@
       "Cuboctahedron Build can now grow face to face with its neighbors, not just corner to corner -- click closer to a flat face on an existing one instead of a point to grow that way, filling in the space between them.",
       "New Piece: Octahedron -- fills the gap that opens up between cuboctahedra face to face. Select it and click near a Cuboctahedron's own corner. A real, exact fit, not a rough approximation -- and separate from the existing Flattened Octahedron (renamed from Octahedron Site, to be less easily confused with the new one), which still builds the same BCC-interstitial bundle it always has.",
       "The Piece wheel's own Material face is gone -- picking any Piece now opens the color swatch right after, so shape and material stay a single step apart. Material's still one tap away from the bottom-left color icon too."
-    ]
-  },
-  {
-    "date": "2026-08-31",
-    "title": "Grow It Your Way",
-    "items": [
-      "New Cultivate sliders: Growth limit, Growth rate, and Bias, alongside the existing Direction and Packing density -- shape how far, how fast, and which way a manually-planted seed grows, no genome required.",
-      "New hint in the Lab panel's Piece picker: try placing 6 pyramids on a cube, then 12, then remove the outer 6 -- a small nudge toward one of this tool's favorite tricks."
     ]
   },
   {
@@ -449,15 +463,6 @@
   },
   {
     "date": "2026-08-24",
-    "title": "Rhombeometry, right from the start",
-    "items": [
-      "A real Mode choice now exists: Rhombeometry (geometry only) or Full World (mining, trade, hazards) -- pick it on the welcome screen or flip it anytime from Lab Settings.",
-      "New visitors land in Rhombeometry by default, since the geometry comes first.",
-      "Switching modes never wipes anything -- your World's own cells, claims, and belts just sit inert while their systems are off, the same clean hide every individual system already got."
-    ]
-  },
-  {
-    "date": "2026-08-24",
     "title": "Sculpture Mode, truly its own space",
     "items": [
       "Sculpture Mode no longer shows the real World's presets or asteroid-belt hints -- it's a genuinely isolated scratch space now, not just in spirit.",
@@ -476,14 +481,6 @@
   },
   {
     "date": "2026-08-19",
-    "title": "Walk anywhere, mine anywhere",
-    "items": [
-      "Walk Mode now works on touch -- a virtual joystick and jump button, not just keyboard and mouse.",
-      "Fixed mining while walking, and asteroid belts disappearing after Load/New World or a Shared World switch."
-    ]
-  },
-  {
-    "date": "2026-08-19",
     "title": "The Rhombic Wheel, and everything behind it",
     "items": [
       "One control surface for everything: the Rhombic Wheel (Tab / Space, or tap Menu) replaces the old always-visible sidebar.",
@@ -493,26 +490,6 @@
       "Achievements, World sharing via a link, a public Gallery of shared Worlds, and a sequenced first-visit tour instead of a tutorial modal.",
       "Walk up to another person and Interact to trade -- named avatars, a lightweight pseudonymous display name, no accounts.",
       "A pass of real mobile/touch fixes: tap-to-open the wheel, bottom-sheet tool panels, first-use hints on the icon toggles."
-    ]
-  },
-  {
-    "date": "2026-08-14",
-    "title": "Growth, evolution, and a home to explore",
-    "items": [
-      "Real aperiodic (Penrose/Ammann-rhombohedra) growth -- plant a seed and watch it unfold into a tree, shell, or crystal cluster over time.",
-      "A genome/phenotype evolution system: planted organisms reproduce, mutate, and speciate on their own.",
-      "Animals: habitats, mobility, and real herbivore/carnivore relationships.",
-      "A Showcase World -- a real continental planetoid with growth, evolved organisms, and animals already in it."
-    ]
-  },
-  {
-    "date": "2026-08-12",
-    "title": "Whole planets, gravity, and the extremes of physics",
-    "items": [
-      "Planetoid building with real radial gravity bending toward the core.",
-      "Water and ice, black holes, star systems, and supernovae -- each grounded in real physics (Schwarzschild behavior, Chandrasekhar-limit detonation, icy-moon subsurface oceans).",
-      "Shared World: opt-in realtime multiplayer, ownership claims, mining, and barter trade.",
-      "Public deploy, with the legal/safety basics (Terms, Privacy, Security) in place."
     ]
   },
   {
