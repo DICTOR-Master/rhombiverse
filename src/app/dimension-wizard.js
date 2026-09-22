@@ -201,16 +201,25 @@ function toWireframe() {
   return wireframeSvg(edgesByMinDistance(points), 22);
 }
 
-// Square (2D tier): a plain square prism. NOT vertex-uniform-edge-length
-// (the square's own side and the prism's height differ), so
-// edgesByMinDistance()'s technique doesn't apply here the way it does
-// for RD/TO above (it would only connect the shorter edges, giving a
-// broken wireframe) -- explicit topology instead, real corner
-// coordinates, not guessed.
-function squareWireframe() {
+// Rhombus (2D tier): a real rhombus prism, matching geometry-extensions/
+// lattice-2d.js's own rhombusTileVerts EXACTLY (same 70-degree, 2-equal-
+// vector construction) -- direct correction, same session, "why square
+// for 2D[,] all rhombi should be derived from same basic shape." NOT
+// vertex-uniform-edge-length (the rhombus's own side and the prism's
+// height differ), so edgesByMinDistance()'s technique doesn't apply here
+// the way it does for RD/TO above -- explicit topology instead, real
+// corner coordinates, not guessed.
+function rhombusWireframe() {
   const h = 0.5;
-  const top = [[1, 1, h], [1, -1, h], [-1, -1, h], [-1, 1, h]];
-  const bot = top.map(([x, y]) => [x, y, -h]);
+  const angleDeg = 70;
+  const v0 = [1, 0];
+  const v1 = [Math.cos((angleDeg * Math.PI) / 180), Math.sin((angleDeg * Math.PI) / 180)];
+  const corners2d = [[0, 0], v0, [v0[0] + v1[0], v0[1] + v1[1]], v1];
+  const cx = corners2d.reduce((s, p) => s + p[0], 0) / 4;
+  const cy = corners2d.reduce((s, p) => s + p[1], 0) / 4;
+  const shifted = corners2d.map(([x, y]) => [x - cx, y - cy]);
+  const top = shifted.map(([x, y]) => [x, y, h]);
+  const bot = shifted.map(([x, y]) => [x, y, -h]);
   const edges = [];
   for (let i = 0; i < 4; i++) {
     edges.push([top[i], top[(i + 1) % 4]]);
@@ -225,21 +234,23 @@ function squareWireframe() {
 // real wireframe; the rest are the honest, undecorated "planned, not
 // built" treatment this file's own header explains.
 const DIMENSIONS = [
-  // Phase 2 (2026-09-22): Square shipped, direct instruction ("flat
-  // layer in the same 3D scene... start with Square"). Triangular/
-  // Hexagonal/Rhombic still planned -- desc says so honestly.
-  { id: '2D', label: '2D', desc: 'Square (shipped) -- Triangular, Hexagonal, Rhombic tilings still planned.', enabled: true, preview: squareWireframe },
+  // Phase 2 (2026-09-22): Rhombus shipped, direct instruction ("flat
+  // layer in the same 3D scene... start with Square") -- later renamed
+  // Square to Rhombus ("why square for 2D[,] all rhombi should be
+  // derived from same basic shape"). Triangular/Hexagonal still
+  // planned -- desc says so honestly.
+  { id: '2D', label: '2D', desc: 'Rhombus (shipped) -- Triangular, Hexagonal tilings still planned.', enabled: true, preview: rhombusWireframe },
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, preview: rdWireframe },
   { id: '4D', label: '4D', desc: 'Hypercubic (Tesseract) and D4 root lattice.', enabled: false },
   { id: '5D', label: '5D', desc: 'Decagonal quasicrystal.', enabled: false },
   { id: '6D', label: '6D', desc: 'Icosahedral quasicrystal.', enabled: false },
 ];
 
-// LATTICE_FAMILIES_2D: 2D's own lattice-family screen -- Square only so
+// LATTICE_FAMILIES_2D: 2D's own lattice-family screen -- Rhombus only so
 // far (Phase 2, incremental). Same "reuse the existing real action, one
 // tool one doorway" reasoning as LATTICE_FAMILIES_3D below.
 const LATTICE_FAMILIES_2D = [
-  { label: 'Square', desc: 'Z² -- a flat layer of square tiles, own separate lattice, pinned to z=0 in this same scene.', action: 'tool:pieceType:square2d', preview: squareWireframe },
+  { label: 'Rhombus', desc: 'A flat layer of real rhombus tiles (2 equal-length vectors, 70 degrees apart) -- own separate lattice, pinned to z=0 in this same scene.', action: 'tool:pieceType:rhombus2d', preview: rhombusWireframe },
 ];
 
 // LATTICE_FAMILIES_3D: 3D's own lattice-family screen. Actions reuse

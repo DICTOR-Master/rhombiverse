@@ -754,14 +754,16 @@ export const WHEEL_DIMENSION = {
       desc: "Hypercubic (Tesseract) and D4 root lattice -- planned, not yet built." },
     "equator|sx-1sy1":  { kind: "spare", label: "4D", action: null,
       desc: "Hypercubic (Tesseract) and D4 root lattice -- planned, not yet built." },
-    // Phase 2 (2026-09-22): Square shipped (flat layer, own store, same
+    // Phase 2 (2026-09-22): Rhombus shipped (flat layer, own store, same
     // FCC-world scene) -- 2D goes from spare to real, matching 3D's own
     // dual-antipode-doubled treatment now that a second dimension is
-    // actually buildable. Triangular/Hexagonal/Rhombic still planned.
+    // actually buildable. Originally Square, renamed ("why square for
+    // 2D[,] all rhombi should be derived from same basic shape").
+    // Triangular/Hexagonal still planned.
     "top|sy1sz1":       { kind: "dept", label: "2D", action: "tool:selectDimension:2D",
-      desc: "Square (shipped) -- Triangular, Hexagonal, Rhombic tilings still planned." },
+      desc: "Rhombus (shipped) -- Triangular, Hexagonal tilings still planned." },
     "bottom|sy-1sz-1":  { kind: "dept", label: "2D", action: "tool:selectDimension:2D",
-      desc: "Square (shipped) -- Triangular, Hexagonal, Rhombic tilings still planned." },
+      desc: "Rhombus (shipped) -- Triangular, Hexagonal tilings still planned." },
     "top|sy-1sz1":      { kind: "spare", label: "5D", action: null,
       desc: "Decagonal quasicrystal -- planned, not yet built." },
     "bottom|sy1sz-1":   { kind: "spare", label: "5D", action: null,
