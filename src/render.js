@@ -3654,6 +3654,15 @@ async function init() {
   const PIECE_MARK_KEY = {
     rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', to: 'pieceTO', ioct: 'pieceOctaSite', octahedron: 'pieceOctahedron', idis: 'pieceDisphenoid',
     halfrd: 'pieceHalfRD', hourglass: 'pieceHourglass', hemi3: 'pieceHemi3', hemi4: 'pieceHemi4', hemiTri: 'pieceHemiTri',
+    // Real bug fixed 2026-09-23, direct report ("it keeps saying RD
+    // however many times i select elongated"): every piece added this
+    // session was missing from this map, so the quick-select icon
+    // always fell back to pieceRD's own mark (see updateQuickSelect's
+    // own `?? MARKS.pieceRD` fallback below) regardless of which was
+    // actually selected -- the real placement itself was always
+    // correct, only this indicator was silently wrong.
+    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRhombohedron',
+    square2d: 'pieceSquare2D', hexagon2d: 'pieceHexagon2D', triangle2d: 'pieceTriangle2D', rhombohedra: 'pieceRhombohedron',
   };
   const quickShapeEl = document.getElementById('hud-quick-shape');
   const quickMaterialEl = document.getElementById('hud-quick-material');

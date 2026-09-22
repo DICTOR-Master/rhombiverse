@@ -688,8 +688,13 @@ export const WHEEL_RD_FAMILY = {
     // genuine RD-family piece (one of RD's own 4 real rhombohedra).
     "equator|sx-1sy-1": { kind: "dept", label: "RD Quarter", action: "tool:pieceType:rdquarter",
       desc: "One of RD's own 4 real rhombohedra (Fedorov's zonotope decomposition) -- click a corner to fill it in." },
-    "top|sy1sz1":       { kind: "dept", label: "Elongated Dodecahedron", action: "tool:pieceType:elongdodeca",
-      desc: "The 4th of the real \"5\" parallelohedra -- its own lattice, same FCC positions, anisotropic scale." },
+    // "ED", not the full name -- direct instruction 2026-09-23, matching
+    // this wheel's own existing abbreviation convention (RD, TO, CO):
+    // "Elongated Dodecahedron" was the one long label left on this
+    // wheel, long enough to visually crowd/overlap its neighboring
+    // faces' own label area.
+    "top|sy1sz1":       { kind: "dept", label: "ED", action: "tool:pieceType:elongdodeca",
+      desc: "Elongated Dodecahedron -- the 4th of the real \"5\" parallelohedra -- its own lattice, same FCC positions, anisotropic scale." },
     "bottom|sy1sz-1":   { kind: "dept", label: "Hex Prism", action: "tool:pieceType:hexprism",
       desc: "The 5th real parallelohedron -- its own separate hexagonal lattice." },
     // Rhombohedra (free lattice): direct follow-up, same session as RD
@@ -863,6 +868,18 @@ export const ACTION_TO_MARK = {
   'tool:pieceType:ioct': 'pieceOctaSite',
   'tool:pieceType:octahedron': 'pieceOctahedron',
   'tool:pieceType:idis': 'pieceDisphenoid',
+  // Same real gap as PIECE_MARK_KEY's own (render.js) -- every piece
+  // added this session was missing here too, leaving these wheel faces
+  // with no icon at all (the `markKey && MARKS[markKey]` fallback in
+  // rhombic-wheel-3d.js/almanac.js is empty-string, not pieceRD, so this
+  // specific gap read as "blank," not "wrong," but still a real gap).
+  'tool:pieceType:elongdodeca': 'pieceElongDodeca',
+  'tool:pieceType:hexprism': 'pieceHexPrism',
+  'tool:pieceType:rdquarter': 'pieceRhombohedron',
+  'tool:pieceType:rhombohedra': 'pieceRhombohedron',
+  'tool:pieceType:square2d': 'pieceSquare2D',
+  'tool:pieceType:hexagon2d': 'pieceHexagon2D',
+  'tool:pieceType:triangle2d': 'pieceTriangle2D',
   'tool:fill': 'fill',
   'tool:dig': 'dig',
   'tool:smooth': 'smooth',

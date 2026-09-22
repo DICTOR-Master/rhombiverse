@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-09-23",
+    "title": "Elongated Dodecahedron: Fixed Flush-Fit, and Real Icons",
+    "items": [
+      "Fixed: an Elongated Dodecahedron bootstrapped off a real RD in 8 of the 12 real directions sat 0.43 units off its true flush position (verified exactly, both mathematically and against the app's own live geometry) -- close enough to blend into the RD it grew from and hide the very hexagonal faces that prove it's a different shape. Only the other 4 directions (where the shared face is a plain rhombus, not squeezed by the elongation) were ever correctly aligned.",
+      "Fixed: the always-visible current-shape icon (bottom-left) silently showed RD's own icon for every piece added this session (Elongated Dodecahedron, Hex Prism, RD Quarter, Square/Hexagon/Triangle 2D, Rhombohedra) regardless of which was actually selected -- real placement was always correct, only this indicator was lying. All 7 now get their own real icon, on the wheel too.",
+      "Renamed: Elongated Dodecahedron's own wheel face to \"ED\", matching RD/TO/CO's existing abbreviation -- the one long label left on that wheel was crowding its neighbors."
+    ]
+  },
+  {
+    "date": "2026-09-23",
     "title": "Triangle Joins 2D; Rhombohedra Get Their Own Free Lattice",
     "items": [
       "New: Triangle joins Square and Hexagon in 2D -- a real equilateral-triangle tiling, up- and down-pointing alternating, own coexisting store.",

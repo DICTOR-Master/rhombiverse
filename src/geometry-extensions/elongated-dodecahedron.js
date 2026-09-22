@@ -78,9 +78,35 @@ export function elongatedDodecahedronVerts(s = 1, elongationRatio = 1) {
 // a flush face. NEIGHBOR_OFFSETS/isValidCell (core/lattice.js) are
 // reused verbatim by elongdodeca-build.js; only this scale function is
 // new, per this file's own header.
+//
+// Real bug found live, direct report ("i am revolving it in every
+// direction... no hexagon faces" / "seeing RD when elongated is
+// selected"): elongDodecaWorld has NO seed of its own -- every piece
+// bootstraps off an ALREADY-REAL, un-elongated RD cell in the main
+// world (this file's own header: "the main world's own cells are
+// always a valid bootstrap surface"). The z=0 cell in THIS store's own
+// coordinate frame therefore always represents that real, ordinary RD
+// -- but the old formula (`z * (s+h)`) charged the SAME full elongation
+// gap (s+h) for the very FIRST step away from it as for every step
+// between two ALREADY-elongated neighbors, when the boundary crossed on
+// that first step is only HALF-elongated (one real RD side, one
+// elongated side). That extra half-h of unearned distance pushed the
+// first placed piece off its true flush position -- for the 8 of 12
+// NEIGHBOR_OFFSETS with a nonzero z-component (2/3 of all real click
+// directions), badly enough to misalign the piece and hide the very
+// hexagonal faces that would prove it isn't just another RD.
+//
+// Fixed by decomposing z into "one real RD-to-elongdodeca transition
+// (h/2) plus (|z|-1) further elongdodeca-to-elongdodeca steps (h each)"
+// -- verified algebraically equal to `z*(s+h) - sign(z)*(h/2)` for any
+// integer z, and confirmed self-consistent: z=1's own flush position
+// (s+h/2) plus one further full elongdodeca step (s+h) exactly equals
+// z=2's own value, so growing a SECOND elongdodeca off an already-
+// placed one (elongDodecaMesh-to-elongDodecaMesh, not bootstrapped
+// through a real RD) still gets the correct, undiminished full gap.
 export function elongDodecaCellToWorld(x, y, z, s = 1, elongationRatio = 1) {
   const half = s * 0.5;
   const h = Math.sqrt(3) * half * elongationRatio;
-  const zScale = s + h; // one full cell's own real Z extent: RD's own s-per-step PLUS the inserted prism height
-  return [x * s, y * s, z * zScale];
+  const worldZ = z === 0 ? 0 : z * (s + h) - Math.sign(z) * (h / 2);
+  return [x * s, y * s, worldZ];
 }

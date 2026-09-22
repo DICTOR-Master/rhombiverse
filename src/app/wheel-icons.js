@@ -162,6 +162,43 @@ export const MARKS = {
   // angles) with a cross through it, to read as clearly distinct from
   // bare Cube at a glance.
   pieceOctahedron: `<polygon points="-24,-24 24,-24 24,24 -24,24" ${THIN}/><path d="M-24,0 H24 M0,-24 V24" stroke="currentColor" stroke-width="1.5"/>`,
+  // Real bug fixed 2026-09-23, direct report ("it keeps saying RD
+  // however many times i select elongated"): every piece added this
+  // session (Elongated Dodecahedron, Hex Prism, RD Quarter, Square/
+  // Hexagon/Triangle 2D, Rhombohedra) was missing from PIECE_MARK_KEY
+  // below, so the bottom-left "current shape" quick-select icon always
+  // fell back to pieceRD's own mark regardless of which of these was
+  // actually selected -- the REAL placement was always correct (own
+  // store, own geometry, verified independently), only this always-
+  // visible indicator was silently lying about what was selected.
+  //
+  // Elongated Dodecahedron: an elongated (taller than wide) hexagon
+  // outline -- the real distinguishing feature (4 real hexagonal
+  // faces, see that piece's own geometry header) stretched to hint at
+  // the actual elongation, unlike pieceRD's own plain filled hexagon.
+  pieceElongDodeca: `<polygon points="${hexPts(20, 0, 0, -90).split(' ').map((p) => { const [x, y] = p.split(',').map(Number); return `${x.toFixed(2)},${(y * 1.45).toFixed(2)}`; }).join(' ')}" ${THIN}/>`,
+  // Hex Prism: a plain hexagon outline plus 2 vertical side lines,
+  // reading as "hexagon extruded into a prism" -- distinct from both
+  // pieceRD's filled hexagon and Elongated Dodecahedron's stretched one.
+  pieceHexPrism: `<polygon points="${hexPts(20)}" ${THIN}/><path d="M-17,-10 V10 M17,-10 V10" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
+  // RD Quarter / Rhombohedra: genuinely the SAME real shape (one of
+  // RD's own 4 congruent zonotope pieces, see rhombohedra-lattice.js's
+  // own header) -- same mark for both, a real skewed parallelogram
+  // (not the symmetric kite rhombusPts() draws elsewhere), matching a
+  // rhombohedron's own non-orthogonal silhouette.
+  pieceRhombohedron: `<polygon points="-22,10 -6,-22 22,-10 6,22" ${THIN}/>`,
+  // Square (2D tier): a plain square outline, PLUS a horizontal
+  // midline -- reads as "a flat tile," distinct from pieceCube's own
+  // bare square (a real 3D solid) and pieceOctahedron's crossed square.
+  pieceSquare2D: `<polygon points="-22,-22 22,-22 22,22 -22,22" ${THIN}/><path d="M-22,0 H22" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
+  // Hexagon (2D tier): a flatter (wider than tall) hexagon outline --
+  // deliberately the opposite proportion from Elongated Dodecahedron's
+  // own stretched-tall one, and undecorated unlike Hex Prism's.
+  pieceHexagon2D: `<polygon points="${hexPts(20, 0, 0, 0).split(' ').map((p) => { const [x, y] = p.split(',').map(Number); return `${x.toFixed(2)},${(y * 0.8).toFixed(2)}`; }).join(' ')}" ${THIN}/>`,
+  // Triangle (2D tier): a plain flat equilateral triangle outline --
+  // deliberately undecorated/symmetric, distinct from piecePyramid's
+  // own taller "peaked" triangle (a real 3D apex, not a flat 2D tile).
+  pieceTriangle2D: `<polygon points="0,-24 21,12 -21,12" ${THIN}/>`,
   // Fill: "+" shown across three hexagons.
   fill: `
     <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>
