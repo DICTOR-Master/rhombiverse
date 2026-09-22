@@ -102,9 +102,19 @@ const CSS = `
   box-sizing: content-box;
 }
 #rhombic-wheel-3d-overlay-dimension .rw3d-dim-shadow svg { width: 100%; height: 100%; display: block; }
-#rhombic-wheel-3d-overlay-dimension .rw3d-label.spare {
-  opacity: 0.4 !important;
+/* dim-spare (not the shared .spare -- see that class's own assignment
+   comment above for why): deliberately NO color or opacity override
+   here. Color inherits the base .rw3d-label rule (SKELETON_COLOR, the
+   same cyan every real face on this wheel already uses -- "why green on
+   blue wheel" fixed by simply not diverging from it). Opacity is set
+   directly, per real camera-facing frame, by updateLabelsAndFaceVisuals()
+   itself -- a CSS rule here would only re-create the exact bug just
+   fixed (a static value beating the dynamic one). pointer-events:none
+   is the one real thing still needed here: unbuilt dimensions stay
+   visible-when-facing but never clickable. */
+#rhombic-wheel-3d-overlay-dimension .rw3d-label.dim-spare {
   pointer-events: none;
+  cursor: default;
 }
 /* Icon System (RHOMBIVERSE_SPEC_ICON_SYSTEM.md section 3): resting state
    is symbol-only; the text word is a separate child, hidden until
@@ -308,7 +318,18 @@ export function createRhombicWheel3D({
       group.add(mesh, line);
 
       const labelEl = document.createElement('div');
-      labelEl.className = 'rw3d-label' + (isSpare ? ' spare' : '');
+      // Dimension wheel's own spare faces get a DIFFERENT class
+      // (dim-spare, not spare) -- direct report, "why green on blue
+      // wheel": the shared .rw3d-label.spare rule sets both a different
+      // color (#7fa, green) AND a flat !important opacity, neither of
+      // which this wheel wants (every face here should read as the
+      // SAME cyan SKELETON_COLOR family, just dimmer for unbuilt ones,
+      // and opacity needs to stay the real per-frame facing value --
+      // see updateLabelsAndFaceVisuals()'s own comment). Using a
+      // non-colliding class name is simpler and safer than trying to
+      // "un-important" the shared rule, which CSS has no way to do.
+      const spareClass = isSpare ? (wheelConfig.id === 'dimension' ? ' dim-spare' : ' spare') : '';
+      labelEl.className = 'rw3d-label' + spareClass;
       labelEl.dataset.faceKey = key;
       // Icon System (RHOMBIVERSE_SPEC_ICON_SYSTEM.md): only actions
       // ACTION_TO_MARK actually resolves get a real icon + reveal-on-
@@ -427,6 +448,23 @@ export function createRhombicWheel3D({
       const isSelect = selected === e.key;
       const boost = isSelect ? 1 : isHover ? 0.85 : 0;
       let target = facing < -0.3 ? 0 : Math.max(angleFade, boost);
+      // Dimension wheel's own spare faces (2026-09-22): real bug, direct
+      // report -- "shapes on wheel... showing thru from behind[,] only
+      // front facing should show[,] as detailed many times in wheel
+      // history." The shared .rw3d-label.spare CSS rule forces opacity
+      // to a FIXED value (0 normally; this wheel's own scoped override
+      // used 0.4 so unbuilt dimensions stay readable -- "all main entry
+      // wheel info 2D 3D etc [visible] inside," confirmed earlier) --
+      // but !important, by construction, also defeats the real per-
+      // frame facing computation above for EVERY face it touches,
+      // including ones currently on the back of the wheel. Fixed here,
+      // not via CSS: give this wheel's own spare faces the SAME real
+      // dynamic `target` every other face already gets (so they
+      // correctly fade to 0 when facing away), just capped below full
+      // brightness so they still read as "planned, not built" rather
+      // than as prominent as a real clickable face. The CSS override is
+      // gone (see that rule's own updated comment).
+      if (e.isSpare && currentWheelId === 'dimension') target = Math.min(target, 0.4);
       const prev = e._labelOpacity ?? 0;
       e._labelOpacity = prev + (target - prev) * 0.25;
       e.labelEl.style.opacity = String(e._labelOpacity);
