@@ -11,10 +11,16 @@
 // Dress tiling theorem needed just for an outline): walk v0, v1, ...,
 // v(N-1), then -v0, -v1, ..., -v(N-1) -- a real, closed, convex 2N-gon.
 //
-// N=2 is a genuine special case, not the generic formula: 2 vectors at
-// 90 degrees give a rectangle, not a rhombus, so 2D keeps the simple
-// flat-diamond CSS clip-path treatment already shipped (rhombic-wheel-
-// 3d.js's own scoped CSS) rather than going through this file at all.
+// N=2 (2D) is its own real case, not the generic 180/N-spaced formula
+// (2 vectors at 90 degrees would give a rectangle, not a rhombus): any
+// two EQUAL-length vectors form a true rhombus (all 4 sides equal by
+// construction) at any angle between them except 0/180 degrees, so this
+// picks a visually clean 70-degree angle rather than the generic
+// spacing. Direct correction, same session: 2D was skipping this file
+// entirely (its own CSS clip-path backdrop only), which meant its own
+// word label had no icon to hide behind -- it showed unconditionally
+// instead of only on hover/touch like every other face. Now it goes
+// through the exact same has-icon/reveal structure as 3D-6D.
 // N=3 (3D) gets its own explicit 3-rhombi construction too -- the exact
 // same "3 faces sharing one corner" fact as RD's own zonotope decomposition,
 // just 2D -- because that's the real, well-known closed form for 3
@@ -31,6 +37,18 @@ function vec(n, R, k) {
 }
 function add(a, b) { return [a[0] + b[0], a[1] + b[1]]; }
 function pts(arr) { return arr.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' '); }
+
+function twoDShadow(R) {
+  const angleDeg = 70;
+  const v0 = [R, 0];
+  const v1 = [R * Math.cos((angleDeg * Math.PI) / 180), R * Math.sin((angleDeg * Math.PI) / 180)];
+  const o = [0, 0];
+  const rhombus = [o, v0, add(v0, v1), v1];
+  const cx = rhombus.reduce((s, q) => s + q[0], 0) / rhombus.length;
+  const cy = rhombus.reduce((s, q) => s + q[1], 0) / rhombus.length;
+  const centered = rhombus.map(([x, y]) => [x - cx, y - cy]);
+  return `<polygon points="${pts(centered)}" fill="currentColor" opacity="0.85"/>`;
+}
 
 function threeDShadow(R) {
   const v0 = vec(3, R, 0), v1 = vec(3, R, 1), v2 = vec(3, R, 2);
@@ -55,14 +73,14 @@ function outlineShadow(n, R) {
   return `<polygon points="${pts(centered)}" fill="none" stroke="currentColor" stroke-width="2.5"/>`;
 }
 
-const DIMENSION_N = { '3D': 3, '4D': 4, '5D': 5, '6D': 6 };
-
-// Returns null for 2D -- see this file's own header for why that stays
-// the plain CSS-clip-path diamond instead of going through here.
 export function dimensionShadowIcon(label) {
-  const n = DIMENSION_N[label];
-  if (!n) return null;
   const R = 22;
-  const inner = n === 3 ? threeDShadow(R) : outlineShadow(n, R);
+  let inner;
+  if (label === '2D') inner = twoDShadow(R);
+  else if (label === '3D') inner = threeDShadow(R);
+  else if (label === '4D') inner = outlineShadow(4, R);
+  else if (label === '5D') inner = outlineShadow(5, R);
+  else if (label === '6D') inner = outlineShadow(6, R);
+  else return null;
   return `<svg viewBox="-30 -30 60 60" width="1em" height="1em" role="img" aria-label="${label} shadow">${inner}</svg>`;
 }

@@ -323,13 +323,6 @@ export function createRhombicWheel3D({
         textEl.className = 'rw3d-label-text';
         textEl.textContent = data.label;
         labelEl.append(iconEl, textEl);
-      } else if (wheelConfig.id === 'dimension') {
-        // 2D: no shadow SVG (see dimensionShadowIcon's own header) --
-        // the scoped CSS diamond backdrop is its own "shadow," and with
-        // no icon to reveal-FROM, the label just stays plain text (2D's
-        // own rhombus backdrop already always shows -- there's nothing
-        // to hide behind a touch/hover here).
-        labelEl.textContent = data.label;
       } else if (markKey && MARKS[markKey]) {
         labelEl.classList.add('has-icon');
         const iconEl = document.createElement('span');
