@@ -314,9 +314,13 @@ export const WHEEL_HOME = {
       desc: "Precise coordinate building — Dome, Spiral Column, Templates. Was labeled \"Rhombitect\"; renamed to plain English, same wheel underneath." },
     // Was "Cultivate" (Plant/Prune/Growth Parameters) -- growth/
     // evolution/cultivation retired 2026-09-22 along with the rest of
-    // the second world-building removal pass (see README.md); this face
-    // is a genuine, honest blank now, same treatment as Trade below.
-    "equator|sx-1sy1":  { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
+    // the second world-building removal pass (see README.md). Now real
+    // again, same day: the dimension-select wizard's own "Change
+    // Dimension" doorway (tool:changeDimension, handled in render.js's
+    // onAction) -- reopens WHEEL_DIMENSION, focused back on whichever
+    // dimension is already active.
+    "equator|sx-1sy1":  { kind: "dept", label: "Change Dimension", action: "tool:changeDimension",
+      desc: "Switch which dimension tier you're building in." },
     // Was "Trade" (Offer/Accept/Inventory) -- the resource/decay economy
     // was retired 2026-09-17 along with the rest of World Systems (see
     // README.md); this face is a genuine, honest blank now rather than a
@@ -683,10 +687,23 @@ export const WHEEL_RD_FAMILY = {
   }
 };
 
+// Dimension-select wizard (2026-09-22): an earlier draft put dimension/
+// lattice-family selection ON this wheel (WHEEL_DIMENSION/
+// WHEEL_LATTICE_3D configs, right here). Reverted same session, direct
+// correction: "as in polyhedraverse one list two routes" -- dimension-
+// select is its own real wireframe-card list (src/app/dimension-
+// wizard.js, "the wizard"), a SEPARATE overlay from this wheel, not a
+// wheel screen. "The wheel has breakdown family shapes as in 3D
+// currently" -- this wheel keeps doing exactly what it already does for
+// 3D (Piece -> RD Family breakdown), untouched; it was never the right
+// place for the dimension/family PICK itself. See render.js's
+// handleWheelAction ("Change Dimension" branch) and dimension-wizard.js
+// for where that logic actually lives now.
+
 export const ALL_WHEELS = {
   home: WHEEL_HOME, build: WHEEL_BUILD, alter: WHEEL_ALTER,
   rhombitect: WHEEL_RHOMBITECT,
-  piece: WHEEL_PIECE, rdFamily: WHEEL_RD_FAMILY
+  piece: WHEEL_PIECE, rdFamily: WHEEL_RD_FAMILY,
 };
 
 // Icon System (RHOMBIVERSE_SPEC_ICON_SYSTEM.md): only actions the spec's

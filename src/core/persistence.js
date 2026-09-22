@@ -30,6 +30,14 @@ export const CUBOCTA_GAP_STORAGE_KEY = 'rhombiverse-cubocta-gap-world';
 // direct instruction 2026-09-06.
 export const HEMISPHERE_STORAGE_KEY = 'rhombiverse-hemisphere-world';
 
+// Elongated Dodecahedron build ('elongdodeca' piece tier, core/build.js's
+// own handleElongDodecaClick): same reasoning again -- a seventh
+// independent store, own key. Same FCC integer coordinate grid as the
+// main World (see geometry-extensions/elongated-dodecahedron.js's own
+// header for why), just a different own key so its saves never mix
+// with the main world's.
+export const ELONGDODECA_STORAGE_KEY = 'rhombiverse-elongdodeca-world';
+
 export function saveToLocalStorage(worldJSON, key = STORAGE_KEY) {
   try {
     localStorage.setItem(key, JSON.stringify(worldJSON));

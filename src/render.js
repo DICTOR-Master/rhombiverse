@@ -20,6 +20,8 @@ import { createHemisphereStore } from './core/hemisphere-build.js';
 import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
 import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extensions/spherical-toggle.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
+import { createDimensionWizard } from './app/dimension-wizard.js';
+import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -74,6 +76,7 @@ import {
   CUBOCTA_STORAGE_KEY,
   CUBOCTA_GAP_STORAGE_KEY,
   HEMISPHERE_STORAGE_KEY,
+  ELONGDODECA_STORAGE_KEY,
 } from './core/persistence.js';
 import {
   compressionSupported,
@@ -144,6 +147,15 @@ let workspaceMode = 'world';
 // Bridges init()-scoped wheel3D.refresh() out to wireSettingsPanel()'s IIFE
 // below, which runs at module-eval time before init() (and wheel3D) exist.
 let refreshWheel3D = () => {};
+// Dimension-select wizard (2026-09-22): which dimension tier the app is
+// currently in ('3D' the only real value in Phase 1; null before a
+// choice is made, which only ever happens for the instant between page
+// load and init() force-opening WHEEL_DIMENSION -- see init()'s own
+// "auto-open to dimension wheel" comment). In-memory only, never
+// persisted -- every fresh load starts back at the dimension-select
+// wheel, same "UI state, not world state" convention this app already
+// applies to every other transient screen.
+let activeDimension = null;
 
 const camera = new THREE.PerspectiveCamera(
   getSettings().fov,
@@ -1043,6 +1055,7 @@ function rebuildPartialCellMeshes(world, inReportMode = false) {
 // would corrupt the main world's own hit-testing. See core/bcc-build.md.
 let bccCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let cuboctaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
+let elongDodecaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let octGapCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are octGap's own offset-frame index, see core/cubocta-gap-build.js
 // Interstitial-lattice build: one real Mesh per disphenoid cell, same
 // pattern as partialCellGroup/partialCellMeshes above and for the same
@@ -1186,6 +1199,26 @@ function rebuildBCCInstances(bccMesh, bccWorld) {
   bccMesh.computeBoundingSphere();
 }
 
+// Real placed Elongated Dodecahedron cells -- same instancing pattern
+// again, own separate cell order/mesh, own (anisotropic)
+// elongDodecaCellToWorld position (see that function's own header for
+// why: same FCC index topology as the main world, different world-space
+// scale along one axis).
+function rebuildElongDodecaInstances(elongDodecaMesh, elongDodecaWorld) {
+  elongDodecaCellOrder = elongDodecaWorld.entries();
+  const m = new THREE.Matrix4();
+  elongDodecaCellOrder.forEach((cell, i) => {
+    const [wx, wy, wz] = elongDodecaCellToWorld(cell.x, cell.y, cell.z, SCALE);
+    m.makeTranslation(wx, wy, wz);
+    elongDodecaMesh.setMatrixAt(i, m);
+    elongDodecaMesh.setColorAt(i, instanceColorFor(cell));
+  });
+  elongDodecaMesh.count = elongDodecaCellOrder.length;
+  elongDodecaMesh.instanceMatrix.needsUpdate = true;
+  if (elongDodecaMesh.instanceColor) elongDodecaMesh.instanceColor.needsUpdate = true;
+  elongDodecaMesh.computeBoundingSphere();
+}
+
 // Real placed Cuboctahedron Build cells -- same instancing pattern as
 // rebuildBCCInstances above, own separate cell order/mesh.
 function rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld) {
@@ -1292,6 +1325,16 @@ async function init() {
   const octGapSavedJSON = loadFromLocalStorage(CUBOCTA_GAP_STORAGE_KEY);
   const octGapWorld = createWorldStore(octGapSavedJSON ?? { worldName: 'Cuboctahedron Gap Octahedra', version: 1, cells: {}, meta: {} });
 
+  // Elongated Dodecahedron Build: a sixth independent store (own
+  // localStorage key, ELONGDODECA_STORAGE_KEY). Same FCC integer
+  // coordinate grid as the main World -- see geometry-extensions/
+  // elongated-dodecahedron.js's own header -- so, unlike bccWorld/
+  // cuboctaWorld, it doesn't need its own "never truly empty" bootstrap
+  // rule to stay reachable: the main world's own cells are always a
+  // valid bootstrap surface for it.
+  const elongDodecaSavedJSON = loadFromLocalStorage(ELONGDODECA_STORAGE_KEY);
+  const elongDodecaWorld = createWorldStore(elongDodecaSavedJSON ?? { worldName: 'Elongated Dodecahedron Lattice', version: 1, cells: {}, meta: {} });
+
   const geometry = buildRDGeometry(SCALE);
   // White base color: actual per-cell color comes entirely from
   // setColorAt (instanceColorFor) via the multiplicative USE_INSTANCING_
@@ -1316,6 +1359,20 @@ async function init() {
   bccMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(bccMesh);
   rebuildBCCInstances(bccMesh, bccWorld);
+
+  // Elongated Dodecahedron Build: its own InstancedMesh, same "own
+  // material clone, same MATERIAL_COLORS palette, different base shape"
+  // pattern as bccMesh above. elongatedDodecahedronVerts(SCALE) already
+  // uses the verified equilateral-hexagon elongation ratio by default
+  // (elongationRatio=1, geometry-extensions/elongated-dodecahedron.js's
+  // own header) -- no extra scale correction needed the way bccShapeScaleFor
+  // provides for TO.
+  const elongDodecaGeometry = new ConvexGeometry(elongatedDodecahedronVerts(SCALE).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  elongDodecaGeometry.computeVertexNormals();
+  const elongDodecaMesh = new THREE.InstancedMesh(elongDodecaGeometry, material.clone(), MAX_CELLS);
+  elongDodecaMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(elongDodecaMesh);
+  rebuildElongDodecaInstances(elongDodecaMesh, elongDodecaWorld);
 
   // Cuboctahedron Build: its own InstancedMesh (cuboctahedron geometry),
   // same "own material clone, same MATERIAL_COLORS palette" pattern as
@@ -1750,6 +1807,7 @@ async function init() {
     const planes = enabled ? [sectionPlane] : [];
     material.clippingPlanes = planes;
     bccMesh.material.clippingPlanes = planes;
+    elongDodecaMesh.material.clippingPlanes = planes;
     cuboctaMesh.material.clippingPlanes = planes;
     octGapMesh.material.clippingPlanes = planes;
     // Cube-less cells (see core/pyramid.js's hasCube()) render as a
@@ -1801,7 +1859,7 @@ async function init() {
   let skeletonGeneration = 0;
   const TRANSLUCENT_OPACITY = 0.55; // matches Lattice Quick-View/Dualize preview's own established "see-through structure" opacity
   function worldViewMaterials() {
-    const mats = [material, bccMesh.material, cuboctaMesh.material, octGapMesh.material];
+    const mats = [material, bccMesh.material, elongDodecaMesh.material, cuboctaMesh.material, octGapMesh.material];
     for (const { mesh: m } of partialCellMeshes.values()) {
       if (m.isGroup) { for (const child of m.children) mats.push(child.material); }
       else mats.push(m.material);
@@ -1822,6 +1880,7 @@ async function init() {
   function setSolidWorldVisible(visible) {
     mesh.visible = visible;
     bccMesh.visible = visible;
+    elongDodecaMesh.visible = visible;
     cuboctaMesh.visible = visible;
     octGapMesh.visible = visible;
     partialCellGroup.visible = visible;
@@ -2318,9 +2377,18 @@ async function init() {
   // scope just needs a stable reference to call into from onAction.
   const almanac = createAlmanac();
   {
-    const wheel3D = createRhombicWheel3D({
-      getWorkspaceMode: () => workspaceMode,
-      onAction: (action) => {
+    // handleWheelAction: extracted to a named function (2026-09-22,
+    // dimension-select wizard) so the new dimension-wizard.js overlay can
+    // dispatch through the exact SAME real-action path the wheel itself
+    // uses (e.g. tool:pieceType:rd/to for FCC/BCC) rather than duplicating
+    // any of this logic -- "one tool, one doorway" extended to a second
+    // real caller, not a second implementation. Safe to reference wheel3D
+    // before its own declaration below: this function's body only reads
+    // wheel3D when actually CALLED (a later click), by which time the
+    // const just below has long since been assigned -- the exact same
+    // closure timing this arrow function already relied on before the
+    // extraction, just now also reachable from outside createRhombicWheel3D.
+    const handleWheelAction = (action) => {
         // openCyborg/openLab reuse the real, already-shipped toggles.
         // openAlmanac now opens the real Almanac overlay (Stage 1 --
         // previously just a "not built yet" toast).
@@ -2395,9 +2463,25 @@ async function init() {
         // not two. wheel3D now closes here too, matching every other
         // terminal tool: action -- there's no more Material face left on
         // this screen to stay open for.
+        // WHEEL_HOME's "Change Dimension" face (repurposed spare, see
+        // that wheel's own header comment). Direct correction, same
+        // session, after an earlier draft put dimension-select ON the
+        // wheel itself ("as in polyhedraverse one list two routes" --
+        // dimension-select is its own real wireframe-card list, the
+        // wizard, a SEPARATE overlay from the wheel; the wheel stays
+        // purely the in-sandbox family-breakdown tool it already is for
+        // 3D's Piece -> RD Family, unchanged). "Change Dimension" is one
+        // of the wizard's two routes in (the other: force-opened once on
+        // load, see init()'s own comment below) -- both land on the SAME
+        // single dimensionWizard instance/list, not two different ones.
+        if (action === 'tool:changeDimension') {
+          wheel3D.close();
+          dimensionWizard.open();
+          return;
+        }
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
-          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster' };
+          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron' };
           document.getElementById('piece-type-select').value = value;
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
@@ -2536,7 +2620,10 @@ async function init() {
         if (action === 'tool:spiralColumn' || action === 'tool:templates') { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
 
         if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
-      },
+    };
+    const wheel3D = createRhombicWheel3D({
+      getWorkspaceMode: () => workspaceMode,
+      onAction: handleWheelAction,
     });
     refreshWheel3D = () => wheel3D.refresh();
     // Direct instruction 2026-08-26: "there should always automatically
@@ -2556,6 +2643,26 @@ async function init() {
         onChange();
       }
     }
+    // Dimension-select wizard (2026-09-22): the real dimension/family
+    // picker -- a separate wireframe-card list overlay, not a wheel
+    // screen (see handleWheelAction's own "Change Dimension" comment
+    // above for the full reasoning/history of that correction).
+    // onSelectFamily dispatches through handleWheelAction, the exact
+    // same real-action path the wheel's own Piece screen already uses
+    // for FCC/BCC -- "one tool, one doorway" extended to this second
+    // caller, not duplicated. seedIfWorldEmpty() runs here for the same
+    // reason toggleWheel3D's own call does just below: this is a new
+    // entry path into Build mode that bypasses that call site entirely
+    // (the wizard opens directly from init(), never through
+    // toggleWheel3D), so a fresh empty world needs the same real seed
+    // cell before Add/Remove has any face to click.
+    const dimensionWizard = createDimensionWizard({
+      onSelectFamily: (action) => {
+        activeDimension = '3D';
+        seedIfWorldEmpty();
+        handleWheelAction(action);
+      },
+    });
     function toggleWheel3D() {
       if (pickers.isAnyPickerOpen()) { pickers.closeAnyPicker(); return; }
       if (wheel3D.isOpen) wheel3D.close();
@@ -2563,6 +2670,16 @@ async function init() {
     }
     rhombicWheel3DToggleBtn?.addEventListener('click', toggleWheel3D);
     isRhombicWheel3DOpen = () => wheel3D.isOpen;
+
+    // Dimension-select wizard (2026-09-22): the app's real entry gate
+    // now -- every load force-opens the wizard's own overlay (a real
+    // wireframe-card list, NOT the wheel -- see handleWheelAction's own
+    // "Change Dimension" comment above for why this isn't a wheel
+    // screen), in place of the old default of landing in the 3D FCC
+    // sandbox with nothing open. No persistence/skip (matches
+    // activeDimension's own "in-memory only" comment above): every
+    // fresh load asks again.
+    dimensionWizard.open();
 
     // Reclaims Tab/Space/hud-wheel-cue from the old 2D wheel -- same
     // entry points, now driving the sole (3D) wheel.
@@ -3127,6 +3244,15 @@ async function init() {
   // text readout below, these two stay accurate through Walk/Sculpture
   // Mode too (the underlying value doesn't change either), so this runs
   // unconditionally rather than sharing those early returns.
+  // Dimension-select wizard (2026-09-22), direct confirmation: this
+  // shortcut stays exactly as-is across every dimension tier, not
+  // replaced by anything dimension-specific -- as 2D/4D/5D/6D each ship
+  // real piece types (PIECE_MARK_KEY today only covers 3D's), this same
+  // icon should pick from whichever shapes the ACTIVE dimension (see
+  // activeDimension near the top of this file) actually offers, same
+  // "families coexist, switch via the existing Piece-picker pattern"
+  // principle the wizard plan already settled on for 3D's FCC/BCC. No
+  // gating needed yet -- 3D is the only real dimension so far.
   function updateQuickSelect() {
     if (quickShapeEl) {
       // Cuboctahedron Build (currentMode === 'cubocta') isn't a
@@ -3918,6 +4044,10 @@ async function init() {
           add: 'A Truncated Octahedron is already there.',
           remove: "No Truncated Octahedron there to remove -- Remove+TO only clears an actual TO, not the RD world around it. Tap directly on one you've placed.",
         },
+        elongdodeca: {
+          add: 'An Elongated Dodecahedron is already there.',
+          remove: "No Elongated Dodecahedron there to remove -- Remove+Elongated Dodecahedron only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
+        },
         idis: {
           add: "That disphenoid's already there.",
           remove: 'No disphenoid there to remove -- tap directly on one from the interstitial lattice.',
@@ -3969,6 +4099,10 @@ async function init() {
     bccMesh,
     bccCellAt: (instanceId) => bccCellOrder[instanceId],
     onBCCChange,
+    elongDodecaWorld,
+    elongDodecaMesh,
+    elongDodecaCellAt: (instanceId) => elongDodecaCellOrder[instanceId],
+    onElongDodecaChange,
     interstitialStore,
     interstitialGroup,
     onInterstitialChange,
@@ -4007,6 +4141,18 @@ async function init() {
     updateSectionEnabled(); // keeps bccMesh's own material in sync with X-Ray -- see that function's own header
     applyWorldViewMaterials(); // same reasoning -- see World View's own header
     saveToLocalStorage(bccWorld.toJSON(), BCC_STORAGE_KEY);
+  }
+
+  // Elongated Dodecahedron build: own change handler, same reasoning as
+  // onBCCChange above. No "never truly empty" invariant here -- see
+  // elongDodecaWorld's own construction comment above for why it doesn't
+  // need one (the main FCC world, which DOES enforce that invariant via
+  // seedIfWorldEmpty(), is always a valid bootstrap surface for it).
+  function onElongDodecaChange() {
+    rebuildElongDodecaInstances(elongDodecaMesh, elongDodecaWorld);
+    updateSectionEnabled();
+    applyWorldViewMaterials();
+    saveToLocalStorage(elongDodecaWorld.toJSON(), ELONGDODECA_STORAGE_KEY);
   }
 
   // Interstitial-lattice build: own change handler, same reasoning as

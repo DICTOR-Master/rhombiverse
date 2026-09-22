@@ -230,6 +230,21 @@ export function createBuildController({
   bccMesh = null,
   bccCellAt = () => null,
   onBCCChange = () => {},
+  // Elongated Dodecahedron ('elongdodeca' piece tier): same "adopted
+  // family member" reasoning as TO above, EXCEPT this shape reuses
+  // NEIGHBOR_OFFSETS/matchNeighborOffset verbatim -- unlike TO's own
+  // genuinely different lattice, Elongated Dodecahedron is
+  // combinatorially the SAME FCC lattice RD already uses (12 faces, same
+  // 12 face-normal directions, verified in geometry-extensions/elongated-
+  // dodecahedron.js's own header), just anisotropically stretched along
+  // one axis -- so its own bootstrap and grow cases both reduce to the
+  // exact same "cell + matchNeighborOffset(normal)" arithmetic, no
+  // separate offset table or nearest-point snap needed. All optional/
+  // no-op by default, same as every other adopted-family param above.
+  elongDodecaWorld = null,
+  elongDodecaMesh = null,
+  elongDodecaCellAt = () => null,
+  onElongDodecaChange = () => {},
   // Interstitial-lattice ("ioct"/"idis" piece tiers, core/interstitial-
   // build.md): same "adopted family member" reasoning as the TO params
   // above -- a genuinely different lattice (the BCC Delaunay/interstitial
@@ -300,6 +315,10 @@ export function createBuildController({
     // would silently steal clicks meant for the FCC world in every OTHER
     // piece tier.
     const bccTargets = bccMesh && getPieceType() === 'to' ? [bccMesh] : [];
+    // Same reasoning as bccTargets above -- only enters the raycast
+    // under its own piece tier, so it never steals clicks meant for the
+    // main FCC world under any other tier.
+    const elongDodecaTargets = elongDodecaMesh && getPieceType() === 'elongdodeca' ? [elongDodecaMesh] : [];
     // Same reasoning: interstitialGroup only enters the raycast under
     // its own piece tiers, for the same "don't steal clicks from other
     // tiers" reason as bccTargets above.
@@ -310,7 +329,7 @@ export function createBuildController({
     // Half RD/Hourglass mesh; harmless for Add (handleHemisphereClick's
     // own bootstrap-only Add path explicitly no-ops if it lands there).
     const hemisphereTargets = hemisphereGroup && HEMISPHERE_PIECE_TYPES.includes(pieceType) ? [hemisphereGroup] : [];
-    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...interstitialTargets, ...hemisphereTargets], true);
+    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...interstitialTargets, ...hemisphereTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -388,6 +407,47 @@ export function createBuildController({
     bccWorld.removeCell(bccCell.x, bccCell.y, bccCell.z);
     onBCCChange();
     if (onRemoved) onRemoved(bccCell);
+  }
+
+  // Elongated Dodecahedron piece tier: bootstrap and grow both reduce to
+  // the same "cell + matchNeighborOffset(normal)" step (see this
+  // controller's own elongDodecaWorld param comment for why -- same
+  // lattice topology as the main FCC world, no separate offset table or
+  // snap needed). Unlike handleToClick, there's no bootstrap-vs-extend
+  // BRANCH here beyond which mesh the raycast actually hit, since both
+  // cases use identical arithmetic.
+  function handleElongDodecaClick(hit, mode) {
+    const action = mode === 'build' ? 'add' : 'remove';
+    if (mode === 'build') {
+      const n = hit.face.normal;
+      let baseCell;
+      if (hit.object === elongDodecaMesh) {
+        if (hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        baseCell = elongDodecaCellAt(hit.instanceId);
+      } else {
+        baseCell = cellAt(hit);
+      }
+      if (!baseCell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const [dx, dy, dz] = matchNeighborOffset(n);
+      const nx = baseCell.x + dx, ny = baseCell.y + dy, nz = baseCell.z + dz;
+      // No-op: an Elongated Dodecahedron already sits there -- same
+      // class of "silent and correct, but reads as broken" bug TO's own
+      // onPieceNoOp note above already documents.
+      if (elongDodecaWorld.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const material = getMaterial();
+      elongDodecaWorld.addCell(nx, ny, nz, { material });
+      onElongDodecaChange();
+      if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
+      return;
+    }
+    // mode === 'chisel' (Remove) -- only ever acts on an actual placed
+    // Elongated Dodecahedron, same as TO's own Remove above.
+    if (hit.object !== elongDodecaMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const cell = elongDodecaCellAt(hit.instanceId);
+    if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    elongDodecaWorld.removeCell(cell.x, cell.y, cell.z);
+    onElongDodecaChange();
+    if (onRemoved) onRemoved(cell);
   }
 
   // Interstitial-lattice piece tiers ('idis': one disphenoid at a time,
@@ -1009,6 +1069,10 @@ export function createBuildController({
     // controller's own params) -- every other caller is unaffected.
     if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'to' && bccWorld && bccMesh) {
       handleToClick(hit, mode);
+      return;
+    }
+    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'elongdodeca' && elongDodecaWorld && elongDodecaMesh) {
+      handleElongDodecaClick(hit, mode);
       return;
     }
     // Same reasoning, for the interstitial-lattice piece tiers. 'ioct'
