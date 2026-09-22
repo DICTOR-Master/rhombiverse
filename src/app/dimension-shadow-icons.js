@@ -58,8 +58,28 @@ function centerRhombi(rhombi) {
   return rhombi.map((r) => ({ corners: r.corners.map(([x, y]) => [x - cx, y - cy]) }));
 }
 
+// Real bug, direct report: a fixed generating-vector length (R=22) was
+// used for every N, but a zonogon's own bounding box grows with N (more
+// vectors summed together) -- 5D/6D's real coordinates reached +-36/+-41,
+// overflowing the -30..30 viewBox itself (genuine SVG-level clipping,
+// not just the CSS backdrop issue fixed earlier), and every dimension
+// rendered at a visibly different overall size ("shouldn't be different
+// sizes"). Fixed by normalizing AFTER generating the real tiling: scale
+// every coordinate so the actual max distance from center matches one
+// fixed target, for every N -- same visual footprint regardless of
+// dimension, real geometry underneath unchanged (facet proportions
+// relative to each other are preserved, only the overall scale changes).
+function normalizeToTarget(rhombi, targetMaxExtent) {
+  const all = rhombi.flatMap((r) => r.corners);
+  const maxExtent = Math.max(...all.map(([x, y]) => Math.hypot(x, y)));
+  const scale = maxExtent > 0 ? targetMaxExtent / maxExtent : 1;
+  return rhombi.map((r) => ({ corners: r.corners.map(([x, y]) => [x * scale, y * scale]) }));
+}
+
+const ICON_TARGET_EXTENT = 24; // fits inside the -30..30 viewBox with real margin
+
 function zonogonSvg(n) {
-  const rhombi = centerRhombi(zonogonTiling(n, 22));
+  const rhombi = normalizeToTarget(centerRhombi(zonogonTiling(n, 22)), ICON_TARGET_EXTENT);
   // Direct report, live: cycling through many different opacity levels
   // (an earlier draft) read as "different colors... own outline shapes,
   // confusing" -- a jumble of translucent overlapping edges instead of
@@ -100,11 +120,14 @@ export function almanacIcon() {
   const cy = outer.reduce((s, p) => s + p[1], 0) / 4;
   const shift = ([x, y]) => [x - cx, y - cy];
   const bases = [[0, 0], h0, h1, add(h0, h1)];
+  const rhombi = normalizeToTarget(
+    bases.map((base) => ({ corners: [base, add(base, h0), add(add(base, h0), h1), add(base, h1)].map(shift) })),
+    ICON_TARGET_EXTENT
+  );
   // Same consistent-fill-plus-stroke treatment as zonogonSvg above, not
   // per-facet opacity cycling -- see that function's own comment.
-  const polys = bases.map((base) => {
-    const corners = [base, add(base, h0), add(add(base, h0), h1), add(base, h1)].map(shift);
-    return `<polygon points="${pts(corners)}" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="1.2"/>`;
-  }).join('\n    ');
+  const polys = rhombi.map((r) =>
+    `<polygon points="${pts(r.corners)}" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="1.2"/>`
+  ).join('\n    ');
   return `<svg viewBox="-30 -30 60 60" width="1em" height="1em" role="img" aria-label="Almanac">${polys}</svg>`;
 }
