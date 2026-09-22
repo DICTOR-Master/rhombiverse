@@ -9,10 +9,7 @@
 export const FEATURES = {
   // Geometry Extensions — opt-in, still shape-focused
   dualSculpture: true,
-  growth: true,
-  cultivation: true,
   latticeZoom: true,
-  gravity: true,
   // BCC dual-lattice: a nested detail lattice inside the existing RD
   // world, never touches world state -- see
   // geometry-extensions/bcc-detail-lattice.md. Was Rhombeometry-only;
@@ -29,4 +26,9 @@ export const FEATURES = {
   animals: false,
   hazards: false,
   hydrosphere: false,
+  // growth/cultivation/gravity retired 2026-09-22 (second world-building
+  // removal pass) -- same reasoning as the World Systems flags above.
+  growth: false,
+  cultivation: false,
+  gravity: false,
 };

@@ -5,7 +5,7 @@
 // exactly one place.
 // See RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md section 3 (delivered
 // 2026-08-31) for the plantInstance/growInstance naming this formalizes.
-import { growSeed, VALID_TRIPLES } from '../geometry-extensions/growth.js';
+import { growSeed, VALID_TRIPLES } from './growth.js';
 
 // Same seed-record shape growth.js's own plantSeed() builds -- factored
 // out here so evolution.js's plantOrganism() no longer duplicates it.

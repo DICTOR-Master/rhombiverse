@@ -136,8 +136,6 @@ function injectCssOnce() {
 export function createWheelPickers({
   modeButtonSelector = '.mode-btn',
   materialSelectId = 'material-select',
-  generatorSelectId = 'generator-type-select',
-  speciesSelectId = 'species-select',
   onModeChosen = () => {},
   onDragPlacementChange = () => {},
   onMenuSound = () => {},
@@ -278,16 +276,13 @@ export function createWheelPickers({
     const options = readSelectOptions(select);
     openMaterialWheel(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
   }
-  function openSpeciesPicker(onPick) {
-    const select = document.getElementById(speciesSelectId);
-    const options = readSelectOptions(select);
-    openPickerStrip(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
-  }
-  function openGeneratorPicker(onPick) {
-    const select = document.getElementById(generatorSelectId);
-    const options = readSelectOptions(select);
-    openPickerStrip(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
-  }
+  // openSpeciesPicker/openGeneratorPicker (both used openPickerStrip, below)
+  // removed 2026-09-22 (second world-building removal pass) -- their only
+  // callers (Cultivate's Plant, Rhombitect's Generate a Body) were
+  // archived along with growth/evolution/cultivation and planetoidgen.
+  // openPickerStrip/pickerStrip themselves stay: isAnyPickerOpen/
+  // closeAnyPicker (below) still check/close the strip generically for
+  // the material-picker-close-on-navigate interplay render.js relies on.
   function toggleDragPlacement() {
     dragPlacementEnabled = !dragPlacementEnabled;
     onDragPlacementChange(dragPlacementEnabled);
@@ -298,8 +293,6 @@ export function createWheelPickers({
 
   return {
     openMaterialPicker,
-    openSpeciesPicker,
-    openGeneratorPicker,
     toggleDragPlacement,
     isDragPlacementEnabled: () => dragPlacementEnabled,
     // For a caller (the 3D wheel's Tab/Space/HUD-cue handling) that

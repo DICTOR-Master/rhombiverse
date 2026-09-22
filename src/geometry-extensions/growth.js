@@ -1,7 +1,17 @@
-// Phase 6 -- RHOMBIVERSE_SPEC_PENROSE_GROWTH.md. Real Ammann-rhombohedra
-// geometry, grown by local incremental substitution (never imports, and
-// is never imported by, build.js). Full design rationale/history for
-// every export below: docs/code-notes/geometry-extensions/growth.md
+// Ammann-rhombohedra tiling geometry -- deterministic, on-demand math only.
+// Trimmed 2026-09-22 (second world-building removal pass) from the original
+// growth.js, which also carried a real growth-over-time engine (species
+// templates, tick-rate-limited growSeed/applyGrowth/plantSeed/pruneTile).
+// That engine is archived in full at
+// src/world-systems-archived/growth.js -- see
+// docs/code-notes/world-systems-archived/growth.md for its history.
+//
+// What's kept here is genuinely reusable, non-simulated geometry: the 12
+// star directions, the valid acute/oblate rhombohedron triples they form,
+// a single tile's vertices, and a real 3D SAT overlap test between two
+// tiles. render.js's live Duality Mode feature (VALID_TRIPLES,
+// unitTileVertices) depends on this directly. Full design rationale/history
+// for the math itself: docs/code-notes/geometry-extensions/growth.md
 
 export const PHI = (1 + Math.sqrt(5)) / 2;
 
@@ -67,30 +77,6 @@ function buildValidTriples() {
     }
   }
   return triples;
-}
-
-const EXTENSIONS_BY_PAIR = buildExtensionsByPair();
-
-function pairKey(i, j) {
-  return i < j ? `${i},${j}` : `${j},${i}`;
-}
-
-function buildExtensionsByPair() {
-  const map = new Map();
-  for (const { dirs, type } of VALID_TRIPLES) {
-    const [i, j, k] = dirs;
-    for (const [a, b, c] of [
-      [i, j, k],
-      [i, k, j],
-      [j, k, i],
-    ]) {
-      const key = pairKey(a, b);
-      const list = map.get(key) ?? [];
-      list.push({ third: c, type });
-      map.set(key, list);
-    }
-  }
-  return map;
 }
 
 function vecAdd(a, b) {
@@ -161,7 +147,11 @@ function maxRadiusFrom(verts, center) {
 // Real 3D SAT overlap test between two tiles, with a cheap bounding-sphere
 // pre-check (never changes the answer, only skips the expensive exact
 // test). See docs/code-notes/geometry-extensions/growth.md for the full
-// derivation and the 2026-08-13/2026-08-24 bug/perf histories.
+// derivation and the 2026-08-13/2026-08-24 bug/perf histories. Not called
+// by any live feature today (its one live caller, evolution.js, was
+// archived in the same pass this file was trimmed) -- kept because it's
+// genuine deterministic geometry, not simulation, and a lattice-overlap
+// check is a natural thing a lattice-selection tool will want again.
 export function tilesOverlap(vertsA, vertsB, eps = 1e-6) {
   const centerA = centroidOf(vertsA);
   const centerB = centroidOf(vertsB);
@@ -198,194 +188,4 @@ export function tilesOverlap(vertsA, vertsB, eps = 1e-6) {
     if (maxA <= minB + eps || maxB <= minA + eps) return false; // separated (or just touching) on this axis
   }
   return true; // no separating axis found among any candidate -- genuine overlap
-}
-
-function facesOfTile(tile) {
-  const [i, j, k] = tile.dirs;
-  const [ei, ej, ek] = [STAR_DIRECTIONS[i], STAR_DIRECTIONS[j], STAR_DIRECTIONS[k]];
-  const o = tile.origin;
-  return [
-    { pair: [i, j], origin: o, exclude: k },
-    { pair: [i, j], origin: vecAdd(o, ek), exclude: k },
-    { pair: [i, k], origin: o, exclude: j },
-    { pair: [i, k], origin: vecAdd(o, ej), exclude: j },
-    { pair: [j, k], origin: o, exclude: i },
-    { pair: [j, k], origin: vecAdd(o, ei), exclude: i },
-  ];
-}
-
-// Per-species growth bias. See docs/code-notes/.../growth.md for the
-// real-biology grounding behind each choice.
-const SPECIES_BIAS = {
-  amoeba: { preferType: 'oblate', facesPerTick: 1 },
-  moss: { preferType: null, facesPerTick: 2 },
-  fungus: { preferType: 'acute', facesPerTick: 1 },
-  fern: { preferType: 'acute', facesPerTick: 3 },
-};
-
-// Wave 1 + Wave 2 growth templates. See docs/code-notes/.../growth.md
-// for the spec staging history and per-template real-biology grounding.
-export const GROWTH_TEMPLATES = {
-  amoeba: { species: 'amoeba', maxGeneration: 3 },
-  moss: { species: 'moss', maxGeneration: 5 },
-  fungus: { species: 'fungus', maxGeneration: 6 },
-  fern: { species: 'fern', maxGeneration: 6 },
-
-  sapling: {
-    species: 'plant',
-    maxGeneration: 8,
-    bias: { preferType: 'acute', facesPerTick: 2 },
-  },
-  conifer: {
-    species: 'plant',
-    maxGeneration: 16,
-    bias: { preferType: 'acute', facesPerTick: 2 },
-  },
-  shrub: {
-    species: 'plant',
-    maxGeneration: 9,
-    bias: { preferType: null, facesPerTick: 4 },
-  },
-  nautilus: {
-    species: 'shell',
-    maxGeneration: 14,
-    bias: { preferType: 'oblate', facesPerTick: 1 },
-  },
-  scallop: {
-    species: 'shell',
-    maxGeneration: 8,
-    bias: { preferType: 'oblate', facesPerTick: 3 },
-  },
-  spineling: {
-    species: 'creature',
-    maxGeneration: 10,
-    bias: { preferType: 'acute', facesPerTick: 2 },
-  },
-  'cluster-frame': {
-    species: 'creature',
-    maxGeneration: 13,
-    bias: { preferType: null, facesPerTick: 4 },
-  },
-};
-
-export const GROWTH_TICK_MS = 30000;
-
-// Grows one seed by one step. See docs/code-notes/.../growth.md for the
-// 2026-08-13 overlap-bug story and the phenotypeOverride/growthParameters
-// design rationale.
-export function growSeed(seed, now = Date.now(), phenotypeOverride = null) {
-  const maxGeneration = phenotypeOverride ? phenotypeOverride.maxGeneration : GROWTH_TEMPLATES[seed.species]?.maxGeneration;
-  if (maxGeneration === undefined) return false;
-  if (seed.generation >= maxGeneration) return false;
-  if (now - seed.lastGrowthAt < GROWTH_TICK_MS) return false;
-
-  const bias = phenotypeOverride
-    ? { preferType: phenotypeOverride.preferType, facesPerTick: phenotypeOverride.facesPerTick }
-    : (GROWTH_TEMPLATES[seed.species].bias ?? SPECIES_BIAS[seed.species]);
-
-  const growthParams = seed.growthParameters;
-  const facesPerTick =
-    growthParams?.densityBias != null
-      ? Math.max(1, Math.round(bias.facesPerTick * (0.4 + growthParams.densityBias * 1.2)))
-      : bias.facesPerTick;
-
-  const frontier = [];
-  for (const tile of seed.tiles) {
-    for (const face of facesOfTile(tile)) {
-      frontier.push(face);
-    }
-  }
-
-  const placedVerts = seed.tiles.map((t) => tileVertices(t));
-
-  let added = 0;
-  for (const face of frontier) {
-    if (added >= facesPerTick) break;
-    const options = EXTENSIONS_BY_PAIR.get(pairKey(...face.pair)) ?? [];
-    if (options.length === 0) continue;
-    const preferred = bias.preferType ? options.filter((o) => o.type === bias.preferType) : options;
-    const rest = options.filter((o) => !preferred.includes(o));
-    let orderedOptions = [...preferred, ...rest];
-    if (growthParams?.directionalBias) {
-      const [bx, by, bz] = growthParams.directionalBias;
-      orderedOptions = orderedOptions
-        .map((o) => ({ o, align: STAR_DIRECTIONS[o.third][0] * bx + STAR_DIRECTIONS[o.third][1] * by + STAR_DIRECTIONS[o.third][2] * bz }))
-        .sort((a, b) => b.align - a.align)
-        .map(({ o }) => o);
-    }
-
-    for (let n = 0; n < orderedOptions.length; n++) {
-      const choice = orderedOptions[(seed.tiles.length + added + n) % orderedOptions.length];
-      const dirs = [...face.pair, choice.third].sort((a, b) => a - b);
-      const candidate = { type: choice.type, dirs, origin: face.origin };
-      const candidateVerts = tileVertices(candidate);
-      if (placedVerts.some((verts) => tilesOverlap(candidateVerts, verts))) continue;
-
-      seed.tiles.push(candidate);
-      placedVerts.push(candidateVerts);
-      added++;
-      break;
-    }
-  }
-
-  if (added > 0) {
-    seed.generation += 1;
-    seed.lastGrowthAt = now;
-    // cachedBoundingRadius: real perf fix, see docs/code-notes/.../growth.md
-    let maxDist = 0;
-    for (const verts of placedVerts) {
-      for (const v of verts) {
-        const d = Math.hypot(v[0], v[1], v[2]);
-        if (d > maxDist) maxDist = d;
-      }
-    }
-    seed.cachedBoundingRadius = maxDist;
-  }
-  return added > 0;
-}
-
-export function applyGrowth(world, now = Date.now()) {
-  let changed = false;
-  for (const [seedId, seed] of Object.entries(world.getSeeds())) {
-    // A player-cultivated seed's own phenotypeOverride (Lab-panel
-    // sliders, see core/instance.js's phenotypeFromSliders()) applies on
-    // every tick, not just at plant time -- organism-owned seeds are
-    // grown by evolution.js's own growOrganism() instead, never via this
-    // loop with a real maxGeneration (GROWTH_TEMPLATES has no
-    // "organism:..." entries), so this can't double-drive them.
-    if (growSeed(seed, now, seed.phenotypeOverride ?? null)) {
-      world.setSeed(seedId, seed);
-      changed = true;
-    }
-  }
-  return changed;
-}
-
-export function plantSeed(world, seedId, species, origin, now = Date.now()) {
-  if (!GROWTH_TEMPLATES[species]) {
-    throw new Error(`Unknown growth species: ${species}`);
-  }
-  const firstTriple = VALID_TRIPLES.find((t) => t.type === 'acute');
-  const seed = {
-    species,
-    origin,
-    plantedAt: now,
-    lastGrowthAt: now,
-    generation: 0,
-    tiles: [{ type: firstTriple.type, dirs: [...firstTriple.dirs], origin: [0, 0, 0] }],
-  };
-  world.setSeed(seedId, seed);
-  return seed;
-}
-
-export function pruneTile(world, seedId, tileIndex) {
-  const seed = world.getSeeds()[seedId];
-  if (!seed || tileIndex <= 0 || tileIndex >= seed.tiles.length) return false;
-  seed.tiles.splice(tileIndex, 1);
-  world.setSeed(seedId, seed);
-  return true;
-}
-
-export function tileWorldVertices(seed, tile) {
-  return tileVertices(tile).map((v) => vecAdd(v, seed.origin));
 }

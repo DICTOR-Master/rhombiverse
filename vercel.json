@@ -27,7 +27,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://esm.sh; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://zuvlqvvxifuzumqeyuir.supabase.co wss://zuvlqvvxifuzumqeyuir.supabase.co https://api.anthropic.com https://api.openai.com; font-src 'self' data:"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.anthropic.com https://api.openai.com; font-src 'self' data:"
         }
       ]
     }

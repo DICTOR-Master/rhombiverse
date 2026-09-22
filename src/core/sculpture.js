@@ -7,15 +7,12 @@ import { cellKey, cellsInShells, isValidCell } from './lattice.js';
 import { DUAL_DIRS } from './dual.js';
 import { requestBYOKJson } from '../app/byok.js';
 
-// render.js supplies the real claimIdAt/isClaimProtected via
-// setRegionsIntegration(), gated behind FEATURES.economy. Inert
-// defaults otherwise (no claims exist).
+// setRegionsIntegration() hook removed 2026-08-31 along with the Claims
+// integration it fed (regions.js retired 2026-09-17) -- nothing has ever
+// called it since; these stay permanently at their inert defaults (no
+// claims exist), still consumed by canFullCyborgEditAt below.
 let claimIdAt = () => null;
 let isClaimProtected = () => false;
-export function setRegionsIntegration({ claimIdAt: claimIdAtFn, isClaimProtected: isClaimProtectedFn }) {
-  claimIdAt = claimIdAtFn;
-  isClaimProtected = isClaimProtectedFn;
-}
 
 // --- Symmetry mirroring -----------------------------------------------
 const PERMS = [

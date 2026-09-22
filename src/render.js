@@ -35,14 +35,9 @@ import {
   SUB_LATTICE_THROTTLE_BASE_MS,
   nextVolatilityScore,
   throttleForVolatility,
-  scaleVerticesAroundOrigin,
-  dominantSpecies,
-  speckleCountForBiomass,
-  AGGREGATE_MAX_SPECKLES,
 } from './geometry-extensions/latticezoom.js';
 import { loadWorld, createWorldStore } from './core/worldstate-core.js';
 import { createBuildController, removeShell, recolorShell } from './core/build.js';
-import { generatePlanetoid } from './geometry-extensions/planetoidgen.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR, QUALITY_LEVELS_ASCENDING } from './app/settings.js';
 import { t, LANG_ORDER, LANG_META } from './app/i18n.js';
 import { playPlaceSound, playRemoveSound, playMenuSound } from './app/sfx.js';
@@ -67,8 +62,6 @@ import {
   shellBrushCells,
 } from './core/sculpture.js';
 import { matchNeighborOffset } from './core/build.js';
-import { computePlanetoids, gravityAt, nearestPlanetoid } from './geometry-extensions/gravity.js';
-import { createPlayerController } from './app/player.js';
 import { saveCameraState, loadCameraState } from './app/camera-persistence.js';
 import {
   saveToLocalStorage,
@@ -83,19 +76,6 @@ import {
   HEMISPHERE_STORAGE_KEY,
 } from './core/persistence.js';
 import {
-  ensureAnonymousSession,
-  loadSharedWorld,
-  pushCellUpsert,
-  pushCellDelete,
-  subscribeToSharedWorld,
-  setSyncErrorHandler,
-  pushSeedSet,
-  pushSeedClear,
-  publishToGallery,
-  fetchGalleryWorlds,
-  fetchGalleryWorldData,
-} from './app/sync.js';
-import {
   compressionSupported,
   encodeWorldForUrl,
   decodeWorldFromUrl,
@@ -103,35 +83,11 @@ import {
   getSharedWorldParam,
   clearSharedWorldParam,
 } from './app/worldshare.js';
-import { GROWTH_TEMPLATES, plantSeed, applyGrowth, tileWorldVertices, pruneTile, VALID_TRIPLES, unitTileVertices } from './geometry-extensions/growth.js';
-import { phenotypeFromSliders } from './core/instance.js';
-import {
-  createCultivationSession,
-  proposeCultivationSite,
-  acceptCultivationSuggestion,
-  dismissCultivationSuggestion,
-  requestCultivationIntent,
-  executeCultivationIntent,
-} from './geometry-extensions/cultivation.js';
-import {
-  GENOME_TRAIT_RANGES,
-  plantOrganism,
-  resolveCatchUpForAllPlanetoids,
-  averageTraitValue,
-  planetoidKeyFor,
-  localBiomassAvailability,
-} from './geometry-extensions/evolution.js';
+import { VALID_TRIPLES, unitTileVertices } from './geometry-extensions/growth.js';
 // World-building/game systems (mining, trade, claims, achievements,
-// animals, hazards, hydrosphere) were retired and their code archived to
-// world-systems-archived/ -- see README.md. evolution.js is the one
-// exception (imported above, live): the "plant something and let it
-// grow" feature is real geometry, not game trappings.
-//
-// resolveCatchUpForAllPlanetoids (evolution.js) still takes optional
-// animal-specific hooks in its signature -- kept as permanently-undefined
-// here rather than editing that call, since evolution.js already
-// tolerates their absence (this is the exact behavior today, unchanged).
-let animalGenerationStepHook, reproduceFn, computeAnimalSurvivalProbability;
+// animals, hazards, hydrosphere, gravity/planetoids, growth/evolution/
+// cultivation, walking/exploring, Shared World sync) were retired and
+// their code archived to world-systems-archived/ -- see README.md.
 
 const SCALE = 1;
 const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
@@ -153,25 +109,6 @@ function confirmLargeWorldLoad(worldJSON) {
   );
 }
 const MAX_SHELL = 15; // enforced cap on shell-count UI inputs, see docs/code-notes/render.md
-
-let syncWarningTimer = null;
-function showSyncWarning(error) {
-  const el = document.getElementById('sync-warning');
-  if (!el) return;
-  const errorMessage = error?.message ?? '';
-  const message = /budget exceeded/i.test(errorMessage)
-    ? "You're building faster than Shared World allows right now -- some changes may not have saved. It refills over time; slow down a bit."
-    : /asteroid cell at that position/i.test(errorMessage)
-      ? "That rock is already gone -- someone else may have mined it first."
-      : "Some changes aren't reaching Shared World (connection issue) -- they may not be saved for other users.";
-  el.textContent = `⚠ ${message}`;
-  el.style.display = 'block';
-  clearTimeout(syncWarningTimer);
-  syncWarningTimer = setTimeout(() => {
-    el.style.display = 'none';
-  }, 6000);
-}
-setSyncErrorHandler(showSyncWarning);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05050a);
@@ -430,16 +367,15 @@ onSettingsChange((s) => {
   if (languageSelect && languageSelect.value !== s.language) languageSelect.value = s.language;
 });
 
-// Walk mode (RHOMBIVERSE_PLAN.md Phase 5.5) state, module-level since
-// both init() (which creates `player` once the world is loaded) and
-// animate() (the top-level render loop) need it. `planetoids` is derived
-// from world-state and recomputed in onChange() -- see gravity.js.
+// Walk mode (RHOMBIVERSE_PLAN.md Phase 5.5) was archived 2026-09-22
+// (second world-building removal pass) along with gravity/planetoids --
+// `walking` is kept, permanently false, since a number of unrelated
+// mode guards elsewhere (Duality/Sculpt/Cuboctahedron) still read it
+// defensively; nothing sets it true anymore, so those guards are
+// harmless no-ops now rather than load-bearing. `player` (the walk
+// controller) had no other consumer, so it's gone entirely.
 let walking = false;
-let player = null;
-// Assigned inside init() once updateHudIndicator exists there -- enterWalk/
-// exitWalk are module-level (defined before init()) but still need to
-// refresh the bottom-left quick-select Piece/Material icons on every
-// Explore transition.
+// Assigned inside init() once updateHudIndicator exists there.
 let refreshHudIndicator = () => {};
 
 // Assigned once the Rhombic Wheel 3D is created (feature-flagged, see
@@ -497,305 +433,7 @@ function wireFirstUseHint(elementId, text) {
   el.addEventListener('mouseenter', reveal);
   el.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') reveal(); });
 }
-let planetoids = {};
-// RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 9: mirrors
-// world.getOrganisms(), same module-level pattern as planetoids above --
-// updateEvolutionInfo() lives outside init()'s scope. Refreshed via
-// refreshOrganismsSnapshot -- see docs/code-notes/render.md
-let organismsSnapshot = {};
-
-// Shared World (Phase 5) state -- see docs/code-notes/render.md
-let sharedWorldActive = false;
-let applyingRemote = false;
-let unsubscribeShared = null;
-let myUserId = null; // this session's anonymous auth.uid(), set on enableSharedWorld
-const LOCAL_PLAYER_ID = 'local-player'; // B6: fallback ownerId for solo play, see notes
-
-function handleLocalAdd(x, y, z, data) {
-  if (sharedWorldActive && !applyingRemote) pushCellUpsert(x, y, z, data);
-}
-function handleLocalRemove(x, y, z) {
-  if (sharedWorldActive && !applyingRemote) pushCellDelete(x, y, z);
-}
-// Push-on-local-mutation for seeds too -- see docs/code-notes/render.md
-function handleLocalSeedSet(seedId, seedData) {
-  if (sharedWorldActive && !applyingRemote) pushSeedSet(seedId, seedData);
-}
-function handleLocalSeedClear(seedId) {
-  if (sharedWorldActive && !applyingRemote) pushSeedClear(seedId);
-}
-
-// See docs/code-notes/render.md
-function updateGravityInfo() {
-  const el = document.getElementById('gravity-info');
-  if (!el) return;
-  const refPos = walking && player ? player.getPosition() : controls.target;
-  const nearest = nearestPlanetoid(refPos, planetoids);
-  if (!nearest) {
-    el.textContent = 'No planetoid yet — place a Blackstar-Glassite cell to create a gravity source.';
-    return;
-  }
-  const status = nearest.active ? 'active' : 'out of range (build closer to the core, or add more BSG)';
-  const hydro = nearest.hydrosphereActive ? ' · hydrosphere+atmosphere active' : '';
-  const blackHole = nearest.isBlackHole
-    ? ` · BLACK HOLE — ledger ${nearest.consumedMatter} · generated ${nearest.generatedCellCount} cells through shell ${nearest.generatedThroughShell}`
-    : '';
-  const star = nearest.isStar
-    ? ` · STAR — luminosity ${nearest.luminosity.toFixed(1)} · fusion ${nearest.fusionActive ? 'active' : 'idle (needs hydrosphere + Ferrostone)'} · frost line ${nearest.frostLineDistance.toFixed(1)}u` +
-      (nearest.detonated ? ` · DETONATED${nearest.isBlackHoleRemnant ? ' (black hole remnant)' : ''}` : ` · mass ${nearest.accumulatedMass}/${nearest.supernovaCriticalMass}`)
-    : '';
-  el.textContent =
-    `Nearest planetoid: gravity ${status} · radius ${nearest.gravityRadius.toFixed(1)}u · ` +
-    `${nearest.bsgCount} BSG cell${nearest.bsgCount === 1 ? '' : 's'} · ` +
-    `recommended core: ${nearest.coreShellRecommendation} shell${nearest.coreShellRecommendation === 1 ? '' : 's'}${hydro}${blackHole}${star}`;
-}
-
-// See docs/code-notes/render.md (Stage 1-7 catch-up engine, Animals wiring)
-function resolveEvolution(world, now) {
-  const organismIds = Object.keys(world.getOrganisms());
-  if (organismIds.length === 0) return false;
-  const results = resolveCatchUpForAllPlanetoids(world, organismIds, now, animalGenerationStepHook, reproduceFn, computeAnimalSurvivalProbability);
-  return Object.values(results).some((r) => r.generationsResolved > 0);
-}
-
-// See docs/code-notes/render.md
-function refreshOrganismsSnapshot(world) {
-  const seeds = world.getSeeds();
-  organismsSnapshot = Object.fromEntries(
-    Object.entries(world.getOrganisms()).map(([id, o]) => [id, { ...o, origin: seeds[o.seedId]?.origin }])
-  );
-}
-
-// See docs/code-notes/render.md
-function updateEvolutionInfo() {
-  const el = document.getElementById('evolution-info');
-  if (!el) return;
-  const refPos = walking && player ? player.getPosition() : controls.target;
-  const nearest = nearestPlanetoid(refPos, planetoids);
-  const allIds = Object.keys(organismsSnapshot);
-  if (allIds.length === 0) {
-    el.textContent = 'No evolving life yet — Plant an "(evolving)" species to start a real, adapting population.';
-    return;
-  }
-  const key = nearest ? planetoidKeyFor(nearest.centerOfMass) : null;
-  const localIds = key
-    ? allIds.filter((id) => {
-        const origin = organismsSnapshot[id].origin;
-        if (!origin) return false;
-        const p = nearestPlanetoid({ x: origin[0], y: origin[1], z: origin[2] }, planetoids);
-        return p && planetoidKeyFor(p.centerOfMass) === key;
-      })
-    : [];
-  if (localIds.length === 0) {
-    el.textContent = 'No evolving life near this planetoid yet.';
-    return;
-  }
-  const bySpecies = {};
-  for (const id of localIds) {
-    const s = organismsSnapshot[id].species;
-    bySpecies[s] = (bySpecies[s] ?? 0) + 1;
-  }
-  const mix = Object.entries(bySpecies)
-    .map(([s, n]) => `${n} ${s}`)
-    .join(', ');
-  const avgEfficiency = averageTraitValue(
-    { getOrganisms: () => organismsSnapshot },
-    localIds,
-    'resourceEfficiency'
-  );
-  const avgMutation = averageTraitValue({ getOrganisms: () => organismsSnapshot }, localIds, 'mutationRate');
-  const pendingCount = localIds.filter((id) => organismsSnapshot[id].status === 'pending').length;
-  el.textContent =
-    `Life here: ${mix} · avg resourceEfficiency ${avgEfficiency.toFixed(2)} · avg mutationRate ${avgMutation.toFixed(2)}` +
-    (pendingCount > 0 ? ` · ${pendingCount} pending review` : '');
-}
-
-// B2 Explore transition sequence -- see docs/code-notes/render.md
-const SPACE_BG_COLOR = new THREE.Color(0x05050a);
-const WALK_BG_COLOR = new THREE.Color(0x0d1420); // stands in for "horizon change", see notes
-const WALK_TRANSITION_MS = 550;
-let walkTransitioning = false;
-
-function animateBackground(from, to, duration, onDone) {
-  const start = performance.now();
-  function step(now) {
-    const t = Math.min(1, (now - start) / duration);
-    scene.background.copy(from).lerp(to, t);
-    if (t < 1) requestAnimationFrame(step);
-    else if (onDone) onDone();
-  }
-  requestAnimationFrame(step);
-}
-
-function enterWalk() {
-  if (!player || walking || walkTransitioning) return;
-  walking = true;
-  walkTransitioning = true;
-  controls.enabled = false;
-  document.body.classList.add('explore-transitioning');
-  showHudPrompt('Entering Explore — gravity engaging…', WALK_TRANSITION_MS + 400);
-  animateBackground(SPACE_BG_COLOR, WALK_BG_COLOR, WALK_TRANSITION_MS);
-  setTimeout(() => {
-    document.body.classList.remove('explore-transitioning');
-    document.getElementById('walk-toggle').textContent = t('walk.exit', getSettings().language);
-    document.getElementById('walk-hint').style.display = '';
-    document.getElementById('hud-crosshair')?.classList.add('visible');
-    setWalkTouchControlsVisible(true);
-    player.reset(camera.position);
-    player.setEnabled(true);
-    player.requestLock();
-    walkTransitioning = false;
-    window.dispatchEvent(new CustomEvent('rhombiverse:walkModeEntered')); // B6's onboarding discovery sequence
-    updateGravityInfo();
-    updateEvolutionInfo();
-    refreshHudIndicator();
-  }, WALK_TRANSITION_MS);
-}
-
-function exitWalk() {
-  if (!walking || walkTransitioning) return;
-  walking = false;
-  walkTransitioning = true;
-  if (player) player.setEnabled(false);
-  camera.up.set(0, 1, 0);
-  document.body.classList.add('explore-transitioning');
-  showHudPrompt('Leaving Explore…', WALK_TRANSITION_MS + 400);
-  document.getElementById('hud-crosshair')?.classList.remove('visible');
-  setWalkTouchControlsVisible(false);
-  animateBackground(WALK_BG_COLOR, SPACE_BG_COLOR, WALK_TRANSITION_MS);
-  setTimeout(() => {
-    document.body.classList.remove('explore-transitioning');
-    controls.enabled = true;
-    document.getElementById('walk-toggle').textContent = t('walk.enter', getSettings().language);
-    document.getElementById('walk-hint').style.display = 'none';
-    walkTransitioning = false;
-    updateGravityInfo();
-    updateEvolutionInfo();
-    refreshHudIndicator();
-  }, WALK_TRANSITION_MS);
-}
-
-document.getElementById('walk-toggle').addEventListener('click', () => {
-  if (walking) exitWalk();
-  else enterWalk();
-});
-
-// See docs/code-notes/render.md
-document.addEventListener('pointerlockchange', () => {
-  if (walking && document.pointerLockElement !== renderer.domElement) exitWalk();
-});
-
-// Mobile/touch support -- see docs/code-notes/render.md
-const IS_TOUCH_PRIMARY = window.matchMedia('(pointer: coarse)').matches;
-
-const walkLookZoneEl = document.getElementById('walk-look-zone');
-const walkJoystickEl = document.getElementById('walk-joystick');
-const walkJoystickKnobEl = document.getElementById('walk-joystick-knob');
-const walkJumpBtnEl = document.getElementById('walk-jump-btn');
-
-function setWalkTouchControlsVisible(visible) {
-  if (!IS_TOUCH_PRIMARY) return;
-  walkLookZoneEl.classList.toggle('visible', visible);
-  walkJoystickEl.classList.toggle('visible', visible);
-  walkJumpBtnEl.classList.toggle('visible', visible);
-}
-
-if (IS_TOUCH_PRIMARY) {
-  const JOYSTICK_RADIUS = 50; // px -- knob travel distance for full-speed input
-  let joystickTouchId = null;
-  let joystickCenter = { x: 0, y: 0 };
-
-  walkJoystickEl.addEventListener('touchstart', (e) => {
-    const t = e.changedTouches[0];
-    joystickTouchId = t.identifier;
-    const r = walkJoystickEl.getBoundingClientRect();
-    joystickCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-  }, { passive: true });
-  walkJoystickEl.addEventListener('touchmove', (e) => {
-    const t = [...e.changedTouches].find((t) => t.identifier === joystickTouchId);
-    if (!t || !player) return;
-    let dx = t.clientX - joystickCenter.x;
-    let dy = t.clientY - joystickCenter.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist > JOYSTICK_RADIUS) {
-      dx = (dx / dist) * JOYSTICK_RADIUS;
-      dy = (dy / dist) * JOYSTICK_RADIUS;
-    }
-    walkJoystickKnobEl.style.transform = `translate(${dx}px, ${dy}px)`;
-    // Screen-down (positive dy) is backward, matching a real joystick's
-    // "pull toward you to go back" convention.
-    player.setVirtualMove(-dy / JOYSTICK_RADIUS, dx / JOYSTICK_RADIUS);
-  }, { passive: true });
-  const endJoystickTouch = (e) => {
-    if (![...e.changedTouches].some((t) => t.identifier === joystickTouchId)) return;
-    joystickTouchId = null;
-    walkJoystickKnobEl.style.transform = '';
-    player?.setVirtualMove(0, 0);
-  };
-  walkJoystickEl.addEventListener('touchend', endJoystickTouch);
-  walkJoystickEl.addEventListener('touchcancel', endJoystickTouch);
-
-  walkJumpBtnEl.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    player?.setVirtualKey('Space', true);
-  });
-  const endJumpTouch = () => player?.setVirtualKey('Space', false);
-  walkJumpBtnEl.addEventListener('touchend', endJumpTouch);
-  walkJumpBtnEl.addEventListener('touchcancel', endJumpTouch);
-
-  // Drag-to-look -- see docs/code-notes/render.md
-  const LOOK_LONG_PRESS_MS = 500;
-  const LOOK_MOVE_TOLERANCE = 12; // px
-  let lookTouchId = null;
-  let lookLastX = 0;
-  let lookLastY = 0;
-  let lookStartX = 0;
-  let lookStartY = 0;
-  let lookLongPressTimer = null;
-  let lookLongPressFired = false;
-
-  walkLookZoneEl.addEventListener('touchstart', (e) => {
-    if (lookTouchId !== null) return; // one look-drag at a time
-    const t = e.changedTouches[0];
-    lookTouchId = t.identifier;
-    lookStartX = lookLastX = t.clientX;
-    lookStartY = lookLastY = t.clientY;
-    lookLongPressFired = false;
-    clearTimeout(lookLongPressTimer);
-    lookLongPressTimer = setTimeout(() => {
-      lookLongPressFired = true;
-      renderer.domElement.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        clientX: lookLastX,
-        clientY: lookLastY,
-      }));
-    }, LOOK_LONG_PRESS_MS);
-  }, { passive: true });
-
-  walkLookZoneEl.addEventListener('touchmove', (e) => {
-    const t = [...e.changedTouches].find((t) => t.identifier === lookTouchId);
-    if (!t || !player) return;
-    const dx = t.clientX - lookLastX;
-    const dy = t.clientY - lookLastY;
-    lookLastX = t.clientX;
-    lookLastY = t.clientY;
-    if (Math.hypot(t.clientX - lookStartX, t.clientY - lookStartY) > LOOK_MOVE_TOLERANCE) {
-      clearTimeout(lookLongPressTimer);
-    }
-    // "Standard mobile-FPS convention": drag right -> look right, same
-    // sign as a real mouse's movementX/Y feeding the same applyLookDelta.
-    if (!lookLongPressFired) player.lookBy(dx, dy);
-  }, { passive: true });
-
-  const endLookTouch = (e) => {
-    if (![...e.changedTouches].some((t) => t.identifier === lookTouchId)) return;
-    lookTouchId = null;
-    clearTimeout(lookLongPressTimer);
-  };
-  walkLookZoneEl.addEventListener('touchend', endLookTouch);
-  walkLookZoneEl.addEventListener('touchcancel', endLookTouch);
-}
+const LOCAL_PLAYER_ID = 'local-player'; // fallback ownerId for solo play (no multiplayer identity exists), see notes
 
 const labToggleEl = document.getElementById('lab-toggle');
 const labPanelEl = document.getElementById('lab-panel');
@@ -890,12 +528,11 @@ cyborgToggleEl.addEventListener('click', async () => {
   cyborgToggleEl.classList.toggle('active', cyborgMode.isEnabled());
 });
 
-// B6 onboarding sequence -- see docs/code-notes/render.md
-const onboardingCyborg = createCyborgMode({
-  subscriptUrl: './data/cyborg/onboarding.json',
-  panelTitle: 'Welcome — a quick tour',
-  getSuggestion: getCyborgSuggestion,
-});
+// B6 onboarding sequence removed 2026-09-22 -- narrated Full World/game
+// content (an "already-built World," "growing life", other players) that
+// no longer exists; its own enable() call was already permanently
+// unreachable (gated on !pureGeometry, which settings.js forces true
+// unconditionally). data/cyborg-archived/onboarding.json (moved there, narrated retired game content).
 
 // See docs/code-notes/render.md
 let pendingPersonaChoice = null;
@@ -938,9 +575,13 @@ window.addEventListener('rhombiverse:personaChosen', (e) => {
   // choice to expose here.
 
   // Model vs. World Separation (reframe Stage 2): unlike pureGeometry
-  // above, this is a live, no-reload toggle -- workspaceMode is read
-  // fresh by the 5s simulation tick (see init()'s setInterval) on its
-  // very next firing, not just at module-eval time.
+  // above, this is a live, no-reload toggle. Originally gated the whole
+  // simulation heartbeat (growth/evolution/gravity ticks); those systems
+  // were archived 2026-09-22 (second world-building removal pass) along
+  // with the heartbeat itself, so this toggle now only gates Cuboctahedron
+  // Build (WORLD_ONLY_FACE_ACTIONS, rhombic-wheel-3d-core.js) -- a
+  // persistent-World-only system for unrelated reasons. Kept rather than
+  // removed since that gate is still real.
   const workspaceModeInput = document.getElementById('setting-workspace-mode');
   workspaceModeInput.checked = workspaceMode === 'model';
   workspaceModeInput.addEventListener('change', () => {
@@ -948,8 +589,8 @@ window.addEventListener('rhombiverse:personaChosen', (e) => {
     refreshWheel3D();
     showHudPrompt(
       workspaceMode === 'model'
-        ? 'Model workspace: simulation frozen (growth, ecosystem/animal catch-up, asteroid regrowth, inventory decay all paused). Geometry and material tools stay available.'
-        : 'World workspace: simulation resumed.',
+        ? 'Model workspace: Cuboctahedron Build paused (a persistent-World-only system). Geometry and material tools stay available.'
+        : 'World workspace: Cuboctahedron Build available again.',
       5000,
     );
   });
@@ -1137,6 +778,16 @@ function sphericalClassificationFor(scale) {
 // as emerald/gold above. Deliberately NOT separate "-glassite"
 // variants (direct correction: translucency is the World View toggle
 // below, not per-material dropdown entries) -- see WORLD_VIEW_MODES.
+//
+// 2026-09-22: this is now a plain color palette, not gem/mineral-themed
+// -- index.html's #material-select dropdown shows plain color names
+// (Red, Gray, Blue, ...) instead of these keys' original gem/mineral
+// names. The KEYS themselves ('garnet', 'blackstar-glassite', etc.) are
+// kept as-is rather than renamed, deliberately: they're stored verbatim
+// as `cell.material` in every existing preset/saved World, and renaming
+// them would silently break material lookups on anything built before
+// this pass (falling back to MATERIAL_COLORS.base). Same 14 colors,
+// same values -- only the human-facing label changed.
 const MATERIAL_COLORS = {
   base: 0x8899aa,
   garnet: 0x8b2e2e,
@@ -1206,37 +857,6 @@ const AUTO_ASSIGN_PIECE_LABELS = {
   hemiTri: 'Hemi RD: Triangle Cluster',
 };
 const AUTO_ASSIGN_STORAGE_KEY = 'rhombiverse-auto-assign-materials';
-
-// See docs/code-notes/render.md
-const SPECIES_COLORS = {
-  amoeba: 0x9fd8a0,
-  moss: 0x4f7a3f,
-  fungus: 0xd9b26b,
-  fern: 0x2f6b3a,
-  sapling: 0x6fae4f,
-  conifer: 0x1f4a28,
-  shrub: 0x7a8f3f,
-  nautilus: 0xe8dcc0,
-  scallop: 0xe0a598,
-  spineling: 0xc9b896,
-  'cluster-frame': 0x8a8f99,
-  amoeba_evolved: 0x6ee7b7,
-  plant_evolved: 0x86efac,
-  landCreature_evolved: 0xd4a574,
-  seaCreature_evolved: 0x0e7490,
-};
-
-const LANDSCAPE_WEATHERED_COLOR = new THREE.Color(0x8b6f47); // see docs/code-notes/render.md
-
-// See docs/code-notes/render.md
-const ORGANISM_SEED_SPECIES_PREFIX = 'organism:';
-function speciesColor(species) {
-  if (species.startsWith(ORGANISM_SEED_SPECIES_PREFIX)) {
-    const base = species.slice(ORGANISM_SEED_SPECIES_PREFIX.length);
-    return new THREE.Color(SPECIES_COLORS[`${base}_evolved`] ?? SPECIES_COLORS[base] ?? 0xffffff);
-  }
-  return new THREE.Color(SPECIES_COLORS[species] ?? 0xffffff);
-}
 
 // See docs/code-notes/render.md
 const _shellColorCache = new Map();
@@ -1614,7 +1234,12 @@ async function init() {
   wireFirstUseHint('hud-wheel-cue', 'Tab / Space (or tap Menu) opens the Rhombic Wheel -- build, sculpt, grow, and more, all from here.');
   wireFirstUseHint('export-json', 'Export your World anytime to keep a copy.');
 
-  // World load priority (shared link / saved / Showcase World) -- see docs/code-notes/render.md
+  // World load priority (shared link / saved / blank starter) -- see
+  // docs/code-notes/render.md. No bundled demo/preset World loads on
+  // first visit anymore (Showcase World and the "Body Types" planetoid
+  // presets were removed 2026-09-22, along with the game-world framing
+  // they carried) -- every first visit starts from the same single-cell
+  // starter, geometry only, no tour, no other players, nothing pre-built.
   const sharedParam = getSharedWorldParam();
   let sharedWorldJSON = null;
   if (sharedParam) {
@@ -1627,54 +1252,20 @@ async function init() {
   }
 
   const savedJSON = loadFromLocalStorage();
-  const isFirstVisit = !sharedWorldJSON && !savedJSON;
   let worldJSON;
   if (sharedWorldJSON) {
     worldJSON = sharedWorldJSON;
   } else if (savedJSON) {
     worldJSON = savedJSON;
-  } else if (getSettings().pureGeometry) {
-    // Rhombeometry's first-visit experience is geometry-only, full stop --
-    // no pre-built World, no systems-flavored tour (both of those are
-    // Full World content, see onboardingCyborg.enable() below). Direct
-    // user decision 2026-08-28: the mode choice on the welcome screen
-    // ("geometry comes first") was silently undone the moment the world
-    // itself loaded, since this branch used to run unconditionally
-    // regardless of pureGeometry -- every first-time Rhombeometry visitor
-    // was actually dropped into the same Showcase World + tour as Full
-    // World, no different first look at all.
-    worldJSON = await loadWorld('./data/starter-world.json');
   } else {
-    try {
-      worldJSON = await loadWorld('./data/presets/showcase-world.json');
-    } catch (err) {
-      console.warn('Rhombiverse: failed to load the Showcase World for first visit, falling back to a generated starter planetoid', err);
-      worldJSON = await loadWorld('./data/starter-world.json');
-      worldJSON.cells = {};
-    }
+    worldJSON = await loadWorld('./data/starter-world.json');
   }
-  const world = createWorldStore(worldJSON, {
-    onAdd: handleLocalAdd,
-    onRemove: handleLocalRemove,
-    onSeedSet: handleLocalSeedSet,
-    onSeedClear: handleLocalSeedClear,
-  });
+  const world = createWorldStore(worldJSON);
   cyborgWorldRef = world;
-  if (isFirstVisit && world.entries().length === 0) {
-    generatePlanetoid(world, 'rocky', 0, 0, 0, 2); // only reached if the Showcase World fetch above failed
-  }
   if (sharedWorldJSON) {
     saveToLocalStorage(world.toJSON());
     showHudPrompt('Loaded a shared World from your link.', 5000);
   }
-  // Every step of this tour narrates Full World content (an
-  // "already-built World," pre-seeded "growing life", Explore framed as
-  // walking around "yours and everyone else's") -- none of it true for
-  // Rhombeometry's actual first-visit world (a single blank cell, no
-  // organisms, no other players). Direct user decision 2026-08-28: no
-  // tour at all for a first-time Rhombeometry visitor, rather than
-  // narrating content that isn't there.
-  if (isFirstVisit && !getSettings().pureGeometry) onboardingCyborg.enable();
   // Declared early -- see docs/code-notes/render.md
   let currentMode = 'build';
 
@@ -1846,29 +1437,6 @@ async function init() {
   let lastSubLatticeRefresh = 0;
   const subLatticeDummy = new THREE.Object3D();
 
-  // Lattice Zoom Stage 5 -- Ecosystem Rendering -- see docs/code-notes/render.md
-  const organismMiniGroup = new THREE.Group();
-  scene.add(organismMiniGroup);
-  const MAX_NEARBY_ORGANISMS = 20;
-
-  const aggregateSpeckleScale = level2Scale * 0.4;
-  const aggregateSpeckleGeometry = buildRDGeometry(aggregateSpeckleScale);
-  const aggregateSpeckleMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffffff, // identity multiplier -- real color comes entirely from setColorAt, same pattern as the top-level `mesh`
-    metalness: 0.1,
-    roughness: 0.7,
-    flatShading: true,
-  });
-  const aggregateSpeckleMesh = new THREE.InstancedMesh(
-    aggregateSpeckleGeometry,
-    aggregateSpeckleMaterial,
-    MAX_NEARBY_SUBLATTICE_CELLS * AGGREGATE_MAX_SPECKLES
-  );
-  aggregateSpeckleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  aggregateSpeckleMesh.count = 0;
-  scene.add(aggregateSpeckleMesh);
-  const aggregateSpeckleDummy = new THREE.Object3D();
-
   // See docs/code-notes/render.md
   function writeBlendedInstance(mesh, idx, worldPosition, blend) {
     subLatticeDummy.position.set(...worldPosition);
@@ -1878,48 +1446,8 @@ async function init() {
   }
 
   // See docs/code-notes/render.md
-  function refreshOrganismMiniatures(refPos) {
-    while (organismMiniGroup.children.length > 0) {
-      const group = organismMiniGroup.children[0];
-      organismMiniGroup.remove(group);
-      for (const child of group.children) {
-        child.geometry.dispose();
-        child.material.dispose();
-      }
-    }
-    const items = Object.values(organismsSnapshot)
-      .filter((o) => o.origin)
-      .map((o) => ({ worldPosition: o.origin, seedId: o.seedId }));
-    const chosen = selectNearbyByWorldPosition(
-      items,
-      refPos,
-      SUB_LATTICE_TRIGGER_DISTANCE + SUB_LATTICE_BLEND_WIDTH,
-      MAX_NEARBY_ORGANISMS
-    );
-    const baseFactor = subScaleFactor(SUB_LATTICE_MAX_SHELL);
-    for (const item of chosen) {
-      const blend = blendFactor(item.d, SUB_LATTICE_TRIGGER_DISTANCE, SUB_LATTICE_BLEND_WIDTH);
-      if (blend <= 0) continue; // degenerate (every vertex would collapse onto origin) -- skip rather than build a zero-size hull
-      const seed = world.getSeeds()[item.seedId];
-      if (!seed) continue;
-      const factor = baseFactor * blend;
-      const color = speciesColor(seed.species);
-      const group = new THREE.Group();
-      for (const tile of seed.tiles) {
-        const verts = scaleVerticesAroundOrigin(tileWorldVertices(seed, tile), seed.origin, factor).map(
-          ([x, y, z]) => new THREE.Vector3(x, y, z)
-        );
-        const geometry = new ConvexGeometry(verts);
-        const material = new THREE.MeshStandardMaterial({ color, flatShading: true });
-        group.add(new THREE.Mesh(geometry, material));
-      }
-      organismMiniGroup.add(group);
-    }
-  }
-
-  // See docs/code-notes/render.md
   function refreshSubLattice() {
-    const camPos = walking && player ? player.getPosition() : camera.position;
+    const camPos = camera.position;
     const refPos = [camPos.x, camPos.y, camPos.z];
 
     const movement = lastSubLatticeRefPos
@@ -1938,9 +1466,7 @@ async function init() {
     );
 
     let idx = 0;
-    let speckleIdx = 0;
     const level1Cells = [];
-    const organismList = Object.values(organismsSnapshot);
     for (const parent of chosen) {
       const blend = blendFactor(parent.d, SUB_LATTICE_TRIGGER_DISTANCE, SUB_LATTICE_BLEND_WIDTH);
       const subCells = generateSubLattice(parent.x, parent.y, parent.z, SUB_LATTICE_MAX_SHELL, SCALE);
@@ -1949,37 +1475,7 @@ async function init() {
         idx++;
         level1Cells.push(sub);
       }
-
-      const parentWorldPos = cellToWorld(parent.x, parent.y, parent.z, SCALE);
-      const biomass = localBiomassAvailability(world, parentWorldPos, Object.keys(organismsSnapshot));
-      const speckleCount = Math.min(speckleCountForBiomass(biomass), subCells.length);
-      if (speckleCount > 0) {
-        const nearbyForColor = organismList.filter((o) => {
-          if (!o.origin) return false;
-          const d = Math.hypot(o.origin[0] - parentWorldPos[0], o.origin[1] - parentWorldPos[1], o.origin[2] - parentWorldPos[2]);
-          return d <= SUB_LATTICE_TRIGGER_DISTANCE;
-        });
-        const dominant = dominantSpecies(nearbyForColor);
-        const speckleColor = speciesColor(dominant ? `${ORGANISM_SEED_SPECIES_PREFIX}${dominant}` : 'plant');
-        const nearestForLandscape = nearestPlanetoid({ x: parentWorldPos[0], y: parentWorldPos[1], z: parentWorldPos[2] }, planetoids);
-        const landscapeState = nearestForLandscape
-          ? world.getPlanetoidEvolution()[planetoidKeyFor(nearestForLandscape.centerOfMass)]?.landscapeState ?? 0
-          : 0;
-        speckleColor.lerp(LANDSCAPE_WEATHERED_COLOR, landscapeState);
-        for (let i = 0; i < speckleCount; i++) {
-          aggregateSpeckleDummy.position.set(...subCells[i].worldPosition);
-          aggregateSpeckleDummy.scale.setScalar(blend);
-          aggregateSpeckleDummy.updateMatrix();
-          aggregateSpeckleMesh.setMatrixAt(speckleIdx, aggregateSpeckleDummy.matrix);
-          aggregateSpeckleMesh.setColorAt(speckleIdx, speckleColor);
-          speckleIdx++;
-        }
-      }
     }
-    aggregateSpeckleMesh.count = speckleIdx;
-    aggregateSpeckleMesh.instanceMatrix.needsUpdate = true;
-    if (aggregateSpeckleMesh.instanceColor) aggregateSpeckleMesh.instanceColor.needsUpdate = true;
-    aggregateSpeckleMesh.computeBoundingSphere();
     subLatticeMesh.count = idx;
     subLatticeMesh.instanceMatrix.needsUpdate = true;
     subLatticeMesh.computeBoundingSphere(); // see docs/code-notes/render.md
@@ -2004,8 +1500,6 @@ async function init() {
     level2Mesh.count = idx2;
     level2Mesh.instanceMatrix.needsUpdate = true;
     level2Mesh.computeBoundingSphere();
-
-    refreshOrganismMiniatures(refPos);
   }
   refreshSubLattice();
 
@@ -2019,29 +1513,7 @@ async function init() {
   }
   scheduleSubLatticeRefresh();
 
-  // See docs/code-notes/render.md
-  const growthGroup = new THREE.Group();
-  scene.add(growthGroup);
-  const growthMeshesBySeed = new Map(); // seedId -> THREE.Group
-
   rebuildInstances(mesh, world);
-
-  planetoids = computePlanetoids(world);
-  player = createPlayerController({
-    camera,
-    domElement: renderer.domElement,
-    getGravity: (pos) => gravityAt(pos, planetoids),
-  });
-  updateGravityInfo();
-  rebuildAllGrowth();
-
-  // Pre-interactivity catch-up -- see docs/code-notes/render.md
-  if (!sharedWorldActive && Object.keys(world.getOrganisms()).length > 0) {
-    if (resolveEvolution(world, Date.now())) rebuildAllGrowth();
-    saveToLocalStorage(world.toJSON());
-  }
-  refreshOrganismsSnapshot(world);
-  updateEvolutionInfo();
 
   // Undo stack -- see docs/code-notes/render.md
   const undoStack = [];
@@ -2050,7 +1522,7 @@ async function init() {
 
   function updateUndoButton() {
     const btn = document.getElementById('undo-btn');
-    btn.disabled = sharedWorldActive || undoStack.length === 0;
+    btn.disabled = undoStack.length === 0;
     // B2: the icon itself no longer carries a numeric readout -- the
     // scrub-timeline strip (renderUndoScrubStrip) is the count now.
   }
@@ -2074,7 +1546,7 @@ async function init() {
   }
 
   function jumpToUndoIndex(i) {
-    if (sharedWorldActive || i < 0 || i >= undoStack.length) return;
+    if (i < 0 || i >= undoStack.length) return;
     const target = undoStack[i];
     world.replaceAll(JSON.parse(target));
     lastSnapshot = target;
@@ -2200,12 +1672,7 @@ async function init() {
     // here holds regardless of which of them caused the count to drop,
     // not just the dedicated Clear World button (which already happened
     // to be fine, since it always reloads the real 1-cell starter file).
-    // Skipped during Shared World: that world is server-authoritative,
-    // and unilaterally inserting a local-only cell here would desync
-    // from the real multiplayer state rather than fix anything -- same
-    // reasoning as the existing sharedWorldActive guard on the save call
-    // below.
-    if (!sharedWorldActive && world.entries().length === 0) {
+    if (world.entries().length === 0) {
       world.addCell(0, 0, 0, { material: 'base' });
     }
     rebuildInstances(mesh, world, currentMode === 'report');
@@ -2217,10 +1684,6 @@ async function init() {
     // rebuildLatticeQuickView's own header), so a build/remove while one
     // is active should update it too.
     if (latticeQuickViewMode !== 'off') rebuildLatticeQuickView();
-    planetoids = computePlanetoids(world);
-    updateGravityInfo();
-    refreshOrganismsSnapshot(world);
-    updateEvolutionInfo();
     const afterJSON = world.toJSON();
     const afterStr = JSON.stringify(afterJSON);
     if (afterStr !== lastSnapshot) {
@@ -2228,10 +1691,7 @@ async function init() {
       if (undoStack.length > MAX_UNDO) undoStack.shift();
     }
     lastSnapshot = afterStr;
-    // Frozen while Shared World is active -- otherwise the shared view
-    // (loaded via world.replaceAll(), not the player's own build) would
-    // overwrite their real local save on the very next onChange().
-    if (!sharedWorldActive) saveToLocalStorage({ ...afterJSON, planetoids });
+    saveToLocalStorage(afterJSON);
     updateUndoButton();
     renderUndoScrubStrip();
     renderRingList();
@@ -2871,15 +2331,6 @@ async function init() {
         if (action === 'openCyborg') { wheel3D.close(); cyborgToggleEl?.click(); return; }
         if (action === 'openLab') { wheel3D.close(); labToggleEl?.click(); return; }
         if (action === 'openAlmanac') { wheel3D.close(); almanac.open(); return; }
-        // Explore (Rhombinaut) is a single destination, not a wheel --
-        // reuses the real existing action (#walk-toggle, same trigger
-        // the 2D wheel.js's own Explore item uses), then closes this
-        // wheel since there's nothing left to navigate to here.
-        if (action === 'navigateTo:explore') {
-          document.getElementById('walk-toggle')?.click();
-          wheel3D.close();
-          return;
-        }
         // Real tool wiring below -- reuses existing, already-working
         // primitives (mode-btn clicks, panel-open functions) rather
         // than reimplementing anything, same pattern as Explore's
@@ -2997,28 +2448,6 @@ async function init() {
         // being withheld here.
         if (action === 'tool:pattern') { showHudPrompt('Pattern stamping is coming soon.', 3000); return; }
 
-        // --- Cultivate: Growth Params is a direct match; Prune has no
-        // separate mode -- it's a right-click gesture on an existing
-        // growth tile while already in 'plant' mode (see render.js's
-        // contextmenu listener calling pruneTile()), so this sets the
-        // same real mode and explains the real gesture rather than
-        // inventing a "prune mode" that doesn't exist. Plant also opens
-        // the species picker (2D wheel's "Plant a Seed", folded in here
-        // rather than given its own face) before setting plant mode --
-        // mirrors the 2D wheel's own species-picker -> mode -> prompt
-        // order exactly. ---
-        if (action === 'tool:plant') {
-          wheel3D.close();
-          pickers.openSpeciesPicker((value, label) => {
-            clickMode('plant');
-            document.getElementById('cultivate-panel')?.classList.add('open');
-            showHudPrompt(`Click anywhere to plant a ${label}.`, 3500);
-          });
-          return;
-        }
-        if (action === 'tool:prune') { clickMode('plant'); showHudPrompt('Prune: right-click an existing growth tile while in Plant mode.', 4000); wheel3D.close(); return; }
-        if (action === 'tool:growthParams') { document.getElementById('cultivate-panel')?.classList.add('open'); wheel3D.close(); return; } // real "Growth Parameters" section lives in this panel
-
         // --- Piece: Cuboctahedron Build (core/cubocta-build.js), the RD
         // lattice's own dual shape -- 2026-08-29, freed onto Piece's
         // top|sy1sz1 slot by dropping Lenses from the universal ring.
@@ -3105,19 +2534,6 @@ async function init() {
           return;
         }
         if (action === 'tool:spiralColumn' || action === 'tool:templates') { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
-        // Reuses the 2D wheel's generator-type picker (a real,
-        // already-independent overlay) via the openGeneratorPicker
-        // export -- mirrors the 2D wheel's own picker -> mode:'generate'
-        // -> prompt order exactly. Placed on Rhombitect rather than
-        // Build/Cultivate/Trade per direct user decision 2026-08-25.
-        if (action === 'tool:generateBody') {
-          wheel3D.close();
-          pickers.openGeneratorPicker((value, label) => {
-            clickMode('generate');
-            showHudPrompt(`Click anywhere to grow a ${label}.`, 3500);
-          });
-          return;
-        }
 
         if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
       },
@@ -3680,23 +3096,17 @@ async function init() {
     fill: 'Click a cell to fill shells (hollow from–radius) outward around it, approximating a sphere. A second click on the same structure grows it further.',
     round: 'Click a shell-tagged cell to smooth its outer boundary by true distance from center.',
     excavate: 'Click a shell-tagged structure to hollow out its interior below "Hollow from shell".',
-    generate: 'Click a cell to generate a full body of the chosen type there (radius = Shell fill radius), formula-built in one click instead of hand-placing every cell.',
     report: 'Shows flagged/removed cells (normally hidden) in red. Click one to flag it, click a flagged one to approve it back.',
-    plant: 'Click anywhere to plant a seed of the chosen species. Left alone, it grows on its own over real time.',
     sculpt: 'Model (add) onto a face, or Chisel (subtract) a clicked cell -- see the Sculpt panel for tier/mirror/brush.',
     bcc: 'Click a face of an existing BCC cell to extend it, or a face of your normal World to start one nearby. Right-click removes a BCC cell. Overlap with your normal World is expected -- it\'s how the two lattices join.',
     cubocta: 'Click a face of your normal World to place a cuboctahedron there, or near a POINT of an existing one to grow toward that neighbor -- click closer to a flat face instead of a point to grow face to face with its next-door neighbor. Right-click removes one. Overlap with your normal World is expected. To fill the gap that opens up between face-to-face cuboctahedra, switch to Build/Chisel mode and pick Octahedron from the Piece menu instead -- click near a corner of an existing cuboctahedron.',
     dualize: 'Click an existing structure (FCC or a real placed BCC/TO cell) to preview its region (radius = Shell fill radius) reinterpreted through the other lattice. View-only -- nothing is written to your World.',
   };
   function updateModeUI() {
-    const showRadius = currentMode === 'fill' || currentMode === 'generate' || currentMode === 'dualize';
+    const showRadius = currentMode === 'fill' || currentMode === 'dualize';
     const showHollowFrom = currentMode === 'fill' || currentMode === 'excavate';
-    const showGenerator = currentMode === 'generate';
-    const showSpecies = currentMode === 'plant';
     document.getElementById('shell-radius-row').style.display = showRadius ? '' : 'none';
     document.getElementById('hollow-from-row').style.display = showHollowFrom ? '' : 'none';
-    document.getElementById('generator-row').style.display = showGenerator ? '' : 'none';
-    document.getElementById('species-row').style.display = showSpecies ? '' : 'none';
     document.getElementById('mode-hint').textContent = MODE_HINTS[currentMode];
     updateHudIndicator();
   }
@@ -3781,103 +3191,7 @@ async function init() {
     });
   });
 
-  // See docs/code-notes/render.md
-  const plantRaycaster = new THREE.Raycaster();
-  const plantPointer = new THREE.Vector2();
-  let seedCounter = 0;
-  renderer.domElement.addEventListener('click', (event) => {
-    if (currentMode !== 'plant' || walking) return;
-    const rect = renderer.domElement.getBoundingClientRect();
-    plantPointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    plantPointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    plantRaycaster.setFromCamera(plantPointer, camera);
-    const hits = plantRaycaster.intersectObject(mesh);
-    let origin;
-    if (hits.length > 0) {
-      const hit = hits[0];
-      const normal = hit.face.normal;
-      origin = [hit.point.x + normal.x * 0.5, hit.point.y + normal.y * 0.5, hit.point.z + normal.z * 0.5];
-    } else {
-      const dir = plantRaycaster.ray.direction;
-      const p = camera.position.clone().add(dir.clone().multiplyScalar(10));
-      origin = [p.x, p.y, p.z];
-    }
-    const species = document.getElementById('species-select').value;
-
-    // B5 Cultivation Mode's Semi-Cyborg tier: propose a planting site
-    // instead of planting immediately -- nothing plants without
-    // explicit accept. Only applies to plain (non-evolving) species;
-    // evolving organisms/animals are a different, unrelated planting
-    // path this mode doesn't touch.
-    if (cultivateSession.assistanceTier === 'semi-cyborg' && !species.startsWith('evo-')) {
-      const [cx, cy, cz] = nearestValidCell(origin[0], origin[1], origin[2]);
-      const hitCell = world.has(cx, cy, cz) ? { x: cx, y: cy, z: cz, ...world.entries().find((c) => c.x === cx && c.y === cy && c.z === cz) } : { x: cx, y: cy, z: cz };
-      proposeCultivationSite(cultivateSession, world, hitCell, species, currentGrowthParameters());
-      renderCultivateSuggestion();
-      return;
-    }
-
-    seedCounter += 1;
-    const seedId = `seed_${Date.now()}_${seedCounter}`;
-    let seed;
-    // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md Stage 9: 'evo-*' options
-    // are the one new player-facing lever this stage adds -- plant a
-    // REAL, genome-bearing organism (evolution.js's plantOrganism)
-    // instead of a fixed Wave-1/Wave-2 template seed. Per section 9's own
-    // governing decision ("no breeding/culling UI"), the player never
-    // hand-edits genome numbers -- a starting genome is drawn uniformly
-    // at random within each trait's own real, coherence-bounded range
-    // (GENOME_TRAIT_RANGES), the same "player influences conditions, not
-    // genes directly" framing every other lever in section 9 already
-    // uses (this is just the FOUNDING lever: what starts on the
-    // planetoid at all).
-    const isEvolvingSpecies =
-      species === 'evo-amoeba' || species === 'evo-plant' || species === 'evo-land' || species === 'evo-land-dino' || species === 'evo-sea';
-    if (isEvolvingSpecies && sharedWorldActive) {
-      // See docs/code-notes/render.md
-      alert('Evolving species require local (non-Shared-World) play for now -- disable Shared World first.');
-      return;
-    }
-    if (species === 'evo-amoeba' || species === 'evo-plant') {
-      const evoSpecies = species.slice('evo-'.length);
-      const genome = {};
-      for (const [trait, [min, max]] of Object.entries(GENOME_TRAIT_RANGES)) {
-        genome[trait] = min + Math.random() * (max - min);
-      }
-      const organismId = `organism_${Date.now()}_${seedCounter}`;
-      ({ seed } = plantOrganism(world, organismId, seedId, evoSpecies, genome, origin));
-    } else {
-      seed = plantSeed(world, seedId, species, origin);
-      // See docs/code-notes/render.md
-      world.setSeed(seedId, { ...seed, growthParameters: currentGrowthParameters(), phenotypeOverride: currentPhenotypeOverride(), assistanceTier: cultivateSession.assistanceTier, authorId: myUserId ?? LOCAL_PLAYER_ID });
-    }
-    rebuildSeedMeshes(seedId, seed);
-    if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
-    refreshOrganismsSnapshot(world);
-    updateEvolutionInfo();
-    window.dispatchEvent(new CustomEvent('rhombiverse:seedPlanted'));
-  });
   updateModeUI();
-
-  // See docs/code-notes/render.md
-  renderer.domElement.addEventListener('contextmenu', (event) => {
-    if (currentMode !== 'plant' || walking) return;
-    const rect = renderer.domElement.getBoundingClientRect();
-    plantPointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    plantPointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    plantRaycaster.setFromCamera(plantPointer, camera);
-    const hits = plantRaycaster.intersectObjects(growthGroup.children, true);
-    if (hits.length === 0) return;
-    const { seedId, tileIndex } = hits[0].object.userData;
-    if (seedId === undefined) return;
-    event.preventDefault();
-    if (pruneTile(world, seedId, tileIndex)) {
-      const seed = world.getSeeds()[seedId];
-      rebuildSeedMeshes(seedId, seed);
-      if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
-      showHudPrompt('Pruned -- the growth layer will fill the gap back in on its own.');
-    }
-  });
 
   // --- Dualize (reframe Stage 3): view-only FCC<->BCC region
   // reinterpretation. Reuses shellBrushCells (Shell Brush's own region-
@@ -4023,102 +3337,11 @@ async function init() {
   // -- see cycleLatticeQuickView/rebuildLatticeQuickView above. Direct
   // confirmation to retire rather than keep both.
 
-  // --- B5: Cultivation Mode (Grow -> Cultivate) -----------------------
-  const cultivateSession = createCultivationSession(myUserId ?? LOCAL_PLAYER_ID);
-
-  function currentGrowthParameters() {
-    const [bx, by, bz] = document.getElementById('cultivate-directional-bias').value.split(',').map(Number);
-    const densityBias = Number(document.getElementById('cultivate-density-bias').value);
-    return { directionalBias: [bx, by, bz], densityBias };
-  }
-
-  // Genome-free growth sliders (RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md
-  // section 6) -- the "what"/rate half of a manually-cultivated seed's
-  // growth, same phenotypeOverride shape genomeToPhenotype() derives
-  // from a genome for organisms, built here directly from sliders via
-  // core/instance.js's phenotypeFromSliders() instead.
-  function currentPhenotypeOverride() {
-    return phenotypeFromSliders({
-      growthRate: (Number(document.getElementById('cultivate-growth-rate').value) - 1) / 5,
-      maturitySize: Number(document.getElementById('cultivate-growth-limit').value),
-      preferType: document.getElementById('cultivate-prefer-type').value || null,
-    });
-  }
-  const growthLimitEl = document.getElementById('cultivate-growth-limit');
-  const growthRateEl = document.getElementById('cultivate-growth-rate');
-  growthLimitEl?.addEventListener('input', () => {
-    document.getElementById('cultivate-growth-limit-value').textContent = growthLimitEl.value;
-  });
-  growthRateEl?.addEventListener('input', () => {
-    document.getElementById('cultivate-growth-rate-value').textContent = growthRateEl.value;
-  });
-
-  function renderCultivateSuggestion() {
-    const el = document.getElementById('cultivate-suggestion');
-    const s = cultivateSession.pendingSuggestion;
-    if (!s) {
-      el.style.display = 'none';
-      return;
-    }
-    document.getElementById('cultivate-suggestion-text').textContent = `Plant ${s.species} here -- ${s.reason}.`;
-    el.style.display = '';
-  }
-
-  document.querySelectorAll('#cultivate-tier-row .tier-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#cultivate-tier-row .tier-btn').forEach((b) => b.classList.toggle('active', b === btn));
-      cultivateSession.assistanceTier = btn.dataset.tier;
-      cultivateSession.pendingSuggestion = null;
-      renderCultivateSuggestion();
-      const isFullCyborg = cultivateSession.assistanceTier === 'full-cyborg';
-      // Same standalone-mode-or-flag rule as Sculpt's own Full-Cyborg
-      // gate (B5's own instruction: "gated the same way" as B4a's).
-      const fullCyborgUsable = sculptureModeActive || FULL_CYBORG_INWORLD_ENABLED;
-      document.getElementById('cultivate-fullcyborg-section').style.display = isFullCyborg && fullCyborgUsable ? '' : 'none';
-      document.getElementById('cultivate-fullcyborg-gated').style.display = isFullCyborg && !fullCyborgUsable ? '' : 'none';
-    });
-  });
-
-  document.getElementById('cultivate-close')?.addEventListener('click', () => {
-    document.getElementById('cultivate-panel').classList.remove('open');
-  });
-
-  document.getElementById('cultivate-suggestion-accept').addEventListener('click', () => {
-    acceptCultivationSuggestion(cultivateSession, world, myUserId ?? LOCAL_PLAYER_ID);
-    onChange();
-    renderCultivateSuggestion();
-  });
-  document.getElementById('cultivate-suggestion-dismiss').addEventListener('click', () => {
-    dismissCultivationSuggestion(cultivateSession);
-    renderCultivateSuggestion();
-  });
-
-  document.getElementById('cultivate-nl-go').addEventListener('click', async () => {
-    const input = document.getElementById('cultivate-nl-input');
-    const resultEl = document.getElementById('cultivate-nl-result');
-    const text = input.value.trim();
-    if (!text) return;
-    resultEl.textContent = 'Thinking…';
-    const origin = { x: 0, y: 0, z: 0 }; // TODO: same last-hovered-cell limitation as Sculpt's own Full-Cyborg box
-    const intent = await requestCultivationIntent(text, origin);
-    if (intent.unrecognized) {
-      resultEl.textContent = intent.description;
-      return;
-    }
-    const { applied, skipped } = executeCultivationIntent(world, intent, world.getClaims(), myUserId ?? LOCAL_PLAYER_ID, currentGrowthParameters());
-    resultEl.textContent = `${intent.description}${intent.viaAI ? ' (AI)' : ' (local parser)'} -- ${applied.length} seed${applied.length === 1 ? '' : 's'} planted${skipped.length ? `, ${skipped.length} skipped (outside your claim)` : ''}.`;
-    if (applied.length > 0) {
-      refreshOrganismsSnapshot(world);
-      onChange();
-    }
-    input.value = '';
-  });
-
   const canPlaceMaterial = () => true;
 
   // See docs/code-notes/render.md
   const FULL_CYBORG_INWORLD_ENABLED = false;
-  const sculptSession = createSculptureSession(myUserId ?? LOCAL_PLAYER_ID);
+  const sculptSession = createSculptureSession(LOCAL_PLAYER_ID);
   let sculptMirrorPlane = '';
   let sculptActionMode = 'add';
 
@@ -4255,7 +3478,7 @@ async function init() {
       sculptTarget.world,
       intent,
       sculptTarget.world.getClaims(),
-      myUserId ?? LOCAL_PLAYER_ID,
+      LOCAL_PLAYER_ID,
       material,
       sculptTarget.canPlaceMaterial
     );
@@ -4440,7 +3663,6 @@ async function init() {
 
   function enterSculptureMode() {
     if (sculptureModeActive) return;
-    if (walking) exitWalk();
     // See docs/code-notes/render.md
     document.getElementById('duality-toggle')?.classList.contains('active') && document.getElementById('duality-toggle').click();
     savedCameraState.position.copy(camera.position);
@@ -4450,7 +3672,6 @@ async function init() {
       sculptureWorld.addCell(0, 0, 0, { material: 'base' });
     }
     sculptureModeActive = true;
-    updateWorldPanelVisibility();
     sculptTarget.world = sculptureWorld;
     sculptTarget.mesh = sculptureMesh;
     sculptTarget.canPlaceMaterial = permissiveCanPlaceMaterial;
@@ -4473,7 +3694,6 @@ async function init() {
     if (!sculptureModeActive) return;
     document.getElementById('duality-toggle')?.classList.contains('active') && document.getElementById('duality-toggle').click();
     sculptureModeActive = false;
-    updateWorldPanelVisibility();
     sculptTarget.world = world;
     sculptTarget.mesh = mesh;
     sculptTarget.canPlaceMaterial = canPlaceMaterial;
@@ -4672,17 +3892,6 @@ async function init() {
       // real toast so the choice is legible, not an invisible internal
       // disambiguation detail.
       if (cell.label) showHudPrompt(cell.label, 2500);
-      // Direct report 2026-09-02: generating a body right where you're
-      // standing/looking can fill the whole screen with the new mass at
-      // typical shell-fill radii -- genuinely disorienting on first use,
-      // read as "stuck, no way back" even though Tab/Menu still worked
-      // the whole time. A toast survives being visually engulfed (it's
-      // a fixed HUD overlay, not part of the 3D scene), so it's the
-      // direct fix for the actual complaint -- not a generation/camera
-      // change, which is a bigger, separate design question.
-      if (currentMode === 'generate') {
-        showHudPrompt("Body generated. If it fills your view, that's normal -- Tab / Menu (bottom-left) still opens the wheel from here.", 6000);
-      }
     },
     onRemoved: (cell) => {
       flashAt(cell, 0xff8866);
@@ -4741,12 +3950,10 @@ async function init() {
       showHudPrompt(messages[piece]?.[action] ?? 'Nothing to do there.', 3500);
     },
     getDragPlacementEnabled: () => pickers.isDragPlacementEnabled(),
-    // getMode() must return 'plant', never null -- see docs/code-notes/render.md
     getMode: () => (walking ? null : currentMode),
     getShellCount,
     getMinShell: () => Math.min(Math.max(1, Number(hollowFromInput.value) || 1), getShellCount()),
     getMaterial: () => currentMaterialFor(document.getElementById('piece-type-select').value),
-    getGeneratorType: () => document.getElementById('generator-type-select').value,
     getPieceType: () => document.getElementById('piece-type-select').value,
     // TO ("adopted family member", direct instruction 2026-08-26): lets
     // the universal Add/Remove actions ALSO target the separate BCC
@@ -4769,7 +3976,7 @@ async function init() {
     hemisphereGroup,
     onHemisphereChange,
     canPlaceMaterial,
-    getOwnerId: () => myUserId ?? LOCAL_PLAYER_ID,
+    getOwnerId: () => LOCAL_PLAYER_ID,
     onCellClicked: (cell) => {
       focusedCenterKey = cell.shellCenter || null;
       renderRingList();
@@ -4919,14 +4126,15 @@ async function init() {
   // No UI dependency at all now, 2D or 3D.
   applyPersonaChoiceFn = (persona) => {
     const clickMode = (modeName) => document.querySelector(`.mode-btn[data-mode="${modeName}"]`)?.click();
-    if (persona === 'rhombinaut') {
-      document.getElementById('walk-toggle')?.click();
-    } else if (persona === 'rhombisculptor') {
+    // 'rhombinaut' (Explore/walk) and 'rhombiologist' (Cultivate/plant)
+    // removed 2026-09-22 along with those systems -- this whole
+    // personaChosen mechanism has no live dispatcher anywhere in the app
+    // today (grepped: nothing fires 'rhombiverse:personaChosen'), so
+    // these branches were already unreachable; trimmed rather than left
+    // referencing archived UI.
+    if (persona === 'rhombisculptor') {
       clickMode('sculpt');
       openSculptPanel();
-    } else if (persona === 'rhombiologist') {
-      clickMode('plant');
-      document.getElementById('cultivate-panel')?.classList.add('open');
     }
     // 'rhombitect' (Build): already the default state, nothing to do.
   };
@@ -4934,160 +4142,6 @@ async function init() {
     applyPersonaChoiceFn(pendingPersonaChoice);
     pendingPersonaChoice = null;
   }
-
-  // See docs/code-notes/render.md
-  function applyRemoteUpsert(x, y, z, data) {
-    applyingRemote = true;
-    world.addCell(x, y, z, data);
-    onChange();
-    applyingRemote = false;
-  }
-  function applyRemoteDelete(x, y, z) {
-    applyingRemote = true;
-    world.removeCell(x, y, z);
-    onChange();
-    applyingRemote = false;
-  }
-
-  // See docs/code-notes/render.md
-  function applyRemoteSeedSet(seedId, seedData) {
-    applyingRemote = true;
-    world.setSeed(seedId, seedData);
-    applyingRemote = false;
-    rebuildSeedMeshes(seedId, seedData);
-  }
-  function applyRemoteSeedClear(seedId) {
-    applyingRemote = true;
-    world.removeSeed(seedId);
-    applyingRemote = false;
-  }
-
-  const sharedWorldToggle = document.getElementById('shared-world-toggle');
-  const sharedWorldHint = document.getElementById('shared-world-hint');
-  const newWorldBtn = document.getElementById('new-world');
-  const loadPresetBtn = document.getElementById('load-preset');
-  // See docs/code-notes/render.md
-  function updateWorldPanelVisibility() {
-    const presetsSection = document.getElementById('world-presets-section');
-    if (presetsSection) presetsSection.style.display = sculptureModeActive ? 'none' : '';
-  }
-  updateWorldPanelVisibility();
-
-  // See docs/code-notes/render.md
-  function rebuildSeedMeshes(seedId, seed) {
-    const existing = growthMeshesBySeed.get(seedId);
-    if (existing) {
-      growthGroup.remove(existing);
-      for (const child of existing.children) {
-        child.geometry.dispose();
-        child.material.dispose();
-      }
-      growthMeshesBySeed.delete(seedId);
-    }
-    if (seed.species.startsWith(ORGANISM_SEED_SPECIES_PREFIX)) return; // see docs/code-notes/render.md
-    const group = new THREE.Group();
-    const color = speciesColor(seed.species);
-    seed.tiles.forEach((tile, tileIndex) => {
-      const verts = tileWorldVertices(seed, tile).map(([x, y, z]) => new THREE.Vector3(x, y, z));
-      const geometry = new ConvexGeometry(verts);
-      const material = new THREE.MeshStandardMaterial({ color, flatShading: true });
-      const tileMesh = new THREE.Mesh(geometry, material);
-      tileMesh.userData.seedId = seedId;
-      tileMesh.userData.tileIndex = tileIndex;
-      group.add(tileMesh);
-    });
-    growthGroup.add(group);
-    growthMeshesBySeed.set(seedId, group);
-  }
-
-  // Full rebuild -- every planted seed, from scratch. Used on init/
-  // Shared World connect-disconnect/preset load, where the whole world
-  // (not just one seed) may have changed.
-  function rebuildAllGrowth() {
-    for (const [seedId] of growthMeshesBySeed) {
-      const group = growthMeshesBySeed.get(seedId);
-      growthGroup.remove(group);
-      for (const child of group.children) {
-        child.geometry.dispose();
-        child.material.dispose();
-      }
-    }
-    growthMeshesBySeed.clear();
-    for (const [seedId, seed] of Object.entries(world.getSeeds())) {
-      rebuildSeedMeshes(seedId, seed);
-    }
-  }
-
-
-  // See docs/code-notes/render.md
-  function setLocalResetControlsEnabled(enabled) {
-    newWorldBtn.disabled = !enabled;
-    importInput.disabled = !enabled;
-    loadPresetBtn.disabled = !enabled;
-  }
-
-  async function enableSharedWorld() {
-    if (sharedWorldActive) return;
-    if (!confirm(t('world.sharedConfirm', getSettings().language))) {
-      return;
-    }
-    sharedWorldToggle.disabled = true;
-    sharedWorldHint.textContent = t('world.sharedConnecting', getSettings().language);
-    try {
-      const session = await ensureAnonymousSession();
-      myUserId = session.user.id;
-      const shared = await loadSharedWorld();
-      world.replaceAll(shared);
-      // Needed BEFORE onChange() -- a real bug caught only by a live
-      // two-session test, not by review: this used to be set AFTER,
-      // so world.addCell's own onAdd hook fired while sharedWorldActive
-      // was still false, meaning handleLocalAdd's own
-      // `if (sharedWorldActive...)` guard skipped pushCellUpsert
-      // entirely. Also still needed for onChange()'s own localStorage
-      // guard and the undo button's disabled state to already reflect
-      // shared mode for this first render.
-      sharedWorldActive = true;
-      onChange();
-      unsubscribeShared = subscribeToSharedWorld({
-        onRemoteUpsert: applyRemoteUpsert,
-        onRemoteDelete: applyRemoteDelete,
-        onRemoteSeedSet: applyRemoteSeedSet,
-        onRemoteSeedClear: applyRemoteSeedClear,
-      });
-      rebuildAllGrowth();
-      setLocalResetControlsEnabled(false);
-      sharedWorldToggle.textContent = t('world.disableShared', getSettings().language);
-      sharedWorldHint.textContent = t('world.sharedLive', getSettings().language);
-    } catch (err) {
-      sharedWorldActive = false;
-      sharedWorldHint.textContent = t('world.sharedFailed', getSettings().language);
-      console.warn('Rhombiverse: failed to enable Shared World', err);
-    } finally {
-      sharedWorldToggle.disabled = false;
-    }
-  }
-
-  async function disableSharedWorld() {
-    if (!sharedWorldActive) return;
-    sharedWorldActive = false;
-    if (unsubscribeShared) {
-      unsubscribeShared();
-      unsubscribeShared = null;
-    }
-    const local = loadFromLocalStorage() ?? (await loadWorld('./data/starter-world.json'));
-    world.replaceAll(local);
-    onChange();
-    setLocalResetControlsEnabled(true);
-    myUserId = null;
-    rebuildAllGrowth();
-    sharedWorldToggle.textContent = t('world.enableShared', getSettings().language);
-    sharedWorldHint.textContent = t('world.sharedOff', getSettings().language);
-  }
-
-  sharedWorldToggle.addEventListener('click', () => {
-    if (sharedWorldActive) disableSharedWorld();
-    else enableSharedWorld();
-  });
 
   // Shared by both the Lab panel's own "New World" button and the always-
   // visible HUD clear-world-toggle added alongside it (2026-08-25) -- same
@@ -5105,11 +4159,7 @@ async function init() {
     // completely off-screen and unclickable -- looks and feels exactly
     // like zero even though it isn't. Same reasoning as
     // enterSculptureMode's own camera.position.set(6,5,8)/controls.
-    // target.set(0,0,0) reset. Exits Walk mode first if active, since a
-    // walking player's camera is driven by the player controller every
-    // frame, not by controls.target directly -- the orbit reset alone
-    // wouldn't be visible until Walk mode itself is off.
-    if (walking) document.getElementById('walk-toggle')?.click();
+    // target.set(0,0,0) reset.
     camera.position.set(6, 5, 8);
     controls.target.set(0, 0, 0);
     controls.update();
@@ -5118,7 +4168,6 @@ async function init() {
     const fresh = await loadWorld('./data/starter-world.json');
     world.replaceAll(fresh);
     onChange();
-    rebuildAllGrowth();
     // BCC dual-lattice build: a real second world store, so a "fresh
     // start" needs to clear it too, not just the main one -- see
     // core/bcc-build.md.
@@ -5153,109 +4202,13 @@ async function init() {
   });
 
   document.getElementById('export-json').addEventListener('click', () => {
-    exportWorldFile({ ...world.toJSON(), planetoids });
+    exportWorldFile(world.toJSON());
   });
 
   // .rhomb: pure-model export, no game data (RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md
   // section 4) -- always extractable regardless of workspaceMode/pureGeometry.
   document.getElementById('export-rhomb')?.addEventListener('click', () => {
     exportWorldFile(world.toRhombJSON(), 'rhombiverse-model.rhomb');
-  });
-
-  // B6 Shared Worlds Gallery -- requires Shared World (a real Supabase
-  // account is needed for the shared_worlds table's RLS insert policy,
-  // author_id = auth.uid()), same boundary claims already use. Requires
-  // schema.sql's shared_worlds table to actually exist server-side --
-  // if that migration hasn't been run yet, fetch/publish calls below
-  // fail cleanly into their own catch blocks with a real error message,
-  // not a crash.
-  const galleryOverlay = document.getElementById('gallery-overlay');
-  const galleryGrid = document.getElementById('gallery-grid');
-  const galleryGated = document.getElementById('gallery-gated');
-  const galleryPublishRow = document.getElementById('gallery-publish-row');
-
-  function captureThumbnail() {
-    // Downscale from the real canvas so a gallery row stays small --
-    // full-resolution screenshots would bloat every fetchGalleryWorlds()
-    // call for no visual benefit at thumbnail size.
-    const THUMB_W = 320;
-    const THUMB_H = 240;
-    const src = renderer.domElement;
-    const off = document.createElement('canvas');
-    off.width = THUMB_W;
-    off.height = THUMB_H;
-    off.getContext('2d').drawImage(src, 0, 0, src.width, src.height, 0, 0, THUMB_W, THUMB_H);
-    return off.toDataURL('image/png');
-  }
-
-  async function renderGalleryGrid() {
-    galleryGrid.innerHTML = '<div class="sculpt-hint">Loading…</div>';
-    try {
-      const worlds = await fetchGalleryWorlds();
-      galleryGrid.innerHTML = '';
-      if (worlds.length === 0) {
-        galleryGrid.innerHTML = '<div class="sculpt-hint">No Worlds published yet -- be the first.</div>';
-        return;
-      }
-      for (const w of worlds) {
-        const item = document.createElement('div');
-        item.className = 'gallery-card-item';
-        item.innerHTML = `<img src="${w.thumbnail ?? ''}" alt="" /><div class="gallery-title"></div>`;
-        item.querySelector('.gallery-title').textContent = w.title;
-        item.addEventListener('click', async () => {
-          try {
-            const data = await fetchGalleryWorldData(w.id);
-            world.replaceAll(data);
-            onChange();
-            rebuildAllGrowth();
-            galleryOverlay.classList.remove('open');
-            showHudPrompt(`Loaded "${w.title}" from the Gallery.`, 4000);
-          } catch (err) {
-            console.warn('Rhombiverse: failed to load gallery world', err);
-            showHudPrompt('Could not load that World.', 4000);
-          }
-        });
-        galleryGrid.appendChild(item);
-      }
-    } catch (err) {
-      console.warn('Rhombiverse: failed to fetch gallery', err);
-      galleryGrid.innerHTML = '<div class="sculpt-hint">Could not reach the Gallery (has the shared_worlds table been set up yet?).</div>';
-    }
-  }
-
-  document.getElementById('open-gallery')?.addEventListener('click', () => {
-    galleryOverlay.classList.add('open');
-    const usable = sharedWorldActive && myUserId;
-    galleryGated.style.display = usable ? 'none' : '';
-    galleryPublishRow.style.display = usable ? '' : 'none';
-    galleryGrid.style.display = usable ? '' : 'none';
-    if (usable) renderGalleryGrid();
-  });
-  document.getElementById('gallery-close')?.addEventListener('click', () => {
-    galleryOverlay.classList.remove('open');
-  });
-  galleryOverlay?.addEventListener('click', (e) => {
-    if (e.target === galleryOverlay) galleryOverlay.classList.remove('open');
-  });
-  document.getElementById('gallery-publish-btn')?.addEventListener('click', async () => {
-    const titleInput = document.getElementById('gallery-publish-title');
-    const hint = document.getElementById('gallery-publish-hint');
-    const title = titleInput.value.trim();
-    if (!title) {
-      hint.textContent = t('gallery.titleFirst', getSettings().language);
-      return;
-    }
-    hint.textContent = t('gallery.publishing', getSettings().language);
-    try {
-      const thumbnail = captureThumbnail();
-      await publishToGallery(title, world.toJSON(), thumbnail);
-      hint.textContent = t('gallery.published', getSettings().language);
-      titleInput.value = '';
-      renderGalleryGrid();
-    } catch (err) {
-      console.warn('Rhombiverse: gallery publish failed', err);
-      hint.textContent = t('gallery.publishFailed', getSettings().language);
-    }
   });
 
   document.getElementById('share-world')?.addEventListener('click', async () => {
@@ -5285,7 +4238,6 @@ async function init() {
       if (!confirmLargeWorldLoad(parsed)) return;
       world.replaceAll(parsed);
       onChange();
-      rebuildAllGrowth();
     } catch (err) {
       alert('That file is not valid Rhombiverse world JSON.');
       console.warn('Rhombiverse: import failed', err);
@@ -5294,61 +4246,11 @@ async function init() {
     }
   });
 
-  // Presets: ready-built structures (data/presets/*.json) loaded the
-  // same way New World does -- a full world.replaceAll(), confirm-gated
-  // since it's destructive. Exists because precise face-by-face clicking
-  // to hand-build something like a 20-BSG-cell black hole is genuinely
-  // fragile (real face targeting needs the shared-face midpoint between
-  // two cell centers, not either center itself, and a fixed camera plus
-  // a growing structure can walk distant click targets off-canvas or into
-  // occlusion -- both hit for real while verifying the frost line this
-  // session) -- these presets are generated via the actual lattice math
-  // (NEIGHBOR_OFFSETS-driven, not hand-derived coordinates) so they're
-  // guaranteed valid, and double as reliable fixtures for future tests.
-  // See docs/code-notes/render.md
-  document.getElementById('load-preset').addEventListener('click', async () => {
-    const key = document.getElementById('preset-select').value;
-    if (!key) return;
-    if (!confirm('Load this preset? This clears your current build.')) return;
-    const path = key.startsWith('growth:')
-      ? `./data/growth-presets/${key.slice('growth:'.length)}.json`
-      : `./data/presets/${key}.json`;
-    const preset = await loadWorld(path);
-    if (!confirmLargeWorldLoad(preset)) return;
-    world.replaceAll(preset);
-    onChange();
-    rebuildAllGrowth();
-  });
-
-  // 5s idle-time tick: growth and evolution catch-up. Deliberately does
-  // NOT go through onChange() -- see docs/code-notes/render.md for why,
-  // and for a real bug history on the evolution-save condition below.
-  setInterval(() => {
-    // Model vs. World Separation (reframe Stage 2): this tick IS "all
-    // time-based and agent-based simulation" for the whole app -- growth
-    // and ecosystem/animal catch-up funnel through this single interval,
-    // nothing else runs on a timer. Freezing model mode here, as one
-    // early return, is exhaustive rather than freezing each sub-system
-    // individually and risking missing one.
-    if (workspaceMode !== 'world') return;
-    const before = world.entries().length;
-    if (applyGrowth(world, Date.now())) {
-      rebuildAllGrowth();
-      if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
-    }
-    // Saves on every tick with >=1 organism (not just when something
-    // visibly changed) -- see docs/code-notes/render.md for the real
-    // lost-baseline bug this fixes.
-    if (!sharedWorldActive && Object.keys(world.getOrganisms()).length > 0) {
-      if (resolveEvolution(world, Date.now())) rebuildAllGrowth();
-      saveToLocalStorage(world.toJSON());
-    }
-    refreshOrganismsSnapshot(world);
-    updateEvolutionInfo();
-    if (world.entries().length === before) return;
-    rebuildInstances(mesh, world, currentMode === 'report');
-    if (!sharedWorldActive) saveToLocalStorage(world.toJSON());
-  }, 5000);
+  // Preset-world picker (Showcase World, planetoid Body Types) removed
+  // 2026-09-22 along with the rest of the game-world content -- see
+  // data/presets-archived/. Building your own World, Export/Import, and
+  // World sharing (compressed link) above are all that remain, and are
+  // untouched.
 }
 
 function onResize() {
@@ -5408,14 +4310,7 @@ function animate() {
     }
   }
 
-  if (walking && player) {
-    player.update(dt);
-    // player position changes every frame, unlike Build mode's onChange-driven updates
-    updateGravityInfo();
-    updateEvolutionInfo();
-  } else {
-    controls.update();
-  }
+  controls.update();
   // Skip the (otherwise fully-hidden) world render while the Rhombic
   // Wheel 3D is open -- its own overlay/renderer covers the whole
   // screen, so this pass would be pure wasted GPU work every frame.

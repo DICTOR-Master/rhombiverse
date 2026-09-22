@@ -3,8 +3,8 @@
 // same as growth.test.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { plantInstance, growInstance, phenotypeFromSliders } from '../../src/core/instance.js';
-import { growSeed } from '../../src/geometry-extensions/growth.js';
+import { plantInstance, growInstance, phenotypeFromSliders } from '../../src/world-systems-archived/instance.js';
+import { growSeed } from '../../src/world-systems-archived/growth.js';
 
 test('plantInstance: a fresh instance is never invisible (at least one tile immediately)', () => {
   const instance = plantInstance({ species: 'amoeba', origin: [1, 2, 3], now: 1000 });

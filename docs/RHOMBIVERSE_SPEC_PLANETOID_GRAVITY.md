@@ -1,5 +1,12 @@
 # Rhombiverse — Spec Addendum: Planetoid Gravity & Core-Cavity System
 
+> **ARCHIVED 2026-09-22** — this system was retired as part of the second
+> world-building removal pass (planetoids/growth/gravity/walking/sync); see
+> README.md. Its code moved to `src/world-systems-archived/gravity.js` and
+> `src/world-systems-archived/player.js` (the walk controller) — kept
+> intact for reference, permanently unreachable in the running app, not
+> deleted. This doc is historical.
+
 Standalone addendum to `RHOMBIVERSE_PLAN.md`. Extends **Phase 5.5 (Planetoid Building + Radial Gravity)** — do not merge into the main plan file; implement as its own module referencing the same lattice math (section 2 of the main plan).
 
 ---

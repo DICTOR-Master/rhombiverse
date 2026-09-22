@@ -26,7 +26,7 @@ import {
   PREDATION_PROBABILITY,
   isAtHabitatBoundary,
   CROSSOVER_MIN_BOUNDARY_GENERATIONS,
-} from '../../src/world-systems/animals.js';
+} from '../../src/world-systems-archived/animals.js';
 import {
   isMature,
   growOrganism,
@@ -35,8 +35,11 @@ import {
   plantOrganism,
   reproduce,
   computeSurvivalProbability,
-} from '../../src/world-systems/evolution.js';
-import { createWorldStore } from '../../src/core/worldstate-core.js';
+} from '../../src/world-systems-archived/evolution.js';
+// getSeeds/setSeed/getOrganisms/setOrganism/getPlanetoidEvolution/
+// setPlanetoidEvolution no longer exist on the live createWorldStore
+// (schema trimmed 2026-09-22) -- see helpers/archived-world-store.mjs.
+import { createArchivedWorldStore as createWorldStore } from './helpers/archived-world-store.mjs';
 
 function growToMaturity(world, organismId, maxTicks = 20) {
   let now = 0;

@@ -9,8 +9,10 @@ import { cellKey, parseCellKey } from './lattice.js';
 // have a claimIdAt integration point here too (render.js supplied the
 // real one via setRegionsIntegration(), gated behind FEATURES.economy).
 // Removed 2026-08-31 along with the claimId cell-stamping it only
-// existed to feed (see addCell below) -- sculpture.js and gravity.js
-// still have their own setRegionsIntegration() for their own real uses.
+// existed to feed (see addCell below). sculpture.js's own
+// setRegionsIntegration() hook (same reasoning) was removed 2026-09-22,
+// never having had a live caller; gravity.js's was archived along with
+// the rest of that system the same day.
 
 export async function loadWorld(url) {
   const res = await fetch(url);
@@ -29,17 +31,10 @@ export function createWorldStore(worldJSON, hooks = {}) {
   let inventory = { ...(worldJSON.playerInventory ?? {}) };
   let regrowthQueue = { ...(worldJSON.asteroidRegrowth ?? {}) };
   let pendingTrades = { ...(worldJSON.pendingTrades ?? {}) };
-  let seeds = { ...(worldJSON.seeds ?? {}) };
-  let organisms = { ...(worldJSON.organisms ?? {}) };
-  // Memoized getSeeds/getOrganisms/getPlanetoidEvolution/entries() copies
-  // -- real perf bugs found live (2026-08-14 and 2026-08-24), see notes.
-  // Invalidated (set back to null) by every mutator below and by
-  // replaceAll; lazily rebuilt on the next read after that.
-  let seedsCache = null;
-  let organismsCache = null;
-  let planetoidEvolutionCache = null;
+  // Memoized entries() copy -- a real perf bug found live (2026-08-24),
+  // see notes. Invalidated (set back to null) by every mutator below and
+  // by replaceAll; lazily rebuilt on the next read after that.
   let cellsEntriesCache = null;
-  let planetoidEvolution = { ...(worldJSON.planetoidEvolution ?? {}) };
 
   return {
     has(x, y, z) {
@@ -133,44 +128,6 @@ export function createWorldStore(worldJSON, hooks = {}) {
       regrowthQueue = rest;
       hooks.onRegrowthClear?.(key);
     },
-    getSeeds() {
-      if (seedsCache === null) seedsCache = { ...seeds };
-      return seedsCache;
-    },
-    setSeed(seedId, seedData) {
-      seeds = { ...seeds, [seedId]: seedData };
-      seedsCache = null;
-      hooks.onSeedSet?.(seedId, seedData);
-    },
-    removeSeed(seedId) {
-      const { [seedId]: _removed, ...rest } = seeds;
-      seeds = rest;
-      seedsCache = null;
-      hooks.onSeedClear?.(seedId);
-    },
-    getOrganisms() {
-      if (organismsCache === null) organismsCache = { ...organisms };
-      return organismsCache;
-    },
-    setOrganism(organismId, organismData) {
-      organisms = { ...organisms, [organismId]: organismData };
-      organismsCache = null;
-      hooks.onOrganismSet?.(organismId, organismData);
-    },
-    removeOrganism(organismId) {
-      const { [organismId]: _removed, ...rest } = organisms;
-      organisms = rest;
-      organismsCache = null;
-      hooks.onOrganismClear?.(organismId);
-    },
-    getPlanetoidEvolution() {
-      if (planetoidEvolutionCache === null) planetoidEvolutionCache = { ...planetoidEvolution };
-      return planetoidEvolutionCache;
-    },
-    setPlanetoidEvolution(planetoidKey, data) {
-      planetoidEvolution = { ...planetoidEvolution, [planetoidKey]: data };
-      planetoidEvolutionCache = null;
-    },
     toJSON() {
       return {
         worldName,
@@ -180,27 +137,24 @@ export function createWorldStore(worldJSON, hooks = {}) {
         playerInventory: inventory,
         asteroidRegrowth: regrowthQueue,
         pendingTrades,
-        seeds,
-        organisms,
-        planetoidEvolution,
         meta: { ...meta, lastModified: new Date().toISOString() },
       };
     },
     // Pure-model export (.rhomb; RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md
     // section 4) -- same fields as toJSON() minus everything game-only
-    // (claims/playerInventory/asteroidRegrowth/pendingTrades/organisms/
-    // planetoidEvolution). Organism-grown seeds are kept: once stripped
-    // of their owning organism they're just geometry, same as any other
-    // seed -- "always extractable, no game dependency" per the plan.
-    // Deliberately NOT a nested {model, game} wrapper -- see commit
-    // message / plan doc for why a flat filtered object was chosen
+    // (claims/playerInventory/asteroidRegrowth/pendingTrades). `seeds`/
+    // `organisms`/`planetoidEvolution` removed from the schema entirely
+    // 2026-09-22 (second world-building removal pass, growth/evolution/
+    // cultivation archived) -- with no way left to create a seed, keeping
+    // an always-empty schema slice would be an orphaned invariant, not a
+    // real feature. Deliberately NOT a nested {model, game} wrapper -- see
+    // commit message / plan doc for why a flat filtered object was chosen
     // over restructuring the live schema every save already round-trips.
     toRhombJSON() {
       return {
         worldName,
         version,
         cells: Object.fromEntries(cells),
-        seeds,
         meta: { ...meta, lastModified: new Date().toISOString() },
       };
     },
@@ -212,12 +166,6 @@ export function createWorldStore(worldJSON, hooks = {}) {
       inventory = { ...(newWorldJSON.playerInventory ?? {}) };
       regrowthQueue = { ...(newWorldJSON.asteroidRegrowth ?? {}) };
       pendingTrades = { ...(newWorldJSON.pendingTrades ?? {}) };
-      seeds = { ...(newWorldJSON.seeds ?? {}) };
-      organisms = { ...(newWorldJSON.organisms ?? {}) };
-      planetoidEvolution = { ...(newWorldJSON.planetoidEvolution ?? {}) };
-      seedsCache = null;
-      organismsCache = null;
-      planetoidEvolutionCache = null;
       cellsEntriesCache = null;
       cells.clear();
       for (const [key, data] of Object.entries(newWorldJSON.cells)) {

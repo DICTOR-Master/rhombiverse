@@ -29,7 +29,6 @@ import {
   axisKeyToOffset,
   nearestPyramidAxis,
 } from './pyramid.js';
-import { generatePlanetoid } from '../geometry-extensions/planetoidgen.js';
 import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
 import {
   bootstrapDisphenoid,
@@ -211,12 +210,11 @@ export function createBuildController({
   getShellCount,
   getMinShell,
   getMaterial,
-  getGeneratorType,
   // Piece tier (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md, direct follow-up
   // 2026-08-26): 'rd' (default) | 'cube' | 'pyramid' | 'to' -- what the
   // universal Add/Remove actions (mode 'build'/'chisel' below) operate
-  // on. Everything else (Fill/Dig/Round/Replace/Generate/Report) stays
-  // RD-only, scoped deliberately -- not asked for beyond Add/Remove.
+  // on. Everything else (Fill/Dig/Round/Replace/Report) stays RD-only,
+  // scoped deliberately -- not asked for beyond Add/Remove.
   getPieceType = () => 'rd',
   // TO ("adopted family member", direct instruction 2026-08-26): the
   // truncated octahedron lives on a genuinely different lattice
@@ -1073,14 +1071,6 @@ export function createBuildController({
       const { x, y, z, ...data } = cell;
       world.addCell(x, y, z, { ...data, status: newStatus });
       onChange();
-      return;
-    }
-
-    if (mode === 'generate') {
-      generatePlanetoid(world, getGeneratorType(), cell.x, cell.y, cell.z, getShellCount(), canPlaceMaterial);
-      if (onCellClicked) onCellClicked({ shellCenter: cellKey(cell.x, cell.y, cell.z) });
-      onChange();
-      if (onPlaced) onPlaced(cell);
       return;
     }
 

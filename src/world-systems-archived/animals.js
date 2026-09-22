@@ -6,8 +6,11 @@
 // docs/code-notes/world-systems-archived/animals.md
 //
 // This file was archived 2026-09-17 (retired game/world-building system,
-// see README.md) -- evolution.js itself was NOT archived (real, live
-// geometry) and moved to geometry-extensions/, hence the path below.
+// see README.md). evolution.js itself was kept live at the time (real
+// geometry, not game trappings) and lived in geometry-extensions/, hence
+// the original import path here -- it was archived too on 2026-09-22
+// (second world-building removal pass, see README.md) and is now a
+// sibling in this same archive folder.
 import {
   GENOME_TRAIT_RANGES,
   plantOrganism,
@@ -24,7 +27,7 @@ import {
   ORGANISM_SEED_SPECIES_PREFIX,
   localMatureSameSpeciesCount,
   BIOMASS_SEARCH_RADIUS,
-} from '../geometry-extensions/evolution.js';
+} from './evolution.js';
 import { cellToWorld } from '../core/lattice.js';
 
 export const LAND_CREATURE_SPECIES = 'landCreature';

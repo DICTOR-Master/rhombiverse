@@ -72,7 +72,7 @@ function injectCssOnce() {
   document.head.appendChild(style);
 }
 
-const SUCCESS_EVENTS = ['cameraRotated', 'faceHovered', 'cellPlaced', 'wheelOpened', 'walkModeEntered', 'seedPlanted'];
+const SUCCESS_EVENTS = ['cameraRotated', 'faceHovered', 'cellPlaced', 'wheelOpened'];
 
 export function createCyborgMode({
   subscriptUrl = './data/cyborg/first-build-session.json',

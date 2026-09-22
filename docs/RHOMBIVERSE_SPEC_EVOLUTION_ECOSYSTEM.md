@@ -1,5 +1,17 @@
 # Rhombiverse — Spec Addendum: Evolutionary & Ecosystem Development
 
+> **ARCHIVED 2026-09-22** — this system was retired as part of the second
+> world-building removal pass (planetoids/growth/gravity/walking/sync); see
+> README.md. Its code moved to `src/world-systems-archived/evolution.js` —
+> kept intact for reference, permanently unreachable in the running app,
+> not deleted. Previously kept live in the 2026-09-17 pass on the
+> reasoning that "plant something and let it grow" was real geometry, not
+> game trappings — that judgment didn't hold against the new bar (no
+> simulated-over-time state): `resolveCatchUp`/
+> `resolveCatchUpForAllPlanetoids` literally advance multiple simulated
+> generations across real elapsed time, including while the tab was
+> closed. This doc is historical.
+
 Standalone addendum. Extends the Penrose/RT Growth Layer (`RHOMBIVERSE_PLAN.md` Phase 6, now implemented — plant life and amoeba are live in the select menus with preselected compatible planetoids). This document does not re-spec growth itself; it specs what happens *across generations* of already-growable organisms. Complies with `RHOMBIVERSE_PRINCIPLES.md` — Grounded Simplicity, Isolation, Adaptive Damping are called out explicitly below, per the binding rule in that document.
 
 Governing decisions (confirmed with the project owner before writing this plan):

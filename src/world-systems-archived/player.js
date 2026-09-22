@@ -3,7 +3,7 @@
 // three/addons' PointerLockControls (hard-codes world Y as "up").
 // Full rationale/history: docs/code-notes/app/player.md
 import * as THREE from 'three';
-import { getSettings } from './settings.js';
+import { getSettings } from '../app/settings.js';
 
 const WALK_SPEED = 4.0; // world units/sec, first-guess, not yet playtested
 const FLY_SPEED = 6.0;

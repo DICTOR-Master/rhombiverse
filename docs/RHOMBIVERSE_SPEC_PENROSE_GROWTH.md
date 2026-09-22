@@ -1,5 +1,15 @@
 # Rhombiverse — Spec Addendum: Penrose/RT Growth Layer (Phase 6)
 
+> **ARCHIVED 2026-09-22** — this system was retired as part of the second
+> world-building removal pass (planetoids/growth/gravity/walking/sync); see
+> README.md. Its growth-over-time engine moved to
+> `src/world-systems-archived/growth.js` — kept intact for reference,
+> permanently unreachable in the running app, not deleted. The
+> deterministic Ammann-rhombohedra tiling/SAT-overlap geometry this spec
+> also describes (real, non-simulated math, used live by Duality Mode)
+> stayed behind in a trimmed `src/geometry-extensions/growth.js`. This doc
+> is historical.
+
 Standalone addendum for `RHOMBIVERSE_PLAN.md` Phase 6: "New `growth.js`
 module, new `seeds` key in world-state, generation via substitution/
 L-system rules on rhombic triacontahedron geometry. Does not modify or

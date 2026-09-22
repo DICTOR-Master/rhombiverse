@@ -4,7 +4,7 @@
 // consumption guard -- see companion doc for the full history.
 // Full design rationale/history: docs/code-notes/world-systems/blackhole.md
 import { shellCount, cellKey, cellToWorld, cellsInShells } from '../core/lattice.js';
-import { BSG_MATERIAL, findClusters, bsgClusterStats } from '../geometry-extensions/gravity.js';
+import { BSG_MATERIAL, findClusters, bsgClusterStats } from './gravity.js';
 import { isClaimProtected } from './regions.js';
 
 export const BLACK_HOLE_BSG_THRESHOLD = 20;

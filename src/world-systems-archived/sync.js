@@ -1,7 +1,9 @@
+// ARCHIVED 2026-09-22 (second world-building removal pass) -- kept intact
+// for reference, permanently unreachable in the running app, not deleted.
 // Phase 5 (Shared World) realtime sync backend over the `public.cells`
 // table (supabase/schema.sql). Requires Anonymous Sign-Ins enabled on
 // the project. Full design rationale/history for every export below:
-// docs/code-notes/app/sync.md
+// docs/code-notes/world-systems-archived/sync.md
 import { createClient } from '@supabase/supabase-js';
 import { cellKey } from '../core/lattice.js';
 

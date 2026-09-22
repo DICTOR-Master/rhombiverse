@@ -2,7 +2,7 @@
 // Full design rationale/history for every export below:
 // docs/code-notes/world-systems/starsystem.md
 import { cellToWorld } from '../core/lattice.js';
-import { BSG_MATERIAL, findClusters, bsgClusterStats } from '../geometry-extensions/gravity.js';
+import { BSG_MATERIAL, findClusters, bsgClusterStats } from './gravity.js';
 
 // First-guess constants, not yet playtested -- see docs/code-notes.
 export const STAR_BSG_THRESHOLD = 8;

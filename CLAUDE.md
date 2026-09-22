@@ -20,9 +20,8 @@ section 6 (Vision Statement) before touching anything else in this repo —
 they're short and everything downstream assumes you've read them.
 
 **World Systems are retired** (mining, trade, claims, achievements,
-animals, hazards, hydrosphere — `src/world-systems/*.js` and
-`achievements.js`/`animals.js`/`hydrosphere.js`/hazard modules). Code and
-Supabase schema (`claims`, `pending_trades` tables) are archived, not
+animals, hazards, hydrosphere — `src/world-systems-archived/*.js`). Code
+and Supabase schema (`claims`, `pending_trades` tables) are archived, not
 deleted, but permanently unreachable: `settings.js`'s `getSettings()`
 forces `pureGeometry: true` unconditionally regardless of any stored
 setting, which is what `features.js` reads to decide whether to even wire
@@ -31,6 +30,41 @@ choice and the matching Settings-panel checkbox are both gone — there's
 only one mode now. Don't reintroduce a toggle back into these without an
 explicit decision to un-retire World Systems; the removal was deliberate,
 not a temporary flag flip.
+
+**2026-09-22: gravity/planetoids, growth/evolution/cultivation, walking/
+exploring, and Shared World sync were retired too** (second world-building
+removal pass — see README.md), moving `src/world-systems-archived/*.js` to
+16 files total. The 2026-09-17 pass had judged these "real geometry, not
+game trappings" and kept them live; that didn't hold against a stricter
+bar once `evolution.js` turned out to be a genuine agent-based simulation
+advancing multiple generations across real elapsed time (including while
+the tab was closed). `growth.js` was split rather than archived wholesale
+— its deterministic Ammann-rhombohedra tiling/SAT-overlap math stayed live
+(Duality Mode depends on it directly); the growth-over-time engine moved
+to the archive. The Rhombic Wheel's Grow and Explore categories are gone.
+
+### Guardrails for the app's current scope
+
+Rhombiverse is now a pure mathematical spatial editor for FCC and BCC
+lattices — deterministic, on-demand geometry, never simulated over time.
+Do not reintroduce, even partially, any of the following without an
+explicit decision to do so:
+- Physical world dynamics — no gravity, rigid-body physics, or velocities.
+- Game states — no player loops, procedural terrain, or culling
+  optimizations meant for infinite voxel worlds.
+- Life-form/growth simulation of any kind (a tick/interval that advances
+  state based on elapsed real time, independent of user action).
+- Shared or persistent world state — no multiplayer sync, sessions, or
+  networked world saves.
+- Keep rendering local, explicit, and lightweight.
+
+Retained on purpose, not oversights: vector/matrix math utilities (needed
+by the lattice generator, not tied to physics); the Three.js/Canvas
+rendering layer (fed only static, computed geometry); camera controls
+(orbit/pan/zoom) — UI, not simulation. A dimension-select UI (3D→4D→5D→6D
+lattice picker) is planned as a future, separate addition — deliberately
+deferred out of the 2026-09-22 pass rather than built alongside it; treat
+it as its own plan, not something to infer or start speculatively.
 
 **This is a different project from `~/rhombispheres/`** (formerly named
 `rhombiverse` until 2026-08-11, when it was renamed to free up this name).

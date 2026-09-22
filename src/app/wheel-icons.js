@@ -254,24 +254,10 @@ export const MARKS = {
     <circle cx="0" cy="-32" r="4" fill="currentColor"/>
     <path d="M0,-32 L-23,32 M0,-32 L23,32" ${STROKE}/>
     <path d="M-14,0 Q0,8 14,0" stroke="currentColor" stroke-width="2" fill="none"/>`,
-  // Cultivate (mark key "rhombivate", unchanged internally): single
-  // rhombus, creased down the center like a leaf/bean. Enlarged
-  // 2026-09-02 -- a single-symbol mark like this one is effectively
-  // 2-3x smaller than the "same" nominal size next to a mark sharing
-  // its hexagon with 2-3 shapes, so it needs to actually dominate the
-  // frame the way Add's bold "+" does, not just be "somewhat bigger."
-  // 30x40 -> 46x62, outline bumped from the shared THIN (2px) to 2.5px
-  // for real single-symbol boldness. Plant/Prune below share this exact
-  // shape (documented as deliberately reusing it) so they're enlarged
-  // to match, not left inconsistent.
-  rhombivate: `
-    <polygon points="${rhombusPts(46, 62)}" stroke="currentColor" stroke-width="2.5" fill="none"/>
-    <path d="M0,-31 Q9,0 0,31" stroke="currentColor" stroke-width="2.5" fill="none"/>`,
-  // Explore: hexagon split diagonally into an arrow shape, with a faint trailing echo of smaller hexagons.
-  explore: `
-    <polygon points="${hexPts(12, -30, 22)}" stroke="currentColor" stroke-width="1.5" opacity="0.3" fill="none"/>
-    <polygon points="${hexPts(17, -14, 12)}" stroke="currentColor" stroke-width="1.5" opacity="0.55" fill="none"/>
-    <path d="M-10,10 L28,-28 M28,-28 L28,-8 M28,-28 L8,-28" ${STROKE}/>`,
+  // Cultivate/rhombivate and Explore marks removed 2026-09-22 (second
+  // world-building removal pass) along with growth/evolution/cultivation
+  // and walking/exploring -- neither action resolves to a mark anymore
+  // (see ACTION_TO_MARK, rhombic-wheel-3d-core.js).
   // Lenses: three overlapping upright diamonds.
   lenses: `
     <polygon points="${rhombusPts(24, 31, 0, -12)}" ${THIN}/>
@@ -285,8 +271,8 @@ export const MARKS = {
   // bug) -- LATTICE_QUICK_VIEW_MARK_KEY had no 'off' entry, so the
   // default/most-common state rendered an EMPTY iconFrame (just the
   // outline, zero ink) rather than anything faint-but-present. This
-  // mark fills that gap; single-symbol sizing (see rhombivate/cyborg/
-  // lab above for the same reasoning).
+  // mark fills that gap; single-symbol sizing (see cyborg/lab above for
+  // the same reasoning).
   latticeOff: `<polygon points="${hexPts(32)}" stroke="currentColor" stroke-width="2.5" fill="none"/>`,
   // Almanac: four diamonds arranged around a center point. Enlarged
   // 2026-09-02 (direct report: "almanac ... too small") -- each
@@ -400,29 +386,10 @@ export const MARKS = {
     <circle cx="-14" cy="-14" r="4" fill="currentColor"/><circle cx="0" cy="-14" r="4" fill="currentColor"/><circle cx="14" cy="-14" r="4" fill="currentColor"/>
     <circle cx="-14" cy="0" r="4" fill="currentColor"/><circle cx="0" cy="0" r="4" fill="currentColor"/><circle cx="14" cy="0" r="4" fill="currentColor"/>
     <circle cx="-14" cy="14" r="4" fill="currentColor"/><circle cx="0" cy="14" r="4" fill="currentColor"/><circle cx="14" cy="14" r="4" fill="currentColor"/>`,
-  // Generate a Body: a filled circle (a body/orb) centered in the frame
-  // hexagon -- as literal as this vocabulary allows for "spawn a
-  // celestial body."
-  generateBody: `<circle cx="0" cy="0" r="20" fill="currentColor"/>`,
-  // Plant: Cultivate's own creased-rhombus, plus a small filled seed
-  // dot at its base -- related to Cultivate (same department, same
-  // "growing thing" language) but a distinct, more specific mark, not a
-  // duplicate of the department's own icon.
-  plant: `
-    <polygon points="${rhombusPts(46, 62)}" stroke="currentColor" stroke-width="2.5" fill="none"/>
-    <path d="M0,-31 Q9,0 0,31" stroke="currentColor" stroke-width="2.5" fill="none"/>
-    <circle cx="0" cy="31" r="7" fill="currentColor"/>`,
-  // Growth Params: three vertical bars of different heights (adjustable
-  // parameters) -- deliberately not a dial/slider (outside this
-  // project's hex/rhombus vocabulary), a bar-height comparison is real
-  // grounded geometry instead.
-  growthParams: `<path d="M-18,14 V-6 M0,14 V-18 M18,14 V2" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>`,
-  // Prune: the same creased rhombus as Plant/Cultivate, with a cut mark
-  // (a short crossing line) at one point -- trimming.
-  prune: `
-    <polygon points="${rhombusPts(46, 62)}" stroke="currentColor" stroke-width="2.5" fill="none"/>
-    <path d="M0,-31 Q9,0 0,31" stroke="currentColor" stroke-width="2.5" fill="none"/>
-    <path d="M-11,6 L11,-6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`,
+  // Generate a Body/Plant/Growth Params/Prune marks removed 2026-09-22
+  // (second world-building removal pass) along with planetoidgen.js and
+  // growth/evolution/cultivation -- none of these actions resolve to a
+  // mark anymore (see ACTION_TO_MARK, rhombic-wheel-3d-core.js).
   // Offer: single rhombus with an outward arrow -- giving something away.
   offer: `
     <polygon points="${rhombusPts(26, 34)}" ${THIN}/>

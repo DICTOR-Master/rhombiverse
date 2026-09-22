@@ -78,17 +78,17 @@ test('toRhombJSON: pure model only, no game data (section 4 verification test)',
   world.addClaim('claim_0_0_0', { ownerId: 'p1', center: [0, 0, 0], size: '2-shell' });
   world.creditInventory('p1', 'garnet', 5);
   world.setPendingTrade('trade_1', { playerA: 'p1', playerB: 'p2' });
-  world.setSeed('seed_1', { species: 'amoeba', origin: [0, 0, 0], tiles: [] });
-  world.setOrganism('org_1', { genome: {}, seedId: 'seed_1', species: 'amoeba' });
-  world.setPlanetoidEvolution('p1', { generation: 3 });
 
   const rhomb = world.toRhombJSON();
-  const forbidden = ['claims', 'playerInventory', 'asteroidRegrowth', 'pendingTrades', 'organisms', 'planetoidEvolution'];
+  // seeds/organisms/planetoidEvolution removed from the schema entirely
+  // 2026-09-22 (second world-building removal pass, growth/evolution/
+  // cultivation archived) -- with no way left to create a seed, .rhomb
+  // output is cells + meta only now.
+  const forbidden = ['claims', 'playerInventory', 'asteroidRegrowth', 'pendingTrades', 'seeds', 'organisms', 'planetoidEvolution'];
   for (const key of forbidden) {
     assert.equal(key in rhomb, false, `.rhomb output must not include "${key}"`);
   }
   assert.deepEqual(Object.keys(rhomb.cells), ['0,0,0']);
-  assert.deepEqual(Object.keys(rhomb.seeds), ['seed_1']);
   assert.ok(rhomb.meta.lastModified);
 });
 

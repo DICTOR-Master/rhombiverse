@@ -1,5 +1,7 @@
+// ARCHIVED 2026-09-22 (second world-building removal pass) -- kept intact
+// for reference, permanently unreachable in the running app, not deleted.
 // Formula-driven planetoid generation (rocky/ice-moon/gas-giant/etc. in
-// one click). Full design rationale/history: docs/code-notes/geometry-extensions/planetoidgen.md
+// one click). Full design rationale/history: docs/code-notes/world-systems-archived/planetoidgen.md
 import { cellsInShells, cellKey } from '../core/lattice.js';
 
 function fractionalRecipe(bands) {

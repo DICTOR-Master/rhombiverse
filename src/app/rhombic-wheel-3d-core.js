@@ -189,12 +189,16 @@ export function resolveWheelFaces(wheelConfig) {
 // and Rhombitect's/Blueprint's Generate a Body stay available in both
 // modes (pure geometry, no clock involved). Action-keyed (not
 // face-key-keyed) so every existing "temporary duplicate" face sharing
-// one of these actions (e.g. Home's own bottom|sx1sz-1 Cultivate
-// duplicate) is gated for free, with no separate list to keep in sync.
+// one of these actions is gated for free, with no separate list to keep
+// in sync.
+//
+// Cultivate/Plant/Explore removed from this set 2026-09-22 (second
+// world-building removal pass) -- growth/evolution/cultivation and
+// walking/exploring were archived along with the systems these actions
+// pointed at; their wheel faces are plain Spare now (see WHEEL_HOME/
+// WHEEL_RHOMBITECT below), not gated ones. Cuboctahedron Build is the
+// one remaining real reason this gate exists at all.
 const WORLD_ONLY_FACE_ACTIONS = new Set([
-  "navigateTo:cultivate", // Cultivate -- Plant/Prune/Growth Parameters
-  "navigateTo:explore",   // Explore -- grouped with the dynamic side per the reframe brief's own "Grow/Explore/Simulate"
-  "tool:plant",           // Cultivate's Plant
   "tool:cuboctaBuild",    // Piece's Cuboctahedron Build
   // "tool:bccBuild" removed 2026-09-02 -- the standalone BCC Build face
   // it gated is retired; BCC-lattice placement now happens entirely via
@@ -308,25 +312,23 @@ export const WHEEL_HOME = {
       desc: "Add, Symmetry, Fill, and Piece. Was one click deeper, behind Construct -- moved directly onto Home." },
     "equator|sx1sy-1":  { kind: "dept", label: "Blueprint", action: "navigateTo:rhombitect",
       desc: "Precise coordinate building — Dome, Spiral Column, Templates. Was labeled \"Rhombitect\"; renamed to plain English, same wheel underneath." },
-    // Label only -- internal id/action ("cultivate") unchanged, so
-    // #cultivate-panel and every navigateTo:cultivate reference stay
-    // exactly as they are. Was labeled "Rhombivate"; renamed to match
-    // its own internal name and drop the invented portmanteau.
-    "equator|sx-1sy1":  { kind: "dept", label: "Cultivate",  action: "navigateTo:cultivate",
-      desc: "Plant, Prune, and Growth Parameters for the organic/Penrose layer." },
+    // Was "Cultivate" (Plant/Prune/Growth Parameters) -- growth/
+    // evolution/cultivation retired 2026-09-22 along with the rest of
+    // the second world-building removal pass (see README.md); this face
+    // is a genuine, honest blank now, same treatment as Trade below.
+    "equator|sx-1sy1":  { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
     // Was "Trade" (Offer/Accept/Inventory) -- the resource/decay economy
     // was retired 2026-09-17 along with the rest of World Systems (see
     // README.md); this face is a genuine, honest blank now rather than a
     // real department masked at render time by a gate.
     "equator|sx-1sy-1": { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
-    "bottom|sy1sz-1":   { kind: "dept", label: "Explore",    action: "navigateTo:explore",
-      desc: "Rhombinaut mode — one face, one destination, identity-framed name only." },
-    // Least-adjacent-available placement (verified numerically --
-    // bottom|sx-1sz-1 is non-adjacent to equator|sx1sy1, bottom|
-    // sx1sz-1 is non-adjacent to equator|sx-1sy1), same rule applied
-    // uniformly across every wheel with a remaining blank face.
-    "bottom|sx1sz-1":   { kind: "dept", label: "Cultivate", action: "navigateTo:cultivate", temporary: true,
-      desc: "Plant, Prune, and Growth Parameters for the organic/Penrose layer. Duplicated here for quick access from a spare slot." },
+    // Was "Explore" (Rhombinaut/walk mode) -- retired 2026-09-22 along
+    // with gravity/planetoids, its own reason for existing. Genuine
+    // blank now, same treatment as Trade/Cultivate above.
+    "bottom|sy1sz-1":   { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
+    // Cultivate's own duplicate, same retirement as its true original
+    // above -- also now a genuine blank.
+    "bottom|sx1sz-1":   { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
     // Direct follow-up report, same day: this swap freed up a real
     // blank spot that's discoverable by rotating -- "another blank face
     // as it spins." Verified non-adjacent numerically (bottom|sx-1sz-1's
@@ -584,93 +586,29 @@ export const WHEEL_RHOMBITECT = {
     "equator|sx1sy1":  { kind: "dept", label: "Dome", action: "tool:dome", desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it." },
     "equator|sx1sy-1": { kind: "dept", label: "Spiral Column", action: "tool:spiralColumn", desc: "Not built yet." },
     "equator|sx-1sy1": { kind: "dept", label: "Templates", action: "tool:templates", desc: "Not built yet." },
-    // Direct follow-up report, same day: moving Generate a Body to
-    // top|sy1sz1 freed up a real blank spot that's discoverable by
-    // rotating. Verified non-adjacent numerically (equator|sx-1sy-1's
-    // own 4 neighbors are top|sy-1sz1, bottom|sy-1sz-1, top|sx-1sz1,
-    // and bottom|sx-1sz-1 -- Dome's true original, equator|sx1sy1,
-    // isn't among them). Spiral Column/Templates skipped -- both
-    // non-functional stubs, same reasoning as elsewhere in this file.
-    // Generate a Body itself already has its own duplicate (below), so
-    // Dome balances coverage rather than tripling one action.
     "equator|sx-1sy-1": { kind: "dept", label: "Dome", action: "tool:dome", temporary: true,
       desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
-    // Least-adjacent placement duplicates Dome; the OTHER remaining
-    // slot skips Templates on purpose (a non-functional stub, same
-    // reasoning as WHEEL_ALTER skipping Replace) -- Generate a Body
-    // fills it instead. Still non-adjacent to top|sy1sz1 (Generate a
-    // Body's new true-original slot, 2026-09-02) since neither
-    // bottom-ring face is in top|sy1sz1's own 4-face adjacency set.
-    "bottom|sx1sz-1":  { kind: "dept", label: "Generate a Body", action: "tool:generateBody", temporary: true,
-      desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...). Duplicated here for quick access from a spare slot." },
+    // Was "Generate a Body" (planetoidgen.js) -- retired 2026-09-22
+    // along with gravity/planetoids, its own reason for existing.
+    // Genuine, honest blank now, same treatment as Trade on WHEEL_HOME.
+    "bottom|sx1sz-1":  { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
     "bottom|sx-1sz-1": { kind: "dept", label: "Dome", action: "tool:dome", temporary: true,
       desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it. Duplicated here for quick access from a spare slot." },
-    // Direct report 2026-09-02: top|sy1sz1 is one of only 3 faces
-    // visible at a wheel's default opening rotation -- leaving it SPARE
-    // made landing on this wheel look mostly empty (Dome + Lab/Settings
-    // + a blank). Filled by swapping in Generate a Body from its old
-    // equator|sx-1sy-1 slot rather than adding a new duplicate (Dome,
-    // the only other non-stub real face here, IS adjacent to top|sy1sz1
-    // so couldn't be used) -- see WHEEL_HOME's own top|sy1sz1 comment
-    // for the shared reasoning.
-    "top|sy1sz1":      { kind: "dept", label: "Generate a Body", action: "tool:generateBody", desc: "Pick a celestial body type to spawn (planetoid, moon, giant, ...)." }
+    // Was Generate a Body's own true-original slot (one of only 3 faces
+    // visible at a wheel's default opening rotation) -- also now a
+    // genuine blank rather than inventing a 3rd Dome duplicate to fill
+    // it; Dome already has 2 copies (true original + equator-antipode
+    // duplicate above), matching this file's own standing policy of not
+    // over-duplicating one action past what real coverage needs.
+    "top|sy1sz1":      { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." }
   }
 };
 
-export const WHEEL_CULTIVATE = {
-  id: "cultivate",
-  faces: {
-    // Also opens the species picker (2D wheel's "Plant a Seed") --
-    // folded in here rather than given its own face, since choosing
-    // what to plant is naturally part of the same action as choosing
-    // to plant. See render.js's onAction.
-    "equator|sx1sy1":  { kind: "dept", label: "Plant", action: "tool:plant", desc: "Pick a species, then click to plant it. Opens the Cultivate panel." },
-    // Prune has no separate mode of its own -- it's a real right-click
-    // gesture on an existing growth tile while already in Plant mode
-    // (see render.js's contextmenu listener / pruneTile()).
-    "equator|sx1sy-1": { kind: "dept", label: "Prune", action: "tool:prune", desc: "Sets Plant mode -- right-click an existing growth tile to prune it." },
-    // Direct follow-up report, same day: moving Growth Params to
-    // top|sy1sz1 freed up a real blank spot that's discoverable by
-    // rotating. Verified non-adjacent numerically (equator|sx-1sy1's
-    // own 4 neighbors are top|sy1sz1, bottom|sy1sz-1, top|sx-1sz1, and
-    // bottom|sx-1sz-1 -- Prune's true original, equator|sx1sy-1, isn't
-    // among them). Prune balances coverage against Plant, which already
-    // has its own duplicate just below.
-    "equator|sx-1sy1": { kind: "dept", label: "Prune", action: "tool:prune", temporary: true,
-      desc: "Sets Plant mode -- right-click an existing growth tile to prune it. Duplicated here for quick access from a spare slot." },
-    // Temporary duplicate at Plant's true geometric antipode (equator|
-    // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
-    // policy: a blank face duplicates its antipode's content until
-    // real content exists for it, direct user directive 2026-08-25.
-    "equator|sx-1sy-1": { kind: "dept", label: "Plant", action: "tool:plant", temporary: true, desc: "Pick a species, then click to plant it. Opens the Cultivate panel. Duplicated here for quick access from a spare slot." },
-    "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
-    // Still non-adjacent to top|sy1sz1 (Growth Params' new true-original
-    // slot, 2026-09-02) since this bottom-ring face isn't in top|sy1sz1's
-    // own 4-face adjacency set.
-    "bottom|sx1sz-1":  { kind: "dept", label: "Growth Params", action: "tool:growthParams", temporary: true,
-      desc: "Opens the Cultivate panel's Growth Parameters section. Duplicated here for quick access from a spare slot." },
-    // Was a 2nd Plant copy (2026-08-25 audit fix): Plant already has its
-    // true original PLUS an equator-antipode duplicate, and this bottom
-    // slot is edge-adjacent to that duplicate (equator|sx-1sy-1) -- a
-    // 3rd copy here can't avoid touching a sibling. Prune has NO
-    // existing duplicate anywhere yet and this slot is non-adjacent to
-    // Prune's true original (equator|sx1sy-1, verified numerically), so
-    // it fills the slot with genuinely new coverage instead of a
-    // colliding 3rd copy of Plant.
-    "bottom|sx-1sz-1": { kind: "dept", label: "Prune", action: "tool:prune", temporary: true,
-      desc: "Sets Plant mode -- right-click an existing growth tile to prune it. Duplicated here for quick access from a spare slot." },
-    // Direct report 2026-09-02: top|sy1sz1 is one of only 3 faces
-    // visible at a wheel's default opening rotation -- leaving it SPARE
-    // made landing on this wheel look mostly empty (Plant + Lab/Settings
-    // + a blank). Filled by swapping in Growth Params from its old
-    // equator|sx-1sy1 slot rather than adding a new duplicate (Plant,
-    // the equator's other real face, IS adjacent to top|sy1sz1 so
-    // couldn't be used) -- see WHEEL_HOME's own top|sy1sz1 comment for
-    // the shared reasoning.
-    "top|sy1sz1":      { kind: "dept", label: "Growth Params", action: "tool:growthParams", desc: "Opens the Cultivate panel's Growth Parameters section." }
-  }
-};
+// WHEEL_CULTIVATE (Plant/Prune/Growth Parameters) removed 2026-09-22
+// along with the rest of the second world-building removal pass (growth/
+// evolution/cultivation) -- see README.md. Its own "Cultivate" doorway on
+// WHEEL_HOME is now a plain Spare face (see that wheel's own comment).
 
 // WHEEL_TRADE (Offer/Accept/Inventory) removed 2026-09-17 along with the
 // rest of World Systems -- see README.md. Its own "Trade" doorway on
@@ -747,7 +685,7 @@ export const WHEEL_RD_FAMILY = {
 
 export const ALL_WHEELS = {
   home: WHEEL_HOME, build: WHEEL_BUILD, alter: WHEEL_ALTER,
-  rhombitect: WHEEL_RHOMBITECT, cultivate: WHEEL_CULTIVATE,
+  rhombitect: WHEEL_RHOMBITECT,
   piece: WHEEL_PIECE, rdFamily: WHEEL_RD_FAMILY
 };
 
@@ -816,8 +754,6 @@ export const ACTION_TO_MARK = {
   'tool:smooth': 'smooth',
   'tool:replace': 'replace',
   'navigateTo:rhombitect': 'rhombitect', // wheel now labeled "Blueprint"; mark/id name unchanged
-  'navigateTo:cultivate': 'rhombivate', // wheel now labeled "Cultivate"; mark/id name unchanged
-  'navigateTo:explore': 'explore',
   openAlmanac: 'almanac',
   openCyborg: 'cyborg',
   // 2026-08-26 second pass -- see wheel-icons.js for full design notes
@@ -825,10 +761,6 @@ export const ACTION_TO_MARK = {
   'tool:material': 'material',
   'tool:repeat': 'repeat',
   'tool:pattern': 'pattern',
-  'tool:generateBody': 'generateBody',
-  'tool:plant': 'plant',
-  'tool:growthParams': 'growthParams',
-  'tool:prune': 'prune',
   // Build's department-nav face reuses its own wheel's primary tool
   // icon -- the face is a doorway into that wheel, so Add doubles as a
   // preview of what's inside. Alter used to do the same with Dig, but

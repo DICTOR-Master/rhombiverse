@@ -1,6 +1,8 @@
 // RHOMBIVERSE_SPEC_LATTICE_ZOOM.md -- Static Sub-Lattice Geometry, LOD
-// trigger/blending, Adaptive Damping, and Ecosystem Rendering helpers.
-// A rendering-layer addition on top of lattice.js; never touches
+// trigger/blending, Adaptive Damping. (Its Ecosystem Rendering helpers,
+// Stage 5, were removed 2026-09-22 along with growth/evolution/
+// cultivation -- see the note near the bottom of this file.) A
+// rendering-layer addition on top of lattice.js; never touches
 // worldstate.js's cell schema. Full rationale/history for every export
 // below: docs/code-notes/geometry-extensions/latticezoom.md
 import { cellsInShells, shellCount, cellToWorld } from '../core/lattice.js';
@@ -103,22 +105,9 @@ export function scaleVerticesAroundOrigin(vertices, origin, factor) {
   return vertices.map(([x, y, z]) => [ox + (x - ox) * factor, oy + (y - oy) * factor, oz + (z - oz) * factor]);
 }
 
-export function dominantSpecies(organisms) {
-  if (organisms.length === 0) return null;
-  const counts = new Map();
-  for (const o of organisms) counts.set(o.species, (counts.get(o.species) ?? 0) + 1);
-  let best = null;
-  let bestCount = -1;
-  for (const [species, count] of counts) {
-    if (count > bestCount) {
-      best = species;
-      bestCount = count;
-    }
-  }
-  return best;
-}
-
-export const AGGREGATE_MAX_SPECKLES = 8;
-export function speckleCountForBiomass(biomassAvailability) {
-  return Math.round(Math.min(1, Math.max(0, biomassAvailability)) * AGGREGATE_MAX_SPECKLES);
-}
+// dominantSpecies/speckleCountForBiomass/AGGREGATE_MAX_SPECKLES (Lattice
+// Zoom Stage 5 -- Ecosystem Rendering) removed 2026-09-22 (second
+// world-building removal pass) along with growth/evolution/cultivation --
+// they only ever had meaning visualizing organism density/species mix,
+// both now archived. Stages 1-4 above (sub-lattice cell generation) are
+// unrelated, deterministic geometry and stay live.

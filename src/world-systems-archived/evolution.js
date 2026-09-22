@@ -1,14 +1,20 @@
+// ARCHIVED 2026-09-22 (second world-building removal pass) -- kept intact
+// for reference, permanently unreachable in the running app, not deleted.
 // RHOMBIVERSE_SPEC_EVOLUTION_ECOSYSTEM.md -- genome/phenotype, reproduction,
 // selection, catch-up simulation, isolation, adaptive damping (Stages 1-8).
 // This module imports growth.js, growth.js never imports this module.
-// Full design rationale/history for every export below: docs/code-notes/geometry-extensions/evolution.md
-// Moved here from world-systems/ (2026-09-17): despite the old path, this
-// is real, live geometry ("plant something and let it grow"), not a
-// retired game/world-building system -- see README.md.
+// Full design rationale/history for every export below:
+// docs/code-notes/world-systems-archived/evolution.md
+// Previously kept live (2026-09-17 pass) on the reasoning that "plant
+// something and let it grow" was real geometry, not game trappings -- see
+// README.md. That judgment doesn't hold against the new bar (no simulated-
+// over-time state): resolveCatchUp/resolveCatchUpForAllPlanetoids below
+// literally advance multiple simulated generations across real elapsed
+// time, including while the tab was closed. Retired for real this pass.
 import { tileWorldVertices, tilesOverlap, GROWTH_TICK_MS } from './growth.js';
 import { cellToWorld } from '../core/lattice.js';
 import { computePlanetoids, nearestPlanetoid } from './gravity.js';
-import { plantInstance, growInstance, phenotypeFromSliders } from '../core/instance.js';
+import { plantInstance, growInstance, phenotypeFromSliders } from './instance.js';
 
 export const GENOME_TRAIT_RANGES = {
   growthRate: [0, 1],

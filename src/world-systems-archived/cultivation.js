@@ -1,5 +1,7 @@
+// ARCHIVED 2026-09-22 (second world-building removal pass) -- kept intact
+// for reference, permanently unreachable in the running app, not deleted.
 // Cultivation Mode (RHOMBIVERSE_UIUX_BUILD_PLAN.md B5).
-// Full design rationale/history: docs/code-notes/geometry-extensions/cultivation.md
+// Full design rationale/history: docs/code-notes/world-systems-archived/cultivation.md
 import { plantSeed } from './growth.js';
 import { canFullCyborgEditAt } from '../core/sculpture.js';
 import { nearestValidCell } from '../core/lattice.js';

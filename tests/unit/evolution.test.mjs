@@ -54,9 +54,12 @@ import {
   nextLandscapeState,
   LANDSCAPE_STATE_EMA_RATE,
   MAX_ORGANISMS_PER_PLANETOID,
-} from '../../src/world-systems/evolution.js';
-import { createWorldStore } from '../../src/core/worldstate-core.js';
-import { applyGrowth, plantSeed } from '../../src/geometry-extensions/growth.js';
+} from '../../src/world-systems-archived/evolution.js';
+// getSeeds/setSeed/getOrganisms/setOrganism/getPlanetoidEvolution/
+// setPlanetoidEvolution no longer exist on the live createWorldStore
+// (schema trimmed 2026-09-22) -- see helpers/archived-world-store.mjs.
+import { createArchivedWorldStore as createWorldStore } from './helpers/archived-world-store.mjs';
+import { applyGrowth, plantSeed } from '../../src/world-systems-archived/growth.js';
 
 function growToMaturity(world, organismId, maxTicks = 20) {
   let now = 0;

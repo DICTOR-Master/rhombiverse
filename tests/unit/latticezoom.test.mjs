@@ -22,9 +22,6 @@ import {
   nextVolatilityScore,
   throttleForVolatility,
   scaleVerticesAroundOrigin,
-  dominantSpecies,
-  AGGREGATE_MAX_SPECKLES,
-  speckleCountForBiomass,
 } from '../../src/geometry-extensions/latticezoom.js';
 import { shellCount, isValidCell, cellToWorld } from '../../src/core/lattice.js';
 
@@ -316,32 +313,7 @@ test('scaleVerticesAroundOrigin: factor=0 collapses every vertex exactly onto or
   for (const v of result) assert.deepEqual(v, origin);
 });
 
-test('dominantSpecies: real majority wins, empty list returns null', () => {
-  assert.equal(dominantSpecies([]), null);
-  const organisms = [{ species: 'plant' }, { species: 'plant' }, { species: 'amoeba' }];
-  assert.equal(dominantSpecies(organisms), 'plant');
-});
-
-test('dominantSpecies: a single organism is trivially its own species\' majority', () => {
-  assert.equal(dominantSpecies([{ species: 'amoeba' }]), 'amoeba');
-});
-
-test('speckleCountForBiomass: zero biomass produces zero speckles, full (1.0) biomass produces AGGREGATE_MAX_SPECKLES', () => {
-  assert.equal(speckleCountForBiomass(0), 0);
-  assert.equal(speckleCountForBiomass(1), AGGREGATE_MAX_SPECKLES);
-});
-
-test('speckleCountForBiomass: monotonically non-decreasing with biomass, and clamps input outside [0,1]', () => {
-  const samples = [0, 0.2, 0.4, 0.6, 0.8, 1].map(speckleCountForBiomass);
-  for (let i = 1; i < samples.length; i++) {
-    assert.ok(samples[i] >= samples[i - 1], `speckle count must never decrease as biomass grows: ${samples}`);
-  }
-  assert.equal(speckleCountForBiomass(-5), 0, 'must clamp a nonsensical negative input rather than go negative');
-  assert.equal(speckleCountForBiomass(50), AGGREGATE_MAX_SPECKLES, 'must clamp a nonsensical >1 input rather than exceed the cap');
-});
-
-test('speckleCountForBiomass: this stage\'s own success check -- a real change in underlying population stats visibly changes the layer\'s output', () => {
-  const noPopulation = speckleCountForBiomass(0);
-  const thrivingPopulation = speckleCountForBiomass(0.9);
-  assert.ok(thrivingPopulation > noPopulation, 'a thriving nearby population must produce visibly more coverage than none at all');
-});
+// dominantSpecies/speckleCountForBiomass/AGGREGATE_MAX_SPECKLES (Lattice
+// Zoom Stage 5 -- Ecosystem Rendering) tests removed 2026-09-22 (second
+// world-building removal pass) along with the functions themselves --
+// see latticezoom.js's own note near the bottom of that file.

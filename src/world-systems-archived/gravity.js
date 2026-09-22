@@ -1,15 +1,14 @@
-// Planetoid gravity backend -- RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md.
-// Full design rationale/history for every export below:
-// docs/code-notes/geometry-extensions/gravity.md
+// ARCHIVED 2026-09-22 (second world-building removal pass). Planetoid
+// gravity backend -- RHOMBIVERSE_SPEC_PLANETOID_GRAVITY.md. Kept intact for
+// reference, permanently unreachable in the running app, not deleted. Full
+// design rationale/history for every export below:
+// docs/code-notes/world-systems-archived/gravity.md
 import { NEIGHBOR_OFFSETS, cellKey, parseCellKey, cellToWorld } from '../core/lattice.js';
 
-// Core vs. Modules boundary: render.js supplies the real isClaimProtected
-// via setRegionsIntegration(), gated behind FEATURES.economy. Inert
-// default here (no claims exist) otherwise.
-let isClaimProtected = () => false;
-export function setRegionsIntegration({ isClaimProtected: isClaimProtectedFn }) {
-  isClaimProtected = isClaimProtectedFn;
-}
+// setRegionsIntegration()/isClaimProtected hook removed here 2026-09-22 --
+// render.js stopped calling it once the Claims system was retired
+// 2026-09-17 (its only real caller); dead code, safe to drop even in an
+// archived file.
 
 export const BSG_MATERIAL = 'blackstar-glassite';
 
@@ -122,9 +121,9 @@ export function nearestPlanetoid(position, planetoids) {
 export function gravityAt(position, planetoids, claims = {}) {
   const nearest = nearestPlanetoid(position, planetoids);
   if (!nearest || !nearest.active) return null;
-  const cx = Math.round(position.x);
-  const cy = Math.round(position.y);
-  const cz = Math.round(position.z);
-  if (isClaimProtected(claims, cx, cy, cz)) return null;
+  // claims/isClaimProtected always defaulted to a no-op (see the removed
+  // setRegionsIntegration hook above) -- never actually blocked anything
+  // in the live app, so this parameter is now vestigial rather than wired.
+  void claims;
   return nearest;
 }
