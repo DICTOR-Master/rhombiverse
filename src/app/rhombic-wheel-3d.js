@@ -17,7 +17,7 @@ import {
   ACTION_TO_MARK,
 } from './rhombic-wheel-3d-core.js';
 import { iconFrame, MARKS } from './wheel-icons.js';
-import { dimensionShadowIcon } from './dimension-shadow-icons.js';
+import { dimensionShadowIcon, almanacIcon } from './dimension-shadow-icons.js';
 import { FEATURES } from './features.js';
 
 // Reveal timing (spec section 3): explicitly left tunable by the spec
@@ -312,7 +312,9 @@ export function createRhombicWheel3D({
       // shadow icon shows by default, the word label only on hover/
       // touch, exactly like every other wheel face; "larger script"
       // (the scoped CSS font-size bump) still applies once revealed.
-      const dimensionShadow = wheelConfig.id === 'dimension' ? dimensionShadowIcon(data.label) : null;
+      const dimensionShadow = wheelConfig.id === 'dimension'
+        ? (data.label === 'Almanac' ? almanacIcon() : dimensionShadowIcon(data.label))
+        : null;
       const markKey = ACTION_TO_MARK[data.action];
       if (dimensionShadow) {
         labelEl.classList.add('has-icon');

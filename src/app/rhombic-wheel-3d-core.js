@@ -168,6 +168,20 @@ export const FIFTH_SLOT_DEFAULT = {
 // THE function that guarantees uniformity -- every wheel, including
 // Home, passes through here rather than assembling its own map.
 export function resolveWheelFaces(wheelConfig) {
+  // noUniversalRing (2026-09-22, dimension wheel only): direct
+  // instruction, "on first view of wheel only dimensions should show...
+  // not all almanac and everything else." The dimension wheel is the
+  // one wheel in this app that's never navigated TO from another wheel
+  // (it's the standalone top-level gate, its own createRhombicWheel3D
+  // instance) and never needs Cyborg/Settings/Almanac/Home reachable
+  // from it -- so, uniquely, it skips the universal-ring/5th-slot
+  // injection entirely and declares all 12 face keys itself. Every
+  // other wheel keeps the normal injected ring unchanged.
+  if (wheelConfig.noUniversalRing) {
+    const faces = {};
+    for (const [key, val] of Object.entries(wheelConfig.faces)) faces[key] = val;
+    return faces;
+  }
   const faces = { ...UNIVERSAL_RING };
   faces[FIFTH_SLOT_KEY] = wheelConfig.id === "home" && wheelConfig.fifthSlotOverride
     ? wheelConfig.fifthSlotOverride
@@ -707,31 +721,30 @@ export const WHEEL_RD_FAMILY = {
 // src/world-systems-archived/dimension-wizard.js) now that this wheel
 // replaces it as the actual dimension picker.
 //
-// Real structural constraint worth documenting, not glossed over:
-// resolveWheelFaces() always injects the SAME 3 universal-ring faces
-// (Cyborg/Settings/Almanac, fixed positions) and the 5th slot (Home,
-// since this wheel's id isn't "home") regardless of what's declared
-// here -- leaving exactly 8 free slots, not 12. Of those 8, only the 4
-// EQUATOR slots pair up into real geometric antipodes with each other
-// (verified via this file's own established face-normal-direction
-// math: an equator face at (sx,sy,0) has its true antipode at
-// (-sx,-sy,0), still on the equator ring). The other 4 free slots
-// (top|sy1sz1, bottom|sy1sz-1, bottom|sx1sz-1, bottom|sx-1sz-1) each
-// have their TRUE antipode landing on a fixed universal-ring face, so
-// they can't get a real doubled partner within this wheel's own free
-// slots. "Doubled on opposite faces," direct instruction: 3D and 4D
-// each get a TRUE antipodal double (the only 2 pairs that exist); 2D
-// gets a practical (non-antipodal) second copy in a second lone slot,
-// same "duplicate into a spare slot for reachability" convention this
-// file already uses elsewhere (DUPLICATE_HOME_FACE, Alter's own
-// temporary Dig duplicate) -- not a literal antipode, just placed for
-// visibility. 5D/6D get one slot each (all 8 free slots used, none
-// truly spare). Only 3D is real/clickable (`kind: "dept"`); 2D/4D/5D/6D
-// are plain SPARE (dark, non-clickable, label + desc kept) -- direct
-// correction from earlier this session ("simplicity is key... no
-// extraneous out of scope steps visible") still applies unchanged.
+// 4th iteration, direct correction: "on first view of wheel only
+// dimensions should show[,] all dimensions doubled on opposite poles" +
+// "not all almanac and everything else." resolveWheelFaces' own
+// noUniversalRing flag (see that function's own header) is what makes
+// this possible -- with the 3 fixed universal-ring faces and the 5th-
+// slot Home no longer injected, ALL 12 face keys are free, which
+// resolve into exactly 6 true antipodal pairs (verified via this file's
+// own established face-normal-direction math): the 2 equator pairs
+// already used for 3D/4D, plus 4 more cross-ring pairs (a top face at
+// (0,sy,1)/(sx,0,1) has its true antipode at (0,-sy,-1)/(-sx,0,-1) on
+// the bottom ring) that were previously unreachable because their
+// antipodes were fixed universal-ring faces. That's exactly enough for
+// every one of the 5 real dimensions to get a TRUE doubled pair (10
+// slots), with one pair (2 slots) left over -- given to Almanac,
+// doubled too, direct follow-up ("maybe almanac too doubled for all
+// 12") -- so all 12 slots are real, none truly spare. Only 3D is
+// buildable (`kind: "dept"`, real click); 2D/4D/5D/6D stay plain SPARE
+// (dark, non-clickable, label + desc kept) until each tier actually
+// ships -- "simplicity is key" still applies unchanged, just now with
+// every dimension visibly doubled rather than only the ones that
+// happened to have a free antipode under the old universal-ring layout.
 export const WHEEL_DIMENSION = {
   id: "dimension",
+  noUniversalRing: true,
   faces: {
     "equator|sx1sy1":   { kind: "dept", label: "3D", action: "tool:selectDimension:3D",
       desc: "FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app's existing lattice core." },
@@ -747,10 +760,18 @@ export const WHEEL_DIMENSION = {
     // actually buildable. Triangular/Hexagonal/Rhombic still planned.
     "top|sy1sz1":       { kind: "dept", label: "2D", action: "tool:selectDimension:2D",
       desc: "Square (shipped) -- Triangular, Hexagonal, Rhombic tilings still planned." },
-    "bottom|sy1sz-1":   { kind: "dept", label: "2D", action: "tool:selectDimension:2D",
+    "bottom|sy-1sz-1":  { kind: "dept", label: "2D", action: "tool:selectDimension:2D",
       desc: "Square (shipped) -- Triangular, Hexagonal, Rhombic tilings still planned." },
-    "bottom|sx1sz-1":   { kind: "spare", label: "5D", action: null,
+    "top|sy-1sz1":      { kind: "spare", label: "5D", action: null,
       desc: "Decagonal quasicrystal -- planned, not yet built." },
+    "bottom|sy1sz-1":   { kind: "spare", label: "5D", action: null,
+      desc: "Decagonal quasicrystal -- planned, not yet built." },
+    "top|sx-1sz1":      { kind: "dept", label: "Almanac", action: "openAlmanac",
+      desc: "Math & Geometry reference -- the demonstrations behind everything you build." },
+    "bottom|sx1sz-1":   { kind: "dept", label: "Almanac", action: "openAlmanac",
+      desc: "Math & Geometry reference -- the demonstrations behind everything you build." },
+    "top|sx1sz1":       { kind: "spare", label: "6D", action: null,
+      desc: "Icosahedral quasicrystal -- planned, not yet built." },
     "bottom|sx-1sz-1":  { kind: "spare", label: "6D", action: null,
       desc: "Icosahedral quasicrystal -- planned, not yet built." },
   }

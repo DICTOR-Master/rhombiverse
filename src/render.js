@@ -2785,8 +2785,11 @@ async function init() {
           handleWheelAction('tool:pieceType:square2d');
           return;
         }
-        if (action === 'openCyborg') { dimensionWheel3D.close(); cyborgToggleEl?.click(); return; }
-        if (action === 'openLab') { dimensionWheel3D.close(); labToggleEl?.click(); return; }
+        // WHEEL_DIMENSION's own noUniversalRing:true (see that config's
+        // own header) means Cyborg/Settings are no longer reachable
+        // faces on this wheel at all -- only Almanac stays, doubled on
+        // its own antipodal pair ("maybe almanac too doubled for all
+        // 12"), so this is the one universal-ring action still live here.
         if (action === 'openAlmanac') { dimensionWheel3D.close(); almanac.open(); return; }
       },
     });
@@ -3307,7 +3310,19 @@ async function init() {
     autoAssignOverrides = JSON.parse(localStorage.getItem(AUTO_ASSIGN_STORAGE_KEY)) ?? {};
   } catch { /* corrupt/missing -- fall back to the built-in defaults */ }
 
-  // See AUTO_ASSIGN_MATERIAL_BY_PIECE's own header.
+  // See AUTO_ASSIGN_MATERIAL_BY_PIECE's own header. Direct follow-up
+  // (2026-09-22) after a first, wrong-direction attempt at this (auto-
+  // cycling every placement, reverted): "auto assign is fine but with
+  // override changes pre-assign until updated again" / "has a color if
+  // you don't change but changes if you pick new color" -- the real
+  // complaint was that auto-assign's own fixed per-piece default
+  // silently outranked the MAIN #material-select dropdown, so picking a
+  // new color there appeared to do nothing for auto-assigned piece
+  // types. Fixed below (not here) by having a #material-select change
+  // ALSO write into autoAssignOverrides for whichever piece type is
+  // currently selected -- same "sticky until you change it again"
+  // model, just reachable from the dropdown the user is actually
+  // looking at, not only the Settings-panel per-piece list.
   function currentMaterialFor(pieceType) {
     if (autoAssignMaterialCheckbox?.checked) {
       return autoAssignOverrides[pieceType] ?? AUTO_ASSIGN_MATERIAL_BY_PIECE[pieceType] ?? materialSelect.value;
@@ -3438,6 +3453,36 @@ async function init() {
   }
   refreshHudIndicator = updateHudIndicator;
   materialSelect.addEventListener('change', updateHudIndicator);
+  // Direct fix for the "auto assign... but with override changes pre-
+  // assign until updated again" complaint above: picking a new color
+  // from the MAIN material picker now also updates the auto-assign
+  // override for whichever piece type is currently selected, so it
+  // actually takes effect (previously auto-assign's own fixed default
+  // silently outranked this dropdown whenever it was checked, which is
+  // ON by default). Same "sticky until changed again" persistence as
+  // the Settings-panel per-piece dropdowns already have -- this is just
+  // a second way to reach the exact same autoAssignOverrides entry, not
+  // a separate mechanism, so the two never drift out of sync with each
+  // other. Only writes when auto-assign is actually on -- with it off,
+  // materialSelect.value already IS the live color (currentMaterialFor's
+  // own plain fallback), nothing extra to persist.
+  materialSelect.addEventListener('change', () => {
+    if (!autoAssignMaterialCheckbox?.checked) return;
+    const pieceType = document.getElementById('piece-type-select')?.value;
+    if (!pieceType) return;
+    autoAssignOverrides[pieceType] = materialSelect.value;
+    try { localStorage.setItem(AUTO_ASSIGN_STORAGE_KEY, JSON.stringify(autoAssignOverrides)); } catch { /* best-effort only */ }
+    // Keep the Settings-panel per-piece dropdown (if it exists for this
+    // piece type) visually in sync too, so the two controls never show
+    // contradicting values.
+    for (const wrap of autoAssignMaterialsRow?.children ?? []) {
+      const span = wrap.querySelector('span');
+      const select = wrap.querySelector('select');
+      if (select && span?.textContent === (AUTO_ASSIGN_PIECE_LABELS[pieceType] ?? pieceType)) {
+        select.value = materialSelect.value;
+      }
+    }
+  });
   // Real bug, caught live 2026-08-31 ("picking CO... disphenoid coming
   // instead", eventually pinned down to "picker shape is flat
   // octahedron" -- not a placement bug at all, confirmed by checking
