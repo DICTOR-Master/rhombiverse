@@ -82,6 +82,21 @@
       padding: 6px 4px; margin: -6px -4px; /* bumps the tap target up without moving the text */
     }
     #hud-wheel-cue:hover { opacity: 1; }
+    /* Dimension wizard cue: top-left, mirroring #hud-wheel-cue's own
+       bottom-left styling -- direct instruction, "top left for
+       wireframe wizard" -- a second, parallel entry point alongside the
+       bottom-left menu wheel, same "wheel + browser" split polyhedraverse
+       already uses, just both reachable from inside a dimension's own
+       sandbox rather than forced open (that's the dedicated dimension-
+       select wheel's own job now, on load). Positioned just below
+       #hud-wordmark (top:14px/left:16px) to avoid overlapping it. */
+    #hud-wizard-cue {
+      position: fixed; top: 38px; left: 16px; z-index: 900;
+      color: #9cd; font: 11px system-ui, sans-serif; opacity: 0.7;
+      user-select: none; cursor: pointer;
+      padding: 6px 4px; margin: -6px -4px;
+    }
+    #hud-wizard-cue:hover { opacity: 1; }
     /* Quick-select: the CURRENTLY active Piece/Material, always visible
        next to Menu rather than only shown as a fading toast -- direct
        request 2026-08-29 ("a little hexagon icon of each... stay open
@@ -799,6 +814,7 @@
   <div id="hud-prompt"></div>
   <div id="sculpture-mode-banner"><span data-i18n="hud.sculptureModeBanner">Sculpture Mode -- isolated scratch space, separate from your main build</span><button id="sculpture-mode-exit" type="button" data-i18n="hud.exitToUniverse">Exit to Universe</button></div>
   <div id="hud-wheel-cue" title="Tab / Space also opens this" data-i18n="hud.menu">Menu</div>
+  <div id="hud-wizard-cue" title="Browse dimensions and lattice families">Wizard</div>
   <button id="hud-quick-shape" type="button" title="Shape (tap to change)"></button>
   <button id="hud-quick-material" type="button" title="Material (tap to change)"></button>
   <button id="hud-quick-lattice-view" type="button" title="Lattice View (tap to cycle)"></button>

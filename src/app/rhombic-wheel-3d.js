@@ -25,14 +25,14 @@ import { FEATURES } from './features.js';
 const REVEAL_HOLD_MS = 350;
 
 const CSS = `
-#rhombic-wheel-3d-overlay {
+.rhombic-wheel-3d-overlay {
   position: fixed; inset: 0; z-index: 990;
   display: none;
   background: rgba(2, 2, 6, 0.55);
 }
-#rhombic-wheel-3d-overlay.open { display: block; }
-#rhombic-wheel-3d-canvas-wrap { position: absolute; inset: 0; }
-#rhombic-wheel-3d-labels { position: absolute; inset: 0; pointer-events: none; }
+.rhombic-wheel-3d-overlay.open { display: block; }
+.rhombic-wheel-3d-canvas-wrap { position: absolute; inset: 0; }
+.rhombic-wheel-3d-labels { position: absolute; inset: 0; pointer-events: none; }
 .rw3d-label {
   position: absolute; transform: translate(-50%, -50%);
   width: max-content; /* explicit shrink-to-fit -- see .has-icon's own comment for why this can't be left implicit */
@@ -92,7 +92,7 @@ const CSS = `
   font-size: ${LABEL_STYLE.fontSizeBase};
 }
 .rw3d-label.reveal .rw3d-label-text { opacity: 1; }
-#rhombic-wheel-3d-panel {
+.rhombic-wheel-3d-panel {
   position: absolute; right: 24px; top: 50%; transform: translateY(-50%);
   width: 260px; padding: 16px;
   background: rgba(10, 12, 20, 0.85); border: 1px solid rgba(77, 208, 225, 0.5);
@@ -105,14 +105,14 @@ const CSS = `
      tapped next) -- silently stealing the very follow-up tap the "stay
      open" design exists to enable. The panel is read-only (title +
      description text, no buttons or links of its own -- the real close
-     control is the separate sibling #rhombic-wheel-3d-close), so it's
+     control is the separate sibling .rhombic-wheel-3d-close), so it's
      safe to let clicks pass straight through it to whatever face is
      actually underneath. */
   pointer-events: none;
 }
-#rhombic-wheel-3d-panel.open { display: block; }
-#rhombic-wheel-3d-panel h3 { margin: 0 0 8px; color: ${SKELETON_COLOR}; }
-#rhombic-wheel-3d-close {
+.rhombic-wheel-3d-panel.open { display: block; }
+.rhombic-wheel-3d-panel h3 { margin: 0 0 8px; color: ${SKELETON_COLOR}; }
+.rhombic-wheel-3d-close {
   position: absolute; top: 16px; right: 16px;
   color: #eaf6ff; background: none; border: 1px solid rgba(255,255,255,0.4);
   width: 32px; height: 32px; cursor: pointer; font-size: 16px;
@@ -130,19 +130,36 @@ function injectCssOnce() {
 export function createRhombicWheel3D({
   onAction, // (actionString) => void -- caller resolves navigateHome/navigateTo:x/tool:x/openLab/etc.
   getWorkspaceMode, // () => 'model' | 'world' -- read fresh on every build, not snapshotted at construction (reframe Stage 2)
+  // Dimension-select wheel (2026-09-22): a SECOND, independent instance
+  // of this factory now exists (render.js's own dimensionWheel3D) --
+  // every DOM id below used to be a bare hardcoded literal, which was
+  // fine for exactly one instance but is a real duplicate-id bug with
+  // two (whichever instance's element document.getElementById/CSS-id-
+  // selector queries would resolve to is undefined browser behavior).
+  // instanceId suffixes the id only; CSS below targets the STABLE class
+  // every instance shares instead of the id, so visual styling is
+  // unaffected. Defaults to '' (empty) so the original primary instance
+  // (render.js's own wheel3D) keeps its exact original ids unchanged.
+  instanceId = '',
 } = {}) {
   injectCssOnce();
+  const suffix = instanceId ? `-${instanceId}` : '';
 
   const overlay = document.createElement('div');
-  overlay.id = 'rhombic-wheel-3d-overlay';
+  overlay.id = `rhombic-wheel-3d-overlay${suffix}`;
+  overlay.className = 'rhombic-wheel-3d-overlay';
   const canvasWrap = document.createElement('div');
-  canvasWrap.id = 'rhombic-wheel-3d-canvas-wrap';
+  canvasWrap.id = `rhombic-wheel-3d-canvas-wrap${suffix}`;
+  canvasWrap.className = 'rhombic-wheel-3d-canvas-wrap';
   const labelsLayer = document.createElement('div');
-  labelsLayer.id = 'rhombic-wheel-3d-labels';
+  labelsLayer.id = `rhombic-wheel-3d-labels${suffix}`;
+  labelsLayer.className = 'rhombic-wheel-3d-labels';
   const panel = document.createElement('div');
-  panel.id = 'rhombic-wheel-3d-panel';
+  panel.id = `rhombic-wheel-3d-panel${suffix}`;
+  panel.className = 'rhombic-wheel-3d-panel';
   const closeBtn = document.createElement('button');
-  closeBtn.id = 'rhombic-wheel-3d-close';
+  closeBtn.id = `rhombic-wheel-3d-close${suffix}`;
+  closeBtn.className = 'rhombic-wheel-3d-close';
   closeBtn.type = 'button';
   closeBtn.textContent = '×';
   overlay.append(canvasWrap, labelsLayer, panel, closeBtn);

@@ -683,21 +683,78 @@ export const WHEEL_RD_FAMILY = {
   }
 };
 
-// Dimension-select wizard (2026-09-22): an earlier draft put dimension/
-// lattice-family selection ON this wheel (WHEEL_DIMENSION/
-// WHEEL_LATTICE_3D configs, right here). Reverted same session, direct
-// correction: "as in polyhedraverse one list two routes" -- dimension-
-// select is its own real wireframe-card list (src/app/dimension-
-// wizard.js, "the wizard"), a SEPARATE overlay from this wheel, not a
-// wheel screen. "The wheel has breakdown family shapes as in 3D
-// currently" -- this wheel keeps doing exactly what it already does for
-// 3D (Piece -> RD Family breakdown), untouched; it was never the right
-// place for the dimension/family PICK itself. See render.js's
-// handleWheelAction ("Change Dimension" branch) and dimension-wizard.js
-// for where that logic actually lives now.
+// Dimension-select wheel (2026-09-22, 3rd iteration): two earlier
+// drafts tried and reverted, both real, both worth keeping on record.
+// (1) A flat HTML/CSS card overlay -- replaced because "UI wheel should
+// display 2D 3D 4D 5D 6D" asked for a real rotating wheel. (2) Put
+// directly ON this shared department wheel (WHEEL_DIMENSION/
+// WHEEL_LATTICE_3D configs right here) -- reverted because "as in
+// polyhedraverse one list two routes"/"the wheel has breakdown family
+// shapes as in 3D currently" clarified this shared wheel's real job
+// stays exactly what it already does for 3D (Piece -> RD Family), not
+// dimension-select too; replaced with a separate wireframe-card wizard
+// (src/app/dimension-wizard.js).
+//
+// THIS is the 3rd iteration, direct instruction: "one moving rhombic
+// wheel with all dimensions selectable" -- but confirmed as "a
+// dedicated rotating wheel just for dimensions... NOT reusing/merging
+// with the shared Build/Piece navigation wheel." So: a SEPARATE
+// createRhombicWheel3D() instance (its own scene/overlay, see
+// render.js's own dimensionWheel3D), reusing this exact config system
+// (resolveWheelFaces/ALL_WHEELS) since it's already proven, just never
+// reached via navigateTo: from any other wheel and never navigated away
+// from. dimension-wizard.js is retired (archived, not deleted --
+// src/world-systems-archived/dimension-wizard.js) now that this wheel
+// replaces it as the actual dimension picker.
+//
+// Real structural constraint worth documenting, not glossed over:
+// resolveWheelFaces() always injects the SAME 3 universal-ring faces
+// (Cyborg/Settings/Almanac, fixed positions) and the 5th slot (Home,
+// since this wheel's id isn't "home") regardless of what's declared
+// here -- leaving exactly 8 free slots, not 12. Of those 8, only the 4
+// EQUATOR slots pair up into real geometric antipodes with each other
+// (verified via this file's own established face-normal-direction
+// math: an equator face at (sx,sy,0) has its true antipode at
+// (-sx,-sy,0), still on the equator ring). The other 4 free slots
+// (top|sy1sz1, bottom|sy1sz-1, bottom|sx1sz-1, bottom|sx-1sz-1) each
+// have their TRUE antipode landing on a fixed universal-ring face, so
+// they can't get a real doubled partner within this wheel's own free
+// slots. "Doubled on opposite faces," direct instruction: 3D and 4D
+// each get a TRUE antipodal double (the only 2 pairs that exist); 2D
+// gets a practical (non-antipodal) second copy in a second lone slot,
+// same "duplicate into a spare slot for reachability" convention this
+// file already uses elsewhere (DUPLICATE_HOME_FACE, Alter's own
+// temporary Dig duplicate) -- not a literal antipode, just placed for
+// visibility. 5D/6D get one slot each (all 8 free slots used, none
+// truly spare). Only 3D is real/clickable (`kind: "dept"`); 2D/4D/5D/6D
+// are plain SPARE (dark, non-clickable, label + desc kept) -- direct
+// correction from earlier this session ("simplicity is key... no
+// extraneous out of scope steps visible") still applies unchanged.
+export const WHEEL_DIMENSION = {
+  id: "dimension",
+  faces: {
+    "equator|sx1sy1":   { kind: "dept", label: "3D", action: "tool:selectDimension:3D",
+      desc: "FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app's existing lattice core." },
+    "equator|sx-1sy-1": { kind: "dept", label: "3D", action: "tool:selectDimension:3D",
+      desc: "FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app's existing lattice core." },
+    "equator|sx1sy-1":  { kind: "spare", label: "4D", action: null,
+      desc: "Hypercubic (Tesseract) and D4 root lattice -- planned, not yet built." },
+    "equator|sx-1sy1":  { kind: "spare", label: "4D", action: null,
+      desc: "Hypercubic (Tesseract) and D4 root lattice -- planned, not yet built." },
+    "top|sy1sz1":       { kind: "spare", label: "2D", action: null,
+      desc: "Square, Triangular, Hexagonal, Rhombic tilings -- planned, not yet built." },
+    "bottom|sy1sz-1":   { kind: "spare", label: "2D", action: null,
+      desc: "Square, Triangular, Hexagonal, Rhombic tilings -- planned, not yet built." },
+    "bottom|sx1sz-1":   { kind: "spare", label: "5D", action: null,
+      desc: "Decagonal quasicrystal -- planned, not yet built." },
+    "bottom|sx-1sz-1":  { kind: "spare", label: "6D", action: null,
+      desc: "Icosahedral quasicrystal -- planned, not yet built." },
+  }
+};
 
 export const ALL_WHEELS = {
   home: WHEEL_HOME, build: WHEEL_BUILD, alter: WHEEL_ALTER,
+  dimension: WHEEL_DIMENSION,
   rhombitect: WHEEL_RHOMBITECT,
   piece: WHEEL_PIECE, rdFamily: WHEEL_RD_FAMILY,
 };

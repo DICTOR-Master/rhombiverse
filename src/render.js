@@ -2442,12 +2442,13 @@ async function init() {
   const almanac = createAlmanac();
   {
     // handleWheelAction: extracted to a named function (2026-09-22,
-    // dimension-select wizard) so the new dimension-wizard.js overlay can
-    // dispatch through the exact SAME real-action path the wheel itself
-    // uses (e.g. tool:pieceType:rd/to for FCC/BCC) rather than duplicating
-    // any of this logic -- "one tool, one doorway" extended to a second
-    // real caller, not a second implementation. Safe to reference wheel3D
-    // before its own declaration below: this function's body only reads
+    // dimension-select wheel) so the dedicated dimensionWheel3D instance
+    // can dispatch through the exact SAME real-action path the shared
+    // wheel itself uses (e.g. tool:pieceType:rd/to for FCC/BCC) rather
+    // than duplicating any of this logic -- "one tool, one doorway"
+    // extended to a second real caller, not a second implementation.
+    // Safe to reference wheel3D before its own declaration below: this
+    // function's body only reads
     // wheel3D when actually CALLED (a later click), by which time the
     // const just below has long since been assigned -- the exact same
     // closure timing this arrow function already relied on before the
@@ -2528,19 +2529,16 @@ async function init() {
         // terminal tool: action -- there's no more Material face left on
         // this screen to stay open for.
         // WHEEL_HOME's "Change Dimension" face (repurposed spare, see
-        // that wheel's own header comment). Direct correction, same
-        // session, after an earlier draft put dimension-select ON the
-        // wheel itself ("as in polyhedraverse one list two routes" --
-        // dimension-select is its own real wireframe-card list, the
-        // wizard, a SEPARATE overlay from the wheel; the wheel stays
-        // purely the in-sandbox family-breakdown tool it already is for
-        // 3D's Piece -> RD Family, unchanged). "Change Dimension" is one
-        // of the wizard's two routes in (the other: force-opened once on
-        // load, see init()'s own comment below) -- both land on the SAME
-        // single dimensionWizard instance/list, not two different ones.
+        // that wheel's own header comment). Opens the dedicated
+        // dimensionWheel3D instance -- a SEPARATE wheel/overlay from
+        // this shared one (see WHEEL_DIMENSION's own header in
+        // rhombic-wheel-3d-core.js for the full history/reasoning). One
+        // of dimensionWheel3D's two routes in (the other: force-opened
+        // once on load, see init()'s own comment below) -- both land on
+        // the SAME single instance, not two different ones.
         if (action === 'tool:changeDimension') {
           wheel3D.close();
-          dimensionWizard.open();
+          dimensionWheel3D.open('dimension');
           return;
         }
         if (action.startsWith('tool:pieceType:')) {
@@ -2707,19 +2705,53 @@ async function init() {
         onChange();
       }
     }
-    // Dimension-select wizard (2026-09-22): the real dimension/family
-    // picker -- a separate wireframe-card list overlay, not a wheel
-    // screen (see handleWheelAction's own "Change Dimension" comment
-    // above for the full reasoning/history of that correction).
-    // onSelectFamily dispatches through handleWheelAction, the exact
-    // same real-action path the wheel's own Piece screen already uses
-    // for FCC/BCC -- "one tool, one doorway" extended to this second
-    // caller, not duplicated. seedIfWorldEmpty() runs here for the same
-    // reason toggleWheel3D's own call does just below: this is a new
-    // entry path into Build mode that bypasses that call site entirely
-    // (the wizard opens directly from init(), never through
-    // toggleWheel3D), so a fresh empty world needs the same real seed
-    // cell before Add/Remove has any face to click.
+    // Dimension-select wheel (2026-09-22, 3rd iteration): a SEPARATE
+    // createRhombicWheel3D() instance, dedicated only to WHEEL_DIMENSION
+    // -- never navigated to/from wheel3D (the shared Build/Piece nav
+    // wheel), its own overlay/scene, direct instruction ("one moving
+    // rhombic wheel with all dimensions selectable... a dedicated
+    // rotating wheel just for dimensions"). Replaces the earlier
+    // wireframe-card wizard (dimension-wizard.js, now archived --
+    // src/world-systems-archived/dimension-wizard.js).
+    //
+    // Its own onAction, NOT handleWheelAction directly: the universal-
+    // ring actions (openCyborg/openLab/openAlmanac) need to close THIS
+    // wheel instance, not wheel3D (handleWheelAction's own `wheel3D.
+    // close()` calls would close the wrong, already-closed instance and
+    // leave this one sitting open on top of Settings/Cyborg/Almanac).
+    // navigateHome/navigateTo: are intercepted inside createRhombicWheel3D's
+    // own dispatchAction before ever reaching onAction, so nothing
+    // special is needed for the 5th-slot Home face -- it already
+    // switches this same instance to WHEEL_HOME's own content.
+    const dimensionWheel3D = createRhombicWheel3D({
+      instanceId: 'dimension',
+      getWorkspaceMode: () => workspaceMode,
+      onAction: (action) => {
+        if (action === 'tool:selectDimension:3D') {
+          activeDimension = '3D';
+          seedIfWorldEmpty();
+          dimensionWheel3D.close();
+          handleWheelAction('tool:pieceType:rd');
+          return;
+        }
+        if (action === 'openCyborg') { dimensionWheel3D.close(); cyborgToggleEl?.click(); return; }
+        if (action === 'openLab') { dimensionWheel3D.close(); labToggleEl?.click(); return; }
+        if (action === 'openAlmanac') { dimensionWheel3D.close(); almanac.open(); return; }
+      },
+    });
+    // Dimension wizard: a SECOND, parallel entry point inside a
+    // dimension's own sandbox -- direct instruction ("wheel is entry
+    // point of whole rhombiverse[,] then whichever dimension['s] scene
+    // opens[:] bottom left for menu wheel or top left for wireframe
+    // wizard... similar to Polyhedraverse[,] except one more entry
+    // wheel"). Polyhedraverse keeps its own wheel and card-browser as
+    // two deliberately separate, parallel surfaces (confirmed directly
+    // against its own page.tsx); rhombiverse's dedicated dimension wheel
+    // above is the "one more" on top of that same pattern. This is the
+    // exact same wizard/onSelectFamily wiring as before -- only WHEN
+    // it's reachable changed (no longer forced open on load, that's
+    // dimensionWheel3D's own job now; reachable any time via the new
+    // top-left #hud-wizard-cue instead).
     const dimensionWizard = createDimensionWizard({
       onSelectFamily: (action) => {
         activeDimension = '3D';
@@ -2727,23 +2759,21 @@ async function init() {
         handleWheelAction(action);
       },
     });
+    document.getElementById('hud-wizard-cue')?.addEventListener('click', () => dimensionWizard.open());
     function toggleWheel3D() {
       if (pickers.isAnyPickerOpen()) { pickers.closeAnyPicker(); return; }
       if (wheel3D.isOpen) wheel3D.close();
       else { seedIfWorldEmpty(); wheel3D.open('home'); }
     }
     rhombicWheel3DToggleBtn?.addEventListener('click', toggleWheel3D);
-    isRhombicWheel3DOpen = () => wheel3D.isOpen;
+    isRhombicWheel3DOpen = () => wheel3D.isOpen || dimensionWheel3D.isOpen;
 
-    // Dimension-select wizard (2026-09-22): the app's real entry gate
-    // now -- every load force-opens the wizard's own overlay (a real
-    // wireframe-card list, NOT the wheel -- see handleWheelAction's own
-    // "Change Dimension" comment above for why this isn't a wheel
-    // screen), in place of the old default of landing in the 3D FCC
-    // sandbox with nothing open. No persistence/skip (matches
-    // activeDimension's own "in-memory only" comment above): every
-    // fresh load asks again.
-    dimensionWizard.open();
+    // Dimension-select wheel: the app's real entry gate now -- every
+    // load force-opens this dedicated wheel, in place of the old
+    // default of landing in the 3D FCC sandbox with nothing open. No
+    // persistence/skip (matches activeDimension's own "in-memory only"
+    // comment above): every fresh load asks again.
+    dimensionWheel3D.open('dimension');
 
     // Reclaims Tab/Space/hud-wheel-cue from the old 2D wheel -- same
     // entry points, now driving the sole (3D) wheel.
@@ -2757,6 +2787,7 @@ async function init() {
       if (e.code === 'Escape') {
         if (pickers.isAnyPickerOpen()) pickers.closeAnyPicker();
         else if (wheel3D.isOpen) wheel3D.close();
+        else if (dimensionWheel3D.isOpen) dimensionWheel3D.close();
         return;
       }
       e.preventDefault();

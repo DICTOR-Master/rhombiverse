@@ -53,32 +53,18 @@ async function main() {
   const overlayDisplay = await page.$eval('#welcome-overlay', (el) => getComputedStyle(el).display);
   assert.equal(overlayDisplay, 'none', 'welcome overlay should hide after Enter');
 
-  // Dimension-select wizard (2026-09-22): init() now force-opens a
-  // dedicated overlay (dimension-wizard.js's createDimensionWizard, NOT
-  // the Rhombic Wheel -- see that file's own header for why an earlier
-  // wheel-based draft was reverted) on every load, in place of the old
-  // default of landing straight in the 3D FCC sandbox with nothing open.
-  // Unlike the Rhombic Wheel's own raycast-driven faces (not a reliable
-  // CI interaction -- see the Tab-open/close check further down), this
-  // overlay's cards are plain DOM buttons with stable data- attributes,
-  // so the real flow (not a bypass) is actually reliable to click through
-  // here: confirm the gate, pick 3D, pick FCC, confirm it closes.
-  const wizardOpenOnLoad = await page.$eval('.dim-wizard-overlay', (el) => el.classList.contains('open'));
-  assert.ok(wizardOpenOnLoad, 'the dimension wizard should force-open on load');
-  await page.click('.dim-wizard-card-btn[data-dim="3D"]');
-  await page.waitForTimeout(200);
-  const fccCard = await page.waitForSelector('.dim-wizard-card-btn[data-action="tool:pieceType:rd"]', { state: 'visible', timeout: 5000 });
-  await fccCard.click();
-  await page.waitForTimeout(300);
-  const wizardClosedAfterPick = await page.$eval('.dim-wizard-overlay', (el) => !el.classList.contains('open'));
-  assert.ok(wizardClosedAfterPick, 'picking FCC should close the dimension wizard');
-  const pieceTypeAfterPick = await page.$eval('#piece-type-select', (el) => el.value);
-  assert.equal(pieceTypeAfterPick, 'rd', 'picking FCC in the wizard should set the real piece-type select to rd');
-  // Picking a piece type opens the real material picker next (same
-  // handleWheelAction branch WHEEL_PIECE's own faces already use) --
-  // dismiss it the same way a real user's Escape already does
-  // (pickers.isAnyPickerOpen() is checked before wheel3D in the app's
-  // own keydown handler) before the canvas-click checks below.
+  // Dimension-select wheel (2026-09-22, 3rd iteration): init() now
+  // force-opens a SEPARATE, dedicated createRhombicWheel3D() instance
+  // (render.js's own dimensionWheel3D, DOM id "rhombic-wheel-3d-overlay-
+  // dimension" -- see that factory's own instanceId param) on every
+  // load, in place of the old default of landing straight in the 3D FCC
+  // sandbox with nothing open. Its faces are raycast-driven, same
+  // reliability caveat as the shared Rhombic Wheel (see the Tab-open/
+  // close check further down) -- confirm the gate, then Escape past it
+  // (a known, deliberate gap while only 3D is real, same reasoning as
+  // the shared wheel's own) to reach this test's real target below.
+  const dimensionWheelOpenOnLoad = await page.$eval('#rhombic-wheel-3d-overlay-dimension', (el) => el.classList.contains('open'));
+  assert.ok(dimensionWheelOpenOnLoad, 'the dedicated dimension wheel should force-open on load');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
 

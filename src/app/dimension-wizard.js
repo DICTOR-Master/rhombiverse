@@ -79,20 +79,25 @@ const CSS = `
   font: 13px system-ui, sans-serif; padding: 0; margin-bottom: 10px;
 }
 .dim-wizard-sub { color: #99a; font-size: 12px; margin-bottom: 14px; }
+/* A vertical LIST of rows (like polyhedraverse's own family tabs/list),
+   not a box grid -- direct correction, same session: "each dimension is
+   lists like polyhedraverse not boxes"/"run through a list with all
+   dimensions like polyhedra families." */
 .dim-wizard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .dim-wizard-card-btn {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  display: flex; flex-direction: row; align-items: center; gap: 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(124, 204, 255, 0.3);
   border-radius: 8px;
-  padding: 12px 8px;
+  padding: 8px 12px;
   color: #eee;
   cursor: pointer;
-  text-align: center;
+  text-align: left;
+  width: 100%;
 }
 .dim-wizard-card-btn:hover { background: rgba(124, 204, 255, 0.1); border-color: rgba(124, 204, 255, 0.6); }
 .dim-wizard-card-btn.disabled {
@@ -102,7 +107,8 @@ const CSS = `
   border-color: rgba(255, 255, 255, 0.18);
 }
 .dim-wizard-card-btn.disabled:hover { background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.18); }
-.dim-wizard-preview { width: 72px; height: 72px; }
+.dim-wizard-preview { width: 40px; height: 40px; flex: 0 0 auto; }
+.dim-wizard-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dim-wizard-label { font: 700 13px system-ui, sans-serif; color: #fff; }
 .dim-wizard-desc { font-size: 11px; color: #9ab; line-height: 1.35; }
 `;
@@ -247,8 +253,10 @@ export function createDimensionWizard({ onSelectFamily }) {
       grid += `
         <button type="button" class="dim-wizard-card-btn${disabledCls}" data-dim="${dim.id}" ${dim.enabled ? '' : 'disabled title="Planned, not yet built."'}>
           ${preview}
-          <span class="dim-wizard-label">${dim.label}</span>
-          <span class="dim-wizard-desc">${dim.desc}</span>
+          <span class="dim-wizard-row-text">
+            <span class="dim-wizard-label">${dim.label}</span>
+            <span class="dim-wizard-desc">${dim.desc}</span>
+          </span>
         </button>`;
     }
     bodyEl.innerHTML = `<div class="dim-wizard-sub">Pick which dimension tier to build in.</div><div class="dim-wizard-grid">${grid}</div>`;
@@ -266,8 +274,10 @@ export function createDimensionWizard({ onSelectFamily }) {
       grid += `
         <button type="button" class="dim-wizard-card-btn" data-action="${fam.action}">
           ${fam.preview()}
-          <span class="dim-wizard-label">${fam.label}</span>
-          <span class="dim-wizard-desc">${fam.desc}</span>
+          <span class="dim-wizard-row-text">
+            <span class="dim-wizard-label">${fam.label}</span>
+            <span class="dim-wizard-desc">${fam.desc}</span>
+          </span>
         </button>`;
     }
     bodyEl.innerHTML = `
