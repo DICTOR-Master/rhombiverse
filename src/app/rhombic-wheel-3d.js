@@ -17,6 +17,7 @@ import {
   ACTION_TO_MARK,
 } from './rhombic-wheel-3d-core.js';
 import { iconFrame, MARKS } from './wheel-icons.js';
+import { dimensionShadowIcon } from './dimension-shadow-icons.js';
 import { FEATURES } from './features.js';
 
 // Reveal timing (spec section 3): explicitly left tunable by the spec
@@ -49,6 +50,46 @@ const CSS = `
   opacity: 0;
 }
 .rw3d-label.spare { color: #7fa; opacity: 0 !important; pointer-events: none; cursor: default; }
+/* Dimension wheel's own signature treatment (2026-09-22, direct
+   instruction: "all main entry wheel info 2D 3D etc inside signature
+   smaller rhombus (not hexagon, as before)" + "larger script 2D") --
+   scoped to this ONE instance via its now-unique overlay id (see
+   createRhombicWheel3D's own instanceId param), never touching the
+   shared wheel's own styling. Rhombus via clip-path (a real diamond,
+   not the icon system's hexagon frame -- direct correction, this
+   wheel's own signature shape instead) as a backdrop behind the label
+   text, sized up from the base 16/19px. Spare (unbuilt) dimensions get
+   a real, readable dim label here instead of the shared wheel's
+   default opacity:0 -- "all main entry wheel info 2D 3D etc [visible]
+   inside," not hidden until built. */
+/* !important is required here, not just higher specificity -- font-size
+   is set via a direct e.labelEl.style.fontSize assignment every frame
+   (isSelect ? fontSizeSelected : fontSizeBase, both plain 16-19px
+   values), which as an inline style would otherwise beat any stylesheet
+   rule regardless of selector specificity. !important is the one thing
+   that still wins over an inline style. */
+#rhombic-wheel-3d-overlay-dimension .rw3d-label-text {
+  /* .rw3d-label-text has its own explicit font-size (LABEL_STYLE.
+     fontSizeBase, 16px, see that rule's own definition) -- a child's
+     own declared property always wins over a parent's, !important or
+     not, so this needs its own matching override, not just the parent
+     .rw3d-label rule below. */
+  font-size: 26px !important;
+}
+#rhombic-wheel-3d-overlay-dimension .rw3d-label {
+  font-size: 26px !important;
+  background: rgba(4, 10, 16, 0.72);
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  padding: 22px 30px;
+}
+/* .rw3d-dim-shadow rides along with the existing .rw3d-label-icon class
+   (52x52px, display:block -- see that rule's own comment for why NOT
+   flex) -- just needs its inner <svg> sized to fill that box. */
+#rhombic-wheel-3d-overlay-dimension .rw3d-dim-shadow svg { width: 100%; height: 100%; }
+#rhombic-wheel-3d-overlay-dimension .rw3d-label.spare {
+  opacity: 0.4 !important;
+  pointer-events: none;
+}
 /* Icon System (RHOMBIVERSE_SPEC_ICON_SYSTEM.md section 3): resting state
    is symbol-only; the text word is a separate child, hidden until
    .reveal (hover on desktop, hold on touch -- see REVEAL_HOLD_MS). Its
@@ -258,8 +299,38 @@ export function createRhombicWheel3D({
       // touch word; everything else keeps the plain text label exactly
       // as before -- see that map's own header for why (spec leaves
       // several real actions genuinely unresolved; not guessing here).
+      // Dimension wheel's own "shadow" icons (2026-09-22): a real N-
+      // vector zonogon per dimension (dimension-shadow-icons.js's own
+      // header has the full math) -- deliberately NOT run through
+      // iconFrame() (the shared hexagon frame every other mark uses):
+      // direct correction, "signature smaller rhombus (not hexagon, as
+      // before)" -- this wheel's own scoped CSS (.rw3d-label's clip-path
+      // diamond backdrop) is the frame instead. Reuses the SAME has-icon/
+      // reveal-on-touch structure every other marked face already has
+      // (direct follow-up correction: "script only comes as you touch
+      // wheel, dimensional shadow only on wheel until touched") -- the
+      // shadow icon shows by default, the word label only on hover/
+      // touch, exactly like every other wheel face; "larger script"
+      // (the scoped CSS font-size bump) still applies once revealed.
+      const dimensionShadow = wheelConfig.id === 'dimension' ? dimensionShadowIcon(data.label) : null;
       const markKey = ACTION_TO_MARK[data.action];
-      if (markKey && MARKS[markKey]) {
+      if (dimensionShadow) {
+        labelEl.classList.add('has-icon');
+        const iconEl = document.createElement('span');
+        iconEl.className = 'rw3d-label-icon rw3d-dim-shadow';
+        iconEl.innerHTML = dimensionShadow;
+        const textEl = document.createElement('span');
+        textEl.className = 'rw3d-label-text';
+        textEl.textContent = data.label;
+        labelEl.append(iconEl, textEl);
+      } else if (wheelConfig.id === 'dimension') {
+        // 2D: no shadow SVG (see dimensionShadowIcon's own header) --
+        // the scoped CSS diamond backdrop is its own "shadow," and with
+        // no icon to reveal-FROM, the label just stays plain text (2D's
+        // own rhombus backdrop already always shows -- there's nothing
+        // to hide behind a touch/hover here).
+        labelEl.textContent = data.label;
+      } else if (markKey && MARKS[markKey]) {
         labelEl.classList.add('has-icon');
         const iconEl = document.createElement('span');
         iconEl.className = 'rw3d-label-icon';
