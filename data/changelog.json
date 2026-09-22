@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-09-23",
+    "title": "Material Picker Now Tracks the Selected Piece",
+    "items": [
+      "Fixed: the main color/material dropdown never updated its own displayed value when you switched piece types, so after switching it kept showing whichever color was last picked for the PREVIOUS piece -- reading as 'my color change isn't sticking' even though each piece type was already correctly remembering its own color the whole time. It now syncs to the newly selected piece's own real current color on every switch."
+    ]
+  },
+  {
+    "date": "2026-09-23",
     "title": "RD Grows Back Off Elongated Dodecahedron Too",
     "items": [
       "New: a plain RD (or Cube) can now grow directly off an already-placed Elongated Dodecahedron's own rhombic face, completing the bootstrap relationship in both directions -- previously only worked one way (RD to Elongated Dodecahedron). Only places when the two lattices' real positions land exactly flush; genuinely incompatible spots (deep inside an elongated chain) correctly no-op instead of placing something silently misaligned."

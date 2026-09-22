@@ -3756,6 +3756,21 @@ async function init() {
   // last set it to, with no refresh at all until some other action
   // happened to call updateHudIndicator() again.
   document.getElementById('piece-type-select')?.addEventListener('change', updateHudIndicator);
+  // Real bug, direct report ("color change is not working still
+  // following previous pieces color"): the main #material-select
+  // dropdown never updated its own DISPLAYED value when piece type
+  // changed, so after switching pieces it kept visually showing
+  // whichever color was last picked for the PREVIOUS piece type --
+  // reading as "my color change isn't sticking," even though
+  // currentMaterialFor() (the function that actually decides a new
+  // cell's real color) was already correctly using each piece type's
+  // own independent auto-assign override/default the whole time
+  // (verified directly). Syncs the dropdown to the NEW piece type's
+  // own real current color on every switch, so what's shown always
+  // matches what will actually be placed.
+  document.getElementById('piece-type-select')?.addEventListener('change', (e) => {
+    materialSelect.value = currentMaterialFor(e.target.value);
+  });
   // quickShapeEl/quickMaterialEl's own click handlers are wired up above,
   // inside the wheel3D block (they need wheel3D/toggleWheel3D/
   // seedIfWorldEmpty, which only exist in that block's own scope).
