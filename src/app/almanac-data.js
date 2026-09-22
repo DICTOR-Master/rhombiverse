@@ -17,6 +17,9 @@ import { CUBE_VERTS, rdRawVerts, pyramidPieces, cuboctahedronVertices, octGapVer
 import { truncatedOctahedronVertices } from '../geometry-extensions/dual-lattice.js';
 import { bootstrapDisphenoid, octahedronVerts } from '../geometry-extensions/interstitial-lattice.js';
 import { CORNER_GROUPS, BAND_GROUPS, TRIANGLE_GROUPS, triangleRingCells, canonicalHourglassCells } from '../core/hemisphere-build.js';
+import { rdQuarterPieces } from '../core/lattice.js';
+import { elongatedDodecahedronVerts } from '../geometry-extensions/elongated-dodecahedron.js';
+import { hexPrismVerts } from '../geometry-extensions/hex-prism.js';
 
 // Only "kind: dept" faces with a real tool:pieceType:*/tool:cuboctaBuild
 // action are actual placeable pieces. Excludes two kinds of non-piece
@@ -57,6 +60,9 @@ function convexPieceVerts(action) {
     // despite both being "an octahedron" in casual terms.
     case 'tool:pieceType:octahedron': return octGapVertices(1);
     case 'tool:pieceType:halfrd': return hemisphereSplit(1, 0).positive;
+    case 'tool:pieceType:rdquarter': return rdQuarterPieces(1)[0];
+    case 'tool:pieceType:elongdodeca': return elongatedDodecahedronVerts(1);
+    case 'tool:pieceType:hexprism': return hexPrismVerts(1);
     default: return null; // not a single-cell convex piece -- see compositionForAction below
   }
 }

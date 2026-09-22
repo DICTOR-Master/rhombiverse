@@ -38,6 +38,11 @@ export const HEMISPHERE_STORAGE_KEY = 'rhombiverse-hemisphere-world';
 // with the main world's.
 export const ELONGDODECA_STORAGE_KEY = 'rhombiverse-elongdodeca-world';
 
+// Hexagonal Prism build ('hexprism' piece tier): the 5th "adopted family
+// member" store -- own axial-hex coordinate frame (geometry-extensions/
+// hex-prism.js), genuinely separate from FCC's own grid.
+export const HEXPRISM_STORAGE_KEY = 'rhombiverse-hexprism-world';
+
 export function saveToLocalStorage(worldJSON, key = STORAGE_KEY) {
   try {
     localStorage.setItem(key, JSON.stringify(worldJSON));

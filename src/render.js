@@ -22,6 +22,7 @@ import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extens
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
+import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -77,6 +78,7 @@ import {
   CUBOCTA_GAP_STORAGE_KEY,
   HEMISPHERE_STORAGE_KEY,
   ELONGDODECA_STORAGE_KEY,
+  HEXPRISM_STORAGE_KEY,
 } from './core/persistence.js';
 import {
   compressionSupported,
@@ -93,6 +95,12 @@ import { VALID_TRIPLES, unitTileVertices } from './geometry-extensions/growth.js
 // their code archived to world-systems-archived/ -- see README.md.
 
 const SCALE = 1;
+// Hex Prism: no special proportion is required for a plain hex-prism
+// tiling (any height works, unlike Elongated Dodecahedron's own derived
+// h) -- these are a deliberate, honestly-arbitrary aesthetic choice
+// (roughly SCALE-sized), not a derived constant.
+const HEX_PRISM_R = SCALE;
+const HEX_PRISM_H = Math.sqrt(3) * SCALE;
 const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
 
 // Performance guardrail (reframe Stage 6): warn before loading a World
@@ -1056,6 +1064,7 @@ function rebuildPartialCellMeshes(world, inReportMode = false) {
 let bccCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let cuboctaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let elongDodecaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
+let hexPrismCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let octGapCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are octGap's own offset-frame index, see core/cubocta-gap-build.js
 // Interstitial-lattice build: one real Mesh per disphenoid cell, same
 // pattern as partialCellGroup/partialCellMeshes above and for the same
@@ -1228,6 +1237,23 @@ function rebuildElongDodecaInstances(elongDodecaMesh, elongDodecaWorld) {
   elongDodecaMesh.computeBoundingSphere();
 }
 
+// Real placed Hex Prism cells -- same instancing pattern again, own
+// hexCellToWorld position (axial q,r + integer z, not the main FCC grid).
+function rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld) {
+  hexPrismCellOrder = hexPrismWorld.entries();
+  const m = new THREE.Matrix4();
+  hexPrismCellOrder.forEach((cell, i) => {
+    const [wx, wy, wz] = hexCellToWorld(cell.x, cell.y, cell.z, HEX_PRISM_R, HEX_PRISM_H);
+    m.makeTranslation(wx, wy, wz);
+    hexPrismMesh.setMatrixAt(i, m);
+    hexPrismMesh.setColorAt(i, instanceColorFor(cell));
+  });
+  hexPrismMesh.count = hexPrismCellOrder.length;
+  hexPrismMesh.instanceMatrix.needsUpdate = true;
+  if (hexPrismMesh.instanceColor) hexPrismMesh.instanceColor.needsUpdate = true;
+  hexPrismMesh.computeBoundingSphere();
+}
+
 // Real placed Cuboctahedron Build cells -- same instancing pattern as
 // rebuildBCCInstances above, own separate cell order/mesh.
 function rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld) {
@@ -1344,6 +1370,23 @@ async function init() {
   const elongDodecaSavedJSON = loadFromLocalStorage(ELONGDODECA_STORAGE_KEY);
   const elongDodecaWorld = createWorldStore(elongDodecaSavedJSON ?? { worldName: 'Elongated Dodecahedron Lattice', version: 1, cells: {}, meta: {} });
 
+  // Hex Prism Build: a genuinely separate lattice (own axial-hex
+  // coordinate frame, geometry-extensions/hex-prism.js), same "own
+  // independent store, own localStorage key" pattern as bccWorld/
+  // cuboctaWorld. Unlike elongDodecaWorld, DOES need the "never truly
+  // empty" invariant (onHexPrismChange, below) -- its own coordinate
+  // frame is unrelated to FCC's, so there's no bootstrap-from-FCC path
+  // to fall back on; growth only ever works from an existing hex-prism
+  // cell.
+  const hexPrismSavedJSON = loadFromLocalStorage(HEXPRISM_STORAGE_KEY);
+  const hexPrismWorld = createWorldStore(hexPrismSavedJSON ?? { worldName: 'Hex Prism Lattice', version: 1, cells: {}, meta: {} });
+  // Seeded here, not just inside onHexPrismChange -- that handler only
+  // ever runs in response to a real click, so a truly fresh load (no
+  // saved JSON) would otherwise leave hexPrismMesh with zero instances
+  // forever, and handleHexPrismClick's own grow-only design (see its own
+  // header) has no bootstrap path to recover from that.
+  if (hexPrismWorld.entries().length === 0) hexPrismWorld.addCell(0, 0, 0, { material: 'base' });
+
   const geometry = buildRDGeometry(SCALE);
   // White base color: actual per-cell color comes entirely from
   // setColorAt (instanceColorFor) via the multiplicative USE_INSTANCING_
@@ -1382,6 +1425,16 @@ async function init() {
   elongDodecaMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(elongDodecaMesh);
   rebuildElongDodecaInstances(elongDodecaMesh, elongDodecaWorld);
+
+  // Hex Prism Build: its own InstancedMesh, own geometry (hexPrismVerts,
+  // no special elongation ratio needed -- see HEX_PRISM_R/H's own
+  // header above).
+  const hexPrismGeometry = new ConvexGeometry(hexPrismVerts(HEX_PRISM_R, HEX_PRISM_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  hexPrismGeometry.computeVertexNormals();
+  const hexPrismMesh = new THREE.InstancedMesh(hexPrismGeometry, material.clone(), MAX_CELLS);
+  hexPrismMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(hexPrismMesh);
+  rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld);
 
   // Cuboctahedron Build: its own InstancedMesh (cuboctahedron geometry),
   // same "own material clone, same MATERIAL_COLORS palette" pattern as
@@ -1817,6 +1870,7 @@ async function init() {
     material.clippingPlanes = planes;
     bccMesh.material.clippingPlanes = planes;
     elongDodecaMesh.material.clippingPlanes = planes;
+    hexPrismMesh.material.clippingPlanes = planes;
     cuboctaMesh.material.clippingPlanes = planes;
     octGapMesh.material.clippingPlanes = planes;
     // Cube-less cells (see core/pyramid.js's hasCube()) render as a
@@ -1868,7 +1922,7 @@ async function init() {
   let skeletonGeneration = 0;
   const TRANSLUCENT_OPACITY = 0.55; // matches Lattice Quick-View/Dualize preview's own established "see-through structure" opacity
   function worldViewMaterials() {
-    const mats = [material, bccMesh.material, elongDodecaMesh.material, cuboctaMesh.material, octGapMesh.material];
+    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, cuboctaMesh.material, octGapMesh.material];
     for (const { mesh: m } of partialCellMeshes.values()) {
       if (m.isGroup) { for (const child of m.children) mats.push(child.material); }
       else mats.push(m.material);
@@ -1890,6 +1944,7 @@ async function init() {
     mesh.visible = visible;
     bccMesh.visible = visible;
     elongDodecaMesh.visible = visible;
+    hexPrismMesh.visible = visible;
     cuboctaMesh.visible = visible;
     octGapMesh.visible = visible;
     partialCellGroup.visible = visible;
@@ -2490,7 +2545,7 @@ async function init() {
         }
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
-          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)' };
+          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism' };
           document.getElementById('piece-type-select').value = value;
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
@@ -4066,6 +4121,10 @@ async function init() {
           add: 'All 4 real rhombohedra are already placed in that cell.',
           remove: 'No RD Quarter there to remove -- tap directly on one you’ve placed.',
         },
+        hexprism: {
+          add: 'A Hex Prism is already there.',
+          remove: "No Hex Prism there to remove -- Remove+Hex Prism only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
+        },
         idis: {
           add: "That disphenoid's already there.",
           remove: 'No disphenoid there to remove -- tap directly on one from the interstitial lattice.',
@@ -4121,6 +4180,10 @@ async function init() {
     elongDodecaMesh,
     elongDodecaCellAt: (instanceId) => elongDodecaCellOrder[instanceId],
     onElongDodecaChange,
+    hexPrismWorld,
+    hexPrismMesh,
+    hexPrismCellAt: (instanceId) => hexPrismCellOrder[instanceId],
+    onHexPrismChange,
     interstitialStore,
     interstitialGroup,
     onInterstitialChange,
@@ -4171,6 +4234,19 @@ async function init() {
     updateSectionEnabled();
     applyWorldViewMaterials();
     saveToLocalStorage(elongDodecaWorld.toJSON(), ELONGDODECA_STORAGE_KEY);
+  }
+
+  // Hex Prism build: own change handler. "Never truly empty" invariant
+  // (see hexPrismWorld's own construction comment above for why this
+  // one specifically needs it, unlike elongDodecaWorld).
+  function onHexPrismChange() {
+    if (hexPrismWorld.entries().length === 0) {
+      hexPrismWorld.addCell(0, 0, 0, { material: 'base' });
+    }
+    rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld);
+    updateSectionEnabled();
+    applyWorldViewMaterials();
+    saveToLocalStorage(hexPrismWorld.toJSON(), HEXPRISM_STORAGE_KEY);
   }
 
   // Interstitial-lattice build: own change handler, same reasoning as

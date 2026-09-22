@@ -30,6 +30,7 @@ import {
   nearestPyramidAxis,
 } from './pyramid.js';
 import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
+import { matchHexNeighborOffset } from '../geometry-extensions/hex-prism.js';
 import {
   bootstrapDisphenoid,
   disphenoidKey,
@@ -247,6 +248,19 @@ export function createBuildController({
   elongDodecaMesh = null,
   elongDodecaCellAt = () => null,
   onElongDodecaChange = () => {},
+  // Hex Prism ('hexprism' piece tier): a genuinely separate lattice
+  // (own axial-hex coordinate frame, geometry-extensions/hex-prism.js --
+  // NOT a sub-piece of RD's own lattice the way Elongated Dodecahedron
+  // is, so there's no FCC-relative bootstrap here). Always seeded at
+  // (0,0,0) by onHexPrismChange's own "never truly empty" invariant
+  // (same pattern bccWorld/cuboctaWorld already use), so growth only
+  // ever needs to click an EXISTING hex-prism face, never bootstrap
+  // from FCC. All optional/no-op by default, same as every other
+  // adopted-family param above.
+  hexPrismWorld = null,
+  hexPrismMesh = null,
+  hexPrismCellAt = () => null,
+  onHexPrismChange = () => {},
   // Interstitial-lattice ("ioct"/"idis" piece tiers, core/interstitial-
   // build.md): same "adopted family member" reasoning as the TO params
   // above -- a genuinely different lattice (the BCC Delaunay/interstitial
@@ -321,6 +335,7 @@ export function createBuildController({
     // under its own piece tier, so it never steals clicks meant for the
     // main FCC world under any other tier.
     const elongDodecaTargets = elongDodecaMesh && getPieceType() === 'elongdodeca' ? [elongDodecaMesh] : [];
+    const hexPrismTargets = hexPrismMesh && getPieceType() === 'hexprism' ? [hexPrismMesh] : [];
     // Same reasoning: interstitialGroup only enters the raycast under
     // its own piece tiers, for the same "don't steal clicks from other
     // tiers" reason as bccTargets above.
@@ -331,7 +346,7 @@ export function createBuildController({
     // Half RD/Hourglass mesh; harmless for Add (handleHemisphereClick's
     // own bootstrap-only Add path explicitly no-ops if it lands there).
     const hemisphereTargets = hemisphereGroup && HEMISPHERE_PIECE_TYPES.includes(pieceType) ? [hemisphereGroup] : [];
-    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...interstitialTargets, ...hemisphereTargets], true);
+    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...interstitialTargets, ...hemisphereTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -449,6 +464,30 @@ export function createBuildController({
     if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
     elongDodecaWorld.removeCell(cell.x, cell.y, cell.z);
     onElongDodecaChange();
+    if (onRemoved) onRemoved(cell);
+  }
+
+  // Hex Prism piece tier: grow-only (no bootstrap -- the "never truly
+  // empty" invariant in render.js's onHexPrismChange guarantees a real
+  // clickable cell always exists). Click an existing face, match its
+  // normal against the 8 real hex-prism neighbor directions.
+  function handleHexPrismClick(hit, mode) {
+    const action = mode === 'build' ? 'add' : 'remove';
+    if (hit.object !== hexPrismMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const cell = hexPrismCellAt(hit.instanceId);
+    if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    if (mode === 'build') {
+      const [dq, dr, dz] = matchHexNeighborOffset(hit.face.normal);
+      const nq = cell.x + dq, nr = cell.y + dr, nz = cell.z + dz;
+      if (hexPrismWorld.has(nq, nr, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const material = getMaterial();
+      hexPrismWorld.addCell(nq, nr, nz, { material });
+      onHexPrismChange();
+      if (onPlaced) onPlaced({ x: nq, y: nr, z: nz, material });
+      return;
+    }
+    hexPrismWorld.removeCell(cell.x, cell.y, cell.z);
+    onHexPrismChange();
     if (onRemoved) onRemoved(cell);
   }
 
@@ -1117,6 +1156,10 @@ export function createBuildController({
     }
     if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'elongdodeca' && elongDodecaWorld && elongDodecaMesh) {
       handleElongDodecaClick(hit, mode);
+      return;
+    }
+    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'hexprism' && hexPrismWorld && hexPrismMesh) {
+      handleHexPrismClick(hit, mode);
       return;
     }
     // Same reasoning, for the interstitial-lattice piece tiers. 'ioct'

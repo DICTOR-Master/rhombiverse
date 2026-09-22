@@ -665,9 +665,19 @@ export const WHEEL_RD_FAMILY = {
       desc: "One real hemisphereSplit() half of an RD -- click an existing face to add the neighbor's near half." },
     "equator|sx-1sy1":  { kind: "dept", label: "Hourglass", action: "tool:pieceType:hourglass",
       desc: "Two matching hemisphere halves bridging a cell and its neighbor -- click an existing face to add one across that boundary." },
-    "equator|sx-1sy-1": SPARE,
-    "top|sy1sz1":       SPARE,
-    "bottom|sy1sz-1":   SPARE,
+    // Not strictly "RD family" (Elongated Dodecahedron/Hex Prism are 2
+    // of the OTHER real parallelohedra, unrelated to RD's own
+    // decomposition) -- placed here anyway, direct pragmatic call:
+    // WHEEL_PIECE itself has zero spare slots (see its own header
+    // comment -- "completely full" already before these 3 existed), and
+    // this sub-wheel is the only one with real room. RD Quarter IS a
+    // genuine RD-family piece (one of RD's own 4 real rhombohedra).
+    "equator|sx-1sy-1": { kind: "dept", label: "RD Quarter", action: "tool:pieceType:rdquarter",
+      desc: "One of RD's own 4 real rhombohedra (Fedorov's zonotope decomposition) -- click a corner to fill it in." },
+    "top|sy1sz1":       { kind: "dept", label: "Elongated Dodecahedron", action: "tool:pieceType:elongdodeca",
+      desc: "The 4th of the real \"5\" parallelohedra -- its own lattice, same FCC positions, anisotropic scale." },
+    "bottom|sy1sz-1":   { kind: "dept", label: "Hex Prism", action: "tool:pieceType:hexprism",
+      desc: "The 5th real parallelohedron -- its own separate hexagonal lattice." },
     "bottom|sx1sz-1":   SPARE,
     "bottom|sx-1sz-1":  SPARE,
   }
