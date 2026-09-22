@@ -34,6 +34,7 @@ import { matchHexNeighborOffset } from '../geometry-extensions/hex-prism.js';
 import { SQUARE_NEIGHBOR_OFFSETS, TRIANGLE_NEIGHBOR_OFFSETS_FROM_UP, TRIANGLE_NEIGHBOR_OFFSETS_FROM_DOWN, triangleCellToWorld } from '../geometry-extensions/lattice-2d.js';
 import { HEX_NEIGHBOR_OFFSETS, hexCellToWorld } from '../geometry-extensions/hex-prism.js';
 import { matchRhombohedraNeighborOffset } from '../geometry-extensions/rhombohedra-lattice.js';
+import { elongDodecaCellToWorld } from '../geometry-extensions/elongated-dodecahedron.js';
 import {
   bootstrapDisphenoid,
   disphenoidKey,
@@ -371,8 +372,10 @@ export function createBuildController({
     const bccTargets = bccMesh && getPieceType() === 'to' ? [bccMesh] : [];
     // Same reasoning as bccTargets above -- only enters the raycast
     // under its own piece tier, so it never steals clicks meant for the
-    // main FCC world under any other tier.
-    const elongDodecaTargets = elongDodecaMesh && getPieceType() === 'elongdodeca' ? [elongDodecaMesh] : [];
+    // main FCC world under any other tier. Also included for 'rd'/
+    // 'cube' -- direct follow-up ("RD doesnt place on elongated RDs
+    // rhombic sides"), see handleRDOffElongDodecaClick's own header.
+    const elongDodecaTargets = elongDodecaMesh && (getPieceType() === 'elongdodeca' || getPieceType() === 'rd' || getPieceType() === 'cube') ? [elongDodecaMesh] : [];
     const hexPrismTargets = hexPrismMesh && getPieceType() === 'hexprism' ? [hexPrismMesh] : [];
     const square2dTargets = square2dMesh && getPieceType() === 'square2d' ? [square2dMesh] : [];
     const hexagon2dTargets = hexagon2dMesh && getPieceType() === 'hexagon2d' ? [hexagon2dMesh] : [];
@@ -507,6 +510,48 @@ export function createBuildController({
     elongDodecaWorld.removeCell(cell.x, cell.y, cell.z);
     onElongDodecaChange();
     if (onRemoved) onRemoved(cell);
+  }
+
+  // A plain RD/Cube growing back OFF an already-placed Elongated
+  // Dodecahedron's own face -- direct follow-up, same session ("RD
+  // doesnt place on elongated RDs rhombic sides"): bootstrap only ever
+  // went one way (RD -> ElongDodeca) before this. Reuses the SAME real
+  // NEIGHBOR_OFFSETS/matchNeighborOffset matching RD's own faces
+  // already use (an ElongDodeca's 12 faces sit on the exact same 12
+  // real directions).
+  //
+  // Real, unavoidable limit, checked explicitly rather than silently
+  // guessed: the main world's own cellToWorld is a plain ISOTROPIC
+  // per-axis scale, but elongDodecaCellToWorld is ANISOTROPIC along Z
+  // (see that function's own header) -- the two only ever compute the
+  // exact same real position for a shared integer address when the
+  // elongation hasn't actually displaced it there (the 4 dz=0
+  // directions always, or the very first dz!=0 step off a REAL,
+  // un-elongated RD). Deeper into an ElongDodeca chain, no plain RD
+  // integer address can land exactly flush any more -- rather than
+  // silently place something misaligned, this checks the two real
+  // positions match (within float tolerance) before ever writing to
+  // `world`, and no-ops (not places-anyway) when they don't.
+  function handleRDOffElongDodecaClick(hit, mode) {
+    const action = mode === 'build' ? 'add' : 'remove';
+    if (mode !== 'build' || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const ecell = elongDodecaCellAt(hit.instanceId);
+    if (!ecell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
+    const nx = ecell.x + dx, ny = ecell.y + dy, nz = ecell.z + dz;
+    const [ewx, ewy, ewz] = elongDodecaCellToWorld(nx, ny, nz);
+    const [pwx, pwy, pwz] = cellToWorld(nx, ny, nz);
+    const EPS = 1e-6;
+    if (Math.abs(ewx - pwx) > EPS || Math.abs(ewy - pwy) > EPS || Math.abs(ewz - pwz) > EPS) {
+      if (onPieceNoOp) onPieceNoOp(action);
+      return;
+    }
+    if (world.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const material = getMaterial();
+    const data = getPieceType() === 'cube' ? { material, pyramids: 0 } : { material };
+    world.addCell(nx, ny, nz, data);
+    onChange();
+    if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
   }
 
   // Hex Prism piece tier: grow-only (no bootstrap -- the "never truly
@@ -1400,6 +1445,15 @@ export function createBuildController({
     // raycast missed (e.g. not precisely on an existing cuboctahedron)
     // fall through to the generic cellAt() RD-placement path below.
     if ((mode === 'build' || mode === 'chisel') && pieceTypeForInterstitial === 'octahedron') {
+      return;
+    }
+    // RD/Cube growing back off an already-placed Elongated Dodecahedron's
+    // own face -- routed BEFORE the generic cellAt() below, which only
+    // knows the main FCC world's own instance-id space (same reasoning
+    // as bccMesh's own gate above). See handleRDOffElongDodecaClick's
+    // own header for why this can genuinely no-op on some clicks.
+    if ((mode === 'build' || mode === 'chisel') && (pieceTypeForInterstitial === 'rd' || pieceTypeForInterstitial === 'cube') && hit.object === elongDodecaMesh && elongDodecaWorld && elongDodecaMesh) {
+      handleRDOffElongDodecaClick(hit, mode);
       return;
     }
 

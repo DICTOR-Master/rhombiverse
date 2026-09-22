@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-09-23",
+    "title": "RD Grows Back Off Elongated Dodecahedron Too",
+    "items": [
+      "New: a plain RD (or Cube) can now grow directly off an already-placed Elongated Dodecahedron's own rhombic face, completing the bootstrap relationship in both directions -- previously only worked one way (RD to Elongated Dodecahedron). Only places when the two lattices' real positions land exactly flush; genuinely incompatible spots (deep inside an elongated chain) correctly no-op instead of placing something silently misaligned."
+    ]
+  },
+  {
+    "date": "2026-09-23",
     "title": "Elongated Dodecahedron: Fixed Flush-Fit, and Real Icons",
     "items": [
       "Fixed: an Elongated Dodecahedron bootstrapped off a real RD in 8 of the 12 real directions sat 0.43 units off its true flush position (verified exactly, both mathematically and against the app's own live geometry) -- close enough to blend into the RD it grew from and hide the very hexagonal faces that prove it's a different shape. Only the other 4 directions (where the shared face is a plain rhombus, not squeezed by the elongation) were ever correctly aligned.",

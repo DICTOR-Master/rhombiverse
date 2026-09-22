@@ -4450,7 +4450,20 @@ async function init() {
     // Pyramid Sub-Cell: a hit on a partial cell's own individual Mesh has
     // no instanceId (that's InstancedMesh-only) -- resolve it via the
     // hit object's own userData.cellKey instead. See core/pyramid.md.
-    cellAt: (hit) => (hit.instanceId !== undefined
+    //
+    // Real bug avoided here, direct follow-up to the "RD doesnt place on
+    // elongated RDs rhombic sides" fix: elongDodecaMesh is now ALSO a
+    // valid raycast target for 'rd'/'cube' (see pick()'s own
+    // elongDodecaTargets), handled by its own dedicated
+    // handleRDOffElongDodecaClick in onClick -- but onContextMenu's own
+    // generic fallback still reaches this same cellAt() for a
+    // right-click there. Blindly indexing hit.instanceId into
+    // cellOrder (the MAIN world's own instance-order array) for a hit
+    // on a COMPLETELY DIFFERENT mesh would silently return the WRONG
+    // cell (whichever one happens to sit at that same numeric index in
+    // cellOrder) instead of null -- this explicit `hit.object === mesh`
+    // check is what keeps that impossible, not just unlikely.
+    cellAt: (hit) => (hit.object === mesh && hit.instanceId !== undefined
       ? cellOrder[hit.instanceId]
       : (partialCellMeshes.get(hit.object?.userData?.cellKey)?.cell ?? null)),
     world,
