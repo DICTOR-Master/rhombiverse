@@ -201,16 +201,45 @@ function toWireframe() {
   return wireframeSvg(edgesByMinDistance(points), 22);
 }
 
+// Square (2D tier): a plain square prism. NOT vertex-uniform-edge-length
+// (the square's own side and the prism's height differ), so
+// edgesByMinDistance()'s technique doesn't apply here the way it does
+// for RD/TO above (it would only connect the shorter edges, giving a
+// broken wireframe) -- explicit topology instead, real corner
+// coordinates, not guessed.
+function squareWireframe() {
+  const h = 0.5;
+  const top = [[1, 1, h], [1, -1, h], [-1, -1, h], [-1, 1, h]];
+  const bot = top.map(([x, y]) => [x, y, -h]);
+  const edges = [];
+  for (let i = 0; i < 4; i++) {
+    edges.push([top[i], top[(i + 1) % 4]]);
+    edges.push([bot[i], bot[(i + 1) % 4]]);
+    edges.push([top[i], bot[i]]);
+  }
+  return wireframeSvg(edges, 22);
+}
+
 // DIMENSIONS: the dimension-select screen's own 5 cards. Only `enabled`
 // tiers get a real onOpen (advances to that tier's lattice screen) and a
 // real wireframe; the rest are the honest, undecorated "planned, not
 // built" treatment this file's own header explains.
 const DIMENSIONS = [
-  { id: '2D', label: '2D', desc: 'Square, Triangular, Hexagonal, Rhombic tilings.', enabled: false },
+  // Phase 2 (2026-09-22): Square shipped, direct instruction ("flat
+  // layer in the same 3D scene... start with Square"). Triangular/
+  // Hexagonal/Rhombic still planned -- desc says so honestly.
+  { id: '2D', label: '2D', desc: 'Square (shipped) -- Triangular, Hexagonal, Rhombic tilings still planned.', enabled: true, preview: squareWireframe },
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, preview: rdWireframe },
   { id: '4D', label: '4D', desc: 'Hypercubic (Tesseract) and D4 root lattice.', enabled: false },
   { id: '5D', label: '5D', desc: 'Decagonal quasicrystal.', enabled: false },
   { id: '6D', label: '6D', desc: 'Icosahedral quasicrystal.', enabled: false },
+];
+
+// LATTICE_FAMILIES_2D: 2D's own lattice-family screen -- Square only so
+// far (Phase 2, incremental). Same "reuse the existing real action, one
+// tool one doorway" reasoning as LATTICE_FAMILIES_3D below.
+const LATTICE_FAMILIES_2D = [
+  { label: 'Square', desc: 'Z² -- a flat layer of square tiles, own separate lattice, pinned to z=0 in this same scene.', action: 'tool:pieceType:square2d', preview: squareWireframe },
 ];
 
 // LATTICE_FAMILIES_3D: 3D's own lattice-family screen. Actions reuse
@@ -264,6 +293,32 @@ export function createDimensionWizard({ onSelectFamily }) {
       el.addEventListener('click', () => {
         const dim = el.dataset.dim;
         if (dim === '3D') showLattice3D();
+        else if (dim === '2D') showLattice2D();
+      });
+    });
+  }
+
+  function showLattice2D() {
+    let grid = '';
+    for (const fam of LATTICE_FAMILIES_2D) {
+      grid += `
+        <button type="button" class="dim-wizard-card-btn" data-action="${fam.action}">
+          ${fam.preview()}
+          <span class="dim-wizard-row-text">
+            <span class="dim-wizard-label">${fam.label}</span>
+            <span class="dim-wizard-desc">${fam.desc}</span>
+          </span>
+        </button>`;
+    }
+    bodyEl.innerHTML = `
+      <button type="button" class="dim-wizard-back">← Back</button>
+      <div class="dim-wizard-sub">2D: pick which lattice family starts active.</div>
+      <div class="dim-wizard-grid">${grid}</div>`;
+    bodyEl.querySelector('.dim-wizard-back').addEventListener('click', showDimensions);
+    bodyEl.querySelectorAll('.dim-wizard-card-btn[data-action]').forEach((el) => {
+      el.addEventListener('click', () => {
+        close();
+        onSelectFamily(el.dataset.action);
       });
     });
   }

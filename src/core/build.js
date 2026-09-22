@@ -31,6 +31,7 @@ import {
 } from './pyramid.js';
 import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
 import { matchHexNeighborOffset } from '../geometry-extensions/hex-prism.js';
+import { SQUARE_NEIGHBOR_OFFSETS } from '../geometry-extensions/lattice-2d.js';
 import {
   bootstrapDisphenoid,
   disphenoidKey,
@@ -261,6 +262,14 @@ export function createBuildController({
   hexPrismMesh = null,
   hexPrismCellAt = () => null,
   onHexPrismChange = () => {},
+  // Square (2D tier, Phase 2): same "adopted family member" reasoning
+  // again -- flat layer, own store, grow-only via the "never truly
+  // empty" invariant (same as hexPrismWorld above; z is always pinned
+  // to 0 in this store's own cells).
+  square2dWorld = null,
+  square2dMesh = null,
+  square2dCellAt = () => null,
+  onSquare2dChange = () => {},
   // Interstitial-lattice ("ioct"/"idis" piece tiers, core/interstitial-
   // build.md): same "adopted family member" reasoning as the TO params
   // above -- a genuinely different lattice (the BCC Delaunay/interstitial
@@ -336,6 +345,7 @@ export function createBuildController({
     // main FCC world under any other tier.
     const elongDodecaTargets = elongDodecaMesh && getPieceType() === 'elongdodeca' ? [elongDodecaMesh] : [];
     const hexPrismTargets = hexPrismMesh && getPieceType() === 'hexprism' ? [hexPrismMesh] : [];
+    const square2dTargets = square2dMesh && getPieceType() === 'square2d' ? [square2dMesh] : [];
     // Same reasoning: interstitialGroup only enters the raycast under
     // its own piece tiers, for the same "don't steal clicks from other
     // tiers" reason as bccTargets above.
@@ -346,7 +356,7 @@ export function createBuildController({
     // Half RD/Hourglass mesh; harmless for Add (handleHemisphereClick's
     // own bootstrap-only Add path explicitly no-ops if it lands there).
     const hemisphereTargets = hemisphereGroup && HEMISPHERE_PIECE_TYPES.includes(pieceType) ? [hemisphereGroup] : [];
-    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...interstitialTargets, ...hemisphereTargets], true);
+    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...square2dTargets, ...interstitialTargets, ...hemisphereTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -488,6 +498,53 @@ export function createBuildController({
     }
     hexPrismWorld.removeCell(cell.x, cell.y, cell.z);
     onHexPrismChange();
+    if (onRemoved) onRemoved(cell);
+  }
+
+  // Square piece tier (2D tier, Phase 2): grow-only (same "never truly
+  // empty" invariant as hexPrismWorld). Matches the click's face normal
+  // against SQUARE_NEIGHBOR_OFFSETS directly -- already real unit-ish
+  // vectors (squareCellToWorld is a trivial per-axis scale, no rotation),
+  // so no separate direction-derivation helper is needed the way hex
+  // prism's own matchHexNeighborOffset was.
+  function handleSquare2dClick(hit, mode) {
+    const action = mode === 'build' ? 'add' : 'remove';
+    if (hit.object !== square2dMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const cell = square2dCellAt(hit.instanceId);
+    if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    if (mode === 'build') {
+      // Real bug found in browser verification: a flat 2D tile is
+      // viewed mostly from directly above, so almost every real click
+      // lands on its TOP face -- whose normal is (0,0,1), which has
+      // ZERO dot product with all 4 of SQUARE_NEIGHBOR_OFFSETS (they're
+      // all in-plane, oz=0), so face-normal matching (the RD/TO/hex-
+      // prism technique) always fell through to the same default index
+      // regardless of where on the tile you actually clicked. Fixed the
+      // same way Cuboctahedron's own click handling already does (its
+      // own header: "matches the raycast hit POINT's own direction from
+      // the clicked cuboctahedron's real center"): use the hit point's
+      // own XY offset from the cell's own world center instead of the
+      // face normal -- meaningful and distinguishable even for a
+      // top-face-only click, unlike the normal.
+      const [cx, cy] = cellToWorld(cell.x, cell.y, cell.z);
+      const dirX = hit.point.x - cx;
+      const dirY = hit.point.y - cy;
+      let bestIdx = 0, bestDot = -Infinity;
+      SQUARE_NEIGHBOR_OFFSETS.forEach(([ox, oy], i) => {
+        const dot = ox * dirX + oy * dirY;
+        if (dot > bestDot) { bestDot = dot; bestIdx = i; }
+      });
+      const [dx, dy, dz] = SQUARE_NEIGHBOR_OFFSETS[bestIdx];
+      const nx = cell.x + dx, ny = cell.y + dy, nz = cell.z + dz;
+      if (square2dWorld.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const material = getMaterial();
+      square2dWorld.addCell(nx, ny, nz, { material });
+      onSquare2dChange();
+      if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
+      return;
+    }
+    square2dWorld.removeCell(cell.x, cell.y, cell.z);
+    onSquare2dChange();
     if (onRemoved) onRemoved(cell);
   }
 
@@ -878,6 +935,10 @@ export function createBuildController({
     // of reading these null fields -- a 2-axis wedge has no single
     // "missing direction" the way a plain halfrd/hourglass half does.
     if (piece.type === 'wedge2') return [{ cell: piece.cell, offsetIndex: null, side: null }];
+    // 'rdquarter' (RD Quarter): same "only the cell matters" reasoning
+    // as wedge2 above -- each of the 4 real rhombohedra is independent,
+    // no missing-side direction to track.
+    if (piece.type === 'rdquarter') return [{ cell: piece.cell, offsetIndex: null, side: null }];
     return [
       { cell: piece.cellA, offsetIndex: piece.offsetIndex, side: 'positive' },
       { cell: piece.cellB, offsetIndex: piece.offsetIndex, side: 'negative' },
@@ -1016,16 +1077,19 @@ export function createBuildController({
   // the SAME cell (clicking near a different corner than what's there
   // fills that one in too -- a cell can hold any subset of the 4).
   function handleRdQuarterClick(hit) {
-    let cell;
-    if (hit.object.parent === hemisphereGroup) {
-      const piece = hemisphereStore.get(hit.object.userData.key);
-      if (!piece || piece.type !== 'rdquarter') return null;
-      cell = piece.cell;
-    } else {
-      const c = hit.object === bccMesh ? bccCellAt(hit.instanceId) : cellAt(hit);
-      if (!c) return null;
-      cell = [c.x, c.y, c.z];
-    }
+    // Real bug, direct report ("RD quarter isn't allowing attachment to
+    // RD or pair of RD-Hemis"): this used to only accept a hit on a
+    // solid FCC cell or an EXISTING rdquarter piece, rejecting Hemi RD/
+    // Hourglass/wedge2 hits outright. resolveClusterAnchorCell (already
+    // used by the cluster stamps for exactly this "attach to any
+    // existing hemisphere piece's own owning cell" case) resolves the
+    // real anchor cell uniformly across all of those, plus solid cells,
+    // plus rdquarter itself (see hemispherePieceCandidates' own new
+    // 'rdquarter' case above) -- one consistent path instead of a
+    // narrower bespoke check.
+    const anchorCell = resolveClusterAnchorCell(hit);
+    if (!anchorCell) return null;
+    const cell = [anchorCell.x, anchorCell.y, anchorCell.z];
     const [wx, wy, wz] = cellToWorld(cell[0], cell[1], cell[2]);
     const dir = new THREE.Vector3(hit.point.x - wx, hit.point.y - wy, hit.point.z - wz).normalize();
     let bestIdx = -1;
@@ -1160,6 +1224,10 @@ export function createBuildController({
     }
     if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'hexprism' && hexPrismWorld && hexPrismMesh) {
       handleHexPrismClick(hit, mode);
+      return;
+    }
+    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'square2d' && square2dWorld && square2dMesh) {
+      handleSquare2dClick(hit, mode);
       return;
     }
     // Same reasoning, for the interstitial-lattice piece tiers. 'ioct'

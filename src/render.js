@@ -23,6 +23,7 @@ import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
+import { squareTileVerts, squareCellToWorld } from './geometry-extensions/lattice-2d.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -79,6 +80,7 @@ import {
   HEMISPHERE_STORAGE_KEY,
   ELONGDODECA_STORAGE_KEY,
   HEXPRISM_STORAGE_KEY,
+  SQUARE2D_STORAGE_KEY,
 } from './core/persistence.js';
 import {
   compressionSupported,
@@ -101,6 +103,11 @@ const SCALE = 1;
 // (roughly SCALE-sized), not a derived constant.
 const HEX_PRISM_R = SCALE;
 const HEX_PRISM_H = Math.sqrt(3) * SCALE;
+// Square (2D tier): matches SCALE for visual consistency with everything
+// else -- no special proportion required (same reasoning as hex prism's
+// own height above).
+const SQUARE2D_S = SCALE;
+const SQUARE2D_H = 0.15 * SCALE;
 const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
 
 // Performance guardrail (reframe Stage 6): warn before loading a World
@@ -1065,6 +1072,7 @@ let bccCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let cuboctaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let elongDodecaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let hexPrismCellOrder = []; // instanceId -> {x, y, z, ...cellData}
+let square2dCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let octGapCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are octGap's own offset-frame index, see core/cubocta-gap-build.js
 // Interstitial-lattice build: one real Mesh per disphenoid cell, same
 // pattern as partialCellGroup/partialCellMeshes above and for the same
@@ -1254,6 +1262,23 @@ function rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld) {
   hexPrismMesh.computeBoundingSphere();
 }
 
+// Real placed Square cells (2D tier) -- same instancing pattern again,
+// own squareCellToWorld position (z always 0, a flat layer).
+function rebuildSquare2dInstances(square2dMesh, square2dWorld) {
+  square2dCellOrder = square2dWorld.entries();
+  const m = new THREE.Matrix4();
+  square2dCellOrder.forEach((cell, i) => {
+    const [wx, wy, wz] = squareCellToWorld(cell.x, cell.y, SQUARE2D_S);
+    m.makeTranslation(wx, wy, wz);
+    square2dMesh.setMatrixAt(i, m);
+    square2dMesh.setColorAt(i, instanceColorFor(cell));
+  });
+  square2dMesh.count = square2dCellOrder.length;
+  square2dMesh.instanceMatrix.needsUpdate = true;
+  if (square2dMesh.instanceColor) square2dMesh.instanceColor.needsUpdate = true;
+  square2dMesh.computeBoundingSphere();
+}
+
 // Real placed Cuboctahedron Build cells -- same instancing pattern as
 // rebuildBCCInstances above, own separate cell order/mesh.
 function rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld) {
@@ -1387,6 +1412,12 @@ async function init() {
   // header) has no bootstrap path to recover from that.
   if (hexPrismWorld.entries().length === 0) hexPrismWorld.addCell(0, 0, 0, { material: 'base' });
 
+  // Square (2D tier, Phase 2): own store, flat layer -- same "seed here,
+  // not just in the change handler" reasoning as hexPrismWorld above.
+  const square2dSavedJSON = loadFromLocalStorage(SQUARE2D_STORAGE_KEY);
+  const square2dWorld = createWorldStore(square2dSavedJSON ?? { worldName: 'Square Lattice (2D)', version: 1, cells: {}, meta: {} });
+  if (square2dWorld.entries().length === 0) square2dWorld.addCell(2, 0, 0, { material: 'base' });
+
   const geometry = buildRDGeometry(SCALE);
   // White base color: actual per-cell color comes entirely from
   // setColorAt (instanceColorFor) via the multiplicative USE_INSTANCING_
@@ -1435,6 +1466,14 @@ async function init() {
   hexPrismMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(hexPrismMesh);
   rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld);
+
+  // Square Build (2D tier): its own InstancedMesh, own geometry.
+  const square2dGeometry = new ConvexGeometry(squareTileVerts(SQUARE2D_S, SQUARE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  square2dGeometry.computeVertexNormals();
+  const square2dMesh = new THREE.InstancedMesh(square2dGeometry, material.clone(), MAX_CELLS);
+  square2dMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(square2dMesh);
+  rebuildSquare2dInstances(square2dMesh, square2dWorld);
 
   // Cuboctahedron Build: its own InstancedMesh (cuboctahedron geometry),
   // same "own material clone, same MATERIAL_COLORS palette" pattern as
@@ -1871,6 +1910,7 @@ async function init() {
     bccMesh.material.clippingPlanes = planes;
     elongDodecaMesh.material.clippingPlanes = planes;
     hexPrismMesh.material.clippingPlanes = planes;
+    square2dMesh.material.clippingPlanes = planes;
     cuboctaMesh.material.clippingPlanes = planes;
     octGapMesh.material.clippingPlanes = planes;
     // Cube-less cells (see core/pyramid.js's hasCube()) render as a
@@ -1922,7 +1962,7 @@ async function init() {
   let skeletonGeneration = 0;
   const TRANSLUCENT_OPACITY = 0.55; // matches Lattice Quick-View/Dualize preview's own established "see-through structure" opacity
   function worldViewMaterials() {
-    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, cuboctaMesh.material, octGapMesh.material];
+    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, square2dMesh.material, cuboctaMesh.material, octGapMesh.material];
     for (const { mesh: m } of partialCellMeshes.values()) {
       if (m.isGroup) { for (const child of m.children) mats.push(child.material); }
       else mats.push(m.material);
@@ -1945,6 +1985,7 @@ async function init() {
     bccMesh.visible = visible;
     elongDodecaMesh.visible = visible;
     hexPrismMesh.visible = visible;
+    square2dMesh.visible = visible;
     cuboctaMesh.visible = visible;
     octGapMesh.visible = visible;
     partialCellGroup.visible = visible;
@@ -2543,7 +2584,7 @@ async function init() {
         }
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
-          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism' };
+          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', square2d: 'Square (2D)' };
           document.getElementById('piece-type-select').value = value;
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
@@ -2732,6 +2773,16 @@ async function init() {
           seedIfWorldEmpty();
           dimensionWheel3D.close();
           handleWheelAction('tool:pieceType:rd');
+          return;
+        }
+        // 2D (Phase 2): square2dWorld is already seeded at construction
+        // (see its own "seed here, not just in the change handler"
+        // comment above) -- unlike 3D there's no separate world to
+        // seed here, just select the piece type.
+        if (action === 'tool:selectDimension:2D') {
+          activeDimension = '2D';
+          dimensionWheel3D.close();
+          handleWheelAction('tool:pieceType:square2d');
           return;
         }
         if (action === 'openCyborg') { dimensionWheel3D.close(); cyborgToggleEl?.click(); return; }
@@ -4156,6 +4207,10 @@ async function init() {
           add: 'A Hex Prism is already there.',
           remove: "No Hex Prism there to remove -- Remove+Hex Prism only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
         },
+        square2d: {
+          add: 'A Square is already there.',
+          remove: "No Square there to remove -- Remove+Square only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
+        },
         idis: {
           add: "That disphenoid's already there.",
           remove: 'No disphenoid there to remove -- tap directly on one from the interstitial lattice.',
@@ -4215,6 +4270,10 @@ async function init() {
     hexPrismMesh,
     hexPrismCellAt: (instanceId) => hexPrismCellOrder[instanceId],
     onHexPrismChange,
+    square2dWorld,
+    square2dMesh,
+    square2dCellAt: (instanceId) => square2dCellOrder[instanceId],
+    onSquare2dChange,
     interstitialStore,
     interstitialGroup,
     onInterstitialChange,
@@ -4278,6 +4337,18 @@ async function init() {
     updateSectionEnabled();
     applyWorldViewMaterials();
     saveToLocalStorage(hexPrismWorld.toJSON(), HEXPRISM_STORAGE_KEY);
+  }
+
+  // Square build (2D tier): own change handler, same "never truly
+  // empty" invariant.
+  function onSquare2dChange() {
+    if (square2dWorld.entries().length === 0) {
+      square2dWorld.addCell(2, 0, 0, { material: 'base' });
+    }
+    rebuildSquare2dInstances(square2dMesh, square2dWorld);
+    updateSectionEnabled();
+    applyWorldViewMaterials();
+    saveToLocalStorage(square2dWorld.toJSON(), SQUARE2D_STORAGE_KEY);
   }
 
   // Interstitial-lattice build: own change handler, same reasoning as
@@ -4465,6 +4536,21 @@ async function init() {
     clearLocalStorage(HEMISPHERE_STORAGE_KEY);
     hemisphereStore.replaceAll({ worldName: 'Hemisphere Pieces', version: 1, pieces: {} });
     onHemisphereChange();
+    // Elongated Dodecahedron/Hex Prism/Square (2D): 3 more real stores
+    // added later, same session -- real bug, direct report ("hex prisms
+    // aren't going when pressing clear current build"): these were never
+    // wired into this function at all, so Clear World silently left them
+    // untouched. Same "fresh start clears it too" reasoning as every
+    // store above.
+    clearLocalStorage(ELONGDODECA_STORAGE_KEY);
+    elongDodecaWorld.replaceAll({ worldName: 'Elongated Dodecahedron Lattice', version: 1, cells: {}, meta: {} });
+    onElongDodecaChange();
+    clearLocalStorage(HEXPRISM_STORAGE_KEY);
+    hexPrismWorld.replaceAll({ worldName: 'Hex Prism Lattice', version: 1, cells: {}, meta: {} });
+    onHexPrismChange();
+    clearLocalStorage(SQUARE2D_STORAGE_KEY);
+    square2dWorld.replaceAll({ worldName: 'Square Lattice (2D)', version: 1, cells: {}, meta: {} });
+    onSquare2dChange();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

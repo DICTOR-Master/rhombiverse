@@ -43,6 +43,11 @@ export const ELONGDODECA_STORAGE_KEY = 'rhombiverse-elongdodeca-world';
 // hex-prism.js), genuinely separate from FCC's own grid.
 export const HEXPRISM_STORAGE_KEY = 'rhombiverse-hexprism-world';
 
+// 2D tier (dimension-select wizard Phase 2), Square family: own store,
+// flat layer pinned to z=0 in the SAME scene 3D already uses (geometry-
+// extensions/lattice-2d.js). Same "adopted family member" reasoning.
+export const SQUARE2D_STORAGE_KEY = 'rhombiverse-square2d-world';
+
 export function saveToLocalStorage(worldJSON, key = STORAGE_KEY) {
   try {
     localStorage.setItem(key, JSON.stringify(worldJSON));
