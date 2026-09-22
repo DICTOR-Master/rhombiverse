@@ -1980,17 +1980,51 @@ async function init() {
       mat.needsUpdate = true;
     }
   }
+  // Dimension-scoped visibility (2026-09-22): direct report, "2D is in
+  // 3D world so... all seed shapes revolving about screen" -- 2D's own
+  // Square lattice and 3D's own coexisting families (BCC/Elongated
+  // Dodecahedron/Hex Prism -- all reached from WHEEL_RD_FAMILY, so
+  // structurally "3D" regardless of activeDimension having no separate
+  // slot for them) were ALWAYS both visible/clickable regardless of
+  // which dimension is actually active, cluttering the view with the
+  // other dimension's own stray seed cells. The main FCC world itself
+  // (`mesh`) is deliberately NOT gated here -- that's the user's own
+  // real 3D build, never a "stray seed" to hide.
+  // Real follow-up report, live: the main FCC world (`mesh`) was
+  // deliberately excluded from this gate at first ("that's the user's
+  // own real 3D build, never a stray seed to hide") -- direct
+  // correction, "can still see 3D shapes in middle of 2D scene," is
+  // unambiguous that it should hide too. Nothing is deleted -- this
+  // only toggles Object3D.visible, so switching back to 3D
+  // (tool:selectDimension:3D, which also calls applyDimensionVisibility)
+  // shows it again exactly as it was.
+  function dimensionAllowsMesh(key) {
+    if (activeDimension === '2D') return key === 'square2d';
+    // '3D' or not yet chosen (activeDimension === null, e.g. mid-load):
+    // default to showing 3D's own coexisting families, same as before
+    // this fix existed.
+    return key !== 'square2d';
+  }
   function setSolidWorldVisible(visible) {
-    mesh.visible = visible;
-    bccMesh.visible = visible;
-    elongDodecaMesh.visible = visible;
-    hexPrismMesh.visible = visible;
-    square2dMesh.visible = visible;
-    cuboctaMesh.visible = visible;
-    octGapMesh.visible = visible;
-    partialCellGroup.visible = visible;
-    interstitialGroup.visible = visible;
-    hemisphereGroup.visible = visible;
+    mesh.visible = visible && dimensionAllowsMesh('mesh');
+    bccMesh.visible = visible && dimensionAllowsMesh('bcc');
+    elongDodecaMesh.visible = visible && dimensionAllowsMesh('elongdodeca');
+    hexPrismMesh.visible = visible && dimensionAllowsMesh('hexprism');
+    square2dMesh.visible = visible && dimensionAllowsMesh('square2d');
+    cuboctaMesh.visible = visible && dimensionAllowsMesh('cubocta');
+    octGapMesh.visible = visible && dimensionAllowsMesh('octgap');
+    partialCellGroup.visible = visible && dimensionAllowsMesh('mesh'); // partial (pyramid-decomposed) FCC cells -- same "main world" content as `mesh` above
+    interstitialGroup.visible = visible && dimensionAllowsMesh('interstitial');
+    hemisphereGroup.visible = visible && dimensionAllowsMesh('hemisphere');
+  }
+  // Re-applies the same visibility rule whenever activeDimension itself
+  // changes (not just when World View mode changes, which is
+  // setSolidWorldVisible's own original trigger) -- reuses that exact
+  // function with the CURRENT worldViewMode's own solid-visibility
+  // intent (true unless Skeleton mode has already hidden everything),
+  // so the two mechanisms never fight each other.
+  function applyDimensionVisibility() {
+    setSolidWorldVisible(worldViewMode !== 'skeleton');
   }
   function clearWorldViewSkeleton() {
     if (skeletonMesh) {
@@ -2770,6 +2804,7 @@ async function init() {
       onAction: (action) => {
         if (action === 'tool:selectDimension:3D') {
           activeDimension = '3D';
+          applyDimensionVisibility();
           seedIfWorldEmpty();
           dimensionWheel3D.close();
           handleWheelAction('tool:pieceType:rd');
@@ -2781,6 +2816,7 @@ async function init() {
         // seed here, just select the piece type.
         if (action === 'tool:selectDimension:2D') {
           activeDimension = '2D';
+          applyDimensionVisibility();
           dimensionWheel3D.close();
           handleWheelAction('tool:pieceType:square2d');
           return;
@@ -2807,9 +2843,17 @@ async function init() {
     // dimensionWheel3D's own job now; reachable any time via the new
     // top-left #hud-wizard-cue instead).
     const dimensionWizard = createDimensionWizard({
-      onSelectFamily: (action) => {
-        activeDimension = '3D';
-        seedIfWorldEmpty();
+      // Real bug fixed same session: this used to hardcode
+      // activeDimension = '3D' regardless of which of the wizard's own
+      // screens the pick came from, so choosing Square from its 2D
+      // screen incorrectly left activeDimension at '3D' -- wrong for
+      // applyDimensionVisibility's own dimension-scoped mesh toggling.
+      // dimension-wizard.js's own showLattice2D/showLattice3D now pass
+      // the real dimension alongside the action.
+      onSelectFamily: (dimension, action) => {
+        activeDimension = dimension;
+        applyDimensionVisibility();
+        if (dimension === '3D') seedIfWorldEmpty();
         handleWheelAction(action);
       },
     });

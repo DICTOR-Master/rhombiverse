@@ -60,12 +60,15 @@ function centerRhombi(rhombi) {
 
 function zonogonSvg(n) {
   const rhombi = centerRhombi(zonogonTiling(n, 22));
-  // Shading cycles through a few opacity steps so adjacent facets read
-  // as distinct pieces (real depth/structure cue), not a flat blob --
-  // purely a rendering choice, doesn't affect the real geometry above.
-  const shades = [0.85, 0.55, 0.3, 0.7, 0.45, 0.2, 0.9, 0.6, 0.35, 0.25, 0.8, 0.5, 0.4, 0.65, 0.3];
-  const polys = rhombi.map((r, i) =>
-    `<polygon points="${pts(r.corners)}" fill="currentColor" opacity="${shades[i % shades.length]}"/>`
+  // Direct report, live: cycling through many different opacity levels
+  // (an earlier draft) read as "different colors... own outline shapes,
+  // confusing" -- a jumble of translucent overlapping edges instead of
+  // one cohesive symbol. Simplified to ONE consistent fill opacity plus
+  // a real stroke on every facet, so the divisions between rhombi are
+  // drawn deliberately (same line weight/color throughout) rather than
+  // implied by uneven translucency.
+  const polys = rhombi.map((r) =>
+    `<polygon points="${pts(r.corners)}" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="1.2"/>`
   ).join('\n    ');
   return `<svg viewBox="-30 -30 60 60" width="1em" height="1em" role="img" aria-label="${n}-vector zonogon shadow">${polys}</svg>`;
 }
@@ -97,10 +100,11 @@ export function almanacIcon() {
   const cy = outer.reduce((s, p) => s + p[1], 0) / 4;
   const shift = ([x, y]) => [x - cx, y - cy];
   const bases = [[0, 0], h0, h1, add(h0, h1)];
-  const shades = [0.85, 0.55, 0.55, 0.3];
-  const polys = bases.map((base, i) => {
+  // Same consistent-fill-plus-stroke treatment as zonogonSvg above, not
+  // per-facet opacity cycling -- see that function's own comment.
+  const polys = bases.map((base) => {
     const corners = [base, add(base, h0), add(add(base, h0), h1), add(base, h1)].map(shift);
-    return `<polygon points="${pts(corners)}" fill="currentColor" opacity="${shades[i]}"/>`;
+    return `<polygon points="${pts(corners)}" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="1.2"/>`;
   }).join('\n    ');
   return `<svg viewBox="-30 -30 60 60" width="1em" height="1em" role="img" aria-label="Almanac">${polys}</svg>`;
 }

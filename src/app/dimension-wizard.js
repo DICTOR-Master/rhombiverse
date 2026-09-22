@@ -318,7 +318,7 @@ export function createDimensionWizard({ onSelectFamily }) {
     bodyEl.querySelectorAll('.dim-wizard-card-btn[data-action]').forEach((el) => {
       el.addEventListener('click', () => {
         close();
-        onSelectFamily(el.dataset.action);
+        onSelectFamily('2D', el.dataset.action);
       });
     });
   }
@@ -343,7 +343,7 @@ export function createDimensionWizard({ onSelectFamily }) {
     bodyEl.querySelectorAll('.dim-wizard-card-btn[data-action]').forEach((el) => {
       el.addEventListener('click', () => {
         close();
-        onSelectFamily(el.dataset.action);
+        onSelectFamily('3D', el.dataset.action);
       });
     });
   }

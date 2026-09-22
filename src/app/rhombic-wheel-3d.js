@@ -73,19 +73,35 @@ const CSS = `
      fontSizeBase, 16px, see that rule's own definition) -- a child's
      own declared property always wins over a parent's, !important or
      not, so this needs its own matching override, not just the parent
-     .rw3d-label rule below. */
+     .rw3d-label rule below. Real bug found live: the diamond clip-path
+     used to live on the PARENT .rw3d-label, which also contains this
+     revealed text -- a diamond's own profile is narrow away from its
+     center line, so any word wider than ~2 characters (Almanac, most
+     of all) got silently clipped away, reading as "text isn't
+     appearing when touching" even though it really was there
+     (opacity:1, just invisible past the clip). Fixed by moving the
+     diamond clip-path/background onto ONLY the icon element below, so
+     the text -- a separate sibling, positioned above the icon by the
+     shared .rw3d-label-text rule already -- is never clipped by it.
+     A plain readable backdrop (no diamond) here instead, sized to fit
+     whatever word actually needs to show. */
   font-size: 26px !important;
+  background: rgba(4, 10, 16, 0.85);
+  border-radius: 4px;
+  padding: 4px 10px;
+  white-space: nowrap;
 }
-#rhombic-wheel-3d-overlay-dimension .rw3d-label {
-  font-size: 26px !important;
+#rhombic-wheel-3d-overlay-dimension .rw3d-label { font-size: 26px !important; }
+/* The diamond backdrop lives HERE now (the icon only -- see .rw3d-
+   label-text's own comment above for why not the parent), sized to the
+   existing 52x52 .rw3d-label-icon box with room to breathe. */
+#rhombic-wheel-3d-overlay-dimension .rw3d-dim-shadow {
   background: rgba(4, 10, 16, 0.72);
   clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  padding: 22px 30px;
+  padding: 14px;
+  box-sizing: content-box;
 }
-/* .rw3d-dim-shadow rides along with the existing .rw3d-label-icon class
-   (52x52px, display:block -- see that rule's own comment for why NOT
-   flex) -- just needs its inner <svg> sized to fill that box. */
-#rhombic-wheel-3d-overlay-dimension .rw3d-dim-shadow svg { width: 100%; height: 100%; }
+#rhombic-wheel-3d-overlay-dimension .rw3d-dim-shadow svg { width: 100%; height: 100%; display: block; }
 #rhombic-wheel-3d-overlay-dimension .rw3d-label.spare {
   opacity: 0.4 !important;
   pointer-events: none;
