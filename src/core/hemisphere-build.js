@@ -27,6 +27,16 @@ export function halfRdKey(x, y, z, offsetIndex, side) {
   return `halfrd|${cellKey(x, y, z)}|${offsetIndex}|${side}`;
 }
 
+// RD Quarter (core/lattice.js's rdQuarterPieces): one of RD's own 4 real
+// zonotope rhombohedra, indexed 0-3 matching rdQuarterPieces()'s own
+// anchor order. Unlike halfrd, no "side" -- each of the 4 is an
+// independent, self-contained solid (not one half of a shared cut), so
+// a cell can hold any subset of the 4 simultaneously.
+export function rdQuarterKey(x, y, z, cornerIndex) {
+  return `rdquarter|${cellKey(x, y, z)}|${cornerIndex}`;
+}
+export const RD_QUARTER_ANCHORS = [[1, 1, 1], [1, 1, -1], [1, -1, 1], [-1, 1, 1]];
+
 // Two-axis wedge ("Triangle Ring", added 2026-09-06): the intersection of
 // TWO independent hemisphereSplit() cuts on the SAME cell -- direct user
 // idea after Triangle Cluster's own anchor-cell dependency was questioned

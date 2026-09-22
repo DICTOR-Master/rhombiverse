@@ -48,6 +48,8 @@ import {
   resolveTriangleGroup,
   wedge2Key,
   triangleRingCells,
+  rdQuarterKey,
+  RD_QUARTER_ANCHORS,
 } from './hemisphere-build.js';
 
 // Every piece type routed through handleHemisphereClick/hemisphereStore --
@@ -55,7 +57,7 @@ import {
 // cluster stamps of the same underlying halfrd entries, core/hemisphere-
 // build.js). One shared list so the several gates below (raycast targets,
 // onClick/onContextMenu dispatch) can't drift out of sync with each other.
-const HEMISPHERE_PIECE_TYPES = ['halfrd', 'hourglass', 'hemi3', 'hemi4', 'hemiTri', 'hemiRing'];
+const HEMISPHERE_PIECE_TYPES = ['halfrd', 'hourglass', 'hemi3', 'hemi4', 'hemiTri', 'hemiRing', 'rdquarter'];
 
 const NEIGHBOR_DIRECTIONS = NEIGHBOR_OFFSETS.map(
   ([x, y, z]) => new THREE.Vector3(x, y, z).normalize()
@@ -965,9 +967,51 @@ export function createBuildController({
     return { added: 1, anchor: { x: ax, y: ay, z: az } };
   }
 
+  // RD Quarter ('rdquarter'): one at a time, like halfrd -- but each of
+  // RD's own 4 real rhombohedra (rdQuarterPieces()) is an independent
+  // solid within its OWN cell (no "missing other half" the way halfrd's
+  // split has), so growth is simpler: match the click's own direction
+  // from the cell center against whichever of the 4 anchor corners
+  // aren't already placed there, and add that one. Bootstraps from a
+  // solid FCC cell OR grows from an already-placed rdquarter piece in
+  // the SAME cell (clicking near a different corner than what's there
+  // fills that one in too -- a cell can hold any subset of the 4).
+  function handleRdQuarterClick(hit) {
+    let cell;
+    if (hit.object.parent === hemisphereGroup) {
+      const piece = hemisphereStore.get(hit.object.userData.key);
+      if (!piece || piece.type !== 'rdquarter') return null;
+      cell = piece.cell;
+    } else {
+      const c = hit.object === bccMesh ? bccCellAt(hit.instanceId) : cellAt(hit);
+      if (!c) return null;
+      cell = [c.x, c.y, c.z];
+    }
+    const [wx, wy, wz] = cellToWorld(cell[0], cell[1], cell[2]);
+    const dir = new THREE.Vector3(hit.point.x - wx, hit.point.y - wy, hit.point.z - wz).normalize();
+    let bestIdx = -1;
+    let bestDot = -Infinity;
+    RD_QUARTER_ANCHORS.forEach((anchor, i) => {
+      if (hemisphereStore.has(rdQuarterKey(cell[0], cell[1], cell[2], i))) return; // already placed -- skip
+      const dot = new THREE.Vector3(...anchor).normalize().dot(dir);
+      if (dot > bestDot) { bestDot = dot; bestIdx = i; }
+    });
+    if (bestIdx === -1) return { added: 0 }; // all 4 orientations already placed
+    const key = rdQuarterKey(cell[0], cell[1], cell[2], bestIdx);
+    hemisphereStore.set(key, { type: 'rdquarter', cell, cornerIndex: bestIdx, material: getMaterial() });
+    return { added: 1, anchor: { x: cell[0], y: cell[1], z: cell[2] } };
+  }
+
   function handleHemisphereClick(hit, mode, pieceType) {
     const action = mode === 'build' ? 'add' : 'remove';
     if (mode === 'build') {
+      if (pieceType === 'rdquarter') {
+        const result = handleRdQuarterClick(hit);
+        if (!result || result.added === 0) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        onHemisphereChange();
+        if (onPlaced) onPlaced({ x: result.anchor.x, y: result.anchor.y, z: result.anchor.z, material: getMaterial() });
+        return;
+      }
       // Cluster stamps ('hemi3'/'hemi4'/'hemiTri'/'hemiRing') can anchor
       // on either a solid cell or an existing hemisphere piece's own
       // owning cell -- direct report 2026-09-06 ("the clusters should be

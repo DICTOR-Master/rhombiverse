@@ -650,6 +650,13 @@ export const WHEEL_RHOMBITECT = {
 // ideas for piece variety" the same session this wheel was created, so
 // real room is kept for future RD-derived pieces, just never as an
 // accidentally-blank face again.
+// Trimmed 2026-09-22, direct instruction ("remove some RD pieces, just
+// keeping RD-Hemi and RD-Hourglass"): the 4 cluster stamps (Corner/Band/
+// Triangle Cluster, Triangle Ring) are cut from this wheel -- their
+// underlying core/hemisphere-build.js math and core/build.js click
+// handling are untouched, just no longer reachable via this face or the
+// Piece picker (archived-in-place, per this repo's own "archive, don't
+// delete" convention, not removed from the codebase).
 export const WHEEL_RD_FAMILY = {
   id: "rdFamily",
   faces: {
@@ -658,31 +665,10 @@ export const WHEEL_RD_FAMILY = {
       desc: "One real hemisphereSplit() half of an RD -- click an existing face to add the neighbor's near half." },
     "equator|sx-1sy1":  { kind: "dept", label: "Hourglass", action: "tool:pieceType:hourglass",
       desc: "Two matching hemisphere halves bridging a cell and its neighbor -- click an existing face to add one across that boundary." },
-    "equator|sx-1sy-1": { kind: "dept", label: "Corner Cluster", action: "tool:pieceType:hemi3",
-      desc: "3 Hemi RD halves around one real cube corner -- click a face near the corner you mean, one of 8 possible." },
-    "top|sy1sz1":       { kind: "dept", label: "Band Cluster", action: "tool:pieceType:hemi4",
-      desc: "4 Hemi RD halves forming a flat equatorial band around one axis -- click any face along that axis, one of 3 possible." },
-    // Triangle Cluster: a genuine third symmetric family, added same
-    // session -- direct user idea ("equilateral triangle with flat sides
-    // out"), verified numerically before building (see core/hemisphere-
-    // build.js's own TRIANGLE_GROUPS header) that this is a real, flat,
-    // 120-degree ring, distinct from both Corner Cluster (3D, converges
-    // to a point) and Band Cluster (a 4-fold square ring).
-    "bottom|sy1sz-1":   { kind: "dept", label: "Triangle Cluster", action: "tool:pieceType:hemiTri",
-      desc: "3 Hemi RD halves in one flat plane at 120 degrees -- click a face near the flat ring you mean, one of 8 possible." },
-    // Triangle Ring: added same session, direct follow-up once Triangle
-    // Cluster's own anchor-cell dependency got questioned ("equilateral
-    // cluster without whole rd in the middle"). Genuinely different piece
-    // type ('wedge2', core/hemisphere-build.js) -- the SAME 8 real
-    // direction-triples Corner Cluster already uses (verified: they are
-    // the only mutually-adjacent triples in this lattice), but each cell
-    // contributes a real 2-axis wedge facing its 2 ring-mates directly,
-    // so all 3 pieces genuinely touch each other with no anchor cell
-    // required at all -- confirmed by real removal test (a plain Corner/
-    // Triangle Cluster leaves gaps if you remove the anchor; this one
-    // doesn't need one in the first place).
-    "bottom|sx1sz-1":   { kind: "dept", label: "Triangle Ring", action: "tool:pieceType:hemiRing",
-      desc: "3 Hemi RD wedges that touch each other directly -- no anchor cell needed. Click a face near the ring you mean, one of 8 possible." },
+    "equator|sx-1sy-1": SPARE,
+    "top|sy1sz1":       SPARE,
+    "bottom|sy1sz-1":   SPARE,
+    "bottom|sx1sz-1":   SPARE,
     "bottom|sx-1sz-1":  SPARE,
   }
 };

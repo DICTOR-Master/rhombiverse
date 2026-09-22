@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { rdRawVerts, cellToWorld, nearestValidCell, isValidCell, cellKey, pyramidPieces, cellsInShells, cuboctahedronVertices, octGapVertices, hemisphereSplit, NEIGHBOR_OFFSETS } from './core/lattice.js';
+import { rdRawVerts, cellToWorld, nearestValidCell, isValidCell, cellKey, pyramidPieces, rdQuarterPieces, cellsInShells, cuboctahedronVertices, octGapVertices, hemisphereSplit, NEIGHBOR_OFFSETS } from './core/lattice.js';
 import { FULL_PYRAMIDS, presentAxisKeys, hasCube, effectivePyramids } from './core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { createAlmanac } from './app/almanac.js';
@@ -1135,6 +1135,15 @@ function buildHemisphereGeometry(piece, subScale) {
   // already documents and claims was verified (non-degenerate for every
   // real CORNER_GROUPS triple), just never actually wired into a real
   // render.
+  if (piece.type === 'rdquarter') {
+    const [cx, cy, cz] = piece.cell;
+    const [wx, wy, wz] = cellToWorld(cx, cy, cz, subScale);
+    const verts = rdQuarterPieces(subScale)[piece.cornerIndex]
+      .map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
+    const geometry = new ConvexGeometry(verts);
+    geometry.computeVertexNormals();
+    return geometry;
+  }
   if (piece.type === 'wedge2') {
     const [cx, cy, cz] = piece.cell;
     const [wx, wy, wz] = cellToWorld(cx, cy, cz, subScale);
@@ -2481,7 +2490,7 @@ async function init() {
         }
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
-          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron' };
+          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)' };
           document.getElementById('piece-type-select').value = value;
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
@@ -2802,12 +2811,13 @@ async function init() {
   // interstitial-lattice.js). Labels/icons are keyed by mode name below
   // (LATTICE_QUICK_VIEW_LABELS/_MARK_KEY), not by array position, so
   // reordering this list alone is safe.
-  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'cubocta', 'octahedron', 'bcc', 'octa', 'disphenoid'];
+  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'rdquarter', 'cubocta', 'octahedron', 'bcc', 'octa', 'disphenoid'];
   const LATTICE_QUICK_VIEW_LABELS = {
     off: 'Off.',
     rd: 'RD -- every built cell shown as a complete block.',
     cube: 'Cube -- every built cell shown bare, pyramids hidden.',
     pyramid: "Pyramid -- every built cell's cube and 6 pyramid facets shown as separate pieces.",
+    rdquarter: 'RD Quarter -- every built cell shown as its 4 real rhombohedra (Fedorov’s zonotope decomposition).',
     cubocta: 'Cuboctahedron -- every built cell shown as the real coordination shape, plus a preview at one face-touching axis-neighbor position too.',
     bcc: 'BCC/TO -- every co-locatable built cell shown as its dual truncated octahedron.',
     octa: 'Flattened Octahedron -- every co-locatable built cell shown as one octahedron bundle.',
@@ -2819,7 +2829,7 @@ async function init() {
   // iconFrame (outline only, zero ink) for the default/most-common
   // state -- direct report ("lattice view symbols are still feint")
   // traced to this, not a rendering-strength issue. See MARKS.latticeOff.
-  const LATTICE_QUICK_VIEW_MARK_KEY = { off: 'latticeOff', rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', octahedron: 'pieceOctahedron', disphenoid: 'pieceDisphenoid' };
+  const LATTICE_QUICK_VIEW_MARK_KEY = { off: 'latticeOff', rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', rdquarter: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', octahedron: 'pieceOctahedron', disphenoid: 'pieceDisphenoid' };
   // Fixed axis for octahedron/disphenoid coverage -- matches core/
   // build.js's own bootstrap default for a fresh 'ioct' placement; a
   // representative single orientation per anchor is enough for a
@@ -2905,6 +2915,10 @@ async function init() {
     if (mode === 'rd') return [new ConvexGeometry(shift(rdRawVerts(SCALE)))];
     const { cube, pyramids } = pyramidPieces(SCALE);
     if (mode === 'cube') return [new ConvexGeometry(shift(cube))];
+    // RD Quarter (Fedorov's zonotope decomposition, see rdQuarterPieces'
+    // own header) -- same "own quick-view mode, no interactive click-to-
+    // place" treatment as Cube above, not a new partial-cell system.
+    if (mode === 'rdquarter') return rdQuarterPieces(SCALE).map((verts) => new ConvexGeometry(shift(verts)));
     const pieces = [];
     for (const axisKey of Object.keys(pyramids)) {
       const { base, apex } = pyramids[axisKey];
@@ -2960,7 +2974,7 @@ async function init() {
     // no longer be current.
     if (myGeneration !== latticeQuickViewGeneration) return;
 
-    const isFccFamily = latticeQuickViewMode === 'rd' || latticeQuickViewMode === 'cube' || latticeQuickViewMode === 'pyramid';
+    const isFccFamily = latticeQuickViewMode === 'rd' || latticeQuickViewMode === 'cube' || latticeQuickViewMode === 'pyramid' || latticeQuickViewMode === 'rdquarter';
     const pieces = [];
     const cells = w ? w.entries() : [];
     if (isFccFamily) {
@@ -4047,6 +4061,10 @@ async function init() {
         elongdodeca: {
           add: 'An Elongated Dodecahedron is already there.',
           remove: "No Elongated Dodecahedron there to remove -- Remove+Elongated Dodecahedron only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
+        },
+        rdquarter: {
+          add: 'All 4 real rhombohedra are already placed in that cell.',
+          remove: 'No RD Quarter there to remove -- tap directly on one you’ve placed.',
         },
         idis: {
           add: "That disphenoid's already there.",

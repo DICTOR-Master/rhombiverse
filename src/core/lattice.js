@@ -79,6 +79,39 @@ export function pyramidPieces(s = 1) {
 // share a real flat seam. facePieces() exists so any future interlocking
 // geometry between two real lattice neighbors starts from their own
 // actual shared face, not an unrelated 6-direction decomposition.
+// RD Quarter -- RD is a zonotope (Minkowski sum of the cube's own 4
+// body-diagonal directions), which always decomposes into exactly
+// C(4,3)=4 congruent rhombohedra (parallelepipeds, 6 rhombic faces
+// each). Verified numerically before writing this (volume: each piece
+// = 4, four of them = 16 = RD's own volume in this convention;
+// vertices: every non-center vertex of each piece is a REAL RD vertex
+// -- 4 cube corners + 3 octahedral points -- not an invented point).
+// Construction: anchor at one cube corner, opposite corner is RD's own
+// center (origin), edges run to the 3 octahedral points matching that
+// corner's own 3 coordinate signs.
+export function rdQuarterPieces(s = 1) {
+  const half = s * 0.5;
+  const octa = s;
+  const anchors = [[1, 1, 1], [1, 1, -1], [1, -1, 1], [-1, 1, 1]];
+  return anchors.map(([sx, sy, sz]) => {
+    const anchor = [sx * half, sy * half, sz * half];
+    const edges = [
+      [sx * octa - anchor[0], -anchor[1], -anchor[2]],
+      [-anchor[0], sy * octa - anchor[1], -anchor[2]],
+      [-anchor[0], -anchor[1], sz * octa - anchor[2]],
+    ];
+    const verts = [];
+    for (const b0 of [0, 1]) for (const b1 of [0, 1]) for (const b2 of [0, 1]) {
+      verts.push([
+        anchor[0] + b0 * edges[0][0] + b1 * edges[1][0] + b2 * edges[2][0],
+        anchor[1] + b0 * edges[0][1] + b1 * edges[1][1] + b2 * edges[2][1],
+        anchor[2] + b0 * edges[0][2] + b1 * edges[1][2] + b2 * edges[2][2],
+      ]);
+    }
+    return verts;
+  });
+}
+
 export function facePieces(s = 1) {
   const verts = rdRawVerts(s);
   const cube = verts.slice(0, 8);
