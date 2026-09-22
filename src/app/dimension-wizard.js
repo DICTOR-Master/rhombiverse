@@ -256,6 +256,32 @@ function hexagonWireframe() {
   return wireframeSvg(edges, 22);
 }
 
+// Triangle (2D tier): a real equilateral-triangle prism, matching
+// geometry-extensions/lattice-2d.js's own triangleTileVerts EXACTLY
+// (the canonical "up" orientation -- 2 equal-length vectors at 60
+// degrees, same basisVectors construction Square's own 90-degree
+// version already uses) -- same "real corner coordinates, not guessed"
+// discipline as squareWireframe/hexagonWireframe above.
+function triangleWireframe() {
+  const h = 0.5;
+  const angleDeg = 60;
+  const v0 = [1, 0];
+  const v1 = [Math.cos((angleDeg * Math.PI) / 180), Math.sin((angleDeg * Math.PI) / 180)];
+  const corners2d = [[0, 0], v0, v1];
+  const cx = corners2d.reduce((s, p) => s + p[0], 0) / 3;
+  const cy = corners2d.reduce((s, p) => s + p[1], 0) / 3;
+  const shifted = corners2d.map(([x, y]) => [x - cx, y - cy]);
+  const top = shifted.map(([x, y]) => [x, y, h]);
+  const bot = shifted.map(([x, y]) => [x, y, -h]);
+  const edges = [];
+  for (let i = 0; i < 3; i++) {
+    edges.push([top[i], top[(i + 1) % 3]]);
+    edges.push([bot[i], bot[(i + 1) % 3]]);
+    edges.push([top[i], bot[i]]);
+  }
+  return wireframeSvg(edges, 22);
+}
+
 // DIMENSIONS: the dimension-select screen's own 5 cards. Only `enabled`
 // tiers get a real onOpen (advances to that tier's lattice screen) and a
 // real wireframe; the rest are the honest, undecorated "planned, not
@@ -270,7 +296,7 @@ const DIMENSIONS = [
   // semantics") -- a real, separate Rhombus family is still planned,
   // scheduled for after Triangular. Hexagon shipped next. Triangular
   // and the real Rhombi still planned -- desc says so honestly.
-  { id: '2D', label: '2D', desc: 'Square and Hexagon (shipped) -- Triangular tiling and real Rhombi still planned.', enabled: true, preview: squareWireframe },
+  { id: '2D', label: '2D', desc: 'Square, Hexagon, and Triangle (shipped) -- a real (non-square) Rhombi family still planned.', enabled: true, preview: squareWireframe },
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, preview: rdWireframe },
   { id: '4D', label: '4D', desc: 'Hypercubic (Tesseract) and D4 root lattice.', enabled: false },
   { id: '5D', label: '5D', desc: 'Decagonal quasicrystal.', enabled: false },
@@ -285,6 +311,7 @@ const DIMENSIONS = [
 const LATTICE_FAMILIES_2D = [
   { label: 'Square', desc: 'A flat layer of real square tiles -- own separate lattice, pinned to z=0 in this same scene.', action: 'tool:pieceType:square2d', preview: squareWireframe },
   { label: 'Hexagon', desc: 'A flat layer of real hexagon tiles -- same axial hex lattice as the 3D Hex Prism tier, own separate store, pinned to z=0 in this same scene.', action: 'tool:pieceType:hexagon2d', preview: hexagonWireframe },
+  { label: 'Triangle', desc: 'A flat layer of real equilateral triangles, up- and down-pointing alternating -- own separate lattice, pinned to z=0 in this same scene.', action: 'tool:pieceType:triangle2d', preview: triangleWireframe },
 ];
 
 // LATTICE_FAMILIES_3D: 3D's own lattice-family screen. Actions reuse

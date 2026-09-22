@@ -53,6 +53,18 @@ export const SQUARE2D_STORAGE_KEY = 'rhombiverse-square2d-world';
 // but pinned to z=0. Same "adopted family member" reasoning.
 export const HEXAGON2D_STORAGE_KEY = 'rhombiverse-hexagon2d-world';
 
+// 2D tier, Triangular family: own store, same reasoning again -- the
+// one 2D family that uses its cell's own z slot for something real
+// (0=up-pointing, 1=down-pointing triangle) instead of always 0, see
+// geometry-extensions/lattice-2d.js's own header for why.
+export const TRIANGLE2D_STORAGE_KEY = 'rhombiverse-triangle2d-world';
+
+// Rhombohedra (free lattice): own store, own coordinate frame (3 real
+// edge vectors of one of RD Quarter's own 4 congruent orientations --
+// see geometry-extensions/rhombohedra-lattice.js's own header for why
+// RD Quarter itself can't be freely placed/removed in open space).
+export const RHOMBOHEDRA_STORAGE_KEY = 'rhombiverse-rhombohedra-world';
+
 export function saveToLocalStorage(worldJSON, key = STORAGE_KEY) {
   try {
     localStorage.setItem(key, JSON.stringify(worldJSON));

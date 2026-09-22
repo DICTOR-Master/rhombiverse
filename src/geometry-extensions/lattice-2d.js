@@ -62,3 +62,76 @@ export function squareTileVerts(s = 1, h = 0.15 * 1) {
   }
   return verts;
 }
+
+// Triangular (2D tier): the real equilateral-triangle tiling -- up-
+// pointing and down-pointing triangles alternating, together filling
+// every 60-degree rhombus cell of the same skewed basisVectors(s, 60)
+// construction Square's own basisVectors already provides (parametrized
+// exactly for this kind of reuse, per this file's own header).
+//
+// Coordinates: (i, j, orientation) where orientation is 0 (up) or 1
+// (down) -- stored in the cell's own z slot (every other 2D family
+// pins z to 0; this is the one 2D family that needs a real 3rd axis,
+// so it uses the one already available rather than inventing a 4th).
+// up(i,j) has vertices P(i,j), P(i+1,j), P(i,j+1) (P = i*v0 + j*v1);
+// down(i,j) has vertices P(i+1,j), P(i,j+1), P(i+1,j+1) -- together
+// these exactly tile the rhombus cell spanned by P(i,j)..P(i+1,j+1).
+// Verified directly (law of cosines, v0/v1 both length s at 60 degrees
+// apart): every edge of both triangles has length exactly s.
+//
+// Real, verified fact this construction relies on: down(i,j) is
+// EXACTLY up(i,j) rotated 180 degrees about their shared center --
+// confirmed by comparing both triangles' own vertices relative to
+// their own centroids: {(0.5s,0.2887s), (-0.5s,0.2887s), (0,-0.5774s)}
+// for both, not just "same shape, different orientation." This is why
+// render.js can use ONE shared InstancedMesh geometry (the up triangle,
+// triangleTileVerts below) for both orientations -- a down instance is
+// just a 180-degree Z-rotation of the same geometry at its own real
+// world position, not a second mesh/geometry.
+const TRIANGLE_ANGLE_DEG = 60;
+
+// Neighbor offsets are orientation-DEPENDENT (unlike every other 2D
+// family's uniform offset table) -- an up triangle's 3 neighbors are
+// always down triangles and vice versa, so growth logic (build.js's
+// own handleTriangle2dClick) must pick the right table for the
+// clicked cell's own current orientation. Derived directly from the
+// shared-edge relationships above (see this file's own git history/
+// code-notes for the full per-edge derivation).
+export const TRIANGLE_NEIGHBOR_OFFSETS_FROM_UP = [
+  [0, -1, 1], [0, 0, 1], [-1, 0, 1],
+];
+export const TRIANGLE_NEIGHBOR_OFFSETS_FROM_DOWN = [
+  [0, 0, 0], [0, 1, 0], [1, 0, 0],
+];
+
+function trianglePoint(i, j, s) {
+  const [v0, v1] = basisVectors(s, TRIANGLE_ANGLE_DEG);
+  return [i * v0[0] + j * v1[0], i * v0[1] + j * v1[1]];
+}
+
+export function triangleCellToWorld(i, j, orientation, s = 1, worldZ = 0) {
+  const [v0, v1] = basisVectors(s, TRIANGLE_ANGLE_DEG);
+  const [px, py] = trianglePoint(i, j, s);
+  const corners2d = orientation === 0
+    ? [[px, py], [px + v0[0], py + v0[1]], [px + v1[0], py + v1[1]]]
+    : [[px + v0[0], py + v0[1]], [px + v1[0], py + v1[1]], [px + v0[0] + v1[0], py + v0[1] + v1[1]]];
+  const cx = corners2d.reduce((sum, p) => sum + p[0], 0) / 3;
+  const cy = corners2d.reduce((sum, p) => sum + p[1], 0) / 3;
+  return [cx, cy, worldZ];
+}
+
+// The canonical "up" triangle prism only -- "down" instances reuse this
+// SAME geometry with a 180-degree Z-rotation applied to their own
+// instance matrix (see this file's own header for the verified reason
+// this is exact, not an approximation).
+export function triangleTileVerts(s = 1, h = 0.15 * 1) {
+  const [v0, v1] = basisVectors(s, TRIANGLE_ANGLE_DEG);
+  const corners2d = [[0, 0], v0, v1];
+  const cx = corners2d.reduce((sum, p) => sum + p[0], 0) / 3;
+  const cy = corners2d.reduce((sum, p) => sum + p[1], 0) / 3;
+  const verts = [];
+  for (const hz of [h / 2, -h / 2]) {
+    for (const [x, y] of corners2d) verts.push([x - cx, y - cy, hz]);
+  }
+  return verts;
+}

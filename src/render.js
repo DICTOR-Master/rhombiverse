@@ -23,7 +23,8 @@ import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
-import { squareTileVerts, squareCellToWorld } from './geometry-extensions/lattice-2d.js';
+import { squareTileVerts, squareCellToWorld, triangleTileVerts, triangleCellToWorld } from './geometry-extensions/lattice-2d.js';
+import { rhombohedraTileVerts, rhombohedraCellToWorld } from './geometry-extensions/rhombohedra-lattice.js';
 import { hexPrismVerts as hexagonTileVerts2D, hexCellToWorld as hexagonCellToWorld2D } from './geometry-extensions/hex-prism.js';
 import { FEATURES } from './app/features.js';
 import {
@@ -83,6 +84,8 @@ import {
   HEXPRISM_STORAGE_KEY,
   SQUARE2D_STORAGE_KEY,
   HEXAGON2D_STORAGE_KEY,
+  TRIANGLE2D_STORAGE_KEY,
+  RHOMBOHEDRA_STORAGE_KEY,
 } from './core/persistence.js';
 import {
   compressionSupported,
@@ -124,6 +127,13 @@ const SQUARE2D_H = 0.03 * SCALE;
 // near-zero flat-tile height reasoning as SQUARE2D_H above.
 const HEXAGON2D_R = SCALE;
 const HEXAGON2D_H = 0.03 * SCALE;
+// Triangle (2D tier): same real scale as everything else, same near-
+// zero flat-tile height reasoning as SQUARE2D_H/HEXAGON2D_H above.
+const TRIANGLE2D_S = SCALE;
+const TRIANGLE2D_H = 0.03 * SCALE;
+// Rhombohedra (free lattice): same real scale as everything else -- a
+// genuine 3D solid, no special height/thinness constant needed.
+const RHOMBOHEDRA_S = SCALE;
 const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
 
 // Performance guardrail (reframe Stage 6): warn before loading a World
@@ -364,6 +374,15 @@ setInterval(persistCameraState, 3000);
 const saved3DCameraState = { position: new THREE.Vector3(), target: new THREE.Vector3() };
 let cameraSavedFor2D = false;
 function applyDimensionCamera(dimension) {
+  // Direct follow-up, same day: "2D shouldnt revolve should just stay
+  // flat planar movement only" -- enableRotate=false alone (below)
+  // already stops any actual rotation, but left it with NO drag gesture
+  // bound at all (LEFT was still mapped to the now-inert ROTATE action),
+  // reading as "nothing moves," not "flat planar movement." Remaps LEFT
+  // to PAN in 2D instead, so a drag slides the flat view around, then
+  // restores ORBIT_LEFT_DEFAULT (rotate) on the way back to 3D. Guarded
+  // by `!== null`: Drag Placement mode (pickers' own onDragPlacementChange)
+  // sets LEFT to null while active, and this must never clobber that.
   if (dimension === '2D') {
     if (!cameraSavedFor2D) {
       saved3DCameraState.position.copy(camera.position);
@@ -373,9 +392,11 @@ function applyDimensionCamera(dimension) {
     controls.target.set(0, 0, 0);
     camera.position.set(0, 0, 12);
     controls.enableRotate = false;
+    if (controls.mouseButtons.LEFT !== null) controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
     controls.update();
   } else {
     controls.enableRotate = true;
+    if (controls.mouseButtons.LEFT !== null) controls.mouseButtons.LEFT = ORBIT_LEFT_DEFAULT;
     if (cameraSavedFor2D) {
       camera.position.copy(saved3DCameraState.position);
       controls.target.copy(saved3DCameraState.target);
@@ -1130,6 +1151,8 @@ let elongDodecaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let hexPrismCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let square2dCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let hexagon2dCellOrder = []; // instanceId -> {x, y, z, ...cellData}
+let triangle2dCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- z is the orientation flag (0=up, 1=down), see lattice-2d.js's own header
+let rhombohedraCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are rhombohedra-lattice.js's own (i,j,k) frame
 let octGapCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are octGap's own offset-frame index, see core/cubocta-gap-build.js
 // Interstitial-lattice build: one real Mesh per disphenoid cell, same
 // pattern as partialCellGroup/partialCellMeshes above and for the same
@@ -1353,6 +1376,50 @@ function rebuildHexagon2dInstances(hexagon2dMesh, hexagon2dWorld) {
   hexagon2dMesh.computeBoundingSphere();
 }
 
+// Real placed Triangle cells (2D tier) -- same instancing pattern
+// again, but one shared "up" geometry represents BOTH orientations: a
+// down-pointing instance (cell.z === 1) gets an extra 180-degree Z
+// rotation baked into its own instance matrix before translating to its
+// real world position, exact (not approximated) per lattice-2d.js's
+// own verified header.
+function rebuildTriangle2dInstances(triangle2dMesh, triangle2dWorld) {
+  triangle2dCellOrder = triangle2dWorld.entries();
+  const m = new THREE.Matrix4();
+  triangle2dCellOrder.forEach((cell, i) => {
+    const [wx, wy, wz] = triangleCellToWorld(cell.x, cell.y, cell.z, TRIANGLE2D_S);
+    if (cell.z === 1) {
+      m.makeRotationZ(Math.PI);
+      m.setPosition(wx, wy, wz);
+    } else {
+      m.makeTranslation(wx, wy, wz);
+    }
+    triangle2dMesh.setMatrixAt(i, m);
+    triangle2dMesh.setColorAt(i, instanceColorFor(cell));
+  });
+  triangle2dMesh.count = triangle2dCellOrder.length;
+  triangle2dMesh.instanceMatrix.needsUpdate = true;
+  if (triangle2dMesh.instanceColor) triangle2dMesh.instanceColor.needsUpdate = true;
+  triangle2dMesh.computeBoundingSphere();
+}
+
+// Real placed Rhombohedra cells (free lattice) -- same instancing
+// pattern again, own rhombohedraCellToWorld position (a real 3D
+// coordinate frame, no orientation flag or flat-tile height needed).
+function rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld) {
+  rhombohedraCellOrder = rhombohedraWorld.entries();
+  const m = new THREE.Matrix4();
+  rhombohedraCellOrder.forEach((cell, i) => {
+    const [wx, wy, wz] = rhombohedraCellToWorld(cell.x, cell.y, cell.z, RHOMBOHEDRA_S);
+    m.makeTranslation(wx, wy, wz);
+    rhombohedraMesh.setMatrixAt(i, m);
+    rhombohedraMesh.setColorAt(i, instanceColorFor(cell));
+  });
+  rhombohedraMesh.count = rhombohedraCellOrder.length;
+  rhombohedraMesh.instanceMatrix.needsUpdate = true;
+  if (rhombohedraMesh.instanceColor) rhombohedraMesh.instanceColor.needsUpdate = true;
+  rhombohedraMesh.computeBoundingSphere();
+}
+
 // Real placed Cuboctahedron Build cells -- same instancing pattern as
 // rebuildBCCInstances above, own separate cell order/mesh.
 function rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld) {
@@ -1499,6 +1566,27 @@ async function init() {
   const hexagon2dWorld = createWorldStore(hexagon2dSavedJSON ?? { worldName: 'Hexagon Lattice (2D)', version: 1, cells: {}, meta: {} });
   if (hexagon2dWorld.entries().length === 0) hexagon2dWorld.addCell(-2, 0, 0, { material: 'base' });
 
+  // Triangle (2D tier, Phase 2): own store, flat layer -- same reasoning
+  // again. Seeded off-origin (like square2dWorld/hexagon2dWorld) so it
+  // isn't occluded by the main RD seed cell at world origin. z=0 means
+  // the seed is an "up" triangle -- see lattice-2d.js's own header.
+  const triangle2dSavedJSON = loadFromLocalStorage(TRIANGLE2D_STORAGE_KEY);
+  const triangle2dWorld = createWorldStore(triangle2dSavedJSON ?? { worldName: 'Triangle Lattice (2D)', version: 1, cells: {}, meta: {} });
+  if (triangle2dWorld.entries().length === 0) triangle2dWorld.addCell(0, -4, 0, { material: 'base' });
+
+  // Rhombohedra (free lattice): own store, own coordinate frame -- same
+  // reasoning again. Seeded at (5,0,0), NOT the origin -- real bug found
+  // live via a browser sweep test: this lattice's own (0,0,0) sits
+  // exactly at the main RD world's own seed position, and the
+  // rhombohedron's whole volume is a real subset of a solid RD's own
+  // volume at that same spot (same "unclickable, fully enclosed" issue
+  // this whole feature exists to get away from -- see rhombohedra-
+  // lattice.js's own header). Offsetting the seed puts it in genuinely
+  // open space instead.
+  const rhombohedraSavedJSON = loadFromLocalStorage(RHOMBOHEDRA_STORAGE_KEY);
+  const rhombohedraWorld = createWorldStore(rhombohedraSavedJSON ?? { worldName: 'Rhombohedra Lattice', version: 1, cells: {}, meta: {} });
+  if (rhombohedraWorld.entries().length === 0) rhombohedraWorld.addCell(5, 0, 0, { material: 'base' });
+
   const geometry = buildRDGeometry(SCALE);
   // White base color: actual per-cell color comes entirely from
   // setColorAt (instanceColorFor) via the multiplicative USE_INSTANCING_
@@ -1565,6 +1653,27 @@ async function init() {
   hexagon2dMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(hexagon2dMesh);
   rebuildHexagon2dInstances(hexagon2dMesh, hexagon2dWorld);
+
+  // Triangle Build (2D tier): its own InstancedMesh, own geometry -- the
+  // canonical "up" triangle only (see triangleTileVerts' own header for
+  // why "down" instances reuse this same geometry via a 180-degree
+  // instance-matrix rotation instead of a second mesh).
+  const triangle2dGeometry = new ConvexGeometry(triangleTileVerts(TRIANGLE2D_S, TRIANGLE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  triangle2dGeometry.computeVertexNormals();
+  const triangle2dMesh = new THREE.InstancedMesh(triangle2dGeometry, material.clone(), MAX_CELLS);
+  triangle2dMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(triangle2dMesh);
+  rebuildTriangle2dInstances(triangle2dMesh, triangle2dWorld);
+
+  // Rhombohedra Build (free lattice): its own InstancedMesh, own
+  // geometry (rhombohedraTileVerts -- one of RD Quarter's own 4
+  // congruent orientations, centered on its own centroid).
+  const rhombohedraGeometry = new ConvexGeometry(rhombohedraTileVerts(RHOMBOHEDRA_S).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  rhombohedraGeometry.computeVertexNormals();
+  const rhombohedraMesh = new THREE.InstancedMesh(rhombohedraGeometry, material.clone(), MAX_CELLS);
+  rhombohedraMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(rhombohedraMesh);
+  rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld);
 
   // Cuboctahedron Build: its own InstancedMesh (cuboctahedron geometry),
   // same "own material clone, same MATERIAL_COLORS palette" pattern as
@@ -2003,6 +2112,8 @@ async function init() {
     hexPrismMesh.material.clippingPlanes = planes;
     square2dMesh.material.clippingPlanes = planes;
     hexagon2dMesh.material.clippingPlanes = planes;
+    triangle2dMesh.material.clippingPlanes = planes;
+    rhombohedraMesh.material.clippingPlanes = planes;
     cuboctaMesh.material.clippingPlanes = planes;
     octGapMesh.material.clippingPlanes = planes;
     // Cube-less cells (see core/pyramid.js's hasCube()) render as a
@@ -2054,7 +2165,7 @@ async function init() {
   let skeletonGeneration = 0;
   const TRANSLUCENT_OPACITY = 0.55; // matches Lattice Quick-View/Dualize preview's own established "see-through structure" opacity
   function worldViewMaterials() {
-    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, square2dMesh.material, hexagon2dMesh.material, cuboctaMesh.material, octGapMesh.material];
+    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, square2dMesh.material, hexagon2dMesh.material, triangle2dMesh.material, rhombohedraMesh.material, cuboctaMesh.material, octGapMesh.material];
     for (const { mesh: m } of partialCellMeshes.values()) {
       if (m.isGroup) { for (const child of m.children) mats.push(child.material); }
       else mats.push(m.material);
@@ -2091,11 +2202,11 @@ async function init() {
   // (tool:selectDimension:3D, which also calls applyDimensionVisibility)
   // shows it again exactly as it was.
   function dimensionAllowsMesh(key) {
-    if (activeDimension === '2D') return key === 'square2d' || key === 'hexagon2d';
+    if (activeDimension === '2D') return key === 'square2d' || key === 'hexagon2d' || key === 'triangle2d';
     // '3D' or not yet chosen (activeDimension === null, e.g. mid-load):
     // default to showing 3D's own coexisting families, same as before
     // this fix existed.
-    return key !== 'square2d' && key !== 'hexagon2d';
+    return key !== 'square2d' && key !== 'hexagon2d' && key !== 'triangle2d';
   }
   function setSolidWorldVisible(visible) {
     mesh.visible = visible && dimensionAllowsMesh('mesh');
@@ -2104,6 +2215,8 @@ async function init() {
     hexPrismMesh.visible = visible && dimensionAllowsMesh('hexprism');
     square2dMesh.visible = visible && dimensionAllowsMesh('square2d');
     hexagon2dMesh.visible = visible && dimensionAllowsMesh('hexagon2d');
+    triangle2dMesh.visible = visible && dimensionAllowsMesh('triangle2d');
+    rhombohedraMesh.visible = visible && dimensionAllowsMesh('rhombohedra');
     cuboctaMesh.visible = visible && dimensionAllowsMesh('cubocta');
     octGapMesh.visible = visible && dimensionAllowsMesh('octgap');
     partialCellGroup.visible = visible && dimensionAllowsMesh('mesh'); // partial (pyramid-decomposed) FCC cells -- same "main world" content as `mesh` above
@@ -2711,7 +2824,7 @@ async function init() {
         }
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
-          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', square2d: 'Square (2D)', hexagon2d: 'Hexagon (2D)' };
+          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', square2d: 'Square (2D)', hexagon2d: 'Hexagon (2D)', triangle2d: 'Triangle (2D)', rhombohedra: 'Rhombohedra' };
           document.getElementById('piece-type-select').value = value;
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
@@ -4400,6 +4513,10 @@ async function init() {
           add: 'A Hexagon is already there.',
           remove: "No Hexagon there to remove -- Remove+Hexagon only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
         },
+        triangle2d: {
+          add: 'A Triangle is already there.',
+          remove: "No Triangle there to remove -- Remove+Triangle only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
+        },
         idis: {
           add: "That disphenoid's already there.",
           remove: 'No disphenoid there to remove -- tap directly on one from the interstitial lattice.',
@@ -4467,6 +4584,14 @@ async function init() {
     hexagon2dMesh,
     hexagon2dCellAt: (instanceId) => hexagon2dCellOrder[instanceId],
     onHexagon2dChange,
+    triangle2dWorld,
+    triangle2dMesh,
+    triangle2dCellAt: (instanceId) => triangle2dCellOrder[instanceId],
+    onTriangle2dChange,
+    rhombohedraWorld,
+    rhombohedraMesh,
+    rhombohedraCellAt: (instanceId) => rhombohedraCellOrder[instanceId],
+    onRhombohedraChange,
     interstitialStore,
     interstitialGroup,
     onInterstitialChange,
@@ -4554,6 +4679,30 @@ async function init() {
     updateSectionEnabled();
     applyWorldViewMaterials();
     saveToLocalStorage(hexagon2dWorld.toJSON(), HEXAGON2D_STORAGE_KEY);
+  }
+
+  // Triangle build (2D tier): own change handler, same "never truly
+  // empty" invariant.
+  function onTriangle2dChange() {
+    if (triangle2dWorld.entries().length === 0) {
+      triangle2dWorld.addCell(0, -4, 0, { material: 'base' });
+    }
+    rebuildTriangle2dInstances(triangle2dMesh, triangle2dWorld);
+    updateSectionEnabled();
+    applyWorldViewMaterials();
+    saveToLocalStorage(triangle2dWorld.toJSON(), TRIANGLE2D_STORAGE_KEY);
+  }
+
+  // Rhombohedra build (free lattice): own change handler, same "never
+  // truly empty" invariant.
+  function onRhombohedraChange() {
+    if (rhombohedraWorld.entries().length === 0) {
+      rhombohedraWorld.addCell(5, 0, 0, { material: 'base' });
+    }
+    rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld);
+    updateSectionEnabled();
+    applyWorldViewMaterials();
+    saveToLocalStorage(rhombohedraWorld.toJSON(), RHOMBOHEDRA_STORAGE_KEY);
   }
 
   // Interstitial-lattice build: own change handler, same reasoning as
@@ -4759,6 +4908,12 @@ async function init() {
     clearLocalStorage(HEXAGON2D_STORAGE_KEY);
     hexagon2dWorld.replaceAll({ worldName: 'Hexagon Lattice (2D)', version: 1, cells: {}, meta: {} });
     onHexagon2dChange();
+    clearLocalStorage(TRIANGLE2D_STORAGE_KEY);
+    triangle2dWorld.replaceAll({ worldName: 'Triangle Lattice (2D)', version: 1, cells: {}, meta: {} });
+    onTriangle2dChange();
+    clearLocalStorage(RHOMBOHEDRA_STORAGE_KEY);
+    rhombohedraWorld.replaceAll({ worldName: 'Rhombohedra Lattice', version: 1, cells: {}, meta: {} });
+    onRhombohedraChange();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

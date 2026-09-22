@@ -31,8 +31,9 @@ import {
 } from './pyramid.js';
 import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
 import { matchHexNeighborOffset } from '../geometry-extensions/hex-prism.js';
-import { SQUARE_NEIGHBOR_OFFSETS } from '../geometry-extensions/lattice-2d.js';
+import { SQUARE_NEIGHBOR_OFFSETS, TRIANGLE_NEIGHBOR_OFFSETS_FROM_UP, TRIANGLE_NEIGHBOR_OFFSETS_FROM_DOWN, triangleCellToWorld } from '../geometry-extensions/lattice-2d.js';
 import { HEX_NEIGHBOR_OFFSETS, hexCellToWorld } from '../geometry-extensions/hex-prism.js';
+import { matchRhombohedraNeighborOffset } from '../geometry-extensions/rhombohedra-lattice.js';
 import {
   bootstrapDisphenoid,
   disphenoidKey,
@@ -280,6 +281,24 @@ export function createBuildController({
   hexagon2dMesh = null,
   hexagon2dCellAt = () => null,
   onHexagon2dChange = () => {},
+  // Triangle (2D tier): same "adopted family member" reasoning again --
+  // flat layer, own store, grow-only via the "never truly empty"
+  // invariant. Unlike every other 2D family, its own cell's z slot is
+  // a real orientation flag (0=up, 1=down), not always 0 -- see
+  // lattice-2d.js's own header for why up/down triangles need it.
+  triangle2dWorld = null,
+  triangle2dMesh = null,
+  triangle2dCellAt = () => null,
+  onTriangle2dChange = () => {},
+  // Rhombohedra (free lattice): same "adopted family member" reasoning
+  // again -- own store, own coordinate frame (geometry-extensions/
+  // rhombohedra-lattice.js), grows freely in any of 6 real directions
+  // via real face-normal matching (a genuine 3D solid, not a flat 2D
+  // tile, so no hit-point-direction workaround needed).
+  rhombohedraWorld = null,
+  rhombohedraMesh = null,
+  rhombohedraCellAt = () => null,
+  onRhombohedraChange = () => {},
   // Interstitial-lattice ("ioct"/"idis" piece tiers, core/interstitial-
   // build.md): same "adopted family member" reasoning as the TO params
   // above -- a genuinely different lattice (the BCC Delaunay/interstitial
@@ -357,6 +376,8 @@ export function createBuildController({
     const hexPrismTargets = hexPrismMesh && getPieceType() === 'hexprism' ? [hexPrismMesh] : [];
     const square2dTargets = square2dMesh && getPieceType() === 'square2d' ? [square2dMesh] : [];
     const hexagon2dTargets = hexagon2dMesh && getPieceType() === 'hexagon2d' ? [hexagon2dMesh] : [];
+    const triangle2dTargets = triangle2dMesh && getPieceType() === 'triangle2d' ? [triangle2dMesh] : [];
+    const rhombohedraTargets = rhombohedraMesh && getPieceType() === 'rhombohedra' ? [rhombohedraMesh] : [];
     // Same reasoning: interstitialGroup only enters the raycast under
     // its own piece tiers, for the same "don't steal clicks from other
     // tiers" reason as bccTargets above.
@@ -367,7 +388,7 @@ export function createBuildController({
     // Half RD/Hourglass mesh; harmless for Add (handleHemisphereClick's
     // own bootstrap-only Add path explicitly no-ops if it lands there).
     const hemisphereTargets = hemisphereGroup && HEMISPHERE_PIECE_TYPES.includes(pieceType) ? [hemisphereGroup] : [];
-    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...square2dTargets, ...hexagon2dTargets, ...interstitialTargets, ...hemisphereTargets], true);
+    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...square2dTargets, ...hexagon2dTargets, ...triangle2dTargets, ...rhombohedraTargets, ...interstitialTargets, ...hemisphereTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -591,6 +612,73 @@ export function createBuildController({
     }
     hexagon2dWorld.removeCell(cell.x, cell.y, cell.z);
     onHexagon2dChange();
+    if (onRemoved) onRemoved(cell);
+  }
+
+  // Triangle piece tier (2D tier): grow-only, same "never truly empty"
+  // invariant. Unlike Square/Hexagon, the neighbor offset table is
+  // orientation-DEPENDENT (see lattice-2d.js's own header) -- picks
+  // TRIANGLE_NEIGHBOR_OFFSETS_FROM_UP or _FROM_DOWN based on the
+  // clicked cell's own z (0=up, 1=down). Also unlike Square/Hexagon,
+  // dots the hit direction against each candidate's own REAL world
+  // offset (triangleCellToWorld(neighbor) - triangleCellToWorld(cell)),
+  // not the raw index offset -- a triangle's index offsets aren't
+  // already real-ish unit directions the way a square/hex grid's are,
+  // so this is the more general, always-correct version of the same
+  // hit-point-direction technique.
+  function handleTriangle2dClick(hit, mode) {
+    const action = mode === 'build' ? 'add' : 'remove';
+    if (hit.object !== triangle2dMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const cell = triangle2dCellAt(hit.instanceId);
+    if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    if (mode === 'build') {
+      const [cx, cy] = triangleCellToWorld(cell.x, cell.y, cell.z);
+      const dirX = hit.point.x - cx;
+      const dirY = hit.point.y - cy;
+      const offsets = cell.z === 0 ? TRIANGLE_NEIGHBOR_OFFSETS_FROM_UP : TRIANGLE_NEIGHBOR_OFFSETS_FROM_DOWN;
+      let bestIdx = 0, bestDot = -Infinity;
+      offsets.forEach(([ox, oy, oz], i) => {
+        const [nwx, nwy] = triangleCellToWorld(cell.x + ox, cell.y + oy, oz);
+        const dot = (nwx - cx) * dirX + (nwy - cy) * dirY;
+        if (dot > bestDot) { bestDot = dot; bestIdx = i; }
+      });
+      const [dx, dy, dz] = offsets[bestIdx];
+      const nx = cell.x + dx, ny = cell.y + dy, nz = dz;
+      if (triangle2dWorld.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const material = getMaterial();
+      triangle2dWorld.addCell(nx, ny, nz, { material });
+      onTriangle2dChange();
+      if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
+      return;
+    }
+    triangle2dWorld.removeCell(cell.x, cell.y, cell.z);
+    onTriangle2dChange();
+    if (onRemoved) onRemoved(cell);
+  }
+
+  // Rhombohedra (free lattice): grow-only (same "never truly empty"
+  // invariant as hexPrismWorld). Real face-normal matching against
+  // RHOMBOHEDRA_NEIGHBOR_OFFSETS' own 6 real directions -- a genuine 3D
+  // solid, so (unlike every 2D family) the plain face-normal technique
+  // RD/TO/hex-prism already use works fine here, no hit-point-direction
+  // workaround needed.
+  function handleRhombohedraClick(hit, mode) {
+    const action = mode === 'build' ? 'add' : 'remove';
+    if (hit.object !== rhombohedraMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const cell = rhombohedraCellAt(hit.instanceId);
+    if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    if (mode === 'build') {
+      const [di, dj, dk] = matchRhombohedraNeighborOffset(hit.face.normal);
+      const ni = cell.x + di, nj = cell.y + dj, nk = cell.z + dk;
+      if (rhombohedraWorld.has(ni, nj, nk)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const material = getMaterial();
+      rhombohedraWorld.addCell(ni, nj, nk, { material });
+      onRhombohedraChange();
+      if (onPlaced) onPlaced({ x: ni, y: nj, z: nk, material });
+      return;
+    }
+    rhombohedraWorld.removeCell(cell.x, cell.y, cell.z);
+    onRhombohedraChange();
     if (onRemoved) onRemoved(cell);
   }
 
@@ -1280,6 +1368,14 @@ export function createBuildController({
       handleHexagon2dClick(hit, mode);
       return;
     }
+    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'triangle2d' && triangle2dWorld && triangle2dMesh) {
+      handleTriangle2dClick(hit, mode);
+      return;
+    }
+    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'rhombohedra' && rhombohedraWorld && rhombohedraMesh) {
+      handleRhombohedraClick(hit, mode);
+      return;
+    }
     // Same reasoning, for the interstitial-lattice piece tiers. 'ioct'
     // (Octahedron Site) restored here 2026-08-31 -- kept on the wheel
     // building the old 4-disphenoid bundle, direct user decision, after
@@ -1618,6 +1714,44 @@ export function createBuildController({
     // Same reasoning, for the hemisphere piece tiers.
     if (mode === 'build' && HEMISPHERE_PIECE_TYPES.includes(pieceTypeForInterstitialRemove) && hemisphereStore && hemisphereGroup) {
       handleHemisphereClick(hit, 'chisel', pieceTypeForInterstitialRemove);
+      return;
+    }
+    // Same reasoning, for every "adopted family member" piece tier with
+    // its own dedicated handler (elongdodeca/hexprism/square2d/
+    // hexagon2d/triangle2d) -- real bug, direct report ("long touches
+    // arent removing newly created shapes... follow iPhone/iPad
+    // capability of all previously built shapes"): these were never
+    // wired into onContextMenu at all (only into onClick's own
+    // dispatch), so long-press-to-remove (which synthesizes a
+    // contextmenu event, see onTouchStart above) silently fell through
+    // to cellAt(hit) below, which only knows the main FCC world's own
+    // instance-id space -- always null for a hit on one of these
+    // meshes, so the long-press did nothing. Each handler already
+    // branches build (mode==='build') vs remove (anything else) on its
+    // own, same as handleInterstitialClick/handleHemisphereClick above,
+    // so passing 'chisel' here forces the remove branch the same way.
+    if (mode === 'build' && pieceTypeForInterstitialRemove === 'elongdodeca' && elongDodecaWorld && elongDodecaMesh) {
+      handleElongDodecaClick(hit, 'chisel');
+      return;
+    }
+    if (mode === 'build' && pieceTypeForInterstitialRemove === 'hexprism' && hexPrismWorld && hexPrismMesh) {
+      handleHexPrismClick(hit, 'chisel');
+      return;
+    }
+    if (mode === 'build' && pieceTypeForInterstitialRemove === 'square2d' && square2dWorld && square2dMesh) {
+      handleSquare2dClick(hit, 'chisel');
+      return;
+    }
+    if (mode === 'build' && pieceTypeForInterstitialRemove === 'hexagon2d' && hexagon2dWorld && hexagon2dMesh) {
+      handleHexagon2dClick(hit, 'chisel');
+      return;
+    }
+    if (mode === 'build' && pieceTypeForInterstitialRemove === 'triangle2d' && triangle2dWorld && triangle2dMesh) {
+      handleTriangle2dClick(hit, 'chisel');
+      return;
+    }
+    if (mode === 'build' && pieceTypeForInterstitialRemove === 'rhombohedra' && rhombohedraWorld && rhombohedraMesh) {
+      handleRhombohedraClick(hit, 'chisel');
       return;
     }
     // Explicit no-op guard for 'octahedron', same reasoning/bug as

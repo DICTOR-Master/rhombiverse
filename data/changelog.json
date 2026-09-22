@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-09-23",
+    "title": "Triangle Joins 2D; Rhombohedra Get Their Own Free Lattice",
+    "items": [
+      "New: Triangle joins Square and Hexagon in 2D -- a real equilateral-triangle tiling, up- and down-pointing alternating, own coexisting store.",
+      "New: Rhombohedra -- the same real shape as RD Quarter (one of RD's own 4 congruent zonotope pieces), but now its own free-standing lattice that grows through open space in any of 6 real directions, not limited to filling an already-solid RD's own corners (which made a placed RD Quarter piece geometrically unclickable/unremovable once its own cell was fully solid).",
+      "Fixed: long-press-to-remove (touch) silently did nothing for Elongated Dodecahedron, Hex Prism, Square, Hexagon, Triangle, and the new Rhombohedra -- these were never wired into the long-press/right-click removal path, only the tap-to-build one."
+    ]
+  },
+  {
+    "date": "2026-09-23",
     "title": "2D Grows: Hexagon, and a Real Flat View",
     "items": [
       "New: Hexagon joins 2D -- a flat layer of real hexagon tiles, same axial hex lattice the 3D Hex Prism already uses, its own coexisting store.",

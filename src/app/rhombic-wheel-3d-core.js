@@ -692,7 +692,21 @@ export const WHEEL_RD_FAMILY = {
       desc: "The 4th of the real \"5\" parallelohedra -- its own lattice, same FCC positions, anisotropic scale." },
     "bottom|sy1sz-1":   { kind: "dept", label: "Hex Prism", action: "tool:pieceType:hexprism",
       desc: "The 5th real parallelohedron -- its own separate hexagonal lattice." },
-    "bottom|sx1sz-1":   SPARE,
+    // Rhombohedra (free lattice): direct follow-up, same session as RD
+    // Quarter -- "need placement of rhombohedra not limited to fill
+    // existing RDs, rhombohedra should be able to fulfil their own
+    // geometry free connecting in all directions... call them
+    // rhombohedra too." Genuinely the SAME real shape as one of RD
+    // Quarter's own 4 congruent orientations (geometry-extensions/
+    // rhombohedra-lattice.js reuses rdQuarterPieces(s)[0] directly),
+    // just growing freely through open space via its own 6 real face
+    // directions instead of only appearing pre-packed inside an
+    // already-solid RD -- see that file's own header for why RD
+    // Quarter itself can't be freely placed/removed once bootstrapped
+    // into an already-solid cell (its own volume becomes fully
+    // enclosed, unclickable from outside).
+    "bottom|sx1sz-1":   { kind: "dept", label: "Rhombohedra", action: "tool:pieceType:rhombohedra",
+      desc: "The same real rhombohedron as RD Quarter, but its own free-standing lattice -- click an existing face to grow in any of 6 real directions." },
     "bottom|sx-1sz-1":  SPARE,
   }
 };
@@ -764,9 +778,9 @@ export const WHEEL_DIMENSION = {
     // separate Rhombus family is still planned, after Triangular.
     // Hexagon shipped next. Triangular still planned.
     "top|sy1sz1":       { kind: "dept", label: "2D", action: "tool:selectDimension:2D",
-      desc: "Square and Hexagon (shipped) -- Triangular tiling and real Rhombi still planned." },
+      desc: "Square, Hexagon, and Triangle (shipped) -- a real (non-square) Rhombi family still planned." },
     "bottom|sy-1sz-1":  { kind: "dept", label: "2D", action: "tool:selectDimension:2D",
-      desc: "Square and Hexagon (shipped) -- Triangular tiling and real Rhombi still planned." },
+      desc: "Square, Hexagon, and Triangle (shipped) -- a real (non-square) Rhombi family still planned." },
     "top|sy-1sz1":      { kind: "spare", label: "5D", action: null,
       desc: "Decagonal quasicrystal -- planned, not yet built." },
     "bottom|sy1sz-1":   { kind: "spare", label: "5D", action: null,
