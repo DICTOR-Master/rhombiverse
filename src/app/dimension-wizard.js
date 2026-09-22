@@ -201,17 +201,20 @@ function toWireframe() {
   return wireframeSvg(edgesByMinDistance(points), 22);
 }
 
-// Rhombus (2D tier): a real rhombus prism, matching geometry-extensions/
-// lattice-2d.js's own rhombusTileVerts EXACTLY (same 70-degree, 2-equal-
-// vector construction) -- direct correction, same session, "why square
-// for 2D[,] all rhombi should be derived from same basic shape." NOT
-// vertex-uniform-edge-length (the rhombus's own side and the prism's
-// height differ), so edgesByMinDistance()'s technique doesn't apply here
-// the way it does for RD/TO above -- explicit topology instead, real
-// corner coordinates, not guessed.
-function rhombusWireframe() {
+// Square (2D tier): a real square prism, matching geometry-extensions/
+// lattice-2d.js's own squareTileVerts EXACTLY (angle 90, 2 equal-length
+// perpendicular vectors) -- direct correction 2026-09-23 reversed an
+// earlier same-session rename to a 70-degree rhombus ("dont call square
+// rhombus when its familiar name is square, this [is] geometry building
+// not semantics"). A real, separate (non-square) Rhombus family is
+// still planned, scheduled for after Triangular ships. NOT vertex-
+// uniform-edge-length (the square's own side and the prism's height
+// differ), so edgesByMinDistance()'s technique doesn't apply here the
+// way it does for RD/TO above -- explicit topology instead, real corner
+// coordinates, not guessed.
+function squareWireframe() {
   const h = 0.5;
-  const angleDeg = 70;
+  const angleDeg = 90;
   const v0 = [1, 0];
   const v1 = [Math.cos((angleDeg * Math.PI) / 180), Math.sin((angleDeg * Math.PI) / 180)];
   const corners2d = [[0, 0], v0, [v0[0] + v1[0], v0[1] + v1[1]], v1];
@@ -229,28 +232,59 @@ function rhombusWireframe() {
   return wireframeSvg(edges, 22);
 }
 
+// Hexagon (2D tier): a real hexagonal prism, matching geometry-extensions/
+// hex-prism.js's own hexPrismVerts EXACTLY (vertices at 60k degrees,
+// radius R=1, extruded by h) -- same "real corner coordinates, not
+// guessed" discipline as squareWireframe above.
+function hexagonWireframe() {
+  const h = 0.5;
+  const top = [];
+  const bot = [];
+  for (let k = 0; k < 6; k++) {
+    const angle = (Math.PI / 3) * k;
+    const x = Math.cos(angle);
+    const y = Math.sin(angle);
+    top.push([x, y, h]);
+    bot.push([x, y, -h]);
+  }
+  const edges = [];
+  for (let i = 0; i < 6; i++) {
+    edges.push([top[i], top[(i + 1) % 6]]);
+    edges.push([bot[i], bot[(i + 1) % 6]]);
+    edges.push([top[i], bot[i]]);
+  }
+  return wireframeSvg(edges, 22);
+}
+
 // DIMENSIONS: the dimension-select screen's own 5 cards. Only `enabled`
 // tiers get a real onOpen (advances to that tier's lattice screen) and a
 // real wireframe; the rest are the honest, undecorated "planned, not
 // built" treatment this file's own header explains.
 const DIMENSIONS = [
-  // Phase 2 (2026-09-22): Rhombus shipped, direct instruction ("flat
-  // layer in the same 3D scene... start with Square") -- later renamed
-  // Square to Rhombus ("why square for 2D[,] all rhombi should be
-  // derived from same basic shape"). Triangular/Hexagonal still
-  // planned -- desc says so honestly.
-  { id: '2D', label: '2D', desc: 'Rhombus (shipped) -- Triangular, Hexagonal tilings still planned.', enabled: true, preview: rhombusWireframe },
+  // Phase 2 (2026-09-22): Square shipped first, direct instruction
+  // ("flat layer in the same 3D scene... start with Square"). Briefly
+  // renamed Square to a 70-degree Rhombus same session ("why square for
+  // 2D[,] all rhombi should be derived from same basic shape"), then
+  // reverted just as directly ("dont call square rhombus when its
+  // familiar name is square, this [is] geometry building not
+  // semantics") -- a real, separate Rhombus family is still planned,
+  // scheduled for after Triangular. Hexagon shipped next. Triangular
+  // and the real Rhombi still planned -- desc says so honestly.
+  { id: '2D', label: '2D', desc: 'Square and Hexagon (shipped) -- Triangular tiling and real Rhombi still planned.', enabled: true, preview: squareWireframe },
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, preview: rdWireframe },
   { id: '4D', label: '4D', desc: 'Hypercubic (Tesseract) and D4 root lattice.', enabled: false },
   { id: '5D', label: '5D', desc: 'Decagonal quasicrystal.', enabled: false },
   { id: '6D', label: '6D', desc: 'Icosahedral quasicrystal.', enabled: false },
 ];
 
-// LATTICE_FAMILIES_2D: 2D's own lattice-family screen -- Rhombus only so
-// far (Phase 2, incremental). Same "reuse the existing real action, one
-// tool one doorway" reasoning as LATTICE_FAMILIES_3D below.
+// LATTICE_FAMILIES_2D: 2D's own lattice-family screen. Same "reuse the
+// existing real action, one tool one doorway" reasoning as
+// LATTICE_FAMILIES_3D below. A real (non-square) Rhombus family belongs
+// here too, once built -- deferred until after Triangular per direct
+// instruction, not added yet.
 const LATTICE_FAMILIES_2D = [
-  { label: 'Rhombus', desc: 'A flat layer of real rhombus tiles (2 equal-length vectors, 70 degrees apart) -- own separate lattice, pinned to z=0 in this same scene.', action: 'tool:pieceType:rhombus2d', preview: rhombusWireframe },
+  { label: 'Square', desc: 'A flat layer of real square tiles -- own separate lattice, pinned to z=0 in this same scene.', action: 'tool:pieceType:square2d', preview: squareWireframe },
+  { label: 'Hexagon', desc: 'A flat layer of real hexagon tiles -- same axial hex lattice as the 3D Hex Prism tier, own separate store, pinned to z=0 in this same scene.', action: 'tool:pieceType:hexagon2d', preview: hexagonWireframe },
 ];
 
 // LATTICE_FAMILIES_3D: 3D's own lattice-family screen. Actions reuse

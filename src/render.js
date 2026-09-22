@@ -23,7 +23,8 @@ import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
-import { rhombusTileVerts, rhombusCellToWorld } from './geometry-extensions/lattice-2d.js';
+import { squareTileVerts, squareCellToWorld } from './geometry-extensions/lattice-2d.js';
+import { hexPrismVerts as hexagonTileVerts2D, hexCellToWorld as hexagonCellToWorld2D } from './geometry-extensions/hex-prism.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -80,7 +81,8 @@ import {
   HEMISPHERE_STORAGE_KEY,
   ELONGDODECA_STORAGE_KEY,
   HEXPRISM_STORAGE_KEY,
-  RHOMBUS2D_STORAGE_KEY,
+  SQUARE2D_STORAGE_KEY,
+  HEXAGON2D_STORAGE_KEY,
 } from './core/persistence.js';
 import {
   compressionSupported,
@@ -103,11 +105,25 @@ const SCALE = 1;
 // (roughly SCALE-sized), not a derived constant.
 const HEX_PRISM_R = SCALE;
 const HEX_PRISM_H = Math.sqrt(3) * SCALE;
-// Rhombus (2D tier): matches SCALE for visual consistency with everything
+// Square (2D tier): matches SCALE for visual consistency with everything
 // else -- no special proportion required (same reasoning as hex prism's
 // own height above).
-const RHOMBUS2D_S = SCALE;
-const RHOMBUS2D_H = 0.15 * SCALE;
+const SQUARE2D_S = SCALE;
+// 2D tiles read as genuinely flat, direct instruction 2026-09-23 ("make
+// 2D seem more 2D... show only 2D plane"): a near-zero tile height still
+// renders a real, visible top/bottom face pair + edge sliver (not a
+// literal zero-thickness plane, which would z-fight and produce zero
+// normal-based lighting), but reads as a flat tile rather than a puck.
+// Attachment direction-matching never depended on this height in the
+// first place -- handleSquare2dClick/handleHexagon2dClick both use the
+// hit point's own in-plane offset from the cell's world center (see
+// their own headers), not the tile's side-face normals, so shrinking
+// this doesn't touch click behavior at all.
+const SQUARE2D_H = 0.03 * SCALE;
+// Hexagon (2D tier): same real axial-hex radius as HEX_PRISM_R, same
+// near-zero flat-tile height reasoning as SQUARE2D_H above.
+const HEXAGON2D_R = SCALE;
+const HEXAGON2D_H = 0.03 * SCALE;
 const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
 
 // Performance guardrail (reframe Stage 6): warn before loading a World
@@ -328,6 +344,46 @@ function persistCameraState() {
 controls.addEventListener('end', persistCameraState);
 window.addEventListener('beforeunload', persistCameraState);
 setInterval(persistCameraState, 3000);
+
+// Dimension-scoped camera (2026-09-23): direct instruction ("make 2D
+// seem more 2D... show only 2D plane"). A thin flat tile still reads as
+// a 3D puck from this app's normal angled orbit view (confirmed via
+// direct screenshot: hexagon tiles showed visible side faces even at
+// HEXAGON2D_H=0.03) -- tile thinness alone was never going to fix that,
+// the VIEW itself needed to go flat too. Every 2D family (lattice-2d.js/
+// hex-prism.js reused for the 2D tier) pins world Z to 0 and extrudes
+// tile thickness along Z (see squareTileVerts' own header: "height h
+// along the scene's own Z axis"), so a true top-down 2D view means
+// looking straight down the Z axis, not the Y axis camera.position.set
+// (6,5,8)'s default orbit implies. Locks rotation entirely (not just a
+// polar-angle clamp -- OrbitControls' polar angle is measured from its
+// object.up, (0,1,0) by default, which doesn't correspond to "flat
+// along Z" in any simple min/max range) while in 2D; pan/zoom stay
+// free. Save/restore follows the exact same pattern enterSculptureMode/
+// exitSculptureMode already use for their own temporary camera pose.
+const saved3DCameraState = { position: new THREE.Vector3(), target: new THREE.Vector3() };
+let cameraSavedFor2D = false;
+function applyDimensionCamera(dimension) {
+  if (dimension === '2D') {
+    if (!cameraSavedFor2D) {
+      saved3DCameraState.position.copy(camera.position);
+      saved3DCameraState.target.copy(controls.target);
+      cameraSavedFor2D = true;
+    }
+    controls.target.set(0, 0, 0);
+    camera.position.set(0, 0, 12);
+    controls.enableRotate = false;
+    controls.update();
+  } else {
+    controls.enableRotate = true;
+    if (cameraSavedFor2D) {
+      camera.position.copy(saved3DCameraState.position);
+      controls.target.copy(saved3DCameraState.target);
+      cameraSavedFor2D = false;
+      controls.update();
+    }
+  }
+}
 
 // B3 (Cyborg Mode, RHOMBIVERSE_UIUX_BUILD_PLAN.md): the 'cameraRotated'
 // success-condition event a first-build-session subscript step listens
@@ -1072,7 +1128,8 @@ let bccCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let cuboctaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let elongDodecaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let hexPrismCellOrder = []; // instanceId -> {x, y, z, ...cellData}
-let rhombus2dCellOrder = []; // instanceId -> {x, y, z, ...cellData}
+let square2dCellOrder = []; // instanceId -> {x, y, z, ...cellData}
+let hexagon2dCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let octGapCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are octGap's own offset-frame index, see core/cubocta-gap-build.js
 // Interstitial-lattice build: one real Mesh per disphenoid cell, same
 // pattern as partialCellGroup/partialCellMeshes above and for the same
@@ -1262,21 +1319,38 @@ function rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld) {
   hexPrismMesh.computeBoundingSphere();
 }
 
-// Real placed Rhombus cells (2D tier) -- same instancing pattern again,
-// own rhombusCellToWorld position (z always 0, a flat layer).
-function rebuildRhombus2dInstances(rhombus2dMesh, rhombus2dWorld) {
-  rhombus2dCellOrder = rhombus2dWorld.entries();
+// Real placed Square cells (2D tier) -- same instancing pattern again,
+// own squareCellToWorld position (z always 0, a flat layer).
+function rebuildSquare2dInstances(square2dMesh, square2dWorld) {
+  square2dCellOrder = square2dWorld.entries();
   const m = new THREE.Matrix4();
-  rhombus2dCellOrder.forEach((cell, i) => {
-    const [wx, wy, wz] = rhombusCellToWorld(cell.x, cell.y, RHOMBUS2D_S);
+  square2dCellOrder.forEach((cell, i) => {
+    const [wx, wy, wz] = squareCellToWorld(cell.x, cell.y, SQUARE2D_S);
     m.makeTranslation(wx, wy, wz);
-    rhombus2dMesh.setMatrixAt(i, m);
-    rhombus2dMesh.setColorAt(i, instanceColorFor(cell));
+    square2dMesh.setMatrixAt(i, m);
+    square2dMesh.setColorAt(i, instanceColorFor(cell));
   });
-  rhombus2dMesh.count = rhombus2dCellOrder.length;
-  rhombus2dMesh.instanceMatrix.needsUpdate = true;
-  if (rhombus2dMesh.instanceColor) rhombus2dMesh.instanceColor.needsUpdate = true;
-  rhombus2dMesh.computeBoundingSphere();
+  square2dMesh.count = square2dCellOrder.length;
+  square2dMesh.instanceMatrix.needsUpdate = true;
+  if (square2dMesh.instanceColor) square2dMesh.instanceColor.needsUpdate = true;
+  square2dMesh.computeBoundingSphere();
+}
+
+// Real placed Hexagon cells (2D tier) -- same instancing pattern again,
+// own hexagonCellToWorld2D position (z always 0, a flat layer).
+function rebuildHexagon2dInstances(hexagon2dMesh, hexagon2dWorld) {
+  hexagon2dCellOrder = hexagon2dWorld.entries();
+  const m = new THREE.Matrix4();
+  hexagon2dCellOrder.forEach((cell, i) => {
+    const [wx, wy, wz] = hexagonCellToWorld2D(cell.x, cell.y, 0, HEXAGON2D_R);
+    m.makeTranslation(wx, wy, wz);
+    hexagon2dMesh.setMatrixAt(i, m);
+    hexagon2dMesh.setColorAt(i, instanceColorFor(cell));
+  });
+  hexagon2dMesh.count = hexagon2dCellOrder.length;
+  hexagon2dMesh.instanceMatrix.needsUpdate = true;
+  if (hexagon2dMesh.instanceColor) hexagon2dMesh.instanceColor.needsUpdate = true;
+  hexagon2dMesh.computeBoundingSphere();
 }
 
 // Real placed Cuboctahedron Build cells -- same instancing pattern as
@@ -1412,11 +1486,18 @@ async function init() {
   // header) has no bootstrap path to recover from that.
   if (hexPrismWorld.entries().length === 0) hexPrismWorld.addCell(0, 0, 0, { material: 'base' });
 
-  // Rhombus (2D tier, Phase 2): own store, flat layer -- same "seed here,
+  // Square (2D tier, Phase 2): own store, flat layer -- same "seed here,
   // not just in the change handler" reasoning as hexPrismWorld above.
-  const rhombus2dSavedJSON = loadFromLocalStorage(RHOMBUS2D_STORAGE_KEY);
-  const rhombus2dWorld = createWorldStore(rhombus2dSavedJSON ?? { worldName: 'Rhombus Lattice (2D)', version: 1, cells: {}, meta: {} });
-  if (rhombus2dWorld.entries().length === 0) rhombus2dWorld.addCell(2, 0, 0, { material: 'base' });
+  const square2dSavedJSON = loadFromLocalStorage(SQUARE2D_STORAGE_KEY);
+  const square2dWorld = createWorldStore(square2dSavedJSON ?? { worldName: 'Square Lattice (2D)', version: 1, cells: {}, meta: {} });
+  if (square2dWorld.entries().length === 0) square2dWorld.addCell(2, 0, 0, { material: 'base' });
+
+  // Hexagon (2D tier, Phase 2): own store, flat layer -- same reasoning
+  // again. Seeded off-origin (like square2dWorld) so it isn't occluded
+  // by the main RD seed cell at world origin.
+  const hexagon2dSavedJSON = loadFromLocalStorage(HEXAGON2D_STORAGE_KEY);
+  const hexagon2dWorld = createWorldStore(hexagon2dSavedJSON ?? { worldName: 'Hexagon Lattice (2D)', version: 1, cells: {}, meta: {} });
+  if (hexagon2dWorld.entries().length === 0) hexagon2dWorld.addCell(-2, 0, 0, { material: 'base' });
 
   const geometry = buildRDGeometry(SCALE);
   // White base color: actual per-cell color comes entirely from
@@ -1467,13 +1548,23 @@ async function init() {
   scene.add(hexPrismMesh);
   rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld);
 
-  // Rhombus Build (2D tier): its own InstancedMesh, own geometry.
-  const rhombus2dGeometry = new ConvexGeometry(rhombusTileVerts(RHOMBUS2D_S, RHOMBUS2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
-  rhombus2dGeometry.computeVertexNormals();
-  const rhombus2dMesh = new THREE.InstancedMesh(rhombus2dGeometry, material.clone(), MAX_CELLS);
-  rhombus2dMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  scene.add(rhombus2dMesh);
-  rebuildRhombus2dInstances(rhombus2dMesh, rhombus2dWorld);
+  // Square Build (2D tier): its own InstancedMesh, own geometry.
+  const square2dGeometry = new ConvexGeometry(squareTileVerts(SQUARE2D_S, SQUARE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  square2dGeometry.computeVertexNormals();
+  const square2dMesh = new THREE.InstancedMesh(square2dGeometry, material.clone(), MAX_CELLS);
+  square2dMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(square2dMesh);
+  rebuildSquare2dInstances(square2dMesh, square2dWorld);
+
+  // Hexagon Build (2D tier): its own InstancedMesh, own geometry. Reuses
+  // hex-prism.js's own hexPrismVerts directly (real hexagon cross-section),
+  // just at the thin HEXAGON2D_H flat-tile height instead of a tall prism.
+  const hexagon2dGeometry = new ConvexGeometry(hexagonTileVerts2D(HEXAGON2D_R, HEXAGON2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  hexagon2dGeometry.computeVertexNormals();
+  const hexagon2dMesh = new THREE.InstancedMesh(hexagon2dGeometry, material.clone(), MAX_CELLS);
+  hexagon2dMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(hexagon2dMesh);
+  rebuildHexagon2dInstances(hexagon2dMesh, hexagon2dWorld);
 
   // Cuboctahedron Build: its own InstancedMesh (cuboctahedron geometry),
   // same "own material clone, same MATERIAL_COLORS palette" pattern as
@@ -1910,7 +2001,8 @@ async function init() {
     bccMesh.material.clippingPlanes = planes;
     elongDodecaMesh.material.clippingPlanes = planes;
     hexPrismMesh.material.clippingPlanes = planes;
-    rhombus2dMesh.material.clippingPlanes = planes;
+    square2dMesh.material.clippingPlanes = planes;
+    hexagon2dMesh.material.clippingPlanes = planes;
     cuboctaMesh.material.clippingPlanes = planes;
     octGapMesh.material.clippingPlanes = planes;
     // Cube-less cells (see core/pyramid.js's hasCube()) render as a
@@ -1962,7 +2054,7 @@ async function init() {
   let skeletonGeneration = 0;
   const TRANSLUCENT_OPACITY = 0.55; // matches Lattice Quick-View/Dualize preview's own established "see-through structure" opacity
   function worldViewMaterials() {
-    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, rhombus2dMesh.material, cuboctaMesh.material, octGapMesh.material];
+    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, square2dMesh.material, hexagon2dMesh.material, cuboctaMesh.material, octGapMesh.material];
     for (const { mesh: m } of partialCellMeshes.values()) {
       if (m.isGroup) { for (const child of m.children) mats.push(child.material); }
       else mats.push(m.material);
@@ -1982,7 +2074,7 @@ async function init() {
   }
   // Dimension-scoped visibility (2026-09-22): direct report, "2D is in
   // 3D world so... all seed shapes revolving about screen" -- 2D's own
-  // Rhombus lattice and 3D's own coexisting families (BCC/Elongated
+  // Square lattice and 3D's own coexisting families (BCC/Elongated
   // Dodecahedron/Hex Prism -- all reached from WHEEL_RD_FAMILY, so
   // structurally "3D" regardless of activeDimension having no separate
   // slot for them) were ALWAYS both visible/clickable regardless of
@@ -1999,18 +2091,19 @@ async function init() {
   // (tool:selectDimension:3D, which also calls applyDimensionVisibility)
   // shows it again exactly as it was.
   function dimensionAllowsMesh(key) {
-    if (activeDimension === '2D') return key === 'rhombus2d';
+    if (activeDimension === '2D') return key === 'square2d' || key === 'hexagon2d';
     // '3D' or not yet chosen (activeDimension === null, e.g. mid-load):
     // default to showing 3D's own coexisting families, same as before
     // this fix existed.
-    return key !== 'rhombus2d';
+    return key !== 'square2d' && key !== 'hexagon2d';
   }
   function setSolidWorldVisible(visible) {
     mesh.visible = visible && dimensionAllowsMesh('mesh');
     bccMesh.visible = visible && dimensionAllowsMesh('bcc');
     elongDodecaMesh.visible = visible && dimensionAllowsMesh('elongdodeca');
     hexPrismMesh.visible = visible && dimensionAllowsMesh('hexprism');
-    rhombus2dMesh.visible = visible && dimensionAllowsMesh('rhombus2d');
+    square2dMesh.visible = visible && dimensionAllowsMesh('square2d');
+    hexagon2dMesh.visible = visible && dimensionAllowsMesh('hexagon2d');
     cuboctaMesh.visible = visible && dimensionAllowsMesh('cubocta');
     octGapMesh.visible = visible && dimensionAllowsMesh('octgap');
     partialCellGroup.visible = visible && dimensionAllowsMesh('mesh'); // partial (pyramid-decomposed) FCC cells -- same "main world" content as `mesh` above
@@ -2618,7 +2711,7 @@ async function init() {
         }
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
-          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', rhombus2d: 'Rhombus (2D)' };
+          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', square2d: 'Square (2D)', hexagon2d: 'Hexagon (2D)' };
           document.getElementById('piece-type-select').value = value;
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
@@ -2805,20 +2898,22 @@ async function init() {
         if (action === 'tool:selectDimension:3D') {
           activeDimension = '3D';
           applyDimensionVisibility();
+          applyDimensionCamera('3D');
           seedIfWorldEmpty();
           dimensionWheel3D.close();
           handleWheelAction('tool:pieceType:rd');
           return;
         }
-        // 2D (Phase 2): rhombus2dWorld is already seeded at construction
+        // 2D (Phase 2): square2dWorld is already seeded at construction
         // (see its own "seed here, not just in the change handler"
         // comment above) -- unlike 3D there's no separate world to
         // seed here, just select the piece type.
         if (action === 'tool:selectDimension:2D') {
           activeDimension = '2D';
           applyDimensionVisibility();
+          applyDimensionCamera('2D');
           dimensionWheel3D.close();
-          handleWheelAction('tool:pieceType:rhombus2d');
+          handleWheelAction('tool:pieceType:square2d');
           return;
         }
         // WHEEL_DIMENSION's own noUniversalRing:true (see that config's
@@ -2853,6 +2948,7 @@ async function init() {
       onSelectFamily: (dimension, action) => {
         activeDimension = dimension;
         applyDimensionVisibility();
+        applyDimensionCamera(dimension);
         if (dimension === '3D') seedIfWorldEmpty();
         handleWheelAction(action);
       },
@@ -4296,9 +4392,13 @@ async function init() {
           add: 'A Hex Prism is already there.',
           remove: "No Hex Prism there to remove -- Remove+Hex Prism only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
         },
-        rhombus2d: {
-          add: 'A Rhombus is already there.',
-          remove: "No Rhombus there to remove -- Remove+Rhombus only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
+        square2d: {
+          add: 'A Square is already there.',
+          remove: "No Square there to remove -- Remove+Square only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
+        },
+        hexagon2d: {
+          add: 'A Hexagon is already there.',
+          remove: "No Hexagon there to remove -- Remove+Hexagon only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
         },
         idis: {
           add: "That disphenoid's already there.",
@@ -4359,10 +4459,14 @@ async function init() {
     hexPrismMesh,
     hexPrismCellAt: (instanceId) => hexPrismCellOrder[instanceId],
     onHexPrismChange,
-    rhombus2dWorld,
-    rhombus2dMesh,
-    rhombus2dCellAt: (instanceId) => rhombus2dCellOrder[instanceId],
-    onRhombus2dChange,
+    square2dWorld,
+    square2dMesh,
+    square2dCellAt: (instanceId) => square2dCellOrder[instanceId],
+    onSquare2dChange,
+    hexagon2dWorld,
+    hexagon2dMesh,
+    hexagon2dCellAt: (instanceId) => hexagon2dCellOrder[instanceId],
+    onHexagon2dChange,
     interstitialStore,
     interstitialGroup,
     onInterstitialChange,
@@ -4428,16 +4532,28 @@ async function init() {
     saveToLocalStorage(hexPrismWorld.toJSON(), HEXPRISM_STORAGE_KEY);
   }
 
-  // Rhombus build (2D tier): own change handler, same "never truly
+  // Square build (2D tier): own change handler, same "never truly
   // empty" invariant.
-  function onRhombus2dChange() {
-    if (rhombus2dWorld.entries().length === 0) {
-      rhombus2dWorld.addCell(2, 0, 0, { material: 'base' });
+  function onSquare2dChange() {
+    if (square2dWorld.entries().length === 0) {
+      square2dWorld.addCell(2, 0, 0, { material: 'base' });
     }
-    rebuildRhombus2dInstances(rhombus2dMesh, rhombus2dWorld);
+    rebuildSquare2dInstances(square2dMesh, square2dWorld);
     updateSectionEnabled();
     applyWorldViewMaterials();
-    saveToLocalStorage(rhombus2dWorld.toJSON(), RHOMBUS2D_STORAGE_KEY);
+    saveToLocalStorage(square2dWorld.toJSON(), SQUARE2D_STORAGE_KEY);
+  }
+
+  // Hexagon build (2D tier): own change handler, same "never truly
+  // empty" invariant.
+  function onHexagon2dChange() {
+    if (hexagon2dWorld.entries().length === 0) {
+      hexagon2dWorld.addCell(-2, 0, 0, { material: 'base' });
+    }
+    rebuildHexagon2dInstances(hexagon2dMesh, hexagon2dWorld);
+    updateSectionEnabled();
+    applyWorldViewMaterials();
+    saveToLocalStorage(hexagon2dWorld.toJSON(), HEXAGON2D_STORAGE_KEY);
   }
 
   // Interstitial-lattice build: own change handler, same reasoning as
@@ -4625,7 +4741,7 @@ async function init() {
     clearLocalStorage(HEMISPHERE_STORAGE_KEY);
     hemisphereStore.replaceAll({ worldName: 'Hemisphere Pieces', version: 1, pieces: {} });
     onHemisphereChange();
-    // Elongated Dodecahedron/Hex Prism/Rhombus (2D): 3 more real stores
+    // Elongated Dodecahedron/Hex Prism/Square (2D): 3 more real stores
     // added later, same session -- real bug, direct report ("hex prisms
     // aren't going when pressing clear current build"): these were never
     // wired into this function at all, so Clear World silently left them
@@ -4637,9 +4753,12 @@ async function init() {
     clearLocalStorage(HEXPRISM_STORAGE_KEY);
     hexPrismWorld.replaceAll({ worldName: 'Hex Prism Lattice', version: 1, cells: {}, meta: {} });
     onHexPrismChange();
-    clearLocalStorage(RHOMBUS2D_STORAGE_KEY);
-    rhombus2dWorld.replaceAll({ worldName: 'Rhombus Lattice (2D)', version: 1, cells: {}, meta: {} });
-    onRhombus2dChange();
+    clearLocalStorage(SQUARE2D_STORAGE_KEY);
+    square2dWorld.replaceAll({ worldName: 'Square Lattice (2D)', version: 1, cells: {}, meta: {} });
+    onSquare2dChange();
+    clearLocalStorage(HEXAGON2D_STORAGE_KEY);
+    hexagon2dWorld.replaceAll({ worldName: 'Hexagon Lattice (2D)', version: 1, cells: {}, meta: {} });
+    onHexagon2dChange();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

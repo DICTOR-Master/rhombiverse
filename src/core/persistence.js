@@ -46,7 +46,12 @@ export const HEXPRISM_STORAGE_KEY = 'rhombiverse-hexprism-world';
 // 2D tier (dimension-select wizard Phase 2), Rhombus family: own store,
 // flat layer pinned to z=0 in the SAME scene 3D already uses (geometry-
 // extensions/lattice-2d.js). Same "adopted family member" reasoning.
-export const RHOMBUS2D_STORAGE_KEY = 'rhombiverse-rhombus2d-world';
+export const SQUARE2D_STORAGE_KEY = 'rhombiverse-square2d-world';
+
+// 2D tier, Hexagon family: own store, flat layer, same axial hex
+// lattice as the 3D Hex Prism tier (geometry-extensions/hex-prism.js)
+// but pinned to z=0. Same "adopted family member" reasoning.
+export const HEXAGON2D_STORAGE_KEY = 'rhombiverse-hexagon2d-world';
 
 export function saveToLocalStorage(worldJSON, key = STORAGE_KEY) {
   try {

@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-09-23",
+    "title": "2D Grows: Hexagon, and a Real Flat View",
+    "items": [
+      "New: Hexagon joins 2D -- a flat layer of real hexagon tiles, same axial hex lattice the 3D Hex Prism already uses, its own coexisting store.",
+      "2D now looks like 2D: the camera snaps to a locked, straight-down view when you enter a 2D dimension (rotation disabled, pan/zoom still free) instead of showing flat tiles from an angled 3D perspective, and restores your own 3D view exactly when you leave.",
+      "Correction: 2D's first tile family is Square again, not Rhombus -- an earlier same-day rename swapped it for a 70-degree rhombus purely for thematic consistency with the app's own name, which mismatched the shape's real, familiar geometry. A genuine (non-square) Rhombus family is still planned, after Triangular."
+    ]
+  },
+  {
     "date": "2026-09-22",
     "title": "A Real Entry Point: Pick Your Dimension",
     "items": [

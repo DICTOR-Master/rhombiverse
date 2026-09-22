@@ -31,7 +31,8 @@ import {
 } from './pyramid.js';
 import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
 import { matchHexNeighborOffset } from '../geometry-extensions/hex-prism.js';
-import { RHOMBUS_NEIGHBOR_OFFSETS } from '../geometry-extensions/lattice-2d.js';
+import { SQUARE_NEIGHBOR_OFFSETS } from '../geometry-extensions/lattice-2d.js';
+import { HEX_NEIGHBOR_OFFSETS, hexCellToWorld } from '../geometry-extensions/hex-prism.js';
 import {
   bootstrapDisphenoid,
   disphenoidKey,
@@ -262,14 +263,23 @@ export function createBuildController({
   hexPrismMesh = null,
   hexPrismCellAt = () => null,
   onHexPrismChange = () => {},
-  // Rhombus (2D tier, Phase 2): same "adopted family member" reasoning
+  // Square (2D tier, Phase 2): same "adopted family member" reasoning
   // again -- flat layer, own store, grow-only via the "never truly
   // empty" invariant (same as hexPrismWorld above; z is always pinned
   // to 0 in this store's own cells).
-  rhombus2dWorld = null,
-  rhombus2dMesh = null,
-  rhombus2dCellAt = () => null,
-  onRhombus2dChange = () => {},
+  square2dWorld = null,
+  square2dMesh = null,
+  square2dCellAt = () => null,
+  onSquare2dChange = () => {},
+  // Hexagon (2D tier): same "adopted family member" reasoning again --
+  // flat layer, own store, grow-only via the "never truly empty"
+  // invariant, z always pinned to 0. Reuses HEX_NEIGHBOR_OFFSETS'
+  // own 6 in-plane directions directly (hex-prism.js) -- same axial
+  // hex lattice as the 3D Hex Prism tier, just flat instead of stacked.
+  hexagon2dWorld = null,
+  hexagon2dMesh = null,
+  hexagon2dCellAt = () => null,
+  onHexagon2dChange = () => {},
   // Interstitial-lattice ("ioct"/"idis" piece tiers, core/interstitial-
   // build.md): same "adopted family member" reasoning as the TO params
   // above -- a genuinely different lattice (the BCC Delaunay/interstitial
@@ -345,7 +355,8 @@ export function createBuildController({
     // main FCC world under any other tier.
     const elongDodecaTargets = elongDodecaMesh && getPieceType() === 'elongdodeca' ? [elongDodecaMesh] : [];
     const hexPrismTargets = hexPrismMesh && getPieceType() === 'hexprism' ? [hexPrismMesh] : [];
-    const rhombus2dTargets = rhombus2dMesh && getPieceType() === 'rhombus2d' ? [rhombus2dMesh] : [];
+    const square2dTargets = square2dMesh && getPieceType() === 'square2d' ? [square2dMesh] : [];
+    const hexagon2dTargets = hexagon2dMesh && getPieceType() === 'hexagon2d' ? [hexagon2dMesh] : [];
     // Same reasoning: interstitialGroup only enters the raycast under
     // its own piece tiers, for the same "don't steal clicks from other
     // tiers" reason as bccTargets above.
@@ -356,7 +367,7 @@ export function createBuildController({
     // Half RD/Hourglass mesh; harmless for Add (handleHemisphereClick's
     // own bootstrap-only Add path explicitly no-ops if it lands there).
     const hemisphereTargets = hemisphereGroup && HEMISPHERE_PIECE_TYPES.includes(pieceType) ? [hemisphereGroup] : [];
-    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...rhombus2dTargets, ...interstitialTargets, ...hemisphereTargets], true);
+    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...square2dTargets, ...hexagon2dTargets, ...interstitialTargets, ...hemisphereTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -501,22 +512,21 @@ export function createBuildController({
     if (onRemoved) onRemoved(cell);
   }
 
-  // Rhombus piece tier (2D tier, Phase 2): grow-only (same "never truly
-  // empty" invariant as hexPrismWorld). Matches the click's face normal
-  // against RHOMBUS_NEIGHBOR_OFFSETS directly -- already real unit-ish
-  // vectors (rhombusCellToWorld is a trivial per-axis scale, no rotation),
-  // so no separate direction-derivation helper is needed the way hex
-  // prism's own matchHexNeighborOffset was.
-  function handleRhombus2dClick(hit, mode) {
+  // Square piece tier (2D tier, Phase 2): grow-only (same "never truly
+  // empty" invariant as hexPrismWorld). Matches the click's own hit-point
+  // direction against SQUARE_NEIGHBOR_OFFSETS -- see this function's own
+  // in-body comment below for why face-normal matching doesn't work for
+  // a flat top-down tile.
+  function handleSquare2dClick(hit, mode) {
     const action = mode === 'build' ? 'add' : 'remove';
-    if (hit.object !== rhombus2dMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
-    const cell = rhombus2dCellAt(hit.instanceId);
+    if (hit.object !== square2dMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const cell = square2dCellAt(hit.instanceId);
     if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
     if (mode === 'build') {
       // Real bug found in browser verification: a flat 2D tile is
       // viewed mostly from directly above, so almost every real click
       // lands on its TOP face -- whose normal is (0,0,1), which has
-      // ZERO dot product with all 4 of RHOMBUS_NEIGHBOR_OFFSETS (they're
+      // ZERO dot product with all 4 of SQUARE_NEIGHBOR_OFFSETS (they're
       // all in-plane, oz=0), so face-normal matching (the RD/TO/hex-
       // prism technique) always fell through to the same default index
       // regardless of where on the tile you actually clicked. Fixed the
@@ -530,21 +540,57 @@ export function createBuildController({
       const dirX = hit.point.x - cx;
       const dirY = hit.point.y - cy;
       let bestIdx = 0, bestDot = -Infinity;
-      RHOMBUS_NEIGHBOR_OFFSETS.forEach(([ox, oy], i) => {
+      SQUARE_NEIGHBOR_OFFSETS.forEach(([ox, oy], i) => {
         const dot = ox * dirX + oy * dirY;
         if (dot > bestDot) { bestDot = dot; bestIdx = i; }
       });
-      const [dx, dy, dz] = RHOMBUS_NEIGHBOR_OFFSETS[bestIdx];
+      const [dx, dy, dz] = SQUARE_NEIGHBOR_OFFSETS[bestIdx];
       const nx = cell.x + dx, ny = cell.y + dy, nz = cell.z + dz;
-      if (rhombus2dWorld.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      if (square2dWorld.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
       const material = getMaterial();
-      rhombus2dWorld.addCell(nx, ny, nz, { material });
-      onRhombus2dChange();
+      square2dWorld.addCell(nx, ny, nz, { material });
+      onSquare2dChange();
       if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
       return;
     }
-    rhombus2dWorld.removeCell(cell.x, cell.y, cell.z);
-    onRhombus2dChange();
+    square2dWorld.removeCell(cell.x, cell.y, cell.z);
+    onSquare2dChange();
+    if (onRemoved) onRemoved(cell);
+  }
+
+  // Hexagon piece tier (2D tier): grow-only, same "never truly empty"
+  // invariant. Same hit-point-direction fix as Square above (a flat
+  // tile's own top-face normal has zero dot product with every in-plane
+  // offset) -- matches against HEX_NEIGHBOR_OFFSETS' own 6 real
+  // directions instead of Square's 4. Uses hexCellToWorld directly
+  // (not the generic per-axis cellToWorld) for the real cell center,
+  // since a hex lattice's own axial-to-Cartesian formula isn't a plain
+  // per-axis scale.
+  function handleHexagon2dClick(hit, mode) {
+    const action = mode === 'build' ? 'add' : 'remove';
+    if (hit.object !== hexagon2dMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const cell = hexagon2dCellAt(hit.instanceId);
+    if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    if (mode === 'build') {
+      const [cx, cy] = hexCellToWorld(cell.x, cell.y, 0);
+      const dirX = hit.point.x - cx;
+      const dirY = hit.point.y - cy;
+      let bestIdx = 0, bestDot = -Infinity;
+      HEX_NEIGHBOR_OFFSETS.slice(0, 6).forEach(([ox, oy], i) => {
+        const dot = ox * dirX + oy * dirY;
+        if (dot > bestDot) { bestDot = dot; bestIdx = i; }
+      });
+      const [dx, dy] = HEX_NEIGHBOR_OFFSETS[bestIdx];
+      const nx = cell.x + dx, ny = cell.y + dy, nz = 0;
+      if (hexagon2dWorld.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const material = getMaterial();
+      hexagon2dWorld.addCell(nx, ny, nz, { material });
+      onHexagon2dChange();
+      if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
+      return;
+    }
+    hexagon2dWorld.removeCell(cell.x, cell.y, cell.z);
+    onHexagon2dChange();
     if (onRemoved) onRemoved(cell);
   }
 
@@ -1226,8 +1272,12 @@ export function createBuildController({
       handleHexPrismClick(hit, mode);
       return;
     }
-    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'rhombus2d' && rhombus2dWorld && rhombus2dMesh) {
-      handleRhombus2dClick(hit, mode);
+    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'square2d' && square2dWorld && square2dMesh) {
+      handleSquare2dClick(hit, mode);
+      return;
+    }
+    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'hexagon2d' && hexagon2dWorld && hexagon2dMesh) {
+      handleHexagon2dClick(hit, mode);
       return;
     }
     // Same reasoning, for the interstitial-lattice piece tiers. 'ioct'
