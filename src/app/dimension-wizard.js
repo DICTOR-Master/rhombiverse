@@ -45,7 +45,7 @@
 // real -- no other structural change needed.
 import { buildRDFaces } from './rhombic-wheel-3d-core.js';
 import { truncatedOctahedronVertices } from '../geometry-extensions/dual-lattice.js';
-import { LATTICE_2D_COMBINATIONS, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
+import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
 
 const CSS = `
 .dim-wizard-overlay {
@@ -231,17 +231,18 @@ function lattice2dWireframe(combo) {
 // real wireframe; the rest are the honest, undecorated "planned, not
 // built" treatment this file's own header explains.
 const DIMENSIONS = [
-  // Phase 3 (2026-09-23): replaced the earlier Square/Hexagon/Triangle-
-  // as-3-hardcoded-families design with one continuous-in-spirit but
-  // discretely-toggled system -- direct instruction ("variable
-  // coordinate 2D lattice that alters primitives... toggle or slider",
-  // refined through discussion to a discrete toggle x toggle: 4 real
-  // NAMED_LATTICE_ANGLES x 3 LATTICE_PRIMITIVES, see lattice-2d.js's own
-  // header for the full derivation and why a slider wasn't the right
-  // call). Square is still in there (angle=90, primitive=parallelogram)
-  // alongside Hexagon (Voronoi cell) and Triangle -- just as one axis of
-  // a 4x3 grid now, not 3 separate hand-built families.
-  { id: '2D', label: '2D', desc: '4 named lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular) x 3 tile primitives (Parallelogram, Triangle, Hexagon) -- 12 combinations total.', enabled: true, preview: () => lattice2dWireframe(LATTICE_2D_COMBINATIONS[0]) },
+  // Phase 6 (2026-09-23): 3 real primitives (Parallelogram/Triangle/
+  // Hexagon), each its own real store -- picking one here (or from
+  // LATTICE_FAMILIES_2D below) just sets a starting default; the ACTUAL
+  // angle control (4 named NAMED_LATTICE_ANGLES) lives entirely in
+  // render.js's own persistent on-screen toggle panel now, not here --
+  // direct correction ("the toggle should work for groups of cells...
+  // it just needs to be able to do for real"): angle used to be baked
+  // into which of 12 separate (angle, primitive) stores was active,
+  // which meant toggling angle silently swapped to an unrelated store
+  // instead of reshaping the one you'd actually built. See
+  // lattice2dSeedCell's own header in render.js for the full incident.
+  { id: '2D', label: '2D', desc: '3 real tile primitives (Parallelogram, Triangle, Hexagon), each buildable at any of 4 named lattice angles via the in-scene toggle panel.', enabled: true, preview: () => lattice2dWireframe({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: NAMED_LATTICE_ANGLES[0].angleDeg }) },
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, preview: rdWireframe },
   { id: '4D', label: '4D', desc: 'Hypercubic (Tesseract) and D4 root lattice.', enabled: false },
   { id: '5D', label: '5D', desc: 'Decagonal quasicrystal.', enabled: false },
@@ -250,17 +251,19 @@ const DIMENSIONS = [
 
 // LATTICE_FAMILIES_2D: 2D's own lattice-family screen. Same "reuse the
 // existing real action, one tool one doorway" reasoning as
-// LATTICE_FAMILIES_3D below. Phase 3: generated from lattice-2d.js's own
-// LATTICE_2D_COMBINATIONS (4 angles x 3 primitives = 12 rows) instead of
-// 3 hand-written entries -- each row's own action is
-// 'tool:pieceType:lattice2d:<primitiveId>:<angleId>', matching
-// core/build.js's own `lattice2d` param and render.js's
-// dimensionAllowsMesh's own 'lattice2d:' prefix check exactly.
-const LATTICE_FAMILIES_2D = LATTICE_2D_COMBINATIONS.map((combo) => ({
-  label: combo.label,
-  desc: `A flat layer of real ${combo.primitiveLabel.toLowerCase()} tiles at the ${combo.angleLabel} angle -- own separate lattice, pinned to z=0 in this same scene.`,
-  action: `tool:pieceType:lattice2d:${combo.id}`,
-  preview: () => lattice2dWireframe(combo),
+// LATTICE_FAMILIES_3D below. Phase 6: one row per LATTICE_PRIMITIVES
+// entry (3, not 12) -- picking one here just sets which primitive
+// starts active; its own angle defaults to NAMED_LATTICE_ANGLES[0]
+// (Square) and from there is controlled entirely by render.js's own
+// persistent toggle panel, not by anything on this screen. Action is
+// 'tool:pieceType:lattice2d:<primitiveId>', matching core/build.js's
+// own `lattice2d` param and render.js's dimensionAllowsMesh's own
+// 'lattice2d:' prefix check exactly.
+const LATTICE_FAMILIES_2D = LATTICE_PRIMITIVES.map((primitive) => ({
+  label: primitive.label,
+  desc: `A flat layer of real ${primitive.label.toLowerCase()} tiles -- own separate lattice, pinned to z=0 in this same scene, buildable at any of 4 named angles via the in-scene toggle panel.`,
+  action: `tool:pieceType:lattice2d:${primitive.id}`,
+  preview: () => lattice2dWireframe({ primitiveId: primitive.id, angleDeg: NAMED_LATTICE_ANGLES[0].angleDeg }),
 }));
 
 // LATTICE_FAMILIES_3D: 3D's own lattice-family screen. Actions reuse

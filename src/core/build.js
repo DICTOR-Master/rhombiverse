@@ -264,18 +264,19 @@ export function createBuildController({
   hexPrismMesh = null,
   hexPrismCellAt = () => null,
   onHexPrismChange = () => {},
-  // 2D lattice tier (Phase 3, replaces the old separate Square/Hexagon/
-  // Triangle params): one generic "adopted family member" store PER
-  // (angle, primitive) combination from lattice-2d.js's own
-  // LATTICE_2D_COMBINATIONS, all sharing this single param instead of
-  // one hand-written trio of params each -- see lattice-2d.js's header
-  // for why this generalization is correct (each combination is still
-  // its own separate, non-interoperating store, exactly like Square/
-  // Hexagon/Triangle already were). `stores` maps a combination's own
-  // `id` (e.g. "parallelogram:square") to { world, mesh, cellAt }; `s`
-  // is the shared real-world scale every combination's basis vectors
-  // use; `onChange(comboId)` fires after any add/remove on that combo's
-  // own store.
+  // 2D lattice tier (replaces the old separate Square/Hexagon/Triangle
+  // params): one generic "adopted family member" store PER PRIMITIVE
+  // from lattice-2d.js's own LATTICE_PRIMITIVES, all sharing this
+  // single param instead of one hand-written trio of params each.
+  // `stores` maps a primitive's own `id` (e.g. "parallelogram") to
+  // { world, mesh, cellAt }; `s` is the shared real-world scale every
+  // primitive's basis vectors use; `getAngleDeg()` returns the
+  // CURRENTLY toggled angle live (Phase 6 -- angle is a shared,
+  // mutable rendering parameter now, not baked into which store is
+  // active; see render.js's own lattice2dSeedCell header for why an
+  // earlier per-(angle,primitive)-store design was a real mistake, not
+  // just a different valid choice); `onChange(primitiveId)` fires
+  // after any add/remove on that primitive's own store.
   lattice2d = null,
   // Rhombohedra (free lattice): same "adopted family member" reasoning
   // again -- own store, own coordinate frame (geometry-extensions/
@@ -303,6 +304,14 @@ export function createBuildController({
   hemisphereGroup = null,
   onHemisphereChange = () => {},
   onCellClicked,
+  // Real bug fix (see pick()'s own header on meshTargets for the full
+  // incident): whether the main FCC world `mesh` should even be
+  // considered a raycast candidate right now -- defaults to always-true
+  // so every existing caller that never passes this keeps today's
+  // exact behavior (mesh always pickable). render.js passes
+  // `dimensionAllowsMesh('mesh')` specifically (NOT `mesh.visible`,
+  // which also folds in Skeleton view's own separate hiding).
+  getMeshPickable = () => true,
   canPlaceMaterial = () => true,
   getOwnerId = () => null,
   mineRemote = null,
@@ -382,7 +391,32 @@ export function createBuildController({
     // Half RD/Hourglass mesh; harmless for Add (handleHemisphereClick's
     // own bootstrap-only Add path explicitly no-ops if it lands there).
     const hemisphereTargets = hemisphereGroup && HEMISPHERE_PIECE_TYPES.includes(pieceType) ? [hemisphereGroup] : [];
-    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...lattice2dTargets, ...rhombohedraTargets, ...interstitialTargets, ...hemisphereTargets], true);
+    // Real, fundamental bug found investigating a separate hexagon-
+    // specific click failure ("hexagon grew at: null" across a wide
+    // sweep, while parallelogram mostly worked): `mesh` (the main FCC
+    // world) used to be included in the raycast candidates
+    // UNCONDITIONALLY, on the wrong assumption that THREE.Raycaster
+    // skips invisible objects on its own -- it does NOT. Whenever the
+    // main world's own default-seeded RD cell at the origin happened to
+    // sit in front of (or overlap) whatever a 2D lattice tile's own
+    // click ray hit, the HIDDEN main-world cell won the distance
+    // comparison and silently intercepted the click before it ever
+    // reached the real, visible 2D tile -- confirmed directly: a hit on
+    // `mesh` at a CLOSER distance than the lattice2d target, even with
+    // mesh.visible === false. This almost certainly explains a good
+    // deal of the "not every click resolves a direction" behavior
+    // observed all session, previously (wrongly) attributed entirely to
+    // legitimate neighbor-direction tie-breaking. Fixed via
+    // `getMeshPickable()` (defaults to always-true, so every existing
+    // caller that never passes it keeps today's exact behavior) rather
+    // than `mesh.visible` directly -- render.js's own `mesh.visible`
+    // conflates TWO different reasons for being hidden (wrong
+    // dimension, or Skeleton view mode), and Skeleton view may
+    // deliberately keep the solid mesh raycastable-but-invisible so
+    // clicking still builds against it while only a separate skeleton
+    // overlay is shown; only the DIMENSION reason should gate picking.
+    const meshTargets = getMeshPickable() ? [mesh] : [];
+    const hits = raycaster.intersectObjects([...meshTargets, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...lattice2dTargets, ...rhombohedraTargets, ...interstitialTargets, ...hemisphereTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -569,12 +603,20 @@ export function createBuildController({
     if (onRemoved) onRemoved(cell);
   }
 
-  // 2D lattice tier (Phase 3): ONE generic handler for every (angle,
-  // primitive) combination in lattice-2d.js's own LATTICE_2D_COMBINATIONS,
-  // replacing the old handleSquare2dClick/handleHexagon2dClick/
-  // handleTriangle2dClick trio -- see this file's own `lattice2d` param
-  // comment and lattice-2d.js's header for why one parametrized handler
-  // is correct in place of 3 (soon-would-be 12) hand-copied ones.
+  // 2D lattice tier: ONE generic handler for every primitive in
+  // lattice-2d.js's own LATTICE_PRIMITIVES, replacing the old
+  // handleSquare2dClick/handleHexagon2dClick/handleTriangle2dClick trio
+  // -- see this file's own `lattice2d` param comment and lattice-2d.js's
+  // header for why one parametrized handler is correct in place of 3
+  // hand-copied ones. Phase 6: the angle a click resolves against is
+  // read LIVE via `lattice2d.getAngleDeg()` at click time, not baked
+  // into a fixed per-store value -- this is what makes an
+  // already-built structure's own neighbor directions stay correct
+  // after the angle toggle has reshaped it (see render.js's own
+  // lattice2dSeedCell header for the full incident this replaces: a
+  // store used to be keyed by (angle, primitive) together, so toggling
+  // angle silently switched to an unrelated store instead of
+  // reshaping the one you'd actually built).
   //
   // Always matches the click's own hit-point direction against each
   // neighbor candidate's own REAL WORLD offset (impl.cellToWorld(cell+
@@ -593,22 +635,22 @@ export function createBuildController({
   // removed comment): hit-point-direction, never face-normal matching.
   function handleLattice2dClick(hit, mode, pieceType) {
     const action = mode === 'build' ? 'add' : 'remove';
-    const comboId = pieceType.slice('lattice2d:'.length);
-    const store = lattice2d?.stores.get(comboId);
-    const combo = lattice2d?.combos.find((c) => c.id === comboId);
-    if (!store || !combo || hit.object !== store.mesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const primitiveId = pieceType.slice('lattice2d:'.length);
+    const store = lattice2d?.stores.get(primitiveId);
+    const impl = LATTICE_PRIMITIVE_IMPLS[primitiveId];
+    if (!store || !impl || hit.object !== store.mesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
     const cell = store.cellAt(hit.instanceId);
     if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
-    const impl = LATTICE_PRIMITIVE_IMPLS[combo.primitiveId];
+    const angleDeg = lattice2d.getAngleDeg();
     if (mode === 'build') {
       const s = lattice2d.s;
-      const [cx, cy] = impl.cellToWorld(cell.x, cell.y, cell.z, combo.angleDeg, s, 0);
+      const [cx, cy] = impl.cellToWorld(cell.x, cell.y, cell.z, angleDeg, s, 0);
       const dirX = hit.point.x - cx;
       const dirY = hit.point.y - cy;
-      const offsets = impl.neighborOffsets(combo.angleDeg, cell.z);
+      const offsets = impl.neighborOffsets(angleDeg, cell.z);
       let bestIdx = 0, bestDot = -Infinity;
       offsets.forEach(([ox, oy, oz], i) => {
-        const [nwx, nwy] = impl.cellToWorld(cell.x + ox, cell.y + oy, oz, combo.angleDeg, s, 0);
+        const [nwx, nwy] = impl.cellToWorld(cell.x + ox, cell.y + oy, oz, angleDeg, s, 0);
         const dot = (nwx - cx) * dirX + (nwy - cy) * dirY;
         if (dot > bestDot) { bestDot = dot; bestIdx = i; }
       });
@@ -617,12 +659,12 @@ export function createBuildController({
       if (store.world.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
       const material = getMaterial();
       store.world.addCell(nx, ny, nz, { material });
-      lattice2d.onChange(comboId);
+      lattice2d.onChange(primitiveId);
       if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
       return;
     }
     store.world.removeCell(cell.x, cell.y, cell.z);
-    lattice2d.onChange(comboId);
+    lattice2d.onChange(primitiveId);
     if (onRemoved) onRemoved(cell);
   }
 

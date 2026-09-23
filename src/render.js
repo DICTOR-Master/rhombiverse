@@ -23,7 +23,7 @@ import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
-import { NAMED_LATTICE_ANGLES, LATTICE_2D_COMBINATIONS, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis } from './geometry-extensions/lattice-2d.js';
+import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis } from './geometry-extensions/lattice-2d.js';
 import { rhombohedraTileVerts, rhombohedraCellToWorld } from './geometry-extensions/rhombohedra-lattice.js';
 import { FEATURES } from './app/features.js';
 import {
@@ -1184,12 +1184,12 @@ let bccCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let cuboctaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let elongDodecaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let hexPrismCellOrder = []; // instanceId -> {x, y, z, ...cellData}
-// 2D lattice tier (Phase 3): one instanceId->cell array PER (angle,
-// primitive) combination, keyed by the combination's own `id` -- same
-// "separate array per family, never share cellAt's own instance-id
-// space" reasoning as bccCellOrder/hexPrismCellOrder above, generalized
-// off the earlier Phase 2 design's 3 separately-named arrays.
-const lattice2dCellOrders = new Map(); // comboId -> instanceId -> {x, y, z, ...cellData}
+// 2D lattice tier: one instanceId->cell array PER PRIMITIVE, keyed by
+// the primitive's own `id` -- same "separate array per family, never
+// share cellAt's own instance-id space" reasoning as bccCellOrder/
+// hexPrismCellOrder above, generalized off the earlier 3 separately-
+// named arrays.
+const lattice2dCellOrders = new Map(); // primitiveId -> instanceId -> {x, y, z, ...cellData}
 let rhombohedraCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are rhombohedra-lattice.js's own (i,j,k) frame
 let octGapCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are octGap's own offset-frame index, see core/cubocta-gap-build.js
 // Interstitial-lattice build: one real Mesh per disphenoid cell, same
@@ -1380,21 +1380,35 @@ function rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld) {
   hexPrismMesh.computeBoundingSphere();
 }
 
-// Real placed 2D lattice cells (Phase 3) -- same instancing pattern
-// again, generalized off the earlier Phase 2 design's 3 hand-written
-// rebuild functions (Square/Hexagon/Triangle) into one parametrized by
-// `combo` (an entry of LATTICE_2D_COMBINATIONS). Orientation handling
-// (the Triangle primitive's own "down" instances reuse the SAME "up"
-// geometry via a 180-degree Z-rotation baked into the instance matrix,
-// exact per lattice-2d.js's own verified header) generalizes to
-// `impl.hasOrientation`, true only for the triangle primitive.
-function rebuildLattice2dInstances(mesh, world, combo) {
-  const impl = LATTICE_PRIMITIVE_IMPLS[combo.primitiveId];
+// Real placed 2D lattice cells -- same instancing pattern again,
+// parametrized by `primitiveId` + the CURRENTLY toggled `angleDeg`
+// (Phase 6, direct correction: "the toggle should work for groups of
+// cells... it just needs to be able to do for real" -- see
+// lattice2dSeedCell's own header for the full incident). Unlike every
+// other rebuild function on this page, this one also replaces the
+// mesh's own GEOMETRY (not just its instances' transforms) on every
+// call: a primitive's own tile shape is a genuine function of angle
+// (a parallelogram at 90 degrees is square; at 70.53 it's a slanted
+// rhombus -- a different silhouette, not a repositioned one), so
+// toggling the angle on an ALREADY-BUILT structure needs its real
+// geometry to change too, not just where each already-placed instance
+// sits. Orientation handling (the Triangle primitive's own "down"
+// instances reuse the SAME "up" geometry via a 180-degree Z-rotation
+// baked into the instance matrix, exact per lattice-2d.js's own
+// verified header) generalizes to `impl.hasOrientation`, true only for
+// the triangle primitive.
+function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg) {
+  const impl = LATTICE_PRIMITIVE_IMPLS[primitiveId];
+  const newGeometry = new ConvexGeometry(impl.tileVerts(angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  newGeometry.computeVertexNormals();
+  mesh.geometry.dispose();
+  mesh.geometry = newGeometry;
+
   const cellOrder = world.entries();
-  lattice2dCellOrders.set(combo.id, cellOrder);
+  lattice2dCellOrders.set(primitiveId, cellOrder);
   const m = new THREE.Matrix4();
   cellOrder.forEach((cell, i) => {
-    const [wx, wy, wz] = impl.cellToWorld(cell.x, cell.y, cell.z, combo.angleDeg, LATTICE2D_S, 0);
+    const [wx, wy, wz] = impl.cellToWorld(cell.x, cell.y, cell.z, angleDeg, LATTICE2D_S, 0);
     if (impl.hasOrientation && cell.z === 1) {
       m.makeRotationZ(Math.PI);
       m.setPosition(wx, wy, wz);
@@ -1561,41 +1575,42 @@ async function init() {
   // header) has no bootstrap path to recover from that.
   if (hexPrismWorld.entries().length === 0) hexPrismWorld.addCell(0, 0, 0, { material: 'base' });
 
-  // A seed cell (lattice-index coordinates, not world units) for the
-  // idx-th LATTICE_2D_COMBINATIONS entry. Direct correction, 2026-09-23
-  // (a real design mistake, not just a positioning tweak -- caught via
-  // several converging reports: "silhouettes just sit there," "shapes
-  // dont change when dot matrix changes," "dots and shapes arent
-  // separate... they are the matrix together"): this used to scatter
-  // all 12 combos' own seeds across a 3x4 grid so they could ALL stay
-  // simultaneously visible (the earlier "families coexist" design,
-  // copied from Square/Hexagon/Triangle without reconsidering whether
-  // it still made sense at 12). That's exactly what caused the real
-  // confusion: users naturally tapped the big, prominent, decorative
-  // preview shapes at the dot matrix's own center (which were never
-  // wired into the raycast target list -- pure decoration) while the
-  // ACTUAL clickable tile sat small and far off-center, easy to miss
-  // entirely. Fixed by dropping "all 12 visible at once" altogether --
-  // see dimensionAllowsMesh's own updated comment below -- so every
-  // combo's own seed can now live at the SAME origin cell without ever
-  // overlapping another VISIBLE one.
-  function lattice2dSeedCell(_idx) {
+  // Phase 6, direct correction ("the toggle should work for groups of
+  // cells... it reverts to one when shifting... I have loaded four
+  // cells on each toggle... that makes it seem like it is working... it
+  // just needs to be able to do for real"): a real, fundamental design
+  // mistake, not a bug in the previous sense -- one store PER (angle,
+  // primitive) COMBINATION meant toggling the angle silently switched
+  // to a DIFFERENT, independent store rather than re-rendering the SAME
+  // built structure at the new angle. Manually building an identical-
+  // looking cluster under every angle only ever LOOKED like one
+  // structure transforming; it was 12 unrelated ones. Fixed by keying
+  // the real store by PRIMITIVE ALONE (3 stores, not 12) -- which cells
+  // are filled is angle-independent data (an (i,j[,orientation]) index,
+  // not a world position); the angle toggle now only changes the BASIS
+  // that same stored index set is rendered through (see
+  // rebuildLattice2dInstances' own header below), so switching angle
+  // genuinely reshapes the real, already-built structure in place.
+  // Switching PRIMITIVE still switches to a different store -- a
+  // parallelogram cell and a hexagon cell are genuinely different
+  // topology (4 vs 6 neighbors), not just a different rendering of the
+  // same index.
+  function lattice2dSeedCell() {
     return [0, 0];
   }
 
-  // 2D lattice tier (Phase 3): one store PER (angle, primitive)
-  // combination -- same "seed here, not just in the change handler"
-  // reasoning as hexPrismWorld above, generalized off the earlier
-  // Phase 2 design's 3 hand-written blocks (Square/Hexagon/Triangle).
-  const lattice2dWorlds = new Map(); // comboId -> world store
-  LATTICE_2D_COMBINATIONS.forEach((combo, idx) => {
-    const savedJSON = loadFromLocalStorage(lattice2dStorageKey(combo.id));
-    const world = createWorldStore(savedJSON ?? { worldName: `2D Lattice (${combo.label})`, version: 1, cells: {}, meta: {} });
+  // 2D lattice tier: one store PER PRIMITIVE (not per angle x
+  // primitive) -- same "seed here, not just in the change handler"
+  // reasoning as hexPrismWorld above.
+  const lattice2dWorlds = new Map(); // primitiveId -> world store
+  LATTICE_PRIMITIVES.forEach((primitive, idx) => {
+    const savedJSON = loadFromLocalStorage(lattice2dStorageKey(primitive.id));
+    const world = createWorldStore(savedJSON ?? { worldName: `2D Lattice (${primitive.label})`, version: 1, cells: {}, meta: {} });
     if (world.entries().length === 0) {
-      const [sx, sy] = lattice2dSeedCell(idx);
+      const [sx, sy] = lattice2dSeedCell();
       world.addCell(sx, sy, 0, { material: LATTICE2D_SEED_COLORS[idx % LATTICE2D_SEED_COLORS.length] });
     }
-    lattice2dWorlds.set(combo.id, world);
+    lattice2dWorlds.set(primitive.id, world);
   });
 
   // Rhombohedra (free lattice): own store, own coordinate frame -- same
@@ -1664,38 +1679,33 @@ async function init() {
   // be generated"): #piece-type-select only ever had literal <option>s
   // for the OLD square2d/hexagon2d/triangle2d values -- setting a
   // <select>'s .value to a string with no matching <option> silently
-  // no-ops (the DOM leaves the select's value unchanged), so every one
-  // of the 12 new "lattice2d:<id>" values the toggle panel/Wizard set
-  // never actually took effect: the piece-type <select> stayed on
-  // whatever it was before, so build.js's own getPieceType() check
-  // never matched, and clicking a tile silently fell through to
-  // whichever OTHER piece type was actually still selected. Fixed by
-  // injecting a real <option> per LATTICE_2D_COMBINATIONS entry here,
-  // once, before anything below ever tries to set one as the select's
-  // value -- generated, not hand-listed in index.html, so this can't
-  // drift out of sync with the registry again the way the old 3-option
-  // version implicitly did once it stopped being updated.
+  // no-ops (the DOM leaves the select's value unchanged). Fixed by
+  // injecting a real <option> per LATTICE_PRIMITIVES entry here, once,
+  // before anything below ever tries to set one as the select's value
+  // -- generated, not hand-listed in index.html, so this can't drift
+  // out of sync with the registry again. Phase 6: one per PRIMITIVE
+  // now (3, not 12) -- angle is no longer part of the piece-type value
+  // at all, see lattice2dSeedCell's own header above.
   const pieceTypeSelect = document.getElementById('piece-type-select');
-  for (const combo of LATTICE_2D_COMBINATIONS) {
-    pieceTypeSelect.add(new Option(combo.label, `lattice2d:${combo.id}`));
+  for (const primitive of LATTICE_PRIMITIVES) {
+    pieceTypeSelect.add(new Option(primitive.label, `lattice2d:${primitive.id}`));
   }
 
-  // 2D Lattice Build (Phase 3): one InstancedMesh PER (angle, primitive)
-  // combination, own geometry each (a combination's tile shape is a
-  // genuine function of its own angle -- see lattice-2d.js's header --
-  // so, unlike every other family on this page, these 12 meshes can't
-  // share geometry across combinations the way Triangle's own up/down
-  // orientations already share ONE geometry within a single combo).
-  const lattice2dMeshes = new Map(); // comboId -> InstancedMesh
-  LATTICE_2D_COMBINATIONS.forEach((combo) => {
-    const impl = LATTICE_PRIMITIVE_IMPLS[combo.primitiveId];
-    const geometry = new ConvexGeometry(impl.tileVerts(combo.angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  // 2D Lattice Build: one InstancedMesh PER PRIMITIVE (not per angle x
+  // primitive). Its geometry is rebuilt (not just its instances
+  // repositioned) whenever the active angle toggle changes -- see
+  // rebuildLattice2dInstances' own header below -- since a primitive's
+  // own tile shape is a genuine function of angle.
+  const lattice2dMeshes = new Map(); // primitiveId -> InstancedMesh
+  LATTICE_PRIMITIVES.forEach((primitive) => {
+    const impl = LATTICE_PRIMITIVE_IMPLS[primitive.id];
+    const geometry = new ConvexGeometry(impl.tileVerts(NAMED_LATTICE_ANGLES[0].angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
     geometry.computeVertexNormals();
     const mesh = new THREE.InstancedMesh(geometry, material.clone(), MAX_CELLS);
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     scene.add(mesh);
-    lattice2dMeshes.set(combo.id, mesh);
-    rebuildLattice2dInstances(mesh, lattice2dWorlds.get(combo.id), combo);
+    lattice2dMeshes.set(primitive.id, mesh);
+    rebuildLattice2dInstances(mesh, lattice2dWorlds.get(primitive.id), primitive.id, NAMED_LATTICE_ANGLES[0].angleDeg);
   });
 
   // Dot-matrix overlay (Phase 4, direct instruction: "showing the dot
@@ -1865,20 +1875,32 @@ async function init() {
   // the minimum real effect: set the active piece type and make sure
   // Add mode is active, same as handleWheelAction's own pieceType
   // branch does before it gets to the color-picker part.
+  // Phase 6: re-renders the ACTIVE primitive's own real store at the
+  // CURRENT angle on every toggle change (either axis) -- this is what
+  // makes an already-built structure genuinely reshape in place when
+  // the angle toggles, not just what gets placed going forward. See
+  // rebuildLattice2dInstances' own header and lattice2dSeedCell's above
+  // for the full incident this replaces.
+  function currentLattice2dAngleDeg() {
+    return NAMED_LATTICE_ANGLES.find((a) => a.id === activeLattice2dAngleId).angleDeg;
+  }
   function applyLattice2dSelection() {
-    const combo = LATTICE_2D_COMBINATIONS.find((c) => c.angleId === activeLattice2dAngleId && c.primitiveId === activeLattice2dPrimitiveId);
-    updateDotMatrix(combo.angleDeg);
-    document.getElementById('piece-type-select').value = `lattice2d:${combo.id}`;
+    const angleDeg = currentLattice2dAngleDeg();
+    const primitive = LATTICE_PRIMITIVES.find((p) => p.id === activeLattice2dPrimitiveId);
+    updateDotMatrix(angleDeg);
+    rebuildLattice2dInstances(lattice2dMeshes.get(primitive.id), lattice2dWorlds.get(primitive.id), primitive.id, angleDeg);
+    document.getElementById('piece-type-select').value = `lattice2d:${primitive.id}`;
     // Re-derives which single lattice2d mesh dimensionAllowsMesh now
-    // permits (the newly active combo) and hides every other one --
+    // permits (the newly active primitive) and hides every other one --
     // see that function's own Phase 5 comment for why only one is ever
-    // shown at a time now.
+    // shown at a time.
     applyDimensionVisibility();
     if (currentMode !== 'build' && currentMode !== 'chisel') {
       document.querySelector('.mode-btn[data-mode="build"]')?.click();
     }
     updateHudIndicator();
-    showHudPrompt(`Piece: ${combo.label}`, 2000);
+    const angleLabel = NAMED_LATTICE_ANGLES.find((a) => a.id === activeLattice2dAngleId).label;
+    showHudPrompt(`Piece: ${angleLabel} × ${primitive.label}`, 2000);
   }
   renderLattice2dPanel();
 
@@ -2416,24 +2438,28 @@ async function init() {
   // only toggles Object3D.visible, so switching back to 3D
   // (tool:selectDimension:3D, which also calls applyDimensionVisibility)
   // shows it again exactly as it was.
-  // 'lattice2d:' keys (one per LATTICE_2D_COMBINATIONS entry, Phase 3)
-  // replace the old hand-listed 'square2d'/'hexagon2d'/'triangle2d'
-  // trio here -- a namespaced prefix check generalizes to however many
+  // 'lattice2d:' keys (one per LATTICE_PRIMITIVES entry) replace the
+  // old hand-listed 'square2d'/'hexagon2d'/'triangle2d' trio here -- a
+  // namespaced prefix check generalizes to however many
   // combinations lattice-2d.js ever defines, with no new case needed
   // per named angle or primitive added there in the future.
   //
   // Phase 5 correction, 2026-09-23 (a real design mistake, not a
   // tuning issue -- see lattice2dSeedCell's own comment for the full
   // incident): a `lattice2d:<id>` key is now only allowed when it's
-  // the CURRENTLY ACTIVE combo (matching the toggle panel), not "any
-  // combo, all 12 simultaneously" the way every other coexisting
-  // family on this page still is. Direct reports converged on exactly
-  // this: 12 tiles scattered around, most of them not the one you can
-  // actually click, is clutter that actively hid the real interactive
-  // one behind visual noise ("STILL cant generate pieces by tapping").
+  // the CURRENTLY ACTIVE one (matching the toggle panel), not "all of
+  // them simultaneously" the way every other coexisting family on this
+  // page still is. Direct reports converged on exactly this: tiles
+  // scattered around, most of them not the one you can actually click,
+  // is clutter that actively hid the real interactive one behind
+  // visual noise ("STILL cant generate pieces by tapping"). Phase 6:
+  // `<id>` is now a PRIMITIVE id alone (3 possible values), not a
+  // (primitive, angle) combo id (12) -- angle no longer selects a
+  // different store, only how the active primitive's own store is
+  // rendered, so it's no longer part of this key at all.
   function dimensionAllowsMesh(key) {
     if (key.startsWith('lattice2d:')) {
-      return activeDimension === '2D' && key === `lattice2d:${activeLattice2dPrimitiveId}:${activeLattice2dAngleId}`;
+      return activeDimension === '2D' && key === `lattice2d:${activeLattice2dPrimitiveId}`;
     }
     // '3D' or not yet chosen (activeDimension === null, e.g. mid-load):
     // default to showing 3D's own coexisting families, same as before
@@ -2445,7 +2471,7 @@ async function init() {
     bccMesh.visible = visible && dimensionAllowsMesh('bcc');
     elongDodecaMesh.visible = visible && dimensionAllowsMesh('elongdodeca');
     hexPrismMesh.visible = visible && dimensionAllowsMesh('hexprism');
-    lattice2dMeshes.forEach((m, comboId) => { m.visible = visible && dimensionAllowsMesh(`lattice2d:${comboId}`); });
+    lattice2dMeshes.forEach((m, primitiveId) => { m.visible = visible && dimensionAllowsMesh(`lattice2d:${primitiveId}`); });
     rhombohedraMesh.visible = visible && dimensionAllowsMesh('rhombohedra');
     cuboctaMesh.visible = visible && dimensionAllowsMesh('cubocta');
     octGapMesh.visible = visible && dimensionAllowsMesh('octgap');
@@ -3063,13 +3089,35 @@ async function init() {
           const value = action.slice('tool:pieceType:'.length);
           const PIECE_LABELS = {
             rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', rhombohedra: 'Rhombohedra',
-            // 2D lattice tier (Phase 3): one label per LATTICE_2D_COMBINATIONS
-            // entry, generated rather than hand-listed (replaces the old
-            // square2d/hexagon2d/triangle2d trio) so a new named angle or
-            // primitive never needs a matching new label added here.
-            ...Object.fromEntries(LATTICE_2D_COMBINATIONS.map((c) => [`lattice2d:${c.id}`, c.label])),
+            // 2D lattice tier: one label per LATTICE_PRIMITIVES entry
+            // (Phase 6: primitive alone, angle is a live toggle not a
+            // piece-type value -- see lattice2dSeedCell's own header),
+            // generated rather than hand-listed so a new primitive never
+            // needs a matching new label added here.
+            ...Object.fromEntries(LATTICE_PRIMITIVES.map((p) => [`lattice2d:${p.id}`, p.label])),
           };
           document.getElementById('piece-type-select').value = value;
+          // Real gap, caught while fixing a separate lattice2d bug
+          // (see lattice2dSeedCell's own header): every OTHER piece
+          // type here is always-visible regardless of which is picked
+          // (rd/cube/to/... genuinely do coexist), but lattice2d meshes
+          // do NOT -- only the toggle panel's own ACTIVE primitive
+          // stays visible (dimensionAllowsMesh's own Phase 5 gate).
+          // Picking a lattice2d piece from the Wizard/wheel (not the
+          // toggle panel itself) must sync the panel's own state too,
+          // or the piece-type-select changes while the WRONG mesh
+          // stays shown -- a real, silent mismatch this closes.
+          if (value.startsWith('lattice2d:')) {
+            const primitiveId = value.slice('lattice2d:'.length);
+            if (primitiveId !== activeLattice2dPrimitiveId) {
+              activeLattice2dPrimitiveId = primitiveId;
+              renderLattice2dPanel();
+            }
+            const angleDeg = currentLattice2dAngleDeg();
+            rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), lattice2dWorlds.get(primitiveId), primitiveId, angleDeg);
+            updateDotMatrix(angleDeg);
+            applyDimensionVisibility();
+          }
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
           // currentMode. A player who'd entered some OTHER mode first
@@ -3264,14 +3312,13 @@ async function init() {
           handleWheelAction('tool:pieceType:rd');
           return;
         }
-        // 2D (Phase 3): every lattice2dWorlds entry is already seeded at
+        // 2D: every lattice2dWorlds entry is already seeded at
         // construction (see its own "seed here, not just in the change
         // handler" comment above) -- unlike 3D there's no separate world
         // to seed here, just select a default piece type. Defaults to
-        // the Square/Parallelogram combination (LATTICE_2D_COMBINATIONS'
-        // own first entry -- NAMED_LATTICE_ANGLES/LATTICE_PRIMITIVES are
-        // both ordered with Square/Parallelogram first specifically so
-        // this default stays meaningful without hardcoding its id here),
+        // Parallelogram (LATTICE_PRIMITIVES' own first entry) at Square
+        // (NAMED_LATTICE_ANGLES' own first entry, and the toggle panel's
+        // own default -- see activeLattice2dAngleId's declaration),
         // matching this quick dimension-wheel shortcut's own "just pick
         // A reasonable default, the full picker is dimension-wizard.js's
         // job" role -- same relationship 3D's own 'rd' default above has
@@ -3281,7 +3328,7 @@ async function init() {
           applyDimensionVisibility();
           applyDimensionCamera('2D');
           dimensionWheel3D.close();
-          handleWheelAction(`tool:pieceType:lattice2d:${LATTICE_2D_COMBINATIONS[0].id}`);
+          handleWheelAction(`tool:pieceType:lattice2d:${LATTICE_PRIMITIVES[0].id}`);
           return;
         }
         // WHEEL_DIMENSION's own noUniversalRing:true (see that config's
@@ -3917,11 +3964,11 @@ async function init() {
     // actually selected -- the real placement itself was always
     // correct, only this indicator was silently wrong.
     elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRhombohedron', rhombohedra: 'pieceRhombohedron',
-    // 2D lattice tier (Phase 3): one entry per LATTICE_2D_COMBINATIONS,
-    // reusing wheel-icons.js's own 3 primitive-keyed icons (the mark
-    // only varies by primitive, not angle -- see that file's own
-    // comment for why a full 12-icon set wasn't built).
-    ...Object.fromEntries(LATTICE_2D_COMBINATIONS.map((c) => [`lattice2d:${c.id}`, `piece2d${c.primitiveId[0].toUpperCase()}${c.primitiveId.slice(1)}`])),
+    // 2D lattice tier: one entry per LATTICE_PRIMITIVES, reusing
+    // wheel-icons.js's own 3 primitive-keyed icons (Phase 6: the piece
+    // type IS just the primitive now, angle is a separate live toggle
+    // -- see lattice2dSeedCell's own header).
+    ...Object.fromEntries(LATTICE_PRIMITIVES.map((p) => [`lattice2d:${p.id}`, `piece2d${p.id[0].toUpperCase()}${p.id.slice(1)}`])),
   };
   const quickShapeEl = document.getElementById('hud-quick-shape');
   const quickMaterialEl = document.getElementById('hud-quick-material');
@@ -4834,13 +4881,14 @@ async function init() {
       // own label, replacing the old square2d/hexagon2d/triangle2d
       // hand-written trio -- same underlying "grow-only, tap directly on
       // an existing one to remove it" fact for every combination.
-      const lattice2dCombo = piece?.startsWith('lattice2d:') ? LATTICE_2D_COMBINATIONS.find((c) => `lattice2d:${c.id}` === piece) : null;
-      const lattice2dMessages = lattice2dCombo && {
-        add: `A ${lattice2dCombo.label} tile is already there.`,
-        remove: `No ${lattice2dCombo.label} tile there to remove -- Remove only clears an actual one, not the RD world around it. Tap directly on one you've placed.`,
+      const lattice2dPrimitive = piece?.startsWith('lattice2d:') ? LATTICE_PRIMITIVES.find((p) => `lattice2d:${p.id}` === piece) : null;
+      const lattice2dMessages = lattice2dPrimitive && {
+        add: `A ${lattice2dPrimitive.label} tile is already there.`,
+        remove: `No ${lattice2dPrimitive.label} tile there to remove -- Remove only clears an actual one, not the RD world around it. Tap directly on one you've placed.`,
       };
       showHudPrompt((lattice2dMessages ?? messages[piece])?.[action] ?? 'Nothing to do there.', 3500);
     },
+    getMeshPickable: () => dimensionAllowsMesh('mesh'),
     getDragPlacementEnabled: () => pickers.isDragPlacementEnabled(),
     getMode: () => (walking ? null : currentMode),
     getShellCount,
@@ -4869,19 +4917,24 @@ async function init() {
     hexPrismMesh,
     hexPrismCellAt: (instanceId) => hexPrismCellOrder[instanceId],
     onHexPrismChange,
-    // 2D lattice tier (Phase 3): one `lattice2d` param replaces the old
+    // 2D lattice tier: one `lattice2d` param replaces the old
     // square2dWorld/square2dMesh/square2dCellAt(+Hexagon/+Triangle)
     // trio-of-trios -- see core/build.js's own `lattice2d` param
     // comment for why. `stores` is built fresh here (not cached)
-    // because it's cheap (12 entries) and always needs to reflect
-    // lattice2dWorlds/lattice2dMeshes' own current contents.
+    // because it's cheap (3 entries) and always needs to reflect
+    // lattice2dWorlds/lattice2dMeshes' own current contents. Phase 6:
+    // keyed by PRIMITIVE id alone now (not a combo id) -- angle is no
+    // longer a store selector, just a live rendering parameter read via
+    // `getAngleDeg` at click time (see lattice2dSeedCell's own header
+    // for the full incident this replaces).
     lattice2d: {
-      combos: LATTICE_2D_COMBINATIONS,
-      stores: new Map(LATTICE_2D_COMBINATIONS.map((c) => [
-        c.id,
-        { world: lattice2dWorlds.get(c.id), mesh: lattice2dMeshes.get(c.id), cellAt: (instanceId) => lattice2dCellOrders.get(c.id)?.[instanceId] },
+      primitives: LATTICE_PRIMITIVES,
+      stores: new Map(LATTICE_PRIMITIVES.map((p) => [
+        p.id,
+        { world: lattice2dWorlds.get(p.id), mesh: lattice2dMeshes.get(p.id), cellAt: (instanceId) => lattice2dCellOrders.get(p.id)?.[instanceId] },
       ])),
       s: LATTICE2D_S,
+      getAngleDeg: currentLattice2dAngleDeg,
       onChange: onLattice2dChange,
     },
     rhombohedraWorld,
@@ -4953,24 +5006,25 @@ async function init() {
     saveToLocalStorage(hexPrismWorld.toJSON(), HEXPRISM_STORAGE_KEY);
   }
 
-  // 2D lattice tier (Phase 3): ONE generic change handler for every
-  // (angle, primitive) combination, replacing the old onSquare2dChange/
-  // onHexagon2dChange/onTriangle2dChange trio -- same "never truly
-  // empty" invariant, keyed by the combination's own index (for its
-  // own off-origin seed offset, matching lattice2dWorlds' own
-  // construction above) rather than 3 hand-picked seed positions.
-  function onLattice2dChange(comboId) {
-    const combo = LATTICE_2D_COMBINATIONS.find((c) => c.id === comboId);
-    const idx = LATTICE_2D_COMBINATIONS.indexOf(combo);
-    const world = lattice2dWorlds.get(comboId);
+  // 2D lattice tier: ONE generic change handler for every primitive,
+  // replacing the old onSquare2dChange/onHexagon2dChange/
+  // onTriangle2dChange trio -- same "never truly empty" invariant.
+  // Phase 6: keyed by primitiveId alone (not a combo id) -- re-renders
+  // at the CURRENTLY toggled angle (currentLattice2dAngleDeg), same as
+  // applyLattice2dSelection does on a toggle click, so a click-driven
+  // change and a toggle-driven change never disagree about what angle
+  // the structure should be shown at.
+  function onLattice2dChange(primitiveId) {
+    const idx = LATTICE_PRIMITIVES.findIndex((p) => p.id === primitiveId);
+    const world = lattice2dWorlds.get(primitiveId);
     if (world.entries().length === 0) {
-      const [sx, sy] = lattice2dSeedCell(idx);
+      const [sx, sy] = lattice2dSeedCell();
       world.addCell(sx, sy, 0, { material: LATTICE2D_SEED_COLORS[idx % LATTICE2D_SEED_COLORS.length] });
     }
-    rebuildLattice2dInstances(lattice2dMeshes.get(comboId), world, combo);
+    rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), world, primitiveId, currentLattice2dAngleDeg());
     updateSectionEnabled();
     applyWorldViewMaterials();
-    saveToLocalStorage(world.toJSON(), lattice2dStorageKey(comboId));
+    saveToLocalStorage(world.toJSON(), lattice2dStorageKey(primitiveId));
   }
 
   // Rhombohedra build (free lattice): own change handler, same "never
@@ -5182,13 +5236,13 @@ async function init() {
     clearLocalStorage(HEXPRISM_STORAGE_KEY);
     hexPrismWorld.replaceAll({ worldName: 'Hex Prism Lattice', version: 1, cells: {}, meta: {} });
     onHexPrismChange();
-    // 2D lattice tier (Phase 3): one loop over every combination,
-    // replacing the old Square/Hexagon/Triangle hand-written trio --
-    // same "fresh start clears it too" reasoning as every store above.
-    LATTICE_2D_COMBINATIONS.forEach((combo) => {
-      clearLocalStorage(lattice2dStorageKey(combo.id));
-      lattice2dWorlds.get(combo.id).replaceAll({ worldName: `2D Lattice (${combo.label})`, version: 1, cells: {}, meta: {} });
-      onLattice2dChange(combo.id);
+    // 2D lattice tier: one loop over every primitive, replacing the old
+    // Square/Hexagon/Triangle hand-written trio -- same "fresh start
+    // clears it too" reasoning as every store above.
+    LATTICE_PRIMITIVES.forEach((primitive) => {
+      clearLocalStorage(lattice2dStorageKey(primitive.id));
+      lattice2dWorlds.get(primitive.id).replaceAll({ worldName: `2D Lattice (${primitive.label})`, version: 1, cells: {}, meta: {} });
+      onLattice2dChange(primitive.id);
     });
     clearLocalStorage(RHOMBOHEDRA_STORAGE_KEY);
     rhombohedraWorld.replaceAll({ worldName: 'Rhombohedra Lattice', version: 1, cells: {}, meta: {} });
