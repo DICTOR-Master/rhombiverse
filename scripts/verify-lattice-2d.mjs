@@ -271,20 +271,47 @@ function sharesRealEdge(polyA, polyB) {
   }
   return shared >= 2;
 }
+const worldPolyNoOrientation = (tileVerts, cellToWorld, x, y, angleDeg) => {
+  const local = polygonBottomFace(tileVerts(angleDeg, 1, 0.15));
+  const [cx, cy] = cellToWorld(x, y, angleDeg, 1, 0);
+  return local.map(([lx, ly]) => [lx + cx, ly + cy]);
+};
+// Real bug this closes: sharesRealEdge(hex, ITS OWN up/down triangle)
+// alone was true but incomplete -- it never checked whether the
+// hexagon's OTHER edges had ANY covering triangle at all, which is
+// exactly how a hexagon built with the wrong vertex count (a real
+// Square-angle bug, fixed the same session) still "passed" 2 checks
+// while visibly missing triangles on its other edges. This instead
+// checks EVERY edge of hexagon(0,0) against every triangle contributed
+// by hexagon(0,0) and its own 6 real neighbors (kagomeNeighborOffsets),
+// each via the SAME up(x,y)/down(x-1,y-1) claim rule render.js's own
+// rebuildLattice2dInstances uses -- a real full-coverage check, not a
+// sampled one.
+function edgeHasCoveringTriangle(A, B, angleDeg) {
+  const offsets = [[0, 0], ...kagomeNeighborOffsets(angleDeg)];
+  for (const [ox, oy] of offsets) {
+    for (const tri of [
+      worldPolyNoOrientation(kagomeTriangleUpTileVerts, kagomeTriangleUpCellToWorld, ox, oy, angleDeg),
+      worldPolyNoOrientation(kagomeTriangleDownTileVerts, kagomeTriangleDownCellToWorld, ox, oy, angleDeg),
+    ]) {
+      const hasA = tri.some((p) => Math.abs(p[0] - A[0]) < 1e-6 && Math.abs(p[1] - A[1]) < 1e-6);
+      const hasB = tri.some((p) => Math.abs(p[0] - B[0]) < 1e-6 && Math.abs(p[1] - B[1]) < 1e-6);
+      if (hasA && hasB) return true;
+    }
+  }
+  return false;
+}
 for (const { id, angleDeg } of NAMED_LATTICE_ANGLES) {
   const hex = worldPoly(kagomeHexagonTileVerts, kagomeHexagonCellToWorld, 0, 0, 0, angleDeg);
-  const worldPolyNoOrientation = (tileVerts, cellToWorld, x, y, angleDeg) => {
-    const local = polygonBottomFace(tileVerts(angleDeg, 1, 0.15));
-    const [cx, cy] = cellToWorld(x, y, angleDeg, 1, 0);
-    return local.map(([lx, ly]) => [lx + cx, ly + cy]);
-  };
   const triUp = worldPolyNoOrientation(kagomeTriangleUpTileVerts, kagomeTriangleUpCellToWorld, 0, 0, angleDeg);
   const triDown = worldPolyNoOrientation(kagomeTriangleDownTileVerts, kagomeTriangleDownCellToWorld, 0, 0, angleDeg);
-  check(`[${id}] kagome hexagon: ${hex.length} vertices`, hex.length === (id === 'square' ? 4 : 6));
+  check(`[${id}] kagome hexagon: 6 vertices`, hex.length === 6);
   check(`[${id}] kagome hexagon shares a real edge with the up triangle`, sharesRealEdge(hex, triUp));
   check(`[${id}] kagome hexagon shares a real edge with the down triangle`, sharesRealEdge(hex, triDown));
   const neighborCount = kagomeNeighborOffsets(angleDeg).length;
-  check(`[${id}] kagome neighbor count matches hexagon's (${neighborCount})`, neighborCount === (id === 'square' ? 4 : 6));
+  check(`[${id}] kagome neighbor count matches hexagon's (${neighborCount})`, neighborCount === 6);
+  const allEdgesCovered = hex.every((A, i) => edgeHasCoveringTriangle(A, hex[(i + 1) % hex.length], angleDeg));
+  check(`[${id}] kagome hexagon: all 6 edges have a real covering triangle (no gaps)`, allEdgesCovered);
 }
 
 console.log(failures === 0 ? `\nAll checks passed (0 failures).` : `\n${failures} check(s) FAILED.`);

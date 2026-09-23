@@ -576,15 +576,34 @@ export const RHOMBILLE_ARRANGEMENT_IMPL = {
 //      geometric wall at Square at all, only a non-optimal choice of
 //      which down-triangle to pair with which hexagon.
 
-// The hexagon's own real neighbor directions, in real cyclic angular
-// order (hexagonNeighborOffsets' own order isn't guaranteed angular, so
-// this sorts by the real world-space angle before connecting consecutive
-// midpoints into a polygon).
+// Real bug, direct user report ("pointed at both ends... missing
+// triangles... at 90") caught AFTER the Square fix above already
+// shipped: this used to build the hexagon from hexagonNeighborOffsets,
+// which counts VORONOI-adjacent hexagons (4 at Square -- the diagonal
+// direction is redundant there for THAT purpose, per that function's own
+// header). But the real rectification hexagon needs a vertex per
+// TRIANGULATION EDGE at that point, a different count -- verified
+// directly by hand-counting triangles: 6 real triangles meet at any
+// point at EVERY named angle, including Square (up(x,y) contributes 2
+// edges; the 2 squares where this point is a DIAGONAL ENDPOINT each
+// contribute 2 more real edges, since P is shared by both halves of
+// THOSE squares; the 2 "off-diagonal corner" squares contribute 1 each
+// -- 2+2+2+... totals 6, not 4). hexagonNeighborOffsets' own 4-vs-6
+// distinction is real for VORONOI adjacency, but Kagome was never
+// supposed to be built from that function at all -- the 6 real
+// triangulation-edge directions (v0, -v0, v1, -v1, and BOTH ends of the
+// one fixed diagonal line, v1-v0 and v0-v1) are the same fixed 6 formulas
+// at every angle, dropping the hexagonNeighborOffsets dependency
+// entirely rather than special-casing Square. Verified directly: with
+// this fix, every edge of a hexagon is covered by a real triangle from
+// itself or an immediate neighbor, at all 4 angles, with zero gaps (the
+// earlier "shares an edge with ITS OWN up/down triangle" check was true
+// but incomplete -- it never checked whether the hexagon's OTHER edges
+// were covered by anything at all).
 function kagomeNeighborDirsSorted(angleDeg, s) {
   const [v0, v1] = latticeBasis(angleDeg, s);
-  return hexagonNeighborOffsets(angleDeg)
-    .map(([i, j]) => [i * v0[0] + j * v1[0], i * v0[1] + j * v1[1]])
-    .sort((a, b) => Math.atan2(a[1], a[0]) - Math.atan2(b[1], b[0]));
+  const dirs = [v0, [-v0[0], -v0[1]], v1, [-v1[0], -v1[1]], [v1[0] - v0[0], v1[1] - v0[1]], [v0[0] - v1[0], v0[1] - v1[1]]];
+  return dirs.sort((a, b) => Math.atan2(a[1], a[0]) - Math.atan2(b[1], b[0]));
 }
 
 export function kagomeHexagonTileVerts(angleDeg, s = 1, h = 0.15 * 1) {
@@ -647,11 +666,14 @@ export function kagomeTriangleDownCellToWorld(x, y, angleDeg, s = 1, worldZ = 0)
 }
 
 // Kagome's own LOGICAL placement grid is the same point lattice Hexagon
-// already uses (one logical cell per lattice point, expanding at render
-// time into 1 hexagon + 2 triangle instances -- see render.js's own
-// rebuildLattice2dInstances) -- so its neighbor structure is identical.
-export function kagomeNeighborOffsets(angleDeg) {
-  return hexagonNeighborOffsets(angleDeg);
+// already uses, but NOT its neighbor structure -- real bug, same root
+// cause as kagomeNeighborDirsSorted's own header just above (this used
+// to delegate to hexagonNeighborOffsets too, so it was ALSO wrong at
+// Square, missing the 2 real diagonal-line neighbors a 6-edge hexagon
+// needs). Same fixed 6 (i,j) index offsets at every angle, matching
+// kagomeNeighborDirsSorted's own v0/-v0/v1/-v1/(v1-v0)/(v0-v1) exactly.
+export function kagomeNeighborOffsets(_angleDeg) {
+  return [[1, 0], [-1, 0], [0, 1], [0, -1], [-1, 1], [1, -1]];
 }
 
 // ---------------------------------------------------------------------------
