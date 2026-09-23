@@ -23,9 +23,8 @@ import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
-import { squareTileVerts, squareCellToWorld, triangleTileVerts, triangleCellToWorld } from './geometry-extensions/lattice-2d.js';
+import { LATTICE_2D_COMBINATIONS, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from './geometry-extensions/lattice-2d.js';
 import { rhombohedraTileVerts, rhombohedraCellToWorld } from './geometry-extensions/rhombohedra-lattice.js';
-import { hexPrismVerts as hexagonTileVerts2D, hexCellToWorld as hexagonCellToWorld2D } from './geometry-extensions/hex-prism.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -82,9 +81,7 @@ import {
   HEMISPHERE_STORAGE_KEY,
   ELONGDODECA_STORAGE_KEY,
   HEXPRISM_STORAGE_KEY,
-  SQUARE2D_STORAGE_KEY,
-  HEXAGON2D_STORAGE_KEY,
-  TRIANGLE2D_STORAGE_KEY,
+  lattice2dStorageKey,
   RHOMBOHEDRA_STORAGE_KEY,
 } from './core/persistence.js';
 import {
@@ -108,29 +105,22 @@ const SCALE = 1;
 // (roughly SCALE-sized), not a derived constant.
 const HEX_PRISM_R = SCALE;
 const HEX_PRISM_H = Math.sqrt(3) * SCALE;
-// Square (2D tier): matches SCALE for visual consistency with everything
-// else -- no special proportion required (same reasoning as hex prism's
-// own height above).
-const SQUARE2D_S = SCALE;
+// 2D lattice tier (Phase 3): matches SCALE for visual consistency with
+// everything else -- no special proportion required (same reasoning as
+// hex prism's own height above), shared by every (angle, primitive)
+// combination in LATTICE_2D_COMBINATIONS.
+const LATTICE2D_S = SCALE;
 // 2D tiles read as genuinely flat, direct instruction 2026-09-23 ("make
 // 2D seem more 2D... show only 2D plane"): a near-zero tile height still
 // renders a real, visible top/bottom face pair + edge sliver (not a
 // literal zero-thickness plane, which would z-fight and produce zero
 // normal-based lighting), but reads as a flat tile rather than a puck.
 // Attachment direction-matching never depended on this height in the
-// first place -- handleSquare2dClick/handleHexagon2dClick both use the
-// hit point's own in-plane offset from the cell's world center (see
-// their own headers), not the tile's side-face normals, so shrinking
-// this doesn't touch click behavior at all.
-const SQUARE2D_H = 0.03 * SCALE;
-// Hexagon (2D tier): same real axial-hex radius as HEX_PRISM_R, same
-// near-zero flat-tile height reasoning as SQUARE2D_H above.
-const HEXAGON2D_R = SCALE;
-const HEXAGON2D_H = 0.03 * SCALE;
-// Triangle (2D tier): same real scale as everything else, same near-
-// zero flat-tile height reasoning as SQUARE2D_H/HEXAGON2D_H above.
-const TRIANGLE2D_S = SCALE;
-const TRIANGLE2D_H = 0.03 * SCALE;
+// first place -- handleLattice2dClick (build.js) uses the hit point's
+// own in-plane offset from the cell's world center (see its own
+// header), not the tile's side-face normals, so shrinking this doesn't
+// touch click behavior at all.
+const LATTICE2D_H = 0.03 * SCALE;
 // Rhombohedra (free lattice): same real scale as everything else -- a
 // genuine 3D solid, no special height/thinness constant needed.
 const RHOMBOHEDRA_S = SCALE;
@@ -359,10 +349,10 @@ setInterval(persistCameraState, 3000);
 // seem more 2D... show only 2D plane"). A thin flat tile still reads as
 // a 3D puck from this app's normal angled orbit view (confirmed via
 // direct screenshot: hexagon tiles showed visible side faces even at
-// HEXAGON2D_H=0.03) -- tile thinness alone was never going to fix that,
-// the VIEW itself needed to go flat too. Every 2D family (lattice-2d.js/
-// hex-prism.js reused for the 2D tier) pins world Z to 0 and extrudes
-// tile thickness along Z (see squareTileVerts' own header: "height h
+// LATTICE2D_H=0.03) -- tile thinness alone was never going to fix that,
+// the VIEW itself needed to go flat too. Every 2D lattice combination
+// (lattice-2d.js) pins world Z to 0 and extrudes tile thickness along Z
+// (see parallelogramTileVerts' own header: "height h
 // along the scene's own Z axis"), so a true top-down 2D view means
 // looking straight down the Z axis, not the Y axis camera.position.set
 // (6,5,8)'s default orbit implies. Locks rotation entirely (not just a
@@ -1149,9 +1139,12 @@ let bccCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let cuboctaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let elongDodecaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let hexPrismCellOrder = []; // instanceId -> {x, y, z, ...cellData}
-let square2dCellOrder = []; // instanceId -> {x, y, z, ...cellData}
-let hexagon2dCellOrder = []; // instanceId -> {x, y, z, ...cellData}
-let triangle2dCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- z is the orientation flag (0=up, 1=down), see lattice-2d.js's own header
+// 2D lattice tier (Phase 3): one instanceId->cell array PER (angle,
+// primitive) combination, keyed by the combination's own `id` -- same
+// "separate array per family, never share cellAt's own instance-id
+// space" reasoning as bccCellOrder/hexPrismCellOrder above, generalized
+// off the earlier Phase 2 design's 3 separately-named arrays.
+const lattice2dCellOrders = new Map(); // comboId -> instanceId -> {x, y, z, ...cellData}
 let rhombohedraCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are rhombohedra-lattice.js's own (i,j,k) frame
 let octGapCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are octGap's own offset-frame index, see core/cubocta-gap-build.js
 // Interstitial-lattice build: one real Mesh per disphenoid cell, same
@@ -1342,64 +1335,34 @@ function rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld) {
   hexPrismMesh.computeBoundingSphere();
 }
 
-// Real placed Square cells (2D tier) -- same instancing pattern again,
-// own squareCellToWorld position (z always 0, a flat layer).
-function rebuildSquare2dInstances(square2dMesh, square2dWorld) {
-  square2dCellOrder = square2dWorld.entries();
+// Real placed 2D lattice cells (Phase 3) -- same instancing pattern
+// again, generalized off the earlier Phase 2 design's 3 hand-written
+// rebuild functions (Square/Hexagon/Triangle) into one parametrized by
+// `combo` (an entry of LATTICE_2D_COMBINATIONS). Orientation handling
+// (the Triangle primitive's own "down" instances reuse the SAME "up"
+// geometry via a 180-degree Z-rotation baked into the instance matrix,
+// exact per lattice-2d.js's own verified header) generalizes to
+// `impl.hasOrientation`, true only for the triangle primitive.
+function rebuildLattice2dInstances(mesh, world, combo) {
+  const impl = LATTICE_PRIMITIVE_IMPLS[combo.primitiveId];
+  const cellOrder = world.entries();
+  lattice2dCellOrders.set(combo.id, cellOrder);
   const m = new THREE.Matrix4();
-  square2dCellOrder.forEach((cell, i) => {
-    const [wx, wy, wz] = squareCellToWorld(cell.x, cell.y, SQUARE2D_S);
-    m.makeTranslation(wx, wy, wz);
-    square2dMesh.setMatrixAt(i, m);
-    square2dMesh.setColorAt(i, instanceColorFor(cell));
-  });
-  square2dMesh.count = square2dCellOrder.length;
-  square2dMesh.instanceMatrix.needsUpdate = true;
-  if (square2dMesh.instanceColor) square2dMesh.instanceColor.needsUpdate = true;
-  square2dMesh.computeBoundingSphere();
-}
-
-// Real placed Hexagon cells (2D tier) -- same instancing pattern again,
-// own hexagonCellToWorld2D position (z always 0, a flat layer).
-function rebuildHexagon2dInstances(hexagon2dMesh, hexagon2dWorld) {
-  hexagon2dCellOrder = hexagon2dWorld.entries();
-  const m = new THREE.Matrix4();
-  hexagon2dCellOrder.forEach((cell, i) => {
-    const [wx, wy, wz] = hexagonCellToWorld2D(cell.x, cell.y, 0, HEXAGON2D_R);
-    m.makeTranslation(wx, wy, wz);
-    hexagon2dMesh.setMatrixAt(i, m);
-    hexagon2dMesh.setColorAt(i, instanceColorFor(cell));
-  });
-  hexagon2dMesh.count = hexagon2dCellOrder.length;
-  hexagon2dMesh.instanceMatrix.needsUpdate = true;
-  if (hexagon2dMesh.instanceColor) hexagon2dMesh.instanceColor.needsUpdate = true;
-  hexagon2dMesh.computeBoundingSphere();
-}
-
-// Real placed Triangle cells (2D tier) -- same instancing pattern
-// again, but one shared "up" geometry represents BOTH orientations: a
-// down-pointing instance (cell.z === 1) gets an extra 180-degree Z
-// rotation baked into its own instance matrix before translating to its
-// real world position, exact (not approximated) per lattice-2d.js's
-// own verified header.
-function rebuildTriangle2dInstances(triangle2dMesh, triangle2dWorld) {
-  triangle2dCellOrder = triangle2dWorld.entries();
-  const m = new THREE.Matrix4();
-  triangle2dCellOrder.forEach((cell, i) => {
-    const [wx, wy, wz] = triangleCellToWorld(cell.x, cell.y, cell.z, TRIANGLE2D_S);
-    if (cell.z === 1) {
+  cellOrder.forEach((cell, i) => {
+    const [wx, wy, wz] = impl.cellToWorld(cell.x, cell.y, cell.z, combo.angleDeg, LATTICE2D_S, 0);
+    if (impl.hasOrientation && cell.z === 1) {
       m.makeRotationZ(Math.PI);
       m.setPosition(wx, wy, wz);
     } else {
       m.makeTranslation(wx, wy, wz);
     }
-    triangle2dMesh.setMatrixAt(i, m);
-    triangle2dMesh.setColorAt(i, instanceColorFor(cell));
+    mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, instanceColorFor(cell));
   });
-  triangle2dMesh.count = triangle2dCellOrder.length;
-  triangle2dMesh.instanceMatrix.needsUpdate = true;
-  if (triangle2dMesh.instanceColor) triangle2dMesh.instanceColor.needsUpdate = true;
-  triangle2dMesh.computeBoundingSphere();
+  mesh.count = cellOrder.length;
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  mesh.computeBoundingSphere();
 }
 
 // Real placed Rhombohedra cells (free lattice) -- same instancing
@@ -1553,26 +1516,39 @@ async function init() {
   // header) has no bootstrap path to recover from that.
   if (hexPrismWorld.entries().length === 0) hexPrismWorld.addCell(0, 0, 0, { material: 'base' });
 
-  // Square (2D tier, Phase 2): own store, flat layer -- same "seed here,
-  // not just in the change handler" reasoning as hexPrismWorld above.
-  const square2dSavedJSON = loadFromLocalStorage(SQUARE2D_STORAGE_KEY);
-  const square2dWorld = createWorldStore(square2dSavedJSON ?? { worldName: 'Square Lattice (2D)', version: 1, cells: {}, meta: {} });
-  if (square2dWorld.entries().length === 0) square2dWorld.addCell(2, 0, 0, { material: 'base' });
+  // A seed cell (lattice-index coordinates, not world units) for the
+  // idx-th LATTICE_2D_COMBINATIONS entry, arranged as a compact
+  // primitive-column x angle-row grid (3 columns, 4 rows) rather than a
+  // single spread-out line -- real bug caught live via a browser check:
+  // applyDimensionCamera('2D') always frames a FIXED position/distance
+  // (camera.position.set(0,0,12), independent of piece type), so a
+  // naive `idx * 20` line put later combos tens of units outside that
+  // fixed view, invisible until manually panned/zoomed out. This keeps
+  // every combo within a few units of the origin, same as Square/
+  // Hexagon/Triangle's own original hand-picked (2,0)/(-2,0)/(0,-4)
+  // seeds already were, while still keeping all 12 mutually distinct
+  // (a real per-combo world-space gap, not just a coincidence) so they
+  // don't visually stack on each other or on the main RD seed at origin.
+  function lattice2dSeedCell(idx) {
+    const primitiveIndex = idx % LATTICE_PRIMITIVES.length;
+    const angleIndex = Math.floor(idx / LATTICE_PRIMITIVES.length);
+    return [primitiveIndex * 3 - 3, -angleIndex * 3 - 3];
+  }
 
-  // Hexagon (2D tier, Phase 2): own store, flat layer -- same reasoning
-  // again. Seeded off-origin (like square2dWorld) so it isn't occluded
-  // by the main RD seed cell at world origin.
-  const hexagon2dSavedJSON = loadFromLocalStorage(HEXAGON2D_STORAGE_KEY);
-  const hexagon2dWorld = createWorldStore(hexagon2dSavedJSON ?? { worldName: 'Hexagon Lattice (2D)', version: 1, cells: {}, meta: {} });
-  if (hexagon2dWorld.entries().length === 0) hexagon2dWorld.addCell(-2, 0, 0, { material: 'base' });
-
-  // Triangle (2D tier, Phase 2): own store, flat layer -- same reasoning
-  // again. Seeded off-origin (like square2dWorld/hexagon2dWorld) so it
-  // isn't occluded by the main RD seed cell at world origin. z=0 means
-  // the seed is an "up" triangle -- see lattice-2d.js's own header.
-  const triangle2dSavedJSON = loadFromLocalStorage(TRIANGLE2D_STORAGE_KEY);
-  const triangle2dWorld = createWorldStore(triangle2dSavedJSON ?? { worldName: 'Triangle Lattice (2D)', version: 1, cells: {}, meta: {} });
-  if (triangle2dWorld.entries().length === 0) triangle2dWorld.addCell(0, -4, 0, { material: 'base' });
+  // 2D lattice tier (Phase 3): one store PER (angle, primitive)
+  // combination -- same "seed here, not just in the change handler"
+  // reasoning as hexPrismWorld above, generalized off the earlier
+  // Phase 2 design's 3 hand-written blocks (Square/Hexagon/Triangle).
+  const lattice2dWorlds = new Map(); // comboId -> world store
+  LATTICE_2D_COMBINATIONS.forEach((combo, idx) => {
+    const savedJSON = loadFromLocalStorage(lattice2dStorageKey(combo.id));
+    const world = createWorldStore(savedJSON ?? { worldName: `2D Lattice (${combo.label})`, version: 1, cells: {}, meta: {} });
+    if (world.entries().length === 0) {
+      const [sx, sy] = lattice2dSeedCell(idx);
+      world.addCell(sx, sy, 0, { material: 'base' });
+    }
+    lattice2dWorlds.set(combo.id, world);
+  });
 
   // Rhombohedra (free lattice): own store, own coordinate frame -- same
   // reasoning again. Seeded at (5,0,0), NOT the origin -- real bug found
@@ -1636,34 +1612,23 @@ async function init() {
   scene.add(hexPrismMesh);
   rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld);
 
-  // Square Build (2D tier): its own InstancedMesh, own geometry.
-  const square2dGeometry = new ConvexGeometry(squareTileVerts(SQUARE2D_S, SQUARE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
-  square2dGeometry.computeVertexNormals();
-  const square2dMesh = new THREE.InstancedMesh(square2dGeometry, material.clone(), MAX_CELLS);
-  square2dMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  scene.add(square2dMesh);
-  rebuildSquare2dInstances(square2dMesh, square2dWorld);
-
-  // Hexagon Build (2D tier): its own InstancedMesh, own geometry. Reuses
-  // hex-prism.js's own hexPrismVerts directly (real hexagon cross-section),
-  // just at the thin HEXAGON2D_H flat-tile height instead of a tall prism.
-  const hexagon2dGeometry = new ConvexGeometry(hexagonTileVerts2D(HEXAGON2D_R, HEXAGON2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
-  hexagon2dGeometry.computeVertexNormals();
-  const hexagon2dMesh = new THREE.InstancedMesh(hexagon2dGeometry, material.clone(), MAX_CELLS);
-  hexagon2dMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  scene.add(hexagon2dMesh);
-  rebuildHexagon2dInstances(hexagon2dMesh, hexagon2dWorld);
-
-  // Triangle Build (2D tier): its own InstancedMesh, own geometry -- the
-  // canonical "up" triangle only (see triangleTileVerts' own header for
-  // why "down" instances reuse this same geometry via a 180-degree
-  // instance-matrix rotation instead of a second mesh).
-  const triangle2dGeometry = new ConvexGeometry(triangleTileVerts(TRIANGLE2D_S, TRIANGLE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
-  triangle2dGeometry.computeVertexNormals();
-  const triangle2dMesh = new THREE.InstancedMesh(triangle2dGeometry, material.clone(), MAX_CELLS);
-  triangle2dMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  scene.add(triangle2dMesh);
-  rebuildTriangle2dInstances(triangle2dMesh, triangle2dWorld);
+  // 2D Lattice Build (Phase 3): one InstancedMesh PER (angle, primitive)
+  // combination, own geometry each (a combination's tile shape is a
+  // genuine function of its own angle -- see lattice-2d.js's header --
+  // so, unlike every other family on this page, these 12 meshes can't
+  // share geometry across combinations the way Triangle's own up/down
+  // orientations already share ONE geometry within a single combo).
+  const lattice2dMeshes = new Map(); // comboId -> InstancedMesh
+  LATTICE_2D_COMBINATIONS.forEach((combo) => {
+    const impl = LATTICE_PRIMITIVE_IMPLS[combo.primitiveId];
+    const geometry = new ConvexGeometry(impl.tileVerts(combo.angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+    geometry.computeVertexNormals();
+    const mesh = new THREE.InstancedMesh(geometry, material.clone(), MAX_CELLS);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(mesh);
+    lattice2dMeshes.set(combo.id, mesh);
+    rebuildLattice2dInstances(mesh, lattice2dWorlds.get(combo.id), combo);
+  });
 
   // Rhombohedra Build (free lattice): its own InstancedMesh, own
   // geometry (rhombohedraTileVerts -- one of RD Quarter's own 4
@@ -2110,9 +2075,7 @@ async function init() {
     bccMesh.material.clippingPlanes = planes;
     elongDodecaMesh.material.clippingPlanes = planes;
     hexPrismMesh.material.clippingPlanes = planes;
-    square2dMesh.material.clippingPlanes = planes;
-    hexagon2dMesh.material.clippingPlanes = planes;
-    triangle2dMesh.material.clippingPlanes = planes;
+    lattice2dMeshes.forEach((m) => { m.material.clippingPlanes = planes; });
     rhombohedraMesh.material.clippingPlanes = planes;
     cuboctaMesh.material.clippingPlanes = planes;
     octGapMesh.material.clippingPlanes = planes;
@@ -2165,7 +2128,7 @@ async function init() {
   let skeletonGeneration = 0;
   const TRANSLUCENT_OPACITY = 0.55; // matches Lattice Quick-View/Dualize preview's own established "see-through structure" opacity
   function worldViewMaterials() {
-    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, square2dMesh.material, hexagon2dMesh.material, triangle2dMesh.material, rhombohedraMesh.material, cuboctaMesh.material, octGapMesh.material];
+    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, ...[...lattice2dMeshes.values()].map((m) => m.material), rhombohedraMesh.material, cuboctaMesh.material, octGapMesh.material];
     for (const { mesh: m } of partialCellMeshes.values()) {
       if (m.isGroup) { for (const child of m.children) mats.push(child.material); }
       else mats.push(m.material);
@@ -2201,21 +2164,24 @@ async function init() {
   // only toggles Object3D.visible, so switching back to 3D
   // (tool:selectDimension:3D, which also calls applyDimensionVisibility)
   // shows it again exactly as it was.
+  // 'lattice2d:' keys (one per LATTICE_2D_COMBINATIONS entry, Phase 3)
+  // replace the old hand-listed 'square2d'/'hexagon2d'/'triangle2d'
+  // trio here -- a namespaced prefix check generalizes to however many
+  // combinations lattice-2d.js ever defines, with no new case needed
+  // per named angle or primitive added there in the future.
   function dimensionAllowsMesh(key) {
-    if (activeDimension === '2D') return key === 'square2d' || key === 'hexagon2d' || key === 'triangle2d';
+    if (activeDimension === '2D') return key.startsWith('lattice2d:');
     // '3D' or not yet chosen (activeDimension === null, e.g. mid-load):
     // default to showing 3D's own coexisting families, same as before
     // this fix existed.
-    return key !== 'square2d' && key !== 'hexagon2d' && key !== 'triangle2d';
+    return !key.startsWith('lattice2d:');
   }
   function setSolidWorldVisible(visible) {
     mesh.visible = visible && dimensionAllowsMesh('mesh');
     bccMesh.visible = visible && dimensionAllowsMesh('bcc');
     elongDodecaMesh.visible = visible && dimensionAllowsMesh('elongdodeca');
     hexPrismMesh.visible = visible && dimensionAllowsMesh('hexprism');
-    square2dMesh.visible = visible && dimensionAllowsMesh('square2d');
-    hexagon2dMesh.visible = visible && dimensionAllowsMesh('hexagon2d');
-    triangle2dMesh.visible = visible && dimensionAllowsMesh('triangle2d');
+    lattice2dMeshes.forEach((m, comboId) => { m.visible = visible && dimensionAllowsMesh(`lattice2d:${comboId}`); });
     rhombohedraMesh.visible = visible && dimensionAllowsMesh('rhombohedra');
     cuboctaMesh.visible = visible && dimensionAllowsMesh('cubocta');
     octGapMesh.visible = visible && dimensionAllowsMesh('octgap');
@@ -2824,7 +2790,14 @@ async function init() {
         }
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
-          const PIECE_LABELS = { rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', square2d: 'Square (2D)', hexagon2d: 'Hexagon (2D)', triangle2d: 'Triangle (2D)', rhombohedra: 'Rhombohedra' };
+          const PIECE_LABELS = {
+            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', rhombohedra: 'Rhombohedra',
+            // 2D lattice tier (Phase 3): one label per LATTICE_2D_COMBINATIONS
+            // entry, generated rather than hand-listed (replaces the old
+            // square2d/hexagon2d/triangle2d trio) so a new named angle or
+            // primitive never needs a matching new label added here.
+            ...Object.fromEntries(LATTICE_2D_COMBINATIONS.map((c) => [`lattice2d:${c.id}`, c.label])),
+          };
           document.getElementById('piece-type-select').value = value;
           // Real bug, caught live 2026-08-29: picking a piece type here
           // only ever updated the <select> value -- it never touched
@@ -3017,16 +2990,24 @@ async function init() {
           handleWheelAction('tool:pieceType:rd');
           return;
         }
-        // 2D (Phase 2): square2dWorld is already seeded at construction
-        // (see its own "seed here, not just in the change handler"
-        // comment above) -- unlike 3D there's no separate world to
-        // seed here, just select the piece type.
+        // 2D (Phase 3): every lattice2dWorlds entry is already seeded at
+        // construction (see its own "seed here, not just in the change
+        // handler" comment above) -- unlike 3D there's no separate world
+        // to seed here, just select a default piece type. Defaults to
+        // the Square/Parallelogram combination (LATTICE_2D_COMBINATIONS'
+        // own first entry -- NAMED_LATTICE_ANGLES/LATTICE_PRIMITIVES are
+        // both ordered with Square/Parallelogram first specifically so
+        // this default stays meaningful without hardcoding its id here),
+        // matching this quick dimension-wheel shortcut's own "just pick
+        // A reasonable default, the full picker is dimension-wizard.js's
+        // job" role -- same relationship 3D's own 'rd' default above has
+        // to its own wizard screen.
         if (action === 'tool:selectDimension:2D') {
           activeDimension = '2D';
           applyDimensionVisibility();
           applyDimensionCamera('2D');
           dimensionWheel3D.close();
-          handleWheelAction('tool:pieceType:square2d');
+          handleWheelAction(`tool:pieceType:lattice2d:${LATTICE_2D_COMBINATIONS[0].id}`);
           return;
         }
         // WHEEL_DIMENSION's own noUniversalRing:true (see that config's
@@ -3661,8 +3642,12 @@ async function init() {
     // own `?? MARKS.pieceRD` fallback below) regardless of which was
     // actually selected -- the real placement itself was always
     // correct, only this indicator was silently wrong.
-    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRhombohedron',
-    square2d: 'pieceSquare2D', hexagon2d: 'pieceHexagon2D', triangle2d: 'pieceTriangle2D', rhombohedra: 'pieceRhombohedron',
+    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRhombohedron', rhombohedra: 'pieceRhombohedron',
+    // 2D lattice tier (Phase 3): one entry per LATTICE_2D_COMBINATIONS,
+    // reusing wheel-icons.js's own 3 primitive-keyed icons (the mark
+    // only varies by primitive, not angle -- see that file's own
+    // comment for why a full 12-icon set wasn't built).
+    ...Object.fromEntries(LATTICE_2D_COMBINATIONS.map((c) => [`lattice2d:${c.id}`, `piece2d${c.primitiveId[0].toUpperCase()}${c.primitiveId.slice(1)}`])),
   };
   const quickShapeEl = document.getElementById('hud-quick-shape');
   const quickMaterialEl = document.getElementById('hud-quick-material');
@@ -4542,18 +4527,6 @@ async function init() {
           add: 'A Hex Prism is already there.',
           remove: "No Hex Prism there to remove -- Remove+Hex Prism only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
         },
-        square2d: {
-          add: 'A Square is already there.',
-          remove: "No Square there to remove -- Remove+Square only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
-        },
-        hexagon2d: {
-          add: 'A Hexagon is already there.',
-          remove: "No Hexagon there to remove -- Remove+Hexagon only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
-        },
-        triangle2d: {
-          add: 'A Triangle is already there.',
-          remove: "No Triangle there to remove -- Remove+Triangle only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
-        },
         idis: {
           add: "That disphenoid's already there.",
           remove: 'No disphenoid there to remove -- tap directly on one from the interstitial lattice.',
@@ -4583,7 +4556,16 @@ async function init() {
           remove: 'No Hemi RD there to remove -- tap directly on one you’ve placed.',
         },
       };
-      showHudPrompt(messages[piece]?.[action] ?? 'Nothing to do there.', 3500);
+      // 2D lattice tier (Phase 3): one generic message per combination's
+      // own label, replacing the old square2d/hexagon2d/triangle2d
+      // hand-written trio -- same underlying "grow-only, tap directly on
+      // an existing one to remove it" fact for every combination.
+      const lattice2dCombo = piece?.startsWith('lattice2d:') ? LATTICE_2D_COMBINATIONS.find((c) => `lattice2d:${c.id}` === piece) : null;
+      const lattice2dMessages = lattice2dCombo && {
+        add: `A ${lattice2dCombo.label} tile is already there.`,
+        remove: `No ${lattice2dCombo.label} tile there to remove -- Remove only clears an actual one, not the RD world around it. Tap directly on one you've placed.`,
+      };
+      showHudPrompt((lattice2dMessages ?? messages[piece])?.[action] ?? 'Nothing to do there.', 3500);
     },
     getDragPlacementEnabled: () => pickers.isDragPlacementEnabled(),
     getMode: () => (walking ? null : currentMode),
@@ -4613,18 +4595,21 @@ async function init() {
     hexPrismMesh,
     hexPrismCellAt: (instanceId) => hexPrismCellOrder[instanceId],
     onHexPrismChange,
-    square2dWorld,
-    square2dMesh,
-    square2dCellAt: (instanceId) => square2dCellOrder[instanceId],
-    onSquare2dChange,
-    hexagon2dWorld,
-    hexagon2dMesh,
-    hexagon2dCellAt: (instanceId) => hexagon2dCellOrder[instanceId],
-    onHexagon2dChange,
-    triangle2dWorld,
-    triangle2dMesh,
-    triangle2dCellAt: (instanceId) => triangle2dCellOrder[instanceId],
-    onTriangle2dChange,
+    // 2D lattice tier (Phase 3): one `lattice2d` param replaces the old
+    // square2dWorld/square2dMesh/square2dCellAt(+Hexagon/+Triangle)
+    // trio-of-trios -- see core/build.js's own `lattice2d` param
+    // comment for why. `stores` is built fresh here (not cached)
+    // because it's cheap (12 entries) and always needs to reflect
+    // lattice2dWorlds/lattice2dMeshes' own current contents.
+    lattice2d: {
+      combos: LATTICE_2D_COMBINATIONS,
+      stores: new Map(LATTICE_2D_COMBINATIONS.map((c) => [
+        c.id,
+        { world: lattice2dWorlds.get(c.id), mesh: lattice2dMeshes.get(c.id), cellAt: (instanceId) => lattice2dCellOrders.get(c.id)?.[instanceId] },
+      ])),
+      s: LATTICE2D_S,
+      onChange: onLattice2dChange,
+    },
     rhombohedraWorld,
     rhombohedraMesh,
     rhombohedraCellAt: (instanceId) => rhombohedraCellOrder[instanceId],
@@ -4694,40 +4679,24 @@ async function init() {
     saveToLocalStorage(hexPrismWorld.toJSON(), HEXPRISM_STORAGE_KEY);
   }
 
-  // Square build (2D tier): own change handler, same "never truly
-  // empty" invariant.
-  function onSquare2dChange() {
-    if (square2dWorld.entries().length === 0) {
-      square2dWorld.addCell(2, 0, 0, { material: 'base' });
+  // 2D lattice tier (Phase 3): ONE generic change handler for every
+  // (angle, primitive) combination, replacing the old onSquare2dChange/
+  // onHexagon2dChange/onTriangle2dChange trio -- same "never truly
+  // empty" invariant, keyed by the combination's own index (for its
+  // own off-origin seed offset, matching lattice2dWorlds' own
+  // construction above) rather than 3 hand-picked seed positions.
+  function onLattice2dChange(comboId) {
+    const combo = LATTICE_2D_COMBINATIONS.find((c) => c.id === comboId);
+    const idx = LATTICE_2D_COMBINATIONS.indexOf(combo);
+    const world = lattice2dWorlds.get(comboId);
+    if (world.entries().length === 0) {
+      const [sx, sy] = lattice2dSeedCell(idx);
+      world.addCell(sx, sy, 0, { material: 'base' });
     }
-    rebuildSquare2dInstances(square2dMesh, square2dWorld);
+    rebuildLattice2dInstances(lattice2dMeshes.get(comboId), world, combo);
     updateSectionEnabled();
     applyWorldViewMaterials();
-    saveToLocalStorage(square2dWorld.toJSON(), SQUARE2D_STORAGE_KEY);
-  }
-
-  // Hexagon build (2D tier): own change handler, same "never truly
-  // empty" invariant.
-  function onHexagon2dChange() {
-    if (hexagon2dWorld.entries().length === 0) {
-      hexagon2dWorld.addCell(-2, 0, 0, { material: 'base' });
-    }
-    rebuildHexagon2dInstances(hexagon2dMesh, hexagon2dWorld);
-    updateSectionEnabled();
-    applyWorldViewMaterials();
-    saveToLocalStorage(hexagon2dWorld.toJSON(), HEXAGON2D_STORAGE_KEY);
-  }
-
-  // Triangle build (2D tier): own change handler, same "never truly
-  // empty" invariant.
-  function onTriangle2dChange() {
-    if (triangle2dWorld.entries().length === 0) {
-      triangle2dWorld.addCell(0, -4, 0, { material: 'base' });
-    }
-    rebuildTriangle2dInstances(triangle2dMesh, triangle2dWorld);
-    updateSectionEnabled();
-    applyWorldViewMaterials();
-    saveToLocalStorage(triangle2dWorld.toJSON(), TRIANGLE2D_STORAGE_KEY);
+    saveToLocalStorage(world.toJSON(), lattice2dStorageKey(comboId));
   }
 
   // Rhombohedra build (free lattice): own change handler, same "never
@@ -4939,15 +4908,14 @@ async function init() {
     clearLocalStorage(HEXPRISM_STORAGE_KEY);
     hexPrismWorld.replaceAll({ worldName: 'Hex Prism Lattice', version: 1, cells: {}, meta: {} });
     onHexPrismChange();
-    clearLocalStorage(SQUARE2D_STORAGE_KEY);
-    square2dWorld.replaceAll({ worldName: 'Square Lattice (2D)', version: 1, cells: {}, meta: {} });
-    onSquare2dChange();
-    clearLocalStorage(HEXAGON2D_STORAGE_KEY);
-    hexagon2dWorld.replaceAll({ worldName: 'Hexagon Lattice (2D)', version: 1, cells: {}, meta: {} });
-    onHexagon2dChange();
-    clearLocalStorage(TRIANGLE2D_STORAGE_KEY);
-    triangle2dWorld.replaceAll({ worldName: 'Triangle Lattice (2D)', version: 1, cells: {}, meta: {} });
-    onTriangle2dChange();
+    // 2D lattice tier (Phase 3): one loop over every combination,
+    // replacing the old Square/Hexagon/Triangle hand-written trio --
+    // same "fresh start clears it too" reasoning as every store above.
+    LATTICE_2D_COMBINATIONS.forEach((combo) => {
+      clearLocalStorage(lattice2dStorageKey(combo.id));
+      lattice2dWorlds.get(combo.id).replaceAll({ worldName: `2D Lattice (${combo.label})`, version: 1, cells: {}, meta: {} });
+      onLattice2dChange(combo.id);
+    });
     clearLocalStorage(RHOMBOHEDRA_STORAGE_KEY);
     rhombohedraWorld.replaceAll({ worldName: 'Rhombohedra Lattice', version: 1, cells: {}, meta: {} });
     onRhombohedraChange();

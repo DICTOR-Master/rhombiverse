@@ -877,9 +877,27 @@ export const ACTION_TO_MARK = {
   'tool:pieceType:hexprism': 'pieceHexPrism',
   'tool:pieceType:rdquarter': 'pieceRhombohedron',
   'tool:pieceType:rhombohedra': 'pieceRhombohedron',
-  'tool:pieceType:square2d': 'pieceSquare2D',
-  'tool:pieceType:hexagon2d': 'pieceHexagon2D',
-  'tool:pieceType:triangle2d': 'pieceTriangle2D',
+  // 2D lattice tier (Phase 3): one entry per lattice-2d.js's own
+  // LATTICE_2D_COMBINATIONS (4 NAMED_LATTICE_ANGLES ids x 3
+  // LATTICE_PRIMITIVES ids), spelled out by hand rather than generated
+  // -- this file's own header is explicit that it stays at "zero
+  // imports of its own" (a real prior failure importing into a file in
+  // this same wheel-config layer, see that header), so these ids are
+  // kept in sync with lattice-2d.js by hand instead. Grouped by
+  // primitive, since the icon (wheel-icons.js's piece2dParallelogram/
+  // piece2dTriangle/piece2dHexagon) only varies by primitive, not angle.
+  'tool:pieceType:lattice2d:parallelogram:square': 'piece2dParallelogram',
+  'tool:pieceType:lattice2d:parallelogram:rd-rhombus': 'piece2dParallelogram',
+  'tool:pieceType:lattice2d:parallelogram:golden-rhombus': 'piece2dParallelogram',
+  'tool:pieceType:lattice2d:parallelogram:triangular': 'piece2dParallelogram',
+  'tool:pieceType:lattice2d:triangle:square': 'piece2dTriangle',
+  'tool:pieceType:lattice2d:triangle:rd-rhombus': 'piece2dTriangle',
+  'tool:pieceType:lattice2d:triangle:golden-rhombus': 'piece2dTriangle',
+  'tool:pieceType:lattice2d:triangle:triangular': 'piece2dTriangle',
+  'tool:pieceType:lattice2d:hexagon:square': 'piece2dHexagon',
+  'tool:pieceType:lattice2d:hexagon:rd-rhombus': 'piece2dHexagon',
+  'tool:pieceType:lattice2d:hexagon:golden-rhombus': 'piece2dHexagon',
+  'tool:pieceType:lattice2d:hexagon:triangular': 'piece2dHexagon',
   'tool:fill': 'fill',
   'tool:dig': 'dig',
   'tool:smooth': 'smooth',

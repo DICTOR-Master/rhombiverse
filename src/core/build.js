@@ -31,8 +31,7 @@ import {
 } from './pyramid.js';
 import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
 import { matchHexNeighborOffset } from '../geometry-extensions/hex-prism.js';
-import { SQUARE_NEIGHBOR_OFFSETS, TRIANGLE_NEIGHBOR_OFFSETS_FROM_UP, TRIANGLE_NEIGHBOR_OFFSETS_FROM_DOWN, triangleCellToWorld } from '../geometry-extensions/lattice-2d.js';
-import { HEX_NEIGHBOR_OFFSETS, hexCellToWorld } from '../geometry-extensions/hex-prism.js';
+import { LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
 import { matchRhombohedraNeighborOffset } from '../geometry-extensions/rhombohedra-lattice.js';
 import { elongDodecaCellToWorld } from '../geometry-extensions/elongated-dodecahedron.js';
 import {
@@ -265,32 +264,19 @@ export function createBuildController({
   hexPrismMesh = null,
   hexPrismCellAt = () => null,
   onHexPrismChange = () => {},
-  // Square (2D tier, Phase 2): same "adopted family member" reasoning
-  // again -- flat layer, own store, grow-only via the "never truly
-  // empty" invariant (same as hexPrismWorld above; z is always pinned
-  // to 0 in this store's own cells).
-  square2dWorld = null,
-  square2dMesh = null,
-  square2dCellAt = () => null,
-  onSquare2dChange = () => {},
-  // Hexagon (2D tier): same "adopted family member" reasoning again --
-  // flat layer, own store, grow-only via the "never truly empty"
-  // invariant, z always pinned to 0. Reuses HEX_NEIGHBOR_OFFSETS'
-  // own 6 in-plane directions directly (hex-prism.js) -- same axial
-  // hex lattice as the 3D Hex Prism tier, just flat instead of stacked.
-  hexagon2dWorld = null,
-  hexagon2dMesh = null,
-  hexagon2dCellAt = () => null,
-  onHexagon2dChange = () => {},
-  // Triangle (2D tier): same "adopted family member" reasoning again --
-  // flat layer, own store, grow-only via the "never truly empty"
-  // invariant. Unlike every other 2D family, its own cell's z slot is
-  // a real orientation flag (0=up, 1=down), not always 0 -- see
-  // lattice-2d.js's own header for why up/down triangles need it.
-  triangle2dWorld = null,
-  triangle2dMesh = null,
-  triangle2dCellAt = () => null,
-  onTriangle2dChange = () => {},
+  // 2D lattice tier (Phase 3, replaces the old separate Square/Hexagon/
+  // Triangle params): one generic "adopted family member" store PER
+  // (angle, primitive) combination from lattice-2d.js's own
+  // LATTICE_2D_COMBINATIONS, all sharing this single param instead of
+  // one hand-written trio of params each -- see lattice-2d.js's header
+  // for why this generalization is correct (each combination is still
+  // its own separate, non-interoperating store, exactly like Square/
+  // Hexagon/Triangle already were). `stores` maps a combination's own
+  // `id` (e.g. "parallelogram:square") to { world, mesh, cellAt }; `s`
+  // is the shared real-world scale every combination's basis vectors
+  // use; `onChange(comboId)` fires after any add/remove on that combo's
+  // own store.
+  lattice2d = null,
   // Rhombohedra (free lattice): same "adopted family member" reasoning
   // again -- own store, own coordinate frame (geometry-extensions/
   // rhombohedra-lattice.js), grows freely in any of 6 real directions
@@ -377,9 +363,14 @@ export function createBuildController({
     // rhombic sides"), see handleRDOffElongDodecaClick's own header.
     const elongDodecaTargets = elongDodecaMesh && (getPieceType() === 'elongdodeca' || getPieceType() === 'rd' || getPieceType() === 'cube') ? [elongDodecaMesh] : [];
     const hexPrismTargets = hexPrismMesh && getPieceType() === 'hexprism' ? [hexPrismMesh] : [];
-    const square2dTargets = square2dMesh && getPieceType() === 'square2d' ? [square2dMesh] : [];
-    const hexagon2dTargets = hexagon2dMesh && getPieceType() === 'hexagon2d' ? [hexagon2dMesh] : [];
-    const triangle2dTargets = triangle2dMesh && getPieceType() === 'triangle2d' ? [triangle2dMesh] : [];
+    // Same reasoning as every other "adopted family member" above, for
+    // whichever single (angle, primitive) combination is currently
+    // active -- see lattice-2d.js's own header and this param's own
+    // comment (createBuildController's `lattice2d` param) for why one
+    // generic lookup replaces the old square2dTargets/hexagon2dTargets/
+    // triangle2dTargets trio.
+    const activeLattice2dStore = lattice2d && getPieceType().startsWith('lattice2d:') ? lattice2d.stores.get(getPieceType().slice('lattice2d:'.length)) : null;
+    const lattice2dTargets = activeLattice2dStore?.mesh ? [activeLattice2dStore.mesh] : [];
     const rhombohedraTargets = rhombohedraMesh && getPieceType() === 'rhombohedra' ? [rhombohedraMesh] : [];
     // Same reasoning: interstitialGroup only enters the raycast under
     // its own piece tiers, for the same "don't steal clicks from other
@@ -391,7 +382,7 @@ export function createBuildController({
     // Half RD/Hourglass mesh; harmless for Add (handleHemisphereClick's
     // own bootstrap-only Add path explicitly no-ops if it lands there).
     const hemisphereTargets = hemisphereGroup && HEMISPHERE_PIECE_TYPES.includes(pieceType) ? [hemisphereGroup] : [];
-    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...square2dTargets, ...hexagon2dTargets, ...triangle2dTargets, ...rhombohedraTargets, ...interstitialTargets, ...hemisphereTargets], true);
+    const hits = raycaster.intersectObjects([mesh, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...lattice2dTargets, ...rhombohedraTargets, ...interstitialTargets, ...hemisphereTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -578,126 +569,60 @@ export function createBuildController({
     if (onRemoved) onRemoved(cell);
   }
 
-  // Square piece tier (2D tier, Phase 2): grow-only (same "never truly
-  // empty" invariant as hexPrismWorld). Matches the click's own hit-point
-  // direction against SQUARE_NEIGHBOR_OFFSETS -- see this function's own
-  // in-body comment below for why face-normal matching doesn't work for
-  // a flat top-down tile.
-  function handleSquare2dClick(hit, mode) {
+  // 2D lattice tier (Phase 3): ONE generic handler for every (angle,
+  // primitive) combination in lattice-2d.js's own LATTICE_2D_COMBINATIONS,
+  // replacing the old handleSquare2dClick/handleHexagon2dClick/
+  // handleTriangle2dClick trio -- see this file's own `lattice2d` param
+  // comment and lattice-2d.js's header for why one parametrized handler
+  // is correct in place of 3 (soon-would-be 12) hand-copied ones.
+  //
+  // Always matches the click's own hit-point direction against each
+  // neighbor candidate's own REAL WORLD offset (impl.cellToWorld(cell+
+  // offset) - impl.cellToWorld(cell)), never a raw index offset dotted
+  // directly -- the general, always-correct technique Triangle's own
+  // pre-Phase-3 handler already used. This matters more now than it did
+  // before: the old Square-specific shortcut (dotting the RAW index
+  // offset against the hit direction) only ever worked because Square
+  // was hardcoded to a 90-degree (orthogonal) basis, where raw index
+  // offsets happen to already point along real world axes -- at any of
+  // the OTHER 3 named angles a Parallelogram's own basis vectors aren't
+  // perpendicular, so that shortcut would silently pick the wrong
+  // neighbor. Also handles a flat tile's own real "top face has zero
+  // dot product with any in-plane offset" problem the same way every
+  // 2D family already had to (see the old handleSquare2dClick's own
+  // removed comment): hit-point-direction, never face-normal matching.
+  function handleLattice2dClick(hit, mode, pieceType) {
     const action = mode === 'build' ? 'add' : 'remove';
-    if (hit.object !== square2dMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
-    const cell = square2dCellAt(hit.instanceId);
+    const comboId = pieceType.slice('lattice2d:'.length);
+    const store = lattice2d?.stores.get(comboId);
+    const combo = lattice2d?.combos.find((c) => c.id === comboId);
+    if (!store || !combo || hit.object !== store.mesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const cell = store.cellAt(hit.instanceId);
     if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const impl = LATTICE_PRIMITIVE_IMPLS[combo.primitiveId];
     if (mode === 'build') {
-      // Real bug found in browser verification: a flat 2D tile is
-      // viewed mostly from directly above, so almost every real click
-      // lands on its TOP face -- whose normal is (0,0,1), which has
-      // ZERO dot product with all 4 of SQUARE_NEIGHBOR_OFFSETS (they're
-      // all in-plane, oz=0), so face-normal matching (the RD/TO/hex-
-      // prism technique) always fell through to the same default index
-      // regardless of where on the tile you actually clicked. Fixed the
-      // same way Cuboctahedron's own click handling already does (its
-      // own header: "matches the raycast hit POINT's own direction from
-      // the clicked cuboctahedron's real center"): use the hit point's
-      // own XY offset from the cell's own world center instead of the
-      // face normal -- meaningful and distinguishable even for a
-      // top-face-only click, unlike the normal.
-      const [cx, cy] = cellToWorld(cell.x, cell.y, cell.z);
+      const s = lattice2d.s;
+      const [cx, cy] = impl.cellToWorld(cell.x, cell.y, cell.z, combo.angleDeg, s, 0);
       const dirX = hit.point.x - cx;
       const dirY = hit.point.y - cy;
-      let bestIdx = 0, bestDot = -Infinity;
-      SQUARE_NEIGHBOR_OFFSETS.forEach(([ox, oy], i) => {
-        const dot = ox * dirX + oy * dirY;
-        if (dot > bestDot) { bestDot = dot; bestIdx = i; }
-      });
-      const [dx, dy, dz] = SQUARE_NEIGHBOR_OFFSETS[bestIdx];
-      const nx = cell.x + dx, ny = cell.y + dy, nz = cell.z + dz;
-      if (square2dWorld.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
-      const material = getMaterial();
-      square2dWorld.addCell(nx, ny, nz, { material });
-      onSquare2dChange();
-      if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
-      return;
-    }
-    square2dWorld.removeCell(cell.x, cell.y, cell.z);
-    onSquare2dChange();
-    if (onRemoved) onRemoved(cell);
-  }
-
-  // Hexagon piece tier (2D tier): grow-only, same "never truly empty"
-  // invariant. Same hit-point-direction fix as Square above (a flat
-  // tile's own top-face normal has zero dot product with every in-plane
-  // offset) -- matches against HEX_NEIGHBOR_OFFSETS' own 6 real
-  // directions instead of Square's 4. Uses hexCellToWorld directly
-  // (not the generic per-axis cellToWorld) for the real cell center,
-  // since a hex lattice's own axial-to-Cartesian formula isn't a plain
-  // per-axis scale.
-  function handleHexagon2dClick(hit, mode) {
-    const action = mode === 'build' ? 'add' : 'remove';
-    if (hit.object !== hexagon2dMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
-    const cell = hexagon2dCellAt(hit.instanceId);
-    if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
-    if (mode === 'build') {
-      const [cx, cy] = hexCellToWorld(cell.x, cell.y, 0);
-      const dirX = hit.point.x - cx;
-      const dirY = hit.point.y - cy;
-      let bestIdx = 0, bestDot = -Infinity;
-      HEX_NEIGHBOR_OFFSETS.slice(0, 6).forEach(([ox, oy], i) => {
-        const dot = ox * dirX + oy * dirY;
-        if (dot > bestDot) { bestDot = dot; bestIdx = i; }
-      });
-      const [dx, dy] = HEX_NEIGHBOR_OFFSETS[bestIdx];
-      const nx = cell.x + dx, ny = cell.y + dy, nz = 0;
-      if (hexagon2dWorld.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
-      const material = getMaterial();
-      hexagon2dWorld.addCell(nx, ny, nz, { material });
-      onHexagon2dChange();
-      if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
-      return;
-    }
-    hexagon2dWorld.removeCell(cell.x, cell.y, cell.z);
-    onHexagon2dChange();
-    if (onRemoved) onRemoved(cell);
-  }
-
-  // Triangle piece tier (2D tier): grow-only, same "never truly empty"
-  // invariant. Unlike Square/Hexagon, the neighbor offset table is
-  // orientation-DEPENDENT (see lattice-2d.js's own header) -- picks
-  // TRIANGLE_NEIGHBOR_OFFSETS_FROM_UP or _FROM_DOWN based on the
-  // clicked cell's own z (0=up, 1=down). Also unlike Square/Hexagon,
-  // dots the hit direction against each candidate's own REAL world
-  // offset (triangleCellToWorld(neighbor) - triangleCellToWorld(cell)),
-  // not the raw index offset -- a triangle's index offsets aren't
-  // already real-ish unit directions the way a square/hex grid's are,
-  // so this is the more general, always-correct version of the same
-  // hit-point-direction technique.
-  function handleTriangle2dClick(hit, mode) {
-    const action = mode === 'build' ? 'add' : 'remove';
-    if (hit.object !== triangle2dMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
-    const cell = triangle2dCellAt(hit.instanceId);
-    if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
-    if (mode === 'build') {
-      const [cx, cy] = triangleCellToWorld(cell.x, cell.y, cell.z);
-      const dirX = hit.point.x - cx;
-      const dirY = hit.point.y - cy;
-      const offsets = cell.z === 0 ? TRIANGLE_NEIGHBOR_OFFSETS_FROM_UP : TRIANGLE_NEIGHBOR_OFFSETS_FROM_DOWN;
+      const offsets = impl.neighborOffsets(combo.angleDeg, cell.z);
       let bestIdx = 0, bestDot = -Infinity;
       offsets.forEach(([ox, oy, oz], i) => {
-        const [nwx, nwy] = triangleCellToWorld(cell.x + ox, cell.y + oy, oz);
+        const [nwx, nwy] = impl.cellToWorld(cell.x + ox, cell.y + oy, oz, combo.angleDeg, s, 0);
         const dot = (nwx - cx) * dirX + (nwy - cy) * dirY;
         if (dot > bestDot) { bestDot = dot; bestIdx = i; }
       });
       const [dx, dy, dz] = offsets[bestIdx];
       const nx = cell.x + dx, ny = cell.y + dy, nz = dz;
-      if (triangle2dWorld.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      if (store.world.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
       const material = getMaterial();
-      triangle2dWorld.addCell(nx, ny, nz, { material });
-      onTriangle2dChange();
+      store.world.addCell(nx, ny, nz, { material });
+      lattice2d.onChange(comboId);
       if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
       return;
     }
-    triangle2dWorld.removeCell(cell.x, cell.y, cell.z);
-    onTriangle2dChange();
+    store.world.removeCell(cell.x, cell.y, cell.z);
+    lattice2d.onChange(comboId);
     if (onRemoved) onRemoved(cell);
   }
 
@@ -1405,16 +1330,8 @@ export function createBuildController({
       handleHexPrismClick(hit, mode);
       return;
     }
-    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'square2d' && square2dWorld && square2dMesh) {
-      handleSquare2dClick(hit, mode);
-      return;
-    }
-    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'hexagon2d' && hexagon2dWorld && hexagon2dMesh) {
-      handleHexagon2dClick(hit, mode);
-      return;
-    }
-    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'triangle2d' && triangle2dWorld && triangle2dMesh) {
-      handleTriangle2dClick(hit, mode);
+    if ((mode === 'build' || mode === 'chisel') && getPieceType().startsWith('lattice2d:') && lattice2d) {
+      handleLattice2dClick(hit, mode, getPieceType());
       return;
     }
     if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'rhombohedra' && rhombohedraWorld && rhombohedraMesh) {
@@ -1792,16 +1709,8 @@ export function createBuildController({
       handleHexPrismClick(hit, 'chisel');
       return;
     }
-    if (mode === 'build' && pieceTypeForInterstitialRemove === 'square2d' && square2dWorld && square2dMesh) {
-      handleSquare2dClick(hit, 'chisel');
-      return;
-    }
-    if (mode === 'build' && pieceTypeForInterstitialRemove === 'hexagon2d' && hexagon2dWorld && hexagon2dMesh) {
-      handleHexagon2dClick(hit, 'chisel');
-      return;
-    }
-    if (mode === 'build' && pieceTypeForInterstitialRemove === 'triangle2d' && triangle2dWorld && triangle2dMesh) {
-      handleTriangle2dClick(hit, 'chisel');
+    if (mode === 'build' && pieceTypeForInterstitialRemove.startsWith('lattice2d:') && lattice2d) {
+      handleLattice2dClick(hit, 'chisel', pieceTypeForInterstitialRemove);
       return;
     }
     if (mode === 'build' && pieceTypeForInterstitialRemove === 'rhombohedra' && rhombohedraWorld && rhombohedraMesh) {

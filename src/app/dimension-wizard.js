@@ -45,6 +45,7 @@
 // real -- no other structural change needed.
 import { buildRDFaces } from './rhombic-wheel-3d-core.js';
 import { truncatedOctahedronVertices } from '../geometry-extensions/dual-lattice.js';
+import { LATTICE_2D_COMBINATIONS, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
 
 const CSS = `
 .dim-wizard-overlay {
@@ -201,82 +202,25 @@ function toWireframe() {
   return wireframeSvg(edgesByMinDistance(points), 22);
 }
 
-// Square (2D tier): a real square prism, matching geometry-extensions/
-// lattice-2d.js's own squareTileVerts EXACTLY (angle 90, 2 equal-length
-// perpendicular vectors) -- direct correction 2026-09-23 reversed an
-// earlier same-session rename to a 70-degree rhombus ("dont call square
-// rhombus when its familiar name is square, this [is] geometry building
-// not semantics"). A real, separate (non-square) Rhombus family is
-// still planned, scheduled for after Triangular ships. NOT vertex-
-// uniform-edge-length (the square's own side and the prism's height
-// differ), so edgesByMinDistance()'s technique doesn't apply here the
-// way it does for RD/TO above -- explicit topology instead, real corner
-// coordinates, not guessed.
-function squareWireframe() {
-  const h = 0.5;
-  const angleDeg = 90;
-  const v0 = [1, 0];
-  const v1 = [Math.cos((angleDeg * Math.PI) / 180), Math.sin((angleDeg * Math.PI) / 180)];
-  const corners2d = [[0, 0], v0, [v0[0] + v1[0], v0[1] + v1[1]], v1];
-  const cx = corners2d.reduce((s, p) => s + p[0], 0) / 4;
-  const cy = corners2d.reduce((s, p) => s + p[1], 0) / 4;
-  const shifted = corners2d.map(([x, y]) => [x - cx, y - cy]);
-  const top = shifted.map(([x, y]) => [x, y, h]);
-  const bot = shifted.map(([x, y]) => [x, y, -h]);
+// 2D lattice tier (Phase 3): one generic wireframe builder for all 12
+// (angle, primitive) combinations, reusing geometry-extensions/
+// lattice-2d.js's own real tileVerts functions DIRECTLY (via
+// LATTICE_PRIMITIVE_IMPLS) rather than re-deriving the same corner math
+// a second time here -- same "real corner coordinates, not guessed"
+// discipline the old Square/Hexagon/Triangle wireframes each separately
+// re-implemented, now guaranteed to match the real placed geometry
+// exactly (a single source of truth, not 2 independently-hand-written
+// copies of the same construction that could silently drift apart).
+function lattice2dWireframe(combo) {
+  const impl = LATTICE_PRIMITIVE_IMPLS[combo.primitiveId];
+  const verts = impl.tileVerts(combo.angleDeg, 1, 1); // h=1 for a clearly visible prism at preview scale
+  const n = verts.length / 2;
+  const top = verts.slice(0, n);
+  const bot = verts.slice(n);
   const edges = [];
-  for (let i = 0; i < 4; i++) {
-    edges.push([top[i], top[(i + 1) % 4]]);
-    edges.push([bot[i], bot[(i + 1) % 4]]);
-    edges.push([top[i], bot[i]]);
-  }
-  return wireframeSvg(edges, 22);
-}
-
-// Hexagon (2D tier): a real hexagonal prism, matching geometry-extensions/
-// hex-prism.js's own hexPrismVerts EXACTLY (vertices at 60k degrees,
-// radius R=1, extruded by h) -- same "real corner coordinates, not
-// guessed" discipline as squareWireframe above.
-function hexagonWireframe() {
-  const h = 0.5;
-  const top = [];
-  const bot = [];
-  for (let k = 0; k < 6; k++) {
-    const angle = (Math.PI / 3) * k;
-    const x = Math.cos(angle);
-    const y = Math.sin(angle);
-    top.push([x, y, h]);
-    bot.push([x, y, -h]);
-  }
-  const edges = [];
-  for (let i = 0; i < 6; i++) {
-    edges.push([top[i], top[(i + 1) % 6]]);
-    edges.push([bot[i], bot[(i + 1) % 6]]);
-    edges.push([top[i], bot[i]]);
-  }
-  return wireframeSvg(edges, 22);
-}
-
-// Triangle (2D tier): a real equilateral-triangle prism, matching
-// geometry-extensions/lattice-2d.js's own triangleTileVerts EXACTLY
-// (the canonical "up" orientation -- 2 equal-length vectors at 60
-// degrees, same basisVectors construction Square's own 90-degree
-// version already uses) -- same "real corner coordinates, not guessed"
-// discipline as squareWireframe/hexagonWireframe above.
-function triangleWireframe() {
-  const h = 0.5;
-  const angleDeg = 60;
-  const v0 = [1, 0];
-  const v1 = [Math.cos((angleDeg * Math.PI) / 180), Math.sin((angleDeg * Math.PI) / 180)];
-  const corners2d = [[0, 0], v0, v1];
-  const cx = corners2d.reduce((s, p) => s + p[0], 0) / 3;
-  const cy = corners2d.reduce((s, p) => s + p[1], 0) / 3;
-  const shifted = corners2d.map(([x, y]) => [x - cx, y - cy]);
-  const top = shifted.map(([x, y]) => [x, y, h]);
-  const bot = shifted.map(([x, y]) => [x, y, -h]);
-  const edges = [];
-  for (let i = 0; i < 3; i++) {
-    edges.push([top[i], top[(i + 1) % 3]]);
-    edges.push([bot[i], bot[(i + 1) % 3]]);
+  for (let i = 0; i < n; i++) {
+    edges.push([top[i], top[(i + 1) % n]]);
+    edges.push([bot[i], bot[(i + 1) % n]]);
     edges.push([top[i], bot[i]]);
   }
   return wireframeSvg(edges, 22);
@@ -287,16 +231,17 @@ function triangleWireframe() {
 // real wireframe; the rest are the honest, undecorated "planned, not
 // built" treatment this file's own header explains.
 const DIMENSIONS = [
-  // Phase 2 (2026-09-22): Square shipped first, direct instruction
-  // ("flat layer in the same 3D scene... start with Square"). Briefly
-  // renamed Square to a 70-degree Rhombus same session ("why square for
-  // 2D[,] all rhombi should be derived from same basic shape"), then
-  // reverted just as directly ("dont call square rhombus when its
-  // familiar name is square, this [is] geometry building not
-  // semantics") -- a real, separate Rhombus family is still planned,
-  // scheduled for after Triangular. Hexagon shipped next. Triangular
-  // and the real Rhombi still planned -- desc says so honestly.
-  { id: '2D', label: '2D', desc: 'Square, Hexagon, and Triangle (shipped) -- a real (non-square) Rhombi family still planned.', enabled: true, preview: squareWireframe },
+  // Phase 3 (2026-09-23): replaced the earlier Square/Hexagon/Triangle-
+  // as-3-hardcoded-families design with one continuous-in-spirit but
+  // discretely-toggled system -- direct instruction ("variable
+  // coordinate 2D lattice that alters primitives... toggle or slider",
+  // refined through discussion to a discrete toggle x toggle: 4 real
+  // NAMED_LATTICE_ANGLES x 3 LATTICE_PRIMITIVES, see lattice-2d.js's own
+  // header for the full derivation and why a slider wasn't the right
+  // call). Square is still in there (angle=90, primitive=parallelogram)
+  // alongside Hexagon (Voronoi cell) and Triangle -- just as one axis of
+  // a 4x3 grid now, not 3 separate hand-built families.
+  { id: '2D', label: '2D', desc: '4 named lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular) x 3 tile primitives (Parallelogram, Triangle, Hexagon) -- 12 combinations total.', enabled: true, preview: () => lattice2dWireframe(LATTICE_2D_COMBINATIONS[0]) },
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, preview: rdWireframe },
   { id: '4D', label: '4D', desc: 'Hypercubic (Tesseract) and D4 root lattice.', enabled: false },
   { id: '5D', label: '5D', desc: 'Decagonal quasicrystal.', enabled: false },
@@ -305,14 +250,18 @@ const DIMENSIONS = [
 
 // LATTICE_FAMILIES_2D: 2D's own lattice-family screen. Same "reuse the
 // existing real action, one tool one doorway" reasoning as
-// LATTICE_FAMILIES_3D below. A real (non-square) Rhombus family belongs
-// here too, once built -- deferred until after Triangular per direct
-// instruction, not added yet.
-const LATTICE_FAMILIES_2D = [
-  { label: 'Square', desc: 'A flat layer of real square tiles -- own separate lattice, pinned to z=0 in this same scene.', action: 'tool:pieceType:square2d', preview: squareWireframe },
-  { label: 'Hexagon', desc: 'A flat layer of real hexagon tiles -- same axial hex lattice as the 3D Hex Prism tier, own separate store, pinned to z=0 in this same scene.', action: 'tool:pieceType:hexagon2d', preview: hexagonWireframe },
-  { label: 'Triangle', desc: 'A flat layer of real equilateral triangles, up- and down-pointing alternating -- own separate lattice, pinned to z=0 in this same scene.', action: 'tool:pieceType:triangle2d', preview: triangleWireframe },
-];
+// LATTICE_FAMILIES_3D below. Phase 3: generated from lattice-2d.js's own
+// LATTICE_2D_COMBINATIONS (4 angles x 3 primitives = 12 rows) instead of
+// 3 hand-written entries -- each row's own action is
+// 'tool:pieceType:lattice2d:<primitiveId>:<angleId>', matching
+// core/build.js's own `lattice2d` param and render.js's
+// dimensionAllowsMesh's own 'lattice2d:' prefix check exactly.
+const LATTICE_FAMILIES_2D = LATTICE_2D_COMBINATIONS.map((combo) => ({
+  label: combo.label,
+  desc: `A flat layer of real ${combo.primitiveLabel.toLowerCase()} tiles at the ${combo.angleLabel} angle -- own separate lattice, pinned to z=0 in this same scene.`,
+  action: `tool:pieceType:lattice2d:${combo.id}`,
+  preview: () => lattice2dWireframe(combo),
+}));
 
 // LATTICE_FAMILIES_3D: 3D's own lattice-family screen. Actions reuse
 // WHEEL_PIECE's own real "tool:pieceType:rd"/"tool:pieceType:to" VERBATIM

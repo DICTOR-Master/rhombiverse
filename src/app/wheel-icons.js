@@ -187,18 +187,29 @@ export const MARKS = {
   // (not the symmetric kite rhombusPts() draws elsewhere), matching a
   // rhombohedron's own non-orthogonal silhouette.
   pieceRhombohedron: `<polygon points="-22,10 -6,-22 22,-10 6,22" ${THIN}/>`,
-  // Square (2D tier): a plain square outline, PLUS a horizontal
-  // midline -- reads as "a flat tile," distinct from pieceCube's own
-  // bare square (a real 3D solid) and pieceOctahedron's crossed square.
-  pieceSquare2D: `<polygon points="-22,-22 22,-22 22,22 -22,22" ${THIN}/><path d="M-22,0 H22" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
-  // Hexagon (2D tier): a flatter (wider than tall) hexagon outline --
-  // deliberately the opposite proportion from Elongated Dodecahedron's
-  // own stretched-tall one, and undecorated unlike Hex Prism's.
-  pieceHexagon2D: `<polygon points="${hexPts(20, 0, 0, 0).split(' ').map((p) => { const [x, y] = p.split(',').map(Number); return `${x.toFixed(2)},${(y * 0.8).toFixed(2)}`; }).join(' ')}" ${THIN}/>`,
-  // Triangle (2D tier): a plain flat equilateral triangle outline --
-  // deliberately undecorated/symmetric, distinct from piecePyramid's
-  // own taller "peaked" triangle (a real 3D apex, not a flat 2D tile).
-  pieceTriangle2D: `<polygon points="0,-24 21,12 -21,12" ${THIN}/>`,
+  // 2D lattice tier (Phase 3): one icon PER PRIMITIVE, shared across
+  // all 4 NAMED_LATTICE_ANGLES that primitive can appear at (this glyph
+  // shows which of the 3 primitive constructions is active, not the
+  // exact angle -- a full per-angle icon set for all 12 combinations
+  // wasn't asked for and would mostly just be minor skew variations of
+  // these same 3 shapes). Replaces the old pieceSquare2D/pieceHexagon2D/
+  // pieceTriangle2D keys (formerly hardcoded to exactly 90/some-hex/60
+  // degrees) with primitive-named ones matching lattice-2d.js's own
+  // LATTICE_PRIMITIVES ids.
+  //
+  // Parallelogram: a plain square outline, PLUS a horizontal midline --
+  // reads as "a flat tile," distinct from pieceCube's own bare square
+  // (a real 3D solid) and pieceOctahedron's crossed square.
+  piece2dParallelogram: `<polygon points="-22,-22 22,-22 22,22 -22,22" ${THIN}/><path d="M-22,0 H22" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
+  // Hexagon (the lattice's own Voronoi cell): a flatter (wider than
+  // tall) hexagon outline -- deliberately the opposite proportion from
+  // Elongated Dodecahedron's own stretched-tall one, and undecorated
+  // unlike Hex Prism's.
+  piece2dHexagon: `<polygon points="${hexPts(20, 0, 0, 0).split(' ').map((p) => { const [x, y] = p.split(',').map(Number); return `${x.toFixed(2)},${(y * 0.8).toFixed(2)}`; }).join(' ')}" ${THIN}/>`,
+  // Triangle: a plain flat equilateral triangle outline -- deliberately
+  // undecorated/symmetric, distinct from piecePyramid's own taller
+  // "peaked" triangle (a real 3D apex, not a flat 2D tile).
+  piece2dTriangle: `<polygon points="0,-24 21,12 -21,12" ${THIN}/>`,
   // Fill: "+" shown across three hexagons.
   fill: `
     <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>

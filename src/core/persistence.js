@@ -43,21 +43,16 @@ export const ELONGDODECA_STORAGE_KEY = 'rhombiverse-elongdodeca-world';
 // hex-prism.js), genuinely separate from FCC's own grid.
 export const HEXPRISM_STORAGE_KEY = 'rhombiverse-hexprism-world';
 
-// 2D tier (dimension-select wizard Phase 2), Rhombus family: own store,
-// flat layer pinned to z=0 in the SAME scene 3D already uses (geometry-
-// extensions/lattice-2d.js). Same "adopted family member" reasoning.
-export const SQUARE2D_STORAGE_KEY = 'rhombiverse-square2d-world';
-
-// 2D tier, Hexagon family: own store, flat layer, same axial hex
-// lattice as the 3D Hex Prism tier (geometry-extensions/hex-prism.js)
-// but pinned to z=0. Same "adopted family member" reasoning.
-export const HEXAGON2D_STORAGE_KEY = 'rhombiverse-hexagon2d-world';
-
-// 2D tier, Triangular family: own store, same reasoning again -- the
-// one 2D family that uses its cell's own z slot for something real
-// (0=up-pointing, 1=down-pointing triangle) instead of always 0, see
-// geometry-extensions/lattice-2d.js's own header for why.
-export const TRIANGLE2D_STORAGE_KEY = 'rhombiverse-triangle2d-world';
+// 2D tier (Phase 3): one store PER (angle, primitive) combination from
+// lattice-2d.js's own LATTICE_2D_COMBINATIONS, each flat layer pinned
+// to z=0 in the SAME scene 3D already uses -- same "adopted family
+// member" reasoning as every other store on this page, generalized off
+// the earlier Phase 2 design's 3 separately-named keys (Square/Hexagon/
+// Triangle) into one keyed function so a new named angle or primitive
+// never needs a new hand-added constant here.
+export function lattice2dStorageKey(comboId) {
+  return `rhombiverse-lattice2d-${comboId}-world`;
+}
 
 // Rhombohedra (free lattice): own store, own coordinate frame (3 real
 // edge vectors of one of RD Quarter's own 4 congruent orientations --
