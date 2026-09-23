@@ -121,6 +121,16 @@ const LATTICE2D_S = SCALE;
 // header), not the tile's side-face normals, so shrinking this doesn't
 // touch click behavior at all.
 const LATTICE2D_H = 0.03 * SCALE;
+// One seed color PER combination (12 of MATERIAL_COLORS' 14 keys below
+// -- everything except 'base' itself and 'blackstar-glassite', whose
+// near-black tone reads poorly against the scene's own dark background)
+// -- direct correction, 2026-09-23 ("dull colors to start with for
+// shapes"): every seed used to hardcode 'base' (a flat gray), so all 12
+// combinations' own first tile looked identical and unremarkable. Plain
+// string keys, not a reference to MATERIAL_COLORS itself (declared much
+// later in this file) -- this only needs to name them, not look up
+// their values.
+const LATTICE2D_SEED_COLORS = ['garnet', 'ferrostone', 'glassite', 'star-glassite', 'ice99', 'water', 'emerald', 'gold', 'amethyst', 'rose-quartz', 'citrine', 'turquoise'];
 // Rhombohedra (free lattice): same real scale as everything else -- a
 // genuine 3D solid, no special height/thinness constant needed.
 const RHOMBOHEDRA_S = SCALE;
@@ -1545,7 +1555,7 @@ async function init() {
     const world = createWorldStore(savedJSON ?? { worldName: `2D Lattice (${combo.label})`, version: 1, cells: {}, meta: {} });
     if (world.entries().length === 0) {
       const [sx, sy] = lattice2dSeedCell(idx);
-      world.addCell(sx, sy, 0, { material: 'base' });
+      world.addCell(sx, sy, 0, { material: LATTICE2D_SEED_COLORS[idx % LATTICE2D_SEED_COLORS.length] });
     }
     lattice2dWorlds.set(combo.id, world);
   });
@@ -1612,6 +1622,26 @@ async function init() {
   scene.add(hexPrismMesh);
   rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld);
 
+  // Real bug, direct report ("silhouettes just sit there, pieces cant
+  // be generated"): #piece-type-select only ever had literal <option>s
+  // for the OLD square2d/hexagon2d/triangle2d values -- setting a
+  // <select>'s .value to a string with no matching <option> silently
+  // no-ops (the DOM leaves the select's value unchanged), so every one
+  // of the 12 new "lattice2d:<id>" values the toggle panel/Wizard set
+  // never actually took effect: the piece-type <select> stayed on
+  // whatever it was before, so build.js's own getPieceType() check
+  // never matched, and clicking a tile silently fell through to
+  // whichever OTHER piece type was actually still selected. Fixed by
+  // injecting a real <option> per LATTICE_2D_COMBINATIONS entry here,
+  // once, before anything below ever tries to set one as the select's
+  // value -- generated, not hand-listed in index.html, so this can't
+  // drift out of sync with the registry again the way the old 3-option
+  // version implicitly did once it stopped being updated.
+  const pieceTypeSelect = document.getElementById('piece-type-select');
+  for (const combo of LATTICE_2D_COMBINATIONS) {
+    pieceTypeSelect.add(new Option(combo.label, `lattice2d:${combo.id}`));
+  }
+
   // 2D Lattice Build (Phase 3): one InstancedMesh PER (angle, primitive)
   // combination, own geometry each (a combination's tile shape is a
   // genuine function of its own angle -- see lattice-2d.js's header --
@@ -1639,8 +1669,12 @@ async function init() {
   // rebuilt) whenever the toggle panel's own angle changes, so dragging
   // through the 4 named angles visibly morphs this dot grid in place --
   // the actual "see transformations" effect asked for.
-  const DOT_MATRIX_RADIUS = 8;
-  const dotMatrixGeometry = new THREE.SphereGeometry(0.055 * LATTICE2D_S, 8, 6);
+  // Direct correction, 2026-09-23 ("matrix dots are a little big and
+  // coverage is small of whole matrix when zooming out"): smaller dots,
+  // wider coverage (radius 8 -> 24, so the grid still fills the view at
+  // a real zoomed-out distance instead of trailing off into empty space).
+  const DOT_MATRIX_RADIUS = 24;
+  const dotMatrixGeometry = new THREE.SphereGeometry(0.035 * LATTICE2D_S, 8, 6);
   // Signature blue (#9de0ff), same accent color as everything else in
   // this app's own HUD chrome -- fully opaque (not the original 0.85)
   // for max contrast against the scene's own dark starfield background,
@@ -1730,6 +1764,53 @@ async function init() {
     }
     lattice2dPanel.append(angleRow, primRow);
   }
+  // Live preview shapes, direct reports ("shapes dont change when dot
+  // matrix changes" then "you only need to see three basic shapes but
+  // they must change when matrix does"): the 12 real seed tiles each
+  // live in their own separate store at their own fixed grid offset (by
+  // design -- see LATTICE_2D_COMBINATIONS' own "families coexist"
+  // reasoning above), so toggling the angle never visibly reshapes any
+  // already-placed one, and showing all 12 at once is more clutter than
+  // signal. These 3 extra, non-persisted preview meshes (not part of
+  // any world store -- never saved, never counts as a placed cell) --
+  // one per LATTICE_PRIMITIVES entry, side by side at the dot matrix's
+  // own origin -- get their geometry rebuilt to the CURRENT toggled
+  // angle every time it changes, so all 3 visibly morph together in
+  // place alongside the dots. The currently active primitive (the one
+  // that will actually get placed on click) is the one rendered fully
+  // opaque; the other 2 stay dim for comparison.
+  // Direct correction, 2026-09-23 ("shapes are too small relative to
+  // dot spacing"): these 3 are a purely cosmetic comparison display,
+  // not tied to the real 1-unit-per-cell placement grid the way the
+  // actual placeable tiles are, so there's no correctness reason they
+  // need to match dot spacing 1:1 -- scaled up 3x to read as real
+  // "hero" shapes against the now much wider (radius-24) dot field,
+  // spacing scaled proportionally so they still don't overlap.
+  const LATTICE2D_PREVIEW_SCALE = 3;
+  const lattice2dPreviewMeshes = new Map(); // primitiveId -> Mesh
+  function updateLattice2dPreviews(angleDeg, activePrimitiveId) {
+    const previewS = LATTICE2D_S * LATTICE2D_PREVIEW_SCALE;
+    const spacing = 1.6 * previewS;
+    LATTICE_PRIMITIVES.forEach((primitive, i) => {
+      const old = lattice2dPreviewMeshes.get(primitive.id);
+      if (old) {
+        scene.remove(old);
+        old.geometry.dispose();
+        old.material.dispose();
+      }
+      const impl = LATTICE_PRIMITIVE_IMPLS[primitive.id];
+      const geometry = new ConvexGeometry(impl.tileVerts(angleDeg, previewS, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+      geometry.computeVertexNormals();
+      const isActive = primitive.id === activePrimitiveId;
+      const previewMaterial = new THREE.MeshBasicMaterial({ color: 0x9de0ff, transparent: true, opacity: isActive ? 0.85 : 0.35, depthTest: false });
+      const mesh = new THREE.Mesh(geometry, previewMaterial);
+      mesh.position.set((i - (LATTICE_PRIMITIVES.length - 1) / 2) * spacing, 0, 0.2);
+      mesh.renderOrder = 6; // above the dot matrix (5) and the flat tiles it sits on top of
+      scene.add(mesh);
+      lattice2dPreviewMeshes.set(primitive.id, mesh);
+    });
+  }
+
   // Deliberately NOT handleWheelAction (out of scope here -- it's a
   // `const` declared inside a nested block further down, not reachable
   // from this closure; a real ReferenceError caught live) and
@@ -1744,6 +1825,7 @@ async function init() {
   function applyLattice2dSelection() {
     const combo = LATTICE_2D_COMBINATIONS.find((c) => c.angleId === activeLattice2dAngleId && c.primitiveId === activeLattice2dPrimitiveId);
     updateDotMatrix(combo.angleDeg);
+    updateLattice2dPreviews(combo.angleDeg, activeLattice2dPrimitiveId);
     document.getElementById('piece-type-select').value = `lattice2d:${combo.id}`;
     if (currentMode !== 'build' && currentMode !== 'chisel') {
       document.querySelector('.mode-btn[data-mode="build"]')?.click();
@@ -1752,6 +1834,7 @@ async function init() {
     showHudPrompt(`Piece: ${combo.label}`, 2000);
   }
   renderLattice2dPanel();
+  updateLattice2dPreviews(NAMED_LATTICE_ANGLES[0].angleDeg, LATTICE_PRIMITIVES[0].id);
 
   // Rhombohedra Build (free lattice): its own InstancedMesh, own
   // geometry (rhombohedraTileVerts -- one of RD Quarter's own 4
@@ -2317,6 +2400,7 @@ async function init() {
     // the active dimension, regardless of which (angle, primitive) is
     // currently toggled.
     dotMatrixMesh.visible = visible && activeDimension === '2D';
+    lattice2dPreviewMeshes.forEach((m) => { m.visible = visible && activeDimension === '2D'; });
     lattice2dPanel.classList.toggle('visible', activeDimension === '2D');
   }
   // Re-applies the same visibility rule whenever activeDimension itself
@@ -4824,7 +4908,7 @@ async function init() {
     const world = lattice2dWorlds.get(comboId);
     if (world.entries().length === 0) {
       const [sx, sy] = lattice2dSeedCell(idx);
-      world.addCell(sx, sy, 0, { material: 'base' });
+      world.addCell(sx, sy, 0, { material: LATTICE2D_SEED_COLORS[idx % LATTICE2D_SEED_COLORS.length] });
     }
     rebuildLattice2dInstances(lattice2dMeshes.get(comboId), world, combo);
     updateSectionEnabled();

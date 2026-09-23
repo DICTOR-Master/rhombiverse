@@ -952,9 +952,20 @@
           <option value="rdquarter">RD Quarter (rhombohedron, click a corner to fill it in)</option>
           <option value="rhombohedra">Rhombohedra (free-standing lattice, own separate)</option>
           <option value="hexprism">Hex Prism (own separate lattice)</option>
-          <option value="square2d">Square (2D tier, flat layer)</option>
-          <option value="hexagon2d">Hexagon (2D tier, flat layer)</option>
-          <option value="triangle2d">Triangle (2D tier, flat layer)</option>
+          <!-- 2D lattice tier (Phase 3+4) options are injected here at
+               startup by render.js, one per LATTICE_2D_COMBINATIONS entry
+               (id="lattice2d-piece-options") -- NOT hand-listed like every
+               option above, so a value like "lattice2d:parallelogram:square"
+               always has a real matching <option> a plain `select.value =`
+               assignment can find. Real bug this replaces, caught live
+               (direct report, "silhouettes just sit there, pieces cant be
+               generated"): setting a <select>'s .value to a string with NO
+               matching <option> silently no-ops in the DOM (the select's
+               value stays whatever it was), so the old hardcoded
+               square2d/hexagon2d/triangle2d trio here left every one of the
+               12 new combo ids with nothing to match -- the toggle panel's
+               own UI state (dot matrix, highlighted button, HUD toast) all
+               updated correctly, the ACTUAL piece type never did. -->
         </select>
       </label>
     </div>
