@@ -2485,6 +2485,11 @@ async function init() {
     // currently toggled.
     dotMatrixMesh.visible = visible && activeDimension === '2D';
     lattice2dPanel.classList.toggle('visible', activeDimension === '2D');
+    // In 2D, shapes are picked by lattice (the toggle panel above), not
+    // by this dropdown -- lattice2dPanel already keeps #piece-type-select's
+    // own value in sync (see applyLattice2dSelection), so showing this row
+    // too would just be a second, redundant way to pick a shape.
+    document.getElementById('piece-type-row').hidden = activeDimension === '2D';
   }
   // Re-applies the same visibility rule whenever activeDimension itself
   // changes (not just when World View mode changes, which is
