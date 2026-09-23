@@ -560,13 +560,18 @@ export const RHOMBILLE_ARRANGEMENT_IMPL = {
 // hexagon degenerates to 4 neighbors (the (v0-v1) diagonal direction is
 // redundant there, per hexagonNeighborOffsets' own real derivation), so
 // the down-triangle pairing this construction depends on (which needs
-// that diagonal direction to be a real hexagon vertex) only produces a
-// valid shared edge at Triangular -- verified directly (Square fails the
-// same edge-sharing check Triangular passes). Consistent with Kagome
-// being fundamentally a hexagonal-symmetry (6-connected) construction,
-// same reason its own dual Rhombille is angle-locked too, not a partial-
-// coverage gap like Kite's.
-export const KAGOME_VALID_ANGLE_IDS = ['triangular'];
+// that diagonal direction to be a real hexagon vertex) never produces a
+// valid shared edge -- verified directly (Square fails the edge-sharing
+// check the other 3 angles pass). RD Rhombus/Golden Rhombus were
+// initially left out too, by over-generalizing from Rhombille's own
+// (genuinely hard, not just untested) 60-degree-only limit -- checked
+// directly and that analogy doesn't hold here: kagomeNeighborDirsSorted/
+// kagomeTriangleUp/DownTileVerts never assumed regularity (unlike
+// Rhombille's fixed 120-degree rotation, or Kite's single-shape-plus-
+// rotation trick), so they were already angle-general. All 3 non-Square
+// angles verified directly (real shared edges, 6 real neighbors) -- only
+// Square is a genuine rejection, not a partial-coverage gap.
+export const KAGOME_VALID_ANGLE_IDS = ['rd-rhombus', 'golden-rhombus', 'triangular'];
 
 // The hexagon's own real neighbor directions, in real cyclic angular
 // order (hexagonNeighborOffsets' own order isn't guaranteed angular, so
