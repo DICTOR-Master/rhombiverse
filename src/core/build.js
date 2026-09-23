@@ -1819,7 +1819,21 @@ export function createBuildController({
       // for the same reason (their own handleHemisphereClick resolves a
       // direction + side/canonical-pair from the clicked face, not a
       // plain "next FCC neighbor" cell). 'rd'/'cube' both still drag normally.
-      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && !['pyramid', 'to', 'ioct', 'idis', ...HEMISPHERE_PIECE_TYPES].includes(getPieceType())) {
+      // 'lattice2d:*' excluded too -- a REAL latent bug found while
+      // investigating a separate iPad tap report (drag placement itself
+      // is off by default, so this wasn't the active cause of that
+      // report, but it's a genuine bug regardless): this whole branch
+      // below uses the closure's own MAIN FCC `world`/`cellAt` and
+      // `resolveGrowthOffset` unconditionally, with zero awareness of
+      // `lattice2d`'s own per-combo stores -- if drag placement were
+      // ever turned on while a lattice2d piece was active, any pointer
+      // movement past DRAG_MOVE_TOLERANCE would set `dragging = true`,
+      // `cellAt(hit)` would fail to resolve (wrong instance-id space)
+      // and place nothing, and -- worse -- `onPointerUp` would still
+      // set `suppressNextClick = true`, silently eating the real click
+      // handling done. Excluding it here is correct until this branch
+      // gets genuine lattice2d awareness, not just a stopgap.
+      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && !getPieceType().startsWith('lattice2d:') && !['pyramid', 'to', 'ioct', 'idis', ...HEMISPHERE_PIECE_TYPES].includes(getPieceType())) {
         dragging = true;
         clearTimeout(holdTimer);
         holding = false;
@@ -1852,8 +1866,11 @@ export function createBuildController({
     // vs-extend logic; 'halfrd'/'hourglass' resolve a direction + side
     // from the clicked face rather than a plain neighbor cell -- none
     // fits the "next valid FCC position" ghost preview below. 'rd'/
-    // 'cube' both still use it identically.
-    if (mode !== 'build' || ['pyramid', 'to', 'ioct', 'idis', ...HEMISPHERE_PIECE_TYPES].includes(getPieceType())) {
+    // 'cube' both still use it identically. 'lattice2d:*' excluded too,
+    // same reason as the drag-placement branch above -- this ghost
+    // preview also runs through the main FCC world's own `cellAt`/
+    // `resolveGrowthOffset`, with no lattice2d awareness at all.
+    if (mode !== 'build' || getPieceType().startsWith('lattice2d:') || ['pyramid', 'to', 'ioct', 'idis', ...HEMISPHERE_PIECE_TYPES].includes(getPieceType())) {
       if (onHoverEnd) onHoverEnd();
       return;
     }

@@ -327,6 +327,20 @@ controls.rotateSpeed = getSettings().sensitivity;
 // Right-click is reserved for block removal (build.js), not camera pan.
 controls.mouseButtons.RIGHT = null;
 const ORBIT_LEFT_DEFAULT = controls.mouseButtons.LEFT;
+// Real bug, direct report ("still unable to tap and place on iPad"):
+// applyDimensionCamera's own 2D remap below only ever touched
+// controls.mouseButtons.LEFT (mouse-specific), never
+// controls.touches.ONE -- OrbitControls' SEPARATE single-finger touch
+// gesture setting, which defaults to THREE.TOUCH.ROTATE. Even with
+// enableRotate=false suppressing the actual rotation, a real one-
+// finger tap on a touchscreen still goes through OrbitControls' own
+// touch-drag state machine first (mismatched from the intended 2D
+// "flat planar movement" pan design), which can swallow the touch
+// sequence before the browser's own synthesized 'click' event -- the
+// one build.js's own onClick listener actually needs -- ever fires.
+// Saved once here, same pattern as ORBIT_LEFT_DEFAULT, so it can be
+// restored exactly on the way back to 3D.
+const ORBIT_TOUCH_ONE_DEFAULT = controls.touches.ONE;
 
 // Resume the view where it was left last session, instead of always
 // resetting to the fixed default spawn -- fixes a real bug this fed
@@ -402,10 +416,22 @@ function applyDimensionCamera(dimension) {
     camera.position.set(0, 0, 12);
     controls.enableRotate = false;
     if (controls.mouseButtons.LEFT !== null) controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+    // Real bug, direct report ("still unable to tap and place on
+    // iPad"): the mouseButtons.LEFT remap just above only ever covered
+    // mouse input -- controls.touches.ONE (OrbitControls' separate
+    // single-finger touch gesture, defaulting to THREE.TOUCH.ROTATE)
+    // was never touched, so a real one-finger tap on a touchscreen
+    // still went through the ROTATE touch-drag state machine first
+    // (mismatched from 2D's own "flat planar movement" design), which
+    // can swallow the touch sequence before the browser's own
+    // synthesized 'click' (the one build.js's own onClick listener
+    // needs) ever fires -- see ORBIT_TOUCH_ONE_DEFAULT's own header.
+    if (controls.touches.ONE !== null) controls.touches.ONE = THREE.TOUCH.PAN;
     controls.update();
   } else {
     controls.enableRotate = true;
     if (controls.mouseButtons.LEFT !== null) controls.mouseButtons.LEFT = ORBIT_LEFT_DEFAULT;
+    if (controls.touches.ONE !== null) controls.touches.ONE = ORBIT_TOUCH_ONE_DEFAULT;
     if (cameraSavedFor2D) {
       camera.position.copy(saved3DCameraState.position);
       controls.target.copy(saved3DCameraState.target);
@@ -1695,20 +1721,36 @@ async function init() {
   // lattice on every angle toggle, just densely enough that one real
   // square now shows DOT_SUBDIVISIONS^2 = 100 dots across its own area,
   // not only its 4 corners. DOT_MATRIX_CELL_RADIUS (how many REAL cells
-  // outward this covers) stays modest since the fine subdivision alone
-  // already multiplies the total dot count by 100x.
+  // outward this covers) raised 3 -> 10, direct follow-up ("still far
+  // too few dots to cover reasonable portion of screen when zooming
+  // out") -- 3 was sized only for the default un-zoomed camera
+  // distance. (21*DOT_SUBDIVISIONS+1)^2 total instances at radius 10 is
+  // still comfortably within InstancedMesh's own practical range for
+  // this simple an unlit sphere, but if a future iPad performance
+  // report ever comes in, THIS is the number to trade off first.
   const DOT_SUBDIVISIONS = 10;
-  const DOT_MATRIX_CELL_RADIUS = 3;
+  const DOT_MATRIX_CELL_RADIUS = 10;
   const DOT_MATRIX_RADIUS = DOT_SUBDIVISIONS * DOT_MATRIX_CELL_RADIUS;
   const dotMatrixGeometry = new THREE.SphereGeometry(0.06 * LATTICE2D_S / DOT_SUBDIVISIONS, 8, 6);
   // Signature blue (#9de0ff), same accent color as everything else in
   // this app's own HUD chrome -- fully opaque (not the original 0.85)
   // for max contrast against the scene's own dark starfield background,
-  // direct instruction ("contrast against star background").
-  const dotMatrixMaterial = new THREE.MeshBasicMaterial({ color: 0x9de0ff, depthTest: false });
+  // direct instruction ("contrast against star background"). Real
+  // depth testing (NOT depthTest:false, its own original value) --
+  // direct correction, "place tile in front of dots for visibility":
+  // depthTest:false forced dots to draw over EVERYTHING regardless of
+  // actual position, which is exactly why they sat on top of (and
+  // cluttered) the real tile once there were ~100 of them per square.
+  // Real depth testing plus dots positioned BEHIND the tile's own back
+  // face (see updateDotMatrix's own z below) lets the opaque tile
+  // correctly occlude the dots underneath it, while dots elsewhere
+  // (nothing in front of them) still render normally.
+  const dotMatrixMaterial = new THREE.MeshBasicMaterial({ color: 0x9de0ff });
   const dotMatrixCount = (2 * DOT_MATRIX_RADIUS + 1) ** 2;
   const dotMatrixMesh = new THREE.InstancedMesh(dotMatrixGeometry, dotMatrixMaterial, dotMatrixCount);
-  dotMatrixMesh.renderOrder = 5; // stay visible above the flat tiles it sits on top of
+  // renderOrder no longer needed for draw-order purposes now that real
+  // depth testing (not depthTest:false) handles tile-occludes-dots
+  // correctly on its own -- left at the default.
   dotMatrixMesh.visible = false;
   scene.add(dotMatrixMesh);
 
@@ -1720,7 +1762,12 @@ async function init() {
       for (let j = -DOT_MATRIX_RADIUS; j <= DOT_MATRIX_RADIUS; j++) {
         const x = i * v0[0] + j * v1[0];
         const y = i * v0[1] + j * v1[1];
-        m.makeTranslation(x, y, 0.12);
+        // Behind the tile's own back face (LATTICE2D_H's real extent is
+        // roughly +-0.015 regardless of LATTICE2D_S), not in front of it
+        // at 0.12 like before -- see dotMatrixMaterial's own comment
+        // above for why this, paired with real depth testing, is what
+        // actually lets the tile occlude the dots under it now.
+        m.makeTranslation(x, y, -0.05);
         dotMatrixMesh.setMatrixAt(idx++, m);
       }
     }
