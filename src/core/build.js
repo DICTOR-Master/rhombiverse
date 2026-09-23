@@ -642,7 +642,13 @@ export function createBuildController({
     // accessor's own header for the real Rhombille-arrangement mismatch
     // this replaces.
     const impl = lattice2d?.getImpl(primitiveId);
-    if (!store || !impl || hit.object !== store.mesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    // Kite only: store.classMeshes lists ALL of its real click targets
+    // (one per distinct kite shape at the current angle), not just the
+    // primary -- see render.js's own rebuildLattice2dInstances header for
+    // why a hit can land on any of them. undefined for every other
+    // primitive, so this falls back to the plain single-mesh check.
+    const isRealClickTarget = !!store && (hit.object === store.mesh || store.classMeshes?.includes(hit.object));
+    if (!store || !impl || !isRealClickTarget || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
     const cell = store.cellAt(hit.instanceId);
     if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
     const angleDeg = lattice2d.getAngleDeg();

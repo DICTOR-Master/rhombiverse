@@ -302,21 +302,23 @@ export function hexagonTileVerts(angleDeg, s = 1, h = 0.15 * 1) {
 
 // ---------------------------------------------------------------------------
 // Kite primitive (the hexagon above, fanned into kites from its own
-// center) -- ONLY offered at Square and Triangular, the 2 angles where the
-// fan is genuinely N congruent kites related by a pure rotation (4-fold,
-// 6-fold). At RD Rhombus/Golden Rhombus the Voronoi hexagon is irregular
-// (only 180-degree point symmetry, not full N-fold), so its fan produces 3
-// GENUINELY DIFFERENT kite shapes there, not rotations of one -- verified
-// directly (real side lengths differ between adjacent fan positions, only
-// match 3 apart). Rendering that correctly needs real multi-geometry
-// support this file's "one shape per primitive" model doesn't have yet
-// (the same problem Kagome will need to solve for its own 2 sub-shapes) --
-// deferred, not built here. KITE_VALID_ANGLE_IDS is what render.js's
-// toggle panel uses to grey Kite out at the other 2 angles instead of
-// rendering broken geometry.
+// center). At Square and Triangular the fan is genuinely N congruent
+// kites related by a pure rotation (4-fold, 6-fold): the single-mesh
+// "one geometry, per-instance rotation" path below (kiteTileVerts/
+// kiteCellToWorld/kiteInstanceRotationRad, unchanged since first
+// shipped). At RD Rhombus/Golden Rhombus the Voronoi hexagon is
+// irregular (only 180-degree point symmetry, not full N-fold), so the
+// fan produces 3 GENUINELY DIFFERENT kite shapes -- verified directly,
+// each antipodal pair (class, class+3) still exactly a 180-degree
+// rotation of the other (the SAME real fact triangle's own up/down
+// already relies on, just not a FULL N-fold one here) -- so those 2
+// angles use the separate "class" path further below: up to 3 real
+// meshes instead of 1, each holding one class's own shape, rebuilt by
+// render.js's own multi-class mechanism (kite is currently the only
+// primitive using it -- Kagome's own multi-mesh need, 2 sub-SHAPES
+// sharing one lattice, used a simpler "companions" mechanism instead,
+// since none of Kagome's sub-shapes needed more than one geometry each).
 // ---------------------------------------------------------------------------
-
-export const KITE_VALID_ANGLE_IDS = ['square', 'triangular'];
 
 // One kite: hexagon center, the midpoint of its incoming edge, the real
 // polygon vertex itself, and the midpoint of its outgoing edge -- the
@@ -336,11 +338,11 @@ function kiteCorners2d(poly, i) {
   ];
 }
 
-// Fan index 0's own real corners only -- every other fan index (only at
-// the 2 valid angles) is a pure rotation of this SAME shape about the
+// Fan index 0's own real corners only -- at Square/Triangular, every
+// other fan index is a pure rotation of this SAME shape about the
 // hexagon's own center, same "one geometry, per-instance rotation" trick
-// triangle's up/down already uses, generalized from one 180-degree flip to
-// N-fold (see kiteInstanceRotationRad below).
+// triangle's up/down already uses, generalized from one 180-degree flip
+// to N-fold (see kiteInstanceRotationRad below).
 export function kiteTileVerts(angleDeg, s = 1, h = 0.15 * 1) {
   return extrudePrism(kiteCorners2d(voronoiPolygon(angleDeg, s), 0), h);
 }
@@ -356,6 +358,60 @@ export function kiteCellToWorld(x, y, fanIndex, angleDeg, s = 1, worldZ = 0) {
 
 export function kiteInstanceRotationRad(fanIndex, angleDeg) {
   return (fanIndex * 2 * Math.PI) / voronoiPolygon(angleDeg, 1).length;
+}
+
+// How many DISTINCT kite shapes this angle's fan actually needs, derived
+// (not hand-picked) by checking real congruence across all N fan
+// positions -- 1 at Square/Triangular (full N-fold symmetry), else the
+// antipodal-only count ceil(N/2) (currently 3, at RD Rhombus/Golden
+// Rhombus). render.js reads this to decide which of the 2 rendering
+// paths above to use for the CURRENT angle.
+const kiteClassCountCache = new Map();
+export function kiteClassCount(angleDeg) {
+  const key = angleDeg.toFixed(6);
+  if (kiteClassCountCache.has(key)) return kiteClassCountCache.get(key);
+  const poly = voronoiPolygon(angleDeg, 1);
+  const n = poly.length;
+  const sig = (i) => {
+    const c = kiteCorners2d(poly, i);
+    return [0, 1, 2, 3].map((k) => +Math.hypot(c[k][0] - c[(k + 1) % 4][0], c[k][1] - c[(k + 1) % 4][1]).toFixed(6)).sort().join(',');
+  };
+  const base = sig(0);
+  const allCongruent = Array.from({ length: n }, (_, i) => sig(i)).every((s) => s === base);
+  const result = allCongruent ? 1 : Math.ceil(n / 2);
+  kiteClassCountCache.set(key, result);
+  return result;
+}
+
+// Which class (0..classCount-1) a given fan position belongs to, and
+// whether it's the "primary" occurrence or its 180-degree-flipped
+// antipodal partner -- only meaningful/used when kiteClassCount > 1.
+export function kiteClassOf(fanIndex, angleDeg) {
+  return fanIndex % kiteClassCount(angleDeg);
+}
+export function kiteClassIsFlipped(fanIndex, angleDeg) {
+  return fanIndex >= kiteClassCount(angleDeg);
+}
+
+// A given class's own real corners (angle-general -- unlike the single-
+// mesh path above, no N-fold symmetry is assumed).
+export function kiteClassTileVerts(angleDeg, classIndex, s = 1, h = 0.15 * 1) {
+  return extrudePrism(kiteCorners2d(voronoiPolygon(angleDeg, s), classIndex), h);
+}
+
+// The REAL world position for a specific fan instance, computed directly
+// from ITS OWN corners -- not a rotation of class 0's position, which
+// (unlike the shape-congruence fact above) is NOT generally true off
+// Square/Triangular. Position and shape both need to be class-specific.
+export function kiteDirectCellToWorld(x, y, fanIndex, angleDeg, s = 1, worldZ = 0) {
+  const poly = voronoiPolygon(angleDeg, s);
+  const [hcx, hcy] = hexagonCellToWorld(x, y, angleDeg, s, 0);
+  const [ox, oy] = centroid2d(kiteCorners2d(poly, fanIndex));
+  return [hcx + ox, hcy + oy, worldZ];
+}
+
+export function kiteClassInstanceRotationRad(fanIndex, angleDeg) {
+  return kiteClassIsFlipped(fanIndex, angleDeg) ? Math.PI : 0;
 }
 
 // Kite's own real neighbor table: 2 intra-hexagon fan-mates (adjacent fan
@@ -483,13 +539,11 @@ export const RHOMBILLE_ARRANGEMENT_IMPL = {
 // Voronoi construction rescaled (checked directly and rejected: the
 // Voronoi hexagon's vertices point BETWEEN neighbor directions -- -30/-45
 // degrees off v0 -- a different, incompatible construction). The real
-// rectification hexagon's vertices are exactly the MIDPOINTS of the 6 (4
-// at Square) edges to each neighbor, so it's built directly from those
-// midpoints here, not reused from Hexagon. Because Hexagon's own uniform-
-// edge-length restriction still applies to picking neighbor directions
-// cleanly, this is angle-gated to Square + Triangular only, same as Kite
-// (see KITE_VALID_ANGLE_IDS's own header for the general reason: RD
-// Rhombus/Golden Rhombus verified non-uniform hexagon edges directly).
+// rectification hexagon's vertices are exactly the MIDPOINTS of the 6
+// edges to each neighbor, so it's built directly from those midpoints
+// here, not reused from Hexagon. Angle-gated to Triangular only -- see
+// KAGOME_VALID_ANGLE_IDS's own header just below for why (rejected at
+// Square specifically, not just untested).
 //
 // Each small triangle is the medial triangle of an ORIGINAL up/down
 // triangle (vertices at ITS 3 edge midpoints) -- by construction, a
@@ -602,11 +656,36 @@ export const LATTICE_PRIMITIVE_IMPLS = {
   },
   kite: {
     hasOrientation: true,
-    validAngleIds: KITE_VALID_ANGLE_IDS,
     tileVerts: (angleDeg, s, h) => kiteTileVerts(angleDeg, s, h),
-    cellToWorld: (i, j, orientation, angleDeg, s, worldZ) => kiteCellToWorld(i, j, orientation, angleDeg, s, worldZ),
+    // kiteDirectCellToWorld (not kiteCellToWorld's own rotation-trick
+    // shortcut) -- proven identical at Square/Triangular (full N-fold
+    // symmetry makes the rotation trick and the direct computation agree
+    // exactly) AND correct at RD Rhombus/Golden Rhombus, where the trick
+    // alone isn't. Used universally so build.js's click-to-place position
+    // lookups are always right regardless of which rendering path
+    // (single-mesh or multi-class, see maxClasses below) is active.
+    cellToWorld: (i, j, orientation, angleDeg, s, worldZ) => kiteDirectCellToWorld(i, j, orientation, angleDeg, s, worldZ),
     neighborOffsets: (angleDeg, orientation) => kiteNeighborOffsets(angleDeg, orientation),
+    // Single-mesh path fields (used only when classCount(angleDeg) === 1,
+    // i.e. Square/Triangular) -- kiteInstanceRotationRad's full N-fold
+    // rotation, NOT the class path's 180-degree-only one below (those are
+    // two different jobs: this rotates EVERY fan position by its own real
+    // angle around one shared canonical shape; the class path only ever
+    // needs a 0/180 flip because each class mesh already holds ITS OWN
+    // real shape).
     instanceRotationRad: (angleDeg, orientation) => kiteInstanceRotationRad(orientation, angleDeg),
+    // Multi-class path (RD Rhombus/Golden Rhombus, classCount > 1) --
+    // render.js's own rebuildLattice2dInstances branches on classCount
+    // itself; maxClasses is the fixed number of real meshes to always
+    // pre-create for this primitive (3, this file's own verified count
+    // at the 2 irregular angles -- never more at any currently named
+    // angle), so switching angle live never needs to create/destroy
+    // meshes, only resize how many are actually populated.
+    classCount: (angleDeg) => kiteClassCount(angleDeg),
+    maxClasses: 3,
+    classOf: (orientation, angleDeg) => kiteClassOf(orientation, angleDeg),
+    classTileVerts: (angleDeg, classIndex, s, h) => kiteClassTileVerts(angleDeg, classIndex, s, h),
+    classInstanceRotationRad: (orientation, angleDeg) => kiteClassInstanceRotationRad(orientation, angleDeg),
   },
   // Kagome's own entry describes its PRIMARY (clickable) mesh only --
   // the hexagon. `companion` describes its second, render-only mesh (the

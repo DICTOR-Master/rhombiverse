@@ -192,8 +192,8 @@ export const MARKS = {
   // which primitive construction is active, not the exact angle -- a
   // full per-angle icon set for all combinations wasn't asked for and
   // would mostly just be minor skew variations of these same shapes;
-  // Kite (Phase 7) is the one primitive that isn't offered at every
-  // angle -- see lattice-2d.js's own KITE_VALID_ANGLE_IDS). Replaces the
+  // Kagome is the one primitive that isn't offered at every angle -- see
+  // lattice-2d.js's own KAGOME_VALID_ANGLE_IDS). Replaces the
   // old pieceSquare2D/pieceHexagon2D/
   // pieceTriangle2D keys (formerly hardcoded to exactly 90/some-hex/60
   // degrees) with primitive-named ones matching lattice-2d.js's own

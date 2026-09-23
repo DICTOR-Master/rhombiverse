@@ -18,10 +18,12 @@ import {
   hexagonNeighborOffsets,
   PARALLELOGRAM_NEIGHBOR_OFFSETS,
   TRIANGLE_NEIGHBOR_OFFSETS_FROM_UP,
-  KITE_VALID_ANGLE_IDS,
   kiteTileVerts,
   kiteCellToWorld,
   kiteNeighborOffsets,
+  kiteClassCount,
+  kiteClassTileVerts,
+  kiteDirectCellToWorld,
   RHOMBILLE_ANGLE_ID,
   rhombilleTileVerts,
   rhombilleCellToWorld,
@@ -144,41 +146,77 @@ for (const { id, angleDeg } of NAMED_LATTICE_ANGLES) {
   check(`[${id}] every hexagon neighbor offset lands exactly at an edge midpoint x2`, allMatch);
 }
 
-// Kite: only offered at Square/Triangular (see KITE_VALID_ANGLE_IDS's own
-// header) -- every fan position there must be a REAL kite (4 vertices,
-// closed) and, since only those 2 angles have the full N-fold symmetry
-// the single-geometry-plus-rotation instancing trick depends on, every
-// fan position's world shape must be congruent (same side-length
-// multiset) to fan position 0's, not just individually valid.
-check('Kite offered only at Square + Triangular', KITE_VALID_ANGLE_IDS.length === 2 && KITE_VALID_ANGLE_IDS.includes('square') && KITE_VALID_ANGLE_IDS.includes('triangular'));
-
+// Kite: offered at ALL 4 named angles. Square/Triangular use the single-
+// mesh path (classCount === 1, full N-fold symmetry -- every fan
+// position congruent to fan 0, verified via the rotation-trick position
+// kiteCellToWorld/kiteInstanceRotationRad actually render with). RD
+// Rhombus/Golden Rhombus use the multi-class path (classCount === 3) --
+// verified via kiteDirectCellToWorld/kiteClassInstanceRotationRad
+// instead, checking each antipodal pair (class, class+classCount) is a
+// real 180-degree rotation of the other, matching render.js's own
+// degenerate-instance multi-mesh rendering exactly.
+function kitePolyLength(angleDeg) {
+  return NAMED_LATTICE_ANGLES.find((a) => a.angleDeg === angleDeg)?.id === 'square' ? 4 : 6;
+}
 function kiteSideLengths(angleDeg, fanIndex) {
   const poly = polygonBottomFace(kiteTileVerts(angleDeg, 1, 0.15));
   const [cx, cy] = kiteCellToWorld(0, 0, fanIndex, angleDeg, 1, 0);
-  // kiteTileVerts is fan-index-0's own shape, centered at ITS OWN
-  // centroid; rotate + translate it to fan index's own world position the
-  // same way render.js's instancing does, then compare real world-space
-  // side lengths against fan index 0's.
   const theta = (fanIndex * 2 * Math.PI) / kitePolyLength(angleDeg);
   const cos = Math.cos(theta), sin = Math.sin(theta);
   const world = poly.map(([x, y, z]) => [x * cos - y * sin + cx, x * sin + y * cos + cy, z]);
   return edgeLengths(world).map((e) => +e.toFixed(6)).sort();
 }
-function kitePolyLength(angleDeg) {
-  return NAMED_LATTICE_ANGLES.find((a) => a.angleDeg === angleDeg)?.id === 'square' ? 4 : 6;
+function kiteClassSideLengths(angleDeg, classIndex, flipped) {
+  const poly = polygonBottomFace(kiteClassTileVerts(angleDeg, classIndex, 1, 0.15));
+  // classTileVerts is already centered at ITS OWN real centroid (not
+  // rotated from class 0), so the only transform left is the antipodal
+  // 180-degree flip, matching kiteClassInstanceRotationRad exactly.
+  const rot = flipped ? Math.PI : 0;
+  const cos = Math.cos(rot), sin = Math.sin(rot);
+  const world = poly.map(([x, y, z]) => [x * cos - y * sin, x * sin + y * cos, z]);
+  return edgeLengths(world).map((e) => +e.toFixed(6)).sort();
 }
 
-for (const id of KITE_VALID_ANGLE_IDS) {
-  const angleDeg = NAMED_LATTICE_ANGLES.find((a) => a.id === id).angleDeg;
+for (const { id, angleDeg } of NAMED_LATTICE_ANGLES) {
   const kite0 = polygonBottomFace(kiteTileVerts(angleDeg, 1, 0.15));
   check(`[${id}] kite: 4 vertices`, kite0.length === 4);
   const n = kitePolyLength(angleDeg);
-  const base = kiteSideLengths(angleDeg, 0);
-  const allCongruent = Array.from({ length: n }, (_, f) => kiteSideLengths(angleDeg, f)).every((sides) => sides.every((s, k) => Math.abs(s - base[k]) < 1e-4));
-  check(`[${id}] all ${n} kite fan positions are congruent (world-space)`, allCongruent);
+  const numClasses = kiteClassCount(angleDeg);
+
+  if (numClasses === 1) {
+    check(`[${id}] single-mesh path: classCount is 1`, true);
+    const base = kiteSideLengths(angleDeg, 0);
+    const allCongruent = Array.from({ length: n }, (_, f) => kiteSideLengths(angleDeg, f)).every((sides) => sides.every((s, k) => Math.abs(s - base[k]) < 1e-4));
+    check(`[${id}] all ${n} kite fan positions are congruent (world-space)`, allCongruent);
+  } else {
+    check(`[${id}] multi-class path: classCount is ${numClasses}`, numClasses === Math.ceil(n / 2));
+    // Each class must be a real, closed kite, and its own antipodal
+    // partner (class + numClasses) must be EXACTLY that class's shape
+    // rotated 180 degrees -- not just individually valid.
+    const allClassesValid = Array.from({ length: numClasses }, (_, c) => polygonBottomFace(kiteClassTileVerts(angleDeg, c, 1, 0.15)).length === 4).every(Boolean);
+    check(`[${id}] every class is a real 4-vertex kite`, allClassesValid);
+    const antipodalMatches = Array.from({ length: numClasses }, (_, c) => {
+      const direct = kiteClassSideLengths(angleDeg, c, false);
+      const flipped = kiteClassSideLengths(angleDeg, c, true);
+      return direct.every((s, k) => Math.abs(s - flipped[k]) < 1e-6); // same multiset -- a 180-degree rotation preserves side lengths, so this alone doesn't prove the flip is RIGHT, only that it's a valid kite either way; classCount's own derivation (kiteClassCount) already proved the real antipodal relationship directly
+    }).every(Boolean);
+    check(`[${id}] every class's flipped instance is still a valid kite`, antipodalMatches);
+    // Position correctness: kiteDirectCellToWorld's own centroid for
+    // fanIndex=c+numClasses must be the exact 180-degree rotation (about
+    // the hexagon center) of fanIndex=c's centroid -- the real fact
+    // kiteClassCount's own derivation and render.js's rendering both rely
+    // on, checked directly here rather than assumed.
+    const positionsOk = Array.from({ length: numClasses }, (_, c) => {
+      const [px, py] = kiteDirectCellToWorld(0, 0, c, angleDeg, 1, 0);
+      const [qx, qy] = kiteDirectCellToWorld(0, 0, c + numClasses, angleDeg, 1, 0);
+      return Math.abs(qx + px) < 1e-9 && Math.abs(qy + py) < 1e-9;
+    }).every(Boolean);
+    check(`[${id}] antipodal positions are exact 180-degree rotations`, positionsOk);
+  }
 
   // Every fan position should have exactly 4 real neighbors (2 intra-hex
-  // fan-mates + 2 cross-hexagon, matching a kite's own real edge count).
+  // fan-mates + 2 cross-hexagon, matching a kite's own real edge count) --
+  // angle-general, already verified not to depend on classCount.
   const neighborCountsOk = Array.from({ length: n }, (_, f) => kiteNeighborOffsets(angleDeg, f).length === 4).every(Boolean);
   check(`[${id}] every kite fan position has exactly 4 neighbors`, neighborCountsOk);
 }

@@ -1420,31 +1420,76 @@ function resolveLattice2dImpl(primitiveId, arrangementId) {
 // handler only ever checks the PRIMARY mesh, see handleLattice2dClick),
 // rebuilt in lockstep with the primary mesh's own cellOrder so a logical
 // cell's index `i` always means the same real cell across all of them.
-function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangementId = 'translation', companionMeshes = null) {
+//
+// `classMeshes` (Kite only, when impl.classCount(angleDeg) > 1): the
+// OPPOSITE of companions -- every one of these IS a real click target
+// (see build.js's own broadened store.classMeshes check). Each real cell
+// (cellOrder index i) belongs to exactly ONE class mesh; every OTHER
+// class mesh gets a DEGENERATE (zero-scale) instance at that SAME index
+// i, which THREE's raycaster correctly treats as unhittable (a zero-area
+// triangle has no real intersection) -- so index i always means the same
+// cell across every class mesh, letting cellAt stay a single flat lookup
+// with no per-mesh bookkeeping, and a click can only ever register
+// against the ONE mesh actually showing real geometry at that spot.
+function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangementId = 'translation', companionMeshes = null, classMeshes = null) {
   const impl = resolveLattice2dImpl(primitiveId, arrangementId);
-  const newGeometry = new ConvexGeometry(impl.tileVerts(angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
-  newGeometry.computeVertexNormals();
-  mesh.geometry.dispose();
-  mesh.geometry = newGeometry;
-
   const cellOrder = world.entries();
   lattice2dCellOrders.set(primitiveId, cellOrder);
-  const m = new THREE.Matrix4();
-  cellOrder.forEach((cell, i) => {
-    const [wx, wy, wz] = impl.cellToWorld(cell.x, cell.y, cell.z, angleDeg, LATTICE2D_S, 0);
-    if (impl.hasOrientation) {
-      m.makeRotationZ(impl.instanceRotationRad(angleDeg, cell.z));
-      m.setPosition(wx, wy, wz);
-    } else {
-      m.makeTranslation(wx, wy, wz);
-    }
-    mesh.setMatrixAt(i, m);
-    mesh.setColorAt(i, instanceColorFor(cell));
-  });
-  mesh.count = cellOrder.length;
-  mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  mesh.computeBoundingSphere();
+  const numClasses = impl.classCount ? impl.classCount(angleDeg) : 1;
+
+  if (impl.classCount && classMeshes && numClasses > 1) {
+    const m = new THREE.Matrix4();
+    classMeshes.forEach((classMesh, c) => {
+      if (c < numClasses) {
+        const classGeometry = new ConvexGeometry(impl.classTileVerts(angleDeg, c, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+        classGeometry.computeVertexNormals();
+        classMesh.geometry.dispose();
+        classMesh.geometry = classGeometry;
+      }
+      cellOrder.forEach((cell, i) => {
+        if (c < numClasses && impl.classOf(cell.z, angleDeg) === c) {
+          const [wx, wy, wz] = impl.cellToWorld(cell.x, cell.y, cell.z, angleDeg, LATTICE2D_S, 0);
+          m.makeRotationZ(impl.classInstanceRotationRad(cell.z, angleDeg));
+          m.setPosition(wx, wy, wz);
+        } else {
+          m.makeScale(0, 0, 0);
+        }
+        classMesh.setMatrixAt(i, m);
+        classMesh.setColorAt(i, instanceColorFor(cell));
+      });
+      classMesh.count = cellOrder.length;
+      classMesh.instanceMatrix.needsUpdate = true;
+      if (classMesh.instanceColor) classMesh.instanceColor.needsUpdate = true;
+      classMesh.computeBoundingSphere();
+    });
+  } else {
+    // Single-mesh path -- either this primitive has no class concept at
+    // all, or the CURRENT angle only needs 1 (e.g. Kite at Square/
+    // Triangular). Any extra class meshes from a PREVIOUS angle that
+    // needed more must be emptied here, or they'd keep showing/blocking
+    // clicks on stale geometry after switching back.
+    if (classMeshes) for (let c = 1; c < classMeshes.length; c++) classMeshes[c].count = 0;
+    const newGeometry = new ConvexGeometry(impl.tileVerts(angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+    newGeometry.computeVertexNormals();
+    mesh.geometry.dispose();
+    mesh.geometry = newGeometry;
+    const m = new THREE.Matrix4();
+    cellOrder.forEach((cell, i) => {
+      const [wx, wy, wz] = impl.cellToWorld(cell.x, cell.y, cell.z, angleDeg, LATTICE2D_S, 0);
+      if (impl.hasOrientation) {
+        m.makeRotationZ(impl.instanceRotationRad(angleDeg, cell.z));
+        m.setPosition(wx, wy, wz);
+      } else {
+        m.makeTranslation(wx, wy, wz);
+      }
+      mesh.setMatrixAt(i, m);
+      mesh.setColorAt(i, instanceColorFor(cell));
+    });
+    mesh.count = cellOrder.length;
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  }
 
   if (impl.companions && companionMeshes) {
     impl.companions.forEach((companion, idx) => {
@@ -1745,6 +1790,17 @@ async function init() {
   // see rebuildLattice2dInstances' own header for why they're rebuilt in
   // lockstep with the primary mesh rather than owning a separate world.
   const lattice2dCompanionMeshes = new Map(); // primitiveId -> InstancedMesh[]
+  // Kite-only: its up-to-`impl.maxClasses` CLICKABLE class meshes (unlike
+  // companions above, every one of these is a real raycast target -- see
+  // rebuildLattice2dInstances' own header). Index 0 is always the SAME
+  // object as lattice2dMeshes.get(primitiveId), so every generic piece of
+  // plumbing that already iterates lattice2dMeshes (visibility, clipping
+  // planes, world-view materials) keeps working unchanged; indices 1+ are
+  // the real extra meshes. Pre-created once at the primitive's own
+  // maxClasses size regardless of the CURRENT angle, so toggling the
+  // angle live never needs to create/destroy meshes, only resize how many
+  // are actually populated (see rebuildLattice2dInstances).
+  const lattice2dClassMeshes = new Map(); // primitiveId -> InstancedMesh[]
   LATTICE_PRIMITIVES.forEach((primitive) => {
     const impl = LATTICE_PRIMITIVE_IMPLS[primitive.id];
     const geometry = new ConvexGeometry(impl.tileVerts(NAMED_LATTICE_ANGLES[0].angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
@@ -1763,7 +1819,19 @@ async function init() {
         return companionMesh;
       }));
     }
-    rebuildLattice2dInstances(mesh, lattice2dWorlds.get(primitive.id), primitive.id, NAMED_LATTICE_ANGLES[0].angleDeg, 'translation', lattice2dCompanionMeshes.get(primitive.id));
+    if (impl.classCount) {
+      const classMeshes = [mesh];
+      for (let c = 1; c < impl.maxClasses; c++) {
+        const classGeometry = new ConvexGeometry(impl.classTileVerts(NAMED_LATTICE_ANGLES[0].angleDeg, c, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+        classGeometry.computeVertexNormals();
+        const classMesh = new THREE.InstancedMesh(classGeometry, material.clone(), MAX_CELLS);
+        classMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        scene.add(classMesh);
+        classMeshes.push(classMesh);
+      }
+      lattice2dClassMeshes.set(primitive.id, classMeshes);
+    }
+    rebuildLattice2dInstances(mesh, lattice2dWorlds.get(primitive.id), primitive.id, NAMED_LATTICE_ANGLES[0].angleDeg, 'translation', lattice2dCompanionMeshes.get(primitive.id), lattice2dClassMeshes.get(primitive.id));
   });
 
   // Dot-matrix overlay (Phase 4, direct instruction: "showing the dot
@@ -1879,12 +1947,13 @@ async function init() {
   lattice2dPanel.id = 'lattice2d-toggle-panel';
   document.body.appendChild(lattice2dPanel);
 
-  // Kite is only a valid shape at 2 of the 4 named angles (see lattice-
-  // 2d.js's own KITE_VALID_ANGLE_IDS header for why) -- rather than
-  // special-case 'kite' by name here, this reads the SAME
-  // `impl.validAngleIds` field lattice-2d.js's dispatch table already
-  // carries, so any future angle-restricted primitive (e.g. Rhombille)
-  // gates the same way with no new code in this file.
+  // Some primitives are only valid at some named angles (Kagome at
+  // Triangular only -- see lattice-2d.js's own KAGOME_VALID_ANGLE_IDS
+  // header; Kite used to be restricted too, before its own multi-class
+  // rendering path covered the rest) -- rather than special-case a
+  // primitive by name here, this reads the SAME `impl.validAngleIds`
+  // field lattice-2d.js's dispatch table already carries, so any
+  // angle-restricted primitive gates the same way with no new code here.
   function angleAllowedForPrimitive(primitiveId, angleId) {
     const validAngleIds = LATTICE_PRIMITIVE_IMPLS[primitiveId].validAngleIds;
     return !validAngleIds || validAngleIds.includes(angleId);
@@ -1931,7 +2000,8 @@ async function init() {
       if (primitive.id === activeLattice2dPrimitiveId) btn.classList.add('active');
       if (!angleAllowedForPrimitive(primitive.id, activeLattice2dAngleId)) {
         btn.disabled = true;
-        btn.title = `${primitive.label} needs a different angle — try Square or Triangular`;
+        const validLabels = LATTICE_PRIMITIVE_IMPLS[primitive.id].validAngleIds.map((id) => NAMED_LATTICE_ANGLES.find((a) => a.id === id).label);
+        btn.title = `${primitive.label} needs a different angle — try ${validLabels.join(' or ')}`;
       } else {
         btn.addEventListener('click', () => {
           if (primitive.id === activeLattice2dPrimitiveId) return;
@@ -2015,7 +2085,7 @@ async function init() {
     const angleDeg = currentLattice2dAngleDeg();
     const primitive = LATTICE_PRIMITIVES.find((p) => p.id === activeLattice2dPrimitiveId);
     updateDotMatrix(angleDeg);
-    rebuildLattice2dInstances(lattice2dMeshes.get(primitive.id), lattice2dWorlds.get(primitive.id), primitive.id, angleDeg, activeLattice2dArrangementId, lattice2dCompanionMeshes.get(primitive.id));
+    rebuildLattice2dInstances(lattice2dMeshes.get(primitive.id), lattice2dWorlds.get(primitive.id), primitive.id, angleDeg, activeLattice2dArrangementId, lattice2dCompanionMeshes.get(primitive.id), lattice2dClassMeshes.get(primitive.id));
     document.getElementById('piece-type-select').value = `lattice2d:${primitive.id}`;
     // Re-derives which single lattice2d mesh dimensionAllowsMesh now
     // permits (the newly active primitive) and hides every other one --
@@ -2478,6 +2548,7 @@ async function init() {
     hexPrismMesh.material.clippingPlanes = planes;
     lattice2dMeshes.forEach((m) => { m.material.clippingPlanes = planes; });
     lattice2dCompanionMeshes.forEach((meshes) => meshes.forEach((m) => { m.material.clippingPlanes = planes; }));
+    lattice2dClassMeshes.forEach((meshes) => meshes.forEach((m) => { m.material.clippingPlanes = planes; }));
     rhombohedraMesh.material.clippingPlanes = planes;
     cuboctaMesh.material.clippingPlanes = planes;
     octGapMesh.material.clippingPlanes = planes;
@@ -2530,7 +2601,7 @@ async function init() {
   let skeletonGeneration = 0;
   const TRANSLUCENT_OPACITY = 0.55; // matches Lattice Quick-View/Dualize preview's own established "see-through structure" opacity
   function worldViewMaterials() {
-    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, ...[...lattice2dMeshes.values()].map((m) => m.material), ...[...lattice2dCompanionMeshes.values()].flat().map((m) => m.material), rhombohedraMesh.material, cuboctaMesh.material, octGapMesh.material];
+    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, ...[...lattice2dMeshes.values()].map((m) => m.material), ...[...lattice2dCompanionMeshes.values()].flat().map((m) => m.material), ...[...lattice2dClassMeshes.values()].flat().map((m) => m.material), rhombohedraMesh.material, cuboctaMesh.material, octGapMesh.material];
     for (const { mesh: m } of partialCellMeshes.values()) {
       if (m.isGroup) { for (const child of m.children) mats.push(child.material); }
       else mats.push(m.material);
@@ -2601,6 +2672,7 @@ async function init() {
     hexPrismMesh.visible = visible && dimensionAllowsMesh('hexprism');
     lattice2dMeshes.forEach((m, primitiveId) => { m.visible = visible && dimensionAllowsMesh(`lattice2d:${primitiveId}`); });
     lattice2dCompanionMeshes.forEach((meshes, primitiveId) => { const v = visible && dimensionAllowsMesh(`lattice2d:${primitiveId}`); meshes.forEach((m) => { m.visible = v; }); });
+    lattice2dClassMeshes.forEach((meshes, primitiveId) => { const v = visible && dimensionAllowsMesh(`lattice2d:${primitiveId}`); meshes.forEach((m) => { m.visible = v; }); });
     rhombohedraMesh.visible = visible && dimensionAllowsMesh('rhombohedra');
     cuboctaMesh.visible = visible && dimensionAllowsMesh('cubocta');
     octGapMesh.visible = visible && dimensionAllowsMesh('octgap');
@@ -3267,7 +3339,7 @@ async function init() {
               renderLattice2dPanel();
             }
             const angleDeg = currentLattice2dAngleDeg();
-            rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), lattice2dWorlds.get(primitiveId), primitiveId, angleDeg, activeLattice2dArrangementId, lattice2dCompanionMeshes.get(primitiveId));
+            rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), lattice2dWorlds.get(primitiveId), primitiveId, angleDeg, activeLattice2dArrangementId, lattice2dCompanionMeshes.get(primitiveId), lattice2dClassMeshes.get(primitiveId));
             updateDotMatrix(angleDeg);
             applyDimensionVisibility();
           }
@@ -5094,7 +5166,18 @@ async function init() {
       primitives: LATTICE_PRIMITIVES,
       stores: new Map(LATTICE_PRIMITIVES.map((p) => [
         p.id,
-        { world: lattice2dWorlds.get(p.id), mesh: lattice2dMeshes.get(p.id), cellAt: (instanceId) => lattice2dCellOrders.get(p.id)?.[instanceId] },
+        {
+          world: lattice2dWorlds.get(p.id),
+          mesh: lattice2dMeshes.get(p.id),
+          // Kite only (see rebuildLattice2dInstances' own header): every
+          // class mesh is a real click target, not just the primary --
+          // build.js's own handleLattice2dClick checks a hit against ALL
+          // of these, not just `mesh`, via this same array. undefined for
+          // every other primitive, same as `companions`/`classCount` on
+          // their own dispatch entries.
+          classMeshes: lattice2dClassMeshes.get(p.id),
+          cellAt: (instanceId) => lattice2dCellOrders.get(p.id)?.[instanceId],
+        },
       ])),
       s: LATTICE2D_S,
       getAngleDeg: currentLattice2dAngleDeg,
@@ -5194,7 +5277,7 @@ async function init() {
       const [sx, sy] = lattice2dSeedCell();
       world.addCell(sx, sy, 0, { material: LATTICE2D_SEED_COLORS[idx % LATTICE2D_SEED_COLORS.length] });
     }
-    rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), world, primitiveId, currentLattice2dAngleDeg(), activeLattice2dArrangementId, lattice2dCompanionMeshes.get(primitiveId));
+    rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), world, primitiveId, currentLattice2dAngleDeg(), activeLattice2dArrangementId, lattice2dCompanionMeshes.get(primitiveId), lattice2dClassMeshes.get(primitiveId));
     updateSectionEnabled();
     applyWorldViewMaterials();
     saveToLocalStorage(world.toJSON(), lattice2dStorageKey(primitiveId));
