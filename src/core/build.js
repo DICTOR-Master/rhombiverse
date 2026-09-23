@@ -378,7 +378,16 @@ export function createBuildController({
     // generic lookup replaces the old square2dTargets/hexagon2dTargets/
     // triangle2dTargets trio.
     const activeLattice2dStore = lattice2d && getPieceType().startsWith('lattice2d:') ? lattice2d.stores.get(getPieceType().slice('lattice2d:'.length)) : null;
-    const lattice2dTargets = activeLattice2dStore?.mesh ? [activeLattice2dStore.mesh] : [];
+    // Real bug, found investigating a separate "long touch isnt erasing"
+    // report: this used to include ONLY `.mesh`, never `.classMeshes`
+    // (Kite's own extra clickable class meshes at RD Rhombus/Golden
+    // Rhombus, see render.js's own rebuildLattice2dInstances) or
+    // `.companionMeshes` (Kagome's own triangle companions, made real
+    // click targets the same session for the same reason) -- so a hit on
+    // any of those silently missed every raycast, always. Both are
+    // undefined for every primitive that doesn't have them, so this stays
+    // a no-op (just `[activeLattice2dStore.mesh]`) everywhere else.
+    const lattice2dTargets = activeLattice2dStore ? [activeLattice2dStore.mesh, ...(activeLattice2dStore.classMeshes ?? []), ...(activeLattice2dStore.companionMeshes ?? [])] : [];
     const rhombohedraTargets = rhombohedraMesh && getPieceType() === 'rhombohedra' ? [rhombohedraMesh] : [];
     // Same reasoning: interstitialGroup only enters the raycast under
     // its own piece tiers, for the same "don't steal clicks from other
@@ -642,12 +651,21 @@ export function createBuildController({
     // accessor's own header for the real Rhombille-arrangement mismatch
     // this replaces.
     const impl = lattice2d?.getImpl(primitiveId);
-    // Kite only: store.classMeshes lists ALL of its real click targets
-    // (one per distinct kite shape at the current angle), not just the
+    // Kite: store.classMeshes lists ALL of its real click targets (one
+    // per distinct kite shape at the current angle), not just the
     // primary -- see render.js's own rebuildLattice2dInstances header for
-    // why a hit can land on any of them. undefined for every other
-    // primitive, so this falls back to the plain single-mesh check.
-    const isRealClickTarget = !!store && (hit.object === store.mesh || store.classMeshes?.includes(hit.object));
+    // why a hit can land on any of them. Kagome: store.companionMeshes
+    // (its 2 triangle companions) are now real click targets too -- real
+    // bug, direct report ("long touch isnt erasing"): they used to be
+    // render-only, making roughly half of every Kagome cell's own
+    // visible area an invisible dead zone for both add and remove, with
+    // no way to tell hexagon from triangle by looking. Both fields are
+    // undefined for every primitive that doesn't have them, so this
+    // falls back to the plain single-mesh check everywhere else.
+    // cellAt(hit.instanceId) below needs no change either way -- every
+    // one of these meshes is rebuilt sharing the SAME per-cell instance
+    // index as the primary mesh.
+    const isRealClickTarget = !!store && (hit.object === store.mesh || store.classMeshes?.includes(hit.object) || store.companionMeshes?.includes(hit.object));
     if (!store || !impl || !isRealClickTarget || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
     const cell = store.cellAt(hit.instanceId);
     if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }

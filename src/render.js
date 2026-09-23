@@ -5178,6 +5178,21 @@ async function init() {
           // every other primitive, same as `companions`/`classCount` on
           // their own dispatch entries.
           classMeshes: lattice2dClassMeshes.get(p.id),
+          // Kagome only: real bug, direct report ("long touch isnt
+          // erasing") -- its 2 triangle companions were built as
+          // render-only/non-clickable on purpose (see
+          // rebuildLattice2dInstances' own header), but that made roughly
+          // half of every Kagome cell's own visible area a dead zone for
+          // both tap-to-add and long-press-to-remove, with NO visual way
+          // to tell which part is real hexagon vs decorative triangle --
+          // confirmed directly (a contextmenu dispatched at a triangle-
+          // only point correctly hit nothing and no-opped). Companions
+          // are now ALSO real click targets here; they share the SAME
+          // per-cell instance index as the primary mesh (rebuilt in
+          // lockstep, see rebuildLattice2dInstances), so `cellAt` below
+          // needs no change to resolve a companion hit back to its real
+          // owning logical cell.
+          companionMeshes: lattice2dCompanionMeshes.get(p.id),
           cellAt: (instanceId) => lattice2dCellOrders.get(p.id)?.[instanceId],
         },
       ])),
