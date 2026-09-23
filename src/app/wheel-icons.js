@@ -188,11 +188,13 @@ export const MARKS = {
   // rhombohedron's own non-orthogonal silhouette.
   pieceRhombohedron: `<polygon points="-22,10 -6,-22 22,-10 6,22" ${THIN}/>`,
   // 2D lattice tier (Phase 3): one icon PER PRIMITIVE, shared across
-  // all 4 NAMED_LATTICE_ANGLES that primitive can appear at (this glyph
-  // shows which of the 3 primitive constructions is active, not the
-  // exact angle -- a full per-angle icon set for all 12 combinations
-  // wasn't asked for and would mostly just be minor skew variations of
-  // these same 3 shapes). Replaces the old pieceSquare2D/pieceHexagon2D/
+  // every named angle that primitive can appear at (this glyph shows
+  // which primitive construction is active, not the exact angle -- a
+  // full per-angle icon set for all combinations wasn't asked for and
+  // would mostly just be minor skew variations of these same shapes;
+  // Kite (Phase 7) is the one primitive that isn't offered at every
+  // angle -- see lattice-2d.js's own KITE_VALID_ANGLE_IDS). Replaces the
+  // old pieceSquare2D/pieceHexagon2D/
   // pieceTriangle2D keys (formerly hardcoded to exactly 90/some-hex/60
   // degrees) with primitive-named ones matching lattice-2d.js's own
   // LATTICE_PRIMITIVES ids.
@@ -210,6 +212,12 @@ export const MARKS = {
   // undecorated/symmetric, distinct from piecePyramid's own taller
   // "peaked" triangle (a real 3D apex, not a flat 2D tile).
   piece2dTriangle: `<polygon points="0,-24 21,12 -21,12" ${THIN}/>`,
+  // Kite: a classic 4-point kite silhouette (short top, wide middle, long
+  // bottom "tail") -- readable at a glance, not a literal render of the
+  // actual construction (center/edge-midpoint/vertex/edge-midpoint --
+  // same simplification piece2dHexagon's own "flatter than the real
+  // Voronoi cell" already takes).
+  piece2dKite: `<polygon points="0,-24 14,-2 0,24 -14,-2" ${THIN}/>`,
   // Fill: "+" shown across three hexagons.
   fill: `
     <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>

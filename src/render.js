@@ -1392,11 +1392,13 @@ function rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld) {
 // rhombus -- a different silhouette, not a repositioned one), so
 // toggling the angle on an ALREADY-BUILT structure needs its real
 // geometry to change too, not just where each already-placed instance
-// sits. Orientation handling (the Triangle primitive's own "down"
-// instances reuse the SAME "up" geometry via a 180-degree Z-rotation
-// baked into the instance matrix, exact per lattice-2d.js's own
-// verified header) generalizes to `impl.hasOrientation`, true only for
-// the triangle primitive.
+// sits. Orientation handling (Triangle's "down" instances reuse the SAME
+// "up" geometry via a 180-degree Z-rotation baked into the instance
+// matrix; Kite's own other fan positions reuse fan-index-0's geometry via
+// an N-fold rotation, same trick generalized -- both exact per lattice-
+// 2d.js's own verified header) is `impl.hasOrientation`, driving a call
+// to `impl.instanceRotationRad(angleDeg, cell.z)` rather than a hardcoded
+// 180-degree flip.
 function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg) {
   const impl = LATTICE_PRIMITIVE_IMPLS[primitiveId];
   const newGeometry = new ConvexGeometry(impl.tileVerts(angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
@@ -1409,8 +1411,8 @@ function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg) {
   const m = new THREE.Matrix4();
   cellOrder.forEach((cell, i) => {
     const [wx, wy, wz] = impl.cellToWorld(cell.x, cell.y, cell.z, angleDeg, LATTICE2D_S, 0);
-    if (impl.hasOrientation && cell.z === 1) {
-      m.makeRotationZ(Math.PI);
+    if (impl.hasOrientation) {
+      m.makeRotationZ(impl.instanceRotationRad(angleDeg, cell.z));
       m.setPosition(wx, wy, wz);
     } else {
       m.makeTranslation(wx, wy, wz);
@@ -1806,6 +1808,16 @@ async function init() {
   lattice2dPanel.id = 'lattice2d-toggle-panel';
   document.body.appendChild(lattice2dPanel);
 
+  // Kite is only a valid shape at 2 of the 4 named angles (see lattice-
+  // 2d.js's own KITE_VALID_ANGLE_IDS header for why) -- rather than
+  // special-case 'kite' by name here, this reads the SAME
+  // `impl.validAngleIds` field lattice-2d.js's dispatch table already
+  // carries, so any future angle-restricted primitive (e.g. Rhombille)
+  // gates the same way with no new code in this file.
+  function angleAllowedForPrimitive(primitiveId, angleId) {
+    const validAngleIds = LATTICE_PRIMITIVE_IMPLS[primitiveId].validAngleIds;
+    return !validAngleIds || validAngleIds.includes(angleId);
+  }
   function renderLattice2dPanel() {
     lattice2dPanel.innerHTML = '';
     const angleRow = document.createElement('div');
@@ -1822,12 +1834,17 @@ async function init() {
       btn.textContent = `${angle.angleDeg.toFixed(2)}°`;
       btn.title = angle.label;
       if (angle.id === activeLattice2dAngleId) btn.classList.add('active');
-      btn.addEventListener('click', () => {
-        if (angle.id === activeLattice2dAngleId) return;
-        activeLattice2dAngleId = angle.id;
-        renderLattice2dPanel();
-        applyLattice2dSelection();
-      });
+      if (!angleAllowedForPrimitive(activeLattice2dPrimitiveId, angle.id)) {
+        btn.disabled = true;
+        btn.title = `${angle.label} — not available for the current shape`;
+      } else {
+        btn.addEventListener('click', () => {
+          if (angle.id === activeLattice2dAngleId) return;
+          activeLattice2dAngleId = angle.id;
+          renderLattice2dPanel();
+          applyLattice2dSelection();
+        });
+      }
       angleRow.appendChild(btn);
     }
     const primRow = document.createElement('div');
@@ -1837,12 +1854,17 @@ async function init() {
       btn.type = 'button';
       btn.textContent = primitive.label;
       if (primitive.id === activeLattice2dPrimitiveId) btn.classList.add('active');
-      btn.addEventListener('click', () => {
-        if (primitive.id === activeLattice2dPrimitiveId) return;
-        activeLattice2dPrimitiveId = primitive.id;
-        renderLattice2dPanel();
-        applyLattice2dSelection();
-      });
+      if (!angleAllowedForPrimitive(primitive.id, activeLattice2dAngleId)) {
+        btn.disabled = true;
+        btn.title = `${primitive.label} needs a different angle — try Square or Triangular`;
+      } else {
+        btn.addEventListener('click', () => {
+          if (primitive.id === activeLattice2dPrimitiveId) return;
+          activeLattice2dPrimitiveId = primitive.id;
+          renderLattice2dPanel();
+          applyLattice2dSelection();
+        });
+      }
       primRow.appendChild(btn);
     }
     lattice2dPanel.append(angleRow, primRow);

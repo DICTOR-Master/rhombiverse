@@ -18,6 +18,10 @@ import {
   hexagonNeighborOffsets,
   PARALLELOGRAM_NEIGHBOR_OFFSETS,
   TRIANGLE_NEIGHBOR_OFFSETS_FROM_UP,
+  KITE_VALID_ANGLE_IDS,
+  kiteTileVerts,
+  kiteCellToWorld,
+  kiteNeighborOffsets,
 } from '../src/geometry-extensions/lattice-2d.js';
 
 let failures = 0;
@@ -56,7 +60,10 @@ function interiorAngles(poly) {
 check('4 named lattice angles, all distinct', new Set(NAMED_LATTICE_ANGLES.map((a) => a.angleDeg.toFixed(4))).size === 4);
 check('RD Rhombus angle matches arccos(1/3) exactly (70.5288 degrees)', Math.abs(NAMED_LATTICE_ANGLES.find((a) => a.id === 'rd-rhombus').angleDeg - 70.5287793655) < 1e-6);
 check('Golden Rhombus angle matches arctan(2) exactly (63.4349 degrees)', Math.abs(NAMED_LATTICE_ANGLES.find((a) => a.id === 'golden-rhombus').angleDeg - 63.4349488229) < 1e-6);
-check('12 combinations (4 angles x 3 primitives)', LATTICE_2D_COMBINATIONS.length === 12);
+check(
+  `${NAMED_LATTICE_ANGLES.length * LATTICE_PRIMITIVES.length} combinations (${NAMED_LATTICE_ANGLES.length} angles x ${LATTICE_PRIMITIVES.length} primitives)`,
+  LATTICE_2D_COMBINATIONS.length === NAMED_LATTICE_ANGLES.length * LATTICE_PRIMITIVES.length,
+);
 
 for (const { id, angleDeg } of NAMED_LATTICE_ANGLES) {
   const [v0, v1] = latticeBasis(angleDeg, 1);
@@ -123,6 +130,45 @@ for (const { id, angleDeg } of NAMED_LATTICE_ANGLES) {
     return edgeMidpoints.some((m) => dist2d(m, halfway) < 1e-6);
   });
   check(`[${id}] every hexagon neighbor offset lands exactly at an edge midpoint x2`, allMatch);
+}
+
+// Kite: only offered at Square/Triangular (see KITE_VALID_ANGLE_IDS's own
+// header) -- every fan position there must be a REAL kite (4 vertices,
+// closed) and, since only those 2 angles have the full N-fold symmetry
+// the single-geometry-plus-rotation instancing trick depends on, every
+// fan position's world shape must be congruent (same side-length
+// multiset) to fan position 0's, not just individually valid.
+check('Kite offered only at Square + Triangular', KITE_VALID_ANGLE_IDS.length === 2 && KITE_VALID_ANGLE_IDS.includes('square') && KITE_VALID_ANGLE_IDS.includes('triangular'));
+
+function kiteSideLengths(angleDeg, fanIndex) {
+  const poly = polygonBottomFace(kiteTileVerts(angleDeg, 1, 0.15));
+  const [cx, cy] = kiteCellToWorld(0, 0, fanIndex, angleDeg, 1, 0);
+  // kiteTileVerts is fan-index-0's own shape, centered at ITS OWN
+  // centroid; rotate + translate it to fan index's own world position the
+  // same way render.js's instancing does, then compare real world-space
+  // side lengths against fan index 0's.
+  const theta = (fanIndex * 2 * Math.PI) / kitePolyLength(angleDeg);
+  const cos = Math.cos(theta), sin = Math.sin(theta);
+  const world = poly.map(([x, y, z]) => [x * cos - y * sin + cx, x * sin + y * cos + cy, z]);
+  return edgeLengths(world).map((e) => +e.toFixed(6)).sort();
+}
+function kitePolyLength(angleDeg) {
+  return NAMED_LATTICE_ANGLES.find((a) => a.angleDeg === angleDeg)?.id === 'square' ? 4 : 6;
+}
+
+for (const id of KITE_VALID_ANGLE_IDS) {
+  const angleDeg = NAMED_LATTICE_ANGLES.find((a) => a.id === id).angleDeg;
+  const kite0 = polygonBottomFace(kiteTileVerts(angleDeg, 1, 0.15));
+  check(`[${id}] kite: 4 vertices`, kite0.length === 4);
+  const n = kitePolyLength(angleDeg);
+  const base = kiteSideLengths(angleDeg, 0);
+  const allCongruent = Array.from({ length: n }, (_, f) => kiteSideLengths(angleDeg, f)).every((sides) => sides.every((s, k) => Math.abs(s - base[k]) < 1e-4));
+  check(`[${id}] all ${n} kite fan positions are congruent (world-space)`, allCongruent);
+
+  // Every fan position should have exactly 4 real neighbors (2 intra-hex
+  // fan-mates + 2 cross-hexagon, matching a kite's own real edge count).
+  const neighborCountsOk = Array.from({ length: n }, (_, f) => kiteNeighborOffsets(angleDeg, f).length === 4).every(Boolean);
+  check(`[${id}] every kite fan position has exactly 4 neighbors`, neighborCountsOk);
 }
 
 console.log(failures === 0 ? `\nAll checks passed (0 failures).` : `\n${failures} check(s) FAILED.`);

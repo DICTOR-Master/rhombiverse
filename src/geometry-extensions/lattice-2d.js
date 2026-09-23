@@ -64,6 +64,7 @@ export const LATTICE_PRIMITIVES = [
   { id: 'parallelogram', label: 'Parallelogram' },
   { id: 'triangle', label: 'Triangle' },
   { id: 'hexagon', label: 'Hexagon' },
+  { id: 'kite', label: 'Kite' },
 ];
 
 // Two equal-length basis vectors at angleDeg apart. The single shared
@@ -299,6 +300,95 @@ export function hexagonTileVerts(angleDeg, s = 1, h = 0.15 * 1) {
 }
 
 // ---------------------------------------------------------------------------
+// Kite primitive (the hexagon above, fanned into kites from its own
+// center) -- ONLY offered at Square and Triangular, the 2 angles where the
+// fan is genuinely N congruent kites related by a pure rotation (4-fold,
+// 6-fold). At RD Rhombus/Golden Rhombus the Voronoi hexagon is irregular
+// (only 180-degree point symmetry, not full N-fold), so its fan produces 3
+// GENUINELY DIFFERENT kite shapes there, not rotations of one -- verified
+// directly (real side lengths differ between adjacent fan positions, only
+// match 3 apart). Rendering that correctly needs real multi-geometry
+// support this file's "one shape per primitive" model doesn't have yet
+// (the same problem Kagome will need to solve for its own 2 sub-shapes) --
+// deferred, not built here. KITE_VALID_ANGLE_IDS is what render.js's
+// toggle panel uses to grey Kite out at the other 2 angles instead of
+// rendering broken geometry.
+// ---------------------------------------------------------------------------
+
+export const KITE_VALID_ANGLE_IDS = ['square', 'triangular'];
+
+// One kite: hexagon center, the midpoint of its incoming edge, the real
+// polygon vertex itself, and the midpoint of its outgoing edge -- the
+// standard "fan a polygon from its center" kite construction, generic
+// over the polygon's own vertex count (4 at Square, 6 elsewhere) rather
+// than hardcoded to 6.
+function kiteCorners2d(poly, i) {
+  const n = poly.length;
+  const Vi = poly[i];
+  const Vprev = poly[(i - 1 + n) % n];
+  const Vnext = poly[(i + 1) % n];
+  return [
+    [0, 0],
+    [(Vprev[0] + Vi[0]) / 2, (Vprev[1] + Vi[1]) / 2],
+    Vi,
+    [(Vi[0] + Vnext[0]) / 2, (Vi[1] + Vnext[1]) / 2],
+  ];
+}
+
+// Fan index 0's own real corners only -- every other fan index (only at
+// the 2 valid angles) is a pure rotation of this SAME shape about the
+// hexagon's own center, same "one geometry, per-instance rotation" trick
+// triangle's up/down already uses, generalized from one 180-degree flip to
+// N-fold (see kiteInstanceRotationRad below).
+export function kiteTileVerts(angleDeg, s = 1, h = 0.15 * 1) {
+  return extrudePrism(kiteCorners2d(voronoiPolygon(angleDeg, s), 0), h);
+}
+
+export function kiteCellToWorld(x, y, fanIndex, angleDeg, s = 1, worldZ = 0) {
+  const poly = voronoiPolygon(angleDeg, s);
+  const [hcx, hcy] = hexagonCellToWorld(x, y, angleDeg, s, 0);
+  const [ox, oy] = centroid2d(kiteCorners2d(poly, 0));
+  const theta = (fanIndex * 2 * Math.PI) / poly.length;
+  const cos = Math.cos(theta), sin = Math.sin(theta);
+  return [hcx + ox * cos - oy * sin, hcy + ox * sin + oy * cos, worldZ];
+}
+
+export function kiteInstanceRotationRad(fanIndex, angleDeg) {
+  return (fanIndex * 2 * Math.PI) / voronoiPolygon(angleDeg, 1).length;
+}
+
+// Kite's own real neighbor table: 2 intra-hexagon fan-mates (adjacent fan
+// index, same hexagon -- always correct, no angle-dependent derivation
+// needed) plus 2 cross-hexagon neighbors, one per outer edge -- found by
+// matching THIS kite's own vertex (poly[fanIndex]) against each hexagon-
+// neighbor's own vertex set in world space (a shared vertex in world space
+// IS a shared kite edge, since a kite's outer boundary is exactly the 2
+// hexagon-edge half-segments touching its own vertex). Verified directly
+// for both valid angles: always exactly 2 cross-hexagon matches per fan
+// index, matching a kite's real edge count (4) exactly.
+const kiteNeighborOffsetCache = new Map();
+export function kiteNeighborOffsets(angleDeg, fanIndex) {
+  const key = `${angleDeg.toFixed(6)}:${fanIndex}`;
+  if (kiteNeighborOffsetCache.has(key)) return kiteNeighborOffsetCache.get(key);
+  const poly = voronoiPolygon(angleDeg, 1);
+  const n = poly.length;
+  const offsets = [
+    [0, 0, (fanIndex - 1 + n) % n],
+    [0, 0, (fanIndex + 1) % n],
+  ];
+  const Vi = poly[fanIndex];
+  const eq = (a, b) => Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6;
+  for (const [ox, oy] of hexagonNeighborOffsets(angleDeg)) {
+    const [ncx, ncy] = hexagonCellToWorld(ox, oy, angleDeg, 1, 0);
+    for (let j = 0; j < n; j++) {
+      if (eq([poly[j][0] + ncx, poly[j][1] + ncy], Vi)) { offsets.push([ox, oy, j]); break; }
+    }
+  }
+  kiteNeighborOffsetCache.set(key, offsets);
+  return offsets;
+}
+
+// ---------------------------------------------------------------------------
 // Generic dispatch: one lookup table so callers (render.js/build.js) can
 // loop over all NAMED_LATTICE_ANGLES x LATTICE_PRIMITIVES combinations
 // generically instead of hand-writing one block per combination.
@@ -316,12 +406,21 @@ export const LATTICE_PRIMITIVE_IMPLS = {
     tileVerts: (angleDeg, s, h) => triangleTileVerts(angleDeg, s, h),
     cellToWorld: (i, j, orientation, angleDeg, s, worldZ) => triangleCellToWorld(i, j, orientation, angleDeg, s, worldZ),
     neighborOffsets: (_angleDeg, orientation) => (orientation === 0 ? TRIANGLE_NEIGHBOR_OFFSETS_FROM_UP : TRIANGLE_NEIGHBOR_OFFSETS_FROM_DOWN),
+    instanceRotationRad: (_angleDeg, orientation) => (orientation === 1 ? Math.PI : 0),
   },
   hexagon: {
     hasOrientation: false,
     tileVerts: (angleDeg, s, h) => hexagonTileVerts(angleDeg, s, h),
     cellToWorld: (i, j, _orientation, angleDeg, s, worldZ) => hexagonCellToWorld(i, j, angleDeg, s, worldZ),
     neighborOffsets: (angleDeg) => hexagonNeighborOffsets(angleDeg),
+  },
+  kite: {
+    hasOrientation: true,
+    validAngleIds: KITE_VALID_ANGLE_IDS,
+    tileVerts: (angleDeg, s, h) => kiteTileVerts(angleDeg, s, h),
+    cellToWorld: (i, j, orientation, angleDeg, s, worldZ) => kiteCellToWorld(i, j, orientation, angleDeg, s, worldZ),
+    neighborOffsets: (angleDeg, orientation) => kiteNeighborOffsets(angleDeg, orientation),
+    instanceRotationRad: (angleDeg, orientation) => kiteInstanceRotationRad(orientation, angleDeg),
   },
 };
 
