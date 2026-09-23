@@ -1527,22 +1527,25 @@ async function init() {
   if (hexPrismWorld.entries().length === 0) hexPrismWorld.addCell(0, 0, 0, { material: 'base' });
 
   // A seed cell (lattice-index coordinates, not world units) for the
-  // idx-th LATTICE_2D_COMBINATIONS entry, arranged as a compact
-  // primitive-column x angle-row grid (3 columns, 4 rows) rather than a
-  // single spread-out line -- real bug caught live via a browser check:
-  // applyDimensionCamera('2D') always frames a FIXED position/distance
-  // (camera.position.set(0,0,12), independent of piece type), so a
-  // naive `idx * 20` line put later combos tens of units outside that
-  // fixed view, invisible until manually panned/zoomed out. This keeps
-  // every combo within a few units of the origin, same as Square/
-  // Hexagon/Triangle's own original hand-picked (2,0)/(-2,0)/(0,-4)
-  // seeds already were, while still keeping all 12 mutually distinct
-  // (a real per-combo world-space gap, not just a coincidence) so they
-  // don't visually stack on each other or on the main RD seed at origin.
-  function lattice2dSeedCell(idx) {
-    const primitiveIndex = idx % LATTICE_PRIMITIVES.length;
-    const angleIndex = Math.floor(idx / LATTICE_PRIMITIVES.length);
-    return [primitiveIndex * 3 - 3, -angleIndex * 3 - 3];
+  // idx-th LATTICE_2D_COMBINATIONS entry. Direct correction, 2026-09-23
+  // (a real design mistake, not just a positioning tweak -- caught via
+  // several converging reports: "silhouettes just sit there," "shapes
+  // dont change when dot matrix changes," "dots and shapes arent
+  // separate... they are the matrix together"): this used to scatter
+  // all 12 combos' own seeds across a 3x4 grid so they could ALL stay
+  // simultaneously visible (the earlier "families coexist" design,
+  // copied from Square/Hexagon/Triangle without reconsidering whether
+  // it still made sense at 12). That's exactly what caused the real
+  // confusion: users naturally tapped the big, prominent, decorative
+  // preview shapes at the dot matrix's own center (which were never
+  // wired into the raycast target list -- pure decoration) while the
+  // ACTUAL clickable tile sat small and far off-center, easy to miss
+  // entirely. Fixed by dropping "all 12 visible at once" altogether --
+  // see dimensionAllowsMesh's own updated comment below -- so every
+  // combo's own seed can now live at the SAME origin cell without ever
+  // overlapping another VISIBLE one.
+  function lattice2dSeedCell(_idx) {
+    return [0, 0];
   }
 
   // 2D lattice tier (Phase 3): one store PER (angle, primitive)
@@ -1764,52 +1767,22 @@ async function init() {
     }
     lattice2dPanel.append(angleRow, primRow);
   }
-  // Live preview shapes, direct reports ("shapes dont change when dot
-  // matrix changes" then "you only need to see three basic shapes but
-  // they must change when matrix does"): the 12 real seed tiles each
-  // live in their own separate store at their own fixed grid offset (by
-  // design -- see LATTICE_2D_COMBINATIONS' own "families coexist"
-  // reasoning above), so toggling the angle never visibly reshapes any
-  // already-placed one, and showing all 12 at once is more clutter than
-  // signal. These 3 extra, non-persisted preview meshes (not part of
-  // any world store -- never saved, never counts as a placed cell) --
-  // one per LATTICE_PRIMITIVES entry, side by side at the dot matrix's
-  // own origin -- get their geometry rebuilt to the CURRENT toggled
-  // angle every time it changes, so all 3 visibly morph together in
-  // place alongside the dots. The currently active primitive (the one
-  // that will actually get placed on click) is the one rendered fully
-  // opaque; the other 2 stay dim for comparison.
-  // Direct correction, 2026-09-23 ("shapes are too small relative to
-  // dot spacing"): these 3 are a purely cosmetic comparison display,
-  // not tied to the real 1-unit-per-cell placement grid the way the
-  // actual placeable tiles are, so there's no correctness reason they
-  // need to match dot spacing 1:1 -- scaled up 3x to read as real
-  // "hero" shapes against the now much wider (radius-24) dot field,
-  // spacing scaled proportionally so they still don't overlap.
-  const LATTICE2D_PREVIEW_SCALE = 3;
-  const lattice2dPreviewMeshes = new Map(); // primitiveId -> Mesh
-  function updateLattice2dPreviews(angleDeg, activePrimitiveId) {
-    const previewS = LATTICE2D_S * LATTICE2D_PREVIEW_SCALE;
-    const spacing = 1.6 * previewS;
-    LATTICE_PRIMITIVES.forEach((primitive, i) => {
-      const old = lattice2dPreviewMeshes.get(primitive.id);
-      if (old) {
-        scene.remove(old);
-        old.geometry.dispose();
-        old.material.dispose();
-      }
-      const impl = LATTICE_PRIMITIVE_IMPLS[primitive.id];
-      const geometry = new ConvexGeometry(impl.tileVerts(angleDeg, previewS, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
-      geometry.computeVertexNormals();
-      const isActive = primitive.id === activePrimitiveId;
-      const previewMaterial = new THREE.MeshBasicMaterial({ color: 0x9de0ff, transparent: true, opacity: isActive ? 0.85 : 0.35, depthTest: false });
-      const mesh = new THREE.Mesh(geometry, previewMaterial);
-      mesh.position.set((i - (LATTICE_PRIMITIVES.length - 1) / 2) * spacing, 0, 0.2);
-      mesh.renderOrder = 6; // above the dot matrix (5) and the flat tiles it sits on top of
-      scene.add(mesh);
-      lattice2dPreviewMeshes.set(primitive.id, mesh);
-    });
-  }
+  // Decorative preview shapes REMOVED, 2026-09-23 (a real design
+  // mistake, not a tuning issue -- see lattice2dSeedCell's own updated
+  // comment above for the full incident). They were never wired into
+  // build.js's raycast target list (pure decoration, not part of any
+  // world store), sat prominently at the dot matrix's own center where
+  // a real tile now lives instead, and directly caused "STILL cant
+  // generate pieces by tapping": users naturally tapped the big
+  // obvious shape, which did nothing, while the actual clickable tile
+  // was a small, scattered, easy-to-miss real one elsewhere. The
+  // replacement needs no separate preview mechanism at all: with only
+  // the ACTIVE combo's real tile visible now (see dimensionAllowsMesh
+  // below), sitting at the origin among the SAME dots (identical
+  // basis/scale -- see updateDotMatrix), that one real, clickable tile
+  // already IS the "shape transforms with the matrix" demonstration --
+  // unified, not decorative, per direct correction "dots and shapes
+  // arent separate... they are the matrix together."
 
   // Deliberately NOT handleWheelAction (out of scope here -- it's a
   // `const` declared inside a nested block further down, not reachable
@@ -1825,8 +1798,12 @@ async function init() {
   function applyLattice2dSelection() {
     const combo = LATTICE_2D_COMBINATIONS.find((c) => c.angleId === activeLattice2dAngleId && c.primitiveId === activeLattice2dPrimitiveId);
     updateDotMatrix(combo.angleDeg);
-    updateLattice2dPreviews(combo.angleDeg, activeLattice2dPrimitiveId);
     document.getElementById('piece-type-select').value = `lattice2d:${combo.id}`;
+    // Re-derives which single lattice2d mesh dimensionAllowsMesh now
+    // permits (the newly active combo) and hides every other one --
+    // see that function's own Phase 5 comment for why only one is ever
+    // shown at a time now.
+    applyDimensionVisibility();
     if (currentMode !== 'build' && currentMode !== 'chisel') {
       document.querySelector('.mode-btn[data-mode="build"]')?.click();
     }
@@ -1834,7 +1811,6 @@ async function init() {
     showHudPrompt(`Piece: ${combo.label}`, 2000);
   }
   renderLattice2dPanel();
-  updateLattice2dPreviews(NAMED_LATTICE_ANGLES[0].angleDeg, LATTICE_PRIMITIVES[0].id);
 
   // Rhombohedra Build (free lattice): its own InstancedMesh, own
   // geometry (rhombohedraTileVerts -- one of RD Quarter's own 4
@@ -2375,12 +2351,24 @@ async function init() {
   // trio here -- a namespaced prefix check generalizes to however many
   // combinations lattice-2d.js ever defines, with no new case needed
   // per named angle or primitive added there in the future.
+  //
+  // Phase 5 correction, 2026-09-23 (a real design mistake, not a
+  // tuning issue -- see lattice2dSeedCell's own comment for the full
+  // incident): a `lattice2d:<id>` key is now only allowed when it's
+  // the CURRENTLY ACTIVE combo (matching the toggle panel), not "any
+  // combo, all 12 simultaneously" the way every other coexisting
+  // family on this page still is. Direct reports converged on exactly
+  // this: 12 tiles scattered around, most of them not the one you can
+  // actually click, is clutter that actively hid the real interactive
+  // one behind visual noise ("STILL cant generate pieces by tapping").
   function dimensionAllowsMesh(key) {
-    if (activeDimension === '2D') return key.startsWith('lattice2d:');
+    if (key.startsWith('lattice2d:')) {
+      return activeDimension === '2D' && key === `lattice2d:${activeLattice2dPrimitiveId}:${activeLattice2dAngleId}`;
+    }
     // '3D' or not yet chosen (activeDimension === null, e.g. mid-load):
     // default to showing 3D's own coexisting families, same as before
     // this fix existed.
-    return !key.startsWith('lattice2d:');
+    return activeDimension !== '2D';
   }
   function setSolidWorldVisible(visible) {
     mesh.visible = visible && dimensionAllowsMesh('mesh');
@@ -2400,7 +2388,6 @@ async function init() {
     // the active dimension, regardless of which (angle, primitive) is
     // currently toggled.
     dotMatrixMesh.visible = visible && activeDimension === '2D';
-    lattice2dPreviewMeshes.forEach((m) => { m.visible = visible && activeDimension === '2D'; });
     lattice2dPanel.classList.toggle('visible', activeDimension === '2D');
   }
   // Re-applies the same visibility rule whenever activeDimension itself
