@@ -2510,8 +2510,26 @@ async function init() {
     // In 2D, shapes are picked by lattice (the toggle panel above), not
     // by this dropdown -- lattice2dPanel already keeps #piece-type-select's
     // own value in sync (see applyLattice2dSelection), so showing this row
-    // too would just be a second, redundant way to pick a shape.
-    document.getElementById('piece-type-row').hidden = activeDimension === '2D';
+    // too would just be a second, redundant way to pick a shape. Real bug,
+    // direct report ("shape selecter button still visible and active"):
+    // setting the `hidden` PROPERTY alone doesn't work here -- `#controls
+    // .row { display: flex }` is an author-origin rule with no !important,
+    // which beats the UA stylesheet's own `[hidden] { display: none }`
+    // regardless of specificity (author normal always outranks UA normal
+    // in the cascade), so the element kept rendering even with
+    // `.hidden === true`. Setting the inline style directly sidesteps
+    // that -- inline style always wins over any external stylesheet rule
+    // short of an author `!important`, which nothing here uses.
+    document.getElementById('piece-type-row').style.display = activeDimension === '2D' ? 'none' : '';
+    // Same real bug, same fix, for the always-on bottom-left quick-select
+    // shortcut: its click handler unconditionally calls wheel3D.open('piece')
+    // (the 3D Piece wheel) regardless of dimension, and `#hud-quick-shape`
+    // has its own `display: flex` rule with the identical override
+    // problem. Hiding it in 2D avoids a second broken entry point rather
+    // than trying to redirect its click into the lattice panel, which is
+    // already fixed-position and always visible in 2D, so there's nothing
+    // for a click to usefully "open."
+    document.getElementById('hud-quick-shape').style.display = activeDimension === '2D' ? 'none' : '';
   }
   // Re-applies the same visibility rule whenever activeDimension itself
   // changes (not just when World View mode changes, which is
@@ -3998,7 +4016,17 @@ async function init() {
     ...Object.fromEntries(LATTICE_PRIMITIVES.map((p) => [`lattice2d:${p.id}`, `piece2d${p.id[0].toUpperCase()}${p.id.slice(1)}`])),
   };
   const quickShapeEl = document.getElementById('hud-quick-shape');
-  const quickMaterialEl = document.getElementById('hud-quick-material');
+  // Real bug from the same-day Material -> Color rename (669fc6f): that
+  // commit renamed the button's id in index.html's CSS/markup AND this
+  // file's own click handler (a few hundred lines up) to #hud-quick-color,
+  // but missed THIS lookup -- left pointing at the old #hud-quick-material
+  // id, which no longer exists anywhere. getElementById returned null,
+  // silently no-oping the `if (quickMaterialEl)` branch below on every
+  // call, so the button kept working (its click handler was renamed
+  // correctly) but never again showed the current color swatch. Direct
+  // report: "the color selection icon disappeared... still working but
+  // doesnt show current color now" -- exactly this symptom.
+  const quickMaterialEl = document.getElementById('hud-quick-color');
   // Bottom-left quick-select: always-visible current Piece/Material,
   // direct request 2026-08-29 ("a little hexagon icon of each... stay
   // open at bottom next to menu") -- unlike updateHudIndicator's own
