@@ -556,22 +556,25 @@ export const RHOMBILLE_ARRANGEMENT_IMPL = {
 // the same rotation of the original's medial triangle).
 // ---------------------------------------------------------------------------
 
-// Square-only rejected, not just untested: at exactly 90 degrees the
-// hexagon degenerates to 4 neighbors (the (v0-v1) diagonal direction is
-// redundant there, per hexagonNeighborOffsets' own real derivation), so
-// the down-triangle pairing this construction depends on (which needs
-// that diagonal direction to be a real hexagon vertex) never produces a
-// valid shared edge -- verified directly (Square fails the edge-sharing
-// check the other 3 angles pass). RD Rhombus/Golden Rhombus were
-// initially left out too, by over-generalizing from Rhombille's own
-// (genuinely hard, not just untested) 60-degree-only limit -- checked
-// directly and that analogy doesn't hold here: kagomeNeighborDirsSorted/
-// kagomeTriangleUp/DownTileVerts never assumed regularity (unlike
-// Rhombille's fixed 120-degree rotation, or Kite's single-shape-plus-
-// rotation trick), so they were already angle-general. All 3 non-Square
-// angles verified directly (real shared edges, 6 real neighbors) -- only
-// Square is a genuine rejection, not a partial-coverage gap.
-export const KAGOME_VALID_ANGLE_IDS = ['rd-rhombus', 'golden-rhombus', 'triangular'];
+// Kagome works at ALL 4 named angles -- no validAngleIds restriction
+// needed (same as Kite once its own multi-class path shipped). Two real
+// corrections got here, in order:
+//   1. Initially restricted to Triangular only, by over-generalizing
+//      from Rhombille's own genuinely hard 60-degree-only limit --
+//      checked directly and that analogy didn't hold: this file's own
+//      hexagon/triangle construction never assumed regularity (unlike
+//      Rhombille's fixed 120-degree rotation or Kite's rotation trick),
+//      so RD Rhombus/Golden Rhombus were added once actually checked.
+//   2. Square was then believed genuinely rejected (the down(x,y-1)
+//      triangle pairing this file used only shared a real edge with the
+//      hexagon at 3 of the 4 angles, failing at exactly Square) --
+//      direct user request to re-verify that conclusion instead of
+//      trusting it. Systematically checking ALL 3 down-triangle
+//      candidates that touch P(x,y), at every angle, found
+//      down(x-1,y-1) shares a real edge at ALL 4, including Square --
+//      see kagomeTriangleDownTileVerts's own header. There was no
+//      geometric wall at Square at all, only a non-optimal choice of
+//      which down-triangle to pair with which hexagon.
 
 // The hexagon's own real neighbor directions, in real cyclic angular
 // order (hexagonNeighborOffsets' own order isn't guaranteed angular, so
@@ -593,17 +596,28 @@ export function kagomeHexagonCellToWorld(x, y, _orientation, angleDeg, s = 1, wo
   return hexagonCellToWorld(x, y, angleDeg, s, worldZ);
 }
 
-// Two SEPARATE medial-triangle shapes, not one shape plus a 180-degree
-// flip. Real bug caught by scripts/verify-lattice-2d.mjs before this
-// shipped: hexagon(x,y) pairs with up(x,y) [touches P(x,y) directly] and
-// down(x,y-1) = [P(x+1,y-1),P(x,y),P(x+1,y)] (the down-triangle that also
-// touches P(x,y) -- down(x,y) itself does NOT). The existing Triangle
-// primitive's own "down is up rotated 180 degrees" fact is real, but it
-// only holds for the SAME-index pair up(i,j)/down(i,j) -- down(x,y-1) is
-// a DIFFERENT triangle, not a 180-degree rotation of up(x,y) (verified
-// directly: their medial-triangle local shapes are not negatives of each
-// other). Each is instead derived independently, the same "reflect
-// through own centroid, halved" way up's was.
+// hexagon(x,y) pairs with up(x,y) [touches P(x,y) directly] and
+// down(x-1,y-1) = [P(x,y-1),P(x-1,y),P(x,y)] -- the down-triangle whose
+// medial shape is EXACTLY up's own shape rotated 180 degrees about the
+// hexagon's own center (proven directly: down(x-1,y-1)'s local corners,
+// relative to P(x,y), are the exact negation of up's own -- v0/2, v1/2,
+// (v0+v1)/2 vs. -v0/2, -v1/2, -(v0+v1)/2 -- and its real centroid is
+// likewise P(x,y)'s own 180-degree-rotated image of up's centroid).
+// Real correction, caught by direct user request to re-verify the
+// already-shipped "Square genuinely rejected" conclusion: an EARLIER
+// version of this file paired hexagon(x,y) with down(x,y-1) instead
+// (also a real triangle touching P(x,y), just a different one) --
+// that pairing's medial shape is genuinely NOT a 180-degree rotation of
+// up's, so a shared 2-vertex geometry+rotation couldn't be used, AND
+// (unlike down(x-1,y-1)) it only shares a real edge with the hexagon at
+// 3 of the 4 named angles, failing at exactly Square specifically --
+// which is what led to the wrong "Kagome doesn't work at Square, and
+// that's a hard fact like Rhombille's" conclusion. Re-checked directly,
+// systematically, against ALL 3 down-triangle candidates that touch
+// P(x,y) at EVERY named angle: down(x-1,y-1) is the one that shares a
+// real edge at all 4, including Square -- there was no actual geometric
+// wall here, only an arbitrary and, it turns out, non-optimal choice of
+// WHICH down-triangle to pair with which hexagon.
 export function kagomeTriangleUpTileVerts(angleDeg, s = 1, h = 0.15 * 1) {
   const [v0, v1] = latticeBasis(angleDeg, s);
   const corners2d = [[v0[0] / 2, v0[1] / 2], [v1[0] / 2, v1[1] / 2], [(v0[0] + v1[0]) / 2, (v0[1] + v1[1]) / 2]];
@@ -612,17 +626,24 @@ export function kagomeTriangleUpTileVerts(angleDeg, s = 1, h = 0.15 * 1) {
 export function kagomeTriangleUpCellToWorld(x, y, angleDeg, s = 1, worldZ = 0) {
   return [...triangleCellToWorld(x, y, 0, angleDeg, s, 0).slice(0, 2), worldZ];
 }
+// The exact negation of kagomeTriangleUpTileVerts's own corners (see
+// this section's own header for the proof) -- kept as its own real
+// geometry/companion mesh rather than refactored into "one shared
+// geometry + a per-instance 180-degree rotation" (which the proof above
+// would also support): companions currently have no per-instance
+// orientation concept, and this fix is scoped to correctness, not a
+// rendering-path simplification.
 export function kagomeTriangleDownTileVerts(angleDeg, s = 1, h = 0.15 * 1) {
   const [v0, v1] = latticeBasis(angleDeg, s);
   const corners2d = [
-    [v0[0] - v1[0] / 2, v0[1] - v1[1] / 2],
-    [v0[0] / 2, v0[1] / 2],
-    [(v0[0] - v1[0]) / 2, (v0[1] - v1[1]) / 2],
+    [-v0[0] / 2, -v0[1] / 2],
+    [-v1[0] / 2, -v1[1] / 2],
+    [-(v0[0] + v1[0]) / 2, -(v0[1] + v1[1]) / 2],
   ];
   return extrudePrism(corners2d, h);
 }
 export function kagomeTriangleDownCellToWorld(x, y, angleDeg, s = 1, worldZ = 0) {
-  return [...triangleCellToWorld(x, y - 1, 1, angleDeg, s, 0).slice(0, 2), worldZ];
+  return [...triangleCellToWorld(x - 1, y - 1, 1, angleDeg, s, 0).slice(0, 2), worldZ];
 }
 
 // Kagome's own LOGICAL placement grid is the same point lattice Hexagon
@@ -701,7 +722,6 @@ export const LATTICE_PRIMITIVE_IMPLS = {
   // specific code beyond that.
   kagome: {
     hasOrientation: false,
-    validAngleIds: KAGOME_VALID_ANGLE_IDS,
     tileVerts: (angleDeg, s, h) => kagomeHexagonTileVerts(angleDeg, s, h),
     cellToWorld: (i, j, orientation, angleDeg, s, worldZ) => kagomeHexagonCellToWorld(i, j, orientation, angleDeg, s, worldZ),
     neighborOffsets: (angleDeg) => kagomeNeighborOffsets(angleDeg),

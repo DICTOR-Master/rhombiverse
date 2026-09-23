@@ -28,7 +28,6 @@ import {
   rhombilleTileVerts,
   rhombilleCellToWorld,
   rhombilleNeighborOffsets,
-  KAGOME_VALID_ANGLE_IDS,
   kagomeHexagonTileVerts,
   kagomeHexagonCellToWorld,
   kagomeTriangleUpTileVerts,
@@ -257,14 +256,22 @@ function worldPoly(tileVerts, cellToWorld, x, y, orientation, angleDeg, rotation
   return local.map(([lx, ly]) => [lx * cos - ly * sin + cx, lx * sin + ly * cos + cy]);
 }
 function sharesRealEdge(polyA, polyB) {
-  const pts = (poly) => poly.map(([x, y]) => `${x.toFixed(6)},${y.toFixed(6)}`);
-  const a = pts(polyA), b = pts(polyB);
+  // Real false-negative trap this hit directly: string-formatting each
+  // point (even after normalizing exact -0) still breaks on floating-
+  // point noise near zero -- e.g. cos(90deg) in this codebase's own trig
+  // isn't exactly 0, so a genuinely correct Square-angle vertex pair
+  // came out as -3.06e-17 on one side and exactly 0 on the other;
+  // `.toFixed(6)` prints "-0.000000" for the former (the sign survives
+  // rounding) vs "0.000000" for the latter -- different strings, same
+  // point. Proper epsilon-tolerant numeric comparison avoids the whole
+  // class of bug instead of patching one symptom of it.
   let shared = 0;
-  for (const p of a) if (b.includes(p)) shared++;
+  for (const p of polyA) {
+    if (polyB.some((q) => Math.abs(p[0] - q[0]) < 1e-6 && Math.abs(p[1] - q[1]) < 1e-6)) shared++;
+  }
   return shared >= 2;
 }
-for (const id of KAGOME_VALID_ANGLE_IDS) {
-  const angleDeg = NAMED_LATTICE_ANGLES.find((a) => a.id === id).angleDeg;
+for (const { id, angleDeg } of NAMED_LATTICE_ANGLES) {
   const hex = worldPoly(kagomeHexagonTileVerts, kagomeHexagonCellToWorld, 0, 0, 0, angleDeg);
   const worldPolyNoOrientation = (tileVerts, cellToWorld, x, y, angleDeg) => {
     const local = polygonBottomFace(tileVerts(angleDeg, 1, 0.15));

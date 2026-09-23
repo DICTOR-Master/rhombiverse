@@ -1947,11 +1947,13 @@ async function init() {
   lattice2dPanel.id = 'lattice2d-toggle-panel';
   document.body.appendChild(lattice2dPanel);
 
-  // Some primitives are only valid at some named angles (Kagome at
-  // Triangular only -- see lattice-2d.js's own KAGOME_VALID_ANGLE_IDS
-  // header; Kite used to be restricted too, before its own multi-class
-  // rendering path covered the rest) -- rather than special-case a
-  // primitive by name here, this reads the SAME `impl.validAngleIds`
+  // Rhombille is the one primitive genuinely locked to a single named
+  // angle (Triangular -- see RHOMBILLE_ANGLE_ID's own header for the
+  // real geometric reason). Kite and Kagome both used to be restricted
+  // too, before their own rendering fixes covered the rest -- see
+  // lattice-2d.js's own KITE/KAGOME comments for that history. Rather
+  // than special-case a primitive by name here, this reads the SAME
+  // `impl.validAngleIds`
   // field lattice-2d.js's dispatch table already carries, so any
   // angle-restricted primitive gates the same way with no new code here.
   function angleAllowedForPrimitive(primitiveId, angleId) {

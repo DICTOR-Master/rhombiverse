@@ -192,9 +192,11 @@ export const MARKS = {
   // which primitive construction is active, not the exact angle -- a
   // full per-angle icon set for all combinations wasn't asked for and
   // would mostly just be minor skew variations of these same shapes;
-  // Kagome is the one primitive that isn't offered at every angle -- see
-  // lattice-2d.js's own KAGOME_VALID_ANGLE_IDS). Replaces the
-  // old pieceSquare2D/pieceHexagon2D/
+  // every LATTICE_PRIMITIVES entry reaches every named angle now --
+  // Rhombille, the one exception, isn't a primitive of its own at all,
+  // just a contextual arrangement toggle under Parallelogram, so it
+  // never needed its own icon here; see lattice-2d.js's own
+  // RHOMBILLE_ANGLE_ID). Replaces the old pieceSquare2D/pieceHexagon2D/
   // pieceTriangle2D keys (formerly hardcoded to exactly 90/some-hex/60
   // degrees) with primitive-named ones matching lattice-2d.js's own
   // LATTICE_PRIMITIVES ids.
