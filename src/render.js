@@ -1681,16 +1681,26 @@ async function init() {
   // rebuilt) whenever the toggle panel's own angle changes, so dragging
   // through the 4 named angles visibly morphs this dot grid in place --
   // the actual "see transformations" effect asked for.
-  // Radius history: 8 -> 24 -> 10 -> 7 -> 15 here, direct correction
-  // ("should be more dots on each shape = bigger shapes"): both need to
-  // be generous together -- LATTICE2D_S bigger (2.5x, see its own
-  // comment) makes each dot-to-dot gap (and each real tile, built from
-  // that same constant) bigger, and this radius needs to stay wide
-  // enough that several dots are still visible tracing structure well
-  // beyond any single tile's own few corner dots, not just barely
-  // enough to cover one shape.
-  const DOT_MATRIX_RADIUS = 15;
-  const dotMatrixGeometry = new THREE.SphereGeometry(0.035 * LATTICE2D_S, 8, 6);
+  // Direct correction, Phase 5 ("should be about a hundred dots per
+  // square," "not 1 or 4"): dots were one-per-real-lattice-point before
+  // -- exactly 4 per square (its own corners), 3 per triangle, 1 per
+  // hexagon (its own center) -- real lattice points, correctly unified
+  // with the real tile's own basis/angle, but nowhere near "a hundred."
+  // Rather than decoupling dots from the real lattice (which would undo
+  // that unification -- see dimensionAllowsMesh's own Phase 5 comment),
+  // this SUBDIVIDES each real cell into a finer DOT_SUBDIVISIONS x
+  // DOT_SUBDIVISIONS decorative grid, still built from the exact same
+  // angle/basis (latticeBasis), just at 1/DOT_SUBDIVISIONS the spacing
+  // -- so it still visibly skews/transforms together with the real
+  // lattice on every angle toggle, just densely enough that one real
+  // square now shows DOT_SUBDIVISIONS^2 = 100 dots across its own area,
+  // not only its 4 corners. DOT_MATRIX_CELL_RADIUS (how many REAL cells
+  // outward this covers) stays modest since the fine subdivision alone
+  // already multiplies the total dot count by 100x.
+  const DOT_SUBDIVISIONS = 10;
+  const DOT_MATRIX_CELL_RADIUS = 3;
+  const DOT_MATRIX_RADIUS = DOT_SUBDIVISIONS * DOT_MATRIX_CELL_RADIUS;
+  const dotMatrixGeometry = new THREE.SphereGeometry(0.06 * LATTICE2D_S / DOT_SUBDIVISIONS, 8, 6);
   // Signature blue (#9de0ff), same accent color as everything else in
   // this app's own HUD chrome -- fully opaque (not the original 0.85)
   // for max contrast against the scene's own dark starfield background,
@@ -1703,7 +1713,7 @@ async function init() {
   scene.add(dotMatrixMesh);
 
   function updateDotMatrix(angleDeg) {
-    const [v0, v1] = latticeBasis(angleDeg, LATTICE2D_S);
+    const [v0, v1] = latticeBasis(angleDeg, LATTICE2D_S / DOT_SUBDIVISIONS);
     const m = new THREE.Matrix4();
     let idx = 0;
     for (let i = -DOT_MATRIX_RADIUS; i <= DOT_MATRIX_RADIUS; i++) {
