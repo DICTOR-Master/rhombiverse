@@ -23,7 +23,7 @@ import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
-import { LATTICE_2D_COMBINATIONS, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from './geometry-extensions/lattice-2d.js';
+import { NAMED_LATTICE_ANGLES, LATTICE_2D_COMBINATIONS, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis } from './geometry-extensions/lattice-2d.js';
 import { rhombohedraTileVerts, rhombohedraCellToWorld } from './geometry-extensions/rhombohedra-lattice.js';
 import { FEATURES } from './app/features.js';
 import {
@@ -874,7 +874,7 @@ function sphericalClassificationFor(scale) {
 // below, not per-material dropdown entries) -- see WORLD_VIEW_MODES.
 //
 // 2026-09-22: this is now a plain color palette, not gem/mineral-themed
-// -- index.html's #material-select dropdown shows plain color names
+// -- index.html's #color-select dropdown shows plain color names
 // (Red, Gray, Blue, ...) instead of these keys' original gem/mineral
 // names. The KEYS themselves ('garnet', 'blackstar-glassite', etc.) are
 // kept as-is rather than renamed, deliberately: they're stored verbatim
@@ -904,8 +904,8 @@ function materialColor(material) {
 }
 
 // Auto-assign (direct request 2026-09-02, "By piece type"): when the
-// #auto-assign-material checkbox is on, each piece type places with its
-// own material instead of whatever #material-select currently shows --
+// #auto-assign-color checkbox is on, each piece type places with its
+// own material instead of whatever #color-select currently shows --
 // see currentMaterialFor() below, wired into the 3 piece-placing
 // controllers only (main build, Cuboctahedron, octahedron-gap), not the
 // Recolor tool or Sculpture/AI material assignment, which stay explicit
@@ -916,7 +916,7 @@ function materialColor(material) {
 // These are DEFAULTS only -- direct follow-up 2026-09-02 ("autoselected
 // colors for all shapes adjustable"): the real, live-in-effect mapping
 // is autoAssignOverrides (below), user-editable via the per-piece
-// dropdowns #auto-assign-materials-row builds, persisted to
+// dropdowns #auto-assign-colors-row builds, persisted to
 // localStorage. This object is what a dropdown falls back to before the
 // user has ever touched it for that piece, and what Reset (if added
 // later) would restore.
@@ -1630,6 +1630,129 @@ async function init() {
     rebuildLattice2dInstances(mesh, lattice2dWorlds.get(combo.id), combo);
   });
 
+  // Dot-matrix overlay (Phase 4, direct instruction: "showing the dot
+  // matrix of lattice" / "a four position toggle... to see
+  // transformations"): a live visualization of the CURRENT angle's own
+  // lattice points, independent of which primitive is active (dots are
+  // just lattice points -- always well-defined at any angle, no
+  // primitive-shape ambiguity the way a tile has). Repositioned (not
+  // rebuilt) whenever the toggle panel's own angle changes, so dragging
+  // through the 4 named angles visibly morphs this dot grid in place --
+  // the actual "see transformations" effect asked for.
+  const DOT_MATRIX_RADIUS = 8;
+  const dotMatrixGeometry = new THREE.SphereGeometry(0.055 * LATTICE2D_S, 8, 6);
+  // Signature blue (#9de0ff), same accent color as everything else in
+  // this app's own HUD chrome -- fully opaque (not the original 0.85)
+  // for max contrast against the scene's own dark starfield background,
+  // direct instruction ("contrast against star background").
+  const dotMatrixMaterial = new THREE.MeshBasicMaterial({ color: 0x9de0ff, depthTest: false });
+  const dotMatrixCount = (2 * DOT_MATRIX_RADIUS + 1) ** 2;
+  const dotMatrixMesh = new THREE.InstancedMesh(dotMatrixGeometry, dotMatrixMaterial, dotMatrixCount);
+  dotMatrixMesh.renderOrder = 5; // stay visible above the flat tiles it sits on top of
+  dotMatrixMesh.visible = false;
+  scene.add(dotMatrixMesh);
+
+  function updateDotMatrix(angleDeg) {
+    const [v0, v1] = latticeBasis(angleDeg, LATTICE2D_S);
+    const m = new THREE.Matrix4();
+    let idx = 0;
+    for (let i = -DOT_MATRIX_RADIUS; i <= DOT_MATRIX_RADIUS; i++) {
+      for (let j = -DOT_MATRIX_RADIUS; j <= DOT_MATRIX_RADIUS; j++) {
+        const x = i * v0[0] + j * v1[0];
+        const y = i * v0[1] + j * v1[1];
+        m.makeTranslation(x, y, 0.12);
+        dotMatrixMesh.setMatrixAt(idx++, m);
+      }
+    }
+    dotMatrixMesh.count = idx;
+    dotMatrixMesh.instanceMatrix.needsUpdate = true;
+    dotMatrixMesh.computeBoundingSphere();
+  }
+  updateDotMatrix(NAMED_LATTICE_ANGLES[0].angleDeg);
+
+  // Persistent 2D toggle panel (Phase 4, direct instruction: "a four
+  // position toggle... to see transformations" -- an always-reachable
+  // live control while building in 2D, replacing the earlier one-shot
+  // "pick once from the Wizard's 12-row list, then it behaves like a
+  // fixed piece type" design; that list stays as an alternate entry
+  // point -- see dimension-wizard.js -- but this panel is the one meant
+  // to be flipped back and forth mid-session). 2 rows: 4
+  // NAMED_LATTICE_ANGLES, 3 LATTICE_PRIMITIVES. Changing either
+  // immediately re-derives the active (angle, primitive) combination,
+  // switches the live piece type to it (reusing the SAME
+  // 'tool:pieceType:lattice2d:<id>' action beginFaceAttach-style
+  // dispatch already handles), and redraws the dot-matrix overlay at
+  // the new angle.
+  let activeLattice2dAngleId = NAMED_LATTICE_ANGLES[0].id;
+  let activeLattice2dPrimitiveId = LATTICE_PRIMITIVES[0].id;
+  const lattice2dPanel = document.createElement('div');
+  lattice2dPanel.id = 'lattice2d-toggle-panel';
+  document.body.appendChild(lattice2dPanel);
+
+  function renderLattice2dPanel() {
+    lattice2dPanel.innerHTML = '';
+    const angleRow = document.createElement('div');
+    angleRow.className = 'lattice2d-toggle-row';
+    for (const angle of NAMED_LATTICE_ANGLES) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      // Direct correction, 2026-09-23 ("toggle positions names should
+      // be lattice angles not piece names"): this control is about the
+      // continuous lattice-angle parameter, not a set of named pieces,
+      // so the button itself shows the real angle value -- its own
+      // named identity (angle.label, e.g. "RD Rhombus") moves to the
+      // title tooltip instead of disappearing outright.
+      btn.textContent = `${angle.angleDeg.toFixed(2)}°`;
+      btn.title = angle.label;
+      if (angle.id === activeLattice2dAngleId) btn.classList.add('active');
+      btn.addEventListener('click', () => {
+        if (angle.id === activeLattice2dAngleId) return;
+        activeLattice2dAngleId = angle.id;
+        renderLattice2dPanel();
+        applyLattice2dSelection();
+      });
+      angleRow.appendChild(btn);
+    }
+    const primRow = document.createElement('div');
+    primRow.className = 'lattice2d-toggle-row';
+    for (const primitive of LATTICE_PRIMITIVES) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = primitive.label;
+      if (primitive.id === activeLattice2dPrimitiveId) btn.classList.add('active');
+      btn.addEventListener('click', () => {
+        if (primitive.id === activeLattice2dPrimitiveId) return;
+        activeLattice2dPrimitiveId = primitive.id;
+        renderLattice2dPanel();
+        applyLattice2dSelection();
+      });
+      primRow.appendChild(btn);
+    }
+    lattice2dPanel.append(angleRow, primRow);
+  }
+  // Deliberately NOT handleWheelAction (out of scope here -- it's a
+  // `const` declared inside a nested block further down, not reachable
+  // from this closure; a real ReferenceError caught live) and
+  // deliberately NOT reusing its own full pieceType-pick behavior even
+  // once that's fixed: that flow also force-opens the color picker on
+  // every pick, which is right for a one-shot Wizard/wheel selection
+  // but wrong here -- flipping through toggles to watch the lattice
+  // transform shouldn't pop a modal over the view on every click. Just
+  // the minimum real effect: set the active piece type and make sure
+  // Add mode is active, same as handleWheelAction's own pieceType
+  // branch does before it gets to the color-picker part.
+  function applyLattice2dSelection() {
+    const combo = LATTICE_2D_COMBINATIONS.find((c) => c.angleId === activeLattice2dAngleId && c.primitiveId === activeLattice2dPrimitiveId);
+    updateDotMatrix(combo.angleDeg);
+    document.getElementById('piece-type-select').value = `lattice2d:${combo.id}`;
+    if (currentMode !== 'build' && currentMode !== 'chisel') {
+      document.querySelector('.mode-btn[data-mode="build"]')?.click();
+    }
+    updateHudIndicator();
+    showHudPrompt(`Piece: ${combo.label}`, 2000);
+  }
+  renderLattice2dPanel();
+
   // Rhombohedra Build (free lattice): its own InstancedMesh, own
   // geometry (rhombohedraTileVerts -- one of RD Quarter's own 4
   // congruent orientations, centered on its own centroid).
@@ -2188,6 +2311,13 @@ async function init() {
     partialCellGroup.visible = visible && dimensionAllowsMesh('mesh'); // partial (pyramid-decomposed) FCC cells -- same "main world" content as `mesh` above
     interstitialGroup.visible = visible && dimensionAllowsMesh('interstitial');
     hemisphereGroup.visible = visible && dimensionAllowsMesh('hemisphere');
+    // Dot-matrix overlay + its toggle panel (Phase 4): tied to the same
+    // 2D-only gate as the lattice2d tile meshes above, not to any single
+    // combination -- both stay visible/reachable for as long as 2D is
+    // the active dimension, regardless of which (angle, primitive) is
+    // currently toggled.
+    dotMatrixMesh.visible = visible && activeDimension === '2D';
+    lattice2dPanel.classList.toggle('visible', activeDimension === '2D');
   }
   // Re-applies the same visibility rule whenever activeDimension itself
   // changes (not just when World View mode changes, which is
@@ -2769,9 +2899,9 @@ async function init() {
         // sometimes hard to find besides. Replaced: Material's wheel
         // face is gone (freeing that slot for Octahedron, see
         // rhombic-wheel-3d-core.js), and picking ANY piece here now
-        // opens the real material-swatch overlay directly -- same
-        // `pickers.openMaterialPicker` call tool:material's own handler
-        // below uses, so there's exactly one material-picker code path,
+        // opens the real color-swatch overlay directly -- same
+        // `pickers.openColorPicker` call tool:color's own handler
+        // below uses, so there's exactly one color-picker code path,
         // not two. wheel3D now closes here too, matching every other
         // terminal tool: action -- there's no more Material face left on
         // this screen to stay open for.
@@ -2816,17 +2946,20 @@ async function init() {
           updateHudIndicator();
           showHudPrompt(`Piece: ${PIECE_LABELS[value] ?? value}`, 3000);
           wheel3D.close();
-          pickers.openMaterialPicker((matValue, matLabel) => showHudPrompt(`Material: ${matLabel}`, 3000));
+          pickers.openColorPicker((matValue, matLabel) => showHudPrompt(`Color: ${matLabel}`, 3000));
           return;
         }
-        // Reuses the 2D wheel's own material-picker overlay (a real,
+        // Reuses the 2D wheel's own color-picker overlay (a real,
         // already-independent DOM overlay, not part of its radial
-        // LEVEL1/LEVEL2 visuals) via the openMaterialPicker export
-        // added to wheel.js -- filling a real feature into a spare
-        // slot, not inventing one. See rhombic-wheel-3d-core.js.
-        if (action === 'tool:material') {
+        // LEVEL1/LEVEL2 visuals) via the openColorPicker export added
+        // to wheel.js -- filling a real feature into a spare slot, not
+        // inventing one. See rhombic-wheel-3d-core.js. Action renamed
+        // from 'tool:material' 2026-09-23 (direct instruction: "it
+        // should be color picker/color... etc") to match its own
+        // WHEEL_PIECE face label, already renamed to "Color".
+        if (action === 'tool:color') {
           wheel3D.close();
-          pickers.openMaterialPicker((value, label) => showHudPrompt(`Material: ${label}`, 3000));
+          pickers.openColorPicker((value, label) => showHudPrompt(`Color: ${label}`, 3000));
           return;
         }
         // Real toggle, same as the 2D wheel's own "Repeat" leaf --
@@ -2913,7 +3046,7 @@ async function init() {
           clickMode('cubocta');
           showHudPrompt('Piece: CO', 3000);
           wheel3D.close();
-          pickers.openMaterialPicker((value, label) => showHudPrompt(`Material: ${label}`, 3000));
+          pickers.openColorPicker((value, label) => showHudPrompt(`Color: ${label}`, 3000));
           return;
         }
 
@@ -3085,7 +3218,7 @@ async function init() {
     // Bottom-left quick-select icons (their own innerHTML is refreshed
     // further down, near updateHudIndicator) reopen straight to where
     // that value gets changed -- the real Piece wheel screen / the real
-    // Material picker overlay -- not back through Home, matching the
+    // Color picker overlay -- not back through Home, matching the
     // direct request's own "reopens at selection" wording. Wired here,
     // via a fresh getElementById rather than the outer quickShapeEl/
     // quickMaterialEl consts, since wheel3D/toggleWheel3D/
@@ -3103,9 +3236,9 @@ async function init() {
       seedIfWorldEmpty();
       wheel3D.open('piece');
     });
-    document.getElementById('hud-quick-material')?.addEventListener('click', () => {
+    document.getElementById('hud-quick-color')?.addEventListener('click', () => {
       if (wheel3D.isOpen) wheel3D.close();
-      pickers.openMaterialPicker((value, label) => showHudPrompt(`Material: ${label}`, 3000));
+      pickers.openColorPicker((value, label) => showHudPrompt(`Color: ${label}`, 3000));
     });
   }
 
@@ -3532,8 +3665,8 @@ async function init() {
 
   const shellCountInput = document.getElementById('shell-count');
   const hollowFromInput = document.getElementById('hollow-from');
-  const materialSelect = document.getElementById('material-select');
-  const autoAssignMaterialCheckbox = document.getElementById('auto-assign-material');
+  const materialSelect = document.getElementById('color-select');
+  const autoAssignMaterialCheckbox = document.getElementById('auto-assign-color');
 
   // Per-piece overrides on top of AUTO_ASSIGN_MATERIAL_BY_PIECE's own
   // defaults -- direct follow-up 2026-09-02 ("autoselected colors for
@@ -3550,9 +3683,9 @@ async function init() {
   // override changes pre-assign until updated again" / "has a color if
   // you don't change but changes if you pick new color" -- the real
   // complaint was that auto-assign's own fixed per-piece default
-  // silently outranked the MAIN #material-select dropdown, so picking a
+  // silently outranked the MAIN #color-select dropdown, so picking a
   // new color there appeared to do nothing for auto-assigned piece
-  // types. Fixed below (not here) by having a #material-select change
+  // types. Fixed below (not here) by having a #color-select change
   // ALSO write into autoAssignOverrides for whichever piece type is
   // currently selected -- same "sticky until you change it again"
   // model, just reachable from the dropdown the user is actually
@@ -3564,13 +3697,13 @@ async function init() {
     return materialSelect.value;
   }
 
-  // Builds the "Auto-assign colors" mini-panel -- one label + material
-  // dropdown per piece type, options cloned straight from #material-
+  // Builds the "Auto-assign colors" mini-panel -- one label + color
+  // dropdown per piece type, options cloned straight from #color-
   // select so the list can never drift out of sync with the real
   // palette. Built once at startup (not per-toggle) since the row's
   // OWN visibility is all that needs to change when the checkbox
   // flips, not its contents.
-  const autoAssignMaterialsRow = document.getElementById('auto-assign-materials-row');
+  const autoAssignMaterialsRow = document.getElementById('auto-assign-colors-row');
   if (autoAssignMaterialsRow) {
     for (const pieceType of Object.keys(AUTO_ASSIGN_MATERIAL_BY_PIECE)) {
       const wrap = document.createElement('label');
@@ -3599,7 +3732,7 @@ async function init() {
   // the row's own visibility matching that same default, since it
   // otherwise only syncs on the checkbox's 'change' event). Manual
   // override is still one click away either way -- uncheck for the
-  // plain material picker, or use the per-piece dropdowns above without
+  // plain color picker, or use the per-piece dropdowns above without
   // unchecking anything.
   if (autoAssignMaterialsRow && autoAssignMaterialCheckbox) {
     autoAssignMaterialsRow.style.display = autoAssignMaterialCheckbox.checked ? 'flex' : 'none';

@@ -97,13 +97,40 @@
       padding: 6px 4px; margin: -6px -4px;
     }
     #hud-wizard-cue:hover { opacity: 1; }
-    /* Quick-select: the CURRENTLY active Piece/Material, always visible
+    /* 2D lattice toggle panel (Phase 4, direct instruction: "a four
+       position toggle... to see transformations" -- a persistent, always-
+       reachable live control while building in 2D, not a one-shot pick
+       from the Wizard's own list). Hidden by default; render.js shows it
+       only while activeDimension === '2D'. Top-center, clear of the
+       top-left wordmark/wizard-cue and top-right corner-wheel icons. */
+    #lattice2d-toggle-panel {
+      display: none;
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+      z-index: 900;
+      flex-direction: column; align-items: center; gap: 4px;
+    }
+    #lattice2d-toggle-panel.visible { display: flex; }
+    .lattice2d-toggle-row { display: flex; gap: 4px; }
+    .lattice2d-toggle-row button {
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #9cd; font: 11px system-ui, sans-serif;
+      border-radius: 6px; padding: 5px 9px; cursor: pointer;
+    }
+    .lattice2d-toggle-row button:hover { background: rgba(255, 255, 255, 0.15); }
+    /* Signature blue (#9de0ff/#7cf), matching this app's own accent
+       color everywhere else (wordmark, active toggles like #xray-toggle/
+       #cyborg-toggle above) -- direct correction: an earlier pass used a
+       green highlight that didn't match anything else in Rhombiverse's
+       own chrome. */
+    .lattice2d-toggle-row button.active { background: rgba(120, 190, 255, 0.4); border-color: #7cf; color: #fff; }
+    /* Quick-select: the CURRENTLY active Piece/Color, always visible
        next to Menu rather than only shown as a fading toast -- direct
        request 2026-08-29 ("a little hexagon icon of each... stay open
        at bottom next to menu"). Tapping either reopens straight to
-       where that value gets changed (Piece wheel / Material picker),
+       where that value gets changed (Piece wheel / Color picker),
        not back through Home -- see render.js's updateQuickSelect(). */
-    #hud-quick-shape, #hud-quick-material, #hud-quick-lattice-view {
+    #hud-quick-shape, #hud-quick-color, #hud-quick-lattice-view {
       position: fixed; bottom: 8px; z-index: 900;
       width: 36px; height: 36px;
       background: rgba(0, 0, 0, 0.45);
@@ -113,10 +140,10 @@
       display: flex; align-items: center; justify-content: center;
       padding: 0; cursor: pointer;
     }
-    #hud-quick-shape svg, #hud-quick-material svg, #hud-quick-lattice-view svg { width: 24px; height: 24px; }
-    #hud-quick-shape:hover, #hud-quick-material:hover, #hud-quick-lattice-view:hover { background: rgba(255, 255, 255, 0.15); }
+    #hud-quick-shape svg, #hud-quick-color svg, #hud-quick-lattice-view svg { width: 24px; height: 24px; }
+    #hud-quick-shape:hover, #hud-quick-color:hover, #hud-quick-lattice-view:hover { background: rgba(255, 255, 255, 0.15); }
     #hud-quick-shape { left: 64px; }
-    #hud-quick-material { left: 106px; }
+    #hud-quick-color { left: 106px; }
     /* Lattice View quick-select: third bottom-left icon, direct request
        2026-08-29 ("a third square at the bottom left going through all
        options including off") -- cycles the SAME underlying state as
@@ -816,7 +843,7 @@
   <div id="hud-wheel-cue" title="Tab / Space also opens this" data-i18n="hud.menu">Menu</div>
   <div id="hud-wizard-cue" title="Browse dimensions and lattice families">Wizard</div>
   <button id="hud-quick-shape" type="button" title="Shape (tap to change)"></button>
-  <button id="hud-quick-material" type="button" title="Material (tap to change)"></button>
+  <button id="hud-quick-color" type="button" title="Color (tap to change)"></button>
   <button id="hud-quick-lattice-view" type="button" title="Lattice View (tap to cycle)"></button>
   <button id="sculpture-mode-toggle" type="button" title="Sculpture Mode: a separate, isolated scratch workspace">◆</button>
   <button id="cyborg-toggle" type="button" title="Cyborg Mode: guided walkthrough">◈</button>
@@ -885,9 +912,9 @@
       <button class="mode-btn" data-mode="sculpt" type="button">Sculpt</button>
       <button class="mode-btn" data-mode="chisel" type="button">Remove</button>
     </div>
-    <div id="material-row" class="row">
-      <label><span data-i18n="material.label">Material:</span>
-        <select id="material-select">
+    <div id="color-row" class="row">
+      <label><span data-i18n="color.label">Color:</span>
+        <select id="color-select">
           <option value="base">Default</option>
           <option value="garnet">Red</option>
           <option value="ferrostone">Gray</option>
@@ -906,9 +933,9 @@
       </label>
     </div>
     <div id="auto-assign-row" class="row">
-      <label><input id="auto-assign-material" type="checkbox" checked /> <span data-i18n="material.autoAssign">Auto-assign material by piece type</span></label>
+      <label><input id="auto-assign-color" type="checkbox" checked /> <span data-i18n="color.autoAssign">Auto-assign color by piece type</span></label>
     </div>
-    <div id="auto-assign-materials-row" class="row" style="display: none; flex-direction: column; align-items: stretch; gap: 4px;"></div>
+    <div id="auto-assign-colors-row" class="row" style="display: none; flex-direction: column; align-items: stretch; gap: 4px;"></div>
     <div id="piece-type-row" class="row">
       <label><span data-i18n="piece.label">Piece:</span>
         <select id="piece-type-select">

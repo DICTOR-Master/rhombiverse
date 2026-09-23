@@ -405,17 +405,21 @@ export const MARKS = {
   // rhombus vocabulary, same inset-not-retraced-edges lesson from the
   // rhombitect/symmetryMirror fixes above. See wheel-icons.md.
 
-  // Material: three real material colors (garnet / glassite / ferrostone,
-  // matching render.js's own MATERIAL_COLORS exactly, not arbitrary
-  // swatch colors) as small hexagons in the same triangular 3-item
-  // cluster layout as Rhombisis's own satellites. Was a same-color
-  // hexagon split into 3 opacity-varied wedges before -- direct user
-  // report 2026-08-29 that it was hard to identify/remember fixed by
+  // Color (key renamed from `material` 2026-09-23, direct instruction:
+  // "it should be color picker/color... etc" -- the wheel face itself
+  // is relabeled "Color" now too, see rhombic-wheel-3d-core.js): three
+  // real material colors (garnet / glassite / ferrostone, matching
+  // render.js's own MATERIAL_COLORS exactly, not arbitrary swatch
+  // colors) as small hexagons in the same triangular 3-item cluster
+  // layout as Rhombisis's own satellites. Was a same-color hexagon
+  // split into 3 opacity-varied wedges before -- direct user report
+  // 2026-08-29 that it was hard to identify/remember fixed by
   // deliberately breaking this file's otherwise-monochrome vocabulary
-  // here specifically: "material" IS a color choice, so real color is
-  // what makes this ONE icon memorable, more than any single-color
-  // shape could -- every other mark in this file stays currentColor-only.
-  material: `
+  // here specifically: a color choice is what this icon represents, so
+  // real color is what makes this ONE icon memorable, more than any
+  // single-color shape could -- every other mark in this file stays
+  // currentColor-only.
+  color: `
     <polygon points="${hexPts(16, 0, -22)}" fill="#8b2e2e" stroke="currentColor" stroke-width="1" stroke-opacity="0.4"/>
     <polygon points="${hexPts(16, 19.05, 11)}" fill="#bfe3f0" stroke="currentColor" stroke-width="1" stroke-opacity="0.4"/>
     <polygon points="${hexPts(16, -19.05, 11)}" fill="#5a5a5a" stroke="currentColor" stroke-width="1" stroke-opacity="0.4"/>`,
@@ -554,7 +558,7 @@ export const MARKS = {
 
 // One filled hexagon in a given real color -- for the bottom-left
 // quick-select HUD (render.js), which shows the CURRENTLY active
-// material as a live swatch (not MARKS.material's own 3-color "pick
+// color as a live swatch (not MARKS.color's own 3-color "pick
 // one" glyph, a different job: an indicator, not an action icon).
 // Exported rather than duplicating hexPts()'s geometry at the call
 // site, keeping all icon-geometry logic colocated in this one file.

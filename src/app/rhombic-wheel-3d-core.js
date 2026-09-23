@@ -449,7 +449,7 @@ export const WHEEL_BUILD = {
     // its old equator|sx-1sy-1 slot rather than adding a new duplicate
     // -- see WHEEL_HOME's own top|sy1sz1 comment for the full reasoning
     // shared across every wheel this same fix touches.
-    "top|sy1sz1":      { kind: "dept", label: "Material", action: "tool:material", desc: "Pick a build material." }
+    "top|sy1sz1":      { kind: "dept", label: "Color", action: "tool:color", desc: "Pick a build color." }
   }
 };
 
@@ -907,7 +907,7 @@ export const ACTION_TO_MARK = {
   openCyborg: 'cyborg',
   // 2026-08-26 second pass -- see wheel-icons.js for full design notes
   // on each of these (not in the spec's own table, resolved here).
-  'tool:material': 'material',
+  'tool:color': 'color',
   'tool:repeat': 'repeat',
   'tool:pattern': 'pattern',
   // Build's department-nav face reuses its own wheel's primary tool

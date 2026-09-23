@@ -1,4 +1,4 @@
-// Material/generator/species picker overlays + the drag-placement
+// Color/generator/species picker overlays + the drag-placement
 // ("Repeat") toggle -- real, independent functionality extracted out
 // of the old 2D wheel.js (removed 2026-08-25, see CLAUDE.md/docs/
 // code-notes/app/rhombic-wheel-3d.md) so the Rhombic Wheel 3D -- now
@@ -82,15 +82,15 @@ const CSS = `
   margin: 2px 0;
 }
 
-#material-wheel-overlay {
+#color-wheel-overlay {
   position: fixed; inset: 0; z-index: 986;
   display: none;
   align-items: center; justify-content: center;
   background: rgba(2, 2, 6, 0.35);
 }
-#material-wheel-overlay.open { display: flex; }
-#material-wheel-root { position: relative; width: 1px; height: 1px; }
-.material-wheel-item {
+#color-wheel-overlay.open { display: flex; }
+#color-wheel-root { position: relative; width: 1px; height: 1px; }
+.color-wheel-item {
   position: absolute;
   width: 48px; height: 48px;
   margin: -24px 0 0 -24px;
@@ -99,13 +99,13 @@ const CSS = `
   cursor: pointer;
   transition: transform 0.12s, box-shadow 0.12s;
 }
-.material-wheel-item:hover, .material-wheel-item.current {
+.color-wheel-item:hover, .color-wheel-item.current {
   transform: rotate(45deg) scale(1.25);
   box-shadow: 0 0 12px rgba(255,255,255,0.6);
   border-color: #fff;
   z-index: 2;
 }
-#material-wheel-hint {
+#color-wheel-hint {
   position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%);
   color: #eaf6ff; font: 13px system-ui, sans-serif;
   white-space: nowrap;
@@ -135,7 +135,7 @@ function injectCssOnce() {
 
 export function createWheelPickers({
   modeButtonSelector = '.mode-btn',
-  materialSelectId = 'material-select',
+  materialSelectId = 'color-select',
   onModeChosen = () => {},
   onDragPlacementChange = () => {},
   onMenuSound = () => {},
@@ -153,11 +153,11 @@ export function createWheelPickers({
   document.body.appendChild(pickerStrip);
 
   const materialWheelOverlay = document.createElement('div');
-  materialWheelOverlay.id = 'material-wheel-overlay';
+  materialWheelOverlay.id = 'color-wheel-overlay';
   const materialWheelRoot = document.createElement('div');
-  materialWheelRoot.id = 'material-wheel-root';
+  materialWheelRoot.id = 'color-wheel-root';
   const materialWheelHint = document.createElement('div');
-  materialWheelHint.id = 'material-wheel-hint';
+  materialWheelHint.id = 'color-wheel-hint';
   materialWheelRoot.appendChild(materialWheelHint);
   materialWheelOverlay.appendChild(materialWheelRoot);
   document.body.appendChild(materialWheelOverlay);
@@ -174,7 +174,7 @@ export function createWheelPickers({
     const positions = positionsFor(options.length, 100);
     options.forEach((opt, i) => {
       const item = document.createElement('div');
-      item.className = 'material-wheel-item';
+      item.className = 'color-wheel-item';
       if (opt.value === currentValue) item.classList.add('current');
       item.style.left = `${positions[i].x}px`;
       item.style.top = `${positions[i].y}px`;
@@ -271,7 +271,19 @@ export function createWheelPickers({
     }
   }
 
-  function openMaterialPicker(onPick) {
+  // Renamed from openMaterialPicker (2026-09-23, direct instruction: "it
+  // should be color picker/color... etc") -- the underlying DOM/CSS
+  // (#color-wheel-*) and every user-visible label already say Color;
+  // this export is the one piece of the public surface every caller
+  // actually names, so it's renamed too rather than left as the one
+  // remaining "Material" in an otherwise fully-Color-named feature. The
+  // helpers this calls (openMaterialWheel/closeMaterialWheel) and the
+  // `materialSelectId`/`getMaterialColor`/`onMaterialHoverPreview`/
+  // `onMaterialHoverEnd` params stay as-is -- purely internal to this
+  // module, never shown to a user, and the underlying `cell.material`
+  // data concept they ultimately front-end for isn't being renamed (see
+  // MATERIAL_COLORS' own header in render.js for why).
+  function openColorPicker(onPick) {
     const select = document.getElementById(materialSelectId);
     const options = readSelectOptions(select);
     openMaterialWheel(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
@@ -282,7 +294,7 @@ export function createWheelPickers({
   // archived along with growth/evolution/cultivation and planetoidgen.
   // openPickerStrip/pickerStrip themselves stay: isAnyPickerOpen/
   // closeAnyPicker (below) still check/close the strip generically for
-  // the material-picker-close-on-navigate interplay render.js relies on.
+  // the color-picker-close-on-navigate interplay render.js relies on.
   function toggleDragPlacement() {
     dragPlacementEnabled = !dragPlacementEnabled;
     onDragPlacementChange(dragPlacementEnabled);
@@ -292,7 +304,7 @@ export function createWheelPickers({
   }
 
   return {
-    openMaterialPicker,
+    openColorPicker,
     toggleDragPlacement,
     isDragPlacementEnabled: () => dragPlacementEnabled,
     // For a caller (the 3D wheel's Tab/Space/HUD-cue handling) that
