@@ -105,11 +105,20 @@ const SCALE = 1;
 // (roughly SCALE-sized), not a derived constant.
 const HEX_PRISM_R = SCALE;
 const HEX_PRISM_H = Math.sqrt(3) * SCALE;
-// 2D lattice tier (Phase 3): matches SCALE for visual consistency with
-// everything else -- no special proportion required (same reasoning as
-// hex prism's own height above), shared by every (angle, primitive)
-// combination in LATTICE_2D_COMBINATIONS.
-const LATTICE2D_S = SCALE;
+// 2D lattice tier (Phase 3): direct correction, Phase 5 ("why are the
+// shapes so tiny compared to dot still?" then, after the dot-field
+// coverage fix alone wasn't enough, "STILL not letting me add by
+// tapping"): bumped from a plain SCALE match to 2.5x it. A real, non-
+// cosmetic reason this also matters for tapping, not just visual size --
+// this drives BOTH the dot spacing AND the real tile's own edge length
+// (see updateDotMatrix/lattice2dMeshes, both built from this SAME
+// constant), so a bigger value gives a bigger on-screen tile with more
+// actual room between its own center and each of its 4/3/6 neighbor
+// directions -- exactly the precision a hit-point-direction click needs
+// (see handleLattice2dClick's own header, core/build.js) to reliably
+// resolve which neighbor a tap meant, rather than several directions
+// crowding into the same few dozen screen pixels.
+const LATTICE2D_S = SCALE * 2.5;
 // 2D tiles read as genuinely flat, direct instruction 2026-09-23 ("make
 // 2D seem more 2D... show only 2D plane"): a near-zero tile height still
 // renders a real, visible top/bottom face pair + edge sliver (not a
@@ -1672,11 +1681,15 @@ async function init() {
   // rebuilt) whenever the toggle panel's own angle changes, so dragging
   // through the 4 named angles visibly morphs this dot grid in place --
   // the actual "see transformations" effect asked for.
-  // Direct correction, 2026-09-23 ("matrix dots are a little big and
-  // coverage is small of whole matrix when zooming out"): smaller dots,
-  // wider coverage (radius 8 -> 24, so the grid still fills the view at
-  // a real zoomed-out distance instead of trailing off into empty space).
-  const DOT_MATRIX_RADIUS = 24;
+  // Radius history: 8 -> 24 -> 10 -> 7 -> 15 here, direct correction
+  // ("should be more dots on each shape = bigger shapes"): both need to
+  // be generous together -- LATTICE2D_S bigger (2.5x, see its own
+  // comment) makes each dot-to-dot gap (and each real tile, built from
+  // that same constant) bigger, and this radius needs to stay wide
+  // enough that several dots are still visible tracing structure well
+  // beyond any single tile's own few corner dots, not just barely
+  // enough to cover one shape.
+  const DOT_MATRIX_RADIUS = 15;
   const dotMatrixGeometry = new THREE.SphereGeometry(0.035 * LATTICE2D_S, 8, 6);
   // Signature blue (#9de0ff), same accent color as everything else in
   // this app's own HUD chrome -- fully opaque (not the original 0.85)
