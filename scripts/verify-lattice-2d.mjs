@@ -22,6 +22,10 @@ import {
   kiteTileVerts,
   kiteCellToWorld,
   kiteNeighborOffsets,
+  RHOMBILLE_ANGLE_ID,
+  rhombilleTileVerts,
+  rhombilleCellToWorld,
+  rhombilleNeighborOffsets,
 } from '../src/geometry-extensions/lattice-2d.js';
 
 let failures = 0;
@@ -170,6 +174,27 @@ for (const id of KITE_VALID_ANGLE_IDS) {
   const neighborCountsOk = Array.from({ length: n }, (_, f) => kiteNeighborOffsets(angleDeg, f).length === 4).every(Boolean);
   check(`[${id}] every kite fan position has exactly 4 neighbors`, neighborCountsOk);
 }
+
+// Rhombille: angle-locked to exactly Triangular (60 degrees). Its 3
+// rhombi must each be a real, closed 4-vertex rhombus, congruent to each
+// other (same side lengths -- world-space, rotated+translated the same
+// way render.js's own instancing does), and each must have exactly 4
+// real neighbors (2 intra-hexagon + 2 cross-hexagon).
+check('Rhombille is locked to the Triangular angle', RHOMBILLE_ANGLE_ID === 'triangular');
+
+function rhombilleWorldSideLengths(k) {
+  const poly = polygonBottomFace(rhombilleTileVerts(1, 0.15));
+  const [cx, cy] = rhombilleCellToWorld(0, 0, k, 1, 0);
+  const theta = (k * 2 * Math.PI) / 3;
+  const cos = Math.cos(theta), sin = Math.sin(theta);
+  const world = poly.map(([x, y, z]) => [x * cos - y * sin + cx, x * sin + y * cos + cy, z]);
+  return edgeLengths(world).map((e) => +e.toFixed(6)).sort();
+}
+const rhomb0 = polygonBottomFace(rhombilleTileVerts(1, 0.15));
+check('Rhombille: 4 vertices', rhomb0.length === 4);
+const rhombBase = rhombilleWorldSideLengths(0);
+check('Rhombille: all 3 rotations are congruent (world-space)', [0, 1, 2].every((k) => rhombilleWorldSideLengths(k).every((s, i) => Math.abs(s - rhombBase[i]) < 1e-4)));
+check('Rhombille: every rhombus has exactly 4 neighbors', [0, 1, 2].every((k) => rhombilleNeighborOffsets(k).length === 4));
 
 console.log(failures === 0 ? `\nAll checks passed (0 failures).` : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

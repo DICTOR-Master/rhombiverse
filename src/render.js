@@ -23,7 +23,7 @@ import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
-import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis } from './geometry-extensions/lattice-2d.js';
+import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
 import { rhombohedraTileVerts, rhombohedraCellToWorld } from './geometry-extensions/rhombohedra-lattice.js';
 import { FEATURES } from './app/features.js';
 import {
@@ -1399,8 +1399,24 @@ function rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld) {
 // 2d.js's own verified header) is `impl.hasOrientation`, driving a call
 // to `impl.instanceRotationRad(angleDeg, cell.z)` rather than a hardcoded
 // 180-degree flip.
-function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg) {
-  const impl = LATTICE_PRIMITIVE_IMPLS[primitiveId];
+// Resolves which impl is actually active for `primitiveId` right now --
+// RHOMBILLE_ARRANGEMENT_IMPL swaps in for 'parallelogram' only when
+// `arrangementId` is 'rotational', otherwise the plain
+// LATTICE_PRIMITIVE_IMPLS entry. The one place this decision is made,
+// module-level (not closed over init()'s own toggle state) so both
+// rebuildLattice2dInstances below and build.js's click handler (via the
+// lattice2d.getImpl accessor init() passes it) read through the exact
+// same function and can never disagree about which geometry is active.
+// Trusts `arrangementId` rather than re-deriving applicability from the
+// current angle -- init()'s own toggle-panel handlers are responsible for
+// resetting it to 'translation' whenever the Rhombille row stops applying
+// (see renderLattice2dPanel's own angle/primitive click handlers).
+function resolveLattice2dImpl(primitiveId, arrangementId) {
+  if (primitiveId === 'parallelogram' && arrangementId === 'rotational') return RHOMBILLE_ARRANGEMENT_IMPL;
+  return LATTICE_PRIMITIVE_IMPLS[primitiveId];
+}
+function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangementId = 'translation') {
+  const impl = resolveLattice2dImpl(primitiveId, arrangementId);
   const newGeometry = new ConvexGeometry(impl.tileVerts(angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
   newGeometry.computeVertexNormals();
   mesh.geometry.dispose();
@@ -1804,6 +1820,21 @@ async function init() {
   // the new angle.
   let activeLattice2dAngleId = NAMED_LATTICE_ANGLES[0].id;
   let activeLattice2dPrimitiveId = LATTICE_PRIMITIVES[0].id;
+  // Rhombille (Part D): a second, contextual placement pattern for the
+  // SAME 'parallelogram' primitive/world, offered only at the Triangular
+  // angle -- see RHOMBILLE_ARRANGEMENT_IMPL's own header. Not a
+  // LATTICE_PRIMITIVES entry, so it needs its own toggle state rather
+  // than reusing activeLattice2dPrimitiveId.
+  let activeLattice2dArrangementId = 'translation';
+  // Whether the Rhombille row itself should be showing right now -- the
+  // panel uses this to render/hide that 3rd row, and the angle/primitive
+  // click handlers use it to reset activeLattice2dArrangementId back to
+  // 'translation' the moment it stops applying (see renderLattice2dPanel),
+  // which is what lets resolveLattice2dImpl above trust `arrangementId`
+  // alone without re-checking the angle itself on every call.
+  function rhombilleArrangementApplicable() {
+    return activeLattice2dPrimitiveId === 'parallelogram' && activeLattice2dAngleId === RHOMBILLE_ANGLE_ID;
+  }
   const lattice2dPanel = document.createElement('div');
   lattice2dPanel.id = 'lattice2d-toggle-panel';
   document.body.appendChild(lattice2dPanel);
@@ -1841,6 +1872,10 @@ async function init() {
         btn.addEventListener('click', () => {
           if (angle.id === activeLattice2dAngleId) return;
           activeLattice2dAngleId = angle.id;
+          // Rhombille row may just have gone (in)applicable -- reset so
+          // resolveLattice2dImpl never trusts a stale 'rotational' state
+          // (see rhombilleArrangementApplicable's own header).
+          if (!rhombilleArrangementApplicable()) activeLattice2dArrangementId = 'translation';
           renderLattice2dPanel();
           applyLattice2dSelection();
         });
@@ -1861,6 +1896,7 @@ async function init() {
         btn.addEventListener('click', () => {
           if (primitive.id === activeLattice2dPrimitiveId) return;
           activeLattice2dPrimitiveId = primitive.id;
+          if (!rhombilleArrangementApplicable()) activeLattice2dArrangementId = 'translation';
           renderLattice2dPanel();
           applyLattice2dSelection();
         });
@@ -1868,6 +1904,35 @@ async function init() {
       primRow.appendChild(btn);
     }
     lattice2dPanel.append(angleRow, primRow);
+    // Rhombille (Part D): a 3rd row, shown only when the current
+    // (primitive, angle) is exactly (Parallelogram, Triangular) -- the
+    // one combo where 3 rotated copies of the rhombus close up without
+    // gaps (see RHOMBILLE_ARRANGEMENT_IMPL's own header). Every other
+    // combo has exactly one valid arrangement already, so no row shows
+    // for them -- same "don't show a choice that doesn't exist" principle
+    // the angle/primitive disabling above already follows.
+    if (rhombilleArrangementApplicable()) {
+      const arrangementRow = document.createElement('div');
+      arrangementRow.className = 'lattice2d-toggle-row';
+      const arrangements = [
+        { id: 'translation', label: 'Translation' },
+        { id: 'rotational', label: 'Rotational (Rhombille)' },
+      ];
+      for (const arrangement of arrangements) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = arrangement.label;
+        if (arrangement.id === activeLattice2dArrangementId) btn.classList.add('active');
+        btn.addEventListener('click', () => {
+          if (arrangement.id === activeLattice2dArrangementId) return;
+          activeLattice2dArrangementId = arrangement.id;
+          renderLattice2dPanel();
+          applyLattice2dSelection();
+        });
+        arrangementRow.appendChild(btn);
+      }
+      lattice2dPanel.append(arrangementRow);
+    }
   }
   // Decorative preview shapes REMOVED, 2026-09-23 (a real design
   // mistake, not a tuning issue -- see lattice2dSeedCell's own updated
@@ -1910,7 +1975,7 @@ async function init() {
     const angleDeg = currentLattice2dAngleDeg();
     const primitive = LATTICE_PRIMITIVES.find((p) => p.id === activeLattice2dPrimitiveId);
     updateDotMatrix(angleDeg);
-    rebuildLattice2dInstances(lattice2dMeshes.get(primitive.id), lattice2dWorlds.get(primitive.id), primitive.id, angleDeg);
+    rebuildLattice2dInstances(lattice2dMeshes.get(primitive.id), lattice2dWorlds.get(primitive.id), primitive.id, angleDeg, activeLattice2dArrangementId);
     document.getElementById('piece-type-select').value = `lattice2d:${primitive.id}`;
     // Re-derives which single lattice2d mesh dimensionAllowsMesh now
     // permits (the newly active primitive) and hides every other one --
@@ -3156,10 +3221,11 @@ async function init() {
             const primitiveId = value.slice('lattice2d:'.length);
             if (primitiveId !== activeLattice2dPrimitiveId) {
               activeLattice2dPrimitiveId = primitiveId;
+              activeLattice2dArrangementId = 'translation'; // reset -- same reasoning as renderLattice2dPanel's own angle/primitive click handlers
               renderLattice2dPanel();
             }
             const angleDeg = currentLattice2dAngleDeg();
-            rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), lattice2dWorlds.get(primitiveId), primitiveId, angleDeg);
+            rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), lattice2dWorlds.get(primitiveId), primitiveId, angleDeg, activeLattice2dArrangementId);
             updateDotMatrix(angleDeg);
             applyDimensionVisibility();
           }
@@ -4991,6 +5057,16 @@ async function init() {
       s: LATTICE2D_S,
       getAngleDeg: currentLattice2dAngleDeg,
       onChange: onLattice2dChange,
+      // Real bug this closes: build.js used to import LATTICE_PRIMITIVE_
+      // IMPLS directly and look up `impl = LATTICE_PRIMITIVE_IMPLS[primitiveId]`
+      // itself, which has no way to know about the Rhombille arrangement
+      // swap -- a click while Rotational was active would still place/
+      // raycast against plain translated-parallelogram geometry while the
+      // mesh RENDERED as rotated rhombi, a real mismatch between what's
+      // drawn and what's clickable. Routing through the exact same
+      // resolveLattice2dImpl this file's own rebuildLattice2dInstances
+      // already uses keeps them permanently in agreement.
+      getImpl: (primitiveId) => resolveLattice2dImpl(primitiveId, activeLattice2dArrangementId),
     },
     rhombohedraWorld,
     rhombohedraMesh,
@@ -5076,7 +5152,7 @@ async function init() {
       const [sx, sy] = lattice2dSeedCell();
       world.addCell(sx, sy, 0, { material: LATTICE2D_SEED_COLORS[idx % LATTICE2D_SEED_COLORS.length] });
     }
-    rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), world, primitiveId, currentLattice2dAngleDeg());
+    rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), world, primitiveId, currentLattice2dAngleDeg(), activeLattice2dArrangementId);
     updateSectionEnabled();
     applyWorldViewMaterials();
     saveToLocalStorage(world.toJSON(), lattice2dStorageKey(primitiveId));

@@ -389,6 +389,93 @@ export function kiteNeighborOffsets(angleDeg, fanIndex) {
 }
 
 // ---------------------------------------------------------------------------
+// Rhombille arrangement -- NOT a LATTICE_PRIMITIVES entry. It's a second,
+// contextual placement pattern for the SAME rhombus shape Parallelogram
+// already draws at the Triangular/Hexagonal (60-degree) angle: instead of
+// pure translation (today's Parallelogram, one orientation everywhere),
+// this places 3 rotated copies (0/120/240 degrees) around alternating
+// hexagon-center points -- real rhombille tiling, dual of the Kagome
+// (trihexagonal) tiling. Angle-locked to exactly 60 degrees (unlike Kite,
+// this has no partial/irregular fallback at the other 3 named angles: 3
+// rotated copies of a rhombus only close up without gaps when its own
+// corners are exactly 60/120, which is only true here), so render.js
+// offers it as a contextual "Arrangement" toggle under Parallelogram,
+// shown only at this one angle, rather than a normal primitive spanning
+// all 4.
+// ---------------------------------------------------------------------------
+
+export const RHOMBILLE_ANGLE_ID = 'triangular';
+const RHOMBILLE_ANGLE_DEG = NAMED_LATTICE_ANGLES.find((a) => a.id === RHOMBILLE_ANGLE_ID).angleDeg;
+
+// A regular hexagon (only true at exactly 60 degrees) splits into 3
+// congruent 60/120 rhombi by connecting its own center to 3 alternating
+// vertex-pairs: (H0,H1,H2), (H2,H3,H4), (H4,H5,H0) -- a well-known
+// dissection, verified directly (all 3 have identical side lengths, and
+// each is exactly a 120-degree rotation of the others about the hexagon's
+// own center, since shifting the vertex pair by 2 IS a 120-degree
+// rotation at 60-degree 6-fold symmetry). Same side length as
+// Parallelogram's own rhombus at this angle (both are 60/120 rhombi of
+// side s) -- a different placement pattern for an equivalent shape, not a
+// differently-sized one.
+function rhombusCorners2d(poly, k) {
+  const n = poly.length;
+  return [[0, 0], poly[(2 * k) % n], poly[(2 * k + 1) % n], poly[(2 * k + 2) % n]];
+}
+
+// k=0's own real corners only -- k=1/k=2 are pure 120/240-degree rotations
+// of this SAME shape about the hexagon's own center, same "one geometry,
+// per-instance rotation" trick Kite's own fan uses, fixed at N=3 (angle-
+// locked, so no per-angleDeg N to compute).
+export function rhombilleTileVerts(s = 1, h = 0.15 * 1) {
+  return extrudePrism(rhombusCorners2d(voronoiPolygon(RHOMBILLE_ANGLE_DEG, s), 0), h);
+}
+
+export function rhombilleCellToWorld(x, y, k, s = 1, worldZ = 0) {
+  const poly = voronoiPolygon(RHOMBILLE_ANGLE_DEG, s);
+  const [hcx, hcy] = hexagonCellToWorld(x, y, RHOMBILLE_ANGLE_DEG, s, 0);
+  const [ox, oy] = centroid2d(rhombusCorners2d(poly, 0));
+  const theta = (k * 2 * Math.PI) / 3;
+  const cos = Math.cos(theta), sin = Math.sin(theta);
+  return [hcx + ox * cos - oy * sin, hcy + ox * sin + oy * cos, worldZ];
+}
+
+export function rhombilleInstanceRotationRad(k) {
+  return (k * 2 * Math.PI) / 3;
+}
+
+// Verified directly (real hexagon-edge world-position matching, same
+// technique kiteNeighborOffsets uses): each rhombus has exactly 2 intra-
+// hexagon neighbors (the other 2 rhombi sharing this same hexagon, across
+// their shared center-to-vertex radius edges) plus 2 real cross-hexagon
+// neighbors (one per outer edge) -- exactly 4 total, matching a rhombus's
+// real edge count. Fixed, angle-locked constants (this only ever runs at
+// RHOMBILLE_ANGLE_DEG), same "hardcoded per-orientation table" style as
+// TRIANGLE_NEIGHBOR_OFFSETS_FROM_UP/DOWN above rather than a runtime
+// derivation like Kite's (which genuinely varies per angleDeg).
+const RHOMBILLE_NEIGHBOR_OFFSETS = [
+  [[0, 0, 1], [0, 0, 2], [1, 0, 1], [0, 1, 2]], // k=0
+  [[0, 0, 0], [0, 0, 2], [-1, 1, 2], [-1, 0, 0]], // k=1
+  [[0, 0, 0], [0, 0, 1], [0, -1, 0], [1, -1, 1]], // k=2
+];
+export function rhombilleNeighborOffsets(k) {
+  return RHOMBILLE_NEIGHBOR_OFFSETS[k];
+}
+
+// Same shape as a LATTICE_PRIMITIVE_IMPLS entry (tileVerts/cellToWorld/
+// neighborOffsets/instanceRotationRad/hasOrientation), so render.js/
+// build.js can swap it in for the 'parallelogram' entry wholesale when
+// the Rhombille arrangement is active, rather than needing a parallel
+// dispatch mechanism. NOT added to LATTICE_PRIMITIVE_IMPLS itself --
+// it's reached only via that swap, never as its own primitive id.
+export const RHOMBILLE_ARRANGEMENT_IMPL = {
+  hasOrientation: true,
+  tileVerts: (_angleDeg, s, h) => rhombilleTileVerts(s, h),
+  cellToWorld: (i, j, orientation, _angleDeg, s, worldZ) => rhombilleCellToWorld(i, j, orientation, s, worldZ),
+  neighborOffsets: (_angleDeg, orientation) => rhombilleNeighborOffsets(orientation),
+  instanceRotationRad: (_angleDeg, orientation) => rhombilleInstanceRotationRad(orientation),
+};
+
+// ---------------------------------------------------------------------------
 // Generic dispatch: one lookup table so callers (render.js/build.js) can
 // loop over all NAMED_LATTICE_ANGLES x LATTICE_PRIMITIVES combinations
 // generically instead of hand-writing one block per combination.

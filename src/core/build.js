@@ -31,7 +31,6 @@ import {
 } from './pyramid.js';
 import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
 import { matchHexNeighborOffset } from '../geometry-extensions/hex-prism.js';
-import { LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
 import { matchRhombohedraNeighborOffset } from '../geometry-extensions/rhombohedra-lattice.js';
 import { elongDodecaCellToWorld } from '../geometry-extensions/elongated-dodecahedron.js';
 import {
@@ -637,7 +636,12 @@ export function createBuildController({
     const action = mode === 'build' ? 'add' : 'remove';
     const primitiveId = pieceType.slice('lattice2d:'.length);
     const store = lattice2d?.stores.get(primitiveId);
-    const impl = LATTICE_PRIMITIVE_IMPLS[primitiveId];
+    // Routed through lattice2d.getImpl (render.js's own resolveLattice2dImpl)
+    // rather than a direct LATTICE_PRIMITIVE_IMPLS lookup, so a click
+    // always agrees with whatever's actually rendered -- see that
+    // accessor's own header for the real Rhombille-arrangement mismatch
+    // this replaces.
+    const impl = lattice2d?.getImpl(primitiveId);
     if (!store || !impl || hit.object !== store.mesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
     const cell = store.cellAt(hit.instanceId);
     if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
