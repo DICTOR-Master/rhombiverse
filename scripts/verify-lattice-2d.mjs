@@ -26,6 +26,14 @@ import {
   rhombilleTileVerts,
   rhombilleCellToWorld,
   rhombilleNeighborOffsets,
+  KAGOME_VALID_ANGLE_IDS,
+  kagomeHexagonTileVerts,
+  kagomeHexagonCellToWorld,
+  kagomeTriangleUpTileVerts,
+  kagomeTriangleUpCellToWorld,
+  kagomeTriangleDownTileVerts,
+  kagomeTriangleDownCellToWorld,
+  kagomeNeighborOffsets,
 } from '../src/geometry-extensions/lattice-2d.js';
 
 let failures = 0;
@@ -195,6 +203,44 @@ check('Rhombille: 4 vertices', rhomb0.length === 4);
 const rhombBase = rhombilleWorldSideLengths(0);
 check('Rhombille: all 3 rotations are congruent (world-space)', [0, 1, 2].every((k) => rhombilleWorldSideLengths(k).every((s, i) => Math.abs(s - rhombBase[i]) < 1e-4)));
 check('Rhombille: every rhombus has exactly 4 neighbors', [0, 1, 2].every((k) => rhombilleNeighborOffsets(k).length === 4));
+
+// Kagome: verify real edge-sharing in world space (not just matching
+// side lengths, the stronger claim this construction's header makes) --
+// the hexagon at (0,0) must share a REAL edge (2 exactly-matching
+// vertices) with both the up and down medial triangles at (0,0).
+// rotationRad mirrors render.js's own rebuildLattice2dInstances: for a
+// hasOrientation primitive, the mesh applies impl.instanceRotationRad
+// BEFORE translating -- omitting it here (as an earlier version of this
+// helper did) checks the wrong, un-rotated shape for orientation !== 0.
+function worldPoly(tileVerts, cellToWorld, x, y, orientation, angleDeg, rotationRad = 0) {
+  const local = polygonBottomFace(tileVerts(angleDeg, 1, 0.15));
+  const [cx, cy] = cellToWorld(x, y, orientation, angleDeg, 1, 0);
+  const cos = Math.cos(rotationRad), sin = Math.sin(rotationRad);
+  return local.map(([lx, ly]) => [lx * cos - ly * sin + cx, lx * sin + ly * cos + cy]);
+}
+function sharesRealEdge(polyA, polyB) {
+  const pts = (poly) => poly.map(([x, y]) => `${x.toFixed(6)},${y.toFixed(6)}`);
+  const a = pts(polyA), b = pts(polyB);
+  let shared = 0;
+  for (const p of a) if (b.includes(p)) shared++;
+  return shared >= 2;
+}
+for (const id of KAGOME_VALID_ANGLE_IDS) {
+  const angleDeg = NAMED_LATTICE_ANGLES.find((a) => a.id === id).angleDeg;
+  const hex = worldPoly(kagomeHexagonTileVerts, kagomeHexagonCellToWorld, 0, 0, 0, angleDeg);
+  const worldPolyNoOrientation = (tileVerts, cellToWorld, x, y, angleDeg) => {
+    const local = polygonBottomFace(tileVerts(angleDeg, 1, 0.15));
+    const [cx, cy] = cellToWorld(x, y, angleDeg, 1, 0);
+    return local.map(([lx, ly]) => [lx + cx, ly + cy]);
+  };
+  const triUp = worldPolyNoOrientation(kagomeTriangleUpTileVerts, kagomeTriangleUpCellToWorld, 0, 0, angleDeg);
+  const triDown = worldPolyNoOrientation(kagomeTriangleDownTileVerts, kagomeTriangleDownCellToWorld, 0, 0, angleDeg);
+  check(`[${id}] kagome hexagon: ${hex.length} vertices`, hex.length === (id === 'square' ? 4 : 6));
+  check(`[${id}] kagome hexagon shares a real edge with the up triangle`, sharesRealEdge(hex, triUp));
+  check(`[${id}] kagome hexagon shares a real edge with the down triangle`, sharesRealEdge(hex, triDown));
+  const neighborCount = kagomeNeighborOffsets(angleDeg).length;
+  check(`[${id}] kagome neighbor count matches hexagon's (${neighborCount})`, neighborCount === (id === 'square' ? 4 : 6));
+}
 
 console.log(failures === 0 ? `\nAll checks passed (0 failures).` : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

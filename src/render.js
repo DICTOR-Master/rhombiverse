@@ -1415,7 +1415,12 @@ function resolveLattice2dImpl(primitiveId, arrangementId) {
   if (primitiveId === 'parallelogram' && arrangementId === 'rotational') return RHOMBILLE_ARRANGEMENT_IMPL;
   return LATTICE_PRIMITIVE_IMPLS[primitiveId];
 }
-function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangementId = 'translation') {
+// `companionMeshes` (Kagome only): render-only meshes, one real instance
+// PER LOGICAL CELL each (never raycast/click targets -- build.js's click
+// handler only ever checks the PRIMARY mesh, see handleLattice2dClick),
+// rebuilt in lockstep with the primary mesh's own cellOrder so a logical
+// cell's index `i` always means the same real cell across all of them.
+function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangementId = 'translation', companionMeshes = null) {
   const impl = resolveLattice2dImpl(primitiveId, arrangementId);
   const newGeometry = new ConvexGeometry(impl.tileVerts(angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
   newGeometry.computeVertexNormals();
@@ -1440,6 +1445,27 @@ function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangeme
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   mesh.computeBoundingSphere();
+
+  if (impl.companions && companionMeshes) {
+    impl.companions.forEach((companion, idx) => {
+      const companionMesh = companionMeshes[idx];
+      const companionGeometry = new ConvexGeometry(companion.tileVerts(angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+      companionGeometry.computeVertexNormals();
+      companionMesh.geometry.dispose();
+      companionMesh.geometry = companionGeometry;
+      const cm = new THREE.Matrix4();
+      cellOrder.forEach((cell, i) => {
+        const [wx, wy, wz] = companion.cellToWorld(cell.x, cell.y, angleDeg, LATTICE2D_S, 0);
+        cm.makeTranslation(wx, wy, wz);
+        companionMesh.setMatrixAt(i, cm);
+        companionMesh.setColorAt(i, instanceColorFor(cell));
+      });
+      companionMesh.count = cellOrder.length;
+      companionMesh.instanceMatrix.needsUpdate = true;
+      if (companionMesh.instanceColor) companionMesh.instanceColor.needsUpdate = true;
+      companionMesh.computeBoundingSphere();
+    });
+  }
 }
 
 // Real placed Rhombohedra cells (free lattice) -- same instancing
@@ -1715,6 +1741,10 @@ async function init() {
   // rebuildLattice2dInstances' own header below -- since a primitive's
   // own tile shape is a genuine function of angle.
   const lattice2dMeshes = new Map(); // primitiveId -> InstancedMesh
+  // Kagome-only: its 2 companion (render-only, not clickable) meshes --
+  // see rebuildLattice2dInstances' own header for why they're rebuilt in
+  // lockstep with the primary mesh rather than owning a separate world.
+  const lattice2dCompanionMeshes = new Map(); // primitiveId -> InstancedMesh[]
   LATTICE_PRIMITIVES.forEach((primitive) => {
     const impl = LATTICE_PRIMITIVE_IMPLS[primitive.id];
     const geometry = new ConvexGeometry(impl.tileVerts(NAMED_LATTICE_ANGLES[0].angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
@@ -1723,7 +1753,17 @@ async function init() {
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     scene.add(mesh);
     lattice2dMeshes.set(primitive.id, mesh);
-    rebuildLattice2dInstances(mesh, lattice2dWorlds.get(primitive.id), primitive.id, NAMED_LATTICE_ANGLES[0].angleDeg);
+    if (impl.companions) {
+      lattice2dCompanionMeshes.set(primitive.id, impl.companions.map((companion) => {
+        const companionGeometry = new ConvexGeometry(companion.tileVerts(NAMED_LATTICE_ANGLES[0].angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+        companionGeometry.computeVertexNormals();
+        const companionMesh = new THREE.InstancedMesh(companionGeometry, material.clone(), MAX_CELLS);
+        companionMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        scene.add(companionMesh);
+        return companionMesh;
+      }));
+    }
+    rebuildLattice2dInstances(mesh, lattice2dWorlds.get(primitive.id), primitive.id, NAMED_LATTICE_ANGLES[0].angleDeg, 'translation', lattice2dCompanionMeshes.get(primitive.id));
   });
 
   // Dot-matrix overlay (Phase 4, direct instruction: "showing the dot
@@ -1975,7 +2015,7 @@ async function init() {
     const angleDeg = currentLattice2dAngleDeg();
     const primitive = LATTICE_PRIMITIVES.find((p) => p.id === activeLattice2dPrimitiveId);
     updateDotMatrix(angleDeg);
-    rebuildLattice2dInstances(lattice2dMeshes.get(primitive.id), lattice2dWorlds.get(primitive.id), primitive.id, angleDeg, activeLattice2dArrangementId);
+    rebuildLattice2dInstances(lattice2dMeshes.get(primitive.id), lattice2dWorlds.get(primitive.id), primitive.id, angleDeg, activeLattice2dArrangementId, lattice2dCompanionMeshes.get(primitive.id));
     document.getElementById('piece-type-select').value = `lattice2d:${primitive.id}`;
     // Re-derives which single lattice2d mesh dimensionAllowsMesh now
     // permits (the newly active primitive) and hides every other one --
@@ -2437,6 +2477,7 @@ async function init() {
     elongDodecaMesh.material.clippingPlanes = planes;
     hexPrismMesh.material.clippingPlanes = planes;
     lattice2dMeshes.forEach((m) => { m.material.clippingPlanes = planes; });
+    lattice2dCompanionMeshes.forEach((meshes) => meshes.forEach((m) => { m.material.clippingPlanes = planes; }));
     rhombohedraMesh.material.clippingPlanes = planes;
     cuboctaMesh.material.clippingPlanes = planes;
     octGapMesh.material.clippingPlanes = planes;
@@ -2489,7 +2530,7 @@ async function init() {
   let skeletonGeneration = 0;
   const TRANSLUCENT_OPACITY = 0.55; // matches Lattice Quick-View/Dualize preview's own established "see-through structure" opacity
   function worldViewMaterials() {
-    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, ...[...lattice2dMeshes.values()].map((m) => m.material), rhombohedraMesh.material, cuboctaMesh.material, octGapMesh.material];
+    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, ...[...lattice2dMeshes.values()].map((m) => m.material), ...[...lattice2dCompanionMeshes.values()].flat().map((m) => m.material), rhombohedraMesh.material, cuboctaMesh.material, octGapMesh.material];
     for (const { mesh: m } of partialCellMeshes.values()) {
       if (m.isGroup) { for (const child of m.children) mats.push(child.material); }
       else mats.push(m.material);
@@ -2559,6 +2600,7 @@ async function init() {
     elongDodecaMesh.visible = visible && dimensionAllowsMesh('elongdodeca');
     hexPrismMesh.visible = visible && dimensionAllowsMesh('hexprism');
     lattice2dMeshes.forEach((m, primitiveId) => { m.visible = visible && dimensionAllowsMesh(`lattice2d:${primitiveId}`); });
+    lattice2dCompanionMeshes.forEach((meshes, primitiveId) => { const v = visible && dimensionAllowsMesh(`lattice2d:${primitiveId}`); meshes.forEach((m) => { m.visible = v; }); });
     rhombohedraMesh.visible = visible && dimensionAllowsMesh('rhombohedra');
     cuboctaMesh.visible = visible && dimensionAllowsMesh('cubocta');
     octGapMesh.visible = visible && dimensionAllowsMesh('octgap');
@@ -3225,7 +3267,7 @@ async function init() {
               renderLattice2dPanel();
             }
             const angleDeg = currentLattice2dAngleDeg();
-            rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), lattice2dWorlds.get(primitiveId), primitiveId, angleDeg, activeLattice2dArrangementId);
+            rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), lattice2dWorlds.get(primitiveId), primitiveId, angleDeg, activeLattice2dArrangementId, lattice2dCompanionMeshes.get(primitiveId));
             updateDotMatrix(angleDeg);
             applyDimensionVisibility();
           }
@@ -5152,7 +5194,7 @@ async function init() {
       const [sx, sy] = lattice2dSeedCell();
       world.addCell(sx, sy, 0, { material: LATTICE2D_SEED_COLORS[idx % LATTICE2D_SEED_COLORS.length] });
     }
-    rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), world, primitiveId, currentLattice2dAngleDeg(), activeLattice2dArrangementId);
+    rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), world, primitiveId, currentLattice2dAngleDeg(), activeLattice2dArrangementId, lattice2dCompanionMeshes.get(primitiveId));
     updateSectionEnabled();
     applyWorldViewMaterials();
     saveToLocalStorage(world.toJSON(), lattice2dStorageKey(primitiveId));

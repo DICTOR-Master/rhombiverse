@@ -65,6 +65,7 @@ export const LATTICE_PRIMITIVES = [
   { id: 'triangle', label: 'Triangle' },
   { id: 'hexagon', label: 'Hexagon' },
   { id: 'kite', label: 'Kite' },
+  { id: 'kagome', label: 'Kagome' },
 ];
 
 // Two equal-length basis vectors at angleDeg apart. The single shared
@@ -476,6 +477,104 @@ export const RHOMBILLE_ARRANGEMENT_IMPL = {
 };
 
 // ---------------------------------------------------------------------------
+// Kagome (trihexagonal, 3.6.3.6) -- the rectified triangular tiling: a
+// small hexagon at each original lattice point, a small triangle at each
+// original up/down triangle's own position. NOT hexagonTileVerts's own
+// Voronoi construction rescaled (checked directly and rejected: the
+// Voronoi hexagon's vertices point BETWEEN neighbor directions -- -30/-45
+// degrees off v0 -- a different, incompatible construction). The real
+// rectification hexagon's vertices are exactly the MIDPOINTS of the 6 (4
+// at Square) edges to each neighbor, so it's built directly from those
+// midpoints here, not reused from Hexagon. Because Hexagon's own uniform-
+// edge-length restriction still applies to picking neighbor directions
+// cleanly, this is angle-gated to Square + Triangular only, same as Kite
+// (see KITE_VALID_ANGLE_IDS's own header for the general reason: RD
+// Rhombus/Golden Rhombus verified non-uniform hexagon edges directly).
+//
+// Each small triangle is the medial triangle of an ORIGINAL up/down
+// triangle (vertices at ITS 3 edge midpoints) -- by construction, a
+// hexagon edge between two adjacent neighbor-direction midpoints IS
+// exactly one edge of that medial triangle, so hexagon and triangle
+// faces share real edges with no separate alignment step, and the
+// existing Triangle primitive's own proven "up/down are a 180-degree
+// rotation of the same shape, true at any angle" fact applies unchanged
+// to these medial triangles too (a medial triangle of a rotated shape is
+// the same rotation of the original's medial triangle).
+// ---------------------------------------------------------------------------
+
+// Square-only rejected, not just untested: at exactly 90 degrees the
+// hexagon degenerates to 4 neighbors (the (v0-v1) diagonal direction is
+// redundant there, per hexagonNeighborOffsets' own real derivation), so
+// the down-triangle pairing this construction depends on (which needs
+// that diagonal direction to be a real hexagon vertex) only produces a
+// valid shared edge at Triangular -- verified directly (Square fails the
+// same edge-sharing check Triangular passes). Consistent with Kagome
+// being fundamentally a hexagonal-symmetry (6-connected) construction,
+// same reason its own dual Rhombille is angle-locked too, not a partial-
+// coverage gap like Kite's.
+export const KAGOME_VALID_ANGLE_IDS = ['triangular'];
+
+// The hexagon's own real neighbor directions, in real cyclic angular
+// order (hexagonNeighborOffsets' own order isn't guaranteed angular, so
+// this sorts by the real world-space angle before connecting consecutive
+// midpoints into a polygon).
+function kagomeNeighborDirsSorted(angleDeg, s) {
+  const [v0, v1] = latticeBasis(angleDeg, s);
+  return hexagonNeighborOffsets(angleDeg)
+    .map(([i, j]) => [i * v0[0] + j * v1[0], i * v0[1] + j * v1[1]])
+    .sort((a, b) => Math.atan2(a[1], a[0]) - Math.atan2(b[1], b[0]));
+}
+
+export function kagomeHexagonTileVerts(angleDeg, s = 1, h = 0.15 * 1) {
+  const corners2d = kagomeNeighborDirsSorted(angleDeg, s).map(([dx, dy]) => [dx / 2, dy / 2]);
+  return extrudePrism(corners2d, h);
+}
+
+export function kagomeHexagonCellToWorld(x, y, _orientation, angleDeg, s = 1, worldZ = 0) {
+  return hexagonCellToWorld(x, y, angleDeg, s, worldZ);
+}
+
+// Two SEPARATE medial-triangle shapes, not one shape plus a 180-degree
+// flip. Real bug caught by scripts/verify-lattice-2d.mjs before this
+// shipped: hexagon(x,y) pairs with up(x,y) [touches P(x,y) directly] and
+// down(x,y-1) = [P(x+1,y-1),P(x,y),P(x+1,y)] (the down-triangle that also
+// touches P(x,y) -- down(x,y) itself does NOT). The existing Triangle
+// primitive's own "down is up rotated 180 degrees" fact is real, but it
+// only holds for the SAME-index pair up(i,j)/down(i,j) -- down(x,y-1) is
+// a DIFFERENT triangle, not a 180-degree rotation of up(x,y) (verified
+// directly: their medial-triangle local shapes are not negatives of each
+// other). Each is instead derived independently, the same "reflect
+// through own centroid, halved" way up's was.
+export function kagomeTriangleUpTileVerts(angleDeg, s = 1, h = 0.15 * 1) {
+  const [v0, v1] = latticeBasis(angleDeg, s);
+  const corners2d = [[v0[0] / 2, v0[1] / 2], [v1[0] / 2, v1[1] / 2], [(v0[0] + v1[0]) / 2, (v0[1] + v1[1]) / 2]];
+  return extrudePrism(corners2d, h);
+}
+export function kagomeTriangleUpCellToWorld(x, y, angleDeg, s = 1, worldZ = 0) {
+  return [...triangleCellToWorld(x, y, 0, angleDeg, s, 0).slice(0, 2), worldZ];
+}
+export function kagomeTriangleDownTileVerts(angleDeg, s = 1, h = 0.15 * 1) {
+  const [v0, v1] = latticeBasis(angleDeg, s);
+  const corners2d = [
+    [v0[0] - v1[0] / 2, v0[1] - v1[1] / 2],
+    [v0[0] / 2, v0[1] / 2],
+    [(v0[0] - v1[0]) / 2, (v0[1] - v1[1]) / 2],
+  ];
+  return extrudePrism(corners2d, h);
+}
+export function kagomeTriangleDownCellToWorld(x, y, angleDeg, s = 1, worldZ = 0) {
+  return [...triangleCellToWorld(x, y - 1, 1, angleDeg, s, 0).slice(0, 2), worldZ];
+}
+
+// Kagome's own LOGICAL placement grid is the same point lattice Hexagon
+// already uses (one logical cell per lattice point, expanding at render
+// time into 1 hexagon + 2 triangle instances -- see render.js's own
+// rebuildLattice2dInstances) -- so its neighbor structure is identical.
+export function kagomeNeighborOffsets(angleDeg) {
+  return hexagonNeighborOffsets(angleDeg);
+}
+
+// ---------------------------------------------------------------------------
 // Generic dispatch: one lookup table so callers (render.js/build.js) can
 // loop over all NAMED_LATTICE_ANGLES x LATTICE_PRIMITIVES combinations
 // generically instead of hand-writing one block per combination.
@@ -508,6 +607,30 @@ export const LATTICE_PRIMITIVE_IMPLS = {
     cellToWorld: (i, j, orientation, angleDeg, s, worldZ) => kiteCellToWorld(i, j, orientation, angleDeg, s, worldZ),
     neighborOffsets: (angleDeg, orientation) => kiteNeighborOffsets(angleDeg, orientation),
     instanceRotationRad: (angleDeg, orientation) => kiteInstanceRotationRad(orientation, angleDeg),
+  },
+  // Kagome's own entry describes its PRIMARY (clickable) mesh only --
+  // the hexagon. `companion` describes its second, render-only mesh (the
+  // 2 medial triangles per logical cell) -- render.js's own
+  // rebuildLattice2dInstances special-cases this ONE field, everything
+  // else (persistence, select options, toggle-panel angle-gating) is
+  // already fully generic over LATTICE_PRIMITIVES and needs no Kagome-
+  // specific code beyond that.
+  kagome: {
+    hasOrientation: false,
+    validAngleIds: KAGOME_VALID_ANGLE_IDS,
+    tileVerts: (angleDeg, s, h) => kagomeHexagonTileVerts(angleDeg, s, h),
+    cellToWorld: (i, j, orientation, angleDeg, s, worldZ) => kagomeHexagonCellToWorld(i, j, orientation, angleDeg, s, worldZ),
+    neighborOffsets: (angleDeg) => kagomeNeighborOffsets(angleDeg),
+    // Two companion meshes (render-only, not raycast/click targets -- see
+    // render.js's own rebuildLattice2dInstances header), one up-triangle
+    // instance and one down-triangle instance per logical (hexagon) cell.
+    // Each is its OWN single fixed shape (see kagomeTriangleUp/Down's own
+    // header for why they can't share one geometry + rotation the way
+    // Triangle's real up/down pair does), so no `hasOrientation` needed.
+    companions: [
+      { tileVerts: (angleDeg, s, h) => kagomeTriangleUpTileVerts(angleDeg, s, h), cellToWorld: (i, j, angleDeg, s, worldZ) => kagomeTriangleUpCellToWorld(i, j, angleDeg, s, worldZ) },
+      { tileVerts: (angleDeg, s, h) => kagomeTriangleDownTileVerts(angleDeg, s, h), cellToWorld: (i, j, angleDeg, s, worldZ) => kagomeTriangleDownCellToWorld(i, j, angleDeg, s, worldZ) },
+    ],
   },
 };
 

@@ -218,6 +218,10 @@ export const MARKS = {
   // same simplification piece2dHexagon's own "flatter than the real
   // Voronoi cell" already takes).
   piece2dKite: `<polygon points="0,-24 14,-2 0,24 -14,-2" ${THIN}/>`,
+  // Kagome: a small hexagon with 2 small flanking triangles -- reads as
+  // "hexagon plus triangles" at a glance, matching the real composite
+  // (hexagon + 2 medial triangles) this piece type actually places.
+  piece2dKagome: `<polygon points="${hexPts(14, 0, 0, 0).split(' ').map((p) => { const [x, y] = p.split(',').map(Number); return `${x.toFixed(2)},${(y * 0.8).toFixed(2)}`; }).join(' ')}" ${THIN}/><polygon points="18,-14 26,0 18,14" ${THIN}/><polygon points="-18,-14 -26,0 -18,14" ${THIN}/>`,
   // Fill: "+" shown across three hexagons.
   fill: `
     <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>
