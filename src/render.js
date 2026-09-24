@@ -2039,6 +2039,45 @@ async function init() {
   lattice2dPanel.id = 'lattice2d-toggle-panel';
   document.body.appendChild(lattice2dPanel);
 
+  // Rhombohedra attach toggle (direct request 2026-09-24, replacing a
+  // "tap the same spot again to cycle" that could miss and place a
+  // second piece instead): every rhombohedron face offers exactly 2
+  // pieces -- a same-orientation Copy, or the Mirror image across that
+  // face (verified exactly, all 4 orientations x 12 face directions).
+  // Taps place whichever this toggle selects -- a bottom-row quick
+  // button, shown only while Rhombohedra is the 3D piece.
+  const RHOMBO_ATTACH_KEY = 'rhombiverse-rhombo-attach-mode';
+  let rhomboAttachMode = 'copy';
+  try { if (localStorage.getItem(RHOMBO_ATTACH_KEY) === 'mirror') rhomboAttachMode = 'mirror'; } catch { /* best-effort */ }
+  // Written as a general "attach variant" slot (direct note: "it could
+  // be used for other pieces with similar issues in future") -- any
+  // piece whose face attach has more than one valid result can reuse
+  // this button: extend updateRhomboAttachPanel's piece check and read
+  // rhomboAttachMode from that piece's own click handler.
+  // Bottom-row quick button (#hud-quick-attach, next to Shape/Color/
+  // Lattice View): tap switches Copy <-> Mirror. Icon: two rhombi side
+  // by side, parallel (Copy) or reflected about the center line (Mirror).
+  const rhomboAttachBtn = document.getElementById('hud-quick-attach');
+  const RHOMBO_ATTACH_ICONS = {
+    copy: '<svg viewBox="-30 -30 60 60"><g fill="none" stroke="currentColor" stroke-width="3"><polygon points="-26,14 -18,-14 -2,-14 -10,14"/><polygon points="2,14 10,-14 26,-14 18,14"/></g></svg>',
+    mirror: '<svg viewBox="-30 -30 60 60"><g fill="none" stroke="currentColor" stroke-width="3"><polygon points="-26,14 -18,-14 -2,-14 -10,14"/><polygon points="26,14 18,-14 2,-14 10,14"/></g><line x1="0" y1="-22" x2="0" y2="22" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.6"/></svg>',
+  };
+  function renderRhomboAttachButton() {
+    if (!rhomboAttachBtn) return;
+    rhomboAttachBtn.innerHTML = RHOMBO_ATTACH_ICONS[rhomboAttachMode];
+    rhomboAttachBtn.title = `Rhombohedra attach: ${rhomboAttachMode === 'mirror' ? 'Mirror' : 'Copy'} (tap to switch)`;
+  }
+  rhomboAttachBtn?.addEventListener('click', () => {
+    rhomboAttachMode = rhomboAttachMode === 'mirror' ? 'copy' : 'mirror';
+    try { localStorage.setItem(RHOMBO_ATTACH_KEY, rhomboAttachMode); } catch { /* best-effort */ }
+    renderRhomboAttachButton();
+    showHudPrompt(rhomboAttachMode === 'mirror' ? 'Attach: Mirror -- taps place the mirror image across the tapped face.' : 'Attach: Copy -- taps place a same-orientation copy across the tapped face.', 3000);
+  });
+  renderRhomboAttachButton();
+  function updateRhomboAttachPanel() {
+    rhomboAttachBtn?.classList.toggle('hidden', !(activeDimension !== '2D' && document.getElementById('piece-type-select').value === 'rhombohedra'));
+  }
+
   // Rhombille is the one primitive genuinely locked to a single named
   // angle (Triangular -- see RHOMBILLE_ANGLE_ID's own header for the
   // real geometric reason). Kite and Kagome both used to be restricted
@@ -2803,6 +2842,7 @@ async function init() {
     // currently toggled.
     dotMatrixMesh.visible = visible && activeDimension === '2D';
     lattice2dPanel.classList.toggle('visible', activeDimension === '2D');
+    updateRhomboAttachPanel();
     // In 2D, shapes are picked by lattice (the toggle panel above), not
     // by this dropdown -- lattice2dPanel already keeps #piece-type-select's
     // own value in sync (see applyLattice2dSelection), so showing this row
@@ -4384,6 +4424,7 @@ async function init() {
   // principle the wizard plan already settled on for 3D's FCC/BCC. No
   // gating needed yet -- 3D is the only real dimension so far.
   function updateQuickSelect() {
+    updateRhomboAttachPanel();
     if (quickShapeEl) {
       // Cuboctahedron Build (currentMode === 'cubocta') isn't a
       // piece-type value at all -- it's its own mode, same as BCC Build
@@ -5378,6 +5419,7 @@ async function init() {
     rhombohedraWorld,
     rhombohedraMesh,
     rhombohedraCellAt: (instanceId) => rhombohedraCellOrder[instanceId],
+    getRhombohedraAttachMode: () => rhomboAttachMode,
     onRhombohedraChange,
     // Pyrochlore (3D Kagome): resolves a raycast hit on any of its 4
     // meshes to either { type: 'tt', cell } or { type: 'tet', kind,

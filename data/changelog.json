@@ -3,7 +3,7 @@
     "date": "2026-09-24",
     "title": "Rhombohedra in All 4 Orientations",
     "items": [
-      "New: Rhombohedra can now attach in all 4 of the RD's own orientations, not just one. Tap a face to attach; tap the same spot again quickly to flip the new piece to its other orientation.",
+      "New: Rhombohedra can now attach in all 4 of the RD's own orientations, not just one. A new Copy / Mirror button in the bottom row (shown while Rhombohedra is selected) picks what a tap attaches: a same-orientation copy, or the mirror image across the tapped face.",
       "Four rhombohedra can now be clustered face-to-face into a complete RD -- or grown into shapes the single orientation could never make."
     ]
   },

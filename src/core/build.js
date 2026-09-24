@@ -286,6 +286,8 @@ export function createBuildController({
   rhombohedraWorld = null,
   rhombohedraMesh = null,
   rhombohedraCellAt = () => null,
+  // 'copy' | 'mirror' -- render.js's Rhombohedra attach toggle.
+  getRhombohedraAttachMode = () => 'copy',
   onRhombohedraChange = () => {},
   // Pyrochlore (3D Kagome, 'pyrochlore' piece tier): { world, meshes,
   // resolveHit, onChange } -- see render.js's own build-controller
@@ -752,20 +754,17 @@ export function createBuildController({
   // Rhombohedra (free lattice), all 4 of RD Quarter's orientations
   // (2026-09-24, direct report: "only provides one orientation...
   // clustering four seems impossible"). Every face offers exactly 2
-  // non-overlapping pieces (verified, scripts/verify-rhombohedra.mjs):
-  // the same-orientation translate and one partner orientation -- the
-  // one that pairs toward a whole RD. A tap places the first free one;
-  // tapping the SAME spot again quickly (direct decision: "tap again to
-  // cycle") swaps the piece it just placed to the other option across
-  // the same parent face. Instances are rotated per orientation, so the
-  // hit face normal is rotated back into world space before matching.
-  // A placement that would overlap ANY existing piece is refused.
-  const RHOMBO_CYCLE_MS = 1500;
-  const RHOMBO_CYCLE_PX = 30;
-  let rhomboLastPlace = null; // { c4, options, optIdx, time, xy }
-  function rhombohedraFits(opt, ignoreC4 = null) {
+  // non-overlapping pieces (verified, scripts/verify-rhombohedra.mjs): a
+  // same-orientation Copy and the Mirror image across that face -- the
+  // one that pairs toward a whole RD. Which one a tap places comes from
+  // render.js's own Copy | Mirror toggle (getRhombohedraAttachMode) --
+  // replaced an earlier "tap the same spot again to cycle", which could
+  // miss the new piece and place a second one instead (direct report).
+  // Instances are rotated per orientation, so the hit face normal is
+  // rotated back into world space before matching. A placement that
+  // would overlap ANY existing piece is refused.
+  function rhombohedraFits(opt) {
     return !rhombohedraWorld.entries().some((c) => {
-      if (ignoreC4 && c.x === ignoreC4[0] && c.y === ignoreC4[1] && c.z === ignoreC4[2]) return false;
       if (Math.abs(c.x - opt.c4[0]) > 8 || Math.abs(c.y - opt.c4[1]) > 8 || Math.abs(c.z - opt.c4[2]) > 8) return false;
       return rhombohedraOverlap(c.o ?? 0, [c.x, c.y, c.z], opt.o, opt.c4);
     });
@@ -776,40 +775,20 @@ export function createBuildController({
     const cell = rhombohedraCellAt(hit.instanceId);
     if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
     if (mode === 'build') {
-      const now = performance.now();
-      const last = rhomboLastPlace;
-      const sameSpot = last && lastClickXY && Math.hypot(lastClickXY[0] - last.xy[0], lastClickXY[1] - last.xy[1]) <= RHOMBO_CYCLE_PX;
-      if (last && sameSpot && now - last.time <= RHOMBO_CYCLE_MS && cell.x === last.c4[0] && cell.y === last.c4[1] && cell.z === last.c4[2]) {
-        for (let k = 1; k < last.options.length; k++) {
-          const idx = (last.optIdx + k) % last.options.length;
-          const opt = last.options[idx];
-          if (!rhombohedraFits(opt, last.c4)) continue;
-          const { x, y, z, ...data } = cell;
-          rhombohedraWorld.removeCell(x, y, z);
-          rhombohedraWorld.addCell(...opt.c4, { ...data, o: opt.o });
-          rhomboLastPlace = { ...last, c4: opt.c4, optIdx: idx, time: now };
-          onRhombohedraChange();
-          if (onPlaced) onPlaced({ x: opt.c4[0], y: opt.c4[1], z: opt.c4[2], material: data.material });
-          return;
-        }
-        if (onPieceNoOp) onPieceNoOp(action);
-        return;
-      }
       const m = new THREE.Matrix4();
       hit.object.getMatrixAt(hit.instanceId, m);
       const n = hit.face.normal.clone().transformDirection(m);
-      const options = rhombohedraAttachOptions(cell.o ?? 0, [cell.x, cell.y, cell.z], [n.x, n.y, n.z]);
-      const optIdx = options.findIndex((opt) => rhombohedraFits(opt));
-      if (optIdx === -1) { if (onPieceNoOp) onPieceNoOp(action); return; }
-      const opt = options[optIdx];
+      const q = cell.o ?? 0;
+      const options = rhombohedraAttachOptions(q, [cell.x, cell.y, cell.z], [n.x, n.y, n.z]);
+      const wantMirror = getRhombohedraAttachMode() === 'mirror';
+      const opt = options.find((o) => (o.o !== q) === wantMirror);
+      if (!opt || !rhombohedraFits(opt)) { if (onPieceNoOp) onPieceNoOp(action); return; }
       const material = getMaterial();
       rhombohedraWorld.addCell(...opt.c4, { material, o: opt.o });
-      rhomboLastPlace = { c4: opt.c4, options, optIdx, time: now, xy: lastClickXY };
       onRhombohedraChange();
       if (onPlaced) onPlaced({ x: opt.c4[0], y: opt.c4[1], z: opt.c4[2], material });
       return;
     }
-    rhomboLastPlace = null;
     rhombohedraWorld.removeCell(cell.x, cell.y, cell.z);
     onRhombohedraChange();
     if (onRemoved) onRemoved(cell);
@@ -1491,12 +1470,7 @@ export function createBuildController({
     if (onRemoved) onRemoved(piece);
   }
 
-  // Screen position of the latest click/tap -- Rhombohedra's "tap the
-  // same spot again to cycle orientation" needs it (see
-  // handleRhombohedraClick).
-  let lastClickXY = null;
   function onClick(event) {
-    lastClickXY = [event.clientX, event.clientY];
     if (suppressNextClick) {
       suppressNextClick = false;
       return;

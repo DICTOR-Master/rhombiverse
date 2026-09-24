@@ -141,7 +141,7 @@
        at bottom next to menu"). Tapping either reopens straight to
        where that value gets changed (Piece wheel / Color picker),
        not back through Home -- see render.js's updateQuickSelect(). */
-    #hud-quick-shape, #hud-quick-color, #hud-quick-lattice-view {
+    #hud-quick-shape, #hud-quick-color, #hud-quick-lattice-view, #hud-quick-attach {
       position: fixed; bottom: 8px; z-index: 900;
       width: 36px; height: 36px;
       background: rgba(0, 0, 0, 0.45);
@@ -151,8 +151,8 @@
       display: flex; align-items: center; justify-content: center;
       padding: 0; cursor: pointer;
     }
-    #hud-quick-shape svg, #hud-quick-color svg, #hud-quick-lattice-view svg { width: 24px; height: 24px; }
-    #hud-quick-shape:hover, #hud-quick-color:hover, #hud-quick-lattice-view:hover { background: rgba(255, 255, 255, 0.15); }
+    #hud-quick-shape svg, #hud-quick-color svg, #hud-quick-lattice-view svg, #hud-quick-attach svg { width: 24px; height: 24px; }
+    #hud-quick-shape:hover, #hud-quick-color:hover, #hud-quick-lattice-view:hover, #hud-quick-attach:hover { background: rgba(255, 255, 255, 0.15); }
     #hud-quick-shape { left: 64px; }
     #hud-quick-color { left: 106px; }
     /* Lattice View quick-select: third bottom-left icon, direct request
@@ -164,6 +164,11 @@
        control (see FEATURES.bccLattice gating in render.js). */
     #hud-quick-lattice-view { left: 148px; }
     #hud-quick-lattice-view.active { border-color: #39ff88; background: rgba(57, 255, 136, 0.18); }
+    /* Rhombohedra Copy | Mirror attach toggle: 4th bottom-left icon,
+       direct request ("put it in row at bottom with other 3"), shown only
+       while Rhombohedra is the 3D piece (render.js updateRhomboAttachButton). */
+    #hud-quick-attach { left: 190px; }
+    #hud-quick-attach.hidden { display: none; }
     #lab-toggle {
       position: fixed; top: 12px; right: 12px; z-index: 900;
       width: 30px; height: 30px;
@@ -856,6 +861,7 @@
   <button id="hud-quick-shape" type="button" title="Shape (tap to change)"></button>
   <button id="hud-quick-color" type="button" title="Color (tap to change)"></button>
   <button id="hud-quick-lattice-view" type="button" title="Lattice View (tap to cycle)"></button>
+  <button id="hud-quick-attach" type="button" class="hidden" title="Rhombohedra attach: Copy / Mirror (tap to switch)"></button>
   <button id="sculpture-mode-toggle" type="button" title="Sculpture Mode: a separate, isolated scratch workspace">◆</button>
   <button id="cyborg-toggle" type="button" title="Cyborg Mode: guided walkthrough">◈</button>
   <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>
