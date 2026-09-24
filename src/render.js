@@ -148,12 +148,15 @@ const RHOMBOHEDRA_S = SCALE;
 // Pyrochlore (3D Kagome): registered to the main RD world's own units
 // (direct decision) -- see geometry-extensions/pyrochlore-lattice.js.
 const PYROCHLORE_S = SCALE;
-// O-site (orientation +1), in the lattice's doubled coordinates -- world
-// (-3,0,0): clear of the main world's own seed RD at the origin (RD
-// reaches x=-1, the seed's big-tetrahedron silhouette only x=-1.7), but
-// close enough to stay on screen on a phone -- direct request, the
-// earlier (-5,0,0) sat at the iPhone's left edge.
-const PYROCHLORE_SEED = [-6, 0, 0];
+// T-site (orientation -1), in the lattice's doubled coordinates -- world
+// (-1.5,-0.5,0.5): beside the main world's seed RD at the origin,
+// "touching" it -- direct request ("beside the RD touching the corner").
+// An exact single-point corner touch is impossible here: the pyrochlore
+// and RD lattices interleave, so every lattice-registered seed either
+// cuts into the origin RD or clears it. This is one of the 12 closest
+// clear sites (a 0.08 gap between faces/edges, reads as touching),
+// picked because it's on the camera side, not hidden behind the RD.
+const PYROCHLORE_SEED = [-3, -1, 1];
 const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
 
 // Performance guardrail (reframe Stage 6): warn before loading a World
