@@ -149,9 +149,11 @@ const RHOMBOHEDRA_S = SCALE;
 // (direct decision) -- see geometry-extensions/pyrochlore-lattice.js.
 const PYROCHLORE_S = SCALE;
 // O-site (orientation +1), in the lattice's doubled coordinates -- world
-// (-5,0,0), clear of the main world's own seed RD at the origin, same
-// reasoning as rhombohedraWorld's own offset seed.
-const PYROCHLORE_SEED = [-10, 0, 0];
+// (-3,0,0): clear of the main world's own seed RD at the origin (RD
+// reaches x=-1, the seed's big-tetrahedron silhouette only x=-1.7), but
+// close enough to stay on screen on a phone -- direct request, the
+// earlier (-5,0,0) sat at the iPhone's left edge.
+const PYROCHLORE_SEED = [-6, 0, 0];
 const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
 
 // Performance guardrail (reframe Stage 6): warn before loading a World
