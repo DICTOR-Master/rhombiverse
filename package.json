@@ -8,7 +8,8 @@
     "verify:rhombis-i18n": "node scripts/verify-rhombis-i18n.mjs",
     "verify:lattice-2d": "node scripts/verify-lattice-2d.mjs",
     "verify:pyrochlore": "node scripts/verify-pyrochlore.mjs",
-    "verify:rhombohedra": "node scripts/verify-rhombohedra.mjs"
+    "verify:rhombohedra": "node scripts/verify-rhombohedra.mjs",
+    "verify:4d": "node scripts/verify-4d.mjs"
   },
   "dependencies": {
     "ai": "^6.0.0",
