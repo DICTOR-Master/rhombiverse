@@ -3723,7 +3723,7 @@ async function init() {
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
           const PIECE_LABELS = {
-            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', rhombohedra: 'Rhombohedra', pyrochlore: 'Pyrochlore (3D Kagome)', cell24: '24-cell', cell16: '16-cell',
+            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', rhombohedra: 'Rhombohedra', pyrochlore: 'Pyrochlore (3D Kagome)', tesseract: 'Tesseract', cell24: '24-cell', cell16: '16-cell',
             // 2D lattice tier: one label per LATTICE_PRIMITIVES entry
             // (Phase 6: primitive alone, angle is a live toggle not a
             // piece-type value -- see lattice2dSeedCell's own header),
@@ -3732,7 +3732,7 @@ async function init() {
             ...Object.fromEntries(LATTICE_PRIMITIVES.map((p) => [`lattice2d:${p.id}`, p.label])),
           };
           document.getElementById('piece-type-select').value = value;
-          if (value === 'cell24' || value === 'cell16') world4d?.setKind(value);
+          if (value === 'tesseract' || value === 'cell24' || value === 'cell16') world4d?.setKind(value);
           // Real gap, caught while fixing a separate lattice2d bug
           // (see lattice2dSeedCell's own header): every OTHER piece
           // type here is always-visible regardless of which is picked
@@ -4721,7 +4721,7 @@ async function init() {
     // own `?? MARKS.pieceRD` fallback below) regardless of which was
     // actually selected -- the real placement itself was always
     // correct, only this indicator was silently wrong.
-    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRDQuarter', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore', cell24: 'piece24Cell', cell16: 'piece16Cell',
+    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRDQuarter', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore', tesseract: 'pieceTesseract', cell24: 'piece24Cell', cell16: 'piece16Cell',
     // 2D lattice tier: one entry per LATTICE_PRIMITIVES, reusing
     // wheel-icons.js's own 3 primitive-keyed icons (Phase 6: the piece
     // type IS just the primitive now, angle is a separate live toggle
@@ -5609,6 +5609,10 @@ async function init() {
     onPieceNoOp: (action) => {
       const piece = document.getElementById('piece-type-select')?.value;
       const messages = {
+        tesseract: {
+          add: 'A tesseract is already there -- tap a different face, or slide W-depth to reach the next layer.',
+          remove: 'Long-press a placed tesseract to remove it.',
+        },
         cell24: {
           add: 'A 24-cell is already there -- tap a different face, or slide W-depth to reach the next layer.',
           remove: 'Long-press a placed 24-cell to remove it.',

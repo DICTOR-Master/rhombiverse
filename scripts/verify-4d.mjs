@@ -74,20 +74,41 @@ function facetVolume3(pts4, normal) {
     if (basis.length === 3) break;
   }
   const p3 = pts4.map((p) => basis.map((b) => dot4(p, b)));
-  // Both facet kinds here (octahedra, tetrahedra) have only triangular
-  // faces, so every supporting point-triple IS a face: fan each one to
-  // the centroid. (THREE isn't a Node dependency of this repo.)
+  // Divergence theorem over the facet's own 2D faces: every supporting
+  // point-triple spans a face plane; each distinct plane's coplanar
+  // points form one convex polygon (ordered by angle), and each polygon
+  // adds area * (distance from the centroid) / 3. Handles square faces
+  // (tesseract cubes) as well as triangles. (THREE isn't a Node
+  // dependency of this repo.)
   const g = [0, 1, 2].map((k) => p3.reduce((sum, p) => sum + p[k], 0) / p3.length);
   const d = p3.map((p) => [p[0] - g[0], p[1] - g[1], p[2] - g[2]]);
-  const det = (a, b, c) => a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
-  let vol = 0;
+  const planes = new Map();
   for (let i = 0; i < d.length; i++) for (let j = i + 1; j < d.length; j++) for (let k = j + 1; k < d.length; k++) {
     const u = d[j].map((x, a) => x - d[i][a]), v = d[k].map((x, a) => x - d[i][a]);
-    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
-    if (Math.hypot(...n) < 1e-9) continue;
-    const side = d.map((p) => n[0] * (p[0] - d[i][0]) + n[1] * (p[1] - d[i][1]) + n[2] * (p[2] - d[i][2]));
-    if (side.some((t) => t > 1e-9) && side.some((t) => t < -1e-9)) continue;
-    vol += Math.abs(det(d[i], d[j], d[k])) / 6;
+    let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const len = Math.hypot(...n);
+    if (len < 1e-9) continue;
+    n = n.map((x) => x / len);
+    let off = n[0] * d[i][0] + n[1] * d[i][1] + n[2] * d[i][2];
+    if (off < 0) { n = n.map((x) => -x); off = -off; }
+    const side = d.map((p) => n[0] * p[0] + n[1] * p[1] + n[2] * p[2] - off);
+    if (side.some((t) => t > 1e-9)) continue;
+    const on = side.map((t, idx) => (Math.abs(t) < 1e-9 ? idx : -1)).filter((idx) => idx >= 0);
+    planes.set(on.join(','), { n, off, on });
+  }
+  let vol = 0;
+  for (const { n, off, on } of planes.values()) {
+    const c = [0, 1, 2].map((a) => on.reduce((sum, idx) => sum + d[idx][a], 0) / on.length);
+    const e1 = d[on[0]].map((x, a) => x - c[a]);
+    const e2 = [n[1] * e1[2] - n[2] * e1[1], n[2] * e1[0] - n[0] * e1[2], n[0] * e1[1] - n[1] * e1[0]];
+    const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const pts = on.map((idx) => d[idx].map((x, a) => x - c[a])).sort((a, b) => Math.atan2(dot(a, e2), dot(a, e1)) - Math.atan2(dot(b, e2), dot(b, e1)));
+    let area = 0;
+    for (let m = 0; m < pts.length; m++) {
+      const a = pts[m], b = pts[(m + 1) % pts.length];
+      area += dot(n, [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]) / 2;
+    }
+    vol += Math.abs(area) * off / 3;
   }
   return vol;
 }
@@ -97,6 +118,22 @@ function volume4(kind, c) {
 }
 check('24-cell volume = 2 = D4 covolume (one per lattice point fills space)', Math.abs(volume4('cell24', O) - 2) < 1e-9);
 check('16-cell volume = 2/3 on every coset (three per lattice point fill space)', [[1, 0, 0, 0], [0.5, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, -0.5]].every((c) => Math.abs(volume4('cell16', c) - 2 / 3) < 1e-9));
+
+// Z4 (Hypercubic): tesseracts.
+const sT = cellStructure('tesseract', O);
+check('tesseract: 16 vertices, 32 edges of length 1, 8 cubic facets (8 vertices each)', sT.offsets.length === 16 && sT.edges.length === 32 && sT.facets.length === 8 && sT.facets.every((f) => f.verts.length === 8));
+const nT = sT.facets.map((_, i) => neighborAcrossFacet('tesseract', O, i));
+check('tesseract neighbors across facets = the 8 unit steps (+-e_i)', new Set(nT.map(key4)).size === 8 && nT.every((p) => Math.abs(dot4(p, p) - 1) < 1e-9 && p.filter((v) => Math.abs(v) > 1e-9).length === 1));
+check('tesseract volume = 1 = Z4 covolume (one per integer point fills space)', Math.abs(volume4('tesseract', O) - 1) < 1e-9);
+check('tesseract edge = 24-cell edge = 1 (one shared ruler)', sT.edges.every(([i, j]) => Math.abs(Math.hypot(...sT.offsets[i].map((v, k) => v - sT.offsets[j][k])) - 1) < 1e-9) && s24.edges.every(([i, j]) => Math.abs(Math.hypot(...s24.offsets[i].map((v, k) => v - s24.offsets[j][k])) - 1) < 1e-9));
+const secT = sliceCell(cellVertices4('tesseract', O), sT.edges, rotation4(), 0);
+check('tesseract at the origin sliced at w = 0 is the RD world\'s own unit cube (+-1/2)^3', secT && sameSet3(secT, rdRawVerts(1).slice(0, 8)));
+check('tesseract centered at w = 1 does not show at w = 0 (it spans w 1/2..3/2)', sliceCell(cellVertices4('tesseract', [0, 0, 0, 1]), sT.edges, rotation4(), 0) === null);
+// Vertex-first parallel shadow (looking along (1,1,1,1)) has an RD outline.
+const basisT = [[0.5, 0.5, -0.5, -0.5], [0.5, -0.5, 0.5, -0.5], [0.5, -0.5, -0.5, 0.5]];
+const shadowT = sT.offsets.map((v) => basisT.map((b) => dot4(v, b)));
+const extremeT = [...new Set(shadowT.map(key3))].map((k) => k.split(',').map(Number)).filter((p) => Math.hypot(...p) > 1e-9);
+check('tesseract vertex-first shadow: 14 outline points forming an RD (8 at one radius, 6 at another, ratio 2/sqrt3)', extremeT.length === 14 && (() => { const r = extremeT.map((p) => Math.hypot(...p)).sort((a, b) => a - b); return Math.abs(r[0] - r[7]) < 1e-9 && Math.abs(r[8] - r[13]) < 1e-9 && Math.abs(r[13] / r[0] - 2 / Math.sqrt(3)) < 1e-9; })());
 
 // The D4 world's w = 0 slice IS the RD world: a 24-cell on a w = 0 D4
 // point cuts w = 0 in exactly rdRawVerts(1), and one on a w = +-1 point

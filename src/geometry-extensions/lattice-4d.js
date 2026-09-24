@@ -83,6 +83,14 @@ export const CELL24_OFFSETS = [...PERM_UNITS, ...HALF_SIGNS];
 // deep hole -- 8 of the 24 candidate offsets, which 8 depends on the
 // coset (triality), so it's computed, not tabulated.
 export const KINDS_4D = {
+  // Z4 (Hypercubic): one tesseract per integer point, vertices (+-1/2)^4,
+  // edge 1 -- the same edge as the 24-cell, and its w = 0 slice is the
+  // RD world's own unit cube (at every integer point: simple cubic).
+  tesseract: {
+    label: 'Tesseract',
+    isCenter: (p) => p.every(isInt),
+    vertexOffsets: () => HALF_SIGNS,
+  },
   cell24: {
     label: '24-cell',
     isCenter: isD4,

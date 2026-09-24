@@ -167,7 +167,7 @@ const DIMENSIONS = [
   // lattice2dSeedCell's own header in render.js for the full incident.
   { id: '2D', label: '2D', desc: '3 real tile primitives (Parallelogram, Triangle, Hexagon), each buildable at any of 4 named lattice angles via the in-scene toggle panel.', enabled: true, preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: NAMED_LATTICE_ANGLES[0].angleDeg }) },
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, previewAction: 'tool:pieceType:rd' },
-  { id: '4D', label: '4D', desc: 'D4 (24-cell and 16-cell) -- Tesseract and Hyper-pyrochlore planned.', enabled: true, preview: () => edges4D('cell24') },
+  { id: '4D', label: '4D', desc: 'Tesseract (Z4) and D4 (24-cell, 16-cell) -- Hyper-pyrochlore planned.', enabled: true, preview: () => edges4D('cell24') },
   { id: '5D', label: '5D', desc: 'Decagonal quasicrystal.', enabled: false },
   { id: '6D', label: '6D', desc: 'Icosahedral quasicrystal.', enabled: false },
 ];
@@ -242,7 +242,7 @@ export const LATTICES_3D = [
 // the same rotating preview as every other card. Real geometry from
 // lattice-4d.js (verify:4d), nothing hand-drawn.
 const OBLIQUE_4D = rotation4({ xw: 20 * Math.PI / 180, yw: 15 * Math.PI / 180, zw: 10 * Math.PI / 180 });
-const FIRST_4D_CENTER = { cell24: [0, 0, 0, 0], cell16: [0.5, 0.5, 0.5, 0.5] };
+const FIRST_4D_CENTER = { tesseract: [0, 0, 0, 0], cell24: [0, 0, 0, 0], cell16: [0.5, 0.5, 0.5, 0.5] };
 function edges4D(kind) {
   const c = FIRST_4D_CENTER[kind];
   const s = cellStructure(kind, c);
@@ -255,8 +255,8 @@ function edges4D(kind) {
 // disabled rows with no preview, the same honest "not built yet"
 // treatment as the 5D/6D cards.
 export const LATTICES_4D = [
-  { label: 'Z4 (Hypercubic)', desc: 'Tesseract -- the 4D cube world. Planned.', pieces: [
-    { label: 'Tesseract', action: null },
+  { label: 'Z4 (Hypercubic)', desc: 'Tesseract -- the 4D cube, one at every whole-number point. Its w = 0 slice is the RD world\u2019s own unit cube.', pieces: [
+    { label: 'Tesseract', action: 'tool:pieceType:tesseract', preview: () => edges4D('tesseract') },
   ] },
   { label: 'D4', desc: '24-cell, the 4D RD: its w = 0 slice is the FCC world. The bottom-row toggle switches to placing 16-cells.', pieces: [
     { label: '24-cell', action: 'tool:pieceType:cell24', preview: () => edges4D('cell24') },

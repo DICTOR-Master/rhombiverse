@@ -192,6 +192,8 @@ export const MARKS = {
   // sign-off): 24-cell = hexagon (its RD-outline shadow) with a filled
   // inner triangle; 16-cell = the cross-polytope's square-with-cross.
   piece24Cell: `<polygon points="${hexPts(20)}" ${THIN}/><polygon points="0,-10 8.66,5 -8.66,5" fill="currentColor" opacity="0.5"/>`,
+  // Tesseract: the classic cube-in-a-cube shadow.
+  pieceTesseract: `<polygon points="-22,-22 22,-22 22,22 -22,22" ${THIN}/><polygon points="-10,-10 10,-10 10,10 -10,10" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M-22,-22 L-10,-10 M22,-22 L10,-10 M22,22 L10,10 M-22,22 L-10,10" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
   piece16Cell: `<polygon points="0,-22 22,0 0,22 -22,0" ${THIN}/><path d="M0,-22 V22 M-22,0 H22" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
   pieceRDQuarter: `<polygon points="${hexPts(20)}" ${THIN}/><path d="M0,0 V-20 M0,0 L17.32,10 M0,0 L-17.32,10" stroke="currentColor" stroke-width="1.5"/>`,
   // Pyrochlore (3D Kagome): the truncated tetrahedron's own silhouette --

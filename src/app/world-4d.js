@@ -25,6 +25,8 @@ import {
   sliceCell, project4, facetForSliceNormal, toDoubled, fromDoubled, cellKey4,
 } from '../geometry-extensions/lattice-4d.js';
 
+// One store for every 4D kind (the worlds share one frame and coexist,
+// like 3D's); the key name predates the tesseract joining it.
 export const WORLD4D_STORAGE_KEY = 'rhombiverse-4d-d4-world';
 const DEG = Math.PI / 180;
 // Gearing (proportions proposed in design, user to confirm): a full
@@ -40,9 +42,10 @@ const FIRST_COLOR = 0x00e5ff;
 const SLOT_COLOR = 0x9de0ff;
 
 // First placement per kind: the cell whose slice shows at the rest
-// position (w = 0): a 24-cell on the origin (its slice is the RD), a
+// position (w = 0): a tesseract on the origin (its slice is the unit
+// cube), a 24-cell on the origin (its slice is the RD), a
 // 16-cell on the deep hole just above (its slice is a facet tetrahedron).
-const FIRST_CENTER = { cell24: [0, 0, 0, 0], cell16: [0.5, 0.5, 0.5, 0.5] };
+const FIRST_CENTER = { tesseract: [0, 0, 0, 0], cell24: [0, 0, 0, 0], cell16: [0.5, 0.5, 0.5, 0.5] };
 
 export function createWorld4D({ scene, materialColor, getMaterial, onChange = () => {}, showHudPrompt = () => {} }) {
   const group = new THREE.Group();

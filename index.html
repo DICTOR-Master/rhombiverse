@@ -150,8 +150,9 @@
     }
     #world4d-panel.visible { display: flex; }
     /* Toasts sit just above the 4D panel while it's showing, instead of
-       on top of its buttons. */
-    body.world4d-on #hud-prompt { bottom: calc(190px + env(safe-area-inset-bottom, 0px)); }
+       on top of its buttons -- which puts them over the scene, so taps
+       pass straight through them (toasts are text only). */
+    body.world4d-on #hud-prompt { bottom: calc(190px + env(safe-area-inset-bottom, 0px)); pointer-events: none; }
     .w4d-row { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
     .w4d-row button {
       background: rgba(0, 0, 0, 0.45);
@@ -1008,6 +1009,7 @@
           <option value="rhombohedra">Rhombohedra (free-standing lattice, own separate)</option>
           <option value="hexprism">Hex Prism (own separate lattice)</option>
           <option value="pyrochlore">Pyrochlore (3D Kagome)</option>
+          <option value="tesseract">Tesseract</option>
           <option value="cell24">24-cell</option>
           <option value="cell16">16-cell</option>
           <!-- 2D lattice tier (Phase 3+4) options are injected here at

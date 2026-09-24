@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-09-24",
+    "title": "4D: Tesseracts",
+    "items": [
+      "New: the Tesseract -- the 4D cube -- is now buildable in 4D, from the 4D wheel or the Wizard's Z4 (Hypercubic) row.",
+      "At W-depth 0 a tesseract's slice is exactly the unit cube inside an RD, and tesseracts share the 24-cell's edge length, so the tesseract and D4 worlds sit on one ruler.",
+      "Everything works the same as for 24-cells: tap a face to grow, slide W-depth to reach the next layer, long-press to remove, Projection for the classic cube-in-a-cube shadow."
+    ]
+  },
+  {
+    "date": "2026-09-24",
     "title": "4D: The D4 World",
     "items": [
       "New: 4D is open. Pick 4D on the Dimension wheel or in the Wizard to build with 24-cells -- the 4D version of the RD -- and 16-cells.",
