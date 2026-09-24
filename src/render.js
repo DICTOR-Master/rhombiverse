@@ -24,8 +24,8 @@ import { createDimensionWizard } from './app/dimension-wizard.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
-import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWorld, rhombohedraMigrateLegacyCell } from './geometry-extensions/rhombohedra-lattice.js';
-import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats } from './geometry-extensions/pyrochlore-lattice.js';
+import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWorld, rhombohedraMigrateLegacyCell, rhombohedraAttachOptions, rhombohedraOverlap } from './geometry-extensions/rhombohedra-lattice.js';
+import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats, pyrochloreNeighborOffsets } from './geometry-extensions/pyrochlore-lattice.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -911,8 +911,32 @@ function buildSphericalGeometry({ mode, R, n }) {
 //     octGapCellToWorld's (i+0.5,j+0.5,k+0.5)*s placement -- coincides
 //     with octahedron's own vertex/circumradius) -> 0.3413*s, real
 //     growth from the old 0.2887*s.
+// Real volume + nearest face-plane distance of a convex point cloud,
+// measured from its own ConvexGeometry (centroid-fan tetrahedra) -- used
+// for the shapes added to the Spherical Toggle 2026-09-24 (ED, Hex
+// Prism, Rhombohedron) so their sphere radius follows the SAME cap()
+// rule as every other shape without hand-deriving each formula.
+function convexVolumeAndCeiling(verts) {
+  const g = new ConvexGeometry(verts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  const pos = g.attributes.position;
+  const c = [0, 1, 2].map((a) => verts.reduce((sum, v) => sum + v[a], 0) / verts.length);
+  const at = (i) => [pos.getX(i) - c[0], pos.getY(i) - c[1], pos.getZ(i) - c[2]];
+  let volume = 0;
+  let ceiling = Infinity;
+  for (let i = 0; i < pos.count; i += 3) {
+    const [a, b, d] = [at(i), at(i + 1), at(i + 2)];
+    const n = [(b[1] - a[1]) * (d[2] - a[2]) - (b[2] - a[2]) * (d[1] - a[1]), (b[2] - a[2]) * (d[0] - a[0]) - (b[0] - a[0]) * (d[2] - a[2]), (b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0])];
+    volume += Math.abs(a[0] * (b[1] * d[2] - b[2] * d[1]) - a[1] * (b[0] * d[2] - b[2] * d[0]) + a[2] * (b[0] * d[1] - b[1] * d[0])) / 6;
+    const len = Math.hypot(...n);
+    if (len > 1e-12) ceiling = Math.min(ceiling, Math.abs(n[0] * a[0] + n[1] * a[1] + n[2] * a[2]) / len);
+  }
+  g.dispose();
+  return { volume, ceiling };
+}
+
 function sphericalClassificationFor(scale) {
   const cap = (volume, ceiling) => ({ mode: 'sphere', R: Math.min(volumeMatchedRadius(volume), ceiling) });
+  const capStats = ({ volume, ceiling }) => cap(volume, ceiling);
   return {
     rd: cap(2 * scale ** 3, scale / Math.SQRT2),
     octahedron: cap(scale ** 3 / 6, 0.5 * scale),
@@ -922,6 +946,10 @@ function sphericalClassificationFor(scale) {
     // volumes and nearest-face ceilings.
     truncatedTetrahedron: cap(pyrochloreShapeStats(scale).truncatedTetrahedron.volume, pyrochloreShapeStats(scale).truncatedTetrahedron.ceiling),
     tetrahedron: cap(pyrochloreShapeStats(scale).tetrahedron.volume, pyrochloreShapeStats(scale).tetrahedron.ceiling),
+    // View-mode backfill (2026-09-24): ED, Hex Prism, Rhombohedra.
+    elongDodeca: capStats(convexVolumeAndCeiling(elongatedDodecahedronVerts(scale))),
+    hexPrism: capStats(convexVolumeAndCeiling(hexPrismVerts(HEX_PRISM_R, HEX_PRISM_H))),
+    rhombohedron: capStats(convexVolumeAndCeiling(rhombohedraTileVerts(RHOMBOHEDRA_S))),
   };
 }
 
@@ -1552,16 +1580,19 @@ function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangeme
 // Real placed Rhombohedra cells (free lattice) -- same instancing
 // pattern again, own rhombohedraCellToWorld position (a real 3D
 // coordinate frame, no orientation flag or flat-tile height needed).
+// 4 orientations (2026-09-24): cell = 4 x centroid, `o` = which of RD
+// Quarter's 4 orientations -- one shared geometry, rotated per instance
+// (see rhombohedra-lattice.js's 4-orientation section).
+function rhombohedraInstanceMatrix(cell) {
+  const [wx, wy, wz] = rhombohedraPieceWorld([cell.x, cell.y, cell.z], RHOMBOHEDRA_S);
+  const r = rhombohedraOrientationMatrix(cell.o ?? 0);
+  return new THREE.Matrix4().set(r[0][0], r[0][1], r[0][2], wx, r[1][0], r[1][1], r[1][2], wy, r[2][0], r[2][1], r[2][2], wz, 0, 0, 0, 1);
+}
 function rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld) {
   rhombohedraCellOrder = rhombohedraWorld.entries();
   const m = new THREE.Matrix4();
   rhombohedraCellOrder.forEach((cell, i) => {
-    // 4 orientations (2026-09-24): cell = 4 x centroid, `o` = which of
-    // RD Quarter's 4 orientations -- one shared geometry, rotated per
-    // instance (see rhombohedra-lattice.js's 4-orientation section).
-    const [wx, wy, wz] = rhombohedraPieceWorld([cell.x, cell.y, cell.z], RHOMBOHEDRA_S);
-    const r = rhombohedraOrientationMatrix(cell.o ?? 0);
-    m.set(r[0][0], r[0][1], r[0][2], wx, r[1][0], r[1][1], r[1][2], wy, r[2][0], r[2][1], r[2][2], wz, 0, 0, 0, 1);
+    m.copy(rhombohedraInstanceMatrix(cell));
     rhombohedraMesh.setMatrixAt(i, m);
     rhombohedraMesh.setColorAt(i, instanceColorFor(cell));
   });
@@ -2071,6 +2102,7 @@ async function init() {
     rhomboAttachMode = rhomboAttachMode === 'mirror' ? 'copy' : 'mirror';
     try { localStorage.setItem(RHOMBO_ATTACH_KEY, rhomboAttachMode); } catch { /* best-effort */ }
     renderRhomboAttachButton();
+    if (latticeQuickViewMode === 'rhombohedra') rebuildLatticeQuickView();
     showHudPrompt(rhomboAttachMode === 'mirror' ? 'Attach: Mirror -- taps place the mirror image across the tapped face.' : 'Attach: Copy -- taps place a same-orientation copy across the tapped face.', 3000);
   });
   renderRhomboAttachButton();
@@ -2961,6 +2993,19 @@ async function init() {
         const g = sphericalModeActive ? sphericalGeometries.octahedron.clone() : buildOctGapGeometry(SCALE);
         pieces.push(g.translate(wx, wy, wz));
       }
+      // View-mode backfill (2026-09-24): ED, Hex Prism, Rhombohedra --
+      // same geometry/position recipe as each one's own instance rebuild.
+      for (const cell of elongDodecaWorld.entries()) {
+        const [wx, wy, wz] = elongDodecaCellToWorld(cell.x, cell.y, cell.z, SCALE);
+        pieces.push((sphericalModeActive ? sphericalGeometries.elongDodeca : elongDodecaGeometry).clone().translate(wx, wy, wz));
+      }
+      for (const cell of hexPrismWorld.entries()) {
+        const [wx, wy, wz] = hexCellToWorld(cell.x, cell.y, cell.z, HEX_PRISM_R, HEX_PRISM_H);
+        pieces.push((sphericalModeActive ? sphericalGeometries.hexPrism : hexPrismGeometry).clone().translate(wx, wy, wz));
+      }
+      for (const cell of rhombohedraWorld.entries()) {
+        pieces.push((sphericalModeActive ? sphericalGeometries.rhombohedron : rhombohedraGeometry).clone().applyMatrix4(rhombohedraInstanceMatrix(cell)));
+      }
       // Pyrochlore (3D Kagome): TTs + their derived cap tets, same
       // geometry/position recipe as rebuildPyrochloreInstances.
       const pyroCells = pyrochloreWorld.entries().filter((c) => pyrochloreSiteOrientation(c.x, c.y, c.z) !== 0);
@@ -3191,6 +3236,9 @@ async function init() {
     truncatedOctahedron: buildSphericalGeometry(sphericalShapes.truncatedOctahedron),
     truncatedTetrahedron: buildSphericalGeometry(sphericalShapes.truncatedTetrahedron),
     tetrahedron: buildSphericalGeometry(sphericalShapes.tetrahedron),
+    elongDodeca: buildSphericalGeometry(sphericalShapes.elongDodeca),
+    hexPrism: buildSphericalGeometry(sphericalShapes.hexPrism),
+    rhombohedron: buildSphericalGeometry(sphericalShapes.rhombohedron),
   };
   const originalGeometries = {
     rd: geometry,
@@ -3350,6 +3398,10 @@ async function init() {
     // angular geometry, so swap per mesh rather than via originalGeometries.
     pyrochloreTTMeshes.forEach((m, idx) => { m.geometry = sphericalModeActive ? sphericalGeometries.truncatedTetrahedron : pyrochloreTTGeometries[idx]; });
     pyrochloreTetMeshes.forEach((m, idx) => { m.geometry = sphericalModeActive ? sphericalGeometries.tetrahedron : pyrochloreTetGeometries[idx]; });
+    // View-mode backfill (2026-09-24): ED, Hex Prism, Rhombohedra.
+    elongDodecaMesh.geometry = sphericalModeActive ? sphericalGeometries.elongDodeca : elongDodecaGeometry;
+    hexPrismMesh.geometry = sphericalModeActive ? sphericalGeometries.hexPrism : hexPrismGeometry;
+    rhombohedraMesh.geometry = sphericalModeActive ? sphericalGeometries.rhombohedron : rhombohedraGeometry;
     applySphericalToDisphenoids(sphericalModeActive);
     applySphericalToPartials(sphericalModeActive);
     // Skeleton's own merged overlay isn't one of the meshes swapped
@@ -3910,7 +3962,7 @@ async function init() {
   // interstitial-lattice.js). Labels/icons are keyed by mode name below
   // (LATTICE_QUICK_VIEW_LABELS/_MARK_KEY), not by array position, so
   // reordering this list alone is safe.
-  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'rdquarter', 'cubocta', 'octahedron', 'bcc', 'octa', 'disphenoid', 'pyrochlore'];
+  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'rdquarter', 'cubocta', 'octahedron', 'bcc', 'octa', 'disphenoid', 'elongdodeca', 'hexprism', 'rhombohedra', 'pyrochlore'];
   const LATTICE_QUICK_VIEW_LABELS = {
     off: 'Off.',
     rd: 'RD -- every built cell shown as a complete block.',
@@ -3922,14 +3974,17 @@ async function init() {
     octa: 'Flattened Octahedron -- every co-locatable built cell shown as one octahedron bundle.',
     octahedron: 'Octahedron -- the Cuboctahedron gap-fill piece, previewed at two cube-centers near every built cell.',
     disphenoid: 'Disphenoid -- every co-locatable built cell shown as one disphenoid.',
-    pyrochlore: 'Pyrochlore (3D Kagome) -- every built cell shown as its own up-tetrahedron, plus the down-tetrahedron wherever 4 built cells meet at a corner: the corner-sharing tetrahedra of the 3D Kagome.',
+    elongdodeca: 'Elongated Dodecahedron -- your ED build plus every open ED slot one step beyond it.',
+    hexprism: 'Hex Prism -- your Hex Prism build plus every open slot one step beyond it on its own hexagonal grid.',
+    rhombohedra: 'Rhombohedra -- your Rhombohedra build plus every open slot one step beyond it (following the current Copy / Mirror setting).',
+    pyrochlore: 'Pyrochlore (3D Kagome) -- your truncated tetrahedra plus every open slot one step beyond them, with all their corner-sharing tetrahedra.',
   };
   // 'off' added 2026-09-02: without it, markKey was undefined and
   // updateLatticeQuickViewIcon() below rendered a totally blank
   // iconFrame (outline only, zero ink) for the default/most-common
   // state -- direct report ("lattice view symbols are still feint")
   // traced to this, not a rendering-strength issue. See MARKS.latticeOff.
-  const LATTICE_QUICK_VIEW_MARK_KEY = { off: 'latticeOff', rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', rdquarter: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', octahedron: 'pieceOctahedron', disphenoid: 'pieceDisphenoid', pyrochlore: 'piecePyrochlore' };
+  const LATTICE_QUICK_VIEW_MARK_KEY = { off: 'latticeOff', rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', rdquarter: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', octahedron: 'pieceOctahedron', disphenoid: 'pieceDisphenoid', elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore' };
   // Fixed axis for octahedron/disphenoid coverage -- matches core/
   // build.js's own bootstrap default for a fresh 'ioct' placement; a
   // representative single orientation per anchor is enough for a
@@ -4137,27 +4192,52 @@ async function init() {
         const verts = octGapVertices(SCALE).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
         pieces.push(new ConvexGeometry(verts));
       }
-    } else if (latticeQuickViewMode === 'pyrochlore') {
-      // Pyrochlore (3D Kagome): the SAME FCC cells, no cross-lattice
-      // conversion -- every real cell's own up-tetrahedron (centered on
-      // the cell), plus a down-tetrahedron at each T+ hole (an RD
-      // 3-valent corner, p + s/2) only when ALL 4 cells meeting there
-      // are built, since that tetrahedron is the gap BETWEEN them. See
-      // geometry-extensions/pyrochlore-lattice.js.
-      const built = new Set(cells.map((c) => `${c.x},${c.y},${c.z}`));
-      const tetPiece = (kind, [cx, cy, cz]) => new ConvexGeometry(tetrahedronVerts(kind, SCALE).map(([x, y, z]) => new THREE.Vector3(x + cx, y + cy, z + cz)));
-      const downHoles = new Map(); // doubled-coord key -> world center
-      for (const cell of cells) {
-        pieces.push(tetPiece('up', cellToWorld(cell.x, cell.y, cell.z, SCALE)));
-        for (const [a, b, c] of [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]]) {
-          const h = [2 * cell.x + a, 2 * cell.y + b, 2 * cell.z + c];
-          const key = h.join(',');
-          if (downHoles.has(key)) continue;
-          const around = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]].map(([u, v, w]) => [(h[0] - u) / 2, (h[1] - v) / 2, (h[2] - w) / 2]);
-          downHoles.set(key, around.every(([x, y, z]) => built.has(`${x},${y},${z}`)) ? h.map((n) => (n / 2) * SCALE) : null);
+    } else if (['elongdodeca', 'hexprism', 'rhombohedra', 'pyrochlore'].includes(latticeQuickViewMode)) {
+      // Own-lattice pieces (2026-09-24, direct instruction: "follow rules
+      // of previous ones where a lattice always extends past where you
+      // have built so far"): drawn from that piece's OWN build, not the
+      // RD world -- every placed piece plus every open slot one step
+      // beyond it, so the grid visibly extends past the build and grows
+      // with it.
+      const at = (verts, [cx, cy, cz]) => new ConvexGeometry(verts.map(([x, y, z]) => new THREE.Vector3(x + cx, y + cy, z + cz)));
+      if (latticeQuickViewMode === 'elongdodeca' || latticeQuickViewMode === 'hexprism') {
+        const isED = latticeQuickViewMode === 'elongdodeca';
+        const own = isED ? elongDodecaWorld.entries() : hexPrismWorld.entries();
+        const offsets = isED ? NEIGHBOR_OFFSETS : HEX_NEIGHBOR_OFFSETS;
+        const slots = new Map();
+        for (const c of own) {
+          slots.set(`${c.x},${c.y},${c.z}`, [c.x, c.y, c.z]);
+          for (const [dx, dy, dz] of offsets) slots.set(`${c.x + dx},${c.y + dy},${c.z + dz}`, [c.x + dx, c.y + dy, c.z + dz]);
         }
+        const verts = isED ? elongatedDodecahedronVerts(SCALE) : hexPrismVerts(HEX_PRISM_R, HEX_PRISM_H);
+        for (const [x, y, z] of slots.values()) pieces.push(at(verts, isED ? elongDodecaCellToWorld(x, y, z, SCALE) : hexCellToWorld(x, y, z, HEX_PRISM_R, HEX_PRISM_H)));
+      } else if (latticeQuickViewMode === 'rhombohedra') {
+        const own = rhombohedraWorld.entries();
+        const slots = new Map(own.map((c) => [`${c.x},${c.y},${c.z}`, { x: c.x, y: c.y, z: c.z, o: c.o ?? 0 }]));
+        const faceDirs = [[1, 1, 0], [1, -1, 0], [1, 0, 1], [1, 0, -1], [0, 1, 1], [0, 1, -1]].flatMap((n) => [n, n.map((v) => -v)]);
+        for (const c of own) {
+          const q = c.o ?? 0;
+          for (const n of faceDirs) {
+            const opt = rhombohedraAttachOptions(q, [c.x, c.y, c.z], n).find((o) => (o.o !== q) === (rhomboAttachMode === 'mirror'));
+            if (!opt || slots.has(opt.c4.join(','))) continue;
+            if (own.some((b) => rhombohedraOverlap(b.o ?? 0, [b.x, b.y, b.z], opt.o, opt.c4))) continue;
+            slots.set(opt.c4.join(','), { x: opt.c4[0], y: opt.c4[1], z: opt.c4[2], o: opt.o });
+          }
+        }
+        const base = rhombohedraTileVerts(RHOMBOHEDRA_S);
+        for (const cell of slots.values()) pieces.push(new ConvexGeometry(base.map(([x, y, z]) => new THREE.Vector3(x, y, z))).applyMatrix4(rhombohedraInstanceMatrix(cell)));
+      } else {
+        const own = pyrochloreWorld.entries().filter((c) => pyrochloreSiteOrientation(c.x, c.y, c.z) !== 0);
+        const slots = new Map();
+        for (const c of own) {
+          slots.set(`${c.x},${c.y},${c.z}`, { x: c.x, y: c.y, z: c.z });
+          for (const [dx, dy, dz] of pyrochloreNeighborOffsets(pyrochloreSiteOrientation(c.x, c.y, c.z))) slots.set(`${c.x + dx},${c.y + dy},${c.z + dz}`, { x: c.x + dx, y: c.y + dy, z: c.z + dz });
+        }
+        const all = [...slots.values()];
+        for (const c of all) pieces.push(at(truncatedTetrahedronVerts(pyrochloreSiteOrientation(c.x, c.y, c.z), PYROCHLORE_S), pyrochloreCellToWorld(c.x, c.y, c.z, PYROCHLORE_S)));
+        const tets = pyrochloreCapTets(all);
+        for (const kind of ['up', 'down']) for (const { center } of tets[kind]) pieces.push(at(tetrahedronVerts(kind, PYROCHLORE_S), pyrochloreCellToWorld(center[0], center[1], center[2], PYROCHLORE_S)));
       }
-      for (const center of downHoles.values()) if (center) pieces.push(tetPiece('down', center));
     } else {
       // BCC-family modes: nearest BCC dual point(s) for EVERY real cell
       // (not just cells that already happen to sit exactly on a BCC
@@ -5485,6 +5565,7 @@ async function init() {
   // need one (the main FCC world, which DOES enforce that invariant via
   // seedIfWorldEmpty(), is always a valid bootstrap surface for it).
   function onElongDodecaChange() {
+    if (latticeQuickViewMode === 'elongdodeca') rebuildLatticeQuickView();
     rebuildElongDodecaInstances(elongDodecaMesh, elongDodecaWorld);
     updateSectionEnabled();
     applyWorldViewMaterials();
@@ -5495,6 +5576,7 @@ async function init() {
   // (see hexPrismWorld's own construction comment above for why this
   // one specifically needs it, unlike elongDodecaWorld).
   function onHexPrismChange() {
+    if (latticeQuickViewMode === 'hexprism') rebuildLatticeQuickView();
     if (hexPrismWorld.entries().length === 0) {
       hexPrismWorld.addCell(0, 0, 0, { material: 'base' });
     }
@@ -5528,6 +5610,7 @@ async function init() {
   // Rhombohedra build (free lattice): own change handler, same "never
   // truly empty" invariant.
   function onPyrochloreChange() {
+    if (latticeQuickViewMode === 'pyrochlore') rebuildLatticeQuickView();
     if (pyrochloreWorld.entries().length === 0) {
       pyrochloreWorld.addCell(...PYROCHLORE_SEED, { material: 'base' });
     }
@@ -5539,6 +5622,7 @@ async function init() {
   }
 
   function onRhombohedraChange() {
+    if (latticeQuickViewMode === 'rhombohedra') rebuildLatticeQuickView();
     if (rhombohedraWorld.entries().length === 0) {
       rhombohedraWorld.addCell(...RHOMBOHEDRA_SEED, { material: 'base', o: 0 });
     }

@@ -1,6 +1,14 @@
 [
   {
     "date": "2026-09-24",
+    "title": "Every View Now Covers ED, Hex Prism and Rhombohedra",
+    "items": [
+      "New: Skeleton and Sphere views now include Elongated Dodecahedra, Hex Prisms and Rhombohedra.",
+      "New: Lattice View modes for Elongated Dodecahedron, Hex Prism, Rhombohedra and Pyrochlore (3D Kagome) -- each shows your own build plus every open slot one step beyond it, so you can see where the lattice goes next."
+    ]
+  },
+  {
+    "date": "2026-09-24",
     "title": "Rhombohedra in All 4 Orientations",
     "items": [
       "New: Rhombohedra can now attach in all 4 of the RD's own orientations, not just one. A new Copy / Mirror button in the bottom row (shown while Rhombohedra is selected) picks what a tap attaches: a same-orientation copy, or the mirror image across the tapped face.",
