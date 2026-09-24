@@ -32,7 +32,7 @@ import {
 import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
 import { matchHexNeighborOffset } from '../geometry-extensions/hex-prism.js';
 import { rhombohedraAttachOptions, rhombohedraOverlap } from '../geometry-extensions/rhombohedra-lattice.js';
-import { pyrochloreSiteOrientation, pyrochloreNeighborForTTFace, pyrochloreNeighborForTetFace } from '../geometry-extensions/pyrochlore-lattice.js';
+import { pyrochloreSiteOrientation, pyrochloreNeighborForTTFace, pyrochloreNeighborForTetFace, pyrochloreCapForTTFace, pyrochloreTetCornerPartner, pyrochloreCapTetsOf, pyrochloreCellToWorld } from '../geometry-extensions/pyrochlore-lattice.js';
 import { elongDodecaCellToWorld } from '../geometry-extensions/elongated-dodecahedron.js';
 import {
   bootstrapDisphenoid,
@@ -288,6 +288,8 @@ export function createBuildController({
   rhombohedraCellAt = () => null,
   // 'copy' | 'mirror' -- render.js's Rhombohedra attach toggle.
   getRhombohedraAttachMode = () => 'copy',
+  // 'whole' | 'small' -- render.js's Pyrochlore Whole tet / Small tet toggle.
+  getPyrochloreAttachMode = () => 'whole',
   onRhombohedraChange = () => {},
   // Pyrochlore (3D Kagome, 'pyrochlore' piece tier): { world, meshes,
   // resolveHit, onChange } -- see render.js's own build-controller
@@ -810,19 +812,57 @@ export function createBuildController({
     const resolved = pyrochlore && hit.instanceId !== undefined ? pyrochlore.resolveHit(hit) : null;
     if (!resolved) { if (onPieceNoOp) onPieceNoOp(action); return; }
     const n = [hit.face.normal.x, hit.face.normal.y, hit.face.normal.z];
+    const world = pyrochlore.world;
+    const cellAtKey = (c) => world.entries().find((e) => e.x === c[0] && e.y === c[1] && e.z === c[2]);
+    // Small tet (direct request 2026-09-24, Whole tet | Small tet toggle):
+    // individual small tetrahedra. Add: tap near a tet's corner -> the tet
+    // sharing that corner; tap a truncated tetrahedron's exposed triangle
+    // face -> its cap back. Remove: long-press any small tet -> just that
+    // one (a derived cap gets a tetRemoved marker that STAYS, direct
+    // decision). Long-press a truncated tetrahedron still removes it.
+    if (getPyrochloreAttachMode() === 'small') {
+      if (mode === 'build') {
+        let target = null;
+        if (resolved.type === 'tet') {
+          const c = pyrochloreCellToWorld(...resolved.center);
+          target = pyrochloreTetCornerPartner(resolved.kind, resolved.center, [hit.point.x - c[0], hit.point.y - c[1], hit.point.z - c[2]]);
+        } else {
+          target = pyrochloreCapForTTFace(resolved.cell.x, resolved.cell.y, resolved.cell.z, n);
+        }
+        if (!target) { if (onPieceNoOp) onPieceNoOp(action); return; }
+        const existing = cellAtKey(target.center);
+        const isDerivedCap = world.entries().some((e) => pyrochloreSiteOrientation(e.x, e.y, e.z) !== 0 && pyrochloreCapTetsOf(e.x, e.y, e.z).some((cap) => cap.center.every((v, a) => v === target.center[a])));
+        if (existing?.tetAdded || (isDerivedCap && !existing?.tetRemoved)) { if (onPieceNoOp) onPieceNoOp(action); return; } // already showing
+        const material = getMaterial();
+        if (existing) world.removeCell(...target.center);
+        world.addCell(...target.center, { material, tetAdded: true });
+        pyrochlore.onChange();
+        if (onPlaced) onPlaced({ x: target.center[0], y: target.center[1], z: target.center[2], material });
+        return;
+      }
+      if (resolved.type === 'tet') {
+        const existing = cellAtKey(resolved.center);
+        const isDerivedCap = world.entries().some((e) => pyrochloreSiteOrientation(e.x, e.y, e.z) !== 0 && pyrochloreCapTetsOf(e.x, e.y, e.z).some((cap) => cap.center.every((v, a) => v === resolved.center[a])));
+        if (existing) world.removeCell(...resolved.center);
+        if (isDerivedCap) world.addCell(...resolved.center, { tetRemoved: true });
+        pyrochlore.onChange();
+        if (onRemoved) onRemoved({ x: resolved.center[0], y: resolved.center[1], z: resolved.center[2] });
+        return;
+      }
+    }
     if (mode === 'build') {
       const target = resolved.type === 'tt'
         ? pyrochloreNeighborForTTFace(resolved.cell.x, resolved.cell.y, resolved.cell.z, n)
         : pyrochloreNeighborForTetFace(resolved.kind, resolved.center, n);
-      if (!target || pyrochloreSiteOrientation(...target) === 0 || pyrochlore.world.has(...target)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      if (!target || pyrochloreSiteOrientation(...target) === 0 || world.has(...target)) { if (onPieceNoOp) onPieceNoOp(action); return; }
       const material = getMaterial();
-      pyrochlore.world.addCell(...target, { material });
+      world.addCell(...target, { material });
       pyrochlore.onChange();
       if (onPlaced) onPlaced({ x: target[0], y: target[1], z: target[2], material });
       return;
     }
     if (resolved.type !== 'tt') { if (onPieceNoOp) onPieceNoOp(action); return; }
-    pyrochlore.world.removeCell(resolved.cell.x, resolved.cell.y, resolved.cell.z);
+    world.removeCell(resolved.cell.x, resolved.cell.y, resolved.cell.z);
     pyrochlore.onChange();
     if (onRemoved) onRemoved(resolved.cell);
   }

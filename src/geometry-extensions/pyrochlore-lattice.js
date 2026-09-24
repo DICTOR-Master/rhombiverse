@@ -156,3 +156,78 @@ export function pyrochloreShapeStats(s = 1) {
     tetrahedron: { volume: e ** 3 / (6 * Math.SQRT2), ceiling: e / (2 * Math.sqrt(6)) },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Individual small tetrahedra (direct request 2026-09-24: a Whole tet |
+// Small tet toggle "for add or removal"). Tets stay DERIVED from placed
+// TTs by default; the world can additionally hold per-tet cells at a tet's
+// own center (never a TT site -- the two index sets are disjoint, see the
+// header): { tetAdded: true, material } adds a tet on its own (pure
+// corner-sharing pyrochlore growth), { tetRemoved: true } hides a derived
+// cap. A removed tet STAYS removed even if another TT later caps the same
+// spot (direct decision) -- only an explicit Small-tet add brings it back.
+// ---------------------------------------------------------------------------
+
+// 'up' | 'down' | null for a doubled-coordinate point.
+export function pyrochloreTetKind(i, j, k) {
+  if (allEven(i, j, k) && mod((i + j + k) / 2, 2) === 0) return 'up';
+  if (allOdd(i, j, k) && mod(i + j + k, 4) === 3) return 'down';
+  return null;
+}
+
+// Every tetrahedron actually shown: derived caps of placed TTs, minus
+// tetRemoved markers, plus tetAdded cells. `cell` is what tints it (the
+// owning TT, or the tet's own added cell).
+export function pyrochloreVisibleTets(cells) {
+  const tts = cells.filter((c) => pyrochloreSiteOrientation(c.x, c.y, c.z) !== 0);
+  const marks = new Map(cells.filter((c) => pyrochloreTetKind(c.x, c.y, c.z)).map((c) => [`${c.x},${c.y},${c.z}`, c]));
+  const derived = pyrochloreCapTets(tts);
+  const out = { up: [], down: [] };
+  const seen = new Set();
+  for (const kind of ['up', 'down']) {
+    for (const { center, owner } of derived[kind]) {
+      const key = center.join(',');
+      const m = marks.get(key);
+      if (m?.tetRemoved) continue;
+      seen.add(key);
+      out[kind].push({ center, cell: m?.tetAdded ? m : tts[owner] });
+    }
+  }
+  for (const [key, m] of marks) {
+    if (!m.tetAdded || seen.has(key)) continue;
+    out[pyrochloreTetKind(m.x, m.y, m.z)].push({ center: [m.x, m.y, m.z], cell: m });
+  }
+  return out;
+}
+
+// Tap on a TT's TRIANGLE face in Small-tet mode: the cap tet that belongs
+// there ({ kind, center }), or null for a hexagon face.
+export function pyrochloreCapForTTFace(i, j, k, worldNormal) {
+  const o = pyrochloreSiteOrientation(i, j, k);
+  let best = null;
+  let bestDot = -Infinity;
+  for (const s of PYROCHLORE_S) {
+    for (const sign of [1, -1]) {
+      const d = dot(worldNormal, [s[0] * sign, s[1] * sign, s[2] * sign]);
+      if (d > bestDot) { bestDot = d; best = { sign, s }; }
+    }
+  }
+  if (best.sign === o) return null; // a hexagon face
+  return { kind: o === 1 ? 'down' : 'up', center: [i + best.sign * best.s[0], j + best.sign * best.s[1], k + best.sign * best.s[2]] };
+}
+
+// Small-tet corner growth: the tet sharing the corner of (kind, center)
+// nearest `localDir` (tap point minus the tet's own world center). Each
+// pyrochlore vertex has exactly one up and one down tet, so an up-tet's
+// corner s is shared with the down-tet at center + s, and a down-tet's
+// corner -s with the up-tet at center - s (doubled coords).
+export function pyrochloreTetCornerPartner(kind, center, localDir) {
+  const sign = kind === 'up' ? 1 : -1;
+  let best = PYROCHLORE_S[0];
+  let bestDot = -Infinity;
+  for (const s of PYROCHLORE_S) {
+    const d = dot(localDir, [s[0] * sign, s[1] * sign, s[2] * sign]);
+    if (d > bestDot) { bestDot = d; best = s; }
+  }
+  return { kind: kind === 'up' ? 'down' : 'up', center: [center[0] + sign * best[0], center[1] + sign * best[1], center[2] + sign * best[2]] };
+}

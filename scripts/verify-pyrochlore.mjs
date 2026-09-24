@@ -13,6 +13,10 @@ import {
   pyrochloreNeighborForTTFace,
   pyrochloreNeighborForTetFace,
   pyrochloreShapeStats,
+  pyrochloreTetKind,
+  pyrochloreVisibleTets,
+  pyrochloreCapForTTFace,
+  pyrochloreTetCornerPartner,
 } from '../src/geometry-extensions/pyrochlore-lattice.js';
 
 let failures = 0;
@@ -84,6 +88,28 @@ check('tet tap -> a real TT site capped by that tet', pyrochloreCapTetsOf(...O).
   const n = c.kind === 'up' ? s.map((x) => -x) : s;
   const across = pyrochloreNeighborForTetFace(c.kind, c.center, n);
   return pyrochloreSiteOrientation(...across) !== 0 && pyrochloreCapTetsOf(...across).some((cc) => key(cc.center) === key(c.center));
+})));
+
+// Individual small tets (Whole tet | Small tet toggle).
+check('tet centers are never TT sites and vice versa', [[0, 0, 0], [1, 1, 1], [2, 2, 0], [-1, -1, 1]].every((p) => (pyrochloreTetKind(...p) === null) !== (pyrochloreSiteOrientation(...p) === 0) || (pyrochloreTetKind(...p) === null && pyrochloreSiteOrientation(...p) === 0)));
+check('cap-tet centers classify as the right kind', pyrochloreCapTetsOf(...O).every((c) => pyrochloreTetKind(...c.center) === c.kind) && pyrochloreCapTetsOf(...T).every((c) => pyrochloreTetKind(...c.center) === c.kind));
+{
+  const caps = pyrochloreCapTetsOf(...O);
+  const removedOne = pyrochloreVisibleTets([{ x: 2, y: 0, z: 0 }, { x: caps[0].center[0], y: caps[0].center[1], z: caps[0].center[2], tetRemoved: true }]);
+  check('a tetRemoved marker hides that derived cap (3 left)', removedOne.up.length + removedOne.down.length === 3);
+  const lone = pyrochloreVisibleTets([{ x: 0, y: 0, z: 0, tetAdded: true }]);
+  check('a tetAdded cell shows on its own (no TT)', lone.up.length === 1 && lone.down.length === 0);
+}
+check('triangle-face tap -> the cap that belongs there; hex-face tap -> null', PYROCHLORE_S.every((s) => {
+  const cap = pyrochloreCapForTTFace(...O, s.map((n) => -n));
+  return cap && pyrochloreCapTetsOf(...O).some((c) => key(c.center) === key(cap.center));
+}) && pyrochloreNeighborOffsets(1).every((d) => pyrochloreCapForTTFace(...O, d) === null));
+check('corner-partner tet shares exactly 1 vertex with the tapped tet', ['up', 'down'].every((kind) => PYROCHLORE_S.every((s) => {
+  const center = kind === 'up' ? [0, 0, 0] : [1, 1, 1];
+  const dir = kind === 'up' ? s : s.map((n) => -n);
+  const p = pyrochloreTetCornerPartner(kind, center, dir);
+  const a = new Set(tetWorld(kind, center).map(key));
+  return p.kind !== kind && pyrochloreTetKind(...p.center) === p.kind && tetWorld(p.kind, p.center).filter((v) => a.has(key(v))).length === 1;
 })));
 
 console.log(failures === 0 ? '\nAll checks passed (0 failures).' : `\n${failures} check(s) FAILED.`);

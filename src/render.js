@@ -25,7 +25,7 @@ import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-e
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
 import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWorld, rhombohedraMigrateLegacyCell, rhombohedraAttachOptions, rhombohedraOverlap } from './geometry-extensions/rhombohedra-lattice.js';
-import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats, pyrochloreNeighborOffsets, pyrochloreCapTetsOf } from './geometry-extensions/pyrochlore-lattice.js';
+import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats, pyrochloreNeighborOffsets, pyrochloreCapTetsOf, pyrochloreVisibleTets, pyrochloreTetCornerPartner } from './geometry-extensions/pyrochlore-lattice.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -1632,17 +1632,19 @@ function rebuildPyrochloreInstances(ttMeshes, tetMeshes, pyrochloreWorld) {
     if (ttMesh.instanceColor) ttMesh.instanceColor.needsUpdate = true;
     ttMesh.computeBoundingSphere();
   });
-  const tets = pyrochloreCapTets(cells);
+  // Derived caps, minus Small-tet removals, plus Small-tet additions --
+  // see pyrochloreVisibleTets.
+  const tets = pyrochloreVisibleTets(pyrochloreWorld.entries());
   ['up', 'down'].forEach((kind, idx) => {
     const tetMesh = tetMeshes[idx];
     const list = tets[kind];
-    list.forEach(({ center, owner }, i) => {
+    list.forEach(({ center, cell }, i) => {
       const [wx, wy, wz] = pyrochloreCellToWorld(center[0], center[1], center[2], PYROCHLORE_S);
       m.makeTranslation(wx, wy, wz);
       tetMesh.setMatrixAt(i, m);
-      tetMesh.setColorAt(i, instanceColorFor(cells[owner]).clone().lerp(KAGOME_TRIANGLE_LIGHTEN_TO, KAGOME_TRIANGLE_LIGHTEN));
+      tetMesh.setColorAt(i, instanceColorFor(cell).clone().lerp(KAGOME_TRIANGLE_LIGHTEN_TO, KAGOME_TRIANGLE_LIGHTEN));
     });
-    pyrochloreTetInstances.set(tetMesh, list.map(({ center, owner }) => ({ kind, center, cell: cells[owner] })));
+    pyrochloreTetInstances.set(tetMesh, list.map(({ center, cell }) => ({ kind, center, cell })));
     tetMesh.count = list.length;
     tetMesh.instanceMatrix.needsUpdate = true;
     if (tetMesh.instanceColor) tetMesh.instanceColor.needsUpdate = true;
@@ -2085,6 +2087,13 @@ async function init() {
   const RHOMBO_ATTACH_KEY = 'rhombiverse-rhombo-attach-mode';
   let rhomboAttachMode = 'copy';
   try { if (localStorage.getItem(RHOMBO_ATTACH_KEY) === 'mirror') rhomboAttachMode = 'mirror'; } catch { /* best-effort */ }
+  // Pyrochlore's own mode in the SAME bottom-row slot (direct request,
+  // 2026-09-24): 'whole' = place/remove whole truncated tetrahedra (small
+  // tets derived), 'small' = add/remove individual small tetrahedra --
+  // see pyrochlore-lattice.js's own Small-tet section.
+  const PYRO_ATTACH_KEY = 'rhombiverse-pyrochlore-attach-mode';
+  let pyroAttachMode = 'whole';
+  try { if (localStorage.getItem(PYRO_ATTACH_KEY) === 'small') pyroAttachMode = 'small'; } catch { /* best-effort */ }
   // Written as a general "attach variant" slot (direct note: "it could
   // be used for other pieces with similar issues in future") -- any
   // piece whose face attach has more than one valid result can reuse
@@ -2098,12 +2107,30 @@ async function init() {
     copy: '<svg viewBox="-30 -30 60 60"><g fill="none" stroke="currentColor" stroke-width="3"><polygon points="-26,14 -18,-14 -2,-14 -10,14"/><polygon points="2,14 10,-14 26,-14 18,14"/></g></svg>',
     mirror: '<svg viewBox="-30 -30 60 60"><g fill="none" stroke="currentColor" stroke-width="3"><polygon points="-26,14 -18,-14 -2,-14 -10,14"/><polygon points="26,14 18,-14 2,-14 10,14"/></g><line x1="0" y1="-22" x2="0" y2="22" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.6"/></svg>',
   };
+  const PYRO_ATTACH_ICONS = {
+    whole: '<svg viewBox="-30 -30 60 60"><polygon points="0,-24 20.78,12 -20.78,12" fill="none" stroke="currentColor" stroke-width="3"/><polygon points="-6.93,-12 6.93,-12 13.86,0 6.93,12 -6.93,12 -13.86,0" fill="currentColor" opacity="0.35"/></svg>',
+    small: '<svg viewBox="-30 -30 60 60"><polygon points="-8,-4 4,-4 -2,8" fill="currentColor" opacity="0.35" stroke="currentColor" stroke-width="2.5"/><polygon points="4,-4 16,-4 10,-16" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>',
+  };
+  const attachPiece = () => document.getElementById('piece-type-select')?.value;
   function renderRhomboAttachButton() {
     if (!rhomboAttachBtn) return;
+    if (attachPiece() === 'pyrochlore') {
+      rhomboAttachBtn.innerHTML = PYRO_ATTACH_ICONS[pyroAttachMode];
+      rhomboAttachBtn.title = `Pyrochlore: ${pyroAttachMode === 'small' ? 'Small tet' : 'Whole tet'} (tap to switch)`;
+      return;
+    }
     rhomboAttachBtn.innerHTML = RHOMBO_ATTACH_ICONS[rhomboAttachMode];
     rhomboAttachBtn.title = `Rhombohedra attach: ${rhomboAttachMode === 'mirror' ? 'Mirror' : 'Copy'} (tap to switch)`;
   }
   rhomboAttachBtn?.addEventListener('click', () => {
+    if (attachPiece() === 'pyrochlore') {
+      pyroAttachMode = pyroAttachMode === 'small' ? 'whole' : 'small';
+      try { localStorage.setItem(PYRO_ATTACH_KEY, pyroAttachMode); } catch { /* best-effort */ }
+      renderRhomboAttachButton();
+      updateFirstPlacementTarget();
+      showHudPrompt(pyroAttachMode === 'small' ? 'Small tet: tap near a small tetrahedron’s corner to add the one sharing it; long-press any small tetrahedron to remove just that one.' : 'Whole tet: tap to add truncated tetrahedra (their small tetrahedra come with them); long-press one to remove it.', 4500);
+      return;
+    }
     rhomboAttachMode = rhomboAttachMode === 'mirror' ? 'copy' : 'mirror';
     try { localStorage.setItem(RHOMBO_ATTACH_KEY, rhomboAttachMode); } catch { /* best-effort */ }
     renderRhomboAttachButton();
@@ -2112,7 +2139,8 @@ async function init() {
   });
   renderRhomboAttachButton();
   function updateRhomboAttachPanel() {
-    rhomboAttachBtn?.classList.toggle('hidden', !(activeDimension !== '2D' && document.getElementById('piece-type-select').value === 'rhombohedra'));
+    rhomboAttachBtn?.classList.toggle('hidden', !(activeDimension !== '2D' && ['rhombohedra', 'pyrochlore'].includes(attachPiece())));
+    renderRhomboAttachButton();
   }
 
   // Rhombille is the one primitive genuinely locked to a single named
@@ -2432,7 +2460,16 @@ async function init() {
         const cc = pyrochloreCellToWorld(...cap.center, PYROCHLORE_S);
         for (const [x, y, z] of tetrahedronVerts(cap.kind, PYROCHLORE_S)) pts.push([x + cc[0], y + cc[1], z + cc[2]]);
       }
-      return pyrochloreWorld.entries().length ? null : { geometry: new ConvexGeometry(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z))), place: (material) => { pyrochloreWorld.addCell(i, j, k, { material }); onPyrochloreChange(); } };
+      // Empty = nothing visible (a world holding only Small-tet removal
+      // markers shows nothing). Small-tet mode starts with one up-tet at
+      // the origin instead of a whole truncated tetrahedron.
+      const cellsNow = pyrochloreWorld.entries();
+      const empty = !cellsNow.some((cc) => pyrochloreSiteOrientation(cc.x, cc.y, cc.z) !== 0 || cc.tetAdded);
+      if (!empty) return null;
+      if (pyroAttachMode === 'small') {
+        return { geometry: new ConvexGeometry(tetrahedronVerts('up', PYROCHLORE_S).map(([x, y, z]) => new THREE.Vector3(x, y, z))), place: (material) => { pyrochloreWorld.addCell(0, 0, 0, { material, tetAdded: true }); onPyrochloreChange(); } };
+      }
+      return { geometry: new ConvexGeometry(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z))), place: (material) => { pyrochloreWorld.addCell(i, j, k, { material }); onPyrochloreChange(); } };
     }
     return null;
   }
@@ -3126,7 +3163,7 @@ async function init() {
         const g = sphericalModeActive ? sphericalGeometries.truncatedTetrahedron.clone() : pyrochloreTTGeometries[pyrochloreSiteOrientation(cell.x, cell.y, cell.z) === 1 ? 0 : 1].clone();
         pieces.push(g.translate(wx, wy, wz));
       }
-      const pyroTets = pyrochloreCapTets(pyroCells);
+      const pyroTets = pyrochloreVisibleTets(pyrochloreWorld.entries());
       ['up', 'down'].forEach((kind, idx) => {
         for (const { center } of pyroTets[kind]) {
           const [wx, wy, wz] = pyrochloreCellToWorld(center[0], center[1], center[2], PYROCHLORE_S);
@@ -4346,8 +4383,24 @@ async function init() {
         }
         const all = [...slots.values()];
         for (const c of all) pieces.push(at(truncatedTetrahedronVerts(pyrochloreSiteOrientation(c.x, c.y, c.z), PYROCHLORE_S), pyrochloreCellToWorld(c.x, c.y, c.z, PYROCHLORE_S)));
-        const tets = pyrochloreCapTets(all);
-        for (const kind of ['up', 'down']) for (const { center } of tets[kind]) pieces.push(at(tetrahedronVerts(kind, PYROCHLORE_S), pyrochloreCellToWorld(center[0], center[1], center[2], PYROCHLORE_S)));
+        // Tets: caps of every TT slot, plus the built world's own visible
+        // tets (incl. Small-tet additions) and, for each of those, the 4
+        // tets sharing its corners -- so a tets-only build extends too.
+        const tetSlots = new Map();
+        const addTet = (kind, center) => tetSlots.set(center.join(','), { kind, center });
+        const caps = pyrochloreCapTets(all);
+        for (const kind of ['up', 'down']) for (const { center } of caps[kind]) addTet(kind, center);
+        const visible = pyrochloreVisibleTets(pyrochloreWorld.entries());
+        for (const kind of ['up', 'down']) {
+          for (const { center } of visible[kind]) {
+            addTet(kind, center);
+            for (const dir of [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]]) {
+              const partner = pyrochloreTetCornerPartner(kind, center, kind === 'up' ? dir : dir.map((v) => -v));
+              addTet(partner.kind, partner.center);
+            }
+          }
+        }
+        for (const { kind, center } of tetSlots.values()) pieces.push(at(tetrahedronVerts(kind, PYROCHLORE_S), pyrochloreCellToWorld(center[0], center[1], center[2], PYROCHLORE_S)));
       }
     } else {
       // BCC-family modes: nearest BCC dual point(s) for EVERY real cell
@@ -5617,6 +5670,7 @@ async function init() {
     rhombohedraMesh,
     rhombohedraCellAt: (instanceId) => rhombohedraCellOrder[instanceId],
     getRhombohedraAttachMode: () => rhomboAttachMode,
+    getPyrochloreAttachMode: () => pyroAttachMode,
     // First-placement target (see firstPlacementSpec): core/build.js
     // raycasts this mesh while it's visible and routes a tap on it here.
     firstPlacementTarget: {
