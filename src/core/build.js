@@ -668,6 +668,11 @@ export function createBuildController({
     // still does.
     const isRealClickTarget = !!store && (hit.object === store.mesh || store.classMeshes?.includes(hit.object) || store.companionMeshes?.includes(hit.object));
     if (!store || !impl || !isRealClickTarget || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    // Kagome: a triangle is shared by up to 3 hexagons, so removing via a
+    // triangle hit deleted an arbitrary (first-placed) hexagon while the
+    // pressed triangle often stayed visible. Direct decision: only
+    // hexagons delete; a long-press on a triangle is a no-op.
+    if (mode !== 'build' && store.companionMeshes?.includes(hit.object)) { if (onPieceNoOp) onPieceNoOp(action); return; }
     const cell = store.cellAt(hit.instanceId, hit.object);
     if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
     const angleDeg = lattice2d.getAngleDeg();
@@ -1376,6 +1381,11 @@ export function createBuildController({
       suppressNextClick = false;
       return;
     }
+    // iPhone Safari can still deliver a synthesized click after a
+    // long-press despite onTouchEnd's preventDefault -- that click would
+    // immediately re-add what the long-press just removed (direct
+    // report: "long press not working on iPhone", Kagome).
+    if (performance.now() - lastLongPressAt < LONG_PRESS_CLICK_GUARD_MS) return;
     const hit = pick(event);
     if (!hit) return;
 
@@ -1992,6 +2002,8 @@ export function createBuildController({
   let touchStartY = 0;
   let longPressTimer = null;
   let longPressFired = false;
+  let lastLongPressAt = -Infinity;
+  const LONG_PRESS_CLICK_GUARD_MS = 800;
   const LONG_PRESS_MS = 500;
   const LONG_PRESS_MOVE_TOLERANCE = 12; // px -- a held finger drifts a little even at rest
 
@@ -2008,6 +2020,7 @@ export function createBuildController({
     clearTimeout(longPressTimer);
     longPressTimer = setTimeout(() => {
       longPressFired = true;
+      lastLongPressAt = performance.now();
       onContextMenu({ preventDefault: () => {}, clientX: touchStartX, clientY: touchStartY });
     }, LONG_PRESS_MS);
   }
