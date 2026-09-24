@@ -1,6 +1,14 @@
 [
   {
     "date": "2026-09-24",
+    "title": "Angled X-Ray",
+    "items": [
+      "New: X-Ray can now cut along any of the 4 cube diagonals, not just X, Y and Z (Diagonal 1-4 in the X-Ray axis picker). The drag handle slides along the diagonal too.",
+      "Cutting a Pyrochlore (3D Kagome) build along a diagonal slices it into its own Kagome layers."
+    ]
+  },
+  {
+    "date": "2026-09-24",
     "title": "A Cyan Target Instead of Starter Pieces",
     "items": [
       "New: lattices no longer fill the scene with starter pieces. When the piece you've selected has nothing built yet, a cyan outline shows exactly where its first piece will go -- tap it to place. Every RD-based piece (Cube, Pyramid, Hemi RD, Hourglass, RD Quarter) plants an RD there first.",

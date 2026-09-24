@@ -319,6 +319,18 @@ const hudWheel = createHudWheel3D(renderer, {
 // normal/constant here is picked up automatically next frame with no
 // separate "apply" step.
 const sectionPlane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
+// X-Ray cut direction for a #section-axis value: the 3 coordinate axes
+// plus (angled X-Ray, 2026-09-24, direct request) the 4 cube body-
+// diagonals -- a cut perpendicular to any of those slices Pyrochlore
+// (3D Kagome) into its own Kagome layers.
+const SECTION_AXIS_DIRS = {
+  x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1],
+  d111: [1, 1, 1], d1mm: [1, -1, -1], dm1m: [-1, 1, -1], dmm1: [-1, -1, 1],
+};
+function sectionAxisVector(axis) {
+  return new THREE.Vector3(...(SECTION_AXIS_DIRS[axis] ?? SECTION_AXIS_DIRS.x)).normalize();
+}
+
 function updateSectionPlane() {
   const axis = document.getElementById('section-axis').value;
   const flip = document.getElementById('section-flip').checked;
@@ -327,11 +339,7 @@ function updateSectionPlane() {
   // chosen axis, regardless of flip -- only the normal direction (which
   // side gets kept vs. clipped) should change when flipping, not where
   // the plane physically sits.
-  const axisVec = new THREE.Vector3(
-    axis === 'x' ? 1 : 0,
-    axis === 'y' ? 1 : 0,
-    axis === 'z' ? 1 : 0
-  );
+  const axisVec = sectionAxisVector(axis);
   const pointOnPlane = axisVec.clone().multiplyScalar(pos);
   const normal = flip ? axisVec.clone().negate() : axisVec.clone();
   sectionPlane.setFromNormalAndCoplanarPoint(normal, pointOnPlane);
@@ -3203,14 +3211,16 @@ async function init() {
     controls.enabled = !e.value; // TransformControls/OrbitControls both want the mouse -- yield orbit while actively dragging the plane
   });
 
+  // Generalized for angled X-Ray (2026-09-24): the handle's own local Z
+  // is turned onto the cut direction (PlaneGeometry faces +Z by default)
+  // and the gizmo drags in LOCAL space along that Z only -- works the
+  // same for the 3 axes and the 4 body-diagonals.
   function orientXrayHandle(axis) {
-    xrayHandle.rotation.set(0, 0, 0);
-    if (axis === 'x') xrayHandle.rotation.y = Math.PI / 2;
-    else if (axis === 'y') xrayHandle.rotation.x = Math.PI / 2;
-    // axis === 'z': PlaneGeometry's own default orientation already faces Z, no rotation needed
-    xrayGizmo.showX = axis === 'x';
-    xrayGizmo.showY = axis === 'y';
-    xrayGizmo.showZ = axis === 'z';
+    xrayHandle.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), sectionAxisVector(axis));
+    xrayGizmo.setSpace('local');
+    xrayGizmo.showX = false;
+    xrayGizmo.showY = false;
+    xrayGizmo.showZ = true;
   }
 
   function syncXrayHandleToSectionPlane() {
@@ -3218,16 +3228,15 @@ async function init() {
     const axis = document.getElementById('section-axis').value;
     const pos = Number(document.getElementById('section-pos').value) || 0;
     orientXrayHandle(axis);
-    xrayHandle.position.set(0, 0, 0);
-    xrayHandle.position[axis] = pos;
+    xrayHandle.position.copy(sectionAxisVector(axis).multiplyScalar(pos));
   }
 
   xrayGizmo.addEventListener('change', () => {
     if (!xrayHandle.visible) return;
     const axis = document.getElementById('section-axis').value;
     const flip = document.getElementById('section-flip').checked;
-    const pos = xrayHandle.position[axis];
-    const axisVec = new THREE.Vector3(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0);
+    const axisVec = sectionAxisVector(axis);
+    const pos = xrayHandle.position.dot(axisVec);
     sectionPlane.setFromNormalAndCoplanarPoint(
       flip ? axisVec.clone().negate() : axisVec,
       axisVec.clone().multiplyScalar(pos)
