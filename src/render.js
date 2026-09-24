@@ -1190,6 +1190,9 @@ let hexPrismCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 // hexPrismCellOrder above, generalized off the earlier 3 separately-
 // named arrays.
 const lattice2dCellOrders = new Map(); // primitiveId -> instanceId -> {x, y, z, ...cellData}
+const lattice2dCompanionOwners = new Map(); // companion InstancedMesh -> instanceId -> cellOrder index (Kagome)
+const KAGOME_TRIANGLE_LIGHTEN_TO = new THREE.Color(0xffffff);
+const KAGOME_TRIANGLE_LIGHTEN = 0.4;
 let rhombohedraCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are rhombohedra-lattice.js's own (i,j,k) frame
 let octGapCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are octGap's own offset-frame index, see core/cubocta-gap-build.js
 // Interstitial-lattice build: one real Mesh per disphenoid cell, same
@@ -1415,11 +1418,14 @@ function resolveLattice2dImpl(primitiveId, arrangementId) {
   if (primitiveId === 'parallelogram' && arrangementId === 'rotational') return RHOMBILLE_ARRANGEMENT_IMPL;
   return LATTICE_PRIMITIVE_IMPLS[primitiveId];
 }
-// `companionMeshes` (Kagome only): render-only meshes, one real instance
-// PER LOGICAL CELL each (never raycast/click targets -- build.js's click
-// handler only ever checks the PRIMARY mesh, see handleLattice2dClick),
-// rebuilt in lockstep with the primary mesh's own cellOrder so a logical
-// cell's index `i` always means the same real cell across all of them.
+// `companionMeshes` (Kagome only): its up/down triangle meshes, one
+// instance per real triangle touching ANY placed hexagon (the Star of
+// David fix -- see lattice-2d.js's own kagomeStarTriangles header), so
+// their instance index does NOT line up with cellOrder. Each instance's
+// owning cellOrder index is recorded in lattice2dCompanionOwners so a
+// tap on a triangle still resolves to a real stored cell (see the
+// lattice2d store's own cellAt). Tinted a lighter shade of the owner's
+// color so the hexagon reads as its own shape.
 //
 // `classMeshes` (Kite only, when impl.classCount(angleDeg) > 1): the
 // OPPOSITE of companions -- every one of these IS a real click target
@@ -1499,13 +1505,14 @@ function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangeme
       companionMesh.geometry.dispose();
       companionMesh.geometry = companionGeometry;
       const cm = new THREE.Matrix4();
-      cellOrder.forEach((cell, i) => {
-        const [wx, wy, wz] = companion.cellToWorld(cell.x, cell.y, angleDeg, LATTICE2D_S, 0);
-        cm.makeTranslation(wx, wy, wz);
+      const instances = companion.instances(cellOrder, angleDeg, LATTICE2D_S);
+      instances.forEach(({ world: [wx, wy], owner }, i) => {
+        cm.makeTranslation(wx, wy, 0);
         companionMesh.setMatrixAt(i, cm);
-        companionMesh.setColorAt(i, instanceColorFor(cell));
+        companionMesh.setColorAt(i, instanceColorFor(cellOrder[owner]).clone().lerp(KAGOME_TRIANGLE_LIGHTEN_TO, KAGOME_TRIANGLE_LIGHTEN));
       });
-      companionMesh.count = cellOrder.length;
+      lattice2dCompanionOwners.set(companionMesh, instances.map((inst) => inst.owner));
+      companionMesh.count = instances.length;
       companionMesh.instanceMatrix.needsUpdate = true;
       if (companionMesh.instanceColor) companionMesh.instanceColor.needsUpdate = true;
       companionMesh.computeBoundingSphere();
@@ -1813,7 +1820,9 @@ async function init() {
       lattice2dCompanionMeshes.set(primitive.id, impl.companions.map((companion) => {
         const companionGeometry = new ConvexGeometry(companion.tileVerts(NAMED_LATTICE_ANGLES[0].angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
         companionGeometry.computeVertexNormals();
-        const companionMesh = new THREE.InstancedMesh(companionGeometry, material.clone(), MAX_CELLS);
+        // 3x: each hexagon touches 3 up + 3 down triangles, so up to 3
+        // of each per placed cell (see kagomeStarTriangles).
+        const companionMesh = new THREE.InstancedMesh(companionGeometry, material.clone(), 3 * MAX_CELLS);
         companionMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         scene.add(companionMesh);
         return companionMesh;
@@ -5187,13 +5196,15 @@ async function init() {
           // to tell which part is real hexagon vs decorative triangle --
           // confirmed directly (a contextmenu dispatched at a triangle-
           // only point correctly hit nothing and no-opped). Companions
-          // are now ALSO real click targets here; they share the SAME
-          // per-cell instance index as the primary mesh (rebuilt in
-          // lockstep, see rebuildLattice2dInstances), so `cellAt` below
-          // needs no change to resolve a companion hit back to its real
-          // owning logical cell.
+          // are now ALSO real click targets here. Since the Star of David
+          // fix their instance index no longer matches cellOrder, so
+          // `cellAt` takes the hit mesh and maps a companion hit through
+          // lattice2dCompanionOwners back to its owning hexagon cell.
           companionMeshes: lattice2dCompanionMeshes.get(p.id),
-          cellAt: (instanceId) => lattice2dCellOrders.get(p.id)?.[instanceId],
+          cellAt: (instanceId, object) => {
+            const owners = object && lattice2dCompanionOwners.get(object);
+            return lattice2dCellOrders.get(p.id)?.[owners ? owners[instanceId] : instanceId];
+          },
         },
       ])),
       s: LATTICE2D_S,

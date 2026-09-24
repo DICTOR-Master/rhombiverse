@@ -35,6 +35,7 @@ import {
   kagomeTriangleDownTileVerts,
   kagomeTriangleDownCellToWorld,
   kagomeNeighborOffsets,
+  LATTICE_PRIMITIVE_IMPLS,
 } from '../src/geometry-extensions/lattice-2d.js';
 
 let failures = 0;
@@ -312,6 +313,34 @@ for (const { id, angleDeg } of NAMED_LATTICE_ANGLES) {
   check(`[${id}] kagome neighbor count matches hexagon's (${neighborCount})`, neighborCount === 6);
   const allEdgesCovered = hex.every((A, i) => edgeHasCoveringTriangle(A, hex[(i + 1) % hex.length], angleDeg));
   check(`[${id}] kagome hexagon: all 6 edges have a real covering triangle (no gaps)`, allEdgesCovered);
+}
+
+// Star of David (real bug, direct user report: "it is not a star of
+// david formation there is no hexagon it just goes from rhombus to
+// square" -- one hexagon + only 2 same-colored triangles fused into a
+// single parallelogram cell). Checks what render.js ACTUALLY draws, via
+// the kagome impl's own companion `instances`: a lone hexagon gets all
+// 6 surrounding triangles, each sharing a real edge with it, and 2
+// adjacent hexagons SHARE the 2 triangles between them (10, not 12).
+function kagomeRenderedTriangles(cells, angleDeg) {
+  return LATTICE_PRIMITIVE_IMPLS.kagome.companions.flatMap((companion) => {
+    const local = polygonBottomFace(companion.tileVerts(angleDeg, 1, 0.15));
+    return companion.instances(cells, angleDeg, 1).map(({ world: [cx, cy] }) => local.map(([lx, ly]) => [lx + cx, ly + cy]));
+  });
+}
+for (const { id, angleDeg } of NAMED_LATTICE_ANGLES) {
+  const hex = worldPoly(kagomeHexagonTileVerts, kagomeHexagonCellToWorld, 0, 0, 0, angleDeg);
+  const star = kagomeRenderedTriangles([{ x: 0, y: 0 }], angleDeg);
+  check(`[${id}] kagome lone hexagon renders 6 triangles (Star of David)`, star.length === 6);
+  check(`[${id}] kagome every star triangle shares a real edge with its hexagon`, star.every((tri) => sharesRealEdge(hex, tri)));
+  const edgesEachCoveredOnce = hex.every((A, i) => {
+    const B = hex[(i + 1) % hex.length];
+    const near = (p, q) => Math.abs(p[0] - q[0]) < 1e-6 && Math.abs(p[1] - q[1]) < 1e-6;
+    return star.filter((tri) => tri.some((p) => near(p, A)) && tri.some((p) => near(p, B))).length === 1;
+  });
+  check(`[${id}] kagome star: each hexagon edge has exactly 1 triangle`, edgesEachCoveredOnce);
+  const pair = kagomeRenderedTriangles([{ x: 0, y: 0 }, { x: 1, y: 0 }], angleDeg);
+  check(`[${id}] kagome adjacent hexagons share 2 triangles (10 total)`, pair.length === 10);
 }
 
 console.log(failures === 0 ? `\nAll checks passed (0 failures).` : `\n${failures} check(s) FAILED.`);

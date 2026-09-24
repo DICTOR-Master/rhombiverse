@@ -676,6 +676,42 @@ export function kagomeNeighborOffsets(_angleDeg) {
   return [[1, 0], [-1, 0], [0, 1], [0, -1], [-1, 1], [1, -1]];
 }
 
+// Real bug, direct user report ("it is not a star of david formation
+// there is no hexagon it just goes from rhombus to square"): this used
+// to render exactly ONE up + ONE down triangle per placed hexagon, all
+// in the cell's own color -- and hexagon(x,y) + up(x,y) + down(x-1,y-1)
+// together are exactly ONE parallelogram cell (a 60-degree rhombus at
+// Triangular, where the triangle edges run collinear with the hexagon's;
+// a unit square at Square -- checked directly from the 8 vertices), so
+// the hexagon was never visible and Kagome looked identical to
+// Parallelogram. Now each placed hexagon shows ALL 6 triangles that
+// touch its own lattice point (the Star of David), and triangles are
+// DERIVED from the placed hexagons rather than owned 1:1 -- a triangle
+// exists iff at least one of its 3 corner points holds a hexagon, so
+// adjacent hexagons share the triangle between them exactly as the real
+// trihexagonal tiling does. Up/down use the Triangle primitive's own
+// (i, j) indexing (up(i,j) = P(i,j),P(i+1,j),P(i,j+1); down(i,j) =
+// P(i+1,j),P(i,j+1),P(i+1,j+1)), so the 6 around P(x,y) are up(x,y),
+// up(x-1,y), up(x,y-1), down(x-1,y-1), down(x-1,y), down(x,y-1).
+// `owner` is the cellOrder index of the first placed hexagon (in
+// cellOrder order) touching that triangle -- used for its tint and to
+// resolve a tap on the triangle back to a real stored cell.
+export function kagomeStarTriangles(cellOrder) {
+  const up = new Map();
+  const down = new Map();
+  cellOrder.forEach(({ x, y }, owner) => {
+    for (const [i, j] of [[x, y], [x - 1, y], [x, y - 1]]) {
+      const key = `${i},${j}`;
+      if (!up.has(key)) up.set(key, { i, j, owner });
+    }
+    for (const [i, j] of [[x - 1, y - 1], [x - 1, y], [x, y - 1]]) {
+      const key = `${i},${j}`;
+      if (!down.has(key)) down.set(key, { i, j, owner });
+    }
+  });
+  return { up: [...up.values()], down: [...down.values()] };
+}
+
 // ---------------------------------------------------------------------------
 // Generic dispatch: one lookup table so callers (render.js/build.js) can
 // loop over all NAMED_LATTICE_ANGLES x LATTICE_PRIMITIVES combinations
@@ -736,8 +772,8 @@ export const LATTICE_PRIMITIVE_IMPLS = {
     classInstanceRotationRad: (orientation, angleDeg) => kiteClassInstanceRotationRad(orientation, angleDeg),
   },
   // Kagome's own entry describes its PRIMARY (clickable) mesh only --
-  // the hexagon. `companion` describes its second, render-only mesh (the
-  // 2 medial triangles per logical cell) -- render.js's own
+  // the hexagon. `companions` describes its triangle meshes (derived
+  // from the placed hexagons, see kagomeStarTriangles) -- render.js's own
   // rebuildLattice2dInstances special-cases this ONE field, everything
   // else (persistence, select options, toggle-panel angle-gating) is
   // already fully generic over LATTICE_PRIMITIVES and needs no Kagome-
@@ -747,15 +783,21 @@ export const LATTICE_PRIMITIVE_IMPLS = {
     tileVerts: (angleDeg, s, h) => kagomeHexagonTileVerts(angleDeg, s, h),
     cellToWorld: (i, j, orientation, angleDeg, s, worldZ) => kagomeHexagonCellToWorld(i, j, orientation, angleDeg, s, worldZ),
     neighborOffsets: (angleDeg) => kagomeNeighborOffsets(angleDeg),
-    // Two companion meshes (render-only, not raycast/click targets -- see
-    // render.js's own rebuildLattice2dInstances header), one up-triangle
-    // instance and one down-triangle instance per logical (hexagon) cell.
-    // Each is its OWN single fixed shape (see kagomeTriangleUp/Down's own
-    // header for why they can't share one geometry + rotation the way
-    // Triangle's real up/down pair does), so no `hasOrientation` needed.
+    // Two companion meshes (also click targets, resolved to their owning
+    // hexagon -- see render.js's own rebuildLattice2dInstances header):
+    // every up/down triangle touching ANY placed hexagon, per
+    // kagomeStarTriangles' own header (the Star of David fix). Each is
+    // its OWN single fixed shape, so no `hasOrientation` needed.
+    // `instances` returns [{ world: [x, y], owner }] per real triangle.
     companions: [
-      { tileVerts: (angleDeg, s, h) => kagomeTriangleUpTileVerts(angleDeg, s, h), cellToWorld: (i, j, angleDeg, s, worldZ) => kagomeTriangleUpCellToWorld(i, j, angleDeg, s, worldZ) },
-      { tileVerts: (angleDeg, s, h) => kagomeTriangleDownTileVerts(angleDeg, s, h), cellToWorld: (i, j, angleDeg, s, worldZ) => kagomeTriangleDownCellToWorld(i, j, angleDeg, s, worldZ) },
+      {
+        tileVerts: (angleDeg, s, h) => kagomeTriangleUpTileVerts(angleDeg, s, h),
+        instances: (cellOrder, angleDeg, s) => kagomeStarTriangles(cellOrder).up.map(({ i, j, owner }) => ({ world: triangleCellToWorld(i, j, 0, angleDeg, s, 0).slice(0, 2), owner })),
+      },
+      {
+        tileVerts: (angleDeg, s, h) => kagomeTriangleDownTileVerts(angleDeg, s, h),
+        instances: (cellOrder, angleDeg, s) => kagomeStarTriangles(cellOrder).down.map(({ i, j, owner }) => ({ world: triangleCellToWorld(i, j, 1, angleDeg, s, 0).slice(0, 2), owner })),
+      },
     ],
   },
 };

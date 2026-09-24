@@ -662,12 +662,13 @@ export function createBuildController({
     // no way to tell hexagon from triangle by looking. Both fields are
     // undefined for every primitive that doesn't have them, so this
     // falls back to the plain single-mesh check everywhere else.
-    // cellAt(hit.instanceId) below needs no change either way -- every
-    // one of these meshes is rebuilt sharing the SAME per-cell instance
-    // index as the primary mesh.
+    // cellAt gets hit.object too: Kagome's companion (triangle) meshes
+    // no longer share the primary mesh's per-cell instance index (see
+    // render.js's own lattice2d store cellAt), every other mesh here
+    // still does.
     const isRealClickTarget = !!store && (hit.object === store.mesh || store.classMeshes?.includes(hit.object) || store.companionMeshes?.includes(hit.object));
     if (!store || !impl || !isRealClickTarget || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
-    const cell = store.cellAt(hit.instanceId);
+    const cell = store.cellAt(hit.instanceId, hit.object);
     if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
     const angleDeg = lattice2d.getAngleDeg();
     if (mode === 'build') {
