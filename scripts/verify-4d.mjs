@@ -4,8 +4,10 @@
 import {
   isD4, isD4DeepHole, KINDS_4D, CELL24_OFFSETS, cellStructure, cellVertices4,
   neighborAcrossFacet, rotation4, matVec, sliceCell, facetForSliceNormal, project4,
-  toDoubled, fromDoubled, dot4,
+  toDoubled, fromDoubled, dot4, dedupeSections,
+  a4To4, a4From4, a4Class, A4_CLASS_KIND, A4_REST_W, A4_FIRST, cellAcrossFacet, throughGap, cornerPartner,
 } from '../src/geometry-extensions/lattice-4d.js';
+import { pyrochloreSiteOrientation } from '../src/geometry-extensions/pyrochlore-lattice.js';
 import { rdRawVerts } from '../src/core/lattice.js';
 
 let failures = 0;
@@ -142,14 +144,14 @@ const I = rotation4();
 const sec = sliceCell(cellVertices4('cell24', O), s24.edges, I, 0);
 check('24-cell at the origin sliced at w = 0 is exactly the RD (rdRawVerts(1))', sec && sameSet3(sec, rdRawVerts(1)));
 check('24-cell centered at w = 1 does not show a solid at w = 0', sliceCell(cellVertices4('cell24', [1, 0, 0, 1]), s24.edges, I, 0) === null);
-check('24-cell centered at w = -1 does not show at w = 0 (half-open ownership)', sliceCell(cellVertices4('cell24', [1, 0, 0, -1]), s24.edges, I, 0) === null);
+check('24-cell centered at w = -1 does not show at w = 0 (touches at one vertex only)', sliceCell(cellVertices4('cell24', [1, 0, 0, -1]), s24.edges, I, 0) === null);
 // A 16-cell whose facet lies in w = 0 shows that facet once: the one
 // above owns it, the one below does not.
 const up = [0.5, 0.5, 0.5, 0.5], down = [0.5, 0.5, 0.5, -0.5];
 const sUp = sliceCell(cellVertices4('cell16', up), cellStructure('cell16', up).edges, I, 0);
 const sDown = sliceCell(cellVertices4('cell16', down), cellStructure('cell16', down).edges, I, 0);
 check('16-cell above w = 0 shows its shared facet (a regular tetrahedron of edge sqrt(2))', sUp && sUp.length === 4);
-check('16-cell below w = 0 does not also show it', sDown === null);
+check('16-cells above and below a facet in w = 0 give the identical section, drawn once (the one above)', sDown && (() => { const kept = dedupeSections([{ pts: sUp, rank: 0, w: up[3], id: 'up' }, { pts: sDown, rank: 0, w: down[3], id: 'down' }]); return kept.length === 1 && kept[0].id === 'up'; })());
 
 // Tapping a slice face resolves the right facet: for each of the RD's 12
 // faces (normals = the 12 FCC directions), the facet found must lead to
@@ -161,6 +163,80 @@ check('Tapping each RD face in the w = 0 slice places the matching FCC neighbor'
   const nb = neighborAcrossFacet('cell24', O, f);
   return [n[0], n[1], n[2], 0].every((v, k) => Math.abs(nb[k] - v) < 1e-9);
 }));
+
+// ---- Hyper-pyrochlore (A4) ----
+const b5 = [0, 1, 2, 3, 4].map((i) => [0, 1, 2, 3, 4].map((j) => (i === j ? 0.8 : -0.2)));
+const roots5 = [];
+for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) if (i !== j) { const r = [0, 0, 0, 0, 0]; r[i] = 1; r[j] = -1; roots5.push(r); }
+check('A4 embedding is an isometry (all 20 roots land at length sqrt(2))', roots5.every((r) => Math.abs(Math.hypot(...a4To4(r)) - Math.SQRT2) < 1e-12));
+check('A4 embedding round-trips', roots5.every((r) => a4From4(a4To4(r)).every((v, k) => Math.abs(v - r[k]) < 1e-12)));
+check('A4 nodes (class 0) sit on the FCC floor at w = 0: node layer xyz = the FCC points', roots5.filter((r) => r[4] === 0).every((r) => { const x = a4To4(r); return x[3] === 0 && Number.isInteger(Math.round(x[0])) && Math.abs(x[0] + x[1] + x[2]) % 2 < 1e-9; }));
+const rep5 = (k) => a4To4(b5[0].map((v) => v * (k > 2 ? k - 5 : k)));
+const shape = (kind, c) => { const st = cellStructure(kind, c); return [st.offsets.length, st.edges.length, st.facets.map((f) => f.verts.length).sort((a, b) => a - b).join(' ')]; };
+check('5-cell: 5 corners, 10 edges, 5 tetrahedral facets', JSON.stringify(shape('a4cell5', rep5(0))) === JSON.stringify([5, 10, '4 4 4 4 4']));
+check('truncated 5-cell (both orientations): 20 corners, 40 edges, 5 tetrahedra + 5 truncated tetrahedra', [2, 4].every((k) => JSON.stringify(shape('a4trunc', rep5(k))) === JSON.stringify([20, 40, '4 4 4 4 4 12 12 12 12 12'])));
+check('bitruncated 5-cell: 30 corners, 60 edges, 10 truncated-tetrahedron facets', JSON.stringify(shape('a4bitrunc', rep5(3))) === JSON.stringify([30, 60, '12 12 12 12 12 12 12 12 12 12']));
+check('every A4 edge is sqrt(2)/2 (= Pyrochlore tetrahedron edge)', ['a4cell5', 'a4trunc', 'a4bitrunc'].every((k, i) => { const st = cellStructure(k, rep5([0, 2, 3][i])); return st.edges.every(([a, c]) => Math.abs(Math.hypot(...st.offsets[a].map((v, j) => v - st.offsets[c][j])) - Math.SQRT2 / 2) < 1e-9); }));
+// Tiling by volume: per A4 lattice point there are 2 five-cells, 2
+// truncated and 1 bitruncated 5-cell; together they must fill A4's
+// covolume sqrt(det Gram) = sqrt(5).
+const vA4 = 2 * volume4('a4cell5', rep5(0)) + volume4('a4trunc', rep5(2)) + volume4('a4trunc', rep5(4)) + volume4('a4bitrunc', rep5(3));
+check(`A4 cells fill space: 2 x 5-cell + 2 x truncated + bitruncated = sqrt(5) (got ${vA4.toFixed(9)})`, Math.abs(vA4 - Math.sqrt(5)) < 1e-9);
+// Adjacency.
+const acrossKinds = (kind, c) => cellStructure(kind, c).facets.map((f, i) => [f.verts.length, cellAcrossFacet(kind, c, i)?.kind]);
+check('every 5-cell facet touches a truncated 5-cell', acrossKinds('a4cell5', rep5(0)).every(([, k]) => k === 'a4trunc') && acrossKinds('a4cell5', rep5(1)).every(([, k]) => k === 'a4trunc'));
+check('truncated 5-cell: tetrahedral facets touch 5-cells, big facets touch bitruncated 5-cells (never another truncated)', [2, 4].every((cl) => acrossKinds('a4trunc', rep5(cl)).every(([n, k]) => (n === 4 ? k === 'a4cell5' : k === 'a4bitrunc'))));
+check('every bitruncated facet touches a truncated 5-cell', acrossKinds('a4bitrunc', rep5(3)).every(([, k]) => k === 'a4trunc'));
+check('straight through a bitruncated gap lands on a truncated 5-cell of the other orientation that shares a facet with the gap', (() => {
+  const T = rep5(2);
+  return cellStructure('a4trunc', T).facets.every((f, i) => {
+    if (f.verts.length !== 12) return true;
+    const B = cellAcrossFacet('a4trunc', T, i).c;
+    const T2 = throughGap(T, B);
+    const cl = a4Class(a4From4(T2));
+    return cl === 4 && cellStructure('a4bitrunc', B).facets.some((_, j) => { const n = cellAcrossFacet('a4bitrunc', B, j); return n.kind === 'a4trunc' && n.c.every((v, k) => Math.abs(v - T2[k]) < 1e-9); });
+  });
+})());
+check('corner partners: each 5-cell corner is shared with exactly the 5-cell reflected through it (the other orientation)', (() => {
+  const C = rep5(0);
+  return cellVertices4('a4cell5', C).every((v) => { const P = cornerPartner(C, v); return a4Class(a4From4(P)) === 1 && cellVertices4('a4cell5', P).some((u) => u.every((x, k) => Math.abs(x - v[k]) < 1e-9)); });
+})());
+check('A4 first cells are the right kinds', ['a4cell5', 'a4trunc', 'a4bitrunc'].every((k) => A4_CLASS_KIND[a4Class(a4From4(A4_FIRST[k]))] === k));
+// The rest slice IS the Pyrochlore world: slice every A4 cell near the
+// origin at w = -sqrt(5)/20, draw identical sections once, and check each
+// is a Pyrochlore piece: truncated tetrahedra (12 corners) at T-sites are
+// truncated 5-cells cut through their middle; at O-sites they're the
+// facet a truncated 5-cell (below) shares with a bitruncated one (above);
+// tetrahedra are facets of 5-cells at FCC points (up) and T+ holes (down).
+const restItems = [];
+const rr = [-2, -1, 0, 1, 2];
+for (let k = -2; k <= 2; k++) for (const a of rr) for (const bb of rr) for (const c of rr) for (const d of rr) {
+  const v = [a, bb, c, d, -(a + bb + c + d)];
+  if (Math.abs(v[4]) > 2) continue;
+  const c4 = a4To4(v.map((x, j) => x + k * b5[0][j]));
+  if (Math.hypot(c4[0], c4[1], c4[2]) > 2.2 || Math.abs(c4[3] - A4_REST_W) > 1.2) continue;
+  const kind = A4_CLASS_KIND[((k % 5) + 5) % 5];
+  const sec = sliceCell(cellVertices4(kind, c4), cellStructure(kind, c4).edges, I, A4_REST_W);
+  if (sec) restItems.push({ pts: sec, rank: { a4cell5: 0, a4trunc: 1, a4bitrunc: 2 }[kind], w: c4[3], kind });
+}
+const restKept = dedupeSections(restItems).filter((it) => it.pts.every((q) => Math.hypot(...q) < 2));
+const centroid = (pts) => [0, 1, 2].map((ax) => pts.reduce((t, q) => t + q[ax], 0) / pts.length);
+const isFCC = (q) => q.every((v) => Math.abs(v - Math.round(v)) < 1e-9) && Math.round(q[0] + q[1] + q[2]) % 2 === 0;
+const isTplus = (q) => { const r = q.map((v) => v - 0.5); return r.every((v) => Math.abs(v - Math.round(v)) < 1e-9) && ((Math.round(r[0] + r[1] + r[2]) % 2) + 2) % 2 === 0; };
+check(`rest slice: every section near the origin is a Pyrochlore piece (${restKept.length} pieces)`, restKept.length >= 20 && restKept.every((it) => {
+  const cn = centroid(it.pts);
+  const site = cn.every((v) => Math.abs(v * 2 - Math.round(v * 2)) < 1e-9) ? pyrochloreSiteOrientation(...cn.map((v) => Math.round(v * 2))) : 0;
+  if (it.pts.length === 12) return (it.kind === 'a4trunc' && site !== 0) || (it.kind === 'a4bitrunc' && site === 1);
+  if (it.pts.length === 4) return it.kind === 'a4cell5' && (isFCC(cn) || isTplus(cn));
+  return false;
+}));
+check('rest slice: first 5-cell = up-tet at the origin, first bitruncated = the TT at (1,0,0), first truncated = the T-site TT at (-1/2,-1/2,-1/2)', (() => {
+  const up = sliceCell(cellVertices4('a4cell5', A4_FIRST.a4cell5), cellStructure('a4cell5', A4_FIRST.a4cell5).edges, I, A4_REST_W);
+  const tt = sliceCell(cellVertices4('a4bitrunc', A4_FIRST.a4bitrunc), cellStructure('a4bitrunc', A4_FIRST.a4bitrunc).edges, I, A4_REST_W);
+  const down = sliceCell(cellVertices4('a4trunc', A4_FIRST.a4trunc), cellStructure('a4trunc', A4_FIRST.a4trunc).edges, I, A4_REST_W);
+  const S = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]];
+  return up && sameSet3(up, S.map((q) => q.map((v) => v / 4))) && tt && tt.length === 12 && key3(centroid(tt)) === key3([1, 0, 0]) && down && down.length === 12 && key3(centroid(down)) === key3([-0.5, -0.5, -0.5]);
+})());
 
 // Rotation: orthonormal, fixed XW -> YW -> ZW order, identity at 0.
 const R = rotation4({ xw: 0.3, yw: -0.7, zw: 1.1 });
