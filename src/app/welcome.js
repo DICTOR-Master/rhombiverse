@@ -8,6 +8,7 @@
 import { buildRDFaces } from './rhombic-wheel-3d-core.js';
 import { getSettings } from './settings.js';
 import { t } from './i18n.js';
+import { openGuide } from './guide.js';
 
 const SKIP_KEY = 'rhombiverse-skip-intro';
 
@@ -159,6 +160,8 @@ function overlayHtml() {
   return `
     <div id="welcome-card">
       <h1>Rhombiverse</h1>
+      <p class="overview">${t('welcome.overview', lang)}</p>
+      <button type="button" class="how-to-link" id="welcome-how-to">${t('welcome.howTo', lang)}</button>
       <div class="rhombis-link">
         <img src="./assets/rhombis-favicon-64.png" alt="" width="28" height="28" />
         <a href="./rhombis.html">${t('welcome.rhombisLink', lang)}</a>
@@ -186,6 +189,10 @@ function init() {
   overlay.id = 'welcome-overlay';
   overlay.innerHTML = overlayHtml();
   document.body.appendChild(overlay);
+  // Delegated, so it survives overlayHtml() being re-rendered.
+  overlay.addEventListener('click', (e) => {
+    if (e.target.closest('#welcome-how-to')) openGuide();
+  });
 
   let stopLogoSpin = () => {};
 

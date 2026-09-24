@@ -86,6 +86,8 @@ const en = {
   'welcome.dontShowAgain': "Don't show this again on this device",
   'welcome.polyhedraverseLink': 'Check out Polyhedraverse, our twin shape-editing site &rarr;',
   'welcome.aboutTitle': 'About Rhombiverse',
+  'welcome.overview': 'The landscape view: lattices of space-filling shapes, in 2D, 3D and 4D.',
+  'welcome.howTo': 'How to use &rarr;',
 };
 
 const ja = {
@@ -138,6 +140,8 @@ const ja = {
   'welcome.dontShowAgain': 'このデバイスでは今後表示しない',
   'welcome.polyhedraverseLink': '姉妹サイト「Polyhedraverse」もチェックしてみてください &rarr;',
   'welcome.aboutTitle': 'Rhombiverseについて',
+  'welcome.overview': 'ランドスケープ（風景）ビュー：空間を埋め尽くす形の格子を、2D・3D・4Dで。',
+  'welcome.howTo': '使い方 &rarr;',
 };
 
 const es = {
@@ -190,6 +194,8 @@ const es = {
   'welcome.dontShowAgain': 'No volver a mostrar esto en este dispositivo',
   'welcome.polyhedraverseLink': 'Descubre Polyhedraverse, nuestro sitio gemelo de edición de formas &rarr;',
   'welcome.aboutTitle': 'Acerca de Rhombiverse',
+  'welcome.overview': 'La vista de paisaje: redes de formas que llenan el espacio, en 2D, 3D y 4D.',
+  'welcome.howTo': 'Cómo usarlo &rarr;',
 };
 
 const fr = {
@@ -242,6 +248,8 @@ const fr = {
   'welcome.dontShowAgain': 'Ne plus afficher ceci sur cet appareil',
   'welcome.polyhedraverseLink': 'Découvrez Polyhedraverse, notre site jumeau d\'édition de formes &rarr;',
   'welcome.aboutTitle': 'À propos de Rhombiverse',
+  'welcome.overview': 'La vue paysage : des réseaux de formes qui remplissent l\'espace, en 2D, 3D et 4D.',
+  'welcome.howTo': 'Mode d\'emploi &rarr;',
 };
 
 const ko = {
@@ -294,6 +302,8 @@ const ko = {
   'welcome.dontShowAgain': '이 기기에서 다시 표시하지 않기',
   'welcome.polyhedraverseLink': '자매 사이트인 Polyhedraverse(도형 편집)도 확인해보세요 &rarr;',
   'welcome.aboutTitle': 'Rhombiverse 정보',
+  'welcome.overview': '풍경 보기: 공간을 빈틈없이 채우는 도형들의 격자를 2D, 3D, 4D로.',
+  'welcome.howTo': '사용 방법 &rarr;',
 };
 
 const zh = {
@@ -346,6 +356,8 @@ const zh = {
   'welcome.dontShowAgain': '在此设备上不再显示',
   'welcome.polyhedraverseLink': '看看我们的姊妹形状编辑站点 Polyhedraverse &rarr;',
   'welcome.aboutTitle': '关于 Rhombiverse',
+  'welcome.overview': '风景视图：由填满空间的形状构成的晶格，涵盖 2D、3D 和 4D。',
+  'welcome.howTo': '使用指南 &rarr;',
 };
 
 const ru = {
@@ -398,6 +410,8 @@ const ru = {
   'welcome.dontShowAgain': 'Не показывать это на этом устройстве',
   'welcome.polyhedraverseLink': 'Загляните в Polyhedraverse, наш родственный сайт редактирования форм &rarr;',
   'welcome.aboutTitle': 'О Rhombiverse',
+  'welcome.overview': 'Пейзажный вид: решётки из фигур, заполняющих пространство, в 2D, 3D и 4D.',
+  'welcome.howTo': 'Как пользоваться &rarr;',
 };
 
 const I18N = { en, ja, es, fr, ko, zh, ru };

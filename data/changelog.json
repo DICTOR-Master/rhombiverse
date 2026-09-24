@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-09-25",
+    "title": "How to use Rhombiverse",
+    "items": [
+      "New: a How to use guide, opened from the welcome screen (the ℹ button brings the welcome screen back any time). It walks through placing, removing and viewing pieces, 4D, sculpting and sharing, then lists every control.",
+      "The same guide is also a page you can share: rhombiverse.vercel.app/guide.",
+      "The welcome screen now describes Rhombiverse as the landscape view of lattices, alongside Polyhedraverse's portrait gallery of shapes."
+    ]
+  },
+  {
     "date": "2026-09-24",
     "title": "4D: Hyper-pyrochlore (4D Kagome)",
     "items": [
