@@ -1,9 +1,91 @@
 [
   {
-    "date": "2026-09-23",
-    "title": "Material Picker Now Tracks the Selected Piece",
+    "date": "2026-09-24",
+    "title": "Kagome Hexagons Delete on iPhone",
     "items": [
-      "Fixed: the main color/material dropdown never updated its own displayed value when you switched piece types, so after switching it kept showing whichever color was last picked for the PREVIOUS piece -- reading as 'my color change isn't sticking' even though each piece type was already correctly remembering its own color the whole time. It now syncs to the newly selected piece's own real current color on every switch."
+      "Fixed: long-pressing a Kagome hexagon on iPhone said there was nothing there to remove. Removal now works out which hexagon you pressed from the exact spot you touched, so it can't miss.",
+      "Fixed: on iPhone, lifting your finger after a long-press could immediately add a new hexagon, so deleting looked like it kept adding instead.",
+      "Changed: long-pressing a Kagome triangle no longer deletes anything -- long-press the hexagon itself."
+    ]
+  },
+  {
+    "date": "2026-09-24",
+    "title": "2D Toggles Move Off the Phone HUD",
+    "items": [
+      "Fixed: on phones, the 2D angle and shape toggles covered the RHOMBIVERSE title and the corner wheel. They now sit at the bottom, just above Menu, and wrap onto a second line if needed."
+    ]
+  },
+  {
+    "date": "2026-09-24",
+    "title": "Kagome Is a Real Star of David Now",
+    "items": [
+      "Fixed: each Kagome hexagon only showed 2 of its triangles, in the same color, which fused into a plain rhombus (a square at 90°) -- it looked identical to Parallelogram and the hexagon never showed.",
+      "Every hexagon now shows all 6 of its triangles (a Star of David). Neighboring hexagons share the triangles between them, building a real Kagome pattern, and triangles are a lighter shade of their hexagon's color."
+    ]
+  },
+  {
+    "date": "2026-09-24",
+    "title": "Kagome and Kite Respond to Every Tap",
+    "items": [
+      "Fixed: tapping or long-pressing a Kagome triangle did nothing, and Kite pieces at 70.53° and 63.43° couldn't be tapped at all."
+    ]
+  },
+  {
+    "date": "2026-09-23",
+    "title": "Kite and Kagome at Every Angle",
+    "items": [
+      "New: Kite and Kagome now work at all 4 lattice angles (90°, 70.53°, 63.43°, 60°), not just some.",
+      "Fixed: Kagome at 90° came out pointed at both ends with triangles missing."
+    ]
+  },
+  {
+    "date": "2026-09-23",
+    "title": "New 2D Shapes: Kite, Kagome, Rhombille",
+    "items": [
+      "New: Kite -- each hexagon fanned into kites from its center.",
+      "New: Kagome -- the trihexagonal pattern of hexagons and triangles.",
+      "New: Rhombille -- at 60°, Parallelogram gets a Rotational arrangement: 3 rotated rhombi per hexagon, the classic 'stacked cubes' pattern."
+    ]
+  },
+  {
+    "date": "2026-09-23",
+    "title": "2D Picks Shapes From the Toggles",
+    "items": [
+      "Changed: in 2D the Piece dropdown and quick-shape button are hidden -- the on-screen toggles are the shape picker there.",
+      "Fixed: the quick-color button stopped showing your current color."
+    ]
+  },
+  {
+    "date": "2026-09-23",
+    "title": "Angle Toggle Reshapes What You Built",
+    "items": [
+      "Fixed: switching the lattice angle used to jump to a separate, empty lattice. It now reshapes the tiles you've already built, in place.",
+      "Fixed: an invisible 3D block could steal taps meant for 2D tiles."
+    ]
+  },
+  {
+    "date": "2026-09-23",
+    "title": "2D Lattice: Bigger Tiles, Denser Dots, Better on iPad",
+    "items": [
+      "Changed: 2D tiles are bigger and easier to tap, one real tile sits at the center of the dot grid, and the dot grid is much finer (about 100 dots per tile) and covers far more of the screen.",
+      "Fixed: dots drew over the tiles; tiles now sit in front of them.",
+      "Fixed: iPad touch and drag problems in 2D."
+    ]
+  },
+  {
+    "date": "2026-09-23",
+    "title": "One Variable 2D Lattice, and Material Is Now Color",
+    "items": [
+      "New: 2D's separate Square/Hexagon/Triangle families are replaced by one lattice with an on-screen toggle panel: 4 angles (90°, 70.53° RD Rhombus, 63.43° Golden Rhombus, 60°) and a shape row (Parallelogram, Triangle, Hexagon).",
+      "Changed: 'Material' is now called 'Color' everywhere.",
+      "Fixed: picking a 2D shape sometimes didn't take effect, so tapping tiles placed nothing."
+    ]
+  },
+  {
+    "date": "2026-09-23",
+    "title": "Color Picker Now Tracks the Selected Piece",
+    "items": [
+      "Fixed: the color picker never updated its displayed value when you switched piece types, so after switching it kept showing whichever color was last picked for the PREVIOUS piece -- reading as 'my color change isn't sticking' even though each piece type was already correctly remembering its own color the whole time. It now syncs to the newly selected piece's own real current color on every switch."
     ]
   },
   {
@@ -323,8 +405,8 @@
     "date": "2026-08-29",
     "title": "A Cleaner HUD",
     "items": [
-      "Removed the top-right \"Mode \u00b7 Material\" text -- redundant now that the bottom-left quick-select icons already show your current Piece/Material at a glance.",
-      "The Lab panel now has its own close (\u2715) button, matching every other panel."
+      "Removed the top-right \"Mode · Material\" text -- redundant now that the bottom-left quick-select icons already show your current Piece/Material at a glance.",
+      "The Lab panel now has its own close (✕) button, matching every other panel."
     ]
   },
   {
