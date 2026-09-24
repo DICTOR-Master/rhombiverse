@@ -4132,7 +4132,7 @@ async function init() {
   // iconFrame (outline only, zero ink) for the default/most-common
   // state -- direct report ("lattice view symbols are still feint")
   // traced to this, not a rendering-strength issue. See MARKS.latticeOff.
-  const LATTICE_QUICK_VIEW_MARK_KEY = { off: 'latticeOff', rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', rdquarter: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', octahedron: 'pieceOctahedron', disphenoid: 'pieceDisphenoid', elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore' };
+  const LATTICE_QUICK_VIEW_MARK_KEY = { off: 'latticeOff', rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', rdquarter: 'pieceRDQuarter', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', octahedron: 'pieceOctahedron', disphenoid: 'pieceDisphenoid', elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore' };
   // Fixed axis for octahedron/disphenoid coverage -- matches core/
   // build.js's own bootstrap default for a fresh 'ioct' placement; a
   // representative single orientation per anchor is enough for a
@@ -4633,7 +4633,7 @@ async function init() {
     // own `?? MARKS.pieceRD` fallback below) regardless of which was
     // actually selected -- the real placement itself was always
     // correct, only this indicator was silently wrong.
-    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRhombohedron', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore',
+    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRDQuarter', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore',
     // 2D lattice tier: one entry per LATTICE_PRIMITIVES, reusing
     // wheel-icons.js's own 3 primitive-keyed icons (Phase 6: the piece
     // type IS just the primitive now, angle is a separate live toggle

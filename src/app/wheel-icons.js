@@ -181,12 +181,14 @@ export const MARKS = {
   // reading as "hexagon extruded into a prism" -- distinct from both
   // pieceRD's filled hexagon and Elongated Dodecahedron's stretched one.
   pieceHexPrism: `<polygon points="${hexPts(20)}" ${THIN}/><path d="M-17,-10 V10 M17,-10 V10" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
-  // RD Quarter / Rhombohedra: genuinely the SAME real shape (one of
-  // RD's own 4 congruent zonotope pieces, see rhombohedra-lattice.js's
-  // own header) -- same mark for both, a real skewed parallelogram
-  // (not the symmetric kite rhombusPts() draws elsewhere), matching a
-  // rhombohedron's own non-orthogonal silhouette.
+  // Rhombohedra: a real skewed parallelogram (not the symmetric kite
+  // rhombusPts() draws elsewhere), matching a rhombohedron's own
+  // non-orthogonal silhouette.
   pieceRhombohedron: `<polygon points="-22,10 -6,-22 22,-10 6,22" ${THIN}/>`,
+  // RD Quarter: shared pieceRhombohedron's mark until 2026-09-24, direct
+  // request for its own -- a hexagon outline with a "Mercedes" Y whose
+  // 3 spokes run to 3 alternate corners.
+  pieceRDQuarter: `<polygon points="${hexPts(20)}" ${THIN}/><path d="M0,0 V-20 M0,0 L17.32,10 M0,0 L-17.32,10" stroke="currentColor" stroke-width="1.5"/>`,
   // Pyrochlore (3D Kagome): the truncated tetrahedron's own silhouette --
   // a tetrahedron (faint outer triangle) with its corners cut off at the
   // real 1/3 points, leaving the hexagon face that makes it Kagome-like.
