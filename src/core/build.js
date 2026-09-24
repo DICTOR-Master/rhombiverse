@@ -651,6 +651,46 @@ export function createBuildController({
     // accessor's own header for the real Rhombille-arrangement mismatch
     // this replaces.
     const impl = lattice2d?.getImpl(primitiveId);
+    // Kagome remove: resolved purely from WHERE the press landed, not
+    // from which mesh/instance the raycast reported -- direct report
+    // (iPhone, 13 hexagons placed): long-press on a hexagon said "no
+    // Kagome there to remove". The nearest lattice point to the hit is
+    // the only hexagon that can contain it (each hexagon sits inside its
+    // own point's Voronoi cell); delete it iff the point is inside.
+    if (primitiveId === 'kagome' && mode !== 'build' && store && impl && hit?.point) {
+      const angleDeg = lattice2d.getAngleDeg();
+      const s = lattice2d.s;
+      const [ox, oy] = impl.cellToWorld(0, 0, 0, angleDeg, s, 0);
+      const [e0x, e0y] = impl.cellToWorld(1, 0, 0, angleDeg, s, 0);
+      const [e1x, e1y] = impl.cellToWorld(0, 1, 0, angleDeg, s, 0);
+      const v0 = [e0x - ox, e0y - oy], v1 = [e1x - ox, e1y - oy];
+      const px = hit.point.x - ox, py = hit.point.y - oy;
+      const det = v0[0] * v1[1] - v0[1] * v1[0];
+      const a = (px * v1[1] - py * v1[0]) / det;
+      const b = (v0[0] * py - v0[1] * px) / det;
+      let best = null, bestD = Infinity;
+      for (const x of [Math.floor(a), Math.floor(a) + 1]) {
+        for (const y of [Math.floor(b), Math.floor(b) + 1]) {
+          const [cx, cy] = impl.cellToWorld(x, y, 0, angleDeg, s, 0);
+          const d = Math.hypot(hit.point.x - cx, hit.point.y - cy);
+          if (d < bestD) { bestD = d; best = { x, y, cx, cy }; }
+        }
+      }
+      const poly = impl.tileVerts(angleDeg, s, 0).slice(0, 6).map(([vx, vy]) => [vx + best.cx, vy + best.cy]);
+      const inside = poly.every(([ax, ay], i) => {
+        const [bx, by] = poly[(i + 1) % poly.length];
+        return (bx - ax) * (hit.point.y - ay) - (by - ay) * (hit.point.x - ax) >= -1e-9;
+      }) || poly.every(([ax, ay], i) => {
+        const [bx, by] = poly[(i + 1) % poly.length];
+        return (bx - ax) * (hit.point.y - ay) - (by - ay) * (hit.point.x - ax) <= 1e-9;
+      });
+      const cell = inside && store.world.has(best.x, best.y, 0) ? store.world.entries().find((c) => c.x === best.x && c.y === best.y && c.z === 0) : null;
+      if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      store.world.removeCell(best.x, best.y, 0);
+      lattice2d.onChange(primitiveId);
+      if (onRemoved) onRemoved(cell);
+      return;
+    }
     // Kite: store.classMeshes lists ALL of its real click targets (one
     // per distinct kite shape at the current angle), not just the
     // primary -- see render.js's own rebuildLattice2dInstances header for
