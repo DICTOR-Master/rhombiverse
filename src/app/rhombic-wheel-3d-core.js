@@ -776,9 +776,9 @@ export const WHEEL_DIMENSION = {
     "equator|sx-1sy-1": { kind: "dept", label: "3D", action: "tool:selectDimension:3D",
       desc: "FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app's existing lattice core." },
     "equator|sx1sy-1":  { kind: "dept", label: "4D", action: "tool:selectDimension:4D",
-      desc: "Tesseract and D4 (24-cell, 16-cell) -- Hyper-pyrochlore planned." },
+      desc: "Tesseract, D4 (24-cell, 16-cell) and Hyper-pyrochlore (4D Kagome)." },
     "equator|sx-1sy1":  { kind: "dept", label: "4D", action: "tool:selectDimension:4D",
-      desc: "Tesseract and D4 (24-cell, 16-cell) -- Hyper-pyrochlore planned." },
+      desc: "Tesseract, D4 (24-cell, 16-cell) and Hyper-pyrochlore (4D Kagome)." },
     // Phase 2 (2026-09-22): Square shipped (flat layer, own store, same
     // FCC-world scene) -- 2D goes from spare to real, matching 3D's own
     // dual-antipode-doubled treatment now that a second dimension is
@@ -811,8 +811,7 @@ export const WHEEL_DIMENSION = {
 // opened from the Dimension wheel's 4D face and from the bottom-left
 // quick-select while in 4D. Six cells, each doubled on an antipodal pair
 // (every face reachable from either side), no universal ring -- same
-// layout rule as WHEEL_DIMENSION. Tesseract and the three A4 cells are
-// planned (spare) until their worlds ship.
+// layout rule as WHEEL_DIMENSION.
 export const WHEEL_PIECE_4D = {
   id: "piece4d",
   noUniversalRing: true,
@@ -823,12 +822,12 @@ export const WHEEL_PIECE_4D = {
     "equator|sx-1sy1":  { kind: "dept", label: "16-cell", action: "tool:pieceType:cell16", desc: "D4's other cell -- 16-cells fill the gaps between D4 points." },
     "top|sy1sz1":       { kind: "dept", label: "Tesseract", action: "tool:pieceType:tesseract", desc: "Z4 (Hypercubic) -- the 4D cube. Its w = 0 slice is the RD world's own unit cube." },
     "bottom|sy-1sz-1":  { kind: "dept", label: "Tesseract", action: "tool:pieceType:tesseract", desc: "Z4 (Hypercubic) -- the 4D cube. Its w = 0 slice is the RD world's own unit cube." },
-    "top|sy-1sz1":      { kind: "spare", label: "Truncated 5-cell", action: null, desc: "Hyper-pyrochlore (4D Kagome) -- planned, not yet built." },
-    "bottom|sy1sz-1":   { kind: "spare", label: "Truncated 5-cell", action: null, desc: "Hyper-pyrochlore (4D Kagome) -- planned, not yet built." },
-    "top|sx-1sz1":      { kind: "spare", label: "Bitruncated 5-cell", action: null, desc: "Hyper-pyrochlore (4D Kagome) -- planned, not yet built." },
-    "bottom|sx1sz-1":   { kind: "spare", label: "Bitruncated 5-cell", action: null, desc: "Hyper-pyrochlore (4D Kagome) -- planned, not yet built." },
-    "top|sx1sz1":       { kind: "spare", label: "5-cell", action: null, desc: "Hyper-pyrochlore (4D Kagome) -- planned, not yet built." },
-    "bottom|sx-1sz-1":  { kind: "spare", label: "5-cell", action: null, desc: "Hyper-pyrochlore (4D Kagome) -- planned, not yet built." },
+    "top|sy-1sz1":      { kind: "dept", label: "Truncated 5-cell", action: "tool:pieceType:a4trunc", desc: "Hyper-pyrochlore (4D Kagome): the main piece -- its corner-sharing 5-cells appear on their own." },
+    "bottom|sy1sz-1":   { kind: "dept", label: "Truncated 5-cell", action: "tool:pieceType:a4trunc", desc: "Hyper-pyrochlore (4D Kagome): the main piece -- its corner-sharing 5-cells appear on their own." },
+    "top|sx-1sz1":      { kind: "dept", label: "Bitruncated 5-cell", action: "tool:pieceType:a4bitrunc", desc: "Hyper-pyrochlore (4D Kagome): fills the gaps between truncated 5-cells." },
+    "bottom|sx1sz-1":   { kind: "dept", label: "Bitruncated 5-cell", action: "tool:pieceType:a4bitrunc", desc: "Hyper-pyrochlore (4D Kagome): fills the gaps between truncated 5-cells." },
+    "top|sx1sz1":       { kind: "dept", label: "5-cell", action: "tool:pieceType:a4cell5", desc: "Hyper-pyrochlore (4D Kagome): single 5-cells, sharing corners in pairs." },
+    "bottom|sx-1sz-1":  { kind: "dept", label: "5-cell", action: "tool:pieceType:a4cell5", desc: "Hyper-pyrochlore (4D Kagome): single 5-cells, sharing corners in pairs." },
   }
 };
 
@@ -913,6 +912,9 @@ export const ACTION_TO_MARK = {
   'tool:pieceType:tesseract': 'pieceTesseract',
   'tool:pieceType:cell24': 'piece24Cell',
   'tool:pieceType:cell16': 'piece16Cell',
+  'tool:pieceType:a4trunc': 'pieceTrunc5Cell',
+  'tool:pieceType:a4bitrunc': 'pieceBitrunc5Cell',
+  'tool:pieceType:a4cell5': 'piece5Cell',
   // 2D lattice tier: one entry per lattice-2d.js's own LATTICE_PRIMITIVES
   // (Phase 6: primitive id alone -- angle is a live, in-scene toggle now,
   // not part of the piece-type value at all; see render.js's own

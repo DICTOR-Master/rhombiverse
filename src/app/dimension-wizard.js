@@ -44,7 +44,7 @@
 // tier actually ships, flip its DIMENSIONS entry below from disabled to
 // real -- no other structural change needed.
 import { mountWireframePreview } from './wireframe-preview.js';
-import { cellStructure, rotation4, matVec, project4 } from '../geometry-extensions/lattice-4d.js';
+import { cellStructure, rotation4, matVec, project4, A4_FIRST } from '../geometry-extensions/lattice-4d.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
 
 const CSS = `
@@ -167,7 +167,7 @@ const DIMENSIONS = [
   // lattice2dSeedCell's own header in render.js for the full incident.
   { id: '2D', label: '2D', desc: '3 real tile primitives (Parallelogram, Triangle, Hexagon), each buildable at any of 4 named lattice angles via the in-scene toggle panel.', enabled: true, preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: NAMED_LATTICE_ANGLES[0].angleDeg }) },
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, previewAction: 'tool:pieceType:rd' },
-  { id: '4D', label: '4D', desc: 'Tesseract (Z4) and D4 (24-cell, 16-cell) -- Hyper-pyrochlore planned.', enabled: true, preview: () => edges4D('cell24') },
+  { id: '4D', label: '4D', desc: 'Tesseract (Z4), D4 (24-cell, 16-cell) and Hyper-pyrochlore (4D Kagome).', enabled: true, preview: () => edges4D('cell24') },
   { id: '5D', label: '5D', desc: 'Decagonal quasicrystal.', enabled: false },
   { id: '6D', label: '6D', desc: 'Icosahedral quasicrystal.', enabled: false },
 ];
@@ -242,7 +242,7 @@ export const LATTICES_3D = [
 // the same rotating preview as every other card. Real geometry from
 // lattice-4d.js (verify:4d), nothing hand-drawn.
 const OBLIQUE_4D = rotation4({ xw: 20 * Math.PI / 180, yw: 15 * Math.PI / 180, zw: 10 * Math.PI / 180 });
-const FIRST_4D_CENTER = { tesseract: [0, 0, 0, 0], cell24: [0, 0, 0, 0], cell16: [0.5, 0.5, 0.5, 0.5] };
+const FIRST_4D_CENTER = { tesseract: [0, 0, 0, 0], cell24: [0, 0, 0, 0], cell16: [0.5, 0.5, 0.5, 0.5], ...A4_FIRST };
 function edges4D(kind) {
   const c = FIRST_4D_CENTER[kind];
   const s = cellStructure(kind, c);
@@ -262,10 +262,10 @@ export const LATTICES_4D = [
     { label: '24-cell', action: 'tool:pieceType:cell24', preview: () => edges4D('cell24') },
     { label: '16-cell', action: 'tool:pieceType:cell16', preview: () => edges4D('cell16') },
   ] },
-  { label: 'Hyper-pyrochlore (4D Kagome)', desc: 'Corner-sharing 5-cells on A4 -- its w-slice is Pyrochlore. Planned.', pieces: [
-    { label: 'Truncated 5-cell', action: null },
-    { label: 'Bitruncated 5-cell', action: null },
-    { label: '5-cell', action: null },
+  { label: 'Hyper-pyrochlore (4D Kagome)', desc: 'Corner-sharing 5-cells on A4 -- it rests on its Pyrochlore slice, which is exactly the Pyrochlore world. Place truncated 5-cells; their 5-cells appear on their own. The bottom-row toggle switches to Bitruncated or single 5-cells.', pieces: [
+    { label: 'Truncated 5-cell', action: 'tool:pieceType:a4trunc', preview: () => edges4D('a4trunc') },
+    { label: 'Bitruncated 5-cell', action: 'tool:pieceType:a4bitrunc', preview: () => edges4D('a4bitrunc') },
+    { label: '5-cell', action: 'tool:pieceType:a4cell5', preview: () => edges4D('a4cell5') },
   ] },
 ];
 

@@ -2118,12 +2118,25 @@ async function init() {
   const attachPiece = () => document.getElementById('piece-type-select')?.value;
   // D4's Whole 24-cell / 16-cell toggle (direct decision) -- the same
   // bottom-row slot: tap swaps which D4 cell you place.
+  // Hyper-pyrochlore's three-way toggle (direct decision): Truncated ->
+  // Bitruncated -> 5-cell, the same slot again.
+  const A4_CYCLE = ['a4trunc', 'a4bitrunc', 'a4cell5'];
+  // handleWheelAction lives inside a later block; bound here once it
+  // exists (same late-binding pattern as isRhombicWheel3DOpen) -- a real
+  // bug otherwise: the 4D toggles below threw ReferenceError on tap.
+  let selectPieceAction = null;
+  const A4_ATTACH_LABELS = { a4trunc: 'Truncated', a4bitrunc: 'Bitruncated', a4cell5: '5-cell' };
   const D4_ATTACH_ICONS = {
     cell24: '<svg viewBox="-30 -30 60 60"><polygon points="0,-24 20.78,-12 20.78,12 0,24 -20.78,12 -20.78,-12" fill="none" stroke="currentColor" stroke-width="3"/><polygon points="0,-12 10.39,6 -10.39,6" fill="currentColor" opacity="0.35"/></svg>',
     cell16: '<svg viewBox="-30 -30 60 60"><polygon points="0,-24 24,0 0,24 -24,0" fill="none" stroke="currentColor" stroke-width="3"/><path d="M0,-24 V24 M-24,0 H24" stroke="currentColor" stroke-width="1.5" opacity="0.6"/></svg>',
   };
   function renderRhomboAttachButton() {
     if (!rhomboAttachBtn) return;
+    if (A4_CYCLE.includes(attachPiece())) {
+      rhomboAttachBtn.innerHTML = `<svg viewBox="-30 -30 60 60">${MARKS[{ a4trunc: 'pieceTrunc5Cell', a4bitrunc: 'pieceBitrunc5Cell', a4cell5: 'piece5Cell' }[attachPiece()]]}</svg>`;
+      rhomboAttachBtn.title = `Hyper-pyrochlore: ${A4_ATTACH_LABELS[attachPiece()]} (tap to switch)`;
+      return;
+    }
     if (attachPiece() === 'cell24' || attachPiece() === 'cell16') {
       rhomboAttachBtn.innerHTML = D4_ATTACH_ICONS[attachPiece()];
       rhomboAttachBtn.title = `D4: ${attachPiece() === 'cell16' ? '16-cell' : 'Whole 24-cell'} (tap to switch)`;
@@ -2139,7 +2152,13 @@ async function init() {
   }
   rhomboAttachBtn?.addEventListener('click', () => {
     if (attachPiece() === 'cell24' || attachPiece() === 'cell16') {
-      handleWheelAction(`tool:pieceType:${attachPiece() === 'cell24' ? 'cell16' : 'cell24'}`);
+      selectPieceAction?.(`tool:pieceType:${attachPiece() === 'cell24' ? 'cell16' : 'cell24'}`);
+      return;
+    }
+    if (A4_CYCLE.includes(attachPiece())) {
+      const next = A4_CYCLE[(A4_CYCLE.indexOf(attachPiece()) + 1) % A4_CYCLE.length];
+      selectPieceAction?.(`tool:pieceType:${next}`);
+      showHudPrompt({ a4trunc: 'Truncated: tap a big face to grow straight through the gap -- the 5-cells come with them.', a4bitrunc: 'Bitruncated: tap a truncated 5-cell\u2019s big face to fill the gap there.', a4cell5: '5-cell: tap near a 5-cell\u2019s corner to add the one sharing it; long-press any 5-cell to remove just that one.' }[next], 4500);
       return;
     }
     if (attachPiece() === 'pyrochlore') {
@@ -2158,7 +2177,7 @@ async function init() {
   });
   renderRhomboAttachButton();
   function updateRhomboAttachPanel() {
-    const attachable = activeDimension === '4D' ? ['cell24', 'cell16'] : activeDimension !== '2D' ? ['rhombohedra', 'pyrochlore'] : [];
+    const attachable = activeDimension === '4D' ? ['cell24', 'cell16', ...A4_CYCLE] : activeDimension !== '2D' ? ['rhombohedra', 'pyrochlore'] : [];
     rhomboAttachBtn?.classList.toggle('hidden', !attachable.includes(attachPiece()));
     renderRhomboAttachButton();
   }
@@ -3723,7 +3742,7 @@ async function init() {
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
           const PIECE_LABELS = {
-            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', rhombohedra: 'Rhombohedra', pyrochlore: 'Pyrochlore (3D Kagome)', tesseract: 'Tesseract', cell24: '24-cell', cell16: '16-cell',
+            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', rhombohedra: 'Rhombohedra', pyrochlore: 'Pyrochlore (3D Kagome)', tesseract: 'Tesseract', cell24: '24-cell', cell16: '16-cell', a4trunc: 'Truncated 5-cell', a4bitrunc: 'Bitruncated 5-cell', a4cell5: '5-cell',
             // 2D lattice tier: one label per LATTICE_PRIMITIVES entry
             // (Phase 6: primitive alone, angle is a live toggle not a
             // piece-type value -- see lattice2dSeedCell's own header),
@@ -3732,7 +3751,7 @@ async function init() {
             ...Object.fromEntries(LATTICE_PRIMITIVES.map((p) => [`lattice2d:${p.id}`, p.label])),
           };
           document.getElementById('piece-type-select').value = value;
-          if (value === 'tesseract' || value === 'cell24' || value === 'cell16') world4d?.setKind(value);
+          if (['tesseract', 'cell24', 'cell16', 'a4trunc', 'a4bitrunc', 'a4cell5'].includes(value)) world4d?.setKind(value);
           // Real gap, caught while fixing a separate lattice2d bug
           // (see lattice2dSeedCell's own header): every OTHER piece
           // type here is always-visible regardless of which is picked
@@ -3896,6 +3915,7 @@ async function init() {
 
         if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
     };
+    selectPieceAction = handleWheelAction;
     const wheel3D = createRhombicWheel3D({
       getWorkspaceMode: () => workspaceMode,
       onAction: handleWheelAction,
@@ -4721,7 +4741,7 @@ async function init() {
     // own `?? MARKS.pieceRD` fallback below) regardless of which was
     // actually selected -- the real placement itself was always
     // correct, only this indicator was silently wrong.
-    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRDQuarter', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore', tesseract: 'pieceTesseract', cell24: 'piece24Cell', cell16: 'piece16Cell',
+    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRDQuarter', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore', tesseract: 'pieceTesseract', cell24: 'piece24Cell', cell16: 'piece16Cell', a4trunc: 'pieceTrunc5Cell', a4bitrunc: 'pieceBitrunc5Cell', a4cell5: 'piece5Cell',
     // 2D lattice tier: one entry per LATTICE_PRIMITIVES, reusing
     // wheel-icons.js's own 3 primitive-keyed icons (Phase 6: the piece
     // type IS just the primitive now, angle is a separate live toggle
@@ -5609,6 +5629,18 @@ async function init() {
     onPieceNoOp: (action) => {
       const piece = document.getElementById('piece-type-select')?.value;
       const messages = {
+        a4trunc: {
+          add: 'Nothing new to grow there -- tap a truncated 5-cell\u2019s big face to grow straight through the gap, or tap one of its 5-cells or a gap cell.',
+          remove: 'Long-press a placed cell to remove it.',
+        },
+        a4bitrunc: {
+          add: 'Bitruncated 5-cells fill the gaps next to truncated 5-cells -- tap a truncated 5-cell\u2019s big face.',
+          remove: 'Long-press a placed cell to remove it.',
+        },
+        a4cell5: {
+          add: 'Tap near a 5-cell\u2019s corner to add the one sharing it, or a truncated 5-cell\u2019s bare small face to put its 5-cell back.',
+          remove: 'Long-press any 5-cell to remove just that one.',
+        },
         tesseract: {
           add: 'A tesseract is already there -- tap a different face, or slide W-depth to reach the next layer.',
           remove: 'Long-press a placed tesseract to remove it.',

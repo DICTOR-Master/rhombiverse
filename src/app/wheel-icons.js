@@ -194,6 +194,13 @@ export const MARKS = {
   piece24Cell: `<polygon points="${hexPts(20)}" ${THIN}/><polygon points="0,-10 8.66,5 -8.66,5" fill="currentColor" opacity="0.5"/>`,
   // Tesseract: the classic cube-in-a-cube shadow.
   pieceTesseract: `<polygon points="-22,-22 22,-22 22,22 -22,22" ${THIN}/><polygon points="-10,-10 10,-10 10,10 -10,10" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M-22,-22 L-10,-10 M22,-22 L10,-10 M22,22 L10,10 M-22,22 L-10,10" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
+  // Hyper-pyrochlore (A4): the 5-cell's own shadow is a pentagon with its
+  // pentagram (every corner joined to every other); truncated = the
+  // pentagon with its corners cut; bitruncated = cut pentagon inside a
+  // cut pentagon.
+  piece5Cell: `<polygon points="0,-22 20.9,-6.8 12.9,17.8 -12.9,17.8 -20.9,-6.8" ${THIN}/><path d="M0,-22 L12.9,17.8 L-20.9,-6.8 L20.9,-6.8 L-12.9,17.8 Z" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.6"/>`,
+  pieceTrunc5Cell: `<polygon points="-6.5,-17.3 6.5,-17.3 16.9,-9.8 20.9,2.5 16.9,14.7 6.5,17.8 -6.5,17.8 -16.9,14.7 -20.9,2.5 -16.9,-9.8" ${THIN}/><polygon points="0,-8 7.6,5 -7.6,5" fill="currentColor" opacity="0.45"/>`,
+  pieceBitrunc5Cell: `<polygon points="-6.5,-17.3 6.5,-17.3 16.9,-9.8 20.9,2.5 16.9,14.7 6.5,17.8 -6.5,17.8 -16.9,14.7 -20.9,2.5 -16.9,-9.8" ${THIN}/><polygon points="-3.2,-8.6 3.2,-8.6 8.4,-4.9 10.4,1.2 8.4,7.3 3.2,8.9 -3.2,8.9 -8.4,7.3 -10.4,1.2 -8.4,-4.9" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>`,
   piece16Cell: `<polygon points="0,-22 22,0 0,22 -22,0" ${THIN}/><path d="M0,-22 V22 M-22,0 H22" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
   pieceRDQuarter: `<polygon points="${hexPts(20)}" ${THIN}/><path d="M0,0 V-20 M0,0 L17.32,10 M0,0 L-17.32,10" stroke="currentColor" stroke-width="1.5"/>`,
   // Pyrochlore (3D Kagome): the truncated tetrahedron's own silhouette --

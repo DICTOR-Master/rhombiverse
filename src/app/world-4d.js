@@ -23,6 +23,7 @@ import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import {
   KINDS_4D, cellStructure, cellVertices4, neighborAcrossFacet, rotation4, matVec,
   sliceCell, project4, facetForSliceNormal, toDoubled, fromDoubled, cellKey4,
+  cellAcrossFacet, throughGap, cornerPartner, dedupeSections, A4_FIRST, A4_REST_W,
 } from '../geometry-extensions/lattice-4d.js';
 
 // One store for every 4D kind (the worlds share one frame and coexist,
@@ -45,7 +46,20 @@ const SLOT_COLOR = 0x9de0ff;
 // position (w = 0): a tesseract on the origin (its slice is the unit
 // cube), a 24-cell on the origin (its slice is the RD), a
 // 16-cell on the deep hole just above (its slice is a facet tetrahedron).
-const FIRST_CENTER = { tesseract: [0, 0, 0, 0], cell24: [0, 0, 0, 0], cell16: [0.5, 0.5, 0.5, 0.5] };
+// Hyper-pyrochlore's three kinds start from A4_FIRST (lattice-4d.js).
+const FIRST_CENTER = { tesseract: [0, 0, 0, 0], cell24: [0, 0, 0, 0], cell16: [0.5, 0.5, 0.5, 0.5], ...A4_FIRST };
+const isA4 = (k) => KINDS_4D[k]?.family === 'a4';
+// Rest position (direct decisions): w = 0 (the FCC floor) for Tesseract
+// and D4; the Pyrochlore slice for Hyper-pyrochlore.
+const restW = (k) => (isA4(k) ? A4_REST_W : 0);
+// Which piece wins when two cells show the identical section (a facet
+// lying in the slice): 5-cells, then truncated, then bitruncated.
+const SECTION_RANK = { a4cell5: 0, a4trunc: 1, a4bitrunc: 2 };
+// Integer keys per kind: A4 kinds use their own exact 5D keys; Z4/D4 the
+// doubled coordinates.
+const keyInts = (k, c) => (KINDS_4D[k].key ? KINDS_4D[k].key(c) : toDoubled(c));
+const fromKeyInts = (k, d) => (KINDS_4D[k].fromKey ? KINDS_4D[k].fromKey(d) : fromDoubled(d));
+const keyOf = (k, c) => cellKey4(k, keyInts(k, c));
 
 export function createWorld4D({ scene, materialColor, getMaterial, onChange = () => {}, showHudPrompt = () => {} }) {
   const group = new THREE.Group();
@@ -67,9 +81,9 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
       const data = JSON.parse(raw);
       for (const c of data.cells ?? []) {
         if (!KINDS_4D[c.kind]) continue;
-        const center = fromDoubled(c.d);
+        const center = fromKeyInts(c.kind, c.d);
         if (!KINDS_4D[c.kind].isCenter(center)) continue;
-        cells.set(cellKey4(c.kind, c.d), { kind: c.kind, c: center, material: c.material });
+        cells.set(cellKey4(c.kind, c.d), { kind: c.kind, c: center, material: c.material, added: !!c.added, removed: !!c.removed });
       }
       if (data.view) {
         Object.assign(view.angles, data.view.angles ?? {});
@@ -84,14 +98,48 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     try {
       localStorage.setItem(WORLD4D_STORAGE_KEY, JSON.stringify({
         version: 1,
-        cells: [...cells.values()].map((c) => ({ kind: c.kind, d: toDoubled(c.c), material: c.material })),
+        cells: [...cells.values()].map((c) => ({ kind: c.kind, d: keyInts(c.kind, c.c), material: c.material, ...(c.added ? { added: true } : {}), ...(c.removed ? { removed: true } : {}) })),
         view: { angles: view.angles, w: view.w, mode: view.mode, perspective: view.perspective, control: view.control },
       }));
     } catch { /* best-effort */ }
   }
   load();
 
-  const has = (k, c) => cells.has(cellKey4(k, toDoubled(c)));
+  // ---- what's in the world ----
+  // Stored: Z4/D4 cells, placed truncated and bitruncated 5-cells, and
+  // 5-cell entries -- `added` (placed on their own, Small-tet style) or
+  // `removed` (a derived cap taken away; the marker stays, same rule as
+  // Pyrochlore's Small tet).
+  const entry = (k, c) => cells.get(keyOf(k, c));
+  // Derived caps (direct decision, Pyrochlore-style): every 5-cell across a
+  // placed truncated 5-cell's tetrahedral facet shows, unless removed.
+  function capsOf(t) {
+    const s = cellStructure('a4trunc', t.c);
+    const out = [];
+    s.facets.forEach((f, i) => {
+      if (f.verts.length !== 4) return;
+      const n = cellAcrossFacet('a4trunc', t.c, i);
+      if (n) out.push(n.c);
+    });
+    return out;
+  }
+  function visibleCells() {
+    const out = new Map();
+    for (const [key, cell] of cells) {
+      if (cell.kind === 'a4cell5') { if (cell.added) out.set(key, cell); continue; }
+      out.set(key, cell);
+    }
+    for (const t of cells.values()) {
+      if (t.kind !== 'a4trunc') continue;
+      for (const c of capsOf(t)) {
+        const key = keyOf('a4cell5', c);
+        if (out.has(key) || cells.get(key)?.removed) continue;
+        out.set(key, { kind: 'a4cell5', c, material: t.material, derived: true });
+      }
+    }
+    return [...out.values()];
+  }
+  const isVisible = (k, c) => visibleCells().some((v) => v.kind === k && keyOf(k, v.c) === keyOf(k, c));
 
   // ---- rendering ----
   const pickTargets = [];
@@ -153,20 +201,49 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     group.add(lines);
   }
 
-  // Open slots: every same-kind neighbor across a facet of a placed cell
-  // that isn't placed itself ("a lattice always extends past where you
-  // have built").
+  // Open slots ("a lattice always extends past where you have built"):
+  // wherever a tap with the selected kind could place next.
+  // Z4/D4: every same-kind neighbor across a facet. Hyper-pyrochlore
+  // (direct decision, Pyrochlore-style): Truncated -> straight through
+  // each bitruncated gap; Bitruncated -> the gaps next to placed
+  // truncated cells; 5-cell -> the partner across every visible 5-cell's
+  // corner, plus any removed cap.
   function openSlots(k) {
     const out = new Map();
-    for (const cell of cells.values()) {
-      if (cell.kind !== k) continue;
-      cellStructure(k, cell.c).facets.forEach((_, i) => {
-        const n = neighborAcrossFacet(k, cell.c, i);
-        const d = toDoubled(n);
-        const key = cellKey4(k, d);
-        if (!cells.has(key)) out.set(key, fromDoubled(d));
-      });
+    const add = (kk, c) => { const key = keyOf(kk, c); if (!out.has(key)) out.set(key, c); };
+    if (!isA4(k)) {
+      for (const cell of cells.values()) {
+        if (cell.kind !== k) continue;
+        cellStructure(k, cell.c).facets.forEach((_, i) => {
+          const n = fromKeyInts(k, keyInts(k, neighborAcrossFacet(k, cell.c, i)));
+          if (!entry(k, n)) add(k, n);
+        });
+      }
+      return [...out.values()];
     }
+    const truncs = [...cells.values()].filter((c) => c.kind === 'a4trunc');
+    if (k === 'a4trunc' || k === 'a4bitrunc') {
+      for (const t of truncs) {
+        cellStructure('a4trunc', t.c).facets.forEach((f, i) => {
+          if (f.verts.length !== 12) return;
+          const gap = cellAcrossFacet('a4trunc', t.c, i);
+          if (!gap) return;
+          if (k === 'a4bitrunc') { if (!entry('a4bitrunc', gap.c)) add('a4bitrunc', gap.c); return; }
+          const t2 = fromKeyInts('a4trunc', keyInts('a4trunc', throughGap(t.c, gap.c)));
+          if (!entry('a4trunc', t2)) add('a4trunc', t2);
+        });
+      }
+      return [...out.values()];
+    }
+    const vis = visibleCells().filter((v) => v.kind === 'a4cell5');
+    const visKeys = new Set(vis.map((v) => keyOf('a4cell5', v.c)));
+    for (const c5 of vis) {
+      for (const v of cellVertices4('a4cell5', c5.c)) {
+        const p = fromKeyInts('a4cell5', keyInts('a4cell5', cornerPartner(c5.c, v)));
+        if (!visKeys.has(keyOf('a4cell5', p))) add('a4cell5', p);
+      }
+    }
+    for (const cell of cells.values()) if (cell.kind === 'a4cell5' && cell.removed) add('a4cell5', cell.c);
     return [...out.values()];
   }
 
@@ -174,23 +251,24 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     clearGroup();
     if (!active) return;
     const R = rotation4(view.angles);
+    const visible = visibleCells();
     let slicedAny = false;
-    for (const cell of cells.values()) {
-      const color = materialColor(cell.material);
-      const userData = { world4d: 'cell', kind: cell.kind, c: cell.c };
-      if (view.mode === 'slice') {
-        const s = cellStructure(cell.kind, cell.c);
-        const pts = sliceCell(cellVertices4(cell.kind, cell.c), s.edges, R, view.w);
-        if (!pts) continue;
-        slicedAny = true;
-        addSolid(pts, { color, userData });
-      } else {
-        addProjectedCell(cell.kind, cell.c, { color, opacity: 0.35, userDataBase: userData });
+    if (view.mode === 'slice') {
+      const items = [];
+      for (const cell of visible) {
+        const pts = sliceCell(cellVertices4(cell.kind, cell.c), cellStructure(cell.kind, cell.c).edges, R, view.w);
+        if (pts) items.push({ pts, rank: SECTION_RANK[cell.kind] ?? 0, w: cell.c[3], cell });
       }
+      for (const { pts, cell } of dedupeSections(items)) {
+        slicedAny = true;
+        addSolid(pts, { color: materialColor(cell.material), userData: { world4d: 'cell', kind: cell.kind, c: cell.c } });
+      }
+    } else {
+      for (const cell of visible) addProjectedCell(cell.kind, cell.c, { color: materialColor(cell.material), opacity: 0.35, userDataBase: { world4d: 'cell', kind: cell.kind, c: cell.c } });
     }
-    const kindCount = [...cells.values()].filter((c) => c.kind === kind).length;
-    if (kindCount === 0) {
-      // Cyan first-placement target for the selected kind.
+    // Empty (for this kind's world): one cyan first-placement target.
+    const worldEmpty = isA4(kind) ? !visible.some((c) => isA4(c.kind)) : !visible.some((c) => c.kind === kind);
+    if (worldEmpty) {
       const c = FIRST_CENTER[kind];
       const userData = { world4d: 'slot', kind, c, first: true };
       if (view.mode === 'slice') {
@@ -215,38 +293,89 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
   }
 
   // ---- taps (core/build.js routes here while 4D is active) ----
-  // Only the selected kind (and its slots) take taps, so a 24-cell never
-  // steals a tap meant for a 16-cell and vice versa.
+  // Z4/D4: only the selected kind (and its slots) take taps, so a 24-cell
+  // never steals a tap meant for a 16-cell. Hyper-pyrochlore: every A4
+  // cell takes taps in every A4 mode (a Truncated tap on a cap or a gap
+  // still grows), per the rules in handleTap.
   function meshes() {
-    return pickTargets.filter((m) => m.userData.kind === kind);
+    return pickTargets.filter((m) => (isA4(kind) ? isA4(m.userData.kind) : m.userData.kind === kind));
+  }
+  function place(k, c, extra = {}) {
+    const snapped = fromKeyInts(k, keyInts(k, c));
+    if (!KINDS_4D[k].isCenter(snapped)) return false;
+    const key = keyOf(k, snapped);
+    const cur = cells.get(key);
+    if (k === 'a4cell5') {
+      if (isVisible('a4cell5', snapped)) return false;
+      if (cur?.removed) cells.delete(key); // a removed cap comes back
+      if (!isVisible('a4cell5', snapped)) cells.set(key, { kind: k, c: snapped, material: getMaterial(), added: true });
+    } else {
+      if (cur) return false;
+      cells.set(key, { kind: k, c: snapped, material: getMaterial(), ...extra });
+    }
+    save(); rebuild(); onChange();
+    return true;
+  }
+  function tappedFacet(hit, u) {
+    if (u.facetIndex !== undefined) return u.facetIndex;
+    const n = hit.face.normal;
+    return facetForSliceNormal(u.kind, u.c, rotation4(view.angles), view.w, [n.x, n.y, n.z]);
+  }
+  // The tapped point back in the 4D world frame (slice: the rotated-frame
+  // point at depth w, turned back; projection: nearest projected corner).
+  function nearestCorner(hit, u) {
+    const R = rotation4(view.angles);
+    const verts = cellVertices4(u.kind, u.c);
+    const p = [hit.point.x, hit.point.y, hit.point.z];
+    let best = null, bestD = Infinity;
+    for (const v of verts) {
+      const q = view.mode === 'slice' ? matVec(R, v) : project4(matVec(R, v), view.perspective);
+      const d = view.mode === 'slice'
+        ? Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2], q[3] - view.w)
+        : Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]);
+      if (d < bestD) { bestD = d; best = v; }
+    }
+    return best;
   }
   function handleTap(hit, mode) {
     const u = hit.object.userData;
     if (mode === 'chisel') {
       if (u.world4d !== 'cell') return false;
-      cells.delete(cellKey4(u.kind, toDoubled(u.c)));
+      const key = keyOf(u.kind, u.c);
+      if (u.kind === 'a4cell5') {
+        // A cap stays gone (marker) if a placed truncated 5-cell derives it.
+        const derived = [...cells.values()].some((t) => t.kind === 'a4trunc' && capsOf(t).some((c) => keyOf('a4cell5', c) === key));
+        cells.delete(key);
+        if (derived) cells.set(key, { kind: 'a4cell5', c: u.c, removed: true });
+      } else {
+        cells.delete(key);
+      }
       save(); rebuild(); onChange();
       return true;
     }
-    let target = null;
-    if (u.world4d === 'slot') {
-      target = u.c;
-    } else if (u.world4d === 'cell') {
-      let facet = -1;
-      if (u.facetIndex !== undefined) facet = u.facetIndex;
-      else {
-        const n = hit.face.normal;
-        facet = facetForSliceNormal(u.kind, u.c, rotation4(view.angles), view.w, [n.x, n.y, n.z]);
-      }
-      if (facet >= 0) target = neighborAcrossFacet(u.kind, u.c, facet);
+    if (u.world4d === 'slot') return place(u.kind, u.c);
+    if (u.world4d !== 'cell') return false;
+    if (!isA4(kind)) {
+      const facet = tappedFacet(hit, u);
+      return facet >= 0 && place(u.kind, neighborAcrossFacet(u.kind, u.c, facet));
     }
-    if (!target) return false;
-    const d = toDoubled(target);
-    const snapped = fromDoubled(d);
-    if (!KINDS_4D[u.kind].isCenter(snapped) || has(u.kind, snapped)) return false;
-    cells.set(cellKey4(u.kind, d), { kind: u.kind, c: snapped, material: getMaterial() });
-    save(); rebuild(); onChange();
-    return true;
+    // Hyper-pyrochlore (direct decision, Pyrochlore-style growth).
+    if (kind === 'a4cell5' && u.kind === 'a4cell5') {
+      const corner = nearestCorner(hit, u);
+      return !!corner && place('a4cell5', cornerPartner(u.c, corner));
+    }
+    const facet = tappedFacet(hit, u);
+    if (facet < 0) return false;
+    const across = cellAcrossFacet(u.kind, u.c, facet);
+    if (!across) return false;
+    const facetSize = cellStructure(u.kind, u.c).facets[facet].verts.length;
+    if (u.kind === 'a4trunc' && facetSize === 4) return across.kind === 'a4cell5' && (kind === 'a4trunc' || kind === 'a4cell5') && place('a4cell5', across.c); // bare cap facet: its cap back
+    if (kind === 'a4trunc') {
+      if (u.kind === 'a4trunc') return across.kind === 'a4bitrunc' && place('a4trunc', throughGap(u.c, across.c));
+      return across.kind === 'a4trunc' && place('a4trunc', across.c);
+    }
+    if (kind === 'a4bitrunc') return u.kind === 'a4trunc' && across.kind === 'a4bitrunc' && place('a4bitrunc', across.c);
+    return false;
   }
 
   // ---- panel: one geared slider + W-depth|XW|YW|ZW toggle ----
@@ -274,6 +403,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     if (isAngle()) return ANGLE_DETENTS.map((v) => ({ v, label: '' }));
     const out = [];
     for (let w = -W_LIMIT; w <= W_LIMIT; w++) out.push({ v: w, label: w === 0 ? 'FCC' : '' });
+    if (isA4(kind)) out.push({ v: A4_REST_W, label: 'Pyrochlore', below: true });
     return out;
   }
 
@@ -289,7 +419,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
       '<button type="button" data-opt="reset">Reset 4D</button>',
     ].join('');
     const L = limit();
-    ticks.innerHTML = detents().map(({ v, label }) => `<span class="w4d-tick" style="left:${((v + L) / (2 * L)) * 100}%">${label}</span>`).join('');
+    ticks.innerHTML = detents().map(({ v, label, below }) => `<span class="w4d-tick${below ? ' w4d-tick-below' : ''}" style="left:${((v + L) / (2 * L)) * 100}%">${label}</span>`).join('');
     thumb.style.left = `calc(17px + (100% - 34px) * ${(valueOf() + L) / (2 * L)})`;
   }
   controlsRow.addEventListener('click', (e) => {
@@ -308,7 +438,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
       view.perspective = !view.perspective;
     } else if (b.dataset.opt === 'reset') {
       view.angles = { xw: 0, yw: 0, zw: 0 };
-      view.w = 0;
+      view.w = restW(kind);
     }
     save(); rebuild();
   });
@@ -333,7 +463,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     if (!drag) return;
     drag = null;
     const snap = isAngle() ? ANGLE_SNAP : W_SNAP;
-    const near = detents().find(({ v }) => Math.abs(v - valueOf()) <= snap);
+    const near = detents().filter(({ v }) => Math.abs(v - valueOf()) <= snap).sort((a, b) => Math.abs(a.v - valueOf()) - Math.abs(b.v - valueOf()))[0];
     if (near) setValue(near.v);
     save();
   };
@@ -349,7 +479,14 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     meshes,
     handleTap,
     get kind() { return kind; },
-    setKind(k) { if (KINDS_4D[k]) { kind = k; rebuild(); } },
+    setKind(k) {
+      if (!KINDS_4D[k]) return;
+      // Switching between worlds (Tesseract/D4 <-> Hyper-pyrochlore) moves
+      // the slider to that world's own rest position.
+      if (isA4(k) !== isA4(kind)) { view.w = restW(k); save(); }
+      kind = k;
+      rebuild();
+    },
     setActive(on) { active = on; group.visible = on; rebuild(); },
     setSkeleton(on) { skeleton = on; rebuild(); },
     setLatticeView(on) { latticeView = on; rebuild(); },

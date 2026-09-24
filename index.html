@@ -170,6 +170,9 @@
       position: absolute; top: 4px; bottom: 4px; width: 1px; background: rgba(157, 224, 255, 0.35);
       font: 10px system-ui, sans-serif; color: #9de0ff; text-indent: 16px; line-height: 26px; white-space: nowrap;
     }
+    /* Hyper-pyrochlore's "Pyrochlore" click-stop sits just left of the FCC
+       one -- its label reads leftward so the two never overlap. */
+    .w4d-tick-below { direction: rtl; }
     .w4d-thumb {
       position: absolute; top: 4px; width: 24px; height: 24px; transform: translateX(-50%);
       border-radius: 50%; background: #7cf; box-shadow: 0 0 6px rgba(124, 204, 255, 0.8); pointer-events: none;
@@ -1012,6 +1015,9 @@
           <option value="tesseract">Tesseract</option>
           <option value="cell24">24-cell</option>
           <option value="cell16">16-cell</option>
+          <option value="a4trunc">Truncated 5-cell</option>
+          <option value="a4bitrunc">Bitruncated 5-cell</option>
+          <option value="a4cell5">5-cell</option>
           <!-- 2D lattice tier (Phase 3+4) options are injected here at
                startup by render.js, one per LATTICE_2D_COMBINATIONS entry
                (id="lattice2d-piece-options") -- NOT hand-listed like every
