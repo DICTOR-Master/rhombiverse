@@ -712,7 +712,13 @@ export const WHEEL_RD_FAMILY = {
     // enclosed, unclickable from outside).
     "bottom|sx1sz-1":   { kind: "dept", label: "Rhombohedra", action: "tool:pieceType:rhombohedra",
       desc: "The same real rhombohedron as RD Quarter, but its own free-standing lattice -- click an existing face to grow in any of 6 real directions." },
-    "bottom|sx-1sz-1":  SPARE,
+    // Pyrochlore (3D Kagome) -- direct request 2026-09-24, placed in
+    // this wheel's one remaining spare slot (direct decision). Not RD-
+    // family either, but registered to the RD world's own FCC frame:
+    // one up-tetrahedron inside every RD, truncated-tetrahedron voids in
+    // its real holes -- see geometry-extensions/pyrochlore-lattice.js.
+    "bottom|sx-1sz-1":  { kind: "dept", label: "Pyrochlore", action: "tool:pieceType:pyrochlore",
+      desc: "Pyrochlore (3D Kagome) -- place truncated tetrahedra; the corner-sharing tetrahedra between them appear on their own." },
   }
 };
 
@@ -877,6 +883,7 @@ export const ACTION_TO_MARK = {
   'tool:pieceType:hexprism': 'pieceHexPrism',
   'tool:pieceType:rdquarter': 'pieceRhombohedron',
   'tool:pieceType:rhombohedra': 'pieceRhombohedron',
+  'tool:pieceType:pyrochlore': 'piecePyrochlore',
   // 2D lattice tier: one entry per lattice-2d.js's own LATTICE_PRIMITIVES
   // (Phase 6: primitive id alone -- angle is a live, in-scene toggle now,
   // not part of the piece-type value at all; see render.js's own

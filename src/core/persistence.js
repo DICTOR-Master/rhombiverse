@@ -97,3 +97,9 @@ export async function importWorldFile(file) {
   const text = await file.text();
   return JSON.parse(text);
 }
+
+// Pyrochlore (3D Kagome) build ('pyrochlore' piece tier): its own
+// separate world of truncated tetrahedra, in geometry-extensions/
+// pyrochlore-lattice.js's own doubled-coordinate frame (registered to the
+// main RD world's units). Cap tetrahedra are derived, never stored.
+export const PYROCHLORE_STORAGE_KEY = 'rhombiverse-pyrochlore-world';

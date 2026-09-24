@@ -25,6 +25,7 @@ import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-e
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
 import { rhombohedraTileVerts, rhombohedraCellToWorld } from './geometry-extensions/rhombohedra-lattice.js';
+import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats } from './geometry-extensions/pyrochlore-lattice.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -83,6 +84,7 @@ import {
   HEXPRISM_STORAGE_KEY,
   lattice2dStorageKey,
   RHOMBOHEDRA_STORAGE_KEY,
+  PYROCHLORE_STORAGE_KEY,
 } from './core/persistence.js';
 import {
   compressionSupported,
@@ -143,6 +145,13 @@ const LATTICE2D_SEED_COLORS = ['garnet', 'ferrostone', 'glassite', 'star-glassit
 // Rhombohedra (free lattice): same real scale as everything else -- a
 // genuine 3D solid, no special height/thinness constant needed.
 const RHOMBOHEDRA_S = SCALE;
+// Pyrochlore (3D Kagome): registered to the main RD world's own units
+// (direct decision) -- see geometry-extensions/pyrochlore-lattice.js.
+const PYROCHLORE_S = SCALE;
+// O-site (orientation +1), in the lattice's doubled coordinates -- world
+// (-5,0,0), clear of the main world's own seed RD at the origin, same
+// reasoning as rhombohedraWorld's own offset seed.
+const PYROCHLORE_SEED = [-10, 0, 0];
 const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
 
 // Performance guardrail (reframe Stage 6): warn before loading a World
@@ -901,6 +910,10 @@ function sphericalClassificationFor(scale) {
     octahedron: cap(scale ** 3 / 6, 0.5 * scale),
     cuboctahedron: cap((5 / 6) * scale ** 3, 0.5 * scale),
     truncatedOctahedron: cap(4 * scale ** 3, scale),
+    // Pyrochlore (3D Kagome) -- see pyrochloreShapeStats for the real
+    // volumes and nearest-face ceilings.
+    truncatedTetrahedron: cap(pyrochloreShapeStats(scale).truncatedTetrahedron.volume, pyrochloreShapeStats(scale).truncatedTetrahedron.ceiling),
+    tetrahedron: cap(pyrochloreShapeStats(scale).tetrahedron.volume, pyrochloreShapeStats(scale).tetrahedron.ceiling),
   };
 }
 
@@ -1193,6 +1206,14 @@ const lattice2dCellOrders = new Map(); // primitiveId -> instanceId -> {x, y, z,
 const lattice2dCompanionOwners = new Map(); // companion InstancedMesh -> instanceId -> cellOrder index (Kagome)
 const KAGOME_TRIANGLE_LIGHTEN_TO = new THREE.Color(0xffffff);
 const KAGOME_TRIANGLE_LIGHTEN = 0.4;
+// Pyrochlore: TTs split across 2 meshes by site orientation ([O-site,
+// T-site] -- the two are exact inversions, each its own fixed geometry,
+// translation-only instances so a hit's face normal is already world-
+// aligned); derived cap tets across 2 more ([up, down]). Tet instance
+// indices don't line up with any cell order, so each tet mesh records
+// per-instance {kind, center, cell} for tap resolution and tinting.
+const pyrochloreCellOrders = [[], []];
+const pyrochloreTetInstances = new Map(); // tet InstancedMesh -> instanceId -> { kind, center, cell }
 let rhombohedraCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are rhombohedra-lattice.js's own (i,j,k) frame
 let octGapCellOrder = []; // instanceId -> {x, y, z, ...cellData} -- x,y,z are octGap's own offset-frame index, see core/cubocta-gap-build.js
 // Interstitial-lattice build: one real Mesh per disphenoid cell, same
@@ -1538,6 +1559,46 @@ function rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld) {
   rhombohedraMesh.computeBoundingSphere();
 }
 
+// Pyrochlore (3D Kagome): placed truncated tetrahedra, plus every
+// tetrahedron capping any of them (derived, same rule as 2D Kagome's
+// triangles -- see pyrochloreCapTets), tinted a lighter shade of the
+// owning TT's own color.
+function rebuildPyrochloreInstances(ttMeshes, tetMeshes, pyrochloreWorld) {
+  const cells = pyrochloreWorld.entries().filter((c) => pyrochloreSiteOrientation(c.x, c.y, c.z) !== 0);
+  const m = new THREE.Matrix4();
+  [1, -1].forEach((orientation, idx) => {
+    const order = cells.filter((c) => pyrochloreSiteOrientation(c.x, c.y, c.z) === orientation);
+    pyrochloreCellOrders[idx] = order;
+    const ttMesh = ttMeshes[idx];
+    order.forEach((cell, i) => {
+      const [wx, wy, wz] = pyrochloreCellToWorld(cell.x, cell.y, cell.z, PYROCHLORE_S);
+      m.makeTranslation(wx, wy, wz);
+      ttMesh.setMatrixAt(i, m);
+      ttMesh.setColorAt(i, instanceColorFor(cell));
+    });
+    ttMesh.count = order.length;
+    ttMesh.instanceMatrix.needsUpdate = true;
+    if (ttMesh.instanceColor) ttMesh.instanceColor.needsUpdate = true;
+    ttMesh.computeBoundingSphere();
+  });
+  const tets = pyrochloreCapTets(cells);
+  ['up', 'down'].forEach((kind, idx) => {
+    const tetMesh = tetMeshes[idx];
+    const list = tets[kind];
+    list.forEach(({ center, owner }, i) => {
+      const [wx, wy, wz] = pyrochloreCellToWorld(center[0], center[1], center[2], PYROCHLORE_S);
+      m.makeTranslation(wx, wy, wz);
+      tetMesh.setMatrixAt(i, m);
+      tetMesh.setColorAt(i, instanceColorFor(cells[owner]).clone().lerp(KAGOME_TRIANGLE_LIGHTEN_TO, KAGOME_TRIANGLE_LIGHTEN));
+    });
+    pyrochloreTetInstances.set(tetMesh, list.map(({ center, owner }) => ({ kind, center, cell: cells[owner] })));
+    tetMesh.count = list.length;
+    tetMesh.instanceMatrix.needsUpdate = true;
+    if (tetMesh.instanceColor) tetMesh.instanceColor.needsUpdate = true;
+    tetMesh.computeBoundingSphere();
+  });
+}
+
 // Real placed Cuboctahedron Build cells -- same instancing pattern as
 // rebuildBCCInstances above, own separate cell order/mesh.
 function rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld) {
@@ -1721,6 +1782,9 @@ async function init() {
   const rhombohedraSavedJSON = loadFromLocalStorage(RHOMBOHEDRA_STORAGE_KEY);
   const rhombohedraWorld = createWorldStore(rhombohedraSavedJSON ?? { worldName: 'Rhombohedra Lattice', version: 1, cells: {}, meta: {} });
   if (rhombohedraWorld.entries().length === 0) rhombohedraWorld.addCell(5, 0, 0, { material: 'base' });
+  const pyrochloreSavedJSON = loadFromLocalStorage(PYROCHLORE_STORAGE_KEY);
+  const pyrochloreWorld = createWorldStore(pyrochloreSavedJSON ?? { worldName: 'Pyrochlore Lattice', version: 1, cells: {}, meta: {} });
+  if (pyrochloreWorld.entries().length === 0) pyrochloreWorld.addCell(...PYROCHLORE_SEED, { material: 'base' });
 
   const geometry = buildRDGeometry(SCALE);
   // White base color: actual per-cell color comes entirely from
@@ -2121,6 +2185,27 @@ async function init() {
   rhombohedraMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(rhombohedraMesh);
   rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld);
+
+  // Pyrochlore Build (3D Kagome): 2 TT meshes (O-site/T-site, exact
+  // inversions) + 2 derived tet meshes (up/down). Tet capacity 4x: each
+  // TT caps 4 tets, so scattered TTs need up to 4 tets each.
+  const pyrochloreGeometry = (verts) => {
+    const g = new ConvexGeometry(verts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+    g.computeVertexNormals();
+    return g;
+  };
+  const pyrochloreTTGeometries = [pyrochloreGeometry(truncatedTetrahedronVerts(1, PYROCHLORE_S)), pyrochloreGeometry(truncatedTetrahedronVerts(-1, PYROCHLORE_S))];
+  const pyrochloreTetGeometries = [pyrochloreGeometry(tetrahedronVerts('up', PYROCHLORE_S)), pyrochloreGeometry(tetrahedronVerts('down', PYROCHLORE_S))];
+  const pyrochloreInstancedMesh = (g, capacity) => {
+    const im = new THREE.InstancedMesh(g, material.clone(), capacity);
+    im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(im);
+    return im;
+  };
+  const pyrochloreTTMeshes = pyrochloreTTGeometries.map((g) => pyrochloreInstancedMesh(g, MAX_CELLS));
+  const pyrochloreTetMeshes = pyrochloreTetGeometries.map((g) => pyrochloreInstancedMesh(g, 4 * MAX_CELLS));
+  const pyrochloreAllMeshes = [...pyrochloreTTMeshes, ...pyrochloreTetMeshes];
+  rebuildPyrochloreInstances(pyrochloreTTMeshes, pyrochloreTetMeshes, pyrochloreWorld);
 
   // Cuboctahedron Build: its own InstancedMesh (cuboctahedron geometry),
   // same "own material clone, same MATERIAL_COLORS palette" pattern as
@@ -2561,6 +2646,7 @@ async function init() {
     lattice2dCompanionMeshes.forEach((meshes) => meshes.forEach((m) => { m.material.clippingPlanes = planes; }));
     lattice2dClassMeshes.forEach((meshes) => meshes.forEach((m) => { m.material.clippingPlanes = planes; }));
     rhombohedraMesh.material.clippingPlanes = planes;
+    pyrochloreAllMeshes.forEach((m) => { m.material.clippingPlanes = planes; });
     cuboctaMesh.material.clippingPlanes = planes;
     octGapMesh.material.clippingPlanes = planes;
     // Cube-less cells (see core/pyramid.js's hasCube()) render as a
@@ -2612,7 +2698,7 @@ async function init() {
   let skeletonGeneration = 0;
   const TRANSLUCENT_OPACITY = 0.55; // matches Lattice Quick-View/Dualize preview's own established "see-through structure" opacity
   function worldViewMaterials() {
-    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, ...[...lattice2dMeshes.values()].map((m) => m.material), ...[...lattice2dCompanionMeshes.values()].flat().map((m) => m.material), ...[...lattice2dClassMeshes.values()].flat().map((m) => m.material), rhombohedraMesh.material, cuboctaMesh.material, octGapMesh.material];
+    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, ...[...lattice2dMeshes.values()].map((m) => m.material), ...[...lattice2dCompanionMeshes.values()].flat().map((m) => m.material), ...[...lattice2dClassMeshes.values()].flat().map((m) => m.material), rhombohedraMesh.material, ...pyrochloreAllMeshes.map((m) => m.material), cuboctaMesh.material, octGapMesh.material];
     for (const { mesh: m } of partialCellMeshes.values()) {
       if (m.isGroup) { for (const child of m.children) mats.push(child.material); }
       else mats.push(m.material);
@@ -2685,6 +2771,7 @@ async function init() {
     lattice2dCompanionMeshes.forEach((meshes, primitiveId) => { const v = visible && dimensionAllowsMesh(`lattice2d:${primitiveId}`); meshes.forEach((m) => { m.visible = v; }); });
     lattice2dClassMeshes.forEach((meshes, primitiveId) => { const v = visible && dimensionAllowsMesh(`lattice2d:${primitiveId}`); meshes.forEach((m) => { m.visible = v; }); });
     rhombohedraMesh.visible = visible && dimensionAllowsMesh('rhombohedra');
+    pyrochloreAllMeshes.forEach((m) => { m.visible = visible && dimensionAllowsMesh('pyrochlore'); });
     cuboctaMesh.visible = visible && dimensionAllowsMesh('cubocta');
     octGapMesh.visible = visible && dimensionAllowsMesh('octgap');
     partialCellGroup.visible = visible && dimensionAllowsMesh('mesh'); // partial (pyramid-decomposed) FCC cells -- same "main world" content as `mesh` above
@@ -2815,6 +2902,22 @@ async function init() {
         const g = sphericalModeActive ? sphericalGeometries.octahedron.clone() : buildOctGapGeometry(SCALE);
         pieces.push(g.translate(wx, wy, wz));
       }
+      // Pyrochlore (3D Kagome): TTs + their derived cap tets, same
+      // geometry/position recipe as rebuildPyrochloreInstances.
+      const pyroCells = pyrochloreWorld.entries().filter((c) => pyrochloreSiteOrientation(c.x, c.y, c.z) !== 0);
+      for (const cell of pyroCells) {
+        const [wx, wy, wz] = pyrochloreCellToWorld(cell.x, cell.y, cell.z, PYROCHLORE_S);
+        const g = sphericalModeActive ? sphericalGeometries.truncatedTetrahedron.clone() : pyrochloreTTGeometries[pyrochloreSiteOrientation(cell.x, cell.y, cell.z) === 1 ? 0 : 1].clone();
+        pieces.push(g.translate(wx, wy, wz));
+      }
+      const pyroTets = pyrochloreCapTets(pyroCells);
+      ['up', 'down'].forEach((kind, idx) => {
+        for (const { center } of pyroTets[kind]) {
+          const [wx, wy, wz] = pyrochloreCellToWorld(center[0], center[1], center[2], PYROCHLORE_S);
+          const g = sphericalModeActive ? sphericalGeometries.tetrahedron.clone() : pyrochloreTetGeometries[idx].clone();
+          pieces.push(g.translate(wx, wy, wz));
+        }
+      });
       for (const cell of interstitialStore.entries()) {
         if (sphericalModeActive) {
           const [cx, cy, cz] = disphenoidCentroid(cell.verts);
@@ -3027,6 +3130,8 @@ async function init() {
     octahedron: buildSphericalGeometry(sphericalShapes.octahedron),
     cuboctahedron: buildSphericalGeometry(sphericalShapes.cuboctahedron),
     truncatedOctahedron: buildSphericalGeometry(sphericalShapes.truncatedOctahedron),
+    truncatedTetrahedron: buildSphericalGeometry(sphericalShapes.truncatedTetrahedron),
+    tetrahedron: buildSphericalGeometry(sphericalShapes.tetrahedron),
   };
   const originalGeometries = {
     rd: geometry,
@@ -3182,6 +3287,10 @@ async function init() {
     octGapMesh.geometry = active.octahedron;
     cuboctaMesh.geometry = active.cuboctahedron;
     bccMesh.geometry = active.truncatedOctahedron;
+    // Pyrochlore: 2 TT + 2 tet meshes, each its own real (non-shared)
+    // angular geometry, so swap per mesh rather than via originalGeometries.
+    pyrochloreTTMeshes.forEach((m, idx) => { m.geometry = sphericalModeActive ? sphericalGeometries.truncatedTetrahedron : pyrochloreTTGeometries[idx]; });
+    pyrochloreTetMeshes.forEach((m, idx) => { m.geometry = sphericalModeActive ? sphericalGeometries.tetrahedron : pyrochloreTetGeometries[idx]; });
     applySphericalToDisphenoids(sphericalModeActive);
     applySphericalToPartials(sphericalModeActive);
     // Skeleton's own merged overlay isn't one of the meshes swapped
@@ -3323,7 +3432,7 @@ async function init() {
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
           const PIECE_LABELS = {
-            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', rhombohedra: 'Rhombohedra',
+            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', rhombohedra: 'Rhombohedra', pyrochlore: 'Pyrochlore (3D Kagome)',
             // 2D lattice tier: one label per LATTICE_PRIMITIVES entry
             // (Phase 6: primitive alone, angle is a live toggle not a
             // piece-type value -- see lattice2dSeedCell's own header),
@@ -3742,7 +3851,7 @@ async function init() {
   // interstitial-lattice.js). Labels/icons are keyed by mode name below
   // (LATTICE_QUICK_VIEW_LABELS/_MARK_KEY), not by array position, so
   // reordering this list alone is safe.
-  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'rdquarter', 'cubocta', 'octahedron', 'bcc', 'octa', 'disphenoid'];
+  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'rdquarter', 'cubocta', 'octahedron', 'bcc', 'octa', 'disphenoid', 'pyrochlore'];
   const LATTICE_QUICK_VIEW_LABELS = {
     off: 'Off.',
     rd: 'RD -- every built cell shown as a complete block.',
@@ -3754,13 +3863,14 @@ async function init() {
     octa: 'Flattened Octahedron -- every co-locatable built cell shown as one octahedron bundle.',
     octahedron: 'Octahedron -- the Cuboctahedron gap-fill piece, previewed at two cube-centers near every built cell.',
     disphenoid: 'Disphenoid -- every co-locatable built cell shown as one disphenoid.',
+    pyrochlore: 'Pyrochlore (3D Kagome) -- every built cell shown as its own up-tetrahedron, plus the down-tetrahedron wherever 4 built cells meet at a corner: the corner-sharing tetrahedra of the 3D Kagome.',
   };
   // 'off' added 2026-09-02: without it, markKey was undefined and
   // updateLatticeQuickViewIcon() below rendered a totally blank
   // iconFrame (outline only, zero ink) for the default/most-common
   // state -- direct report ("lattice view symbols are still feint")
   // traced to this, not a rendering-strength issue. See MARKS.latticeOff.
-  const LATTICE_QUICK_VIEW_MARK_KEY = { off: 'latticeOff', rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', rdquarter: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', octahedron: 'pieceOctahedron', disphenoid: 'pieceDisphenoid' };
+  const LATTICE_QUICK_VIEW_MARK_KEY = { off: 'latticeOff', rd: 'pieceRD', cube: 'pieceCube', pyramid: 'piecePyramid', rdquarter: 'piecePyramid', cubocta: 'cuboctahedron', bcc: 'pieceTO', octa: 'pieceOctaSite', octahedron: 'pieceOctahedron', disphenoid: 'pieceDisphenoid', pyrochlore: 'piecePyrochlore' };
   // Fixed axis for octahedron/disphenoid coverage -- matches core/
   // build.js's own bootstrap default for a fresh 'ioct' placement; a
   // representative single orientation per anchor is enough for a
@@ -3968,6 +4078,27 @@ async function init() {
         const verts = octGapVertices(SCALE).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
         pieces.push(new ConvexGeometry(verts));
       }
+    } else if (latticeQuickViewMode === 'pyrochlore') {
+      // Pyrochlore (3D Kagome): the SAME FCC cells, no cross-lattice
+      // conversion -- every real cell's own up-tetrahedron (centered on
+      // the cell), plus a down-tetrahedron at each T+ hole (an RD
+      // 3-valent corner, p + s/2) only when ALL 4 cells meeting there
+      // are built, since that tetrahedron is the gap BETWEEN them. See
+      // geometry-extensions/pyrochlore-lattice.js.
+      const built = new Set(cells.map((c) => `${c.x},${c.y},${c.z}`));
+      const tetPiece = (kind, [cx, cy, cz]) => new ConvexGeometry(tetrahedronVerts(kind, SCALE).map(([x, y, z]) => new THREE.Vector3(x + cx, y + cy, z + cz)));
+      const downHoles = new Map(); // doubled-coord key -> world center
+      for (const cell of cells) {
+        pieces.push(tetPiece('up', cellToWorld(cell.x, cell.y, cell.z, SCALE)));
+        for (const [a, b, c] of [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]]) {
+          const h = [2 * cell.x + a, 2 * cell.y + b, 2 * cell.z + c];
+          const key = h.join(',');
+          if (downHoles.has(key)) continue;
+          const around = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]].map(([u, v, w]) => [(h[0] - u) / 2, (h[1] - v) / 2, (h[2] - w) / 2]);
+          downHoles.set(key, around.every(([x, y, z]) => built.has(`${x},${y},${z}`)) ? h.map((n) => (n / 2) * SCALE) : null);
+        }
+      }
+      for (const center of downHoles.values()) if (center) pieces.push(tetPiece('down', center));
     } else {
       // BCC-family modes: nearest BCC dual point(s) for EVERY real cell
       // (not just cells that already happen to sit exactly on a BCC
@@ -4199,7 +4330,7 @@ async function init() {
     // own `?? MARKS.pieceRD` fallback below) regardless of which was
     // actually selected -- the real placement itself was always
     // correct, only this indicator was silently wrong.
-    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRhombohedron', rhombohedra: 'pieceRhombohedron',
+    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRhombohedron', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore',
     // 2D lattice tier: one entry per LATTICE_PRIMITIVES, reusing
     // wheel-icons.js's own 3 primitive-keyed icons (Phase 6: the piece
     // type IS just the primitive now, angle is a separate live toggle
@@ -5090,6 +5221,10 @@ async function init() {
           add: 'All 4 real rhombohedra are already placed in that cell.',
           remove: 'No RD Quarter there to remove -- tap directly on one you’ve placed.',
         },
+        pyrochlore: {
+          add: 'A truncated tetrahedron is already there -- tap a hexagon face or one of the small tetrahedra to grow in a new direction.',
+          remove: 'Long-press a truncated tetrahedron itself to remove it -- the small tetrahedra are shared between neighbors and go away on their own.',
+        },
         hexprism: {
           add: 'A Hex Prism is already there.',
           remove: "No Hex Prism there to remove -- Remove+Hex Prism only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
@@ -5225,6 +5360,24 @@ async function init() {
     rhombohedraMesh,
     rhombohedraCellAt: (instanceId) => rhombohedraCellOrder[instanceId],
     onRhombohedraChange,
+    // Pyrochlore (3D Kagome): resolves a raycast hit on any of its 4
+    // meshes to either { type: 'tt', cell } or { type: 'tet', kind,
+    // center, cell } (cell = the tet's owning TT) -- see
+    // rebuildPyrochloreInstances.
+    pyrochlore: {
+      world: pyrochloreWorld,
+      meshes: pyrochloreAllMeshes,
+      resolveHit: (hit) => {
+        const ttIdx = pyrochloreTTMeshes.indexOf(hit.object);
+        if (ttIdx !== -1) {
+          const cell = pyrochloreCellOrders[ttIdx][hit.instanceId];
+          return cell ? { type: 'tt', cell } : null;
+        }
+        const inst = pyrochloreTetInstances.get(hit.object)?.[hit.instanceId];
+        return inst ? { type: 'tet', ...inst } : null;
+      },
+      onChange: onPyrochloreChange,
+    },
     interstitialStore,
     interstitialGroup,
     onInterstitialChange,
@@ -5313,6 +5466,17 @@ async function init() {
 
   // Rhombohedra build (free lattice): own change handler, same "never
   // truly empty" invariant.
+  function onPyrochloreChange() {
+    if (pyrochloreWorld.entries().length === 0) {
+      pyrochloreWorld.addCell(...PYROCHLORE_SEED, { material: 'base' });
+    }
+    rebuildPyrochloreInstances(pyrochloreTTMeshes, pyrochloreTetMeshes, pyrochloreWorld);
+    updateSectionEnabled();
+    applyWorldViewMaterials();
+    if (worldViewMode === 'skeleton') rebuildWorldViewSkeleton();
+    saveToLocalStorage(pyrochloreWorld.toJSON(), PYROCHLORE_STORAGE_KEY);
+  }
+
   function onRhombohedraChange() {
     if (rhombohedraWorld.entries().length === 0) {
       rhombohedraWorld.addCell(5, 0, 0, { material: 'base' });
@@ -5531,6 +5695,9 @@ async function init() {
     clearLocalStorage(RHOMBOHEDRA_STORAGE_KEY);
     rhombohedraWorld.replaceAll({ worldName: 'Rhombohedra Lattice', version: 1, cells: {}, meta: {} });
     onRhombohedraChange();
+    clearLocalStorage(PYROCHLORE_STORAGE_KEY);
+    pyrochloreWorld.replaceAll({ worldName: 'Pyrochlore Lattice', version: 1, cells: {}, meta: {} });
+    onPyrochloreChange();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

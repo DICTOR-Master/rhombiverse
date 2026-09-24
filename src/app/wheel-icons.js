@@ -187,6 +187,10 @@ export const MARKS = {
   // (not the symmetric kite rhombusPts() draws elsewhere), matching a
   // rhombohedron's own non-orthogonal silhouette.
   pieceRhombohedron: `<polygon points="-22,10 -6,-22 22,-10 6,22" ${THIN}/>`,
+  // Pyrochlore (3D Kagome): the truncated tetrahedron's own silhouette --
+  // a tetrahedron (faint outer triangle) with its corners cut off at the
+  // real 1/3 points, leaving the hexagon face that makes it Kagome-like.
+  piecePyrochlore: `<polygon points="0,-24 20.78,12 -20.78,12" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4"/><polygon points="-6.93,-12 6.93,-12 13.86,0 6.93,12 -6.93,12 -13.86,0" ${THIN}/>`,
   // 2D lattice tier (Phase 3): one icon PER PRIMITIVE, shared across
   // every named angle that primitive can appear at (this glyph shows
   // which primitive construction is active, not the exact angle -- a

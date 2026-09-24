@@ -45,6 +45,7 @@
 // real -- no other structural change needed.
 import { buildRDFaces } from './rhombic-wheel-3d-core.js';
 import { truncatedOctahedronVertices } from '../geometry-extensions/dual-lattice.js';
+import { truncatedTetrahedronVerts } from '../geometry-extensions/pyrochlore-lattice.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
 
 const CSS = `
@@ -202,6 +203,12 @@ function toWireframe() {
   return wireframeSvg(edgesByMinDistance(points), 22);
 }
 
+// Pyrochlore (3D Kagome): the truncated tetrahedron, same "derive real
+// edges from the real point cloud" approach as toWireframe above.
+function pyrochloreWireframe() {
+  return wireframeSvg(edgesByMinDistance(truncatedTetrahedronVerts(1)), 34);
+}
+
 // 2D lattice tier (Phase 3): one generic wireframe builder for all 12
 // (angle, primitive) combinations, reusing geometry-extensions/
 // lattice-2d.js's own real tileVerts functions DIRECTLY (via
@@ -283,6 +290,7 @@ const LATTICE_FAMILIES_3D = [
   // upward into every higher dimension. Worth surfacing here per that
   // doc's own suggestion, not invented.
   { label: 'BCC', desc: 'Truncated Octahedron -- body-centered cubic, a second nested lattice. The generic parallelohedron (“permutahedron”) -- the one that generalizes into every higher dimension.', action: 'tool:pieceType:to', preview: toWireframe },
+  { label: 'Pyrochlore (3D Kagome)', desc: 'Corner-sharing tetrahedra on the FCC lattice, with truncated-tetrahedron voids -- the 3D Kagome. Place truncated tetrahedra; the tetrahedra between them appear on their own.', action: 'tool:pieceType:pyrochlore', preview: pyrochloreWireframe },
 ];
 
 export function createDimensionWizard({ onSelectFamily }) {

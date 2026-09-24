@@ -21,6 +21,7 @@ import { rdQuarterPieces } from '../core/lattice.js';
 import { elongatedDodecahedronVerts } from '../geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts } from '../geometry-extensions/hex-prism.js';
 import { rhombohedraTileVerts } from '../geometry-extensions/rhombohedra-lattice.js';
+import { truncatedTetrahedronVerts } from '../geometry-extensions/pyrochlore-lattice.js';
 
 // Only "kind: dept" faces with a real tool:pieceType:*/tool:cuboctaBuild
 // action are actual placeable pieces. Excludes two kinds of non-piece
@@ -69,6 +70,7 @@ function convexPieceVerts(action) {
     case 'tool:pieceType:rhombohedra': return rhombohedraTileVerts(1);
     case 'tool:pieceType:elongdodeca': return elongatedDodecahedronVerts(1);
     case 'tool:pieceType:hexprism': return hexPrismVerts(1);
+    case 'tool:pieceType:pyrochlore': return truncatedTetrahedronVerts(1);
     default: return null; // not a single-cell convex piece -- see compositionForAction below
   }
 }

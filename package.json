@@ -6,7 +6,8 @@
     "build": "node scripts/build.mjs",
     "verify:i18n": "node scripts/verify-i18n.mjs",
     "verify:rhombis-i18n": "node scripts/verify-rhombis-i18n.mjs",
-    "verify:lattice-2d": "node scripts/verify-lattice-2d.mjs"
+    "verify:lattice-2d": "node scripts/verify-lattice-2d.mjs",
+    "verify:pyrochlore": "node scripts/verify-pyrochlore.mjs"
   },
   "dependencies": {
     "ai": "^6.0.0",

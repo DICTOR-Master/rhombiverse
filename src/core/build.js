@@ -32,6 +32,7 @@ import {
 import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
 import { matchHexNeighborOffset } from '../geometry-extensions/hex-prism.js';
 import { matchRhombohedraNeighborOffset } from '../geometry-extensions/rhombohedra-lattice.js';
+import { pyrochloreSiteOrientation, pyrochloreNeighborForTTFace, pyrochloreNeighborForTetFace } from '../geometry-extensions/pyrochlore-lattice.js';
 import { elongDodecaCellToWorld } from '../geometry-extensions/elongated-dodecahedron.js';
 import {
   bootstrapDisphenoid,
@@ -286,6 +287,11 @@ export function createBuildController({
   rhombohedraMesh = null,
   rhombohedraCellAt = () => null,
   onRhombohedraChange = () => {},
+  // Pyrochlore (3D Kagome, 'pyrochlore' piece tier): { world, meshes,
+  // resolveHit, onChange } -- see render.js's own build-controller
+  // params. Truncated tetrahedra are the stored cells; cap tetrahedra
+  // are derived, tappable to grow but never removable on their own.
+  pyrochlore = null,
   // Interstitial-lattice ("ioct"/"idis" piece tiers, core/interstitial-
   // build.md): same "adopted family member" reasoning as the TO params
   // above -- a genuinely different lattice (the BCC Delaunay/interstitial
@@ -389,6 +395,7 @@ export function createBuildController({
     // a no-op (just `[activeLattice2dStore.mesh]`) everywhere else.
     const lattice2dTargets = activeLattice2dStore ? [activeLattice2dStore.mesh, ...(activeLattice2dStore.classMeshes ?? []), ...(activeLattice2dStore.companionMeshes ?? [])] : [];
     const rhombohedraTargets = rhombohedraMesh && getPieceType() === 'rhombohedra' ? [rhombohedraMesh] : [];
+    const pyrochloreTargets = pyrochlore && getPieceType() === 'pyrochlore' ? pyrochlore.meshes : [];
     // Same reasoning: interstitialGroup only enters the raycast under
     // its own piece tiers, for the same "don't steal clicks from other
     // tiers" reason as bccTargets above.
@@ -424,7 +431,7 @@ export function createBuildController({
     // clicking still builds against it while only a separate skeleton
     // overlay is shown; only the DIMENSION reason should gate picking.
     const meshTargets = getMeshPickable() ? [mesh] : [];
-    const hits = raycaster.intersectObjects([...meshTargets, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...lattice2dTargets, ...rhombohedraTargets, ...interstitialTargets, ...hemisphereTargets], true);
+    const hits = raycaster.intersectObjects([...meshTargets, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...lattice2dTargets, ...rhombohedraTargets, ...pyrochloreTargets, ...interstitialTargets, ...hemisphereTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -766,6 +773,34 @@ export function createBuildController({
     rhombohedraWorld.removeCell(cell.x, cell.y, cell.z);
     onRhombohedraChange();
     if (onRemoved) onRemoved(cell);
+  }
+
+  // Pyrochlore (3D Kagome): all 4 meshes are translation-only instances,
+  // so hit.face.normal is already world-aligned. Add: a truncated
+  // tetrahedron's hexagon face grows the neighbor across it; a cap
+  // tetrahedron's face grows the TT across THAT face (its triangle faces
+  // are always covered by a cap tet). Remove: only a TT itself -- a cap
+  // tet is shared, same rule as 2D Kagome's triangles.
+  function handlePyrochloreClick(hit, mode) {
+    const action = mode === 'build' ? 'add' : 'remove';
+    const resolved = pyrochlore && hit.instanceId !== undefined ? pyrochlore.resolveHit(hit) : null;
+    if (!resolved) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const n = [hit.face.normal.x, hit.face.normal.y, hit.face.normal.z];
+    if (mode === 'build') {
+      const target = resolved.type === 'tt'
+        ? pyrochloreNeighborForTTFace(resolved.cell.x, resolved.cell.y, resolved.cell.z, n)
+        : pyrochloreNeighborForTetFace(resolved.kind, resolved.center, n);
+      if (!target || pyrochloreSiteOrientation(...target) === 0 || pyrochlore.world.has(...target)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const material = getMaterial();
+      pyrochlore.world.addCell(...target, { material });
+      pyrochlore.onChange();
+      if (onPlaced) onPlaced({ x: target[0], y: target[1], z: target[2], material });
+      return;
+    }
+    if (resolved.type !== 'tt') { if (onPieceNoOp) onPieceNoOp(action); return; }
+    pyrochlore.world.removeCell(resolved.cell.x, resolved.cell.y, resolved.cell.z);
+    pyrochlore.onChange();
+    if (onRemoved) onRemoved(resolved.cell);
   }
 
   // Interstitial-lattice piece tiers ('idis': one disphenoid at a time,
@@ -1459,6 +1494,10 @@ export function createBuildController({
       handleRhombohedraClick(hit, mode);
       return;
     }
+    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'pyrochlore' && pyrochlore) {
+      handlePyrochloreClick(hit, mode);
+      return;
+    }
     // Same reasoning, for the interstitial-lattice piece tiers. 'ioct'
     // (Octahedron Site) restored here 2026-08-31 -- kept on the wheel
     // building the old 4-disphenoid bundle, direct user decision, after
@@ -1838,6 +1877,10 @@ export function createBuildController({
       handleRhombohedraClick(hit, 'chisel');
       return;
     }
+    if (mode === 'build' && pieceTypeForInterstitialRemove === 'pyrochlore' && pyrochlore) {
+      handlePyrochloreClick(hit, 'chisel');
+      return;
+    }
     // Explicit no-op guard for 'octahedron', same reasoning/bug as
     // onClick's own -- a right-click that misses an actual octahedron
     // instance must not fall through to removing whatever real cell was
@@ -1954,7 +1997,7 @@ export function createBuildController({
       // set `suppressNextClick = true`, silently eating the real click
       // handling done. Excluding it here is correct until this branch
       // gets genuine lattice2d awareness, not just a stopgap.
-      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && !getPieceType().startsWith('lattice2d:') && !['pyramid', 'to', 'ioct', 'idis', ...HEMISPHERE_PIECE_TYPES].includes(getPieceType())) {
+      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && !getPieceType().startsWith('lattice2d:') && !['pyramid', 'to', 'ioct', 'idis', 'pyrochlore', ...HEMISPHERE_PIECE_TYPES].includes(getPieceType())) {
         dragging = true;
         clearTimeout(holdTimer);
         holding = false;
@@ -1991,7 +2034,7 @@ export function createBuildController({
     // same reason as the drag-placement branch above -- this ghost
     // preview also runs through the main FCC world's own `cellAt`/
     // `resolveGrowthOffset`, with no lattice2d awareness at all.
-    if (mode !== 'build' || getPieceType().startsWith('lattice2d:') || ['pyramid', 'to', 'ioct', 'idis', ...HEMISPHERE_PIECE_TYPES].includes(getPieceType())) {
+    if (mode !== 'build' || getPieceType().startsWith('lattice2d:') || ['pyramid', 'to', 'ioct', 'idis', 'pyrochlore', ...HEMISPHERE_PIECE_TYPES].includes(getPieceType())) {
       if (onHoverEnd) onHoverEnd();
       return;
     }

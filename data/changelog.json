@@ -1,6 +1,16 @@
 [
   {
     "date": "2026-09-24",
+    "title": "Pyrochlore: A Real 3D Kagome",
+    "items": [
+      "New: Pyrochlore (3D Kagome) -- the real 3D version of Kagome, built on the same FCC lattice as your RD world. Place truncated tetrahedra; the small corner-sharing tetrahedra between them appear on their own, a lighter shade of their color. A single piece reads as one big tetrahedron.",
+      "Tap a hexagon face to grow the next truncated tetrahedron through it, or tap one of the small tetrahedra to grow through that face. Long-press a truncated tetrahedron to remove it.",
+      "Find it in the Wizard as a 3rd 3D lattice (after FCC and BCC), or on the RD-family piece wheel.",
+      "Works in every view: Translucent, Skeleton, Sphere and X-Ray, plus a new Pyrochlore mode in Lattice View that shows your RD builds' own tetrahedra -- one inside every RD, and one wherever 4 RDs meet at a corner."
+    ]
+  },
+  {
+    "date": "2026-09-24",
     "title": "Kagome Hexagons Delete on iPhone",
     "items": [
       "Fixed: long-pressing a Kagome hexagon on iPhone said there was nothing there to remove. Removal now works out which hexagon you pressed from the exact spot you touched, so it can't miss.",
