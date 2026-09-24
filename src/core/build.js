@@ -2038,6 +2038,10 @@ export function createBuildController({
   function onTouchEnd(event) {
     clearTimeout(longPressTimer);
     if (longPressFired) {
+      // Guard window starts at finger LIFT, not at long-press fire: a
+      // hold longer than LONG_PRESS_CLICK_GUARD_MS otherwise let iPhone
+      // Safari's post-touchend click through ("just keeps adding").
+      lastLongPressAt = performance.now();
       // The browser would otherwise also synthesize a 'click' right after
       // this touchend, which would immediately place a new block.
       event.preventDefault();

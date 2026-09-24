@@ -111,6 +111,17 @@
     }
     #lattice2d-toggle-panel.visible { display: flex; }
     .lattice2d-toggle-row { display: flex; gap: 4px; }
+    /* Phones: top-center collides with the wordmark and corner wheel
+       (direct report, iPhone: "kagome toggle is obscuring HUD") -- move
+       it to the bottom, just above the Menu/quick-select row (36px tall
+       at bottom: 8px), and let rows wrap instead of overflowing. */
+    @media (max-width: 600px) {
+      #lattice2d-toggle-panel {
+        top: auto; bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+        width: calc(100vw - 16px);
+      }
+      .lattice2d-toggle-row { flex-wrap: wrap; justify-content: center; }
+    }
     .lattice2d-toggle-row button {
       background: rgba(0, 0, 0, 0.45);
       border: 1px solid rgba(255, 255, 255, 0.25);
