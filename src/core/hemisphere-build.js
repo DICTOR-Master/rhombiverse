@@ -35,7 +35,9 @@ export function halfRdKey(x, y, z, offsetIndex, side) {
 export function rdQuarterKey(x, y, z, cornerIndex) {
   return `rdquarter|${cellKey(x, y, z)}|${cornerIndex}`;
 }
-export const RD_QUARTER_ANCHORS = [[1, 1, 1], [1, 1, -1], [1, -1, 1], [-1, 1, 1]];
+// Must match core/lattice.js's rdQuarterPieces anchors exactly (see the
+// 2026-09-24 fix there: [1,1,1] -> [-1,-1,-1]).
+export const RD_QUARTER_ANCHORS = [[-1, -1, -1], [1, 1, -1], [1, -1, 1], [-1, 1, 1]];
 
 // Two-axis wedge ("Triangle Ring", added 2026-09-06): the intersection of
 // TWO independent hemisphereSplit() cuts on the SAME cell -- direct user

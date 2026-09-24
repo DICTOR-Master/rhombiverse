@@ -92,7 +92,17 @@ export function pyramidPieces(s = 1) {
 export function rdQuarterPieces(s = 1) {
   const half = s * 0.5;
   const octa = s;
-  const anchors = [[1, 1, 1], [1, 1, -1], [1, -1, 1], [-1, 1, 1]];
+  // Real bug fixed 2026-09-24 (found building Rhombohedra's 4-orientation
+  // attach -- "clustering four seems impossible"): the anchors used to be
+  // [1,1,1],[1,1,-1],[1,-1,1],[-1,1,1], which is NOT an alternating set
+  // of cube corners -- piece 0 overlapped all 3 others (a Monte Carlo
+  // check of the RD: 25% covered twice, 25% not at all). The volume/
+  // vertex checks above passed anyway; they never tested overlap. The
+  // real decomposition needs the 4 corners with the SAME sign parity:
+  // [-1,-1,-1] replaces [1,1,1] (same shape -- a parallelepiped is
+  // centrally symmetric -- just its correct position). Overlap is now
+  // checked by scripts/verify-rhombohedra.mjs.
+  const anchors = [[-1, -1, -1], [1, 1, -1], [1, -1, 1], [-1, 1, 1]];
   return anchors.map(([sx, sy, sz]) => {
     const anchor = [sx * half, sy * half, sz * half];
     const edges = [

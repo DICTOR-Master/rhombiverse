@@ -1,6 +1,14 @@
 [
   {
     "date": "2026-09-24",
+    "title": "Rhombohedra in All 4 Orientations",
+    "items": [
+      "New: Rhombohedra can now attach in all 4 of the RD's own orientations, not just one. Tap a face to attach; tap the same spot again quickly to flip the new piece to its other orientation.",
+      "Four rhombohedra can now be clustered face-to-face into a complete RD -- or grown into shapes the single orientation could never make."
+    ]
+  },
+  {
+    "date": "2026-09-24",
     "title": "Pyrochlore: A Real 3D Kagome",
     "items": [
       "New: Pyrochlore (3D Kagome) -- the real 3D version of Kagome, built on the same FCC lattice as your RD world. Place truncated tetrahedra; the small corner-sharing tetrahedra between them appear on their own, a lighter shade of their color. A single piece reads as one big tetrahedron.",

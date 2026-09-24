@@ -24,7 +24,7 @@ import { createDimensionWizard } from './app/dimension-wizard.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
-import { rhombohedraTileVerts, rhombohedraCellToWorld } from './geometry-extensions/rhombohedra-lattice.js';
+import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWorld, rhombohedraMigrateLegacyCell } from './geometry-extensions/rhombohedra-lattice.js';
 import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats } from './geometry-extensions/pyrochlore-lattice.js';
 import { FEATURES } from './app/features.js';
 import {
@@ -145,6 +145,9 @@ const LATTICE2D_SEED_COLORS = ['garnet', 'ferrostone', 'glassite', 'star-glassit
 // Rhombohedra (free lattice): same real scale as everything else -- a
 // genuine 3D solid, no special height/thinness constant needed.
 const RHOMBOHEDRA_S = SCALE;
+// The original seed (old lattice index (5,0,0)), in the 4-orientation
+// centroid frame -- same world position as before.
+const RHOMBOHEDRA_SEED = rhombohedraMigrateLegacyCell(5, 0, 0);
 // Pyrochlore (3D Kagome): registered to the main RD world's own units
 // (direct decision) -- see geometry-extensions/pyrochlore-lattice.js.
 const PYROCHLORE_S = SCALE;
@@ -1553,8 +1556,12 @@ function rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld) {
   rhombohedraCellOrder = rhombohedraWorld.entries();
   const m = new THREE.Matrix4();
   rhombohedraCellOrder.forEach((cell, i) => {
-    const [wx, wy, wz] = rhombohedraCellToWorld(cell.x, cell.y, cell.z, RHOMBOHEDRA_S);
-    m.makeTranslation(wx, wy, wz);
+    // 4 orientations (2026-09-24): cell = 4 x centroid, `o` = which of
+    // RD Quarter's 4 orientations -- one shared geometry, rotated per
+    // instance (see rhombohedra-lattice.js's 4-orientation section).
+    const [wx, wy, wz] = rhombohedraPieceWorld([cell.x, cell.y, cell.z], RHOMBOHEDRA_S);
+    const r = rhombohedraOrientationMatrix(cell.o ?? 0);
+    m.set(r[0][0], r[0][1], r[0][2], wx, r[1][0], r[1][1], r[1][2], wy, r[2][0], r[2][1], r[2][2], wz, 0, 0, 0, 1);
     rhombohedraMesh.setMatrixAt(i, m);
     rhombohedraMesh.setColorAt(i, instanceColorFor(cell));
   });
@@ -1786,7 +1793,14 @@ async function init() {
   // open space instead.
   const rhombohedraSavedJSON = loadFromLocalStorage(RHOMBOHEDRA_STORAGE_KEY);
   const rhombohedraWorld = createWorldStore(rhombohedraSavedJSON ?? { worldName: 'Rhombohedra Lattice', version: 1, cells: {}, meta: {} });
-  if (rhombohedraWorld.entries().length === 0) rhombohedraWorld.addCell(5, 0, 0, { material: 'base' });
+  // Legacy saves (translation-only lattice: cell = (i,j,k) index, no
+  // `o`) -> the 4-orientation centroid frame, same world positions.
+  // Batched (all removes before any add) so a converted key can never
+  // collide with a not-yet-converted legacy index.
+  const rhombohedraLegacy = rhombohedraWorld.entries().filter((c) => c.o === undefined);
+  rhombohedraLegacy.forEach(({ x, y, z }) => rhombohedraWorld.removeCell(x, y, z));
+  rhombohedraLegacy.forEach(({ x, y, z, ...data }) => rhombohedraWorld.addCell(...rhombohedraMigrateLegacyCell(x, y, z), { ...data, o: 0 }));
+  if (rhombohedraWorld.entries().length === 0) rhombohedraWorld.addCell(...RHOMBOHEDRA_SEED, { material: 'base', o: 0 });
   const pyrochloreSavedJSON = loadFromLocalStorage(PYROCHLORE_STORAGE_KEY);
   const pyrochloreWorld = createWorldStore(pyrochloreSavedJSON ?? { worldName: 'Pyrochlore Lattice', version: 1, cells: {}, meta: {} });
   if (pyrochloreWorld.entries().length === 0) pyrochloreWorld.addCell(...PYROCHLORE_SEED, { material: 'base' });
@@ -5484,7 +5498,7 @@ async function init() {
 
   function onRhombohedraChange() {
     if (rhombohedraWorld.entries().length === 0) {
-      rhombohedraWorld.addCell(5, 0, 0, { material: 'base' });
+      rhombohedraWorld.addCell(...RHOMBOHEDRA_SEED, { material: 'base', o: 0 });
     }
     rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld);
     updateSectionEnabled();
