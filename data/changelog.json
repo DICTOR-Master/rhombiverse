@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-09-24",
+    "title": "Wizard: Every Piece, Rotating",
+    "items": [
+      "New: the Wizard's 3D screen now lists every piece under the lattice it lives on -- FCC, RD Dual, BCC, BCC Interstitial, ED, Hexagonal, Rhombohedral and Pyrochlore.",
+      "Every piece has its own slowly rotating wireframe, drawn from the real piece you place. Tap one to start building with it.",
+      "RD Quarter now has its own wheel symbol: a hexagon with a Y to three of its corners."
+    ]
+  },
+  {
+    "date": "2026-09-24",
     "title": "Pyrochlore: Whole Tet or Small Tet",
     "items": [
       "New: with Pyrochlore selected, the bottom-row button switches between Whole tet and Small tet.",

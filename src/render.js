@@ -3956,7 +3956,45 @@ async function init() {
     // it's reachable changed (no longer forced open on load, that's
     // dimensionWheel3D's own job now; reachable any time via the new
     // top-left #hud-wizard-cue instead).
+    // Wizard wireframes (2026-09-24 parity): each piece's edges come from
+    // the SAME real geometry this file places/renders (and Lattice View /
+    // Skeleton / the cyan first-placement outline all edge the same way,
+    // via EdgesGeometry) -- the wizard owns no geometry of its own.
+    // Built lazily per open screen; plain [[a, b], ...] point pairs out.
+    function wizardPieceGeometry(action) {
+      const convex = (pts) => new ConvexGeometry(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+      const piece = action.replace('tool:pieceType:', '');
+      if (action === 'tool:cuboctaBuild') return cuboctaGeometry;
+      switch (piece) {
+        case 'rd': return geometry;
+        case 'halfrd': return buildHemisphereGeometry({ type: 'halfrd', cell: [0, 0, 0], offsetIndex: 0, side: 'positive' }, SCALE);
+        case 'hourglass': return buildHemisphereGeometry({ type: 'hourglass', cellA: [0, 0, 0], cellB: NEIGHBOR_OFFSETS[0], offsetIndex: 0 }, SCALE);
+        case 'rdquarter': return buildHemisphereGeometry({ type: 'rdquarter', cell: [0, 0, 0], cornerIndex: 0 }, SCALE);
+        case 'cube': return convex(pyramidPieces(SCALE).cube);
+        case 'pyramid': { const { base, apex } = pyramidPieces(SCALE).pyramids['y+']; return convex([...base, apex]); }
+        case 'octahedron': return octGapGeometry;
+        case 'to': return bccGeometry;
+        case 'ioct': return mergeGeometries(octahedronDisphenoids([0, 0, 0], LATTICE_QUICK_VIEW_AXIS_OFFSET).map((v) => convex(disphenoidVertsToWorld(v, SCALE))), false);
+        case 'idis': return buildInterstitialGeometry(bootstrapDisphenoid([0, 0, 0]), SCALE);
+        case 'elongdodeca': return elongDodecaGeometry;
+        case 'hexprism': return hexPrismGeometry;
+        case 'rhombohedra': return rhombohedraGeometry;
+        case 'pyrochlore': return convex(truncatedTetrahedronVerts(1, PYROCHLORE_S));
+        default: return null;
+      }
+    }
+    function wizardPieceEdges(action) {
+      const g = wizardPieceGeometry(action);
+      if (!g) return [];
+      const edges = new THREE.EdgesGeometry(g);
+      const a = edges.attributes.position.array;
+      const out = [];
+      for (let i = 0; i < a.length; i += 6) out.push([[a[i], a[i + 1], a[i + 2]], [a[i + 3], a[i + 4], a[i + 5]]]);
+      edges.dispose();
+      return out;
+    }
     const dimensionWizard = createDimensionWizard({
+      pieceEdges: wizardPieceEdges,
       // Real bug fixed same session: this used to hardcode
       // activeDimension = '3D' regardless of which of the wizard's own
       // screens the pick came from, so choosing Square from its 2D
