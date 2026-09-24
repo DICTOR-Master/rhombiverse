@@ -4616,6 +4616,11 @@ async function init() {
   // gating needed yet -- 3D is the only real dimension so far.
   function updateQuickSelect() {
     updateRhomboAttachPanel();
+    // The "6 pyramids on a cube" hint only applies to RD/Cube/Pyramid --
+    // direct report: it also showed for Kagome/Pyrochlore ("why
+    // instructions for kagome mention cube?").
+    const tryHint = document.getElementById('piece-try-hint');
+    if (tryHint) tryHint.style.display = ['rd', 'cube', 'pyramid'].includes(document.getElementById('piece-type-select')?.value) ? '' : 'none';
     updateFirstPlacementTarget();
     if (quickShapeEl) {
       // Cuboctahedron Build (currentMode === 'cubocta') isn't a
