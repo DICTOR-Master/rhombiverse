@@ -1,6 +1,14 @@
 [
   {
     "date": "2026-09-24",
+    "title": "A Cyan Target Instead of Starter Pieces",
+    "items": [
+      "New: lattices no longer fill the scene with starter pieces. When the piece you've selected has nothing built yet, a cyan outline shows exactly where its first piece will go -- tap it to place. Every RD-based piece (Cube, Pyramid, Hemi RD, Hourglass, RD Quarter) plants an RD there first.",
+      "Only the selected piece's target shows, so the centre of the scene stays clear. Untouched starter pieces from before are removed automatically; anything you built is kept."
+    ]
+  },
+  {
+    "date": "2026-09-24",
     "title": "Every View Now Covers ED, Hex Prism and Rhombohedra",
     "items": [
       "New: Skeleton and Sphere views now include Elongated Dodecahedra, Hex Prisms and Rhombohedra.",

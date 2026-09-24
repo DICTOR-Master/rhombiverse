@@ -294,6 +294,10 @@ export function createBuildController({
   // params. Truncated tetrahedra are the stored cells; cap tetrahedra
   // are derived, tappable to grow but never removable on their own.
   pyrochlore = null,
+  // First-placement target (render.js firstPlacementSpec): { mesh,
+  // place(material) } -- a cyan outline shown while the selected piece's
+  // world is empty, replacing the old physical seeds (2026-09-24).
+  firstPlacementTarget = null,
   // Interstitial-lattice ("ioct"/"idis" piece tiers, core/interstitial-
   // build.md): same "adopted family member" reasoning as the TO params
   // above -- a genuinely different lattice (the BCC Delaunay/interstitial
@@ -398,6 +402,7 @@ export function createBuildController({
     const lattice2dTargets = activeLattice2dStore ? [activeLattice2dStore.mesh, ...(activeLattice2dStore.classMeshes ?? []), ...(activeLattice2dStore.companionMeshes ?? [])] : [];
     const rhombohedraTargets = rhombohedraMesh && getPieceType() === 'rhombohedra' ? [rhombohedraMesh] : [];
     const pyrochloreTargets = pyrochlore && getPieceType() === 'pyrochlore' ? pyrochlore.meshes : [];
+    const firstPlacementTargets = firstPlacementTarget?.mesh.visible ? [firstPlacementTarget.mesh] : [];
     // Same reasoning: interstitialGroup only enters the raycast under
     // its own piece tiers, for the same "don't steal clicks from other
     // tiers" reason as bccTargets above.
@@ -433,7 +438,7 @@ export function createBuildController({
     // clicking still builds against it while only a separate skeleton
     // overlay is shown; only the DIMENSION reason should gate picking.
     const meshTargets = getMeshPickable() ? [mesh] : [];
-    const hits = raycaster.intersectObjects([...meshTargets, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...lattice2dTargets, ...rhombohedraTargets, ...pyrochloreTargets, ...interstitialTargets, ...hemisphereTargets], true);
+    const hits = raycaster.intersectObjects([...meshTargets, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...lattice2dTargets, ...rhombohedraTargets, ...pyrochloreTargets, ...firstPlacementTargets, ...interstitialTargets, ...hemisphereTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -1486,6 +1491,17 @@ export function createBuildController({
     const mode = getMode();
     if (!mode) return; // e.g. Walk mode active -- editing is disabled while walking
 
+    // First-placement target: a tap on the cyan outline places the
+    // selected piece's first piece there (Add mode only).
+    if (firstPlacementTarget && hit.object === firstPlacementTarget.mesh) {
+      if (mode === 'build') {
+        const material = getMaterial();
+        firstPlacementTarget.place(material);
+        if (onPlaced) onPlaced({ x: 0, y: 0, z: 0, material });
+      }
+      return;
+    }
+
     // Routed BEFORE the generic cellAt() resolution below, which only
     // knows the FCC world's own cellOrder/partialCellMeshes -- a bccMesh
     // hit's instanceId indexes a completely different instance array and
@@ -1839,6 +1855,7 @@ export function createBuildController({
     event.preventDefault();
     const hit = pick(event);
     if (!hit) return;
+    if (firstPlacementTarget && hit.object === firstPlacementTarget.mesh) return; // nothing placed there yet to remove
     const mode = getMode();
 
     // TO piece tier: same reasoning as onClick's own handleToClick gate

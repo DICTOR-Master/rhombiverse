@@ -17,7 +17,7 @@ import { createCuboctaBuildController, AXIS_OFFSETS as CUBOCTA_AXIS_OFFSETS } fr
 import { createCuboctaGapBuildController, octGapCellToWorld, octGapCellForCOCell } from './core/cubocta-gap-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
 import { createHemisphereStore } from './core/hemisphere-build.js';
-import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids } from './geometry-extensions/interstitial-lattice.js';
+import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids, disphenoidKey } from './geometry-extensions/interstitial-lattice.js';
 import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extensions/spherical-toggle.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
@@ -25,7 +25,7 @@ import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-e
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
 import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWorld, rhombohedraMigrateLegacyCell, rhombohedraAttachOptions, rhombohedraOverlap } from './geometry-extensions/rhombohedra-lattice.js';
-import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats, pyrochloreNeighborOffsets } from './geometry-extensions/pyrochlore-lattice.js';
+import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats, pyrochloreNeighborOffsets, pyrochloreCapTetsOf } from './geometry-extensions/pyrochlore-lattice.js';
 import { FEATURES } from './app/features.js';
 import {
   generateSubLattice,
@@ -145,21 +145,21 @@ const LATTICE2D_SEED_COLORS = ['garnet', 'ferrostone', 'glassite', 'star-glassit
 // Rhombohedra (free lattice): same real scale as everything else -- a
 // genuine 3D solid, no special height/thinness constant needed.
 const RHOMBOHEDRA_S = SCALE;
-// The original seed (old lattice index (5,0,0)), in the 4-orientation
-// centroid frame -- same world position as before.
-const RHOMBOHEDRA_SEED = rhombohedraMigrateLegacyCell(5, 0, 0);
+// Where the FIRST rhombohedron goes when its world is empty (the cyan
+// target, 2026-09-24): RD Quarter piece 0 of the RD at the origin --
+// 4 x its centroid, orientation 0. Old auto-seed spot kept below only to
+// recognise and remove untouched legacy seeds on load.
+const RHOMBOHEDRA_FIRST = [-1, -1, -1];
+const RHOMBOHEDRA_LEGACY_SEED = rhombohedraMigrateLegacyCell(5, 0, 0);
 // Pyrochlore (3D Kagome): registered to the main RD world's own units
 // (direct decision) -- see geometry-extensions/pyrochlore-lattice.js.
 const PYROCHLORE_S = SCALE;
-// T-site (orientation -1), in the lattice's doubled coordinates -- world
-// (-1.5,-0.5,0.5): beside the main world's seed RD at the origin,
-// "touching" it -- direct request ("beside the RD touching the corner").
-// An exact single-point corner touch is impossible here: the pyrochlore
-// and RD lattices interleave, so every lattice-registered seed either
-// cuts into the origin RD or clears it. This is one of the 12 closest
-// clear sites (a 0.08 gap between faces/edges, reads as touching),
-// picked because it's on the camera side, not hidden behind the RD.
-const PYROCHLORE_SEED = [-3, -1, 1];
+// Where the FIRST truncated tetrahedron goes when the Pyrochlore world is
+// empty (the cyan target, 2026-09-24): the O-site nearest the origin,
+// world (1,0,0). Earlier auto-seed spots kept only to recognise and
+// remove untouched legacy seeds on load.
+const PYROCHLORE_FIRST = [2, 0, 0];
+const PYROCHLORE_LEGACY_SEEDS = [[-10, 0, 0], [-6, 0, 0], [-3, -1, 1]];
 const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
 
 // Performance guardrail (reframe Stage 6): warn before loading a World
@@ -1773,7 +1773,6 @@ async function init() {
   // saved JSON) would otherwise leave hexPrismMesh with zero instances
   // forever, and handleHexPrismClick's own grow-only design (see its own
   // header) has no bootstrap path to recover from that.
-  if (hexPrismWorld.entries().length === 0) hexPrismWorld.addCell(0, 0, 0, { material: 'base' });
 
   // Phase 6, direct correction ("the toggle should work for groups of
   // cells... it reverts to one when shifting... I have loaded four
@@ -1831,10 +1830,8 @@ async function init() {
   const rhombohedraLegacy = rhombohedraWorld.entries().filter((c) => c.o === undefined);
   rhombohedraLegacy.forEach(({ x, y, z }) => rhombohedraWorld.removeCell(x, y, z));
   rhombohedraLegacy.forEach(({ x, y, z, ...data }) => rhombohedraWorld.addCell(...rhombohedraMigrateLegacyCell(x, y, z), { ...data, o: 0 }));
-  if (rhombohedraWorld.entries().length === 0) rhombohedraWorld.addCell(...RHOMBOHEDRA_SEED, { material: 'base', o: 0 });
   const pyrochloreSavedJSON = loadFromLocalStorage(PYROCHLORE_STORAGE_KEY);
   const pyrochloreWorld = createWorldStore(pyrochloreSavedJSON ?? { worldName: 'Pyrochlore Lattice', version: 1, cells: {}, meta: {} });
-  if (pyrochloreWorld.entries().length === 0) pyrochloreWorld.addCell(...PYROCHLORE_SEED, { material: 'base' });
 
   const geometry = buildRDGeometry(SCALE);
   // White base color: actual per-cell color comes entirely from
@@ -2354,6 +2351,108 @@ async function init() {
   const interstitialStore = createInterstitialStore(interstitialSavedJSON);
   rebuildInterstitialMeshes(interstitialStore);
 
+  // Untouched legacy seeds (2026-09-24, direct decision): a world holding
+  // ONLY its old auto-seed -- nothing built from it -- is cleared on load
+  // so the cyan target shows instead. Anything actually built is kept.
+  {
+    const onlySeed = (w, spots) => {
+      const cells = w.entries();
+      return cells.length === 1 && spots.some(([x, y, z]) => cells[0].x === x && cells[0].y === y && cells[0].z === z);
+    };
+    const clear = (w, key) => { for (const c of w.entries()) w.removeCell(c.x, c.y, c.z); saveToLocalStorage(w.toJSON(), key); };
+    if (onlySeed(world, [[0, 0, 0]])) clear(world, undefined);
+    if (onlySeed(bccWorld, [[0, 0, 0]])) clear(bccWorld, BCC_STORAGE_KEY);
+    if (onlySeed(cuboctaWorld, [[0, 0, 0]])) clear(cuboctaWorld, CUBOCTA_STORAGE_KEY);
+    if (onlySeed(hexPrismWorld, [[0, 0, 0]])) clear(hexPrismWorld, HEXPRISM_STORAGE_KEY);
+    if (onlySeed(rhombohedraWorld, [RHOMBOHEDRA_LEGACY_SEED])) clear(rhombohedraWorld, RHOMBOHEDRA_STORAGE_KEY);
+    if (onlySeed(pyrochloreWorld, PYROCHLORE_LEGACY_SEEDS)) clear(pyrochloreWorld, PYROCHLORE_STORAGE_KEY);
+    const inter = interstitialStore.entries();
+    if (inter.length === 1 && inter[0].key === disphenoidKey(bootstrapDisphenoid([0, 0, 0]))) {
+      interstitialStore.replaceAll({ worldName: 'Interstitial Lattice', version: 1, cells: {} });
+      saveToLocalStorage(interstitialStore.toJSON(), INTERSTITIAL_STORAGE_KEY);
+    }
+    rebuildInstances(mesh, world, false);
+    rebuildBCCInstances(bccMesh, bccWorld);
+    rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld);
+    rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld);
+    rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld);
+    rebuildPyrochloreInstances(pyrochloreTTMeshes, pyrochloreTetMeshes, pyrochloreWorld);
+    rebuildInterstitialMeshes(interstitialStore);
+  }
+
+  // First-placement target (2026-09-24, direct request: "get rid of
+  // physical seeds and just have a target outline in cyan showing where
+  // first will place"; "all RD derivatives plant an RD seed first"):
+  // while the SELECTED piece's own world is empty, one cyan outline shows
+  // where its first piece goes; tapping it places that piece (core/
+  // build.js routes a hit on firstPlacementMesh to place()). Only the
+  // selected piece's target ever shows, so nothing crowds the origin.
+  const RD_FAMILY_PIECES = ['rd', 'cube', 'pyramid', 'halfrd', 'hourglass', 'rdquarter', 'hemi3', 'hemi4', 'hemiTri'];
+  function firstPlacementSpec() {
+    if (activeDimension === '2D') return null;
+    const piece = document.getElementById('piece-type-select')?.value;
+    if (currentMode === 'cubocta') {
+      return cuboctaWorld.entries().length ? null : { geometry: cuboctaGeometry.clone(), place: (material) => { cuboctaWorld.addCell(0, 0, 0, { material }); onCuboctaChange(); } };
+    }
+    if (RD_FAMILY_PIECES.includes(piece)) {
+      return world.entries().length ? null : { geometry: geometry.clone(), place: (material) => { world.addCell(0, 0, 0, { material }); onChange(); } };
+    }
+    if (piece === 'to') {
+      return bccWorld.entries().length ? null : { geometry: bccGeometry.clone(), place: (material) => { bccWorld.addCell(0, 0, 0, { material }); onBCCChange(); } };
+    }
+    if (piece === 'ioct' || piece === 'idis') {
+      const verts = bootstrapDisphenoid([0, 0, 0]);
+      return interstitialStore.entries().length ? null : { geometry: buildInterstitialGeometry(verts, SCALE), place: (material) => { interstitialStore.addDisphenoid(verts, { material }); onInterstitialChange(); } };
+    }
+    if (piece === 'elongdodeca') {
+      return elongDodecaWorld.entries().length ? null : { geometry: elongDodecaGeometry.clone().translate(...elongDodecaCellToWorld(0, 0, 0, SCALE)), place: (material) => { elongDodecaWorld.addCell(0, 0, 0, { material }); onElongDodecaChange(); } };
+    }
+    if (piece === 'hexprism') {
+      return hexPrismWorld.entries().length ? null : { geometry: hexPrismGeometry.clone(), place: (material) => { hexPrismWorld.addCell(0, 0, 0, { material }); onHexPrismChange(); } };
+    }
+    if (piece === 'rhombohedra') {
+      const cell = { x: RHOMBOHEDRA_FIRST[0], y: RHOMBOHEDRA_FIRST[1], z: RHOMBOHEDRA_FIRST[2], o: 0 };
+      return rhombohedraWorld.entries().length ? null : { geometry: rhombohedraGeometry.clone().applyMatrix4(rhombohedraInstanceMatrix(cell)), place: (material) => { rhombohedraWorld.addCell(...RHOMBOHEDRA_FIRST, { material, o: 0 }); onRhombohedraChange(); } };
+    }
+    if (piece === 'pyrochlore') {
+      // The whole first piece as it will look: TT + its 4 cap tets --
+      // together exactly one big tetrahedron, so its hull is the outline.
+      const [i, j, k] = PYROCHLORE_FIRST;
+      const c = pyrochloreCellToWorld(i, j, k, PYROCHLORE_S);
+      const pts = truncatedTetrahedronVerts(1, PYROCHLORE_S).map(([x, y, z]) => [x + c[0], y + c[1], z + c[2]]);
+      for (const cap of pyrochloreCapTetsOf(i, j, k)) {
+        const cc = pyrochloreCellToWorld(...cap.center, PYROCHLORE_S);
+        for (const [x, y, z] of tetrahedronVerts(cap.kind, PYROCHLORE_S)) pts.push([x + cc[0], y + cc[1], z + cc[2]]);
+      }
+      return pyrochloreWorld.entries().length ? null : { geometry: new ConvexGeometry(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z))), place: (material) => { pyrochloreWorld.addCell(i, j, k, { material }); onPyrochloreChange(); } };
+    }
+    return null;
+  }
+  const FIRST_PLACEMENT_COLOR = 0x00e5ff;
+  const firstPlacementMesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: FIRST_PLACEMENT_COLOR, transparent: true, opacity: 0.12, depthWrite: false }));
+  const firstPlacementEdges = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: FIRST_PLACEMENT_COLOR }));
+  firstPlacementMesh.visible = false;
+  firstPlacementEdges.visible = false;
+  scene.add(firstPlacementMesh, firstPlacementEdges);
+  let firstPlacementCurrent = null;
+  function updateFirstPlacementTarget() {
+    const spec = firstPlacementSpec();
+    firstPlacementCurrent = spec;
+    firstPlacementMesh.geometry.dispose();
+    firstPlacementEdges.geometry.dispose();
+    if (!spec) {
+      firstPlacementMesh.geometry = new THREE.BufferGeometry();
+      firstPlacementEdges.geometry = new THREE.BufferGeometry();
+      firstPlacementMesh.visible = false;
+      firstPlacementEdges.visible = false;
+      return;
+    }
+    firstPlacementMesh.geometry = spec.geometry;
+    firstPlacementEdges.geometry = new THREE.EdgesGeometry(spec.geometry);
+    firstPlacementMesh.visible = true;
+    firstPlacementEdges.visible = true;
+  }
+
   // Hemisphere pieces (core/hemisphere-build.md): a sixth independent
   // store, own localStorage key, same reasoning as BCC/interstitial/
   // Cuboctahedron/gap-octahedron above. No "never truly empty" bootstrap
@@ -2652,9 +2751,12 @@ async function init() {
     // here holds regardless of which of them caused the count to drop,
     // not just the dedicated Clear World button (which already happened
     // to be fine, since it always reloads the real 1-cell starter file).
-    if (world.entries().length === 0) {
-      world.addCell(0, 0, 0, { material: 'base' });
-    }
+    // The old "never empty" auto-reseed lived here -- replaced 2026-09-24
+    // by the cyan first-placement target (direct request: "get rid of
+    // physical seeds and just have a target outline in cyan showing where
+    // first will place... getting very crowded with seeds"). An empty
+    // world is no longer a dead end: the target is always tappable. See
+    // firstPlacementSpec.
     rebuildInstances(mesh, world, currentMode === 'report');
     updateSectionEnabled(); // keeps newly created partial-cell (Pyramid) mesh materials in sync with X-Ray -- see that function's own header
     applyWorldViewMaterials(); // same reasoning as updateSectionEnabled() above -- see World View's own header
@@ -2726,6 +2828,7 @@ async function init() {
   // created materials pick up the CURRENT clip state immediately
   // instead of only whenever the user next happens to re-toggle X-Ray.
   function updateSectionEnabled() {
+    updateFirstPlacementTarget(); // every lattice's own change handler runs through here -- see firstPlacementSpec
     const enabled = document.getElementById('section-enable').checked;
     const planes = enabled ? [sectionPlane] : [];
     material.clippingPlanes = planes;
@@ -2875,6 +2978,7 @@ async function init() {
     dotMatrixMesh.visible = visible && activeDimension === '2D';
     lattice2dPanel.classList.toggle('visible', activeDimension === '2D');
     updateRhomboAttachPanel();
+    updateFirstPlacementTarget();
     // In 2D, shapes are picked by lattice (the toggle panel above), not
     // by this dropdown -- lattice2dPanel already keeps #piece-type-select's
     // own value in sync (see applyLattice2dSelection), so showing this row
@@ -3731,12 +3835,10 @@ async function init() {
     // wheel/build menu ever actually opens (every other wheel3D call in
     // this file is .close()), so seeding here guarantees a real cell
     // exists before the player can reach any Add/Remove tool at all.
-    function seedIfWorldEmpty() {
-      if (world.entries().length === 0) {
-        world.addCell(0, 0, 0, { material: materialSelect.value });
-        onChange();
-      }
-    }
+    // No longer seeds anything (2026-09-24: physical seeds replaced by
+    // the cyan first-placement target, see firstPlacementSpec) -- kept as
+    // a no-op so its many call sites stay valid.
+    function seedIfWorldEmpty() {}
     // Dimension-select wheel (2026-09-22, 3rd iteration): a SEPARATE
     // createRhombicWheel3D() instance, dedicated only to WHEEL_DIMENSION
     // -- never navigated to/from wheel3D (the shared Build/Piece nav
@@ -4505,6 +4607,7 @@ async function init() {
   // gating needed yet -- 3D is the only real dimension so far.
   function updateQuickSelect() {
     updateRhomboAttachPanel();
+    updateFirstPlacementTarget();
     if (quickShapeEl) {
       // Cuboctahedron Build (currentMode === 'cubocta') isn't a
       // piece-type value at all -- it's its own mode, same as BCC Build
@@ -5500,6 +5603,12 @@ async function init() {
     rhombohedraMesh,
     rhombohedraCellAt: (instanceId) => rhombohedraCellOrder[instanceId],
     getRhombohedraAttachMode: () => rhomboAttachMode,
+    // First-placement target (see firstPlacementSpec): core/build.js
+    // raycasts this mesh while it's visible and routes a tap on it here.
+    firstPlacementTarget: {
+      mesh: firstPlacementMesh,
+      place: (material) => { firstPlacementCurrent?.place(material); },
+    },
     onRhombohedraChange,
     // Pyrochlore (3D Kagome): resolves a raycast hit on any of its 4
     // meshes to either { type: 'tt', cell } or { type: 'tet', kind,
@@ -5550,9 +5659,6 @@ async function init() {
     // lattice point (isBCC: all-even), so this restores exactly the
     // same kind of real, buildable anchor a fresh BCC placement starts
     // from.
-    if (bccWorld.entries().length === 0) {
-      bccWorld.addCell(0, 0, 0, { material: 'base' });
-    }
     rebuildBCCInstances(bccMesh, bccWorld);
     updateSectionEnabled(); // keeps bccMesh's own material in sync with X-Ray -- see that function's own header
     applyWorldViewMaterials(); // same reasoning -- see World View's own header
@@ -5577,9 +5683,6 @@ async function init() {
   // one specifically needs it, unlike elongDodecaWorld).
   function onHexPrismChange() {
     if (latticeQuickViewMode === 'hexprism') rebuildLatticeQuickView();
-    if (hexPrismWorld.entries().length === 0) {
-      hexPrismWorld.addCell(0, 0, 0, { material: 'base' });
-    }
     rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld);
     updateSectionEnabled();
     applyWorldViewMaterials();
@@ -5611,9 +5714,6 @@ async function init() {
   // truly empty" invariant.
   function onPyrochloreChange() {
     if (latticeQuickViewMode === 'pyrochlore') rebuildLatticeQuickView();
-    if (pyrochloreWorld.entries().length === 0) {
-      pyrochloreWorld.addCell(...PYROCHLORE_SEED, { material: 'base' });
-    }
     rebuildPyrochloreInstances(pyrochloreTTMeshes, pyrochloreTetMeshes, pyrochloreWorld);
     updateSectionEnabled();
     applyWorldViewMaterials();
@@ -5623,9 +5723,6 @@ async function init() {
 
   function onRhombohedraChange() {
     if (latticeQuickViewMode === 'rhombohedra') rebuildLatticeQuickView();
-    if (rhombohedraWorld.entries().length === 0) {
-      rhombohedraWorld.addCell(...RHOMBOHEDRA_SEED, { material: 'base', o: 0 });
-    }
     rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld);
     updateSectionEnabled();
     applyWorldViewMaterials();
@@ -5639,9 +5736,6 @@ async function init() {
     // same canonical anchor disphenoid every fresh interstitial build
     // already starts from (interstitial-lattice.js's own sanity gate
     // uses this same anchor), not a special case invented here.
-    if (interstitialStore.entries().length === 0) {
-      interstitialStore.addDisphenoid(bootstrapDisphenoid([0, 0, 0]), { material: 'base' });
-    }
     rebuildInterstitialMeshes(interstitialStore);
     updateSectionEnabled(); // keeps newly created interstitial mesh materials in sync with X-Ray -- see that function's own header
     applyWorldViewMaterials(); // same reasoning -- see World View's own header
@@ -5660,9 +5754,6 @@ async function init() {
   // Cuboctahedron Build: own change handler, same "never truly empty"
   // reasoning as onBCCChange/onInterstitialChange above.
   function onCuboctaChange() {
-    if (cuboctaWorld.entries().length === 0) {
-      cuboctaWorld.addCell(0, 0, 0, { material: 'base' });
-    }
     rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld);
     updateSectionEnabled(); // keeps cuboctaMesh's own material in sync with X-Ray -- see that function's own header
     applyWorldViewMaterials(); // same reasoning -- see World View's own header
