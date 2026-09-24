@@ -370,7 +370,7 @@ export function createHudWheel3D(renderer, { size = 144, margin = 12, getBackgro
       const worldNormal = e.normal.clone().applyQuaternion(group.quaternion);
       const viewDirToCamera = camera.position.clone().sub(e.centroid.clone().applyQuaternion(group.quaternion)).normalize();
       const facing = worldNormal.dot(viewDirToCamera);
-      const visible = facing > 0.3;
+      const visible = facing > 0.3 && !e.hidden;
       e.labelEl.style.opacity = visible ? '1' : '0';
       if (!visible) continue;
       const worldCentroid = e.centroid.clone().applyQuaternion(group.quaternion);
@@ -388,8 +388,17 @@ export function createHudWheel3D(renderer, { size = 144, margin = 12, getBackgro
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(ndc, camera);
     const hits = raycaster.intersectObjects(faceEntries.map((e) => e.mesh));
-    return hits.length ? hits[0].object.userData.faceKey : null;
+    if (!hits.length) return null;
+    const entry = faceEntries.find((e) => e.mesh === hits[0].object);
+    return entry?.hidden ? null : hits[0].object.userData.faceKey;
   }
 
-  return { scene, camera, group, faceEntries, render, pickFace, getRect: () => rect };
+  // Hides a face's symbol and makes it untappable (the face itself stays,
+  // blank) -- e.g. X-Ray and Spherical in 4D, where they don't apply
+  // ("nothing unnecessary is shown").
+  function setFaceHidden(elId, hidden) {
+    for (const e of faceEntries) if (e.data?.elId === elId) e.hidden = hidden;
+  }
+
+  return { scene, camera, group, faceEntries, render, pickFace, setFaceHidden, getRect: () => rect };
 }

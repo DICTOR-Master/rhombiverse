@@ -1,6 +1,18 @@
 [
   {
     "date": "2026-09-24",
+    "title": "4D: The D4 World",
+    "items": [
+      "New: 4D is open. Pick 4D on the Dimension wheel or in the Wizard to build with 24-cells -- the 4D version of the RD -- and 16-cells.",
+      "You see a 3D slice of the 4D world. At W-depth 0 (the FCC mark) a 24-cell's slice is exactly an RD, so the 4D world starts from the RD world you know.",
+      "One slider does everything: switch it between W-depth (move the slice through 4D) and XW, YW, ZW (turn the slice into the fourth dimension). It's geared to move slowly, clicks into place at the marks, and Reset 4D brings you back.",
+      "Tap a face to add the neighbour across it. To build in the fourth direction, slide W-depth into the next layer and tap one of the cyan outlines there. Long-press a cell to remove it.",
+      "Projection shows whole 4D cells as shadows (Parallel or Perspective) -- tap a shadow facet to build across it.",
+      "The bottom-left button opens the new 4D wheel, and the bottom-row toggle switches between 24-cells and 16-cells. Tesseract and Hyper-pyrochlore are coming next."
+    ]
+  },
+  {
+    "date": "2026-09-24",
     "title": "Wizard: Every Piece, Rotating",
     "items": [
       "New: the Wizard's 3D screen now lists every piece under the lattice it lives on -- FCC, RD Dual, BCC, BCC Interstitial, ED, Hexagonal, Rhombohedral and Pyrochlore.",

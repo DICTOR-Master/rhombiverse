@@ -21,6 +21,7 @@ import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids, dis
 import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extensions/spherical-toggle.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
+import { createWorld4D } from './app/world-4d.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
@@ -223,6 +224,9 @@ let refreshWheel3D = () => {};
 // wheel, same "UI state, not world state" convention this app already
 // applies to every other transient screen.
 let activeDimension = null;
+// The 4D world (src/app/world-4d.js) -- created in init, switched on
+// only while activeDimension === '4D'.
+let world4d = null;
 
 const camera = new THREE.PerspectiveCamera(
   getSettings().fov,
@@ -2112,8 +2116,19 @@ async function init() {
     small: '<svg viewBox="-30 -30 60 60"><polygon points="-8,-4 4,-4 -2,8" fill="currentColor" opacity="0.35" stroke="currentColor" stroke-width="2.5"/><polygon points="4,-4 16,-4 10,-16" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>',
   };
   const attachPiece = () => document.getElementById('piece-type-select')?.value;
+  // D4's Whole 24-cell / 16-cell toggle (direct decision) -- the same
+  // bottom-row slot: tap swaps which D4 cell you place.
+  const D4_ATTACH_ICONS = {
+    cell24: '<svg viewBox="-30 -30 60 60"><polygon points="0,-24 20.78,-12 20.78,12 0,24 -20.78,12 -20.78,-12" fill="none" stroke="currentColor" stroke-width="3"/><polygon points="0,-12 10.39,6 -10.39,6" fill="currentColor" opacity="0.35"/></svg>',
+    cell16: '<svg viewBox="-30 -30 60 60"><polygon points="0,-24 24,0 0,24 -24,0" fill="none" stroke="currentColor" stroke-width="3"/><path d="M0,-24 V24 M-24,0 H24" stroke="currentColor" stroke-width="1.5" opacity="0.6"/></svg>',
+  };
   function renderRhomboAttachButton() {
     if (!rhomboAttachBtn) return;
+    if (attachPiece() === 'cell24' || attachPiece() === 'cell16') {
+      rhomboAttachBtn.innerHTML = D4_ATTACH_ICONS[attachPiece()];
+      rhomboAttachBtn.title = `D4: ${attachPiece() === 'cell16' ? '16-cell' : 'Whole 24-cell'} (tap to switch)`;
+      return;
+    }
     if (attachPiece() === 'pyrochlore') {
       rhomboAttachBtn.innerHTML = PYRO_ATTACH_ICONS[pyroAttachMode];
       rhomboAttachBtn.title = `Pyrochlore: ${pyroAttachMode === 'small' ? 'Small tet' : 'Whole tet'} (tap to switch)`;
@@ -2123,6 +2138,10 @@ async function init() {
     rhomboAttachBtn.title = `Rhombohedra attach: ${rhomboAttachMode === 'mirror' ? 'Mirror' : 'Copy'} (tap to switch)`;
   }
   rhomboAttachBtn?.addEventListener('click', () => {
+    if (attachPiece() === 'cell24' || attachPiece() === 'cell16') {
+      handleWheelAction(`tool:pieceType:${attachPiece() === 'cell24' ? 'cell16' : 'cell24'}`);
+      return;
+    }
     if (attachPiece() === 'pyrochlore') {
       pyroAttachMode = pyroAttachMode === 'small' ? 'whole' : 'small';
       try { localStorage.setItem(PYRO_ATTACH_KEY, pyroAttachMode); } catch { /* best-effort */ }
@@ -2139,7 +2158,8 @@ async function init() {
   });
   renderRhomboAttachButton();
   function updateRhomboAttachPanel() {
-    rhomboAttachBtn?.classList.toggle('hidden', !(activeDimension !== '2D' && ['rhombohedra', 'pyrochlore'].includes(attachPiece())));
+    const attachable = activeDimension === '4D' ? ['cell24', 'cell16'] : activeDimension !== '2D' ? ['rhombohedra', 'pyrochlore'] : [];
+    rhomboAttachBtn?.classList.toggle('hidden', !attachable.includes(attachPiece()));
     renderRhomboAttachButton();
   }
 
@@ -2425,7 +2445,7 @@ async function init() {
   // selected piece's target ever shows, so nothing crowds the origin.
   const RD_FAMILY_PIECES = ['rd', 'cube', 'pyramid', 'halfrd', 'hourglass', 'rdquarter', 'hemi3', 'hemi4', 'hemiTri'];
   function firstPlacementSpec() {
-    if (activeDimension === '2D') return null;
+    if (activeDimension === '2D' || activeDimension === '4D') return null; // 4D draws its own cyan target (world-4d.js)
     const piece = document.getElementById('piece-type-select')?.value;
     if (currentMode === 'cubocta') {
       return cuboctaWorld.entries().length ? null : { geometry: cuboctaGeometry.clone(), place: (material) => { cuboctaWorld.addCell(0, 0, 0, { material }); onCuboctaChange(); } };
@@ -2992,6 +3012,9 @@ async function init() {
   // different store, only how the active primitive's own store is
   // rendered, so it's no longer part of this key at all.
   function dimensionAllowsMesh(key) {
+    // 4D shows only its own world (world-4d.js's own group); every 3D and
+    // 2D mesh hides, same "toggle visibility, delete nothing" rule.
+    if (activeDimension === '4D') return false;
     if (key.startsWith('lattice2d:')) {
       return activeDimension === '2D' && key === `lattice2d:${activeLattice2dPrimitiveId}`;
     }
@@ -3021,6 +3044,11 @@ async function init() {
     // the active dimension, regardless of which (angle, primitive) is
     // currently toggled.
     dotMatrixMesh.visible = visible && activeDimension === '2D';
+    world4d?.setActive(activeDimension === '4D');
+    // 4D: X-Ray and Spherical don't apply (the 4D slider IS the X-Ray),
+    // so their HUD faces go blank and untappable (direct decision).
+    hudWheel?.setFaceHidden?.('xray-toggle', activeDimension === '4D');
+    hudWheel?.setFaceHidden?.('spherical-toggle', activeDimension === '4D');
     lattice2dPanel.classList.toggle('visible', activeDimension === '2D');
     updateRhomboAttachPanel();
     updateFirstPlacementTarget();
@@ -3037,7 +3065,7 @@ async function init() {
     // `.hidden === true`. Setting the inline style directly sidesteps
     // that -- inline style always wins over any external stylesheet rule
     // short of an author `!important`, which nothing here uses.
-    document.getElementById('piece-type-row').style.display = activeDimension === '2D' ? 'none' : '';
+    document.getElementById('piece-type-row').style.display = activeDimension === '2D' || activeDimension === '4D' ? 'none' : '';
     // Same real bug, same fix, for the always-on bottom-left quick-select
     // shortcut: its click handler unconditionally calls wheel3D.open('piece')
     // (the 3D Piece wheel) regardless of dimension, and `#hud-quick-shape`
@@ -3114,6 +3142,7 @@ async function init() {
   async function rebuildWorldViewSkeleton() {
     const myGeneration = ++skeletonGeneration;
     clearWorldViewSkeleton();
+    if (activeDimension === '4D') return; // world-4d.js draws its own Skeleton
     const { world: w, scene: s } = activeWorldTriple();
     const cells = w ? w.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed') : [];
     const pieces = cells.flatMap(skeletonCellPieces);
@@ -3205,6 +3234,7 @@ async function init() {
       setSolidWorldVisible(true);
       applyWorldViewMaterials();
     }
+    world4d?.setSkeleton(worldViewMode === 'skeleton');
     document.getElementById('world-view-toggle')?.classList.toggle('active', worldViewMode !== 'color');
   }
   const worldViewSelect = document.getElementById('world-view-select');
@@ -3693,7 +3723,7 @@ async function init() {
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
           const PIECE_LABELS = {
-            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', rhombohedra: 'Rhombohedra', pyrochlore: 'Pyrochlore (3D Kagome)',
+            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', rhombohedra: 'Rhombohedra', pyrochlore: 'Pyrochlore (3D Kagome)', cell24: '24-cell', cell16: '16-cell',
             // 2D lattice tier: one label per LATTICE_PRIMITIVES entry
             // (Phase 6: primitive alone, angle is a live toggle not a
             // piece-type value -- see lattice2dSeedCell's own header),
@@ -3702,6 +3732,7 @@ async function init() {
             ...Object.fromEntries(LATTICE_PRIMITIVES.map((p) => [`lattice2d:${p.id}`, p.label])),
           };
           document.getElementById('piece-type-select').value = value;
+          if (value === 'cell24' || value === 'cell16') world4d?.setKind(value);
           // Real gap, caught while fixing a separate lattice2d bug
           // (see lattice2dSeedCell's own header): every OTHER piece
           // type here is always-visible regardless of which is picked
@@ -3927,6 +3958,17 @@ async function init() {
         // A reasonable default, the full picker is dimension-wizard.js's
         // job" role -- same relationship 3D's own 'rd' default above has
         // to its own wizard screen.
+        // 4D (2026-09-24): switch every 3D/2D mesh off, the 4D world on,
+        // and open the separate 4D picker wheel, starting on the 24-cell.
+        if (action === 'tool:selectDimension:4D') {
+          activeDimension = '4D';
+          handleWheelAction('tool:pieceType:cell24');
+          applyDimensionVisibility();
+          applyDimensionCamera('4D');
+          dimensionWheel3D.close();
+          wheel3D.open('piece4d');
+          return;
+        }
         if (action === 'tool:selectDimension:2D') {
           activeDimension = '2D';
           applyDimensionVisibility();
@@ -4063,6 +4105,9 @@ async function init() {
     // same pattern this block's own onAction callback already relies on.
     document.getElementById('hud-quick-shape')?.addEventListener('click', () => {
       if (pickers.isAnyPickerOpen()) pickers.closeAnyPicker();
+      // 4D: the bottom-left button opens the separate 4D picker wheel
+      // (direct decision), not the 3D Piece wheel.
+      if (activeDimension === '4D') { wheel3D.open('piece4d'); return; }
       seedIfWorldEmpty();
       wheel3D.open('piece');
     });
@@ -4306,6 +4351,8 @@ async function init() {
     const myGeneration = ++latticeQuickViewGeneration;
     clearLatticeQuickView();
     if (latticeQuickViewMode === 'off') { syncLatticeQuickViewActiveState(false); return; }
+    // 4D draws its own Lattice View (world-4d.js); no 3D overlay there.
+    if (activeDimension === '4D') { syncLatticeQuickViewActiveState(true); return; }
     const { world: w, scene: s } = activeWorldTriple();
     const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
     // A newer call (a later click, or a rapid second onChange) may have
@@ -4549,10 +4596,13 @@ async function init() {
   }
   async function cycleLatticeQuickView() {
     const currentIdx = LATTICE_QUICK_VIEW_MODES.indexOf(latticeQuickViewMode);
-    latticeQuickViewMode = LATTICE_QUICK_VIEW_MODES[(currentIdx + 1) % LATTICE_QUICK_VIEW_MODES.length];
+    // 4D has one Lattice View (its own open slots), so it's just Off <-> On.
+    if (activeDimension === '4D') latticeQuickViewMode = latticeQuickViewMode === 'off' ? 'rd' : 'off';
+    else latticeQuickViewMode = LATTICE_QUICK_VIEW_MODES[(currentIdx + 1) % LATTICE_QUICK_VIEW_MODES.length];
     if (latticeQuickViewMode !== 'off') clearDualizePreview(); // mutual exclusion -- see deactivateLatticeQuickView's own comment
     updateLatticeQuickViewIcon();
-    showHudPrompt(`Lattice View: ${LATTICE_QUICK_VIEW_LABELS[latticeQuickViewMode]}`, 4500);
+    world4d?.setLatticeView(latticeQuickViewMode !== 'off');
+    showHudPrompt(activeDimension === '4D' ? `Lattice View: ${latticeQuickViewMode === 'off' ? 'Off.' : 'every open slot one step past your 4D build.'}` : `Lattice View: ${LATTICE_QUICK_VIEW_LABELS[latticeQuickViewMode]}`, 4500);
     await rebuildLatticeQuickView(); // also syncs the toggle buttons' own 'active' state -- see syncLatticeQuickViewActiveState
   }
   bccToggleBtn?.addEventListener('click', cycleLatticeQuickView);
@@ -4671,7 +4721,7 @@ async function init() {
     // own `?? MARKS.pieceRD` fallback below) regardless of which was
     // actually selected -- the real placement itself was always
     // correct, only this indicator was silently wrong.
-    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRDQuarter', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore',
+    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', rdquarter: 'pieceRDQuarter', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore', cell24: 'piece24Cell', cell16: 'piece16Cell',
     // 2D lattice tier: one entry per LATTICE_PRIMITIVES, reusing
     // wheel-icons.js's own 3 primitive-keyed icons (Phase 6: the piece
     // type IS just the primitive now, angle is a separate live toggle
@@ -5488,6 +5538,12 @@ async function init() {
     requestAnimationFrame(step);
   }
 
+  world4d = createWorld4D({
+    scene,
+    materialColor,
+    getMaterial: () => currentMaterialFor(document.getElementById('piece-type-select').value),
+    showHudPrompt,
+  });
   createBuildController({
     renderer,
     camera,
@@ -5553,6 +5609,14 @@ async function init() {
     onPieceNoOp: (action) => {
       const piece = document.getElementById('piece-type-select')?.value;
       const messages = {
+        cell24: {
+          add: 'A 24-cell is already there -- tap a different face, or slide W-depth to reach the next layer.',
+          remove: 'Long-press a placed 24-cell to remove it.',
+        },
+        cell16: {
+          add: 'A 16-cell is already there -- tap a different face, or slide W-depth to reach the next layer.',
+          remove: 'Long-press a placed 16-cell to remove it.',
+        },
         pyramid: {
           add: "That pyramid's already there -- try a face you've removed one from, or switch Piece to Cube/RD to place a whole new block.",
           remove: 'No pyramid there to remove -- that face is already a flat cube.',
@@ -5716,6 +5780,13 @@ async function init() {
       place: (material) => { firstPlacementCurrent?.place(material); },
     },
     onRhombohedraChange,
+    // 4D world (world-4d.js): while 4D is active it is the ONLY raycast
+    // target and handles every tap/long-press itself.
+    world4d: {
+      isActive: () => activeDimension === '4D',
+      meshes: () => world4d.meshes(),
+      handleTap: (hit, mode) => world4d.handleTap(hit, mode),
+    },
     // Pyrochlore (3D Kagome): resolves a raycast hit on any of its 4
     // meshes to either { type: 'tt', cell } or { type: 'tet', kind,
     // center, cell } (cell = the tet's owning TT) -- see

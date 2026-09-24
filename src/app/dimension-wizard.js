@@ -44,6 +44,7 @@
 // tier actually ships, flip its DIMENSIONS entry below from disabled to
 // real -- no other structural change needed.
 import { mountWireframePreview } from './wireframe-preview.js';
+import { cellStructure, rotation4, matVec, project4 } from '../geometry-extensions/lattice-4d.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
 
 const CSS = `
@@ -166,7 +167,7 @@ const DIMENSIONS = [
   // lattice2dSeedCell's own header in render.js for the full incident.
   { id: '2D', label: '2D', desc: '3 real tile primitives (Parallelogram, Triangle, Hexagon), each buildable at any of 4 named lattice angles via the in-scene toggle panel.', enabled: true, preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: NAMED_LATTICE_ANGLES[0].angleDeg }) },
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, previewAction: 'tool:pieceType:rd' },
-  { id: '4D', label: '4D', desc: 'Hypercubic (Tesseract) and D4 root lattice.', enabled: false },
+  { id: '4D', label: '4D', desc: 'D4 (24-cell and 16-cell) -- Tesseract and Hyper-pyrochlore planned.', enabled: true, preview: () => edges4D('cell24') },
   { id: '5D', label: '5D', desc: 'Decagonal quasicrystal.', enabled: false },
   { id: '6D', label: '6D', desc: 'Icosahedral quasicrystal.', enabled: false },
 ];
@@ -234,6 +235,40 @@ export const LATTICES_3D = [
   ] },
 ];
 
+// 4D thumbnails (direct decision, option B): each cell's 4D edges turned
+// by a slight oblique XW 20 / YW 15 / ZW 10 degree rotation, then a
+// parallel shadow into 3D (vertex-first collapses the 24-cell and
+// tesseract to the same RD outline; cell-first hides the 4D-ness), then
+// the same rotating preview as every other card. Real geometry from
+// lattice-4d.js (verify:4d), nothing hand-drawn.
+const OBLIQUE_4D = rotation4({ xw: 20 * Math.PI / 180, yw: 15 * Math.PI / 180, zw: 10 * Math.PI / 180 });
+const FIRST_4D_CENTER = { cell24: [0, 0, 0, 0], cell16: [0.5, 0.5, 0.5, 0.5] };
+function edges4D(kind) {
+  const c = FIRST_4D_CENTER[kind];
+  const s = cellStructure(kind, c);
+  const p = s.offsets.map((o) => project4(matVec(OBLIQUE_4D, o), false));
+  return s.edges.map(([i, j]) => [p[i], p[j]]);
+}
+
+// LATTICES_4D: the three 4D worlds (direct decision: wizard = three
+// worlds, the 4D wheel = six cells). Planned worlds' pieces show as
+// disabled rows with no preview, the same honest "not built yet"
+// treatment as the 5D/6D cards.
+export const LATTICES_4D = [
+  { label: 'Z4 (Hypercubic)', desc: 'Tesseract -- the 4D cube world. Planned.', pieces: [
+    { label: 'Tesseract', action: null },
+  ] },
+  { label: 'D4', desc: '24-cell, the 4D RD: its w = 0 slice is the FCC world. The bottom-row toggle switches to placing 16-cells.', pieces: [
+    { label: '24-cell', action: 'tool:pieceType:cell24', preview: () => edges4D('cell24') },
+    { label: '16-cell', action: 'tool:pieceType:cell16', preview: () => edges4D('cell16') },
+  ] },
+  { label: 'Hyper-pyrochlore (4D Kagome)', desc: 'Corner-sharing 5-cells on A4 -- its w-slice is Pyrochlore. Planned.', pieces: [
+    { label: 'Truncated 5-cell', action: null },
+    { label: 'Bitruncated 5-cell', action: null },
+    { label: '5-cell', action: null },
+  ] },
+];
+
 export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
   injectCssOnce();
 
@@ -290,6 +325,7 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
         const dim = el.dataset.dim;
         if (dim === '3D') showLattice3D();
         else if (dim === '2D') showLattice2D();
+        else if (dim === '4D') showLattice4D();
       });
     });
   }
@@ -321,19 +357,26 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
     });
   }
 
-  function showLattice3D() {
+  function showLatticeSections(dimension, lattices, sub, edgesFor) {
     resetPreviews();
     let grid = '';
-    for (const lat of LATTICES_3D) {
+    for (const lat of lattices) {
       grid += `
         <div class="dim-wizard-section">
           <span class="dim-wizard-label">${lat.label}</span>
           <span class="dim-wizard-desc">${lat.desc}</span>
         </div>`;
       for (const piece of lat.pieces) {
+        if (!piece.action) {
+          grid += `
+        <button type="button" class="dim-wizard-card-btn dim-wizard-piece disabled" disabled title="Planned, not yet built.">
+          <span class="dim-wizard-row-text"><span class="dim-wizard-label">${piece.label}</span></span>
+        </button>`;
+          continue;
+        }
         grid += `
         <button type="button" class="dim-wizard-card-btn dim-wizard-piece" data-action="${piece.action}">
-          ${previewSlot(() => pieceEdges(piece.action))}
+          ${previewSlot(() => edgesFor(piece))}
           <span class="dim-wizard-row-text">
             <span class="dim-wizard-label">${piece.label}</span>
           </span>
@@ -342,16 +385,22 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
     }
     bodyEl.innerHTML = `
       <button type="button" class="dim-wizard-back">← Back</button>
-      <div class="dim-wizard-sub">3D: pick a piece to start with -- every lattice stays reachable afterward via the Piece wheel.</div>
+      <div class="dim-wizard-sub">${sub}</div>
       <div class="dim-wizard-grid">${grid}</div>`;
     mountPreviews();
     bodyEl.querySelector('.dim-wizard-back').addEventListener('click', showDimensions);
     bodyEl.querySelectorAll('.dim-wizard-card-btn[data-action]').forEach((el) => {
       el.addEventListener('click', () => {
         close();
-        onSelectFamily('3D', el.dataset.action);
+        onSelectFamily(dimension, el.dataset.action);
       });
     });
+  }
+  function showLattice3D() {
+    showLatticeSections('3D', LATTICES_3D, '3D: pick a piece to start with -- every lattice stays reachable afterward via the Piece wheel.', (piece) => pieceEdges(piece.action));
+  }
+  function showLattice4D() {
+    showLatticeSections('4D', LATTICES_4D, '4D: pick a cell to start with -- the 4D wheel reaches every cell afterward.', (piece) => piece.preview());
   }
 
   overlay.querySelector('.dim-wizard-close').addEventListener('click', () => close());

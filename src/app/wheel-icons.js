@@ -188,6 +188,11 @@ export const MARKS = {
   // RD Quarter: shared pieceRhombohedron's mark until 2026-09-24, direct
   // request for its own -- a hexagon outline with a "Mercedes" Y whose
   // 3 spokes run to 3 alternate corners.
+  // 4D cells (2026-09-24, provisional marks pending the user's own
+  // sign-off): 24-cell = hexagon (its RD-outline shadow) with a filled
+  // inner triangle; 16-cell = the cross-polytope's square-with-cross.
+  piece24Cell: `<polygon points="${hexPts(20)}" ${THIN}/><polygon points="0,-10 8.66,5 -8.66,5" fill="currentColor" opacity="0.5"/>`,
+  piece16Cell: `<polygon points="0,-22 22,0 0,22 -22,0" ${THIN}/><path d="M0,-22 V22 M-22,0 H22" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
   pieceRDQuarter: `<polygon points="${hexPts(20)}" ${THIN}/><path d="M0,0 V-20 M0,0 L17.32,10 M0,0 L-17.32,10" stroke="currentColor" stroke-width="1.5"/>`,
   // Pyrochlore (3D Kagome): the truncated tetrahedron's own silhouette --
   // a tetrahedron (faint outer triangle) with its corners cut off at the

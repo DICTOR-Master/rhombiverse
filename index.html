@@ -135,6 +135,44 @@
        green highlight that didn't match anything else in Rhombiverse's
        own chrome. */
     .lattice2d-toggle-row button.active { background: rgba(120, 190, 255, 0.4); border-color: #7cf; color: #fff; }
+    /* 4D panel (src/app/world-4d.js): one geared slider plus the
+       W-depth | XW | YW | ZW toggle, and Slice/Projection, Parallel/
+       Perspective (Projection only), Reset 4D. Only shown in 4D. Bottom-
+       center above the quick-select row, full width on phones, big touch
+       targets. */
+    #world4d-panel {
+      display: none;
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+      width: min(460px, calc(100vw - 16px));
+      z-index: 900;
+      flex-direction: column; align-items: stretch; gap: 6px;
+    }
+    #world4d-panel.visible { display: flex; }
+    /* Toasts sit just above the 4D panel while it's showing, instead of
+       on top of its buttons. */
+    body.world4d-on #hud-prompt { bottom: calc(190px + env(safe-area-inset-bottom, 0px)); }
+    .w4d-row { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
+    .w4d-row button {
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #9cd; font: 12px system-ui, sans-serif;
+      border-radius: 6px; padding: 7px 11px; cursor: pointer; min-height: 32px;
+    }
+    .w4d-row button.active { background: rgba(120, 190, 255, 0.4); border-color: #7cf; color: #fff; }
+    .w4d-track {
+      position: relative; height: 34px; touch-action: none; cursor: ew-resize;
+      background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 17px;
+    }
+    .w4d-ticks { position: absolute; inset: 0 17px; pointer-events: none; }
+    .w4d-tick {
+      position: absolute; top: 4px; bottom: 4px; width: 1px; background: rgba(157, 224, 255, 0.35);
+      font: 10px system-ui, sans-serif; color: #9de0ff; text-indent: 16px; line-height: 26px; white-space: nowrap;
+    }
+    .w4d-thumb {
+      position: absolute; top: 4px; width: 24px; height: 24px; transform: translateX(-50%);
+      border-radius: 50%; background: #7cf; box-shadow: 0 0 6px rgba(124, 204, 255, 0.8); pointer-events: none;
+    }
     /* Quick-select: the CURRENTLY active Piece/Color, always visible
        next to Menu rather than only shown as a fading toast -- direct
        request 2026-08-29 ("a little hexagon icon of each... stay open
@@ -970,6 +1008,8 @@
           <option value="rhombohedra">Rhombohedra (free-standing lattice, own separate)</option>
           <option value="hexprism">Hex Prism (own separate lattice)</option>
           <option value="pyrochlore">Pyrochlore (3D Kagome)</option>
+          <option value="cell24">24-cell</option>
+          <option value="cell16">16-cell</option>
           <!-- 2D lattice tier (Phase 3+4) options are injected here at
                startup by render.js, one per LATTICE_2D_COMBINATIONS entry
                (id="lattice2d-piece-options") -- NOT hand-listed like every
