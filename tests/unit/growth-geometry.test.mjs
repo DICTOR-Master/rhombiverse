@@ -3,7 +3,7 @@
 // removal pass). Extracted from growth.test.mjs, which tested the
 // growth-over-time engine half (now archived, see
 // tests/unit/growth-archived.test.mjs... actually kept as
-// growth.test.mjs itself, repointed to world-systems-archived/growth.js)
+// growth.test.mjs itself, which tested the retired engine and was deleted 2026-09-24)
 // alongside this geometry. Zero npm dependencies, same as lattice.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

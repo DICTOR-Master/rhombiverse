@@ -28,21 +28,6 @@ import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latt
 import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWorld, rhombohedraMigrateLegacyCell, rhombohedraAttachOptions, rhombohedraOverlap } from './geometry-extensions/rhombohedra-lattice.js';
 import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats, pyrochloreNeighborOffsets, pyrochloreCapTetsOf, pyrochloreVisibleTets, pyrochloreTetCornerPartner } from './geometry-extensions/pyrochlore-lattice.js';
 import { FEATURES } from './app/features.js';
-import {
-  generateSubLattice,
-  generateSubLatticeAt,
-  SUB_LATTICE_MAX_SHELL,
-  cumulativeCellCount,
-  subScaleFactor,
-  selectNearbyCells,
-  selectNearbyByWorldPosition,
-  MAX_LOD_DEPTH,
-  levelTriggerDistance,
-  blendFactor,
-  SUB_LATTICE_THROTTLE_BASE_MS,
-  nextVolatilityScore,
-  throttleForVolatility,
-} from './geometry-extensions/latticezoom.js';
 import { loadWorld, createWorldStore } from './core/worldstate-core.js';
 import { createBuildController, removeShell, recolorShell } from './core/build.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR, QUALITY_LEVELS_ASCENDING } from './app/settings.js';
@@ -99,7 +84,7 @@ import { VALID_TRIPLES, unitTileVertices } from './geometry-extensions/growth.js
 // World-building/game systems (mining, trade, claims, achievements,
 // animals, hazards, hydrosphere, gravity/planetoids, growth/evolution/
 // cultivation, walking/exploring, Shared World sync) were retired and
-// their code archived to world-systems-archived/ -- see README.md.
+// their code archived to an archive, since deleted (2026-09-24) -- see docs/HISTORY-retired-systems.md.
 
 const SCALE = 1;
 // Hex Prism: no special proportion is required for a plain hex-prism
@@ -630,27 +615,24 @@ function buildCyborgWorldSummary() {
   const materialCounts = {};
   for (const cell of cells) materialCounts[cell.material] = (materialCounts[cell.material] ?? 0) + 1;
   const materialList = Object.entries(materialCounts).map(([m, n]) => `${n} ${m}`).join(', ') || 'nothing yet';
-  const seeds = Object.values(cyborgWorldRef.getSeeds());
-  const speciesList = [...new Set(seeds.map((s) => s.species))].join(', ');
-  const organismCount = Object.keys(cyborgWorldRef.getOrganisms()).length;
-  let text = `${cells.length} blocks built (${materialList}).`;
-  text += seeds.length > 0 ? ` ${seeds.length} planted seed(s): ${speciesList}.` : ' Nothing planted yet.';
-  if (organismCount > 0) text += ` ${organismCount} living organism(s) present.`;
-  return text;
+  // Pure geometry only (seeds/organisms were retired -- and getSeeds/
+  // getOrganisms no longer exist on the world store, so the old lines
+  // here would have thrown).
+  return `${cells.length} blocks built (${materialList}).`;
 }
 
 // Kept in sync with api/cyborg-suggest.js's own copy -- see docs/code-notes/render.md
 const CYBORG_SUGGEST_SYSTEM_PROMPT = `You are a creative building companion for Rhombiverse, a spatial editor where every block is a rhombic dodecahedron.
 
-Given a short description of what someone has already built, suggest ONE small, concrete, achievable next thing for them to build or plant -- something more interesting than "place another block", but still doable in a few minutes. Name a shape, direction, or technique (e.g. "try a mirrored arch to the east", "plant a conifer near your fern for a mixed grove", "hollow out the center and add windows"). Keep it under 140 characters, friendly, and specific to what they've actually built so far -- don't suggest something they've clearly already done. Never mention that you are an AI.
+Given a short description of what someone has already built, suggest ONE small, concrete, achievable next thing for them to build -- something more interesting than "place another block", but still doable in a few minutes. Name a shape, direction, or technique (e.g. "try a mirrored arch to the east", "switch to BCC and wrap your tower in truncated octahedra", "hollow out the center and add windows"). Keep it under 140 characters, friendly, and specific to what they've actually built so far -- don't suggest something they've clearly already done. Never mention that you are an AI.
 
 Respond with a JSON object with exactly one field: suggestion (string, <140 chars).`;
 
 const LOCAL_CYBORG_SUGGESTIONS = [
   'Try building a small dome and see how it looks from inside.',
-  "Plant something new near what's already grown -- see how the species interact.",
+  'Switch lattice (FCC to BCC) and see how the same idea looks built from truncated octahedra.',
   "Add a mirrored wing to double a shape you've already built.",
-  "Walk to the edge of what you've built and extend it in a new direction.",
+  "Orbit to the far side of what you've built and extend it in a new direction.",
   'Try a different material for the next few blocks -- see how the color changes the feel of the shape.',
   'Hollow out part of a solid structure and see what it looks like from inside.',
 ];
@@ -700,7 +682,7 @@ cyborgToggleEl.addEventListener('click', async () => {
 // content (an "already-built World," "growing life", other players) that
 // no longer exists; its own enable() call was already permanently
 // unreachable (gated on !pureGeometry, which settings.js forces true
-// unconditionally). data/cyborg-archived/onboarding.json (moved there, narrated retired game content).
+// unconditionally). The old onboarding.json (retired game content) was deleted 2026-09-24.
 
 // See docs/code-notes/render.md
 let pendingPersonaChoice = null;
@@ -2554,127 +2536,9 @@ async function init() {
   sculptureMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   sculptureScene.add(sculptureMesh);
 
-  // Lattice Zoom Stage 2: sub-lattice reveal setup -- see docs/code-notes/render.md
-  const SUB_LATTICE_TRIGGER_DISTANCE = 4;
-  const MAX_NEARBY_SUBLATTICE_CELLS = 20;
-  const SUB_LATTICE_CELLS_PER_PARENT = cumulativeCellCount(SUB_LATTICE_MAX_SHELL);
-  const subLatticeScale = subScaleFactor(SUB_LATTICE_MAX_SHELL) * SCALE;
-  const subLatticeGeometry = buildRDGeometry(subLatticeScale);
-  const subLatticeMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffb347,
-    metalness: 0.15,
-    roughness: 0.55,
-    flatShading: true,
-  });
-  const subLatticeMesh = new THREE.InstancedMesh(
-    subLatticeGeometry,
-    subLatticeMaterial,
-    MAX_NEARBY_SUBLATTICE_CELLS * SUB_LATTICE_CELLS_PER_PARENT
-  );
-  subLatticeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  subLatticeMesh.count = 0;
-  scene.add(subLatticeMesh);
-
-  // Lattice Zoom Stage 3, level 2 -- see docs/code-notes/render.md
-  const LEVEL2_TRIGGER_DISTANCE = levelTriggerDistance(SUB_LATTICE_TRIGGER_DISTANCE, 2, SUB_LATTICE_MAX_SHELL);
-  const MAX_NEARBY_LEVEL2_PARENTS = 4;
-  const level2Scale = subLatticeScale * subScaleFactor(SUB_LATTICE_MAX_SHELL);
-  const level2Geometry = buildRDGeometry(level2Scale);
-  const level2Mesh = new THREE.InstancedMesh(
-    level2Geometry,
-    subLatticeMaterial,
-    MAX_NEARBY_LEVEL2_PARENTS * SUB_LATTICE_CELLS_PER_PARENT
-  );
-  level2Mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  level2Mesh.count = 0;
-  scene.add(level2Mesh);
-
-  // Blend width per level -- see docs/code-notes/render.md
-  const SUB_LATTICE_BLEND_WIDTH = subLatticeScale;
-  const LEVEL2_BLEND_WIDTH = levelTriggerDistance(SUB_LATTICE_BLEND_WIDTH, 2, SUB_LATTICE_MAX_SHELL);
-
-  // Sub-lattice throttle state -- see docs/code-notes/render.md
-  let subLatticeThrottleMs = SUB_LATTICE_THROTTLE_BASE_MS;
-  let subLatticeVolatilityScore = 0;
-  let lastSubLatticeRefPos = null;
-  let lastSubLatticeRefresh = 0;
-  const subLatticeDummy = new THREE.Object3D();
-
-  // See docs/code-notes/render.md
-  function writeBlendedInstance(mesh, idx, worldPosition, blend) {
-    subLatticeDummy.position.set(...worldPosition);
-    subLatticeDummy.scale.setScalar(blend);
-    subLatticeDummy.updateMatrix();
-    mesh.setMatrixAt(idx, subLatticeDummy.matrix);
-  }
-
-  // See docs/code-notes/render.md
-  function refreshSubLattice() {
-    const camPos = camera.position;
-    const refPos = [camPos.x, camPos.y, camPos.z];
-
-    const movement = lastSubLatticeRefPos
-      ? Math.hypot(refPos[0] - lastSubLatticeRefPos[0], refPos[1] - lastSubLatticeRefPos[1], refPos[2] - lastSubLatticeRefPos[2])
-      : 0;
-    subLatticeVolatilityScore = nextVolatilityScore(subLatticeVolatilityScore, movement, SUB_LATTICE_TRIGGER_DISTANCE);
-    subLatticeThrottleMs = throttleForVolatility(subLatticeVolatilityScore);
-    lastSubLatticeRefPos = refPos;
-
-    const chosen = selectNearbyCells(
-      world.entries(),
-      refPos,
-      SUB_LATTICE_TRIGGER_DISTANCE + SUB_LATTICE_BLEND_WIDTH,
-      MAX_NEARBY_SUBLATTICE_CELLS,
-      SCALE
-    );
-
-    let idx = 0;
-    const level1Cells = [];
-    for (const parent of chosen) {
-      const blend = blendFactor(parent.d, SUB_LATTICE_TRIGGER_DISTANCE, SUB_LATTICE_BLEND_WIDTH);
-      const subCells = generateSubLattice(parent.x, parent.y, parent.z, SUB_LATTICE_MAX_SHELL, SCALE);
-      for (const sub of subCells) {
-        writeBlendedInstance(subLatticeMesh, idx, sub.worldPosition, blend);
-        idx++;
-        level1Cells.push(sub);
-      }
-    }
-    subLatticeMesh.count = idx;
-    subLatticeMesh.instanceMatrix.needsUpdate = true;
-    subLatticeMesh.computeBoundingSphere(); // see docs/code-notes/render.md
-
-    let idx2 = 0;
-    if (MAX_LOD_DEPTH >= 2) {
-      const chosen2 = selectNearbyByWorldPosition(
-        level1Cells,
-        refPos,
-        LEVEL2_TRIGGER_DISTANCE + LEVEL2_BLEND_WIDTH,
-        MAX_NEARBY_LEVEL2_PARENTS
-      );
-      for (const parent of chosen2) {
-        const blend2 = blendFactor(parent.d, LEVEL2_TRIGGER_DISTANCE, LEVEL2_BLEND_WIDTH);
-        const subCells2 = generateSubLatticeAt(parent.worldPosition, parent.scale, SUB_LATTICE_MAX_SHELL);
-        for (const sub of subCells2) {
-          writeBlendedInstance(level2Mesh, idx2, sub.worldPosition, blend2);
-          idx2++;
-        }
-      }
-    }
-    level2Mesh.count = idx2;
-    level2Mesh.instanceMatrix.needsUpdate = true;
-    level2Mesh.computeBoundingSphere();
-  }
-  refreshSubLattice();
-
-  // See docs/code-notes/render.md
-  function scheduleSubLatticeRefresh() {
-    setTimeout(() => {
-      refreshSubLattice();
-      lastSubLatticeRefresh = performance.now();
-      scheduleSubLatticeRefresh();
-    }, subLatticeThrottleMs);
-  }
-  scheduleSubLatticeRefresh();
+  // (Lattice Zoom -- the orange sub-lattice that faded in when the
+  // camera got close -- was removed 2026-09-24: a leftover of the retired
+  // growth layer that read as seeds growing; see docs/HISTORY-retired-systems.md.)
 
   rebuildInstances(mesh, world);
 
@@ -3943,7 +3807,7 @@ async function init() {
     // rhombic wheel with all dimensions selectable... a dedicated
     // rotating wheel just for dimensions"). Replaces the earlier
     // wireframe-card wizard (dimension-wizard.js, now archived --
-    // src/world-systems-archived/dimension-wizard.js).
+    // an old dimension-wizard.js, since deleted).
     //
     // Its own onAction, NOT handleWheelAction directly: the universal-
     // ring actions (openCyborg/openLab/openAlmanac) need to close THIS
@@ -6201,7 +6065,7 @@ async function init() {
 
   // Preset-world picker (Showcase World, planetoid Body Types) removed
   // 2026-09-22 along with the rest of the game-world content -- see
-  // data/presets-archived/. Building your own World, Export/Import, and
+  // the old presets (deleted 2026-09-24). Building your own World, Export/Import, and
   // World sharing (compressed link) above are all that remain, and are
   // untouched.
 }

@@ -1623,7 +1623,6 @@ export function createBuildController({
 
     const cell = cellAt(hit);
     if (!cell) return;
-    if (mode === 'plant') return; // Plant mode's click handling lives in render.js
     if (mode === 'sculpt') return; // Sculpt mode's click handling lives in render.js/sculpture.js
     if (mode === 'bcc') return; // BCC mode's click handling lives in core/bcc-build.js
     if (mode === 'cubocta') return; // Cuboctahedron Build's click handling lives in core/cubocta-build.js
@@ -2063,7 +2062,7 @@ export function createBuildController({
 
   function onPointerMove(event) {
     const mode = getMode();
-    if (!mode || mode === 'plant') {
+    if (!mode) {
       if (onHoverEnd) onHoverEnd();
       return;
     }

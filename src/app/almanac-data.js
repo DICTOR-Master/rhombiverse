@@ -168,18 +168,7 @@ export const LATTICE_CONCEPT_ENTRIES = [
   },
 ];
 
-// World Systems retirement note (spec section 3c) -- one historical
-// entry, not blocking any other stage. See README.md/CLAUDE.md's own
-// retirement notes and commit 890615a for the real history this
-// summarizes.
-export const HISTORY_ENTRIES = [
-  {
-    kind: 'history',
-    id: 'history:worldSystemsRetired',
-    label: 'What Happened to World Systems?',
-    desc: 'World Systems (mining, trade, claims, achievements, animals, hazards) was retired -- the code is archived, not deleted, but every path to it in the live UI is gone. Shared World (pure building, no simulation) is the only mode now. See commit 890615a for the full change.',
-    markKey: null,
-  },
-];
-
-export const ALMANAC_ENTRIES = [...PIECE_ENTRIES, ...LATTICE_CONCEPT_ENTRIES, ...HISTORY_ENTRIES];
+// (The old "What Happened to World Systems?" history entry was removed
+// 2026-09-24, direct instruction: Rhombiverse is pure geometry only, and
+// the Almanac shouldn't point at retired game systems at all.)
+export const ALMANAC_ENTRIES = [...PIECE_ENTRIES, ...LATTICE_CONCEPT_ENTRIES];

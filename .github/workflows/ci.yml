@@ -79,6 +79,10 @@ jobs:
         run: |
           npm install
           npm run build
+      # Stale-wording guard (scripts/verify-copy.mjs): fails if retired
+      # world-building/game terms reach any user-visible text again.
+      - name: Check user-visible text for stale terms
+        run: npm run verify:copy
       - name: Install Playwright
         working-directory: tests/browser
         run: |

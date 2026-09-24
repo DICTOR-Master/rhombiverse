@@ -3,8 +3,8 @@
 // growth.js, which also carried a real growth-over-time engine (species
 // templates, tick-rate-limited growSeed/applyGrowth/plantSeed/pruneTile).
 // That engine is archived in full at
-// src/world-systems-archived/growth.js -- see
-// docs/code-notes/world-systems-archived/growth.md for its history.
+// the old growth engine (deleted 2026-09-24 with the rest of the
+// retired systems -- see docs/HISTORY-retired-systems.md).
 //
 // What's kept here is genuinely reusable, non-simulated geometry: the 12
 // star directions, the valid acute/oblate rhombohedron triples they form,

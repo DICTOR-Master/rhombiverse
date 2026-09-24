@@ -9,7 +9,8 @@
     "verify:lattice-2d": "node scripts/verify-lattice-2d.mjs",
     "verify:pyrochlore": "node scripts/verify-pyrochlore.mjs",
     "verify:rhombohedra": "node scripts/verify-rhombohedra.mjs",
-    "verify:4d": "node scripts/verify-4d.mjs"
+    "verify:4d": "node scripts/verify-4d.mjs",
+    "verify:copy": "node scripts/verify-copy.mjs"
   },
   "dependencies": {
     "ai": "^6.0.0",

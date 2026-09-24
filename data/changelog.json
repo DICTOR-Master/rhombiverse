@@ -279,7 +279,7 @@
     "link": "./rhombis.html?stage=24",
     "items": [
       "New: Multi-Cell's two real cells each get a real diagonal-octahedron alternate fill -- a genuine bipyramid through that cell's own center, built along the exact real neighbor axis the two cells share (facePieces(), the same real primitive verified the same day for the Disphenoid crossover's own interlocking tabs). Genuinely different from Stage 2's own plain Octahedron (built along a cube-face axis, dead straight relative to the RD's own faces) -- this one runs along a real 12-neighbor diagonal instead, so it reads as visibly tilted/angled. Direct instruction: \"multi cell could benefit from a variety of pieces within it\", generalized immediately after into a real standing idea worth reusing elsewhere: \"the bridging point of any adjacent shapes in a structure is a potential opportunity for a big odd connection.\"",
-      "Fixed a real bug caught live the same day (\"22 is saying solved when only your two long pieces are in\"): the octahedron originally claimed the WHOLE cell in one placement, same as the plain fused whole-RD piece -- but unlike that piece, its own real geometry is smaller than the true cell, so the puzzle read solved over real visible gaps. Fixed by rebuilding the cell's OWN loose pieces on the exact same real facePieces() frame the octahedron already uses (instead of the older cube-face frame), so the octahedron now correctly claims only its own real 2-face slice, and the other 10 real slices still need their own loose pieces -- an exact, not approximate, correspondence between the two.",
+      "Fixed a real bug caught live the same day (\"22 is saying solved when only your two long pieces are in\"): the octahedron originally took up the WHOLE cell in one placement, same as the plain fused whole-RD piece -- but unlike that piece, its own real geometry is smaller than the true cell, so the puzzle read solved over real visible gaps. Fixed by rebuilding the cell's OWN loose pieces on the exact same real facePieces() frame the octahedron already uses (instead of the older cube-face frame), so the octahedron now correctly takes up only its own real 2-face slice, and the other 10 real slices still need their own loose pieces -- an exact, not approximate, correspondence between the two.",
       "A flat-star alternate (a shorter, squatter version of the same idea) was tried the same day and pulled again for now -- it shared the octahedron's own original bug and needs the same real rescoping before it can come back."
     ]
   },
@@ -408,9 +408,9 @@
     "date": "2026-09-02",
     "title": "A Simpler Wheel",
     "items": [
-      "Two departments retired: Construct (a pure hop with no content of its own) and Rhombisis (three of its four faces just duplicated tools already on Build, Blueprint, and Cultivate). Build and Alter now sit directly on Home; BCC Build moved there too.",
+      "Two departments retired: Construct (a pure hop with no content of its own) and Rhombisis (three of its four faces just duplicated tools already on Build and Blueprint). Build and Alter now sit directly on Home; BCC Build moved there too.",
       "Every wheel shows real content the moment you land on it now, not a blank face mixed in with the first ones you see.",
-      "\"Rhombitect\" and \"Rhombivate\" are now Blueprint and Cultivate -- plain English, matching the rest of the wheel. \"Lab / Settings\" is just Settings everywhere.",
+      "\"Rhombitect\" is now Blueprint -- plain English, matching the rest of the wheel. \"Lab / Settings\" is just Settings everywhere.",
       "The welcome screen's ENTER is a large, always-clickable label now, fixed at the center of the rotating logo -- no more waiting for a swinging face to catch it, and the old pulsing glow faces are gone."
     ]
   },
@@ -451,7 +451,7 @@
     "date": "2026-08-31",
     "title": "Just the Shape, No Strings Attached",
     "items": [
-      "New: Export Model (.rhomb) in the Lab panel -- a pure-geometry export of your cells and any grown seeds, with none of your claims, inventory, trades, or organism data along for the ride. Export World is unchanged, still there for the full picture."
+      "New: Export Model (.rhomb) in the Lab panel -- a pure-geometry export of your cells. Export World is unchanged, still there for the full picture."
     ]
   },
   {
@@ -538,7 +538,7 @@
     "items": [
       "Fixed: removing your very last cell used to leave your World with nothing left to click -- Add had no face to place against, a genuine dead end. Your World now always keeps at least one real cell, restored automatically the instant it would otherwise hit zero, so there's always something to build forward from.",
       "Same fix for BCC Build and the interstitial lattice (Octahedron Site / Disphenoid) -- whichever one you're working in always keeps at least one real piece to build forward from too.",
-      "Fixed: Clear World left that one real cell exactly where it always is, but never brought your camera/view back to it -- if you'd wandered off elsewhere first, the cell existed but sat off-screen, unreachable, indistinguishable from actually being stuck. Clear World now resets your view (and exits Walk mode if it was on) to look straight at it every time."
+      "Fixed: Clear World left that one real cell exactly where it always is, but never brought your camera/view back to it -- if you'd wandered off elsewhere first, the cell existed but sat off-screen, unreachable, indistinguishable from actually being stuck. Clear World now resets your view to look straight at it every time."
     ]
   },
   {
@@ -613,15 +613,6 @@
   },
   {
     "date": "2026-08-28",
-    "title": "A Still Place to Build",
-    "items": [
-      "New Model workspace setting (Lab panel): freezes growth, ecosystem catch-up, asteroid regrowth, and inventory decay so nothing moves on its own while you work -- geometry and material tools stay fully available.",
-      "The Rhombic Wheel reacts live: Model workspace quiets Rhombivate, Trade, Explore, Plant a Seed, and BCC Build, leaving Construct, Rhombitect, and the rest of Rhombisis front and center.",
-      "Switch back to World workspace anytime -- nothing is lost, everything just picks back up."
-    ]
-  },
-  {
-    "date": "2026-08-28",
     "title": "Five Lenses on Your Lattice",
     "items": [
       "The BCC Lattice toggle now cycles through five real views instead of one: FCC only, the dual lattice only, both together in distinct colors, or either one ghosted behind the other.",
@@ -653,7 +644,6 @@
     "title": "One wheel, everywhere",
     "items": [
       "The old flat menu is gone -- the Rhombic Wheel in 3D is now the only way to navigate, covering every department, tool, and picker the old one did.",
-      "A new Rhombisis department gathers Sculpt, Generate a Body, and Plant a Seed in one place -- the three ways to bring something new into being.",
       "A small gold Rhombic Wheel now sits permanently in the corner, replacing the old row of separate buttons -- rotate it by hand to reach Lab, X-Ray, Cyborg, Sculpture Mode, Duality, BCC, Clear World, and Reload.",
       "Every open face on both wheels now shows something -- a temporary shortcut to a real function elsewhere -- instead of sitting blank."
     ]
@@ -662,8 +652,7 @@
     "date": "2026-08-25",
     "title": "The wheel becomes the shape",
     "items": [
-      "A new toggle in the top-right opens the Rhombic Wheel in 3D -- navigate Build, Alter, Rhombitect, Cultivate, and Trade on the real rhombic-dodecahedron shape itself, not a flat menu.",
-      "Every department does real things -- pick a material, generate a celestial body, choose a species to plant, dig, smooth, fill, sculpt -- right alongside the existing wheel, not replacing it yet.",
+      "A new toggle in the top-right opens the Rhombic Wheel in 3D -- navigate its departments on the real rhombic-dodecahedron shape itself, not a flat menu.",
       "Lenses, Cyborg, Lab Settings, and the Almanac are reachable from every wheel, in the exact same spot every time."
     ]
   },
@@ -679,17 +668,15 @@
     "date": "2026-08-24",
     "title": "Sculpture Mode, truly its own space",
     "items": [
-      "Sculpture Mode no longer shows the real World's presets or asteroid-belt hints -- it's a genuinely isolated scratch space now, not just in spirit.",
-      "Cyborg Mode's AI assistance (Semi- and Full-Cyborg) is now dual-aware -- build outward along a cube or octahedron vertex and it can suggest completing that whole inscribed solid, not just a mirror-plane edge.",
-      "Claims and Load-World presets now hide cleanly when their systems are off, instead of leaving a broken button behind."
+      "Sculpture Mode no longer shows the real World's presets -- it's a genuinely isolated scratch space now, not just in spirit.",
+      "Cyborg Mode's AI assistance (Semi- and Full-Cyborg) is now dual-aware -- build outward along a cube or octahedron vertex and it can suggest completing that whole inscribed solid, not just a mirror-plane edge."
     ]
   },
   {
     "date": "2026-08-23",
     "title": "The geometry comes first",
     "items": [
-      "Rhombiverse is now explicit about what it is: an instrument for exploring and sculpting rhombic-dodecahedron space -- the FCC lattice geometry is the core, not the mining/trade/hazard systems built on top of it.",
-      "A features.js flag registry lets some of those systems (Achievements, Animals, Hydrosphere, Trade decay) load only when needed, instead of always-on.",
+      "Rhombiverse is now explicit about what it is: an instrument for exploring and sculpting rhombic-dodecahedron space -- the FCC lattice geometry is the core.",
       "New in Sculpture Mode: the cube and octahedron inscribed in every block, made visible and sculptable -- a Show Dual overlay, Snap to Dual, a Dual Shell brush, Cube/Octa symmetry presets, and Full symmetry (48)."
     ]
   },
@@ -699,10 +686,9 @@
     "items": [
       "One control surface for everything: the Rhombic Wheel (Tab / Space, or tap Menu) replaces the old always-visible sidebar.",
       "Sculpt: a real symmetry/mirror tool with Model and Chisel modes, plus a standalone Sculpture Mode scratch workspace.",
-      "Grow: Cultivate real aperiodic growth, and see the tiling a structure casts with Duality Mode.",
-      "Cyborg Mode: an optional guided walkthrough, plus real AI assistance for Sculpt/Cultivate -- bring your own API key or use the shared one, never required to use.",
-      "Achievements, World sharing via a link, a public Gallery of shared Worlds, and a sequenced first-visit tour instead of a tutorial modal.",
-      "Walk up to another person and Interact to trade -- named avatars, a lightweight pseudonymous display name, no accounts.",
+      "Duality Mode: see the tiling a structure casts.",
+      "Cyborg Mode: an optional guided walkthrough, plus real AI assistance for Sculpt -- bring your own API key or use the shared one, never required to use.",
+      "World sharing via a link, and a sequenced first-visit tour instead of a tutorial modal.",
       "A pass of real mobile/touch fixes: tap-to-open the wheel, bottom-sheet tool panels, first-use hints on the icon toggles."
     ]
   },

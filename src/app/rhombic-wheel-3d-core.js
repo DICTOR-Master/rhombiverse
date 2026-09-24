@@ -150,7 +150,7 @@ export const UNIVERSAL_RING = {
   // id/action ("openLab", #lab-toggle, #lab-panel) unchanged, same
   // label-only-rename pattern already used for Rhombitect/Rhombivate.
   "top|sx1sz1":  { kind: "universal", label: "Settings", action: "openLab",
-                   desc: "The full technical interface — claims, JSON, moderation, generation parameters." },
+                   desc: "Your own AI key, advanced building, moderation, import/export and sharing, and shells." },
   "top|sx-1sz1": { kind: "universal", label: "Almanac",        action: "openAlmanac",
                    desc: "Math & Geometry reference — the demonstrations behind everything you build." }
 };
@@ -743,7 +743,7 @@ export const WHEEL_RD_FAMILY = {
 // (resolveWheelFaces/ALL_WHEELS) since it's already proven, just never
 // reached via navigateTo: from any other wheel and never navigated away
 // from. dimension-wizard.js is retired (archived, not deleted --
-// src/world-systems-archived/dimension-wizard.js) now that this wheel
+// an old dimension-wizard.js, since deleted) now that this wheel
 // replaces it as the actual dimension picker.
 //
 // 4th iteration, direct correction: "on first view of wheel only
