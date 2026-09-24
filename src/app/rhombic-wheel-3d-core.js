@@ -320,12 +320,12 @@ export const WHEEL_HOME = {
   // above); now hosts Alter directly, the second of the two departments
   // freed up by retiring Construct.
   fifthSlotOverride: { kind: "dept", label: "Alter", action: "navigateTo:alter",
-    desc: "Dig, Smooth, Replace, and Remove." },
+    desc: "Dig, Smooth, and Remove." },
   faces: {
     "equator|sx1sy1":   { kind: "dept", label: "Build",  action: "navigateTo:build",
       desc: "Add, Symmetry, Fill, and Piece. Was one click deeper, behind Construct -- moved directly onto Home." },
     "equator|sx1sy-1":  { kind: "dept", label: "Blueprint", action: "navigateTo:rhombitect",
-      desc: "Precise coordinate building — Dome, Spiral Column, Templates. Was labeled \"Rhombitect\"; renamed to plain English, same wheel underneath." },
+      desc: "Precise coordinate building — Dome. Was labeled \"Rhombitect\"; renamed to plain English, same wheel underneath." },
     // Was "Cultivate" (Plant/Prune/Growth Parameters) -- growth/
     // evolution/cultivation retired 2026-09-22 along with the rest of
     // the second world-building removal pass (see README.md). Now real
@@ -435,12 +435,13 @@ export const WHEEL_BUILD = {
     // Repeat is the 2D wheel's own real "tool-drag" leaf (drag across
     // faces to place a run of cells) -- reused via the new
     // toggleDragPlacement() export, same pattern as Material/Generate
-    // a Body/Species above. Pattern matches the 2D wheel's OWN real
-    // capability exactly: it's a "coming soon" placeholder there too
-    // (kind: 'placeholder'), not a real feature being ported -- added
-    // here for full flow-parity, not invented beyond what exists.
+    // a Body/Species above.
     "bottom|sx1sz-1":  { kind: "dept", label: "Repeat", action: "tool:repeat", desc: "Drag across faces to place a run of cells." },
-    "bottom|sx-1sz-1": { kind: "dept", label: "Pattern", action: "tool:pattern", desc: "Pattern stamping is coming soon." },
+    // Was a "Pattern -- coming soon" stub; unbuilt faces were removed
+    // 2026-09-25 (nothing unnecessary shown), so per the blank-face
+    // policy it duplicates its antipode, the universal Settings face.
+    "bottom|sx-1sz-1": { kind: "universal", label: "Settings", action: "openLab", temporary: true,
+      desc: "Your own AI key, advanced building, import/export and sharing, and shells. Duplicated here for quick access from a spare slot." },
     // Direct report 2026-09-02: top|sy1sz1 is one of only 3 faces
     // visible at a wheel's default opening rotation -- leaving it SPARE
     // made landing on this wheel look mostly empty (Add + Lab/Settings
@@ -542,11 +543,11 @@ export const WHEEL_ALTER = {
   faces: {
     "equator|sx1sy1":  { kind: "dept", label: "Dig", action: "tool:dig", desc: "Excavate mode -- click a cell to remove it." },
     "equator|sx1sy-1": { kind: "dept", label: "Smooth", action: "tool:smooth", desc: "Round mode -- click to smooth a corner." },
-    // Not wired: the underlying "replace" mode has no implementation
-    // anywhere in the codebase (no mode-btn, no currentMode handling)
-    // -- the 2D wheel's own Replace item is already a silent no-op
-    // today, discovered while wiring this. See render.js's onAction.
-    "equator|sx-1sy1": { kind: "dept", label: "Replace", action: "tool:replace", desc: "Not built yet." },
+    // Was a "Replace -- not built yet" stub (no replace mode exists
+    // anywhere); removed 2026-09-25, so per the blank-face policy it
+    // duplicates its antipode, Smooth.
+    "equator|sx-1sy1": { kind: "dept", label: "Smooth", action: "tool:smooth", temporary: true,
+      desc: "Round mode -- click to smooth a corner. Duplicated here for quick access from a spare slot." },
     // Temporary duplicate at Dig's true geometric antipode (equator|
     // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
     // policy: a blank face duplicates its antipode's content until
@@ -599,11 +600,12 @@ export const WHEEL_RHOMBITECT = {
   faces: {
     // Dome routes to the Sculpt panel's real "dome" shape keyword --
     // a judgment call (never a documented 1-click action before), see
-    // render.js's onAction handler. Spiral Column and Templates have
-    // no backing mechanic anywhere in this codebase -- real stubs.
+    // render.js's onAction handler. The two faces after it were "not
+    // built yet" stubs (Spiral Column, Templates), removed 2026-09-25;
+    // they're each other's antipodes, so there's nothing to duplicate.
     "equator|sx1sy1":  { kind: "dept", label: "Dome", action: "tool:dome", desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it." },
-    "equator|sx1sy-1": { kind: "dept", label: "Spiral Column", action: "tool:spiralColumn", desc: "Not built yet." },
-    "equator|sx-1sy1": { kind: "dept", label: "Templates", action: "tool:templates", desc: "Not built yet." },
+    "equator|sx1sy-1": SPARE,
+    "equator|sx-1sy1": SPARE,
     "equator|sx-1sy-1": { kind: "dept", label: "Dome", action: "tool:dome", temporary: true,
       desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
@@ -930,7 +932,6 @@ export const ACTION_TO_MARK = {
   'tool:fill': 'fill',
   'tool:dig': 'dig',
   'tool:smooth': 'smooth',
-  'tool:replace': 'replace',
   'navigateTo:rhombitect': 'rhombitect', // wheel now labeled "Blueprint"; mark/id name unchanged
   openAlmanac: 'almanac',
   openCyborg: 'cyborg',
@@ -938,7 +939,6 @@ export const ACTION_TO_MARK = {
   // on each of these (not in the spec's own table, resolved here).
   'tool:color': 'color',
   'tool:repeat': 'repeat',
-  'tool:pattern': 'pattern',
   // Build's department-nav face reuses its own wheel's primary tool
   // icon -- the face is a doorway into that wheel, so Add doubles as a
   // preview of what's inside. Alter used to do the same with Dig, but

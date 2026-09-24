@@ -314,11 +314,6 @@ export const MARKS = {
   // geometric consequence of touching at the same radius, not a
   // stroke-width guess. Confirmed "you got it."
   smooth: `<path d="M32,0 A32,32 0 1,0 -32,0 A32,32 0 1,0 32,0 Z M0,-32 L27.71,-16 L27.71,16 L0,32 L-27.71,16 L-27.71,-16 Z" fill="currentColor" fill-rule="evenodd"/>`,
-  // Replace: two overlapping hexagons with a real double-headed arrow at the overlap.
-  replace: `
-    <polygon points="${hexPts(28, -14, 0)}" ${THIN}/>
-    <polygon points="${hexPts(28, 14, 0)}" ${THIN}/>
-    <path d="M-8,0 H8 M-8,0 l4,-4 M-8,0 l4,4 M8,0 l-4,-4 M8,0 l-4,4" ${STROKE}/>`,
   // Trade: one black rhombus, one white rhombus, "=" between them.
   trade: `
     <polygon points="${rhombusPts(28, 36, -22, 0)}" fill="currentColor"/>
@@ -468,12 +463,6 @@ export const MARKS = {
     <polygon points="${hexPts(16, 0, 0)}" ${THIN}/>
     <polygon points="${hexPts(16, 26, 0)}" ${THIN}/>
     <path d="M-30,0 H26 M18,-8 L26,0 L18,8" ${STROKE}/>`,
-  // Pattern: hexagon (the frame's own) with a small repeating dot-grid
-  // inside -- a stamp.
-  pattern: `
-    <circle cx="-14" cy="-14" r="4" fill="currentColor"/><circle cx="0" cy="-14" r="4" fill="currentColor"/><circle cx="14" cy="-14" r="4" fill="currentColor"/>
-    <circle cx="-14" cy="0" r="4" fill="currentColor"/><circle cx="0" cy="0" r="4" fill="currentColor"/><circle cx="14" cy="0" r="4" fill="currentColor"/>
-    <circle cx="-14" cy="14" r="4" fill="currentColor"/><circle cx="0" cy="14" r="4" fill="currentColor"/><circle cx="14" cy="14" r="4" fill="currentColor"/>`,
   // Generate a Body/Plant/Growth Params/Prune marks removed 2026-09-22
   // (second world-building removal pass) along with planetoidgen.js and
   // growth/evolution/cultivation -- none of these actions resolve to a

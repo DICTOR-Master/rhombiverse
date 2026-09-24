@@ -54,7 +54,7 @@ removes.
   structure casts) and Dualize (FCC ↔ BCC).
 - **Build tools** — 14 colors (or auto-assign per piece), Repeat, and
   Fill/Round/Excavate for shell-based structures; Alter (Dig, Smooth,
-  Fill, Replace) reshapes what's there.
+  Remove) reshapes what's there.
 - **Sculpt** — a symmetry/mirror tool (order-48 cubic) with Model and
   Chisel modes, plus a separate Sculpture Mode scratch space. An optional
   AI-assisted tier uses your own API key or the shared one — never

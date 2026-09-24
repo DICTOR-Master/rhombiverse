@@ -3536,18 +3536,9 @@ async function init() {
         // both wheels should share.
         const clickMode = (modeName) => document.querySelector(`.mode-btn[data-mode="${modeName}"]`)?.click();
 
-        // --- Alter: Dig/Smooth are direct 1:1 mode matches, high
-        // confidence. Replace is a pre-existing dead end, discovered
-        // while wiring this: wheel.js's own 2D "Replace" item calls
-        // clickModeShim('replace'), but there is no
-        // .mode-btn[data-mode="replace"] anywhere in index.html and no
-        // `currentMode === 'replace'` handling anywhere in render.js --
-        // the 2D button is already a silent no-op today. Not
-        // reproducing that silently here; flagged as not built yet
-        // instead of pretending it's wired. ---
+        // --- Alter: Dig/Smooth are direct 1:1 mode matches. ---
         if (action === 'tool:dig') { clickMode('excavate'); wheel3D.close(); return; }
         if (action === 'tool:smooth') { clickMode('round'); wheel3D.close(); return; }
-        if (action === 'tool:replace') { showHudPrompt('Replace is not built yet (the 2D menu\'s Replace button is a pre-existing no-op too).', 4000); return; }
 
         // --- Build: direct matches, high confidence ---
         // Universal Add/Remove, direct instruction 2026-08-26: retires the
@@ -3685,10 +3676,6 @@ async function init() {
           wheel3D.close();
           return;
         }
-        // Matches the 2D wheel's own real capability exactly -- Pattern
-        // is a "coming soon" placeholder there too, not a real feature
-        // being withheld here.
-        if (action === 'tool:pattern') { showHudPrompt('Pattern stamping is coming soon.', 3000); return; }
 
         // --- Piece: Cuboctahedron Build (core/cubocta-build.js), the RD
         // lattice's own dual shape -- 2026-08-29, freed onto Piece's
@@ -3763,9 +3750,7 @@ async function init() {
         // NL shape keyword (src/core/sculpture.js's shape parser
         // recognizes "dome"); prefilling it is a real, grounded action,
         // not invented, but was never a documented 1-click wheel
-        // action before now. Spiral Column and Templates have no
-        // backing mechanic anywhere in the codebase -- genuine stubs,
-        // not a wiring gap. ---
+        // action before now. ---
         if (action === 'tool:dome') {
           clickMode('sculpt');
           openSculptPanel();
@@ -3775,7 +3760,6 @@ async function init() {
           wheel3D.close();
           return;
         }
-        if (action === 'tool:spiralColumn' || action === 'tool:templates') { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
 
         if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
     };
