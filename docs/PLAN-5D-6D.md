@@ -86,13 +86,16 @@ layer. Phason 3 is hidden.
 true size, every corner as a point (plus ghost corners with Lattice View);
 a piece shows exactly when all its corners are inside (checked).
 
-**5. Info panel** summon/build record (the build counts first; summon
-rows arrive with stage 6).
+**5. Info panel** summon/build record. *Folded:* the build counts
+(built by type, shown vs hidden, slider settings, window corners) shipped
+with stages 2–4; hand-placed vs summoned counts and the summon rows (tap
+one to slide back to its settings; Info then takes taps on those rows)
+move into stage 6, where they have content.
 
 **6. Catalogue pipeline and summon.** Add `data/catalogue-5d6d.json`
 (serial, tier, kind, name, parameters), the Wizard showcase,
 serial-number lookup, the ghost outline + tap placement, the animated
-slider jump, and one undo step. Start with bridge pieces and zonohedra
+slider jump, one undo step, and the Info summon record (from stage 5). Start with bridge pieces and zonohedra
 (about 50) to prove the pipeline. `verify:catalogue` checks:
 - every entry computes and lands without self-overlap;
 - serials are unique and inside their range;
