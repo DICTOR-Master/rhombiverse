@@ -10,7 +10,10 @@ import { getSettings } from './settings.js';
 import { t } from './i18n.js';
 import { openGuide } from './guide.js';
 
-const SKIP_KEY = 'rhombiverse-skip-intro';
+// The welcome screen shows on every visit (direct decision 2026-09-25:
+// the "Don't show this again" opt-out was removed). This is the key that
+// opt-out used to store; it's cleared on load so it can't linger.
+const LEGACY_SKIP_KEY = 'rhombiverse-skip-intro';
 
 // --- Geometry: real 3D RD wireframe, built from the SAME shared source as
 // the Rhombic Wheel 3D / HUD Wheel (buildRDFaces()) -- see companion doc.
@@ -167,10 +170,6 @@ function overlayHtml() {
         <a href="./rhombis.html">${t('welcome.rhombisLink', lang)}</a>
       </div>
       ${logoSvg()}
-      <label class="dont-show">
-        <input type="checkbox" id="skip-intro-checkbox" />
-        ${t('welcome.dontShowAgain', lang)}
-      </label>
       <div class="polyhedraverse-link">
         <img src="./assets/polyhedraverse-favicon-64.png" alt="" width="28" height="28" />
         <a href="https://polyhedraverse.vercel.app" target="_blank" rel="noopener">${t('welcome.polyhedraverseLink', lang)}</a>
@@ -218,18 +217,8 @@ function init() {
     stopLogoSpin();
   }
 
-  function persistSkipChoice() {
-    if (document.getElementById('skip-intro-checkbox').checked) {
-      try {
-        localStorage.setItem(SKIP_KEY, 'true');
-      } catch (err) {
-        console.warn('Rhombiverse: failed to save intro preference', err);
-      }
-    }
-  }
 
   function enterWorld() {
-    persistSkipChoice();
     hide();
   }
 
@@ -247,17 +236,12 @@ function init() {
 
   aboutBtn.addEventListener('click', show);
 
-  let skip = false;
   try {
-    skip = localStorage.getItem(SKIP_KEY) === 'true';
+    localStorage.removeItem(LEGACY_SKIP_KEY);
   } catch (err) {
-    // localStorage unavailable -- default to showing the intro.
+    // localStorage unavailable -- nothing to clear.
   }
-  if (skip) {
-    hide();
-  } else {
-    show();
-  }
+  show();
 }
 
 init();

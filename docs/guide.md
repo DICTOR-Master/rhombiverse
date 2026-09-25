@@ -8,11 +8,18 @@ The first part of this guide walks through common tasks. The second part lists e
 
 ## Getting started
 
+### Pick a dimension
+
+After **ENTER**, the dimension picker opens: a slowly turning shape whose faces are **2D**, **3D** and **4D**, each marked with an icon. Hover over a face (or press and hold it on a touchscreen) to see its name, then tap the one you want. Drag to turn the shape and bring other faces round.
+
+You can switch later from **Menu → Change Dimension**, or from the **Wizard** (top left), which lists every lattice in each dimension with its pieces as rotating wireframes.
+
 ### Place your first piece
 
-1. Press **ENTER** on the welcome screen.
-2. An empty world shows a **cyan outline** where the first piece will go. Tap it.
-3. Tap any face of that piece to add a neighbour on the other side of the face.
+- **3D and 4D:** a **cyan outline** shows where the first piece goes. Tap it.
+- **2D:** the first tile is already in place.
+
+Then tap a face of any piece (a side, in 2D) to add a neighbour on the other side of it.
 
 The piece you place is shown in the **Shape** button at the top of the screen. Tap it to choose a different piece.
 
@@ -31,16 +38,9 @@ To take back your last change, tap **Undo** (↶). Hold Undo to scrub back throu
 
 ## Choosing what to build
 
-### Pick a dimension and lattice
-
-There are two ways to choose:
-
-- **Wizard** (top left) lists every dimension, then every lattice in it, and shows each piece as a rotating wireframe. Tap a piece to start placing it.
-- **Menu → Change Dimension** switches between 2D, 3D and 4D.
-
 ### The pieces, by lattice
 
-**2D:** three tile shapes (Parallelogram, Triangle, Hexagon), each at four named lattice angles, plus Kagome and Rhombille arrangements.
+**2D:** Parallelogram, Triangle, Hexagon, Kite and Kagome tiles, chosen from the panel at the top, each at up to four lattice angles (90°, 70.53°, 63.43° and 60°).
 
 **3D:**
 
@@ -104,14 +104,14 @@ Settings also has a **Section view**: pick an axis, drag the slider to move the 
 
 ## Going into 4D
 
-1. Open the **Wizard** or **Menu → Change Dimension** and choose **4D**.
+1. Choose **4D** in the dimension picker, the Wizard, or **Menu → Change Dimension**.
 2. Pick a world: Tesseract (Z4), 24-cell or 16-cell (D4), or a Hyper-pyrochlore piece.
 3. Build as in 3D: tap a face to add the neighbouring 4D cell.
 
 A 4D panel appears at the bottom of the screen.
 
 - **Slice / Projection** switches how you see 4D. **Slice** (the default) shows the 3D cross-section at the current depth. **Projection** shows whole 4D cells as shadows; tap a shadow's face to build across it. In Projection you can also switch between **Parallel** and **Perspective**.
-- **The slider** moves the slice through the fourth dimension (w) or turns it (XW, YW, ZW). It clicks into place at useful stops. The one labelled **FCC** is the ordinary 3D RD world, and the one labelled **Pyrochlore** is the 3D Pyrochlore world.
+- **The slider** does what the button above it says: **W-depth** moves the slice through the fourth dimension, and **XW**, **YW** and **ZW** turn it into the fourth dimension. It clicks into place at useful stops. The one labelled **FCC** is the ordinary 3D RD world, and the one labelled **Pyrochlore** is the 3D Pyrochlore world.
 - **Reset 4D** puts everything back to the starting position.
 
 ## Sculpting with symmetry
