@@ -245,3 +245,63 @@ export function shells(rule, count, centre = [0, 0, 0], k = 1) {
     if (radii.length === count && radii[count - 1] <= reach * reach) return radii.map((r2) => byR2.get(r2));
   }
 }
+
+// ---- hulls: shells measured by a target shape ----
+// A hull is a gauge: a cell's "size" as that shape (the smallest copy of
+// the shape, centred on the centre cell, that contains it). Shell n is
+// every cell with the n-th smallest positive gauge, so the build grows as
+// that shape. 'steps' is the cuboctahedron's gauge, which is exactly the
+// FCC neighbour-step distance; 'distance' compares squared distances (a
+// sphere). Every linear hull here has |x|,|y|,|z| <= gauge, so a search
+// box of half-width g holds every cell up to gauge g.
+const ax = (c) => c.map(Math.abs);
+export const HULLS = {
+  steps: (c) => { const [x, y, z] = ax(c); return Math.max(x, y, z, (x + y + z) / 2); },
+  distance: ([x, y, z]) => x * x + y * y + z * z,
+  tetrahedron: ([x, y, z]) => Math.max(x + y + z, x - y - z, -x + y - z, -x - y + z),
+  'tetrahedron-mirror': ([x, y, z]) => Math.max(-x - y - z, -x + y + z, x - y + z, x + y - z),
+  cube: (c) => Math.max(...ax(c)),
+  octahedron: (c) => ax(c).reduce((a, b) => a + b, 0),
+  rd: (c) => { const [x, y, z] = ax(c); return Math.max(x + y, x + z, y + z); },
+  // Truncated octahedron: square faces at max|x_i| = 2, hexagons at
+  // |x|+|y|+|z| = 3 (corners (0,±1,±2)); scaled so the squares sit at 1.
+  to: (c) => { const [x, y, z] = ax(c); return Math.max(x, y, z, (2 * (x + y + z)) / 3); },
+};
+export const HULL_IDS = Object.keys(HULLS);
+const gaugeKey = (g) => Math.round(g * 1e9);
+// Per hull: every cell (relative to the centre) up to a covered gauge,
+// grouped by gauge, and the sorted distinct positive gauges.
+const hullCache = new Map();
+function hullTable(hull, needGauge = 0, needCount = 0) {
+  let t = hullCache.get(hull);
+  const covered = (M) => (hull === 'distance' ? M * M : M);
+  for (let M = t ? t.M * 2 : 8; !t || t.covered < needGauge || t.values.length < needCount; M *= 2) {
+    const f = HULLS[hull];
+    const byGauge = new Map();
+    for (let x = -M; x <= M; x++) for (let y = -M; y <= M; y++) for (let z = -M; z <= M; z++) {
+      if ((x + y + z) % 2 !== 0) continue;
+      const g = f([x, y, z]);
+      if (g <= 0 || g > covered(M) + 1e-9) continue;
+      const k = gaugeKey(g);
+      if (!byGauge.has(k)) byGauge.set(k, []);
+      byGauge.get(k).push([x, y, z]);
+    }
+    const values = [...byGauge.keys()].sort((a, b) => a - b);
+    t = { M, covered: covered(M), byGauge, values, rank: new Map(values.map((v, i) => [v, i + 1])) };
+    hullCache.set(hull, t);
+    if (M > 256) break; // far beyond any buildable hull
+  }
+  return t;
+}
+// The shell number of `cell` in `hull` around `centre` (0 = the centre).
+export function hullShellOf(hull, cell, centre) {
+  const rel = [cell[0] - centre[0], cell[1] - centre[1], cell[2] - centre[2]];
+  const g = HULLS[hull](rel);
+  if (g <= 0) return 0;
+  return hullTable(hull, g).rank.get(gaugeKey(g)) ?? 0;
+}
+// The cells of shell n (n >= 1) of `hull` around `centre`.
+export function hullShell(hull, n, centre) {
+  const t = hullTable(hull, 0, n);
+  return (t.byGauge.get(t.values[n - 1]) ?? []).map((c) => [c[0] + centre[0], c[1] + centre[1], c[2] + centre[2]]);
+}

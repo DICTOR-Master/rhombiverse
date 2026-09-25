@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-09-26",
+    "title": "Shells",
+    "items": [
+      "Shells, a new 3D world (Wizard → 3D, or the RD wheel): build hulls from shells of rhombic dodecahedra, each shell its own colour band counted out from your first piece. + Shell fills the next shell, − Shell removes the outermost. The Hull picker chooses how shells count: Steps (a cuboctahedron: 13, 55, 147 … pieces), Distance (toward a sphere), or a target shape: tetrahedron (either mirror image), cube, octahedron, rhombic dodecahedron or truncated octahedron. Info lists every shell and how complete it is."
+    ]
+  },
+  {
     "date": "2026-09-25",
     "title": "5D and 6D: quasicrystals",
     "items": [

@@ -23,6 +23,7 @@ import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { createWorld4D } from './app/world-4d.js';
 import { createQuasicrystalWorld } from './app/world-quasicrystal.js';
+import { createShellsWorld } from './app/world-shells.js';
 import { makeQuasicrystal, PRISM_HEIGHT } from './geometry-extensions/quasicrystal.js';
 import { loadCatalogue, findBySerial, zonotopeVertices, localPatch, polytopeShape } from './geometry-extensions/quasicrystal-catalogue.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
@@ -136,9 +137,14 @@ let world4d = null;
 // The 5D and 6D quasicrystal worlds (src/app/world-quasicrystal.js), by
 // dimension, each switched on only while its dimension is active.
 const qcWorlds = new Map();
-// 4D, 5D and 6D each own their scene, taps, Lattice View and Skeleton.
-const isOwnWorldDimension = () => activeDimension === '4D' || qcWorlds.has(activeDimension);
-const activeOwnWorld = () => qcWorlds.get(activeDimension) ?? world4d;
+// The Shells world (src/app/world-shells.js): a 3D lattice of its own,
+// on while 3D is active and Shells is the chosen piece.
+let shellsWorld = null;
+let shellsChosen = false;
+const shellsActive = () => activeDimension === '3D' && shellsChosen && !!shellsWorld;
+// 4D, 5D, 6D and Shells each own their scene, taps, Lattice View and Skeleton.
+const isOwnWorldDimension = () => activeDimension === '4D' || qcWorlds.has(activeDimension) || shellsActive();
+const activeOwnWorld = () => (shellsActive() ? shellsWorld : qcWorlds.get(activeDimension) ?? world4d);
 
 const camera = new THREE.PerspectiveCamera(
   getSettings().fov,
@@ -2446,6 +2452,7 @@ async function init() {
     }
     reg('world4d', '4D', () => world4d.snapshot(), (j) => world4d.restore(j));
     for (const [dim, w] of qcWorlds) reg(`world${dim.toLowerCase()}`, dim, () => w.snapshot(), (j) => w.restore(j));
+    reg('worldshells', '3D', () => shellsWorld.snapshot(), (j) => shellsWorld.restore(j));
     updateUndoButton();
   }
 
@@ -2678,7 +2685,8 @@ async function init() {
     for (const [dim, w] of qcWorlds) if (dim !== activeDimension) w.setActive(false);
     world4d?.setActive(activeDimension === '4D');
     qcWorlds.get(activeDimension)?.setActive(true);
-    document.body.classList.toggle('qc-world-on', qcWorlds.has(activeDimension));
+    shellsWorld?.setActive(shellsActive());
+    document.body.classList.toggle('qc-world-on', qcWorlds.has(activeDimension) || shellsActive());
     // 4D/6D: X-Ray and Spherical don't apply (the slider IS the X-Ray),
     // so their HUD faces go blank and untappable (direct decision).
     hudWheel?.setFaceHidden?.('xray-toggle', isOwnWorldDimension());
@@ -2871,9 +2879,11 @@ async function init() {
     }
     world4d?.setSkeleton(worldViewMode === 'skeleton');
     for (const w of qcWorlds.values()) w.setSkeleton(worldViewMode === 'skeleton');
+    shellsWorld?.setSkeleton(worldViewMode === 'skeleton');
     // Translucent too, at the same opacity as the 3D worlds.
     world4d?.setTranslucent(worldViewMode === 'translucent' ? TRANSLUCENT_OPACITY : 1);
     for (const w of qcWorlds.values()) w.setTranslucent(worldViewMode === 'translucent' ? TRANSLUCENT_OPACITY : 1);
+    shellsWorld?.setTranslucent(worldViewMode === 'translucent' ? TRANSLUCENT_OPACITY : 1);
     document.getElementById('world-view-toggle')?.classList.toggle('active', worldViewMode !== 'color');
   }
   const worldViewSelect = document.getElementById('world-view-select');
@@ -3282,6 +3292,18 @@ async function init() {
         // 2026-08-29 -- X-Ray stays reachable via the corner HUD wheel's
         // own #xray-toggle face and the Lab panel, so no wheel face
         // routes to it here any more.)
+        if (action === 'tool:shellsWorld') {
+          shellsChosen = true;
+          wheel3D.close();
+          applyDimensionVisibility();
+          updateQuickSelect();
+          showHudPrompt('Shells', 2500);
+          return;
+        }
+        if (shellsChosen && (action?.startsWith('tool:pieceType:') || action === 'tool:cuboctaBuild')) {
+          shellsChosen = false;
+          applyDimensionVisibility();
+        }
         if (action === 'openLab') { wheel3D.close(); labToggleEl?.click(); return; }
         if (action === 'openAlmanac') { wheel3D.close(); almanac.open(); return; }
         // Real tool wiring below -- reuses existing, already-working
@@ -3604,6 +3626,7 @@ async function init() {
       const convex = (pts) => new ConvexGeometry(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
       const piece = action.replace('tool:pieceType:', '');
       if (action === 'tool:cuboctaBuild') return cuboctaGeometry;
+      if (action === 'tool:shellsWorld') return wizardPieceGeometry('tool:pieceType:rd');
       if (action.startsWith('summon:')) {
         const entry = findBySerial(catalogueEntries, Number(action.slice(7)));
         if (!entry) return null;
@@ -4235,6 +4258,7 @@ async function init() {
     updateLatticeQuickViewIcon();
     world4d?.setLatticeView(latticeQuickViewMode !== 'off');
     for (const w of qcWorlds.values()) w.setLatticeView(latticeQuickViewMode !== 'off');
+    shellsWorld?.setLatticeView(latticeQuickViewMode !== 'off');
     showHudPrompt(isOwnWorldDimension() ? `Lattice View: ${latticeQuickViewMode === 'off' ? 'Off.' : `every open slot one step past your ${activeDimension} build.`}` : `Lattice View: ${LATTICE_QUICK_VIEW_LABELS[latticeQuickViewMode]}`, 4500);
     await rebuildLatticeQuickView(); // also syncs the toggle buttons' own 'active' state -- see syncLatticeQuickViewActiveState
   }
@@ -4395,6 +4419,8 @@ async function init() {
       // Checked first, ahead of the plain piece-type lookup below.
       if (qcWorlds.has(activeDimension)) {
         quickShapeEl.innerHTML = iconFrame(MARKS.pieceRhombohedron, { title: t('cat.button', getSettings().language) });
+      } else if (shellsActive()) {
+        quickShapeEl.innerHTML = iconFrame(MARKS.pieceRD, { title: 'Shells' });
       } else if (currentMode === 'cubocta') {
         quickShapeEl.innerHTML = iconFrame(MARKS.cuboctahedron, { title: 'Shape' });
       } else {
@@ -4746,6 +4772,34 @@ async function init() {
     });
     qcWorlds.set(dim, w);
   }
+  // Shells: after + Shell, pull the view back (never in) so the whole
+  // hull fits, keeping the view direction; glide like focusCameraOn.
+  function fitCameraTo([x, y, z], radius) {
+    const centre = new THREE.Vector3(x, y, z);
+    const need = (radius * 1.15) / Math.sin(THREE.MathUtils.degToRad(camera.fov) / 2) / Math.min(1, camera.aspect);
+    const dir = camera.position.clone().sub(controls.target).normalize();
+    const now = camera.position.distanceTo(controls.target);
+    const toTarget = centre;
+    const toPosition = centre.clone().addScaledVector(dir, Math.max(now, need));
+    const fromTarget = controls.target.clone();
+    const fromPosition = camera.position.clone();
+    const t0 = performance.now();
+    const step = (t) => {
+      const u = Math.min(1, (t - t0) / 400);
+      const ease = u * u * (3 - 2 * u);
+      controls.target.lerpVectors(fromTarget, toTarget, ease);
+      camera.position.lerpVectors(fromPosition, toPosition, ease);
+      controls.update();
+      if (u < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+  shellsWorld = createShellsWorld({
+    scene,
+    showHudPrompt,
+    fitView: fitCameraTo,
+    onChange: () => { if (historyRestorers.has('worldshells')) recordHistory('worldshells', shellsWorld.snapshot()); },
+  });
   registerHistoryStores();
   createBuildController({
     renderer,
@@ -5290,6 +5344,7 @@ async function init() {
     // "Erase everything" includes the 4D world (it was left untouched).
     world4d?.clear();
     for (const w of qcWorlds.values()) w.clear();
+    shellsWorld?.clear();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

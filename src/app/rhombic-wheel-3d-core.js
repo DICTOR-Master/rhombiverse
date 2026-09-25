@@ -431,6 +431,8 @@ export const WHEEL_RD_FAMILY = {
   id: "rdFamily",
   faces: {
     "equator|sx1sy1":   { kind: "dept", label: "RD", action: "tool:pieceType:rd", desc: "A full block -- cube plus all 6 pyramids." },
+    "top|sx1sz1":       { kind: "dept", label: "Shells", action: "tool:shellsWorld",
+      desc: "Build hulls from shells of RDs, each shell its own colour band." },
     "equator|sx1sy-1":  { kind: "dept", label: "Hemi RD", action: "tool:pieceType:halfrd",
       desc: "One real hemisphereSplit() half of an RD -- click an existing face to add the neighbor's near half." },
     "equator|sx-1sy1":  { kind: "dept", label: "Hourglass", action: "tool:pieceType:hourglass",
@@ -635,6 +637,7 @@ export const ACTION_TO_MARK = {
   // below.
   'navigateTo:rdFamily': 'pieceRD',
   'tool:pieceType:rd': 'pieceRD',
+  'tool:shellsWorld': 'pieceRD',
   // Real 3D-profile marks, added 2026-09-06 -- see wheel-icons.js's own
   // pieceHalfRD/pieceHourglass/pieceHemi3/pieceHemi4 header for the full
   // derivation (real orthographic silhouettes, not hand-drawn).

@@ -1,6 +1,6 @@
 # Plan: Shells, a hull-building 3D scene
 
-Status: agreed design; stage 1 shipped. Delete this file once every stage
+Status: agreed design; stages 1-3 shipped. Delete this file once every stage
 has shipped (the code and the guide then describe the feature).
 
 ## The idea
@@ -117,12 +117,19 @@ shells at any scale (reuse `cellsInShells`). `scripts/verify-shells.mjs`
   the 3-way-axis thirds; confirm);
 - shell sizes for both rules.
 
-**2. The scene.** `src/app/world-shells.js` (same factory shape as
+**2. The scene.** *Shipped, with stage 3 pulled in:* `+ Shell` / `− Shell`
+and the Hull picker (Steps = the cuboctahedron's gauge, Distance, and
+the six targets). Drawn as ONE fused surface of the visible faces
+(user's idea: fuse the hidden core), so hull size barely costs frame
+rate: measured on dicto-node (software GPU, 12-15 fps with one RD),
+7-10 fps from 300 to 3,871 pieces, versus 1.3 fps drawing every piece.
+Cap 4,000 pieces for now; the view pulls back to fit after `+ Shell`.
+`src/app/world-shells.js` (same factory shape as
 `world-quasicrystal.js`): place RDs on the FCC lattice by hand, colour
 bands by shell from the centre cell, the Steps | Distance toggle, its
 own store, undo and Export/Import entry, listed as a 3D world.
 
-**3. Grow, shrink and targets.** Add or remove the whole outer shell in
+**3. Grow, shrink and targets.** *Shipped in stage 2.* Add or remove the whole outer shell in
 one step (one undo step each), in any shell rule. The Target rule with
 its shape picker (stepped hulls). Engine: target gauges; verify:shells
 checks each target's faces are flat lattice layers.
@@ -156,8 +163,8 @@ shipped stage.
 
 ## Open questions
 
-- **Size limit:** the largest hull before it slows down on a phone
-  (measure in stage 2).
+- **Size limit:** 4,000 pieces for now; confirm on a real phone/iPad
+  whether it can go higher.
 
 ## Rules that apply throughout
 

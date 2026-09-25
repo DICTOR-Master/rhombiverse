@@ -12,7 +12,7 @@ const wizardActions = LATTICES_3D.flatMap((lat) => lat.pieces.map((p) => p.actio
 test('every wheel piece appears in the wizard exactly once', () => {
   const wheelActions = [...Object.values(WHEEL_PIECE.faces), ...Object.values(WHEEL_RD_FAMILY.faces)]
     .map((f) => f.action)
-    .filter((a) => a && (a.startsWith('tool:pieceType:') || a === 'tool:cuboctaBuild'));
+    .filter((a) => a && (a.startsWith('tool:pieceType:') || a === 'tool:cuboctaBuild' || a === 'tool:shellsWorld'));
   for (const a of new Set(wheelActions)) {
     assert.equal(wizardActions.filter((w) => w === a).length, 1, `${a} listed once`);
   }

@@ -5,7 +5,7 @@
 // - the big RD at x2, x3, x4 and x6 is filled exactly by small pieces of
 //   the family, with the measured counts;
 // - shell sizes for both shell rules.
-import { SPLITS, SPLIT_BY_ID, OH, pieceSolid, solidFromPlanes, scaleDecomposition, shells, identifyPiece } from '../src/geometry-extensions/rd-pieces.js';
+import { SPLITS, SPLIT_BY_ID, OH, pieceSolid, solidFromPlanes, scaleDecomposition, shells, identifyPiece, HULLS, HULL_IDS, hullShell, hullShellOf } from '../src/geometry-extensions/rd-pieces.js';
 import { rdQuarterPieces, hemisphereSplit, NEIGHBOR_OFFSETS } from '../src/core/lattice.js';
 
 let failures = 0;
@@ -66,6 +66,33 @@ const distSizes = shells('distance', 8).map((c) => c.length);
 check('distance shells: 12, 6, 24, 12, 24, 8, 48, 6', JSON.stringify(distSizes) === '[12,6,24,12,24,8,48,6]', distSizes.join(','));
 const scaled = shells('steps', 2, [2, 0, 0], 2);
 check('scaled shells: x2 step shell 1 is 12 coarse cells, each 2 small steps from its centre', scaled[0].length === 12 && scaled[0].every((c) => Math.abs(c[0] - 2) + Math.abs(c[1]) + Math.abs(c[2]) === 4));
+// Hulls: Steps is the cuboctahedron gauge, Distance the sphere, and each
+// target's shells hold exactly the cells whose gauge ranks there.
+const sameCells = (a, b) => JSON.stringify(a.map((c) => c.join()).sort()) === JSON.stringify(b.map((c) => c.join()).sort());
+check('hull "steps" shells 1-6 = the neighbour-step shells', shells('steps', 6).every((cells, i) => sameCells(cells, hullShell('steps', i + 1, [0, 0, 0]))));
+check('hull "distance" shells 1-8 = the distance shells', shells('distance', 8).every((cells, i) => sameCells(cells, hullShell('distance', i + 1, [0, 0, 0]))));
+for (const h of HULL_IDS) {
+  const ok = [1, 2, 3, 4, 5, 6].every((n) => hullShell(h, n, [2, 0, 0]).every((c) => hullShellOf(h, c, [2, 0, 0]) === n));
+  const sizes = [1, 2, 3, 4].map((n) => hullShell(h, n, [0, 0, 0]).length);
+  check(`hull "${h}": shells 1-6 round-trip (cell -> shell -> cell), off-origin centre`, ok, `sizes ${sizes.join(',')}…`);
+}
+// Every target's faces lie on lattice layers (flat), measured on a hull of
+// ~600 cells: along each face normal, the outermost cells share one plane
+// and every face holds the same number of them.
+const FACES = {
+  tetrahedron: [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]],
+  'tetrahedron-mirror': [[-1, -1, -1], [-1, 1, 1], [1, -1, 1], [1, 1, -1]],
+  cube: [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]],
+  octahedron: [1, -1].flatMap((a) => [1, -1].flatMap((b) => [1, -1].map((c) => [a, b, c]))),
+  rd: [[1, 1, 0], [1, -1, 0], [-1, 1, 0], [-1, -1, 0], [1, 0, 1], [1, 0, -1], [-1, 0, 1], [-1, 0, -1], [0, 1, 1], [0, 1, -1], [0, -1, 1], [0, -1, -1]],
+};
+for (const [h, N] of Object.entries(FACES)) {
+  const cells = [];
+  for (let n = 1; cells.length < 600; n++) cells.push(...hullShell(h, n, [0, 0, 0]));
+  const perFace = N.map((f) => { const d = cells.map((c) => c[0] * f[0] + c[1] * f[1] + c[2] * f[2]); const m = Math.max(...d); return d.filter((v) => v === m).length; });
+  check(`hull "${h}": every face is a flat layer of equal size`, new Set(perFace).size === 1 && perFace[0] > 1, `${perFace[0]} cells per face`);
+}
+void HULLS;
 check('OH has 48 distinct elements', new Set(OH.map((m) => m.flat().join())).size === 48);
 
 console.log(`\n${failures} failures.`);

@@ -258,6 +258,9 @@ export const LATTICES_3D = [
   { key: 'pyrochlore', label: 'Pyrochlore (3D Kagome)', pieces: [
     { label: 'Truncated Tetrahedron', action: 'tool:pieceType:pyrochlore' },
   ] },
+  { key: 'shells', label: 'Shells', pieces: [
+    { label: 'Shells', action: 'tool:shellsWorld' },
+  ] },
 ];
 
 // 4D thumbnails (direct decision, option B): each cell's 4D edges turned
