@@ -2871,6 +2871,9 @@ async function init() {
     }
     world4d?.setSkeleton(worldViewMode === 'skeleton');
     for (const w of qcWorlds.values()) w.setSkeleton(worldViewMode === 'skeleton');
+    // Translucent too, at the same opacity as the 3D worlds.
+    world4d?.setTranslucent(worldViewMode === 'translucent' ? TRANSLUCENT_OPACITY : 1);
+    for (const w of qcWorlds.values()) w.setTranslucent(worldViewMode === 'translucent' ? TRANSLUCENT_OPACITY : 1);
     document.getElementById('world-view-toggle')?.classList.toggle('active', worldViewMode !== 'color');
   }
   const worldViewSelect = document.getElementById('world-view-select');

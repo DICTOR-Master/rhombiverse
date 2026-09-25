@@ -73,6 +73,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
   let kind = 'cell24';
   let active = false;
   let skeleton = false;
+  let sliceOpacity = 1; // below 1 in World View: Translucent
   let latticeView = false;
   // Info panel (Info button in the 4D panel): what's built, where the
   // slice is, and the last cell tapped or placed, with its 4D centre.
@@ -304,7 +305,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
       }
       for (const { pts, cell } of dedupeSections(items)) {
         slicedAny = true;
-        addSolid(pts, { color: materialColor(cell.material), userData: { world4d: 'cell', kind: cell.kind, c: cell.c } });
+        addSolid(pts, { color: materialColor(cell.material), opacity: sliceOpacity, userData: { world4d: 'cell', kind: cell.kind, c: cell.c } });
       }
     } else {
       for (const cell of visible) addProjectedCell(cell.kind, cell.c, { color: materialColor(cell.material), opacity: 0.35, userDataBase: { world4d: 'cell', kind: cell.kind, c: cell.c } });
@@ -523,6 +524,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     },
     setActive(on) { active = on; group.visible = on; rebuild(); },
     setSkeleton(on) { skeleton = on; rebuild(); },
+    setTranslucent(opacity) { if (opacity !== sliceOpacity) { sliceOpacity = opacity; rebuild(); } },
     setLatticeView(on) { latticeView = on; rebuild(); },
     get isActive() { return active; },
     get isEmpty() { return cells.size === 0; },

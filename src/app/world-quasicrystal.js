@@ -107,6 +107,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   const view = { phason: [0, 0, 0], approx: APPROXIMANT_STOPS.length - 1, control: 'p1', mode: 'build' };
   let active = false;
   let skeleton = false;
+  let pieceOpacity = 1; // below 1 in World View: Translucent
   let latticeView = false;
   let infoOpen = false;
 
@@ -513,7 +514,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       renderPanel();
       return;
     }
-    for (const t of visible) addTile(t, { color: materialColor(t.material), qc: 'tile' });
+    for (const t of visible) addTile(t, { color: materialColor(t.material), opacity: pieceOpacity, qc: 'tile' });
     for (const p of polys.values()) {
       const color = materialColor(p.material);
       addPoly(p, { color, opacity: 0.22, qc: 'polytope', lineColor: color });
@@ -649,6 +650,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       rebuild();
     },
     setSkeleton(on) { skeleton = on; rebuild(); },
+    setTranslucent(opacity) { if (opacity !== pieceOpacity) { pieceOpacity = opacity; rebuild(); } },
     setLatticeView(on) { latticeView = on; rebuild(); },
     startSummon,
     get isEmpty() { return tiles.size === 0 && polys.size === 0; },
