@@ -46,6 +46,7 @@
 import { mountWireframePreview } from './wireframe-preview.js';
 import { cellStructure, rotation4, matVec, project4, A4_FIRST } from '../geometry-extensions/lattice-4d.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
+import { VALID_TRIPLES, unitTileVertices } from '../geometry-extensions/growth.js';
 
 const CSS = `
 .dim-wizard-overlay {
@@ -167,8 +168,19 @@ const DIMENSIONS = [
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, previewAction: 'tool:pieceType:rd' },
   { id: '4D', label: '4D', desc: 'Tesseract (Z4), D4 (24-cell, 16-cell) and Hyper-pyrochlore (4D Kagome).', enabled: true, preview: () => edges4D('cell24') },
   { id: '5D', label: '5D', desc: 'Decagonal quasicrystal.', enabled: false },
-  { id: '6D', label: '6D', desc: 'Icosahedral quasicrystal.', enabled: false },
+  { id: '6D', label: '6D', desc: 'Icosahedral quasicrystal: prolate and oblate golden rhombohedra, sliced from Z⁶. The tiling picks each piece’s shape.', enabled: true, preview: () => edges6D() },
 ];
+
+// 6D thumbnail: a prolate golden rhombohedron, the same tile world-6d.js
+// places (growth.js's unit tile). Edges join corners one step apart.
+function edges6D() {
+  const v = unitTileVertices(VALID_TRIPLES.find((t) => t.type === 'acute').dirs);
+  const c = [0, 1, 2].map((x) => v.reduce((s, p) => s + p[x], 0) / 8);
+  const p = v.map((q) => q.map((x, i) => x - c[i]));
+  const out = [];
+  for (let a = 0; a < 8; a++) for (const bit of [1, 2, 4]) if (!(a & bit)) out.push([p[a], p[a | bit]]);
+  return out;
+}
 
 // LATTICE_FAMILIES_2D: 2D's own lattice-family screen. Same "reuse the
 // existing real action, one tool one doorway" reasoning as
@@ -324,6 +336,7 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
         if (dim === '3D') showLattice3D();
         else if (dim === '2D') showLattice2D();
         else if (dim === '4D') showLattice4D();
+        else if (dim === '6D') { close(); onSelectFamily('6D', null); } // one world, nothing to pick
       });
     });
   }

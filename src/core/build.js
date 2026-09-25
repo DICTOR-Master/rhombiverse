@@ -216,10 +216,11 @@ export function createBuildController({
   // params. Truncated tetrahedra are the stored cells; cap tetrahedra
   // are derived, tappable to grow but never removable on their own.
   pyrochlore = null,
-  // 4D world (src/app/world-4d.js): { isActive(), meshes(), handleTap(hit,
-  // mode) -> placed/removed? }. While active it's the only pick target and
-  // owns every tap -- nothing 3D is visible or clickable in 4D.
-  world4d = null,
+  // A world that handles its own taps (4D: src/app/world-4d.js, 6D:
+  // src/app/world-6d.js): { isActive(), meshes(), handleTap(hit, mode) ->
+  // placed/removed? }. While active it's the only pick target and owns
+  // every tap -- nothing 3D is visible or clickable there.
+  ownWorld = null,
   // First-placement target (render.js firstPlacementSpec): { mesh,
   // place(material) } -- a cyan outline shown while the selected piece's
   // world is empty, replacing the old physical seeds (2026-09-24).
@@ -361,9 +362,9 @@ export function createBuildController({
     // deliberately keep the solid mesh raycastable-but-invisible so
     // clicking still builds against it while only a separate skeleton
     // overlay is shown; only the DIMENSION reason should gate picking.
-    if (world4d?.isActive()) {
-      const hits4d = raycaster.intersectObjects(world4d.meshes(), false);
-      return hits4d.length > 0 ? hits4d[0] : null;
+    if (ownWorld?.isActive()) {
+      const own = raycaster.intersectObjects(ownWorld.meshes(), false);
+      return own.length > 0 ? own[0] : null;
     }
     const meshTargets = getMeshPickable() ? [mesh] : [];
     const hits = raycaster.intersectObjects([...meshTargets, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...lattice2dTargets, ...rhombohedraTargets, ...pyrochloreTargets, ...firstPlacementTargets, ...interstitialTargets, ...hemisphereTargets], true);
@@ -1478,8 +1479,8 @@ export function createBuildController({
 
     const mode = getMode();
     if (!mode) return; // e.g. Walk mode active -- editing is disabled while walking
-    if ((mode === 'build' || mode === 'chisel') && world4d?.isActive()) {
-      if (!world4d.handleTap(hit, mode) && onPieceNoOp) onPieceNoOp(mode === 'build' ? 'add' : 'remove');
+    if ((mode === 'build' || mode === 'chisel') && ownWorld?.isActive()) {
+      if (!ownWorld.handleTap(hit, mode) && onPieceNoOp) onPieceNoOp(mode === 'build' ? 'add' : 'remove');
       return;
     }
 
@@ -1787,9 +1788,9 @@ export function createBuildController({
     if (!hit) return;
     if (firstPlacementTarget && hit.object === firstPlacementTarget.mesh) return; // nothing placed there yet to remove
     const mode = getMode();
-    // Long-press in 4D removes the pressed cell (world-4d.js's own chisel).
-    if (world4d?.isActive()) {
-      if (mode && !world4d.handleTap(hit, 'chisel') && onPieceNoOp) onPieceNoOp('remove');
+    // Long-press in 4D/6D removes the pressed piece (the world's own chisel).
+    if (ownWorld?.isActive()) {
+      if (mode && !ownWorld.handleTap(hit, 'chisel') && onPieceNoOp) onPieceNoOp('remove');
       return;
     }
 

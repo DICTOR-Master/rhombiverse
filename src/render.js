@@ -22,6 +22,7 @@ import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extens
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { createWorld4D } from './app/world-4d.js';
+import { createWorld6D } from './app/world-6d.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
@@ -130,6 +131,10 @@ let activeDimension = null;
 // The 4D world (src/app/world-4d.js) -- created in init, switched on
 // only while activeDimension === '4D'.
 let world4d = null;
+// The 6D world (src/app/world-6d.js), likewise only while '6D' is active.
+let world6d = null;
+// 4D and 6D each own their scene, taps, Lattice View and Skeleton.
+const isOwnWorldDimension = () => activeDimension === '4D' || activeDimension === '6D';
 
 const camera = new THREE.PerspectiveCamera(
   getSettings().fov,
@@ -1901,7 +1906,7 @@ async function init() {
   });
   renderRhomboAttachButton();
   function updateRhomboAttachPanel() {
-    const attachable = activeDimension === '4D' ? ['cell24', 'cell16', ...A4_CYCLE] : activeDimension !== '2D' ? ['rhombohedra', 'pyrochlore'] : [];
+    const attachable = activeDimension === '4D' ? ['cell24', 'cell16', ...A4_CYCLE] : activeDimension !== '2D' && activeDimension !== '6D' ? ['rhombohedra', 'pyrochlore'] : [];
     rhomboAttachBtn?.classList.toggle('hidden', !attachable.includes(attachPiece()));
     renderRhomboAttachButton();
   }
@@ -2189,7 +2194,7 @@ async function init() {
   // selected piece's target ever shows, so nothing crowds the origin.
   const RD_FAMILY_PIECES = ['rd', 'cube', 'pyramid', 'halfrd', 'hourglass', 'rdquarter', 'hemi3', 'hemi4', 'hemiTri'];
   function firstPlacementSpec() {
-    if (activeDimension === '4D') return null; // 4D draws its own cyan target (world-4d.js)
+    if (isOwnWorldDimension()) return null; // 4D/6D draw their own cyan target
     if (activeDimension === '2D') {
       // The active tile at cell (0,0,0), drawn exactly as
       // rebuildLattice2dInstances would draw it at the current angle and
@@ -2313,7 +2318,7 @@ async function init() {
   // registerHistoryStores), so every mesh rebuilds exactly as after a
   // normal edit. Clear World / New World are undoable too.
   const MAX_UNDO = 40;
-  const historySteps = []; // { dims: Set<'2D'|'3D'|'4D'>, before: Map<historyKey, jsonString> }
+  const historySteps = []; // { dims: Set<'2D'|'3D'|'4D'|'6D'>, before: Map<historyKey, jsonString> }
   const historyLastSaved = new Map(); // historyKey -> jsonString, for registered stores only
   const historyRestorers = new Map(); // historyKey -> { dim, restore(json) }
   let historyPending = null;
@@ -2424,6 +2429,7 @@ async function init() {
       reg(lattice2dStorageKey(primitive.id), '2D', () => w2.toJSON(), (j) => { w2.replaceAll(j); onLattice2dChange(primitive.id); });
     }
     reg('world4d', '4D', () => world4d.snapshot(), (j) => world4d.restore(j));
+    reg('world6d', '6D', () => world6d.snapshot(), (j) => world6d.restore(j));
     updateUndoButton();
   }
 
@@ -2622,7 +2628,7 @@ async function init() {
   function dimensionAllowsMesh(key) {
     // 4D shows only its own world (world-4d.js's own group); every 3D and
     // 2D mesh hides, same "toggle visibility, delete nothing" rule.
-    if (activeDimension === '4D') return false;
+    if (isOwnWorldDimension()) return false;
     if (key.startsWith('lattice2d:')) {
       return activeDimension === '2D' && key === `lattice2d:${activeLattice2dPrimitiveId}`;
     }
@@ -2653,10 +2659,11 @@ async function init() {
     // currently toggled.
     dotMatrixMesh.visible = visible && activeDimension === '2D';
     world4d?.setActive(activeDimension === '4D');
-    // 4D: X-Ray and Spherical don't apply (the 4D slider IS the X-Ray),
+    world6d?.setActive(activeDimension === '6D');
+    // 4D/6D: X-Ray and Spherical don't apply (the slider IS the X-Ray),
     // so their HUD faces go blank and untappable (direct decision).
-    hudWheel?.setFaceHidden?.('xray-toggle', activeDimension === '4D');
-    hudWheel?.setFaceHidden?.('spherical-toggle', activeDimension === '4D');
+    hudWheel?.setFaceHidden?.('xray-toggle', isOwnWorldDimension());
+    hudWheel?.setFaceHidden?.('spherical-toggle', isOwnWorldDimension());
     lattice2dPanel.classList.toggle('visible', activeDimension === '2D');
     updateRhomboAttachPanel();
     updateFirstPlacementTarget();
@@ -2674,7 +2681,7 @@ async function init() {
     // `.hidden === true`. Setting the inline style directly sidesteps
     // that -- inline style always wins over any external stylesheet rule
     // short of an author `!important`, which nothing here uses.
-    document.getElementById('piece-type-row').style.display = activeDimension === '2D' || activeDimension === '4D' ? 'none' : '';
+    document.getElementById('piece-type-row').style.display = activeDimension === '3D' || activeDimension === null ? '' : 'none';
     // Same real bug, same fix, for the always-on bottom-left quick-select
     // shortcut: its click handler unconditionally calls wheel3D.open('piece')
     // (the 3D Piece wheel) regardless of dimension, and `#hud-quick-shape`
@@ -2683,7 +2690,8 @@ async function init() {
     // than trying to redirect its click into the lattice panel, which is
     // already fixed-position and always visible in 2D, so there's nothing
     // for a click to usefully "open."
-    document.getElementById('hud-quick-shape').style.display = activeDimension === '2D' ? 'none' : '';
+    // 6D: the tiling decides each piece's shape, so there's nothing to pick.
+    document.getElementById('hud-quick-shape').style.display = activeDimension === '2D' || activeDimension === '6D' ? 'none' : '';
   }
   // Re-applies the same visibility rule whenever activeDimension itself
   // changes (not just when World View mode changes, which is
@@ -2751,7 +2759,7 @@ async function init() {
   async function rebuildWorldViewSkeleton() {
     const myGeneration = ++skeletonGeneration;
     clearWorldViewSkeleton();
-    if (activeDimension === '4D') return; // world-4d.js draws its own Skeleton
+    if (isOwnWorldDimension()) return; // 4D/6D draw their own Skeleton
     const { world: w, scene: s } = activeWorldTriple();
     const cells = w ? w.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed') : [];
     const pieces = cells.flatMap(skeletonCellPieces);
@@ -2842,6 +2850,7 @@ async function init() {
       applyWorldViewMaterials();
     }
     world4d?.setSkeleton(worldViewMode === 'skeleton');
+    world6d?.setSkeleton(worldViewMode === 'skeleton');
     document.getElementById('world-view-toggle')?.classList.toggle('active', worldViewMode !== 'color');
   }
   const worldViewSelect = document.getElementById('world-view-select');
@@ -3529,6 +3538,11 @@ async function init() {
           wheel3D.open('piece4d');
           return;
         }
+        if (action === 'tool:selectDimension:6D') {
+          dimensionWheel3D.close();
+          enter6D();
+          return;
+        }
         if (action === 'tool:selectDimension:2D') {
           activeDimension = '2D';
           applyDimensionVisibility();
@@ -3595,6 +3609,13 @@ async function init() {
       edges.dispose();
       return out;
     }
+    // 6D (icosahedral quasicrystal): one world, and the tiling picks each
+    // piece's shape, so there's no piece to choose on the way in.
+    function enter6D() {
+      activeDimension = '6D';
+      applyDimensionVisibility();
+      applyDimensionCamera('6D');
+    }
     const dimensionWizard = createDimensionWizard({
       pieceEdges: wizardPieceEdges,
       // Real bug fixed same session: this used to hardcode
@@ -3605,6 +3626,7 @@ async function init() {
       // dimension-wizard.js's own showLattice2D/showLattice3D now pass
       // the real dimension alongside the action.
       onSelectFamily: (dimension, action) => {
+        if (dimension === '6D') { enter6D(); return; }
         activeDimension = dimension;
         applyDimensionVisibility();
         applyDimensionCamera(dimension);
@@ -3911,8 +3933,8 @@ async function init() {
     const myGeneration = ++latticeQuickViewGeneration;
     clearLatticeQuickView();
     if (latticeQuickViewMode === 'off') { syncLatticeQuickViewActiveState(false); return; }
-    // 4D draws its own Lattice View (world-4d.js); no 3D overlay there.
-    if (activeDimension === '4D') { syncLatticeQuickViewActiveState(true); return; }
+    // 4D/6D draw their own Lattice View; no 3D overlay there.
+    if (isOwnWorldDimension()) { syncLatticeQuickViewActiveState(true); return; }
     const { world: w, scene: s } = activeWorldTriple();
     const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
     // A newer call (a later click, or a rapid second onChange) may have
@@ -4156,13 +4178,14 @@ async function init() {
   }
   async function cycleLatticeQuickView() {
     const currentIdx = LATTICE_QUICK_VIEW_MODES.indexOf(latticeQuickViewMode);
-    // 4D has one Lattice View (its own open slots), so it's just Off <-> On.
-    if (activeDimension === '4D') latticeQuickViewMode = latticeQuickViewMode === 'off' ? 'rd' : 'off';
+    // 4D/6D have one Lattice View (their own open slots): Off <-> On.
+    if (isOwnWorldDimension()) latticeQuickViewMode = latticeQuickViewMode === 'off' ? 'rd' : 'off';
     else latticeQuickViewMode = LATTICE_QUICK_VIEW_MODES[(currentIdx + 1) % LATTICE_QUICK_VIEW_MODES.length];
     if (latticeQuickViewMode !== 'off') clearDualizePreview(); // mutual exclusion -- see deactivateLatticeQuickView's own comment
     updateLatticeQuickViewIcon();
     world4d?.setLatticeView(latticeQuickViewMode !== 'off');
-    showHudPrompt(activeDimension === '4D' ? `Lattice View: ${latticeQuickViewMode === 'off' ? 'Off.' : 'every open slot one step past your 4D build.'}` : `Lattice View: ${LATTICE_QUICK_VIEW_LABELS[latticeQuickViewMode]}`, 4500);
+    world6d?.setLatticeView(latticeQuickViewMode !== 'off');
+    showHudPrompt(isOwnWorldDimension() ? `Lattice View: ${latticeQuickViewMode === 'off' ? 'Off.' : `every open slot one step past your ${activeDimension} build.`}` : `Lattice View: ${LATTICE_QUICK_VIEW_LABELS[latticeQuickViewMode]}`, 4500);
     await rebuildLatticeQuickView(); // also syncs the toggle buttons' own 'active' state -- see syncLatticeQuickViewActiveState
   }
   bccToggleBtn?.addEventListener('click', cycleLatticeQuickView);
@@ -4636,6 +4659,12 @@ async function init() {
     // cells here after every edit (view changes never reach this).
     onChange: () => { if (historyRestorers.has('world4d')) recordHistory('world4d', world4d.snapshot()); },
   });
+  world6d = createWorld6D({
+    scene,
+    materialColor,
+    getMaterial: () => currentMaterialFor(document.getElementById('piece-type-select').value),
+    onChange: () => { if (historyRestorers.has('world6d')) recordHistory('world6d', world6d.snapshot()); },
+  });
   registerHistoryStores();
   createBuildController({
     renderer,
@@ -4886,12 +4915,12 @@ async function init() {
       place: (material) => { firstPlacementCurrent?.place(material); },
     },
     onRhombohedraChange,
-    // 4D world (world-4d.js): while 4D is active it is the ONLY raycast
-    // target and handles every tap/long-press itself.
-    world4d: {
-      isActive: () => activeDimension === '4D',
-      meshes: () => world4d.meshes(),
-      handleTap: (hit, mode) => world4d.handleTap(hit, mode),
+    // 4D/6D worlds: while one is active it is the ONLY raycast target
+    // and handles every tap/long-press itself.
+    ownWorld: {
+      isActive: isOwnWorldDimension,
+      meshes: () => (activeDimension === '6D' ? world6d : world4d).meshes(),
+      handleTap: (hit, mode) => (activeDimension === '6D' ? world6d : world4d).handleTap(hit, mode),
     },
     // Pyrochlore (3D Kagome): resolves a raycast hit on any of its 4
     // meshes to either { type: 'tt', cell } or { type: 'tet', kind,
@@ -5179,6 +5208,7 @@ async function init() {
     onPyrochloreChange();
     // "Erase everything" includes the 4D world (it was left untouched).
     world4d?.clear();
+    world6d?.clear();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

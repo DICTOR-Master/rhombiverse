@@ -556,10 +556,10 @@ export const WHEEL_DIMENSION = {
       desc: "Math & Geometry reference -- the demonstrations behind everything you build." },
     "bottom|sx1sz-1":   { kind: "dept", label: "Almanac", action: "openAlmanac",
       desc: "Math & Geometry reference -- the demonstrations behind everything you build." },
-    "top|sx1sz1":       { kind: "spare", label: "6D", action: null,
-      desc: "Icosahedral quasicrystal -- planned, not yet built." },
-    "bottom|sx-1sz-1":  { kind: "spare", label: "6D", action: null,
-      desc: "Icosahedral quasicrystal -- planned, not yet built." },
+    "top|sx1sz1":       { kind: "dept", label: "6D", action: "tool:selectDimension:6D",
+      desc: "Icosahedral quasicrystal -- golden rhombohedra sliced from Z6." },
+    "bottom|sx-1sz-1":  { kind: "dept", label: "6D", action: "tool:selectDimension:6D",
+      desc: "Icosahedral quasicrystal -- golden rhombohedra sliced from Z6." },
   }
 };
 

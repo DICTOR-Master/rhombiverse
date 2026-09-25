@@ -180,6 +180,19 @@ for (const tier of ['6d', '5d']) {
   check('a phason step never moves a piece: unchanged tiles keep their key and position',
     [...before.keys()].filter((k) => after.has(k)).every((k) => dist(centre(before.get(k)), centre(after.get(k))) < 1e-12));
 
+  // The first-placement target: a tile near the origin at any slider
+  // position (phasons across +-1 window width, every approximant).
+  let seedsOk = true;
+  for (const ap of APPROXIMANT_STOPS) {
+    const a = makeQuasicrystal(tier, ap);
+    for (let k = -4; k <= 4; k++) {
+      const o = off.map((x, i) => (tier === '5d' && i === 2 ? x : x + (k / 4) * a.windowWidth * [1, 0.6, -0.8][i]));
+      const t = a.seedTile(o);
+      seedsOk &&= a.isTile(t.n, t.I, o) && Math.hypot(...centroid(a.tileVertices(t.n, t.I))) < 1.5;
+    }
+  }
+  check('a first-placement tile is found near the origin across the whole slider range', seedsOk);
+
   // Approximants: every Fibonacci stop is a valid periodic tiling.
   for (const ap of APPROXIMANT_STOPS.filter(Boolean)) {
     const a = makeQuasicrystal(tier, ap);

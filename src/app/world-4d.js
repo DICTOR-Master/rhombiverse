@@ -25,6 +25,7 @@ import {
   sliceCell, project4, facetForSliceNormal, toDoubled, fromDoubled, cellKey4,
   cellAcrossFacet, throughGap, cornerPartner, dedupeSections, A4_FIRST, A4_REST_W,
 } from '../geometry-extensions/lattice-4d.js';
+import { createGearedSlider } from './geared-slider.js';
 
 // One store for every 4D kind (the worlds share one frame and coexist,
 // like 3D's); the key name predates the tesseract joining it.
@@ -437,8 +438,6 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
   const controlsRow = panel.querySelector('.w4d-controls');
   const optionsRow = panel.querySelector('.w4d-options');
   const track = panel.querySelector('.w4d-track');
-  const thumb = panel.querySelector('.w4d-thumb');
-  const ticks = panel.querySelector('.w4d-ticks');
 
   const CONTROL_LABELS = { w: 'W-depth', xw: 'XW', yw: 'YW', zw: 'ZW' };
 
@@ -468,9 +467,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
       '<button type="button" data-opt="reset">Reset 4D</button>',
       `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">Info</button>`,
     ].join('');
-    const L = limit();
-    ticks.innerHTML = detents().map(({ v, label, below }) => `<span class="w4d-tick${below ? ' w4d-tick-below' : ''}" style="left:${((v + L) / (2 * L)) * 100}%">${label}</span>`).join('');
-    thumb.style.left = `calc(17px + (100% - 34px) * ${(valueOf() + L) / (2 * L)})`;
+    slider.render();
   }
   controlsRow.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-control]');
@@ -499,36 +496,17 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     save(); rebuild();
   });
 
-  // Geared relative drag: the thumb doesn't jump to the finger; moving
-  // across the whole track changes the value by one sweep's worth. No
-  // coasting -- it stops the moment the finger lifts, then snaps to a
-  // click-stop if within reach.
-  let drag = null;
-  track.addEventListener('pointerdown', (e) => {
-    drag = { x: e.clientX, start: valueOf(), width: track.getBoundingClientRect().width || 1 };
-    track.setPointerCapture(e.pointerId);
-    e.preventDefault();
+  // Geared relative drag (geared-slider.js): a full sweep of the track is
+  // 45 degrees or one w-layer.
+  const slider = createGearedSlider(track, {
+    value: valueOf,
+    setValue: (v) => { if (isAngle()) view.angles[view.control] = v; else view.w = v; rebuild(); },
+    limit,
+    perSweep: () => (isAngle() ? ANGLE_PER_SWEEP : W_PER_SWEEP),
+    detents,
+    snap: () => (isAngle() ? ANGLE_SNAP : W_SNAP),
+    onEnd: save,
   });
-  track.addEventListener('pointermove', (e) => {
-    if (!drag) return;
-    const per = isAngle() ? ANGLE_PER_SWEEP : W_PER_SWEEP;
-    const v = Math.max(-limit(), Math.min(limit(), drag.start + ((e.clientX - drag.x) / drag.width) * per));
-    setValue(v);
-  });
-  const endDrag = () => {
-    if (!drag) return;
-    drag = null;
-    const snap = isAngle() ? ANGLE_SNAP : W_SNAP;
-    const near = detents().filter(({ v }) => Math.abs(v - valueOf()) <= snap).sort((a, b) => Math.abs(a.v - valueOf()) - Math.abs(b.v - valueOf()))[0];
-    if (near) setValue(near.v);
-    save();
-  };
-  track.addEventListener('pointerup', endDrag);
-  track.addEventListener('pointercancel', endDrag);
-  function setValue(v) {
-    if (isAngle()) view.angles[view.control] = v; else view.w = v;
-    rebuild();
-  }
 
   return {
     group,

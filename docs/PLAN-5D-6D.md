@@ -64,7 +64,9 @@ added to CI) checks, numerically:
 - each approximant repeats with the expected period;
 - a small phason step flips tiles only locally.
 
-**2. The 6D world** (first, because its maths already exists).
+**2. The 6D world** (first, because its maths already exists). *Shipped:*
+the tiling decides each piece's shape (no Shape button in 6D), edge 1,
+phasons ±1 window width per sweep, Lattice View one step out.
 Enable the 6D card in the dimension picker and the Wizard, plus the
 reserved 6D wheel faces. Add a world store for (lattice point,
 direction triple) pieces, registered in `registerHistoryStores()` so

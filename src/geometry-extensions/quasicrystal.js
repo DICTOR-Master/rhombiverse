@@ -55,6 +55,23 @@ function orthonormalRows(rows) {
   return out;
 }
 
+// Solve the square system A x = b (Gaussian elimination, partial pivoting).
+function solveLinear(A, b) {
+  const m = A.map((row, i) => [...row, b[i]]);
+  const n = m.length;
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(m[r][c]) > Math.abs(m[p][c])) p = r;
+    [m[c], m[p]] = [m[p], m[c]];
+    for (let r = 0; r < n; r++) {
+      if (r === c) continue;
+      const f = m[r][c] / m[c][c];
+      for (let k = c; k <= n; k++) m[r][k] -= f * m[c][k];
+    }
+  }
+  return m.map((row, i) => row[n] / row[i]);
+}
+
 const columns = (rows) => rows[0].map((_, i) => rows.map((r) => r[i]));
 
 // --- the two lattices ---------------------------------------------------------
@@ -256,6 +273,24 @@ export function makeQuasicrystal(tier, approximant = null) {
     return out;
   }
 
+  // Which of tileFaces(n, I) a physical point on the tile's surface is on
+  // (6D): the edge coordinate nearest 0 or 1.
+  function faceAtPoint(n, I, p) {
+    const v = tileVertices(n, I);
+    const o = v[0];
+    const rel = [0, 1, 2].map((x) => p[x] - o[x]);
+    const e = [v[4], v[2], v[1]].map((w) => [0, 1, 2].map((x) => w[x] - o[x]));
+    const c = solve3(e[0], e[1], e[2], rel);
+    let best = 0, bestD = Infinity;
+    c.forEach((cj, j) => {
+      for (const side of [0, 1]) {
+        const dd = Math.abs(cj - side);
+        if (dd < bestD) { bestD = dd; best = 2 * j + side; }
+      }
+    });
+    return best;
+  }
+
   // The tile across face `f` (from tileFaces) of tile (n, I), or null.
   function neighbourAcross(n, I, f, offset) {
     const self = tileKey(n, I);
@@ -263,22 +298,31 @@ export function makeQuasicrystal(tier, approximant = null) {
     return other.length === 1 ? other[0] : null;
   }
 
-  // A tile near the physical origin: search growing boxes of Z^d.
+  // The point of R^d with par 0 and perp = offset: lattice points near it
+  // are the ones the cut passes through near the physical origin.
+  function cutPointAtOrigin(offset) {
+    const rows = [...par[0].map((_, k) => par.map((v) => v[k])), ...[0, 1, 2].map((k) => perp.map((v) => v[k]))];
+    return solveLinear(rows, [...par[0].map(() => 0), ...offset]);
+  }
+
+  // A tile near the physical origin: search growing boxes of Z^d around
+  // the cut point.
   function seedTile(offset) {
-    for (let r = 1; r <= 4; r++) {
+    const centre = cutPointAtOrigin(offset).map(Math.round);
+    for (let r = 1; r <= 3; r++) {
       let best = null;
-      const n = new Array(d).fill(-r);
+      const step = new Array(d).fill(-r);
       for (;;) {
+        const n = centre.map((c, i) => c + step[i]);
         for (const I of subsets(d, spec.k)) {
           if (!isTile(n, I, offset)) continue;
-          const c = centroid(tileVertices(n, I));
-          const dist = Math.hypot(...c);
-          if (!best || dist < best.dist) best = { n: n.slice(), I, dist };
+          const dist = Math.hypot(...centroid(tileVertices(n, I)));
+          if (!best || dist < best.dist) best = { n, I, dist };
         }
         let i = 0;
-        while (i < d && n[i] === r) n[i++] = -r;
+        while (i < d && step[i] === r) step[i++] = -r;
         if (i === d) break;
-        n[i]++;
+        step[i]++;
       }
       if (best && best.dist < 1.5) return { n: best.n, I: best.I };
     }
@@ -310,12 +354,16 @@ export function makeQuasicrystal(tier, approximant = null) {
     return tier === '6d' ? c : [c[0], c[2]];
   };
 
+  // Distance between opposite window facets at their closest: the unit
+  // the phason sliders move in.
+  const windowWidth = 2 * Math.min(...windowPlanes.map((w) => w.half));
+
   return {
-    tier, d, k: spec.k, q, approximant,
-    par: par, perp,
+    tier, d, k: spec.k, q, approximant, windowWidth,
+    par, perp,
     perpOf, parOf,
     isTile, margin, isVertex, windowVertices, windowPlanes,
-    tileVertices, tileType, tileFaces, tilesOnFace, neighbourAcross,
+    tileVertices, tileType, tileFaces, tilesOnFace, neighbourAcross, faceAtPoint,
     seedTile, patch,
   };
 }

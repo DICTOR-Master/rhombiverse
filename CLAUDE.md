@@ -7,7 +7,8 @@ nothing in this file is history.
 ## What this project is
 
 Rhombiverse is a browser-based, Three.js spatial editor for real
-space-filling lattices in **2D, 3D and 4D**. It's the *landscape* view:
+space-filling lattices in **2D, 3D and 4D**, plus the 6D icosahedral
+quasicrystal. It's the *landscape* view:
 the lattice exists first, and you place one piece at a time wherever it
 has room. Tap to add a piece, long-press (or right-click) to remove one,
 and look at the build through several views (Lattice View, X-Ray,
@@ -51,7 +52,7 @@ UI rule: hide controls that don't apply; don't grey them out.
 See README.md → Structure. In short: `index.html` (the app),
 `src/render.js` (scene, render loop, most UI wiring), `src/core/`
 (lattice math, placement/removal input in `build.js`, world state,
-persistence), `src/app/` (wheels, Wizard, 4D world, Almanac, settings,
+persistence), `src/app/` (wheels, Wizard, 4D and 6D worlds, Almanac, settings,
 i18n, welcome, guide, language picker), `src/geometry-extensions/` (every
 lattice beyond FCC), `data/` (starter world, changelog), `docs/guide*.md`
 (the user guide).

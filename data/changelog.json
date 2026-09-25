@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-09-25",
+    "title": "6D: the icosahedral quasicrystal",
+    "items": [
+      "New dimension: 6D. Pick it on the dimension wheel or in the Wizard to build the icosahedral quasicrystal, prolate and oblate golden rhombohedra sliced from a 6D cubic lattice. Tap the cyan outline to place the first piece; tap a face to add the piece the tiling has across it (the tiling decides whether it's prolate or oblate); long-press to remove.",
+      "The 6D slider has four modes. Phason 1, 2 and 3 slide the slice through the hidden dimensions, so pieces appear and vanish while none ever moves. Approximant steps through the Fibonacci crystals 1/1, 2/1, 3/2 … up to τ, the true quasicrystal. Reset 6D goes back to the start.",
+      "6D Info shows what you've built (prolate and oblate), how many pieces the current slice shows or hides, and the slider settings. Lattice View shows every piece the tiling has one step past your build; tap one to place it. Undo, Skeleton, Colour, and Export/Import all cover 6D."
+    ]
+  },
+  {
+    "date": "2026-09-25",
     "title": "How to use Rhombiverse",
     "items": [
       "The How to use guide is now in all 7 languages, and a 🌐 language picker sits at the top of the welcome screen and the guide. It changes the whole app's language, the same as Settings → Language.",
