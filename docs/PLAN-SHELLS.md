@@ -72,6 +72,9 @@ purged in 3d87e35; restore reference 216ddbd), as pure geometry.
   outline around its small pieces, showing which pieces are missing or
   extra; confirming replaces them with one big RD. Zooming in opens a
   big RD back into its pieces. Each is one undo step.
+- **Band colours**: the old per-shell hue step is the default (render.js
+  `shellTint`, 0.15 of the hue circle per shell), and a palette can be
+  chosen instead.
 - **Big RDs keep their inner bands**: a big RD remembers the shell
   colours of the pieces it replaced, seen in X-Ray and Translucent.
 
@@ -123,8 +126,6 @@ shipped stage.
 
 ## Open questions
 
-- **Colours:** keep the old per-shell hue step (render.js `shellTint`,
-  0.15 per shell), or a chosen palette?
 - **Size limit:** the largest hull before it slows down on a phone
   (measure in stage 2).
 
