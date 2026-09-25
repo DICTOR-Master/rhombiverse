@@ -92,22 +92,23 @@ slider jump, and one undo step. Start with bridge pieces and zonohedra
 
 **7. Fill the catalogue**: about 100 patches (Conway's 7 vertex stars at
 2–3 sizes, the named patches such as the cartwheel and Conway worms,
-and the icosahedral clusters), then the polytopes.
+and the icosahedral clusters), then the polytopes (zonotopal ones as
+ordinary pieces, the rest as the polytope piece type below).
 
 **8. Words and docs**: all 7 languages for new UI strings, a guide
 section in all 7 guides, Almanac entries for the new pieces and
 concepts, and a What's New entry per shipped stage.
 
-## Open question (settle before stage 7)
+## Polytopes that aren't made of the tier's pieces (decided)
 
-Zonohedra and patches decompose exactly into the tier's own pieces
-(the rhombic triacontahedron is 20 golden rhombohedra, for example),
-so "lands as ordinary pieces" works for them. Most higher-dimensional
-polytopes (simplices, demicubes, 2₂₁) are **not** made of those
-pieces. Options: (a) only zonotopal polytopes (the n-cubes'
-projections) are summonable, and the rest are view-only in the
-catalogue; (b) the rest land as one new "polytope" piece type; (c)
-leave them out.
+Zonohedra and patches decompose exactly into the tier's own pieces (the
+rhombic triacontahedron is 20 golden rhombohedra, for example), so they
+land as ordinary pieces. Polytopes that don't (simplices, demicubes,
+2₂₁) land as **one new "polytope" piece type**: a single piece showing
+that polytope's projection, placed, selected, coloured and removed like
+any other piece, and recorded in Info like any summon. It gets its own
+store entry kind, and `verify:catalogue` checks it doesn't overlap the
+pieces around it.
 
 ## Rules that apply throughout
 
