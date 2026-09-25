@@ -1780,6 +1780,18 @@ async function init() {
   // parallelogram cell and a hexagon cell are genuinely different
   // topology (4 vs 6 neighbors), not just a different rendering of the
   // same index.
+  // Kagome tiles added before 2026-09-25 were saved with z missing
+  // ("1,0,undefined") -- see kagomeNeighborOffsets. Rename those keys to
+  // z 0 on load so the tiles become removable again.
+  function repairLattice2dKeys(json) {
+    if (!json?.cells) return json;
+    const cells = {};
+    for (const [key, value] of Object.entries(json.cells)) {
+      const [x, y, z] = key.split(',');
+      cells[z === undefined || z === 'undefined' || z === 'NaN' || z === 'null' ? `${x},${y},0` : key] = value;
+    }
+    return { ...json, cells };
+  }
   function lattice2dSeedCell() {
     return [0, 0];
   }
@@ -1789,7 +1801,7 @@ async function init() {
   // reasoning as hexPrismWorld above.
   const lattice2dWorlds = new Map(); // primitiveId -> world store
   LATTICE_PRIMITIVES.forEach((primitive) => {
-    const savedJSON = loadFromLocalStorage(lattice2dStorageKey(primitive.id));
+    const savedJSON = repairLattice2dKeys(loadFromLocalStorage(lattice2dStorageKey(primitive.id)));
     // No seed tile (2026-09-25, direct request): an empty 2D world shows
     // the cyan first-placement outline instead, same as 3D and 4D -- see
     // firstPlacementSpec.

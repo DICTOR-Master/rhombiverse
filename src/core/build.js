@@ -753,7 +753,7 @@ export function createBuildController({
         if (dot > bestDot) { bestDot = dot; bestIdx = i; }
       });
       const [dx, dy, dz] = offsets[bestIdx];
-      const nx = cell.x + dx, ny = cell.y + dy, nz = dz;
+      const nx = cell.x + dx, ny = cell.y + dy, nz = dz ?? 0; // no orientation = z 0 (see kagomeNeighborOffsets)
       if (store.world.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
       const material = getMaterial();
       store.world.addCell(nx, ny, nz, { material });

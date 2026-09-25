@@ -286,7 +286,12 @@ export function createWheelPickers({
   function openColorPicker(onPick) {
     const select = document.getElementById(materialSelectId);
     const options = readSelectOptions(select);
-    openMaterialWheel(options, (value, label) => { select.value = value; onPick?.(value, label); }, select.value);
+    // Fire 'change' so a wheel pick behaves exactly like a dropdown pick --
+    // render.js's change listener writes the per-piece auto-assign
+    // override. Setting .value alone doesn't fire it, so with auto-assign
+    // on (the default) the RD stayed grey whatever colour was picked
+    // (direct report 2026-09-25).
+    openMaterialWheel(options, (value, label) => { select.value = value; select.dispatchEvent(new Event('change')); onPick?.(value, label); }, select.value);
   }
   // openSpeciesPicker/openGeneratorPicker (both used openPickerStrip, below)
   // removed 2026-09-22 (second world-building removal pass) -- their only

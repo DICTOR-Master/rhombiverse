@@ -673,7 +673,11 @@ export function kagomeTriangleDownCellToWorld(x, y, angleDeg, s = 1, worldZ = 0)
 // needs). Same fixed 6 (i,j) index offsets at every angle, matching
 // kagomeNeighborDirsSorted's own v0/-v0/v1/-v1/(v1-v0)/(v0-v1) exactly.
 export function kagomeNeighborOffsets(_angleDeg) {
-  return [[1, 0], [-1, 0], [0, 1], [0, -1], [-1, 1], [1, -1]];
+  // [dx, dy, z]: z is always 0 (no orientation), and must be present --
+  // it was omitted, so every tile added next to another was stored with
+  // z undefined ("1,0,undefined") and could never be found to remove
+  // (direct report 2026-09-25: "first kagome will delete but others wont").
+  return [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [-1, 1, 0], [1, -1, 0]];
 }
 
 // Real bug, direct user report ("it is not a star of david formation
