@@ -472,6 +472,7 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
     };
     const sections = [
       { id: 'zonohedron', label: 'Zonohedra', desc: 'Shapes built from the tiling’s own pieces, found wherever they occur.', items: mine.filter((x) => x.kind === 'zonohedron') },
+      { id: 'polytope', label: 'Polytopes', desc: 'Shadows of higher-dimensional polytopes with corners on the lattice, placed at a vertex. They lie over the tiling without blocking pieces; corners in the slice light up.', items: mine.filter((x) => x.kind === 'polytope') },
       ...[1, 2, 3].map((r) => ({
         id: `patch${r}`,
         label: r === 1 ? 'Vertex stars' : `Vertex stars, ${r} rings`,

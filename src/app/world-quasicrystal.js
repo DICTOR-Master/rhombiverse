@@ -40,11 +40,16 @@
 //   item needs another approximant, sliding there in about half a second;
 //   undoing or cancelling the summon slides it back. Info lists every
 //   summon; tap one to slide back to its settings.
+// - Polytopes land as one shadow piece at a tiling vertex: the projected
+//   wireframe over translucent faces (5D: a 1-layer prism). They never
+//   block tiles. Corners that are vertices of the current slice light up,
+//   and Window View draws their hidden-dimension shadow too. Long-press
+//   removes one; they undo and export like pieces.
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { makeQuasicrystal, BASE_OFFSET, APPROXIMANT_STOPS, TIERS, tileKey } from '../geometry-extensions/quasicrystal.js';
+import { makeQuasicrystal, BASE_OFFSET, APPROXIMANT_STOPS, TIERS, PRISM_HEIGHT, tileKey } from '../geometry-extensions/quasicrystal.js';
 import { createGearedSlider } from './geared-slider.js';
-import { findOccurrence } from '../geometry-extensions/quasicrystal-catalogue.js';
+import { findOccurrence, polytopeShape } from '../geometry-extensions/quasicrystal-catalogue.js';
 
 const PHASON_LIMIT = 1; // window widths
 const PHASON_SNAP = 0.04;
@@ -95,6 +100,9 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   // (settings = the slider at landing, before = the slider before the
   // summon moved it). Pieces carry their summon's id.
   let summons = [];
+  // Polytope shadows: key -> { family, directions, v, layer?, material, summon }.
+  const polys = new Map();
+  const polyKey = (p) => `${p.family}|${p.directions.join('')}|${p.v.join(',')}${W.layered ? `|${p.layer}` : ''}`;
   let pending = null; // a summon in progress: { entry, tiles, layer, before }
   const view = { phason: [0, 0, 0], approx: APPROXIMANT_STOPS.length - 1, control: 'p1', mode: 'build' };
   let active = false;
@@ -122,6 +130,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       const data = JSON.parse(raw);
       setTilesFromJSON(data.tiles);
       setSummonsFromJSON(data.summons);
+      setPolysFromJSON(data.polytopes);
       if (data.view) {
         if (Array.isArray(data.view.phason) && data.view.phason.length === 3) {
           view.phason = data.view.phason.map((x, i) => (W.controls.includes(`p${i + 1}`) ? Math.max(-PHASON_LIMIT, Math.min(PHASON_LIMIT, +x || 0)) : 0));
@@ -151,9 +160,21 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       .filter((x) => Number.isInteger(x?.id) && Number.isInteger(x.serial) && x.settings && x.before)
       .map((x) => ({ id: x.id, serial: x.serial, name: String(x.name ?? ''), settings: settingsJSON(x.settings), before: settingsJSON(x.before) }));
   }
+  const polysJSON = () => [...polys.values()].map((p) => ({ ...p }));
+  function setPolysFromJSON(list) {
+    polys.clear();
+    for (const p of Array.isArray(list) ? list : []) {
+      if (!['orthoplex', 'demicube', 'simplex'].includes(p?.family)) continue;
+      if (!Array.isArray(p.v) || p.v.length !== d || !p.v.every(Number.isInteger)) continue;
+      if (!Array.isArray(p.directions) || p.directions.length < 3 || !p.directions.every((i) => Number.isInteger(i) && i >= 0 && i < d)) continue;
+      if (W.layered && !Number.isInteger(p.layer)) continue;
+      const poly = { family: p.family, directions: p.directions, v: p.v, ...(W.layered ? { layer: p.layer } : {}), material: p.material, ...(Number.isInteger(p.summon) ? { summon: p.summon } : {}) };
+      polys.set(polyKey(poly), poly);
+    }
+  }
   function save() {
     try {
-      localStorage.setItem(W.storageKey, JSON.stringify({ version: 1, tiles: tilesJSON(), summons, view }));
+      localStorage.setItem(W.storageKey, JSON.stringify({ version: 1, tiles: tilesJSON(), summons, polytopes: polysJSON(), view }));
     } catch { /* best-effort */ }
   }
   load();
@@ -243,7 +264,8 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   function locate(near, layer) {
     const occ = findOccurrence(engine(), offset(), pending.entry, near);
     if (!occ) { showHudPrompt(`${pending.entry.name} doesn't occur near there. Tap somewhere else.`, 3500); return; }
-    pending.tiles = occ.tiles;
+    pending.tiles = occ.tiles ?? [];
+    pending.anchor = occ.anchor ?? null;
     pending.layer = layer;
     rebuild();
     // The nearest occurrence can be off screen (decagons are rare): bring
@@ -260,7 +282,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     const go = () => {
       const vis = visibleTiles();
       locateSoon(buildCentre(), vis.length ? Math.max(...vis.map((t) => t.layer ?? 0)) : 0, () => {
-        if (pending?.tiles.length) showHudPrompt(`${entry.name}: tap the gold outline to place it, or tap the build to move it.`, 5000);
+        if (pending?.tiles.length || pending?.anchor) showHudPrompt(`${entry.name}: tap the gold outline to place it, or tap the build to move it.`, 5000);
       });
     };
     if (approx !== view.approx) slideTo({ approx, phason: view.phason }, go);
@@ -277,6 +299,10 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     const { entry } = pending;
     const material = getMaterial();
     let added = 0;
+    if (pending.anchor) {
+      const poly = { family: entry.family, directions: entry.directions, v: pending.anchor, ...(W.layered ? { layer: pending.layer } : {}), material, summon: id };
+      if (!polys.has(polyKey(poly))) { polys.set(polyKey(poly), poly); added = 1; }
+    }
     for (const t of pending.tiles) {
       for (let L = 0; L < (entry.layers ?? 1); L++) {
         const piece = pieceOf({ ...t, layer: pending.layer + L });
@@ -318,6 +344,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       ['Phason', W.controls.filter((c) => c !== 'approx').map((c) => fmt(view.phason[Number(c[1]) - 1])).join(' · ')],
       ['Approximant', APPROXIMANT_STOPS[view.approx] ? `${stopLabel(APPROXIMANT_STOPS[view.approx])} (a periodic crystal)` : 'τ (the true quasicrystal)'],
     ];
+    if (polys.size) rows.splice(2, 0, ['Polytopes', `${polys.size} shadow${polys.size === 1 ? '' : 's'}`]);
     const summoned = all.filter((t) => t.summon).length;
     if (summons.length) rows.splice(2, 0, ['Pieces', `${all.length - summoned} hand-placed, ${summoned} summoned`]);
     if (view.mode === 'window') {
@@ -406,8 +433,20 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
         addWindowPiece(g);
       }
     }
+    // Polytopes: their hidden-dimension shadow, same edges.
+    const polyCorners = [];
+    for (const p of polys.values()) {
+      const { verts, edges } = polytopeShape(d, p.family, p.directions);
+      const corners = verts.map((o) => o.map((x, i) => x + p.v[i]));
+      const segs = edges.flatMap(([a, b]) => [corners[a], corners[b]]).map((m) => new THREE.Vector3(...toScene(windowPoint(m))));
+      const g = new THREE.BufferGeometry().setFromPoints(segs);
+      windowGeometries.push(g);
+      group.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: materialColor(p.material) })));
+      polyCorners.push(...corners);
+    }
     const points = [
       ...built.map((m) => ({ m, color: e.isVertex(m, offset()) ? CORNER_IN : CORNER_OUT })),
+      ...polyCorners.map((m) => ({ m, color: e.isVertex(m, offset()) ? CORNER_IN : CORNER_OUT })),
       ...slots.map((m) => ({ m, color: e.isVertex(m, offset()) ? SLOT_COLOR : SLOT_CORNER_OUT })),
     ];
     if (!points.length) return;
@@ -423,6 +462,47 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   const cornerGeometry = new THREE.SphereGeometry(CORNER_RADIUS, 12, 8);
   const windowGeometries = [];
 
+  // A polytope's shadow: its corners (lattice points) in the build's
+  // frame, and its edges. 5D: the flat shadow as a 1-layer prism.
+  function polyGeometry(p) {
+    const e = engine();
+    const { verts, edges } = polytopeShape(d, p.family, p.directions);
+    const corners = verts.map((o) => o.map((x, i) => x + p.v[i]));
+    const at = (m, y) => { const q = e.parOf(m); return W.layered ? [q[0], y, q[1]] : q; };
+    const base = corners.map((m) => at(m, (p.layer ?? 0) * PRISM_HEIGHT));
+    const pts = W.layered ? [...base, ...corners.map((m) => at(m, ((p.layer ?? 0) + 1) * PRISM_HEIGHT))] : base;
+    const segs = [];
+    for (const [a, b] of edges) {
+      segs.push(pts[a], pts[b]);
+      if (W.layered) segs.push(pts[a + corners.length], pts[b + corners.length]);
+    }
+    if (W.layered) corners.forEach((_, i) => segs.push(pts[i], pts[i + corners.length]));
+    return { corners, pts, base, segs };
+  }
+  function addPoly(p, { color, opacity, qc, lineColor, litCorners = true }) {
+    const { corners, pts, base, segs } = polyGeometry(p);
+    const mesh = new THREE.Mesh(new ConvexGeometry(pts.map((q) => new THREE.Vector3(...q))), new THREE.MeshStandardMaterial({
+      color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
+    }));
+    mesh.userData = { qc, poly: p };
+    mesh.visible = !skeleton || qc === 'ghost';
+    group.add(mesh);
+    windowGeometries.push(mesh.geometry);
+    pickTargets.push(mesh);
+    const lineGeometry = new THREE.BufferGeometry().setFromPoints(segs.map((q) => new THREE.Vector3(...q)));
+    group.add(new THREE.LineSegments(lineGeometry, new THREE.LineBasicMaterial({ color: lineColor })));
+    if (!litCorners) return;
+    // Corners that are vertices of the current slice light up.
+    const e = engine(), off = offset();
+    const dots = new THREE.InstancedMesh(cornerGeometry, new THREE.MeshBasicMaterial(), corners.length);
+    const m4 = new THREE.Matrix4(), c = new THREE.Color();
+    corners.forEach((m, i) => {
+      dots.setMatrixAt(i, m4.makeTranslation(...base[i]));
+      dots.setColorAt(i, c.setHex(e.isVertex(m, off) ? CORNER_IN : SLOT_CORNER_OUT));
+    });
+    group.add(dots);
+  }
+
   function rebuild() {
     const visible = active ? visibleTiles() : [];
     renderInfo(visible);
@@ -434,6 +514,13 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       return;
     }
     for (const t of visible) addTile(t, { color: materialColor(t.material), qc: 'tile' });
+    for (const p of polys.values()) {
+      const color = materialColor(p.material);
+      addPoly(p, { color, opacity: 0.22, qc: 'polytope', lineColor: color });
+    }
+    if (pending?.anchor) {
+      addPoly({ family: pending.entry.family, directions: pending.entry.directions, v: pending.anchor, layer: pending.layer }, { color: GHOST_COLOR, opacity: 0.3, qc: 'ghost', lineColor: GHOST_COLOR, litCorners: false });
+    }
     if (pending?.tiles.length) {
       const lineMaterial = new THREE.LineBasicMaterial({ color: GHOST_COLOR });
       for (const t of pending.tiles) for (let L = 0; L < (pending.entry.layers ?? 1); L++) {
@@ -466,7 +553,13 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       // Summoning: the ghost places; anything else moves the ghost there.
       if (qc === 'ghost') return landSummon();
       const p = hit.point;
-      locateSoon(toPar([p.x, p.y, p.z]), tile.layer ?? 0);
+      locateSoon(toPar([p.x, p.y, p.z]), (tile ?? hit.object.userData.poly)?.layer ?? 0);
+      return true;
+    }
+    if (qc === 'polytope') {
+      if (mode !== 'chisel') { showHudPrompt('A polytope shadow: long-press to remove it. Turn the view to reach the pieces behind it.', 3500); return true; }
+      polys.delete(polyKey(hit.object.userData.poly));
+      save(); rebuild(); onChange();
       return true;
     }
     if (mode === 'chisel') {
@@ -558,16 +651,17 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     setSkeleton(on) { skeleton = on; rebuild(); },
     setLatticeView(on) { latticeView = on; rebuild(); },
     startSummon,
-    get isEmpty() { return tiles.size === 0; },
-    clear() { tiles.clear(); summons = []; pending = null; save(); rebuild(); onChange(); },
+    get isEmpty() { return tiles.size === 0 && polys.size === 0; },
+    clear() { tiles.clear(); polys.clear(); summons = []; pending = null; save(); rebuild(); onChange(); },
     // Undo (render.js's history): the pieces and the summon record, never
     // the slider -- except that undoing a summon slides back to where the
     // slider was before it.
-    snapshot() { return { tiles: tilesJSON(), summons: summons.map((x) => ({ ...x })) }; },
+    snapshot() { return { tiles: tilesJSON(), summons: summons.map((x) => ({ ...x })), polytopes: polysJSON() }; },
     restore(json) {
       const undone = summons.filter((x) => !(json?.summons ?? []).some((y) => y.id === x.id));
       setTilesFromJSON(Array.isArray(json) ? json : json?.tiles);
       setSummonsFromJSON(Array.isArray(json) ? [] : json?.summons);
+      setPolysFromJSON(Array.isArray(json) ? [] : json?.polytopes);
       pending = null;
       save(); onChange();
       const back = undone[undone.length - 1]?.before;

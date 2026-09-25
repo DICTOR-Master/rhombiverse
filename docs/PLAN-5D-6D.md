@@ -127,13 +127,20 @@ share a first ring) at 1–3 rings. 6D: the 24 Ammann–Kramer vertex stars at
 so a summon lands nearby; 3 rings is hundreds of pieces and rarely
 repeats). Names are descriptive; de Bruijn's letters and literature names
 (cartwheel, Conway worms, icosahedral clusters) wait until their
-definitions are checked. *7b next:* polytopes, after a design session.
+definitions are checked. *7b shipped:* 27 polytopes (serials 1–27,
+`scripts/generate-catalogue-polytopes.mjs`): orthoplex, demicube and corner
+simplex over 3 to d axes, one per orientation class. User decisions: a
+polytope lands as a shadow overlay at a tiling vertex (projected wireframe
+over translucent faces, never blocking tiles, corners in the slice lit,
+its hidden-dimension shadow in Window View), only lattice polytopes (the
+regular 6-simplex and 2₂₁ don't live on Z⁶), and 5D shadows as 1-layer
+prisms. This replaces the solid "polytope piece" idea below.
 
 **8. Words and docs**: all 7 languages for new UI strings, a guide
 section in all 7 guides, Almanac entries for the new pieces and
 concepts, and a What's New entry per shipped stage.
 
-## Polytopes that aren't made of the tier's pieces (decided)
+## Polytopes that aren't made of the tier's pieces (superseded by 7b: shadow overlays)
 
 Zonohedra and patches decompose exactly into the tier's own pieces (the
 rhombic triacontahedron is 20 golden rhombohedra, for example), so they

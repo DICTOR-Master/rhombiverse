@@ -24,7 +24,7 @@ import { createDimensionWizard } from './app/dimension-wizard.js';
 import { createWorld4D } from './app/world-4d.js';
 import { createQuasicrystalWorld } from './app/world-quasicrystal.js';
 import { makeQuasicrystal, PRISM_HEIGHT } from './geometry-extensions/quasicrystal.js';
-import { loadCatalogue, findBySerial, zonotopeVertices, localPatch } from './geometry-extensions/quasicrystal-catalogue.js';
+import { loadCatalogue, findBySerial, zonotopeVertices, localPatch, polytopeShape } from './geometry-extensions/quasicrystal-catalogue.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
@@ -3628,6 +3628,15 @@ async function init() {
       }
     }
     function wizardPieceEdges(action) {
+      // A polytope's preview is its whole projected wireframe, not just
+      // the hull's outline (5D: the flat shadow, lifted into the x/z plane).
+      const poly = action.startsWith('summon:') && findBySerial(catalogueEntries, Number(action.slice(7)));
+      if (poly?.kind === 'polytope') {
+        const e = qcEngines[poly.tier];
+        const { verts, edges } = polytopeShape(e.d, poly.family, poly.directions);
+        const pts = verts.map((m) => { const q = e.parOf(m); return poly.tier === '5d' ? [q[0], 0, q[1]] : q; });
+        return edges.map(([a, b]) => [pts[a], pts[b]]);
+      }
       const g = wizardPieceGeometry(action);
       if (!g) return [];
       const edges = new THREE.EdgesGeometry(g);

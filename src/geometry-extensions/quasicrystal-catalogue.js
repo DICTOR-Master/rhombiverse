@@ -162,6 +162,7 @@ function findPatch(e, offset, entry, near) {
 // { tiles: [{ n, I }], centre } or null.
 export function findOccurrence(e, offset, entry, near) {
   if (entry.kind === 'patch') return findPatch(e, offset, entry, near);
+  if (entry.kind === 'polytope') return findAnchor(e, offset, near);
   const sets = congruentSets(e, entry.directions);
   for (const radius of [5, 9, 14]) {
     const tiles = e.patch(offset, radius, near);
@@ -186,6 +187,7 @@ export function findOccurrence(e, offset, entry, near) {
 
 // How many pieces an entry lands as.
 export function pieceCount(e, entry) {
+  if (entry.kind === 'polytope') return 1;
   if (entry.kind === 'patch') return entry.pieces * (entry.layers ?? 1);
   const m = entry.directions.length;
   let c = 1;
@@ -213,4 +215,47 @@ let cataloguePromise = null;
 export function loadCatalogue() {
   cataloguePromise ??= fetch('./data/catalogue-5d6d.json').then((r) => r.json()).catch(() => []);
   return cataloguePromise;
+}
+
+// Polytopes (serials 1-999): lattice polytopes with corners in Z^d, over a
+// set S of axes, anchored at a vertex v of the tiling. They land as one
+// shadow piece (their projection), not as tiles: a higher-dimensional
+// polytope's shadow isn't a space-filling brick.
+//   orthoplex: v +- e_i (i in S); edges join every pair but opposites.
+//   simplex:   v, v + e_i (i in S); edges join every pair.
+//   demicube:  v + the even-size subsets of S; edges join corners two
+//              steps apart.
+// Returns lattice offsets from v and edges as index pairs.
+export function polytopeShape(d, family, S) {
+  const unit = (i, s = 1) => Array.from({ length: d }, (_, l) => (l === i ? s : 0));
+  let verts;
+  if (family === 'orthoplex') verts = S.flatMap((i) => [unit(i), unit(i, -1)]);
+  else if (family === 'simplex') verts = [new Array(d).fill(0), ...S.map((i) => unit(i))];
+  else if (family === 'demicube') {
+    verts = [];
+    for (let m = 0; m < 1 << S.length; m++) {
+      const bits = S.filter((_, b) => m & (1 << b));
+      if (bits.length % 2 === 0) verts.push(Array.from({ length: d }, (_, l) => (bits.includes(l) ? 1 : 0)));
+    }
+  } else throw new Error(`unknown polytope family ${family}`);
+  const edges = [];
+  const diff = (a, b) => a.reduce((s, x, i) => s + Math.abs(x - b[i]), 0);
+  for (let a = 0; a < verts.length; a++) for (let b = a + 1; b < verts.length; b++) {
+    const dd = diff(verts[a], verts[b]);
+    if (family === 'orthoplex' ? dd === 2 : family === 'simplex' ? true : dd === 2) edges.push([a, b]);
+  }
+  return { verts, edges };
+}
+
+// The tiling vertex nearest `near` (a polytope's anchor).
+function findAnchor(e, offset, near) {
+  for (const radius of [3, 6, 12]) {
+    let best = null;
+    for (const v of verticesNear(e, offset, near, radius)) {
+      const dist = Math.hypot(...e.parOf(v).map((x, j) => x - near[j]));
+      if (!best || dist < best.dist) best = { v, dist };
+    }
+    if (best) return { anchor: best.v, centre: e.parOf(best.v) };
+  }
+  return null;
 }
