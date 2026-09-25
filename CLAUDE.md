@@ -71,7 +71,7 @@ lattice beyond FCC), `data/` (starter world, changelog), `docs/guide*.md`
   copy, raw source and `dist/` both, in CI.
 - **Checks:** `npm run verify:i18n | verify:rhombis-i18n | verify:copy |
   verify:lattice-2d | verify:pyrochlore | verify:rhombohedra | verify:4d |
-  verify:quasicrystal`.
+  verify:quasicrystal | verify:catalogue`.
 - **Browser automation:** run Playwright on `dicto-node` (192.168.0.7,
   SSH), not the dev Pi. Sync first, with `--delete` for tests. Headless
   Chromium there can starve timers, so hold simulated long-presses 1.5 s+.

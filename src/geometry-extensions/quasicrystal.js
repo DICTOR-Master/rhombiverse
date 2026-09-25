@@ -328,26 +328,32 @@ export function makeQuasicrystal(tier, approximant = null) {
     return other.length === 1 ? other[0] : null;
   }
 
-  // The point of R^d with par 0 and perp = offset: lattice points near it
-  // are the ones the cut passes through near the physical origin.
-  function cutPointAtOrigin(offset) {
+  // The point of R^d with par = centre (a physical point: 3D in 6D, the
+  // Penrose plane's (x, z) in 5D) and perp = offset: lattice points near it
+  // are the ones the cut passes through near that physical point.
+  function cutPoint(offset, centre) {
     const rows = [...par[0].map((_, k) => par.map((v) => v[k])), ...[0, 1, 2].map((k) => perp.map((v) => v[k]))];
-    return solveLinear(rows, [...par[0].map(() => 0), ...offset]);
+    return solveLinear(rows, [...centre, ...offset]);
   }
+  const ORIGIN = par[0].map(() => 0);
+  // A tile's centre in physical space (5D: in the Penrose plane).
+  const parCentre = (n, I) => I.reduce((v, i) => addScaled(v, par[i], 0.5), parOf(n));
+  const distFrom = (centre) => (n, I) => Math.hypot(...parCentre(n, I).map((x, i) => x - centre[i]));
 
-  // A tile near the physical origin: search growing boxes of Z^d around
-  // the cut point.
-  function seedTile(offset) {
-    const centre = cutPointAtOrigin(offset).map(Math.round);
+  // A tile near a physical point (default the origin): search growing
+  // boxes of Z^d around the cut point.
+  function seedTile(offset, centre = ORIGIN) {
+    const dist = distFrom(centre);
+    const c0 = cutPoint(offset, centre).map(Math.round);
     for (let r = 1; r <= 3; r++) {
       let best = null;
       const step = new Array(d).fill(-r);
       for (;;) {
-        const n = centre.map((c, i) => c + step[i]);
+        const n = c0.map((c, i) => c + step[i]);
         for (const I of subsets(d, spec.k)) {
           if (!isTile(n, I, offset)) continue;
-          const dist = Math.hypot(...centroid(tileVertices(n, I)));
-          if (!best || dist < best.dist) best = { n, I, dist };
+          const dd = dist(n, I);
+          if (!best || dd < best.dist) best = { n, I, dist: dd };
         }
         let i = 0;
         while (i < d && step[i] === r) step[i++] = -r;
@@ -356,13 +362,15 @@ export function makeQuasicrystal(tier, approximant = null) {
       }
       if (best && best.dist < 1.5) return { n: best.n, I: best.I };
     }
-    throw new Error('seedTile: no tile near the origin');
+    throw new Error('seedTile: no tile near that point');
   }
 
-  // All tiles with centroid within `radius` of the physical origin
-  // (5D: of the Penrose plane, one layer), by walking face neighbours.
-  function patch(offset, radius) {
-    const start = seedTile(offset);
+  // All tiles whose centre is within `radius` of a physical point (default
+  // the origin; 5D: one layer of the Penrose plane), by walking face
+  // neighbours.
+  function patch(offset, radius, centre = ORIGIN) {
+    const dist = distFrom(centre);
+    const start = seedTile(offset, centre);
     const seen = new Map([[tileKey(start.n, start.I), start]]);
     const queue = [start];
     while (queue.length) {
@@ -371,18 +379,14 @@ export function makeQuasicrystal(tier, approximant = null) {
         for (const u of tilesOnFace(f.n, f.K, offset)) {
           const key = tileKey(u.n, u.I);
           if (seen.has(key)) continue;
-          if (Math.hypot(...centroid(tileVertices(u.n, u.I))) > radius + 3) continue;
+          if (dist(u.n, u.I) > radius + 3) continue;
           seen.set(key, u);
           queue.push(u);
         }
       }
     }
-    return [...seen.values()].filter((t) => Math.hypot(...centroidXZ(t)) <= radius);
+    return [...seen.values()].filter((t) => dist(t.n, t.I) <= radius);
   }
-  const centroidXZ = (t) => {
-    const c = centroid(tileVertices(t.n, t.I));
-    return tier === '6d' ? c : [c[0], c[2]];
-  };
 
   // Distance between opposite window facets at their closest: the unit
   // the phason sliders move in.
@@ -391,7 +395,7 @@ export function makeQuasicrystal(tier, approximant = null) {
   return {
     tier, d, k: spec.k, q, approximant, windowWidth,
     par, perp,
-    perpOf, parOf,
+    perpOf, parOf, parCentre,
     isTile, margin, isVertex, windowVertices, windowSlice, windowPlanes,
     tileVertices, tileType, tileFaces, tilesOnFace, neighbourAcross, faceAtPoint,
     seedTile, patch,

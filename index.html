@@ -164,6 +164,15 @@
       pointer-events: none;
     }
     #world4d-info.visible, .qc-info.visible { display: block; }
+    /* Summon rows in 5D/6D Info: the only part of the box that takes taps
+       (tap one to slide back to its settings). */
+    .qc-info .qc-summon-row {
+      display: block; width: 100%; text-align: left; pointer-events: auto; cursor: pointer;
+      margin-top: 3px; padding: 5px 7px; min-height: 30px;
+      background: rgba(255, 200, 87, 0.08); border: 1px solid rgba(255, 200, 87, 0.35); border-radius: 6px;
+      color: #fde6b0; font: 12px system-ui, sans-serif;
+    }
+    .qc-info .qc-summon-set { color: #b9a37a; }
     #world4d-info .w4d-info-k, .qc-info .w4d-info-k { color: #7cf; font-weight: 600; margin-right: 4px; }
     /* Toasts sit just above the 4D panel while it's showing, instead of
        on top of its buttons -- which puts them over the scene, so taps

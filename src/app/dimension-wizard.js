@@ -48,6 +48,7 @@ import { cellStructure, rotation4, matVec, project4, A4_FIRST } from '../geometr
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
 import { VALID_TRIPLES, unitTileVertices } from '../geometry-extensions/growth.js';
 import { PRISM_HEIGHT } from '../geometry-extensions/quasicrystal.js';
+import { loadCatalogue, findBySerial, pieceCount } from '../geometry-extensions/quasicrystal-catalogue.js';
 
 const CSS = `
 .dim-wizard-overlay {
@@ -117,6 +118,16 @@ const CSS = `
 .dim-wizard-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dim-wizard-label { font: 700 13px system-ui, sans-serif; color: #fff; }
 .dim-wizard-desc { font-size: 11px; color: #9ab; line-height: 1.35; }
+.dim-wizard-serial-row { display: flex; gap: 6px; margin-bottom: 4px; }
+.dim-wizard-serial-row input {
+  flex: 1; min-width: 0; font: 16px system-ui, sans-serif; color: #eee;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(124, 204, 255, 0.35); border-radius: 8px; padding: 8px 10px;
+}
+.dim-wizard-serial-row button {
+  font: 600 14px system-ui, sans-serif; color: #9de0ff; background: rgba(124, 204, 255, 0.12);
+  border: 1px solid rgba(124, 204, 255, 0.45); border-radius: 8px; padding: 8px 16px; cursor: pointer;
+}
+.dim-wizard-serial-msg { min-height: 16px; font-size: 12px; color: #f9a; margin-bottom: 8px; }
 `;
 
 function injectCssOnce() {
@@ -322,14 +333,16 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
   overlay.className = 'dim-wizard-overlay';
   overlay.innerHTML = `
     <div class="dim-wizard-card">
-      <div class="dim-wizard-header"><span>Choose a Dimension</span><button type="button" class="dim-wizard-close">✕</button></div>
+      <div class="dim-wizard-header"><span class="dim-wizard-title">Choose a Dimension</span><button type="button" class="dim-wizard-close">✕</button></div>
       <div class="dim-wizard-body"></div>
     </div>`;
   document.body.appendChild(overlay);
   const bodyEl = overlay.querySelector('.dim-wizard-body');
+  const titleEl = overlay.querySelector('.dim-wizard-title');
 
   function showDimensions() {
     resetPreviews();
+    titleEl.textContent = 'Choose a Dimension';
     let grid = '';
     for (const dim of DIMENSIONS) {
       const disabledCls = dim.enabled ? '' : ' disabled';
@@ -351,7 +364,7 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
         if (dim === '3D') showLattice3D();
         else if (dim === '2D') showLattice2D();
         else if (dim === '4D') showLattice4D();
-        else if (dim === '5D' || dim === '6D') { close(); onSelectFamily(dim, null); } // one world, nothing to pick
+        else if (dim === '5D' || dim === '6D') showCatalogue(dim);
       });
     });
   }
@@ -422,6 +435,70 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
       });
     });
   }
+  // 5D/6D: one world each (the tiling picks every piece's shape), so the
+  // screen is the catalogue: build freely, or summon an item, from the list
+  // or by serial number (any tier's serial works from either screen).
+  async function showCatalogue(dim) {
+    resetPreviews();
+    titleEl.textContent = `${dim} Catalogue`;
+    const entries = await loadCatalogue();
+    const tier = dim.toLowerCase();
+    const k = tier === '6d' ? 3 : 2;
+    const mine = entries.filter((x) => x.tier === tier);
+    const buildRow = `
+        <button type="button" class="dim-wizard-card-btn" data-action="build">
+          ${previewSlot(DIMENSIONS.find((x) => x.id === dim).preview)}
+          <span class="dim-wizard-row-text">
+            <span class="dim-wizard-label">Build freely</span>
+            <span class="dim-wizard-desc">Start from one piece and add them yourself.</span>
+          </span>
+        </button>`;
+    const rows = mine.map((x) => {
+      const n = pieceCount({ k }, x);
+      return `
+        <button type="button" class="dim-wizard-card-btn dim-wizard-piece" data-action="summon:${x.serial}">
+          ${previewSlot(() => pieceEdges(`summon:${x.serial}`))}
+          <span class="dim-wizard-row-text">
+            <span class="dim-wizard-label">${x.name}</span>
+            <span class="dim-wizard-desc">#${x.serial} · ${n} piece${n === 1 ? '' : 's'}</span>
+          </span>
+        </button>`;
+    }).join('');
+    bodyEl.innerHTML = `
+      <button type="button" class="dim-wizard-back">← Back</button>
+      <div class="dim-wizard-sub">${dim}: build freely, or summon an item. It lands where it really occurs in the tiling, as ordinary pieces.</div>
+      <div class="dim-wizard-serial-row">
+        <input type="number" inputmode="numeric" min="1" placeholder="Serial number" aria-label="Serial number">
+        <button type="button" class="dim-wizard-serial-go">Summon</button>
+      </div>
+      <div class="dim-wizard-serial-msg" aria-live="polite"></div>
+      <div class="dim-wizard-grid">
+        ${buildRow}
+        <div class="dim-wizard-section"><span class="dim-wizard-label">Zonohedra</span>
+          <span class="dim-wizard-desc">Shapes built from the tiling's own pieces, found wherever they occur.</span></div>
+        ${rows}
+      </div>`;
+    mountPreviews();
+    bodyEl.querySelector('.dim-wizard-back').addEventListener('click', showDimensions);
+    bodyEl.querySelectorAll('.dim-wizard-card-btn[data-action]').forEach((el) => {
+      el.addEventListener('click', () => {
+        close();
+        onSelectFamily(dim, el.dataset.action === 'build' ? null : el.dataset.action);
+      });
+    });
+    const input = bodyEl.querySelector('.dim-wizard-serial-row input');
+    const msg = bodyEl.querySelector('.dim-wizard-serial-msg');
+    const go = () => {
+      const serial = Number(input.value);
+      const entry = Number.isInteger(serial) ? findBySerial(entries, serial) : null;
+      if (!entry) { msg.textContent = input.value ? `No item with serial ${input.value}.` : 'Type a serial number.'; return; }
+      close();
+      onSelectFamily(entry.tier.toUpperCase(), `summon:${entry.serial}`);
+    };
+    bodyEl.querySelector('.dim-wizard-serial-go').addEventListener('click', go);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+  }
+
   function showLattice3D() {
     showLatticeSections('3D', LATTICES_3D, '3D: pick a piece to start with -- every lattice stays reachable afterward via the Piece wheel.', (piece) => pieceEdges(piece.action));
   }
@@ -446,5 +523,11 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
     overlay.classList.remove('open');
   }
 
-  return { open, close, get isOpen() { return overlay.classList.contains('open'); } };
+  // Straight to a 5D/6D catalogue (the in-world Catalogue button).
+  function openCatalogue(dim) {
+    overlay.classList.add('open');
+    showCatalogue(dim);
+  }
+
+  return { open, openCatalogue, close, get isOpen() { return overlay.classList.contains('open'); } };
 }

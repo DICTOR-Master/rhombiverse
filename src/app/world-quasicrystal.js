@@ -32,10 +32,19 @@
 //   exactly when all its corners are inside (verify:quasicrystal), so a
 //   point crossing the edge is pieces vanishing or appearing. With Lattice
 //   View on, the ghost pieces' corners show too. No placing while it's up.
+// - Summon (catalogue, quasicrystal-catalogue.js): a gold ghost appears
+//   where the item genuinely occurs in the current tiling, nearest the
+//   build; tap anywhere on the build to move it to the nearest occurrence
+//   there, tap the ghost to place it. It lands as ordinary pieces (already
+//   placed ones are kept), in one undo step. The slider only moves if the
+//   item needs another approximant, sliding there in about half a second;
+//   undoing or cancelling the summon slides it back. Info lists every
+//   summon; tap one to slide back to its settings.
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { makeQuasicrystal, BASE_OFFSET, APPROXIMANT_STOPS, TIERS, tileKey } from '../geometry-extensions/quasicrystal.js';
 import { createGearedSlider } from './geared-slider.js';
+import { findOccurrence } from '../geometry-extensions/quasicrystal-catalogue.js';
 
 const PHASON_LIMIT = 1; // window widths
 const PHASON_SNAP = 0.04;
@@ -46,6 +55,9 @@ const CORNER_IN = 0xf2f8ff;
 const CORNER_OUT = 0xff4d5e;
 const SLOT_CORNER_OUT = 0x4a5563;
 const CORNER_RADIUS = 0.045;
+const GHOST_COLOR = 0xffc857;
+const SLIDE_MS = 500;
+const SUMMON_ROWS = 8;
 const CONTROL_LABELS = { p1: 'Phason 1', p2: 'Phason 2', p3: 'Phason 3', approx: 'Approximant' };
 // Approximant stops spread evenly across the track, tau at the right end.
 const STOP_POS = APPROXIMANT_STOPS.map((_, i) => -1 + (2 * i) / (APPROXIMANT_STOPS.length - 1));
@@ -70,7 +82,7 @@ const WORLDS = {
   },
 };
 
-export function createQuasicrystalWorld({ tier, scene, materialColor, getMaterial, onChange = () => {} }) {
+export function createQuasicrystalWorld({ tier, scene, materialColor, getMaterial, onChange = () => {}, showHudPrompt = () => {}, focusOn = () => {} }) {
   const W = WORLDS[tier];
   const { d, k } = TIERS[tier];
   const group = new THREE.Group();
@@ -78,7 +90,12 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   scene.add(group);
 
   // ---- state ----
-  const tiles = new Map(); // key -> { n, I, layer?, material }
+  const tiles = new Map(); // key -> { n, I, layer?, material, summon? }
+  // Summon record: { id, serial, name, settings, before } per summon
+  // (settings = the slider at landing, before = the slider before the
+  // summon moved it). Pieces carry their summon's id.
+  let summons = [];
+  let pending = null; // a summon in progress: { entry, tiles, layer, before }
   const view = { phason: [0, 0, 0], approx: APPROXIMANT_STOPS.length - 1, control: 'p1', mode: 'build' };
   let active = false;
   let skeleton = false;
@@ -104,6 +121,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       if (!raw) return;
       const data = JSON.parse(raw);
       setTilesFromJSON(data.tiles);
+      setSummonsFromJSON(data.summons);
       if (data.view) {
         if (Array.isArray(data.view.phason) && data.view.phason.length === 3) {
           view.phason = data.view.phason.map((x, i) => (W.controls.includes(`p${i + 1}`) ? Math.max(-PHASON_LIMIT, Math.min(PHASON_LIMIT, +x || 0)) : 0));
@@ -114,7 +132,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       }
     } catch { /* corrupt or blocked storage: start empty */ }
   }
-  const tilesJSON = () => [...tiles.values()].map((t) => ({ ...pieceOf(t), material: t.material }));
+  const tilesJSON = () => [...tiles.values()].map((t) => ({ ...pieceOf(t), material: t.material, ...(t.summon ? { summon: t.summon } : {}) }));
   function setTilesFromJSON(list) {
     tiles.clear();
     for (const t of list ?? []) {
@@ -123,13 +141,19 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       if (W.layered && !Number.isInteger(t.layer)) continue;
       const I = [...t.I].sort((a, b) => a - b);
       if (new Set(I).size !== k) continue;
-      const tile = { ...pieceOf({ ...t, I }), material: t.material };
+      const tile = { ...pieceOf({ ...t, I }), material: t.material, ...(Number.isInteger(t.summon) ? { summon: t.summon } : {}) };
       tiles.set(keyOf(tile), tile);
     }
   }
+  const settingsJSON = (x) => ({ phason: x.phason.map((v) => Math.max(-PHASON_LIMIT, Math.min(PHASON_LIMIT, +v || 0))), approx: APPROXIMANT_STOPS[x.approx] !== undefined ? x.approx : APPROXIMANT_STOPS.length - 1 });
+  function setSummonsFromJSON(list) {
+    summons = (Array.isArray(list) ? list : [])
+      .filter((x) => Number.isInteger(x?.id) && Number.isInteger(x.serial) && x.settings && x.before)
+      .map((x) => ({ id: x.id, serial: x.serial, name: String(x.name ?? ''), settings: settingsJSON(x.settings), before: settingsJSON(x.before) }));
+  }
   function save() {
     try {
-      localStorage.setItem(W.storageKey, JSON.stringify({ version: 1, tiles: tilesJSON(), view }));
+      localStorage.setItem(W.storageKey, JSON.stringify({ version: 1, tiles: tilesJSON(), summons, view }));
     } catch { /* best-effort */ }
   }
   load();
@@ -179,6 +203,89 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   // axes to x and z, the diagonal up, matching the build's layout.
   const toScene = (y) => (W.layered ? [y[0], y[2], y[1]] : y);
 
+  // ---- summon ----
+  const settingsNow = () => ({ phason: [...view.phason], approx: view.approx });
+  const sameSettings = (a, b) => a.approx === b.approx && a.phason.every((x, i) => Math.abs(x - b.phason[i]) < 1e-9);
+  // Slide the slider to `target` over SLIDE_MS (phasons glide; the
+  // approximant changes at the start, since its stops are discrete).
+  let slideFrame = 0;
+  function slideTo(target, done = () => {}) {
+    cancelAnimationFrame(slideFrame);
+    const from = settingsNow();
+    view.approx = target.approx;
+    const t0 = performance.now();
+    const step = (now) => {
+      const u = Math.min(1, (now - t0) / SLIDE_MS);
+      const ease = u * u * (3 - 2 * u);
+      view.phason = from.phason.map((x, i) => x + (target.phason[i] - x) * ease);
+      rebuild();
+      if (u < 1) { slideFrame = requestAnimationFrame(step); return; }
+      save();
+      done();
+    };
+    slideFrame = requestAnimationFrame(step);
+  }
+  // A physical point in the build's frame -> the engine's par space.
+  const toPar = (p) => (W.layered ? [p[0], p[2]] : p);
+  const buildCentre = () => {
+    const e = engine();
+    const vis = visibleTiles();
+    if (!vis.length) return toPar([0, 0, 0]);
+    const cs = vis.map((t) => e.parCentre(t.n, t.I));
+    return cs[0].map((_, j) => cs.reduce((acc, c) => acc + c[j], 0) / cs.length);
+  };
+  function locate(near, layer) {
+    const occ = findOccurrence(engine(), offset(), pending.entry, near);
+    if (!occ) { showHudPrompt(`${pending.entry.name} doesn't occur near there. Tap somewhere else.`, 3500); return; }
+    pending.tiles = occ.tiles;
+    pending.layer = layer;
+    rebuild();
+    // The nearest occurrence can be off screen (decagons are rare): bring
+    // the camera round to it.
+    const h = (pending.entry.layers ?? 1) / 2;
+    focusOn(W.layered ? [occ.centre[0], layer + h, occ.centre[1]] : occ.centre);
+  }
+  function startSummon(entry) {
+    if (!entry || entry.tier !== tier) return;
+    const before = pending ? pending.before : settingsNow();
+    pending = { entry, tiles: [], layer: 0, before };
+    view.mode = 'build';
+    const approx = entry.approximant ? APPROXIMANT_STOPS.findIndex((s) => s && s[0] === entry.approximant[0] && s[1] === entry.approximant[1]) : APPROXIMANT_STOPS.length - 1;
+    const go = () => {
+      const vis = visibleTiles();
+      locate(buildCentre(), vis.length ? Math.max(...vis.map((t) => t.layer ?? 0)) : 0);
+      showHudPrompt(`${entry.name}: tap the gold outline to place it, or tap the build to move it.`, 5000);
+    };
+    if (approx !== view.approx) slideTo({ approx, phason: view.phason }, go);
+    else go();
+  }
+  function cancelSummon() {
+    const before = pending?.before;
+    pending = null;
+    if (before && !sameSettings(before, settingsNow())) slideTo(before);
+    else rebuild();
+  }
+  function landSummon() {
+    const id = summons.reduce((m, x) => Math.max(m, x.id), 0) + 1;
+    const { entry } = pending;
+    const material = getMaterial();
+    let added = 0;
+    for (const t of pending.tiles) {
+      for (let L = 0; L < (entry.layers ?? 1); L++) {
+        const piece = pieceOf({ ...t, layer: pending.layer + L });
+        const key = keyOf(piece);
+        if (tiles.has(key)) continue;
+        tiles.set(key, { ...piece, material, summon: id });
+        added++;
+      }
+    }
+    summons.push({ id, serial: entry.serial, name: entry.name, settings: settingsNow(), before: pending.before });
+    pending = null;
+    save(); rebuild(); onChange();
+    showHudPrompt(`${entry.name} placed (${added} new piece${added === 1 ? '' : 's'}).`, 3000);
+    return true;
+  }
+
   // ---- info ----
   const info = document.createElement('div');
   info.id = `world${tier}-info`;
@@ -204,13 +311,28 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       ['Phason', W.controls.filter((c) => c !== 'approx').map((c) => fmt(view.phason[Number(c[1]) - 1])).join(' · ')],
       ['Approximant', APPROXIMANT_STOPS[view.approx] ? `${stopLabel(APPROXIMANT_STOPS[view.approx])} (a periodic crystal)` : 'τ (the true quasicrystal)'],
     ];
+    const summoned = all.filter((t) => t.summon).length;
+    if (summons.length) rows.splice(2, 0, ['Pieces', `${all.length - summoned} hand-placed, ${summoned} summoned`]);
     if (view.mode === 'window') {
       const corners = cornersOf(all);
       const inside = corners.filter((m) => e.isVertex(m, offset())).length;
       rows.push(['Window', corners.length ? `${inside} of ${corners.length} corners inside` : 'place a piece to see its corners']);
     }
-    info.innerHTML = rows.map(([key, v]) => `<div><span class="w4d-info-k">${key}</span> ${v}</div>`).join('');
+    const settingsLabel = (x) => (APPROXIMANT_STOPS[x.approx] ? `${stopLabel(APPROXIMANT_STOPS[x.approx])}, ` : '')
+      + `phason ${W.controls.filter((c) => c !== 'approx').map((c) => fmt(x.phason[Number(c[1]) - 1])).join(' · ')}`;
+    // The most recent few, so the box never covers the scene.
+    const recent = summons.slice(-SUMMON_ROWS);
+    const summonRows = summons.length
+      ? `<div><span class="w4d-info-k">Summoned</span> tap one to slide back to its settings${summons.length > recent.length ? ` (latest ${recent.length} of ${summons.length})` : ''}</div>${recent.map((x) =>
+        `<button type="button" class="qc-summon-row" data-summon="${x.id}">#${x.serial} ${x.name} <span class="qc-summon-set">${settingsLabel(x.settings)}</span></button>`).join('')}`
+      : '';
+    info.innerHTML = rows.map(([key, v]) => `<div><span class="w4d-info-k">${key}</span> ${v}</div>`).join('') + summonRows;
   }
+  info.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-summon]');
+    const x = b && summons.find((s) => s.id === Number(b.dataset.summon));
+    if (x) slideTo(x.settings);
+  });
 
   // ---- rendering ----
   const pickTargets = [];
@@ -305,7 +427,13 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       return;
     }
     for (const t of visible) addTile(t, { color: materialColor(t.material), qc: 'tile' });
-    if (!visible.length) {
+    if (pending?.tiles.length) {
+      const lineMaterial = new THREE.LineBasicMaterial({ color: GHOST_COLOR });
+      for (const t of pending.tiles) for (let L = 0; L < (pending.entry.layers ?? 1); L++) {
+        addTile(pieceOf({ ...t, layer: pending.layer + L }), { color: GHOST_COLOR, opacity: 0.3, qc: 'ghost', lineMaterial });
+      }
+    }
+    if (!visible.length && !pending) {
       // Nothing of the build in this slice (or nothing built): one cyan
       // target on the tile nearest the origin (5D: on layer 0).
       const s = pieceOf({ ...engine().seedTile(offset()), layer: 0 });
@@ -327,6 +455,13 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   }
   function handleTap(hit, mode) {
     const { qc, tile } = hit.object.userData;
+    if (mode !== 'chisel' && pending) {
+      // Summoning: the ghost places; anything else moves the ghost there.
+      if (qc === 'ghost') return landSummon();
+      const p = hit.point;
+      locate(toPar([p.x, p.y, p.z]), tile.layer ?? 0);
+      return true;
+    }
     if (mode === 'chisel') {
       if (qc !== 'tile') return false;
       tiles.delete(keyOf(tile));
@@ -379,10 +514,11 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     panel.classList.toggle('visible', active);
     if (!active) return;
     controlsRow.innerHTML = W.controls.map((c) => `<button type="button" data-control="${c}" class="${c === view.control ? 'active' : ''}">${CONTROL_LABELS[c]}</button>`).join('');
-    optionsRow.innerHTML = [
+    const infoBtn = `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">Info</button>`;
+    optionsRow.innerHTML = pending ? `<button type="button" data-opt="cancel">Cancel summon</button>${infoBtn}` : [
       `<button type="button" data-opt="mode" class="${view.mode === 'window' ? 'active' : ''}">${view.mode === 'window' ? 'Window' : 'Build'}</button>`,
       `<button type="button" data-opt="reset">Reset ${W.label}</button>`,
-      `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">Info</button>`,
+      infoBtn,
     ].join('');
     slider.render();
   }
@@ -395,6 +531,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   optionsRow.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-opt]');
     if (!b) return;
+    if (b.dataset.opt === 'cancel') { cancelSummon(); return; }
     if (b.dataset.opt === 'info') infoOpen = !infoOpen;
     else if (b.dataset.opt === 'mode') { view.mode = view.mode === 'window' ? 'build' : 'window'; save(); }
     else if (b.dataset.opt === 'reset') { view.phason = [0, 0, 0]; view.approx = APPROXIMANT_STOPS.length - 1; save(); }
@@ -413,10 +550,22 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     },
     setSkeleton(on) { skeleton = on; rebuild(); },
     setLatticeView(on) { latticeView = on; rebuild(); },
+    startSummon,
     get isEmpty() { return tiles.size === 0; },
-    clear() { tiles.clear(); save(); rebuild(); onChange(); },
-    // Undo (render.js's history): the built pieces only, never the slider.
-    snapshot() { return tilesJSON(); },
-    restore(list) { setTilesFromJSON(list); save(); rebuild(); onChange(); },
+    clear() { tiles.clear(); summons = []; pending = null; save(); rebuild(); onChange(); },
+    // Undo (render.js's history): the pieces and the summon record, never
+    // the slider -- except that undoing a summon slides back to where the
+    // slider was before it.
+    snapshot() { return { tiles: tilesJSON(), summons: summons.map((x) => ({ ...x })) }; },
+    restore(json) {
+      const undone = summons.filter((x) => !(json?.summons ?? []).some((y) => y.id === x.id));
+      setTilesFromJSON(Array.isArray(json) ? json : json?.tiles);
+      setSummonsFromJSON(Array.isArray(json) ? [] : json?.summons);
+      pending = null;
+      save(); onChange();
+      const back = undone[undone.length - 1]?.before;
+      if (back && !sameSettings(back, settingsNow())) slideTo(back);
+      else rebuild();
+    },
   };
 }

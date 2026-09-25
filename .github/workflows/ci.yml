@@ -23,6 +23,8 @@ jobs:
       - run: node --test tests/unit/
       # 5D/6D cut-and-project engine against the known tiling facts.
       - run: node scripts/verify-quasicrystal.mjs
+      # Every 5D/6D catalogue entry really occurs and lands.
+      - run: node scripts/verify-catalogue.mjs
 
   browser-smoke-test:
     # Real-browser check (Playwright) -- the actual app, served exactly

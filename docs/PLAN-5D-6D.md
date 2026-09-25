@@ -95,11 +95,24 @@ move into stage 6, where they have content.
 **6. Catalogue pipeline and summon.** Add `data/catalogue-5d6d.json`
 (serial, tier, kind, name, parameters), the Wizard showcase,
 serial-number lookup, the ghost outline + tap placement, the animated
-slider jump, one undo step, and the Info summon record (from stage 5). Start with bridge pieces and zonohedra
+slider jump, one undo step, and the Info summon record (from stage 5).
+*Shipped (user decisions):* summons snap to where the item genuinely
+occurs in the current tiling (so they land as real pieces of the same
+quasicrystal, never contradicting the build); the slider moves only when
+the item needs another approximant. The bottom-left button is Catalogue
+in 5D/6D (the Wizard's catalogue screen, serial box on top). First batch:
+the 23 real zonohedra (6D: both golden rhombohedra, Bilinski dodecahedron,
+rhombic icosahedron, rhombic triacontahedron; 5D: rhombus, both hexagon,
+octagon and decagon prisms at 1-3 layers), serials 1001-1023. A ghost off
+screen brings the camera round to it. Start with bridge pieces and zonohedra
 (about 50) to prove the pipeline. `verify:catalogue` checks:
 - every entry computes and lands without self-overlap;
 - serials are unique and inside their range;
 - names are unique.
+
+*Bridge pieces (2000–2999), user's description, still open:* "ridge
+pieces (N−2)" or prismatoid / hyperprism geometry that bridges two parallel
+shapes in different hyperplanes. To design before filling that range.
 
 **7. Fill the catalogue**: about 100 patches (the 7 Penrose vertex stars at
 2–3 sizes, the named patches such as the cartwheel and Conway worms,

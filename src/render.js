@@ -23,6 +23,8 @@ import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { createWorld4D } from './app/world-4d.js';
 import { createQuasicrystalWorld } from './app/world-quasicrystal.js';
+import { makeQuasicrystal, PRISM_HEIGHT } from './geometry-extensions/quasicrystal.js';
+import { loadCatalogue, findBySerial, zonotopeVertices } from './geometry-extensions/quasicrystal-catalogue.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
@@ -2695,8 +2697,9 @@ async function init() {
     // than trying to redirect its click into the lattice panel, which is
     // already fixed-position and always visible in 2D, so there's nothing
     // for a click to usefully "open."
-    // 5D/6D: the tiling decides each piece's shape, so there's nothing to pick.
-    document.getElementById('hud-quick-shape').style.display = activeDimension === '2D' || qcWorlds.has(activeDimension) ? 'none' : '';
+    // 5D/6D: the tiling decides each piece's shape, so this button opens
+    // the catalogue instead (updateQuickSelect draws its icon).
+    document.getElementById('hud-quick-shape').style.display = activeDimension === '2D' ? 'none' : '';
   }
   // Re-applies the same visibility rule whenever activeDimension itself
   // changes (not just when World View mode changes, which is
@@ -3586,6 +3589,10 @@ async function init() {
       const convex = (pts) => new ConvexGeometry(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
       const piece = action.replace('tool:pieceType:', '');
       if (action === 'tool:cuboctaBuild') return cuboctaGeometry;
+      if (action.startsWith('summon:')) {
+        const entry = findBySerial(catalogueEntries, Number(action.slice(7)));
+        return entry && convex(zonotopeVertices(qcEngines[entry.tier], entry, PRISM_HEIGHT));
+      }
       switch (piece) {
         case 'rd': return geometry;
         case 'halfrd': return buildHemisphereGeometry({ type: 'halfrd', cell: [0, 0, 0], offsetIndex: 0, side: 'positive' }, SCALE);
@@ -3616,11 +3623,20 @@ async function init() {
     }
     // 5D/6D (quasicrystals): one world each, and the tiling picks each
     // piece's shape, so there's no piece to choose on the way in.
-    function enterQuasicrystal(dimension) {
+    function enterQuasicrystal(dimension, action = null) {
       activeDimension = dimension;
       applyDimensionVisibility();
       applyDimensionCamera(dimension);
+      updateQuickSelect(); // the bottom-left button becomes Catalogue
+      if (action?.startsWith('summon:')) {
+        loadCatalogue().then((entries) => qcWorlds.get(dimension).startSummon(findBySerial(entries, Number(action.slice(7)))));
+      }
     }
+    // Catalogue wireframes (the Wizard's 5D/6D screen): each entry's
+    // zonotope outline, from the same engine that places its pieces.
+    let catalogueEntries = [];
+    loadCatalogue().then((entries) => { catalogueEntries = entries; });
+    const qcEngines = { '5d': makeQuasicrystal('5d'), '6d': makeQuasicrystal('6d') };
     const dimensionWizard = createDimensionWizard({
       pieceEdges: wizardPieceEdges,
       // Real bug fixed same session: this used to hardcode
@@ -3631,7 +3647,7 @@ async function init() {
       // dimension-wizard.js's own showLattice2D/showLattice3D now pass
       // the real dimension alongside the action.
       onSelectFamily: (dimension, action) => {
-        if (qcWorlds.has(dimension)) { enterQuasicrystal(dimension); return; }
+        if (qcWorlds.has(dimension)) { enterQuasicrystal(dimension, action); return; }
         activeDimension = dimension;
         applyDimensionVisibility();
         applyDimensionCamera(dimension);
@@ -3695,6 +3711,7 @@ async function init() {
       // 4D: the bottom-left button opens the separate 4D picker wheel
       // (direct decision), not the 3D Piece wheel.
       if (activeDimension === '4D') { wheel3D.open('piece4d'); return; }
+      if (qcWorlds.has(activeDimension)) { dimensionWizard.openCatalogue(activeDimension); return; }
       seedIfWorldEmpty();
       wheel3D.open('piece');
     });
@@ -4347,7 +4364,9 @@ async function init() {
       // before, with zero feedback that anything had changed. Direct
       // report 2026-08-29 ("the picker symbol at bottom doesnt change").
       // Checked first, ahead of the plain piece-type lookup below.
-      if (currentMode === 'cubocta') {
+      if (qcWorlds.has(activeDimension)) {
+        quickShapeEl.innerHTML = iconFrame(MARKS.pieceRhombohedron, { title: 'Catalogue' });
+      } else if (currentMode === 'cubocta') {
         quickShapeEl.innerHTML = iconFrame(MARKS.cuboctahedron, { title: 'Shape' });
       } else {
         const pieceValue = document.getElementById('piece-type-select').value;
@@ -4664,6 +4683,27 @@ async function init() {
     // cells here after every edit (view changes never reach this).
     onChange: () => { if (historyRestorers.has('world4d')) recordHistory('world4d', world4d.snapshot()); },
   });
+  // A 5D/6D summon ghost can land out of view (it goes where the item
+  // really occurs): glide the camera, target and position together so the
+  // view direction is kept, until the point is centred.
+  function focusCameraOn([x, y, z]) {
+    const p = new THREE.Vector3(x, y, z);
+    const ndc = p.clone().project(camera);
+    if (Math.abs(ndc.x) < 0.7 && Math.abs(ndc.y) < 0.6 && ndc.z < 1) return;
+    const delta = p.sub(controls.target);
+    const fromTarget = controls.target.clone();
+    const fromPosition = camera.position.clone();
+    const t0 = performance.now();
+    const step = (now) => {
+      const u = Math.min(1, (now - t0) / 400);
+      const ease = u * u * (3 - 2 * u);
+      controls.target.copy(fromTarget).addScaledVector(delta, ease);
+      camera.position.copy(fromPosition).addScaledVector(delta, ease);
+      controls.update();
+      if (u < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
   for (const dim of ['5D', '6D']) {
     const historyKey = `world${dim.toLowerCase()}`;
     const w = createQuasicrystalWorld({
@@ -4671,6 +4711,8 @@ async function init() {
       scene,
       materialColor,
       getMaterial: () => currentMaterialFor(document.getElementById('piece-type-select').value),
+      showHudPrompt,
+      focusOn: focusCameraOn,
       onChange: () => { if (historyRestorers.has(historyKey)) recordHistory(historyKey, w.snapshot()); },
     });
     qcWorlds.set(dim, w);
