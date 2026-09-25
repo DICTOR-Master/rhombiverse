@@ -33,16 +33,9 @@
 //
 // "Simplicity is key... when all primitives are available, the UI
 // should close everything down to simple selections with no extraneous
-// out of scope steps visible" -- direct instruction. Only 3D is real in
-// Phase 1: its card is the only clickable one, with a real wireframe and
-// real description; 2D/4D/5D/6D render dark/disabled, label only, no
-// fabricated preview of geometry that doesn't exist yet (matches this
-// project's own standing "disclose departures honestly" principle,
-// RHOMBIVERSE_PRINCIPLES.md section 0 -- a confident-looking wireframe
-// for content that isn't built would be exactly the kind of oversold
-// claim that principle already had to correct once, for 4D/6D). As each
-// tier actually ships, flip its DIMENSIONS entry below from disabled to
-// real -- no other structural change needed.
+// out of scope steps visible" -- direct instruction. All wording goes
+// through i18n.js ('wiz.*' and 'cat.*'); lattice, piece and tile names
+// stay English.
 import { mountWireframePreview } from './wireframe-preview.js';
 import { cellStructure, rotation4, matVec, project4, A4_FIRST } from '../geometry-extensions/lattice-4d.js';
 import { START_LATTICE_ANGLE, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
@@ -106,13 +99,6 @@ const CSS = `
   width: 100%;
 }
 .dim-wizard-card-btn:hover { background: rgba(124, 204, 255, 0.1); border-color: rgba(124, 204, 255, 0.6); }
-.dim-wizard-card-btn.disabled {
-  cursor: default;
-  opacity: 0.38;
-  border-style: dashed;
-  border-color: rgba(255, 255, 255, 0.18);
-}
-.dim-wizard-card-btn.disabled:hover { background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.18); }
 .dim-wizard-preview { width: 40px; height: 40px; flex: 0 0 auto; }
 .dim-wizard-section { display: flex; flex-direction: column; gap: 2px; margin: 10px 0 2px; }
 .dim-wizard-section:first-child { margin-top: 0; }
@@ -165,10 +151,8 @@ function lattice2dEdges(combo) {
   return edges;
 }
 
-// DIMENSIONS: the dimension-select screen's own 5 cards. Only `enabled`
-// tiers get a real onOpen (advances to that tier's lattice screen) and a
-// real wireframe; the rest are the honest, undecorated "planned, not
-// built" treatment this file's own header explains.
+// DIMENSIONS: the dimension-select screen's own 5 cards (descriptions:
+// 'wiz.dim.<id>').
 const DIMENSIONS = [
   // Phase 6 (2026-09-23): 3 real primitives (Parallelogram/Triangle/
   // Hexagon), each its own real store -- picking one here (or from
@@ -181,11 +165,11 @@ const DIMENSIONS = [
   // which meant toggling angle silently swapped to an unrelated store
   // instead of reshaping the one you'd actually built. See
   // lattice2dSeedCell's own header in render.js for the full incident.
-  { id: '2D', label: '2D', desc: '5 tile types (Parallelogram, Triangle, Hexagon, Kite, Kagome), each at up to 4 named lattice angles, chosen from the in-scene panel.', enabled: true, preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: START_LATTICE_ANGLE.angleDeg }) },
-  { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, previewAction: 'tool:pieceType:rd' },
-  { id: '4D', label: '4D', desc: 'Tesseract (Z4), D4 (24-cell, 16-cell) and Hyper-pyrochlore (4D Kagome).', enabled: true, preview: () => edges4D('cell24') },
-  { id: '5D', label: '5D', desc: 'Decagonal quasicrystal: Penrose thick and thin rhombus prisms in layers, sliced from Z⁵. The tiling picks each piece’s shape.', enabled: true, preview: () => edges5D() },
-  { id: '6D', label: '6D', desc: 'Icosahedral quasicrystal: prolate and oblate golden rhombohedra, sliced from Z⁶. The tiling picks each piece’s shape.', enabled: true, preview: () => edges6D() },
+  { id: '2D', label: '2D', preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: START_LATTICE_ANGLE.angleDeg }) },
+  { id: '3D', label: '3D', previewAction: 'tool:pieceType:rd' },
+  { id: '4D', label: '4D', preview: () => edges4D('cell24') },
+  { id: '5D', label: '5D', preview: () => edges5D() },
+  { id: '6D', label: '6D', preview: () => edges6D() },
 ];
 
 // 6D thumbnail: a prolate golden rhombohedron, the same tile world-quasicrystal.js
@@ -224,8 +208,8 @@ function edges5D() {
 // own `lattice2d` param and render.js's dimensionAllowsMesh's own
 // 'lattice2d:' prefix check exactly.
 const LATTICE_FAMILIES_2D = LATTICE_PRIMITIVES.map((primitive) => ({
+  id: primitive.id,
   label: primitive.label,
-  desc: `A flat layer of real ${primitive.label.toLowerCase()} tiles -- own separate lattice, pinned to z=0 in this same scene, buildable at any of 4 named angles via the in-scene toggle panel.`,
   action: `tool:pieceType:lattice2d:${primitive.id}`,
   preview: () => lattice2dEdges({ primitiveId: primitive.id, angleDeg: START_LATTICE_ANGLE.angleDeg }),
 }));
@@ -243,7 +227,7 @@ const LATTICE_FAMILIES_2D = LATTICE_PRIMITIVES.map((primitive) => ({
 // Interstitial" reuse the code's own existing descriptions of those
 // lattices; they are placeholders pending the user's own naming.
 export const LATTICES_3D = [
-  { label: 'FCC', desc: 'The main World -- face-centered cubic, one Rhombic Dodecahedron per lattice point.', pieces: [
+  { key: 'fcc', label: 'FCC', pieces: [
     { label: 'RD', action: 'tool:pieceType:rd' },
     { label: 'Hemi RD', action: 'tool:pieceType:halfrd' },
     { label: 'Hourglass', action: 'tool:pieceType:hourglass' },
@@ -251,27 +235,27 @@ export const LATTICES_3D = [
     { label: 'Cube', action: 'tool:pieceType:cube' },
     { label: 'Pyramid', action: 'tool:pieceType:pyramid' },
   ] },
-  { label: 'RD Dual', desc: 'Cuboctahedra on the RD lattice’s dual, with octahedra filling the gaps between them.', pieces: [
+  { key: 'rdDual', label: 'RD Dual', pieces: [
     { label: 'CO', action: 'tool:cuboctaBuild' },
     { label: 'Octahedron', action: 'tool:pieceType:octahedron' },
   ] },
-  { label: 'BCC', desc: 'Body-centered cubic -- the Truncated Octahedron, the generic parallelohedron (“permutahedron”) that generalizes into every higher dimension.', pieces: [
+  { key: 'bcc', label: 'BCC', pieces: [
     { label: 'TO', action: 'tool:pieceType:to' },
   ] },
-  { label: 'BCC Interstitial', desc: 'The gaps of the BCC lattice, filled by tetragonal disphenoids.', pieces: [
+  { key: 'bccGaps', label: 'BCC Interstitial', pieces: [
     { label: 'Flattened Octahedron', action: 'tool:pieceType:ioct' },
     { label: 'Disphenoid', action: 'tool:pieceType:idis' },
   ] },
-  { label: 'ED', desc: 'Elongated Dodecahedron -- its own space-filling lattice.', pieces: [
+  { key: 'ed', label: 'ED', pieces: [
     { label: 'ED', action: 'tool:pieceType:elongdodeca' },
   ] },
-  { label: 'Hexagonal', desc: 'Hexagonal prisms stacked on their own hexagonal grid.', pieces: [
+  { key: 'hex', label: 'Hexagonal', pieces: [
     { label: 'Hex Prism', action: 'tool:pieceType:hexprism' },
   ] },
-  { label: 'Rhombohedral', desc: 'Rhombohedra -- one of the RD’s own 4 congruent pieces, tiling on its own lattice.', pieces: [
+  { key: 'rhombohedral', label: 'Rhombohedral', pieces: [
     { label: 'Rhombohedra', action: 'tool:pieceType:rhombohedra' },
   ] },
-  { label: 'Pyrochlore (3D Kagome)', desc: 'Corner-sharing tetrahedra on the FCC lattice -- place truncated tetrahedra; the tetrahedra between them appear on their own.', pieces: [
+  { key: 'pyrochlore', label: 'Pyrochlore (3D Kagome)', pieces: [
     { label: 'Truncated Tetrahedron', action: 'tool:pieceType:pyrochlore' },
   ] },
 ];
@@ -292,18 +276,16 @@ function edges4D(kind) {
 }
 
 // LATTICES_4D: the three 4D worlds (direct decision: wizard = three
-// worlds, the 4D wheel = six cells). Planned worlds' pieces show as
-// disabled rows with no preview, the same honest "not built yet"
-// treatment as the 5D/6D cards.
+// worlds, the 4D wheel = six cells).
 export const LATTICES_4D = [
-  { label: 'Z4 (Hypercubic)', desc: 'Tesseract -- the 4D cube, one at every whole-number point. Its w = 0 slice is the RD world\u2019s own unit cube.', pieces: [
+  { key: 'z4', label: 'Z4 (Hypercubic)', pieces: [
     { label: 'Tesseract', action: 'tool:pieceType:tesseract', preview: () => edges4D('tesseract') },
   ] },
-  { label: 'D4', desc: '24-cell, the 4D RD: its w = 0 slice is the FCC world. The bottom-row toggle switches to placing 16-cells.', pieces: [
+  { key: 'd4', label: 'D4', pieces: [
     { label: '24-cell', action: 'tool:pieceType:cell24', preview: () => edges4D('cell24') },
     { label: '16-cell', action: 'tool:pieceType:cell16', preview: () => edges4D('cell16') },
   ] },
-  { label: 'Hyper-pyrochlore (4D Kagome)', desc: 'Corner-sharing 5-cells on A4 -- it rests on its Pyrochlore slice, which is exactly the Pyrochlore world. Place truncated 5-cells; their 5-cells appear on their own. The bottom-row toggle switches to Bitruncated or single 5-cells.', pieces: [
+  { key: 'a4', label: 'Hyper-pyrochlore (4D Kagome)', pieces: [
     { label: 'Truncated 5-cell', action: 'tool:pieceType:a4trunc', preview: () => edges4D('a4trunc') },
     { label: 'Bitruncated 5-cell', action: 'tool:pieceType:a4bitrunc', preview: () => edges4D('a4bitrunc') },
     { label: '5-cell', action: 'tool:pieceType:a4cell5', preview: () => edges4D('a4cell5') },
@@ -338,7 +320,7 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
   overlay.className = 'dim-wizard-overlay';
   overlay.innerHTML = `
     <div class="dim-wizard-card">
-      <div class="dim-wizard-header"><span class="dim-wizard-title">Choose a Dimension</span><button type="button" class="dim-wizard-close">✕</button></div>
+      <div class="dim-wizard-header"><span class="dim-wizard-title"></span><button type="button" class="dim-wizard-close">✕</button></div>
       <div class="dim-wizard-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -347,23 +329,22 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
 
   function showDimensions() {
     resetPreviews();
-    titleEl.textContent = 'Choose a Dimension';
+    const L = getSettings().language;
+    titleEl.textContent = t('wiz.title', L);
     let grid = '';
     for (const dim of DIMENSIONS) {
-      const disabledCls = dim.enabled ? '' : ' disabled';
-      const preview = !dim.enabled ? '' : previewSlot(dim.previewAction ? () => pieceEdges(dim.previewAction) : dim.preview);
       grid += `
-        <button type="button" class="dim-wizard-card-btn${disabledCls}" data-dim="${dim.id}" ${dim.enabled ? '' : 'disabled title="Planned, not yet built."'}>
-          ${preview}
+        <button type="button" class="dim-wizard-card-btn" data-dim="${dim.id}">
+          ${previewSlot(dim.previewAction ? () => pieceEdges(dim.previewAction) : dim.preview)}
           <span class="dim-wizard-row-text">
             <span class="dim-wizard-label">${dim.label}</span>
-            <span class="dim-wizard-desc">${dim.desc}</span>
+            <span class="dim-wizard-desc">${t(`wiz.dim.${dim.id}`, L)}</span>
           </span>
         </button>`;
     }
-    bodyEl.innerHTML = `<div class="dim-wizard-sub">Pick which dimension tier to build in.</div><div class="dim-wizard-grid">${grid}</div>`;
+    bodyEl.innerHTML = `<div class="dim-wizard-sub">${t('wiz.sub', L)}</div><div class="dim-wizard-grid">${grid}</div>`;
     mountPreviews();
-    bodyEl.querySelectorAll('.dim-wizard-card-btn:not(.disabled)').forEach((el) => {
+    bodyEl.querySelectorAll('.dim-wizard-card-btn').forEach((el) => {
       el.addEventListener('click', () => {
         const dim = el.dataset.dim;
         if (dim === '3D') showLattice3D();
@@ -376,6 +357,7 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
 
   function showLattice2D() {
     resetPreviews();
+    const L = getSettings().language;
     let grid = '';
     for (const fam of LATTICE_FAMILIES_2D) {
       grid += `
@@ -383,13 +365,13 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
           ${previewSlot(fam.preview)}
           <span class="dim-wizard-row-text">
             <span class="dim-wizard-label">${fam.label}</span>
-            <span class="dim-wizard-desc">${fam.desc}</span>
+            <span class="dim-wizard-desc">${t(`wiz.2d.${fam.id}`, L)}</span>
           </span>
         </button>`;
     }
     bodyEl.innerHTML = `
-      <button type="button" class="dim-wizard-back">← Back</button>
-      <div class="dim-wizard-sub">2D: pick which lattice family starts active.</div>
+      <button type="button" class="dim-wizard-back">${t('wiz.back', L)}</button>
+      <div class="dim-wizard-sub">${t('wiz.2d.sub', L)}</div>
       <div class="dim-wizard-grid">${grid}</div>`;
     mountPreviews();
     bodyEl.querySelector('.dim-wizard-back').addEventListener('click', showDimensions);
@@ -401,23 +383,18 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
     });
   }
 
-  function showLatticeSections(dimension, lattices, sub, edgesFor) {
+  function showLatticeSections(dimension, lattices, edgesFor) {
     resetPreviews();
+    const L = getSettings().language;
+    const d = dimension.toLowerCase();
     let grid = '';
     for (const lat of lattices) {
       grid += `
         <div class="dim-wizard-section">
           <span class="dim-wizard-label">${lat.label}</span>
-          <span class="dim-wizard-desc">${lat.desc}</span>
+          <span class="dim-wizard-desc">${t(`wiz.${d}.${lat.key}`, L)}</span>
         </div>`;
       for (const piece of lat.pieces) {
-        if (!piece.action) {
-          grid += `
-        <button type="button" class="dim-wizard-card-btn dim-wizard-piece disabled" disabled title="Planned, not yet built.">
-          <span class="dim-wizard-row-text"><span class="dim-wizard-label">${piece.label}</span></span>
-        </button>`;
-          continue;
-        }
         grid += `
         <button type="button" class="dim-wizard-card-btn dim-wizard-piece" data-action="${piece.action}">
           ${previewSlot(() => edgesFor(piece))}
@@ -428,8 +405,8 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
       }
     }
     bodyEl.innerHTML = `
-      <button type="button" class="dim-wizard-back">← Back</button>
-      <div class="dim-wizard-sub">${sub}</div>
+      <button type="button" class="dim-wizard-back">${t('wiz.back', L)}</button>
+      <div class="dim-wizard-sub">${t(`wiz.${d}.sub`, L)}</div>
       <div class="dim-wizard-grid">${grid}</div>`;
     mountPreviews();
     bodyEl.querySelector('.dim-wizard-back').addEventListener('click', showDimensions);
@@ -492,7 +469,7 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
         </button>${open ? sec.items.map(row).join('') : ''}`;
     }).join('');
     bodyEl.innerHTML = `
-      <button type="button" class="dim-wizard-back">${t('cat.back', L)}</button>
+      <button type="button" class="dim-wizard-back">${t('wiz.back', L)}</button>
       <div class="dim-wizard-sub">${t('cat.sub', L, { dim })}</div>
       <div class="dim-wizard-serial-row">
         <input type="number" inputmode="numeric" min="1" placeholder="${t('cat.serial', L)}" aria-label="${t('cat.serial', L)}">
@@ -533,10 +510,10 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
   }
 
   function showLattice3D() {
-    showLatticeSections('3D', LATTICES_3D, '3D: pick a piece to start with -- every lattice stays reachable afterward via the Piece wheel.', (piece) => pieceEdges(piece.action));
+    showLatticeSections('3D', LATTICES_3D, (piece) => pieceEdges(piece.action));
   }
   function showLattice4D() {
-    showLatticeSections('4D', LATTICES_4D, '4D: pick a cell to start with -- the 4D wheel reaches every cell afterward.', (piece) => piece.preview());
+    showLatticeSections('4D', LATTICES_4D, (piece) => piece.preview());
   }
 
   overlay.querySelector('.dim-wizard-close').addEventListener('click', () => close());
