@@ -13,6 +13,7 @@ import {
   pyramidPieces,
   PYRAMID_AXES,
   oppositeNeighborIndex,
+  rdQuarterPieces,
 } from './lattice.js';
 import {
   applyPyramidEdit,
@@ -1317,10 +1318,37 @@ export function createBuildController({
   // split has), so growth is simpler: match the click's own direction
   // from the cell center against whichever of the 4 anchor corners
   // aren't already placed there, and add that one. Bootstraps from a
-  // solid FCC cell OR grows from an already-placed rdquarter piece in
-  // the SAME cell (clicking near a different corner than what's there
-  // fills that one in too -- a cell can hold any subset of the 4).
+  // solid FCC cell or a Hemi RD / Hourglass piece; a tap on an RD
+  // Quarter itself mirrors across the tapped face (rdQuarterMirrorSlot).
+  // Mirror growth (direct request 2026-09-25, "add mirror to RD
+  // Quarter"): tapping an RD Quarter's own face places its mirror image
+  // across that face -- the same Mirror rule as Rhombohedra. For every
+  // orientation and face that image is itself an RD Quarter slot, in the
+  // same cell or the next one (checked: 24/24; a same-orientation copy
+  // never is, so RD Quarter has no Copy option). Refused when the slot is
+  // taken or inside a solid RD.
+  const RD_QUARTER_C4 = rdQuarterPieces(1).map((v) => [0, 1, 2].map((a) => Math.round((v.reduce((sum, p) => sum + p[a], 0) / 8) * 4)));
+  function rdQuarterMirrorSlot(hit) {
+    const piece = hemisphereStore.get(hit.object.userData.key);
+    const q = piece.cornerIndex;
+    const c4 = piece.cell.map((v, a) => v * 4 + RD_QUARTER_C4[q][a]);
+    const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+    const opt = rhombohedraAttachOptions(q, c4, [n.x, n.y, n.z]).find((o) => o.o !== q);
+    if (!opt) return null;
+    const cell = opt.c4.map((v, a) => (v - RD_QUARTER_C4[opt.o][a]) / 4);
+    if (!cell.every(Number.isInteger)) return null;
+    return { cell, cornerIndex: opt.o };
+  }
+
   function handleRdQuarterClick(hit) {
+    if (hit.object.parent === hemisphereGroup && hemisphereStore.get(hit.object.userData.key)?.type === 'rdquarter') {
+      const slot = rdQuarterMirrorSlot(hit);
+      if (!slot) return { added: 0 };
+      const key = rdQuarterKey(...slot.cell, slot.cornerIndex);
+      if (hemisphereStore.has(key) || world.has(...slot.cell)) return { added: 0 };
+      hemisphereStore.set(key, { type: 'rdquarter', cell: slot.cell, cornerIndex: slot.cornerIndex, material: getMaterial() });
+      return { added: 1, anchor: { x: slot.cell[0], y: slot.cell[1], z: slot.cell[2] } };
+    }
     // Real bug, direct report ("RD quarter isn't allowing attachment to
     // RD or pair of RD-Hemis"): this used to only accept a hit on a
     // solid FCC cell or an EXISTING rdquarter piece, rejecting Hemi RD/

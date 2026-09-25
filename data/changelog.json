@@ -3,6 +3,7 @@
     "date": "2026-09-25",
     "title": "How to use Rhombiverse",
     "items": [
+      "RD Quarter can now grow from cell to cell: tap a quarter's face to place its mirror image across it, which always lands back on the RD lattice.",
       "Simpler: one piece at a time. Tap adds a piece and long-press removes one; the older bulk tools (Fill, Dig, Smooth, Shells, Repeat), Sculpt, Sculpture Mode and Cyborg are gone, and the menu's Home now holds just Piece, Color and Change Dimension.",
       "New: a How to use guide, opened from the welcome screen (the ℹ button brings the welcome screen back any time). It walks through choosing a dimension, placing, removing and viewing pieces, 4D and saving, then lists every control.",
       "The same guide is also a page you can share: rhombiverse.vercel.app/guide.",

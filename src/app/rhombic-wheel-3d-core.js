@@ -444,7 +444,7 @@ export const WHEEL_RD_FAMILY = {
     // this sub-wheel is the only one with real room. RD Quarter IS a
     // genuine RD-family piece (one of RD's own 4 real rhombohedra).
     "equator|sx-1sy-1": { kind: "dept", label: "RD Quarter", action: "tool:pieceType:rdquarter",
-      desc: "One of RD's own 4 real rhombohedra (Fedorov's zonotope decomposition) -- click a corner to fill it in." },
+      desc: "One of RD's own 4 real rhombohedra (Fedorov's zonotope decomposition) -- tap an RD near a corner to fill it in; tap a quarter's face to place its mirror image there." },
     // "ED", not the full name -- direct instruction 2026-09-23, matching
     // this wheel's own existing abbreviation convention (RD, TO, CO):
     // "Elongated Dodecahedron" was the one long label left on this

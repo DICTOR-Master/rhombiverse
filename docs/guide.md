@@ -62,6 +62,8 @@ To take back your last change, tap **Undo** (↶, bottom right). Hold it to scru
 
 Try this on FCC: place 6 Pyramids on a Cube, then 12, then remove the outer 6.
 
+**RD Quarter** is one of the 4 rhombohedra an RD splits into. Tap an RD near one of its corners to fill that corner in, then tap a quarter's face to place its mirror image across that face. The mirror image always lands back on the RD lattice, so you can grow quarters from cell to cell. For a free rhombohedron lattice with Copy as well as Mirror, use **Rhombohedra**.
+
 ### Colours
 
 Tap the **Colour** button (bottom left) to choose from 14 colours. The colour you pick sticks to the piece you're placing. With **Auto-assign colour by piece type** turned on (in Settings), each kind of piece starts with its own colour until you pick one.

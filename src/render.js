@@ -4751,7 +4751,7 @@ async function init() {
           remove: "No Elongated Dodecahedron there to remove -- Remove+Elongated Dodecahedron only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
         },
         rdquarter: {
-          add: 'All 4 real rhombohedra are already placed in that cell.',
+          add: 'Nothing to add there -- that slot is already filled (all 4 rhombohedra in the cell, or the mirror spot is taken or inside a solid RD).',
           remove: 'No RD Quarter there to remove -- tap directly on one you’ve placed.',
         },
         pyrochlore: {
