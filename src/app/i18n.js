@@ -226,6 +226,9 @@ const en = {
   'hull.info.fragments': 'Fragments',
   'hull.prompt.noFit': 'That piece overlaps what is already in that cell.',
   'hull.prompt.target': 'Fragment: tap a piece to target it, then pick its breakdown.',
+  'hull.trim': 'Trim',
+  'hull.prompt.trimShell': 'Trim cuts the hull flat once a shell around the centre is complete.',
+  'hull.prompt.trimTo': 'The truncated octahedron only trims flat at some sizes: complete shell 4 first.',
 };
 
 const ja = {
@@ -413,6 +416,9 @@ const ja = {
   'hull.info.fragments': '断片',
   'hull.prompt.noFit': 'そのピースは、そのセルにあるものと重なります。',
   'hull.prompt.target': '分割：ピースをタップして選び、分割のしかたを選んでください。',
+  'hull.trim': 'トリム',
+  'hull.prompt.trimShell': '中心のまわりのシェルが 1 つ完成すると、トリムでハルを平らに切りそろえられます。',
+  'hull.prompt.trimTo': '切頂八面体は特定の大きさでしか平らに切れません。まずシェル 4 を完成させてください。',
 };
 
 const es = {
@@ -600,6 +606,9 @@ const es = {
   'hull.info.fragments': 'Fragmentos',
   'hull.prompt.noFit': 'Esa pieza se solapa con lo que ya hay en esa celda.',
   'hull.prompt.target': 'Fragmentar: toca una pieza para elegirla y luego escoge su división.',
+  'hull.trim': 'Recortar',
+  'hull.prompt.trimShell': 'Recortar deja la envolvente plana cuando hay una capa completa alrededor del centro.',
+  'hull.prompt.trimTo': 'El octaedro truncado solo se recorta plano en algunos tamaños: completa primero la capa 4.',
 };
 
 const fr = {
@@ -787,6 +796,9 @@ const fr = {
   'hull.info.fragments': 'Fragments',
   'hull.prompt.noFit': 'Cette pièce chevauche ce qui est déjà dans cette cellule.',
   'hull.prompt.target': 'Fragmenter : touchez une pièce pour la choisir, puis sa découpe.',
+  'hull.trim': 'Rogner',
+  'hull.prompt.trimShell': 'Rogner aplanit l’enveloppe dès qu’une couche autour du centre est complète.',
+  'hull.prompt.trimTo': 'L’octaèdre tronqué ne se rogne à plat qu’à certaines tailles : complétez d’abord la couche 4.',
 };
 
 const ko = {
@@ -974,6 +986,9 @@ const ko = {
   'hull.info.fragments': '파편',
   'hull.prompt.noFit': '그 조각은 그 칸에 이미 있는 것과 겹칩니다.',
   'hull.prompt.target': '쪼개기: 조각을 탭해 고른 다음, 쪼개는 방식을 고르세요.',
+  'hull.trim': '다듬기',
+  'hull.prompt.trimShell': '중심을 둘러싼 층이 하나 완성되면 다듬기로 껍질을 평평하게 자를 수 있습니다.',
+  'hull.prompt.trimTo': '깎은 팔면체는 일부 크기에서만 평평하게 다듬어집니다. 먼저 4층을 완성하세요.',
 };
 
 const zh = {
@@ -1161,6 +1176,9 @@ const zh = {
   'hull.info.fragments': '碎片',
   'hull.prompt.noFit': '这个部件与该格中已有的部分重叠。',
   'hull.prompt.target': '分割：轻点一个部件选中它，再选择分割方式。',
+  'hull.trim': '修整',
+  'hull.prompt.trimShell': '中心周围有一层完整后，修整就能把外壳切平。',
+  'hull.prompt.trimTo': '截角八面体只在某些大小下能切平：请先完成第 4 层。',
 };
 
 const ru = {
@@ -1348,6 +1366,9 @@ const ru = {
   'hull.info.fragments': 'Фрагменты',
   'hull.prompt.noFit': 'Эта деталь пересекается с тем, что уже есть в этой ячейке.',
   'hull.prompt.target': 'Дробить: коснитесь детали, чтобы выбрать её, затем выберите разбиение.',
+  'hull.trim': 'Обрезать',
+  'hull.prompt.trimShell': 'Обрезка делает оболочку ровной, когда вокруг центра есть полный слой.',
+  'hull.prompt.trimTo': 'Усечённый октаэдр обрезается ровно только при некоторых размерах: сначала завершите слой 4.',
 };
 
 const I18N = { en, ja, es, fr, ko, zh, ru };

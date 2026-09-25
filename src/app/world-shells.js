@@ -19,7 +19,7 @@
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, facePieces, NEIGHBOR_OFFSETS } from '../core/lattice.js';
-import { HULL_IDS, hullShell, hullShellOf, SPLITS, SPLIT_BY_ID, pieceSolid, splitOrientations, pieceAt, piecesOverlap } from '../geometry-extensions/rd-pieces.js';
+import { HULL_IDS, hullShell, hullShellOf, SPLITS, SPLIT_BY_ID, pieceSolid, splitOrientations, pieceAt, piecesOverlap, TRIMMABLE, hullPlanes, trimGauge, trimPiece } from '../geometry-extensions/rd-pieces.js';
 import { t, tn } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 
@@ -53,7 +53,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
   // key -> { c: [x, y, z], parts: null (a whole RD) | [{ split, g }] }
   const cells = new Map();
   let centre = null; // the first piece's cell
-  const view = { hull: 'steps', mode: 'build', piece: 'whole' };
+  const view = { hull: 'steps', mode: 'build', piece: 'whole', trim: false };
   let target = null; // Fragment mode: the targeted cell's key
   let active = false;
   let skeleton = false;
@@ -101,6 +101,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
       if (HULL_IDS.includes(data.view?.hull)) view.hull = data.view.hull;
       if (data.view?.mode === 'fragment') view.mode = 'fragment';
       if (SPLIT_IDS.includes(data.view?.piece)) view.piece = data.view.piece;
+      view.trim = data.view?.trim === true;
     } catch { /* corrupt or blocked storage: start empty */ }
   }
   function save() {
@@ -184,18 +185,18 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
   // drawn (the hidden core costs nothing). Translucent and Skeleton keep
   // the faces between two shells (once, from the inner piece) so the bands
   // show as nested skins. Faces next to a fragmented cell are drawn.
-  function buildSkin(showBands, shell) {
+  function buildSkin(showBands, shell, drawn, blocks) {
     const b = meshBuilder();
     skinTris = [];
     const c = new THREE.Color(), e = new THREE.Color();
-    for (const [k, { c: cell, parts }] of cells) {
-      if (parts) continue;
+    for (const k of drawn) {
+      const cell = cells.get(k).c;
       const n = shell.get(k);
       shellColor(n, c);
       if (skeleton) e.copy(c); else e.setHex(EDGE_COLOR);
       NEIGHBOR_OFFSETS.forEach(([dx, dy, dz], f) => {
         const nk = keyOf([cell[0] + dx, cell[1] + dy, cell[2] + dz]);
-        if (isWhole(nk) && !(showBands && n < shell.get(nk))) return;
+        if (blocks(nk) && !(showBands && n < shell.get(nk))) return;
         const q = FACES[f].map((v) => [v[0] + cell[0], v[1] + cell[1], v[2] + cell[2]]);
         const tris = b.face(q, c, e);
         for (let i = 0; i < tris; i++) skinTris.push({ key: k, f });
@@ -203,29 +204,57 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     }
     return b.build(pieceMaterial, 'skin');
   }
-  // Fragments: every piece's faces, except those lying on its RD's outer
-  // face against a whole neighbour.
-  function buildParts(shell) {
+  // Separate solids (fragments, and trimmed cells): every face, except
+  // those lying on the RD's outer face against a neighbour that blocks it.
+  // items: [{ key, part (index, or -1 for a whole cell), solid }].
+  function buildParts(shell, items, blocks) {
     const b = meshBuilder();
     partTris = [];
     const c = new THREE.Color(), e = new THREE.Color();
-    for (const [k, { c: cell, parts }] of cells) {
-      if (!parts) continue;
+    for (const { key: k, part: pi, solid } of items) {
+      const cell = cells.get(k).c;
       shellColor(shell.get(k), c);
-      parts.forEach((p, pi) => {
-        if (skeleton) e.copy(c); else e.setHex(EDGE_COLOR);
-        const solid = pieceSolid(p.split, p.g, cell);
-        for (const loop of solid.faces) {
-          const q = loop.map((i) => solid.verts[i]);
-          const m = q.reduce((s, v) => [s[0] + v[0] / q.length, s[1] + v[1] / q.length, s[2] + v[2] / q.length], [0, 0, 0]);
-          const f = NEIGHBOR_OFFSETS.findIndex((o) => Math.abs(o[0] * (m[0] - cell[0]) + o[1] * (m[1] - cell[1]) + o[2] * (m[2] - cell[2]) - 1) < 1e-7);
-          if (f >= 0 && isWhole(keyOf([cell[0] + NEIGHBOR_OFFSETS[f][0], cell[1] + NEIGHBOR_OFFSETS[f][1], cell[2] + NEIGHBOR_OFFSETS[f][2]]))) continue;
-          const tris = b.face(q, c, e);
-          for (let i = 0; i < tris; i++) partTris.push({ key: k, part: pi, f });
-        }
-      });
+      if (skeleton) e.copy(c); else e.setHex(EDGE_COLOR);
+      for (const loop of solid.faces) {
+        const q = loop.map((i) => solid.verts[i]);
+        const m = q.reduce((s, v) => [s[0] + v[0] / q.length, s[1] + v[1] / q.length, s[2] + v[2] / q.length], [0, 0, 0]);
+        const f = NEIGHBOR_OFFSETS.findIndex((o) => Math.abs(o[0] * (m[0] - cell[0]) + o[1] * (m[1] - cell[1]) + o[2] * (m[2] - cell[2]) - 1) < 1e-7);
+        if (f >= 0 && blocks(keyOf([cell[0] + NEIGHBOR_OFFSETS[f][0], cell[1] + NEIGHBOR_OFFSETS[f][1], cell[2] + NEIGHBOR_OFFSETS[f][2]]))) continue;
+        const tris = b.face(q, c, e);
+        for (let i = 0; i < tris; i++) partTris.push({ key: k, part: pi, f });
+      }
     }
     return b.build(pieceMaterial, 'parts');
+  }
+  // A whole cell against the trim planes, fast: its RD's 14 corners decide
+  // 'inside' or outside; only cells a plane crosses get the exact cut.
+  const RD_CORNERS = rdRawVerts(1);
+  function wholeCut(planes, c) {
+    let crossed = false;
+    for (const { n, d } of planes) {
+      let lo = Infinity, hi = -Infinity;
+      for (const v of RD_CORNERS) {
+        const x = n[0] * (v[0] + c[0]) + n[1] * (v[1] + c[1]) + n[2] * (v[2] + c[2]);
+        if (x < lo) lo = x;
+        if (x > hi) hi = x;
+      }
+      if (lo >= d - 1e-9) return null; // wholly beyond this face
+      if (hi > d + 1e-9) crossed = true;
+    }
+    return crossed ? trimPiece(planes, 'whole', 0, c) : 'inside';
+  }
+  // How many shells around the centre are complete (1..n all present).
+  function completeShells() {
+    if (!centre) return 0;
+    let n = 0;
+    while (hullShell(view.hull, n + 1, centre).every((c) => cells.has(keyOf(c)))) n++;
+    return n;
+  }
+  // The trim planes in force, or null (off, a sphere, or no exact size).
+  function trimPlanes() {
+    if (!view.trim || !TRIMMABLE.includes(view.hull)) return null;
+    const g = trimGauge(view.hull, completeShells());
+    return g === null ? null : hullPlanes(view.hull, g, centre);
   }
   // Lattice View in a fragmented cell: its missing pieces (of the split it
   // was last broken into) as ghosts, tap to put one back.
@@ -260,7 +289,27 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
       pieceMaterial.depthWrite = opacity >= 1;
       const shell = new Map();
       for (const [k, { c }] of cells) shell.set(k, shellOf(c));
-      for (const { mesh, lines } of [buildSkin(opacity < 1 || skeleton, shell), buildParts(shell)]) {
+      // Whole cells untouched by any trim go on the fused skin; fragments
+      // and trim-cut cells are drawn as their own solids; cells the trim
+      // cuts away entirely aren't drawn.
+      const planes = trimPlanes();
+      const full = new Set();
+      const items = [];
+      for (const [k, { c, parts }] of cells) {
+        if (!parts) {
+          const cut = planes ? wholeCut(planes, c) : 'inside';
+          if (cut === 'inside') full.add(k);
+          else if (cut) items.push({ key: k, part: -1, solid: cut });
+          continue;
+        }
+        parts.forEach((p, pi) => {
+          const cut = planes ? trimPiece(planes, p.split, p.g, c) : 'inside';
+          if (cut === 'inside') items.push({ key: k, part: pi, solid: pieceSolid(p.split, p.g, c) });
+          else if (cut) items.push({ key: k, part: pi, solid: cut });
+        });
+      }
+      const blocks = (k) => full.has(k);
+      for (const { mesh, lines } of [buildSkin(opacity < 1 || skeleton, shell, full, blocks), buildParts(shell, items, blocks)]) {
         mesh.visible = !skeleton;
         group.add(mesh, lines);
         pickTargets.push(mesh);
@@ -391,7 +440,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     }
     const tri = kind === 'skin' ? skinTris[hit.faceIndex] : kind === 'parts' ? partTris[hit.faceIndex] : null;
     if (!tri) return false;
-    if (chisel) return kind === 'skin' ? removeCell(tri.key) : removePart(tri.key, tri.part);
+    if (chisel) return kind === 'skin' || tri.part < 0 ? removeCell(tri.key) : removePart(tri.key, tri.part);
     if (view.mode === 'fragment') { target = tri.key; rebuild(); return true; }
     // Build: across an outer RD face into the next cell, or (a fragment's
     // cut face) into the same cell.
@@ -482,6 +531,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     optionsRow.innerHTML = [
       `<button type="button" data-opt="mode" class="${fragment ? 'active' : ''}">${t(fragment ? 'hull.mode.fragment' : 'hull.mode.build', L)}</button>`,
       turnable ? `<button type="button" data-opt="turn">${t('hull.turn', L)}</button>` : '',
+      !fragment && TRIMMABLE.includes(view.hull) ? `<button type="button" data-opt="trim" class="${view.trim ? 'active' : ''}">${t('hull.trim', L)}</button>` : '',
       fragment ? '' : `<button type="button" data-opt="remove"${cells.size ? '' : ' hidden'}>${t('hull.removeShell', L)}</button>`,
       fragment ? '' : `<button type="button" data-opt="add">${t('hull.addShell', L)}</button>`,
       `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">${t('hyper.info', L)}</button>`,
@@ -505,6 +555,11 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     if (b.dataset.opt === 'add') addShell();
     else if (b.dataset.opt === 'remove') removeShell();
     else if (b.dataset.opt === 'turn') turnTarget();
+    else if (b.dataset.opt === 'trim') {
+      view.trim = !view.trim;
+      save(); rebuild();
+      if (view.trim && !trimPlanes()) showHudPrompt(t(view.hull === 'to' && completeShells() >= 1 ? 'hull.prompt.trimTo' : 'hull.prompt.trimShell', lang()), 4000);
+    }
     else if (b.dataset.opt === 'info') { infoOpen = !infoOpen; rebuild(); }
     else if (b.dataset.opt === 'mode') {
       view.mode = view.mode === 'fragment' ? 'build' : 'fragment';

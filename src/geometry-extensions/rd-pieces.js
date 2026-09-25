@@ -354,3 +354,49 @@ export function pieceAt(splitId, cell, point, k = 1) {
 export function piecesOverlap(a, b) {
   return solidFromPlanes([...piecePlanes(a.split, a.g, a.cell, a.k ?? 1), ...piecePlanes(b.split, b.g, b.cell, b.k ?? 1)]).volume > 1e-7;
 }
+
+// ---- trimming: a hull cut to its target's flat faces ----
+// Planes { n, d } (n·x <= d) of hull `hull` at gauge g around `centre`,
+// for every hull with flat faces (all but 'distance').
+const OCT_N = [1, -1].flatMap((a) => [1, -1].flatMap((b) => [1, -1].map((c) => [a, b, c])));
+const AX_N = [0, 1, 2].flatMap((i) => [1, -1].map((s) => { const n = [0, 0, 0]; n[i] = s; return n; }));
+const HULL_FACES = {
+  steps: [[AX_N, 1], [OCT_N, 2]],
+  tetrahedron: [[[[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]], 1]],
+  'tetrahedron-mirror': [[[[-1, -1, -1], [-1, 1, 1], [1, -1, 1], [1, 1, -1]], 1]],
+  cube: [[AX_N, 1]],
+  octahedron: [[OCT_N, 1]],
+  rd: [[RD_PLANES.map((p) => p.n), 1]],
+  to: [[AX_N, 1], [OCT_N, 1.5]],
+};
+export const TRIMMABLE = Object.keys(HULL_FACES);
+export function hullPlanes(hull, g, centre = [0, 0, 0]) {
+  return HULL_FACES[hull].flatMap(([normals, s]) => normals.map((n) => ({ n, d: s * g + dot(n, centre) })));
+}
+// The gauge to trim at, for a hull whose shells 1..n are complete: through
+// the centres of shell n's cells (measured exact for every flat hull), or
+// for the truncated octahedron the largest exact size at most that (its
+// squares and hexagons only both fit the lattice at gauge 3, 4, 7, 8, …).
+// null when there's no exact size yet.
+export function trimGauge(hull, n) {
+  if (!TRIMMABLE.includes(hull) || n < 1) return null;
+  const g = HULLS[hull](hullShell(hull, n, [0, 0, 0])[0]);
+  if (hull !== 'to') return g;
+  let best = null;
+  for (let m = 1; m <= n; m++) {
+    const gm = HULLS.to(hullShell('to', m, [0, 0, 0])[0]);
+    if (Math.abs(gm - Math.round(gm)) < 1e-9 && [0, 3].includes(Math.round(gm) % 4)) best = gm;
+  }
+  return best;
+}
+// Cell `cell` (whole, or one piece of it) cut by the trim planes: null if
+// it lies wholly outside, 'inside' if the cut leaves it untouched, else
+// the cut solid.
+export function trimPiece(planes, splitId, g, cell) {
+  const own = piecePlanes(splitId, g, cell);
+  const solid = solidFromPlanes(own);
+  const inside = (v) => planes.every((p) => dot(p.n, v) <= p.d + 1e-9);
+  if (solid.verts.every(inside)) return 'inside';
+  const cut = solidFromPlanes([...own, ...planes]);
+  return cut.volume > 1e-7 ? cut : null;
+}

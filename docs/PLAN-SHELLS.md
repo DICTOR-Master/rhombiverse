@@ -1,6 +1,6 @@
 # Plan: Shells, a hull-building 3D scene
 
-Status: agreed design; stages 1-3 and 4a shipped. Delete this file once every stage
+Status: agreed design; stages 1-4 shipped. Delete this file once every stage
 has shipped (the code and the guide then describe the feature).
 
 ## The idea
@@ -141,7 +141,14 @@ dropdown; with a split chosen, a tap places that split's piece under the
 finger (outer face: the next cell; cut face: the same cell), checked
 exactly for overlap. Long-press removes one fragment; Lattice View ghosts
 a fragmented cell's missing pieces (tap to put back). Larger-scale loose
-pieces come with stage 5. *4b next:* trimming. The **trim option**: flat hull
+pieces come with stage 5. *4b shipped:* Trim, a view toggle (pieces
+unchanged) that cuts the hull flat through the centres of the outermost
+complete shell. Measured exact (the cut pieces fill the target shape) for
+tetrahedron, cube, octahedron, RD and Steps at every size; the truncated
+octahedron only at gauge 3, 4, 7, 8 … (trims at the largest such size
+inside the hull). Sphere: no Trim button. Cut cells are drawn as exact
+solids (convex cuts, not all 48-family pieces: the (111) faces cut
+through cell centres); the untouched inside stays on the fused skin. The **trim option**: flat hull
 faces from Cube, Pyramid, corner caps and the RD's halves (engine and
 verify:shells extended with the caps; checked: RD = octahedron + 8 caps
 exactly). Every split as a placeable piece, from a

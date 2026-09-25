@@ -5,7 +5,7 @@
 // - the big RD at x2, x3, x4 and x6 is filled exactly by small pieces of
 //   the family, with the measured counts;
 // - shell sizes for both shell rules.
-import { SPLITS, SPLIT_BY_ID, OH, pieceSolid, solidFromPlanes, scaleDecomposition, shells, identifyPiece, HULLS, HULL_IDS, hullShell, hullShellOf, splitOrientations, pieceAt, piecesOverlap, pointInPiece } from '../src/geometry-extensions/rd-pieces.js';
+import { SPLITS, SPLIT_BY_ID, OH, pieceSolid, solidFromPlanes, scaleDecomposition, shells, identifyPiece, HULLS, HULL_IDS, hullShell, hullShellOf, splitOrientations, pieceAt, piecesOverlap, pointInPiece, TRIMMABLE, hullPlanes, trimGauge, trimPiece } from '../src/geometry-extensions/rd-pieces.js';
 import { rdQuarterPieces, hemisphereSplit, NEIGHBOR_OFFSETS } from '../src/core/lattice.js';
 
 let failures = 0;
@@ -116,6 +116,27 @@ for (const s of SPLITS) {
   const crossing = splitOrientations('half-axis').flat().filter((g) => piecesOverlap(a, { split: 'half-axis', g, cell: [0, 0, 0] })).length;
   check('overlap: an x-half overlaps every half of the other two axes (and itself), not its opposite', crossing === 5, `${crossing} of 6`);
 }
+// Trimming: the built pieces cut by the trim planes fill the target shape
+// exactly (volume of the cut pieces = volume of the hull), for every flat
+// hull at shells 1-4, and the truncated octahedron at every size the
+// trim rule picks up to shell 8 (and at none it rejects).
+for (const h of TRIMMABLE) {
+  const res = [];
+  const built = [[0, 0, 0]];
+  for (let n = 1; n <= (h === 'to' ? 8 : 4); n++) {
+    built.push(...hullShell(h, n, [0, 0, 0]));
+    const g = trimGauge(h, n);
+    if (g === null) { res.push(`${n}:none`); continue; }
+    const planes = hullPlanes(h, g);
+    const H = solidFromPlanes(planes).volume;
+    let covered = 0;
+    for (const c of built) { const t = trimPiece(planes, 'whole', 0, c); if (t === 'inside') covered += 2; else if (t) covered += t.volume; }
+    res.push(`${n}:${Math.abs(covered - H) < 1e-6 ? 'exact' : 'NOT'}`);
+  }
+  check(`trim "${h}": the cut pieces fill the target shape exactly`, !res.some((r) => r.endsWith('NOT')), res.join(' '));
+}
+check('trim "to": no exact size before shell 4, then gauges 3 and 4', trimGauge('to', 3) === null && trimGauge('to', 4) === 3 && trimGauge('to', 5) === 4 && trimGauge('to', 6) === 4);
+check('trim: the sphere has no flat faces to trim to', trimGauge('distance', 3) === null);
 check('OH has 48 distinct elements', new Set(OH.map((m) => m.flat().join())).size === 48);
 
 console.log(`\n${failures} failures.`);
