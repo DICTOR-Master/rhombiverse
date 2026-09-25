@@ -10,6 +10,7 @@
     "verify:pyrochlore": "node scripts/verify-pyrochlore.mjs",
     "verify:rhombohedra": "node scripts/verify-rhombohedra.mjs",
     "verify:4d": "node scripts/verify-4d.mjs",
+    "verify:quasicrystal": "node scripts/verify-quasicrystal.mjs",
     "verify:copy": "node scripts/verify-copy.mjs"
   },
   "devDependencies": {

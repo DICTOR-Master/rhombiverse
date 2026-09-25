@@ -45,7 +45,7 @@ has shipped (the code and the guide then describe the feature).
 
 Each stage ships on its own, fully working, with its checks passing.
 
-**1. Engine and checks (no UI).**
+**1. Engine and checks (no UI).** *Shipped.*
 `src/geometry-extensions/quasicrystal.js`: Z⁵/Z⁶ projection into
 physical and hidden space, the acceptance window, the window test
 under a phason offset, which lattice faces become tiles, the
@@ -56,7 +56,10 @@ it. `scripts/verify-quasicrystal.mjs` (`npm run verify:quasicrystal`,
 added to CI) checks, numerically:
 - no two tiles overlap;
 - the symmetry is 5-fold or icosahedral;
-- the Penrose patch at zero offset has exactly Conway's 7 vertex stars;
+- the Penrose patch at the base offset has exactly 7 vertex stars by
+  angle (de Bruijn's 8 rhombus vertex types, two of which differ only by
+  matching arrows; Conway's 7 are the kite-and-dart ones), and a cut off
+  the Penrose diagonal has more;
 - the thick/thin and prolate/oblate ratios approach τ;
 - each approximant repeats with the expected period;
 - a small phason step flips tiles only locally.
@@ -73,7 +76,8 @@ modes. Browser check by touch on dicto-node: place, remove, slide,
 undo.
 
 **3. The 5D world.** Same engine and panel for Z⁵: Penrose rhombus
-prisms. Building across a prism's top or bottom face adds the next
+prisms (layer height `PRISM_HEIGHT`, set to 1 edge; confirm with the
+user before building). Building across a prism's top or bottom face adds the next
 layer. Phason 3 is hidden.
 
 **4. Window View**, for both worlds.
@@ -90,7 +94,7 @@ slider jump, and one undo step. Start with bridge pieces and zonohedra
 - serials are unique and inside their range;
 - names are unique.
 
-**7. Fill the catalogue**: about 100 patches (Conway's 7 vertex stars at
+**7. Fill the catalogue**: about 100 patches (the 7 Penrose vertex stars at
 2–3 sizes, the named patches such as the cartwheel and Conway worms,
 and the icosahedral clusters), then the polytopes (zonotopal ones as
 ordinary pieces, the rest as the polytope piece type below).

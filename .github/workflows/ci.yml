@@ -21,6 +21,8 @@ jobs:
         with:
           node-version: 20
       - run: node --test tests/unit/
+      # 5D/6D cut-and-project engine against the known tiling facts.
+      - run: node scripts/verify-quasicrystal.mjs
 
   browser-smoke-test:
     # Real-browser check (Playwright) -- the actual app, served exactly
