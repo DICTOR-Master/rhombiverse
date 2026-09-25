@@ -201,6 +201,34 @@ export function makeQuasicrystal(tier, approximant = null) {
     return windowPlanes.every(({ normal, half }) => Math.abs(dot(normal, y)) <= half + EPS);
   }
 
+  // The window's cross-section at perp height h (5D: the diagonal
+  // coordinate, fixed for each value of sum(n)), as a convex polygon in the
+  // first two perp coordinates, counter-clockwise; [] if it misses. At the
+  // Penrose offset these are the four pentagons.
+  function windowSlice(h) {
+    let poly = [[-10, -10], [10, -10], [10, 10], [-10, 10]];
+    for (const { normal: [a, b, c], half } of windowPlanes) {
+      for (const sgn of [1, -1]) {
+        // keep sgn * (a u + b v + c h) <= half
+        const f = ([u, v]) => half - sgn * (a * u + b * v + c * h);
+        const out = [];
+        poly.forEach((p, i) => {
+          const q = poly[(i + 1) % poly.length];
+          const fp = f(p), fq = f(q);
+          if (fp >= 0) out.push(p);
+          if ((fp >= 0) !== (fq >= 0)) {
+            const t = fp / (fp - fq);
+            out.push([p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]);
+          }
+        });
+        poly = out;
+        if (!poly.length) return [];
+      }
+    }
+    // Drop repeated corners (a plane through a vertex adds a duplicate).
+    return poly.filter((p, i) => Math.hypot(p[0] - poly[(i + 1) % poly.length][0], p[1] - poly[(i + 1) % poly.length][1]) > 1e-9);
+  }
+
   // Window vertices (the zonotope's corners), for Window View.
   function windowVertices() {
     const pts = [];
@@ -364,7 +392,7 @@ export function makeQuasicrystal(tier, approximant = null) {
     tier, d, k: spec.k, q, approximant, windowWidth,
     par, perp,
     perpOf, parOf,
-    isTile, margin, isVertex, windowVertices, windowPlanes,
+    isTile, margin, isVertex, windowVertices, windowSlice, windowPlanes,
     tileVertices, tileType, tileFaces, tilesOnFace, neighbourAcross, faceAtPoint,
     seedTile, patch,
   };

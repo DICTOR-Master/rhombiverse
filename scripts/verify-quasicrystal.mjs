@@ -180,6 +180,39 @@ for (const tier of ['6d', '5d']) {
   check('a phason step never moves a piece: unchanged tiles keep their key and position',
     [...before.keys()].filter((k) => after.has(k)).every((k) => dist(centre(before.get(k)), centre(after.get(k))) < 1e-12));
 
+  // Window View rests on this: a piece is in the tiling exactly when every
+  // corner of it is in the vertex window (so a corner crossing the window's
+  // edge is a piece vanishing or appearing).
+  let cornerRule = true;
+  for (const t of tiles) for (const f of e.tileFaces(t.n, t.I)) for (const u of candidatesOnFace(f)) {
+    cornerRule &&= e.isTile(u.n, u.I, off) === cornerPoints(u).every((m) => e.isVertex(m, off));
+  }
+  check('a face is a tile exactly when all its corners are in the window', cornerRule);
+  function candidatesOnFace(f) {
+    const out = [];
+    for (let j = 0; j < e.d; j++) {
+      if (f.K.includes(j)) continue;
+      const I = [...f.K, j].sort((a, b) => a - b);
+      for (const s of [0, 1]) out.push({ n: f.n.map((x, l) => x - (l === j ? s : 0)), I });
+    }
+    return out;
+  }
+  if (tier === '5d') {
+    // The four Penrose pentagons: slices of the window at the diagonal
+    // heights sum(n) can reach, two sizes in the ratio tau.
+    const heights = [-3, -2, -1, 0, 1, 2, 3].map((s) => off[2] - s / Math.SQRT2);
+    const slices = heights.map((h) => e.windowSlice(h)).filter((p) => p.length);
+    const radius = (p) => Math.max(...p.map(([u, v]) => Math.hypot(u, v)));
+    const radii = slices.map(radius).sort((a, b) => a - b);
+    check(`window slices at the Penrose offset: 4 pentagons (${slices.map((p) => p.length).join(', ')} corners)`, slices.length === 4 && slices.every((p) => p.length === 5));
+    check('two small and two large pentagons, sizes in the ratio tau', Math.abs(radii[0] - radii[1]) < 1e-9 && Math.abs(radii[2] - radii[3]) < 1e-9 && Math.abs(radii[2] / radii[0] - PHI) < 1e-9);
+    const inPoly = (poly, [u, v]) => poly.every((p, i) => { const q = poly[(i + 1) % poly.length]; return (q[0] - p[0]) * (v - p[1]) - (q[1] - p[1]) * (u - p[0]) >= -1e-9; });
+    check('every corner of the patch lies inside its own level\'s pentagon', tiles.every((t) => cornerPoints(t).every((m) => {
+      const y = e.perpOf(m).map((x, i) => off[i] - x);
+      return inPoly(e.windowSlice(y[2]), y);
+    })));
+  }
+
   // Taps: the centre of each face of a tile resolves to that face (6D: 6
   // faces; 5D prisms: 4 sides, then bottom and top, on a raised layer).
   const layer = tier === '5d' ? 3 : 0;

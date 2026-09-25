@@ -82,7 +82,9 @@ prisms (layer height `PRISM_HEIGHT` = 1 edge, confirmed). *Shipped:* one
 factory for both worlds, `src/app/world-quasicrystal.js`. Building across a prism's top or bottom face adds the next
 layer. Phason 3 is hidden.
 
-**4. Window View**, for both worlds.
+**4. Window View**, for both worlds. *Shipped:* a Build | Window toggle,
+true size, every corner as a point (plus ghost corners with Lattice View);
+a piece shows exactly when all its corners are inside (checked).
 
 **5. Info panel** summon/build record (the build counts first; summon
 rows arrive with stage 6).

@@ -24,6 +24,14 @@
 // - Empty slice: a cyan first-placement target on the tile nearest the
 //   origin. Lattice View: every tile across a face of the build, as a
 //   ghost; tap one to place it.
+// - Window View (Build | Window toggle): the acceptance window in the
+//   hidden dimensions, drawn at true size in the units the slider moves in
+//   (6D: the rhombic triacontahedron; 5D: its slices at the corners'
+//   heights, the four Penrose pentagons), with every corner of every
+//   placed piece as a point: white inside, red outside. A piece shows
+//   exactly when all its corners are inside (verify:quasicrystal), so a
+//   point crossing the edge is pieces vanishing or appearing. With Lattice
+//   View on, the ghost pieces' corners show too. No placing while it's up.
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { makeQuasicrystal, BASE_OFFSET, APPROXIMANT_STOPS, TIERS, tileKey } from '../geometry-extensions/quasicrystal.js';
@@ -33,6 +41,11 @@ const PHASON_LIMIT = 1; // window widths
 const PHASON_SNAP = 0.04;
 const FIRST_COLOR = 0x00e5ff;
 const SLOT_COLOR = 0x9de0ff;
+const WINDOW_COLOR = 0x77ccff;
+const CORNER_IN = 0xf2f8ff;
+const CORNER_OUT = 0xff4d5e;
+const SLOT_CORNER_OUT = 0x4a5563;
+const CORNER_RADIUS = 0.045;
 const CONTROL_LABELS = { p1: 'Phason 1', p2: 'Phason 2', p3: 'Phason 3', approx: 'Approximant' };
 // Approximant stops spread evenly across the track, tau at the right end.
 const STOP_POS = APPROXIMANT_STOPS.map((_, i) => -1 + (2 * i) / (APPROXIMANT_STOPS.length - 1));
@@ -66,7 +79,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
 
   // ---- state ----
   const tiles = new Map(); // key -> { n, I, layer?, material }
-  const view = { phason: [0, 0, 0], approx: APPROXIMANT_STOPS.length - 1, control: 'p1' };
+  const view = { phason: [0, 0, 0], approx: APPROXIMANT_STOPS.length - 1, control: 'p1', mode: 'build' };
   let active = false;
   let skeleton = false;
   let latticeView = false;
@@ -97,6 +110,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
         }
         if (Number.isInteger(data.view.approx) && APPROXIMANT_STOPS[data.view.approx] !== undefined) view.approx = data.view.approx;
         if (W.controls.includes(data.view.control)) view.control = data.view.control;
+        if (data.view.mode === 'window') view.mode = 'window';
       }
     } catch { /* corrupt or blocked storage: start empty */ }
   }
@@ -147,6 +161,24 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     return [...out.values()];
   }
 
+  // Every lattice point at a corner of these pieces, once each (5D: a
+  // prism's corners are its rhombus's, on every layer).
+  function cornersOf(list) {
+    const out = new Map();
+    for (const t of list) {
+      for (let mask = 0; mask < 1 << k; mask++) {
+        const m = t.n.map((x, l) => x + (t.I.some((i, b) => i === l && mask & (1 << b)) ? 1 : 0));
+        out.set(m.join(','), m);
+      }
+    }
+    return [...out.values()];
+  }
+  // A corner's point in the window's frame: offset - perp(m).
+  const windowPoint = (m) => { const off = offset(); return engine().perpOf(m).map((x, i) => off[i] - x); };
+  // 6D perp axes go straight to x, y, z. 5D: the Penrose plane's two perp
+  // axes to x and z, the diagonal up, matching the build's layout.
+  const toScene = (y) => (W.layered ? [y[0], y[2], y[1]] : y);
+
   // ---- info ----
   const info = document.createElement('div');
   info.id = `world${tier}-info`;
@@ -172,6 +204,11 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       ['Phason', W.controls.filter((c) => c !== 'approx').map((c) => fmt(view.phason[Number(c[1]) - 1])).join(' · ')],
       ['Approximant', APPROXIMANT_STOPS[view.approx] ? `${stopLabel(APPROXIMANT_STOPS[view.approx])} (a periodic crystal)` : 'τ (the true quasicrystal)'],
     ];
+    if (view.mode === 'window') {
+      const corners = cornersOf(all);
+      const inside = corners.filter((m) => e.isVertex(m, offset())).length;
+      rows.push(['Window', corners.length ? `${inside} of ${corners.length} corners inside` : 'place a piece to see its corners']);
+    }
     info.innerHTML = rows.map(([key, v]) => `<div><span class="w4d-info-k">${key}</span> ${v}</div>`).join('');
   }
 
@@ -190,7 +227,9 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       group.remove(child);
       if (child.isLineSegments) child.geometry.dispose();
       if (child.material && !child.userData.sharedMaterial) child.material.dispose();
+      if (child.isInstancedMesh) child.dispose();
     }
+    for (const g of windowGeometries.splice(0)) g.dispose();
     pickTargets.length = 0;
   }
   function addTile(t, { color, opacity = 1, qc, lineMaterial = edgeMaterial }) {
@@ -209,11 +248,62 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     group.add(lines);
   }
 
+  // Window View: the window plus the corner points.
+  function drawWindow(visible) {
+    const e = engine();
+    const fill = new THREE.MeshBasicMaterial({ color: WINDOW_COLOR, transparent: true, opacity: 0.08, depthWrite: false, side: THREE.DoubleSide });
+    const edges = new THREE.LineBasicMaterial({ color: WINDOW_COLOR });
+    const addWindowPiece = (geometry) => {
+      group.add(new THREE.Mesh(geometry, fill));
+      group.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), edges));
+      windowGeometries.push(geometry);
+    };
+    const built = cornersOf([...tiles.values()]);
+    const builtKeys = new Set(built.map((m) => m.join(',')));
+    const slots = latticeView ? cornersOf(openSlots(visible)).filter((m) => !builtKeys.has(m.join(','))) : [];
+    if (!W.layered) {
+      addWindowPiece(new ConvexGeometry(e.windowVertices().map((v) => new THREE.Vector3(...v))));
+    } else {
+      // One slice per height the corners sit at (four at tau).
+      const heights = new Map();
+      for (const m of [...built, ...slots]) { const h = windowPoint(m)[2]; heights.set(h.toFixed(6), h); }
+      if (!heights.size) heights.set('0', offset()[2]);
+      for (const h of heights.values()) {
+        const poly = e.windowSlice(h);
+        if (poly.length < 3) continue;
+        const shape = new THREE.Shape(poly.map(([u, v]) => new THREE.Vector2(u, v)));
+        // ShapeGeometry lies in x/y; turn it into the x/z plane at height h.
+        const g = new THREE.ShapeGeometry(shape).rotateX(Math.PI / 2).translate(0, h, 0);
+        addWindowPiece(g);
+      }
+    }
+    const points = [
+      ...built.map((m) => ({ m, color: e.isVertex(m, offset()) ? CORNER_IN : CORNER_OUT })),
+      ...slots.map((m) => ({ m, color: e.isVertex(m, offset()) ? SLOT_COLOR : SLOT_CORNER_OUT })),
+    ];
+    if (!points.length) return;
+    const dots = new THREE.InstancedMesh(cornerGeometry, new THREE.MeshBasicMaterial(), points.length);
+    const matrix = new THREE.Matrix4();
+    const color = new THREE.Color();
+    points.forEach(({ m, color: c }, i) => {
+      dots.setMatrixAt(i, matrix.makeTranslation(...toScene(windowPoint(m))));
+      dots.setColorAt(i, color.setHex(c));
+    });
+    group.add(dots);
+  }
+  const cornerGeometry = new THREE.SphereGeometry(CORNER_RADIUS, 12, 8);
+  const windowGeometries = [];
+
   function rebuild() {
     const visible = active ? visibleTiles() : [];
     renderInfo(visible);
     clearGroup();
     if (!active) return;
+    if (view.mode === 'window') {
+      drawWindow(visible);
+      renderPanel();
+      return;
+    }
     for (const t of visible) addTile(t, { color: materialColor(t.material), qc: 'tile' });
     if (!visible.length) {
       // Nothing of the build in this slice (or nothing built): one cyan
@@ -290,6 +380,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     if (!active) return;
     controlsRow.innerHTML = W.controls.map((c) => `<button type="button" data-control="${c}" class="${c === view.control ? 'active' : ''}">${CONTROL_LABELS[c]}</button>`).join('');
     optionsRow.innerHTML = [
+      `<button type="button" data-opt="mode" class="${view.mode === 'window' ? 'active' : ''}">${view.mode === 'window' ? 'Window' : 'Build'}</button>`,
       `<button type="button" data-opt="reset">Reset ${W.label}</button>`,
       `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">Info</button>`,
     ].join('');
@@ -305,13 +396,14 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     const b = e.target.closest('button[data-opt]');
     if (!b) return;
     if (b.dataset.opt === 'info') infoOpen = !infoOpen;
+    else if (b.dataset.opt === 'mode') { view.mode = view.mode === 'window' ? 'build' : 'window'; save(); }
     else if (b.dataset.opt === 'reset') { view.phason = [0, 0, 0]; view.approx = APPROXIMANT_STOPS.length - 1; save(); }
     rebuild();
   });
 
   return {
     group,
-    meshes: () => pickTargets,
+    meshes: () => (view.mode === 'window' ? [] : pickTargets),
     handleTap,
     setActive(on) {
       active = on;
