@@ -49,6 +49,8 @@ import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { makeQuasicrystal, BASE_OFFSET, APPROXIMANT_STOPS, TIERS, PRISM_HEIGHT, tileKey } from '../geometry-extensions/quasicrystal.js';
 import { createGearedSlider } from './geared-slider.js';
+import { t, tn } from './i18n.js';
+import { getSettings, onSettingsChange } from './settings.js';
 import { findOccurrence, polytopeShape } from '../geometry-extensions/quasicrystal-catalogue.js';
 
 const PHASON_LIMIT = 1; // window widths
@@ -63,7 +65,8 @@ const CORNER_RADIUS = 0.045;
 const GHOST_COLOR = 0xffc857;
 const SLIDE_MS = 500;
 const SUMMON_ROWS = 8;
-const CONTROL_LABELS = { p1: 'Phason 1', p2: 'Phason 2', p3: 'Phason 3', approx: 'Approximant' };
+const controlLabel = (c, lang) => (c === 'approx' ? t('qc.control.approx', lang) : t('qc.control.phason', lang, { n: c[1] }));
+const lang = () => getSettings().language;
 // Approximant stops spread evenly across the track, tau at the right end.
 const STOP_POS = APPROXIMANT_STOPS.map((_, i) => -1 + (2 * i) / (APPROXIMANT_STOPS.length - 1));
 const stopLabel = (s) => (s ? `${s[0]}/${s[1]}` : 'τ');
@@ -259,12 +262,12 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   // Big patches take a second or so to find: say so first, and let the
   // prompt paint before the search runs.
   function locateSoon(near, layer, after = () => {}) {
-    showHudPrompt(`Finding ${pending.entry.name}…`, 2500);
+    showHudPrompt(t('qc.finding', lang(), { name: pending.entry.name }), 2500);
     setTimeout(() => { if (pending) { locate(near, layer); after(); } }, 50);
   }
   function locate(near, layer) {
     const occ = findOccurrence(engine(), offset(), pending.entry, near);
-    if (!occ) { showHudPrompt(`${pending.entry.name} doesn't occur near there. Tap somewhere else.`, 3500); return; }
+    if (!occ) { showHudPrompt(t('qc.notHere', lang(), { name: pending.entry.name }), 3500); return; }
     pending.tiles = occ.tiles ?? [];
     pending.anchor = occ.anchor ?? null;
     pending.layer = layer;
@@ -283,7 +286,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     const go = () => {
       const vis = visibleTiles();
       locateSoon(buildCentre(), vis.length ? Math.max(...vis.map((t) => t.layer ?? 0)) : 0, () => {
-        if (pending?.tiles.length || pending?.anchor) showHudPrompt(`${entry.name}: tap the gold outline to place it, or tap the build to move it.`, 5000);
+        if (pending?.tiles.length || pending?.anchor) showHudPrompt(t('qc.tapOutline', lang(), { name: entry.name }), 5000);
       });
     };
     if (approx !== view.approx) slideTo({ approx, phason: view.phason }, go);
@@ -316,7 +319,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     summons.push({ id, serial: entry.serial, name: entry.name, settings: settingsNow(), before: pending.before });
     pending = null;
     save(); rebuild(); onChange();
-    showHudPrompt(`${entry.name} placed (${added} new piece${added === 1 ? '' : 's'}).`, 3000);
+    showHudPrompt(tn('qc.placed', lang(), added, { name: entry.name }), 3000);
     return true;
   }
 
@@ -338,27 +341,29 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     const count = (list, type) => list.filter((t) => e.tileType(t.I) === type).length;
     const all = [...tiles.values()];
     const layers = new Set(all.map((t) => t.layer)).size;
+    const L = lang();
+    const list = W.types.map((ty) => `${count(all, ty)} ${ty}`).join(', ');
     const rows = [
-      ['World', W.name],
-      ['Built', all.length ? `${W.types.map((ty) => `${count(all, ty)} ${ty}`).join(', ')}${W.layered ? ` on ${layers} layer${layers === 1 ? '' : 's'}` : ''}` : 'nothing yet'],
-      ['In the slice', `${visible.length} shown, ${all.length - visible.length} hidden by the slice`],
-      ['Phason', W.controls.filter((c) => c !== 'approx').map((c) => fmt(view.phason[Number(c[1]) - 1])).join(' · ')],
-      ['Approximant', APPROXIMANT_STOPS[view.approx] ? `${stopLabel(APPROXIMANT_STOPS[view.approx])} (a periodic crystal)` : 'τ (the true quasicrystal)'],
+      [t('hyper.info.world', L), W.name],
+      [t('hyper.info.built', L), all.length ? (W.layered ? tn('qc.info.onLayers', L, layers, { list }) : list) : t('hyper.info.nothingYet', L)],
+      [t('qc.info.inSlice', L), t('qc.info.sliceCounts', L, { shown: visible.length, hidden: all.length - visible.length })],
+      [t('qc.info.phason', L), W.controls.filter((c) => c !== 'approx').map((c) => fmt(view.phason[Number(c[1]) - 1])).join(' · ')],
+      [t('qc.info.approximant', L), APPROXIMANT_STOPS[view.approx] ? t('qc.info.periodic', L, { stop: stopLabel(APPROXIMANT_STOPS[view.approx]) }) : t('qc.info.tau', L)],
     ];
-    if (polys.size) rows.splice(2, 0, ['Polytopes', `${polys.size} shadow${polys.size === 1 ? '' : 's'}`]);
-    const summoned = all.filter((t) => t.summon).length;
-    if (summons.length) rows.splice(2, 0, ['Pieces', `${all.length - summoned} hand-placed, ${summoned} summoned`]);
+    if (polys.size) rows.splice(2, 0, [t('qc.info.polytopes', L), tn('qc.info.shadows', L, polys.size)]);
+    const summoned = all.filter((x) => x.summon).length;
+    if (summons.length) rows.splice(2, 0, [t('qc.info.pieces', L), t('qc.info.pieceCounts', L, { hand: all.length - summoned, summoned })]);
     if (view.mode === 'window') {
       const corners = cornersOf(all);
       const inside = corners.filter((m) => e.isVertex(m, offset())).length;
-      rows.push(['Window', corners.length ? `${inside} of ${corners.length} corners inside` : 'place a piece to see its corners']);
+      rows.push([t('qc.info.window', L), corners.length ? t('qc.info.cornersInside', L, { inside, total: corners.length }) : t('qc.info.placeForCorners', L)]);
     }
     const settingsLabel = (x) => (APPROXIMANT_STOPS[x.approx] ? `${stopLabel(APPROXIMANT_STOPS[x.approx])}, ` : '')
-      + `phason ${W.controls.filter((c) => c !== 'approx').map((c) => fmt(x.phason[Number(c[1]) - 1])).join(' · ')}`;
+      + t('qc.info.phasonSetting', L, { values: W.controls.filter((c) => c !== 'approx').map((c) => fmt(x.phason[Number(c[1]) - 1])).join(' · ') });
     // The most recent few, so the box never covers the scene.
     const recent = summons.slice(-SUMMON_ROWS);
     const summonRows = summons.length
-      ? `<div><span class="w4d-info-k">Summoned</span> tap one to slide back to its settings${summons.length > recent.length ? ` (latest ${recent.length} of ${summons.length})` : ''}</div>${recent.map((x) =>
+      ? `<div><span class="w4d-info-k">${t('qc.info.summoned', L)}</span> ${t('qc.info.summonedHint', L)}${summons.length > recent.length ? ` ${t('qc.info.latest', L, { n: recent.length, total: summons.length })}` : ''}</div>${recent.map((x) =>
         `<button type="button" class="qc-summon-row" data-summon="${x.id}">#${x.serial} ${x.name} <span class="qc-summon-set">${settingsLabel(x.settings)}</span></button>`).join('')}`
       : '';
     info.innerHTML = rows.map(([key, v]) => `<div><span class="w4d-info-k">${key}</span> ${v}</div>`).join('') + summonRows;
@@ -558,7 +563,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       return true;
     }
     if (qc === 'polytope') {
-      if (mode !== 'chisel') { showHudPrompt('A polytope shadow: long-press to remove it. Turn the view to reach the pieces behind it.', 3500); return true; }
+      if (mode !== 'chisel') { showHudPrompt(t('qc.polytopeTap', lang()), 3500); return true; }
       polys.delete(polyKey(hit.object.userData.poly));
       save(); rebuild(); onChange();
       return true;
@@ -582,7 +587,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   panel.className = 'qc-panel';
   panel.innerHTML = `
     <div class="w4d-row w4d-controls"></div>
-    <div class="w4d-track" role="slider" aria-label="${W.label} slider"><div class="w4d-ticks"></div><div class="w4d-thumb"></div></div>
+    <div class="w4d-track" role="slider"><div class="w4d-ticks"></div><div class="w4d-thumb"></div></div>
     <div class="w4d-row w4d-options"></div>`;
   document.body.appendChild(panel);
   const controlsRow = panel.querySelector('.w4d-controls');
@@ -610,15 +615,20 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     snap: () => (isApprox() ? 0 : PHASON_SNAP),
     onEnd: save,
   });
+  // A language change redraws the panel and Info (not on every setting).
+  let shownLang = lang();
+  onSettingsChange((st) => { if (st.language !== shownLang) { shownLang = st.language; if (active) rebuild(); } });
 
   function renderPanel() {
     panel.classList.toggle('visible', active);
     if (!active) return;
-    controlsRow.innerHTML = W.controls.map((c) => `<button type="button" data-control="${c}" class="${c === view.control ? 'active' : ''}">${CONTROL_LABELS[c]}</button>`).join('');
-    const infoBtn = `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">Info</button>`;
-    optionsRow.innerHTML = pending ? `<button type="button" data-opt="cancel">Cancel summon</button>${infoBtn}` : [
-      `<button type="button" data-opt="mode" class="${view.mode === 'window' ? 'active' : ''}">${view.mode === 'window' ? 'Window' : 'Build'}</button>`,
-      `<button type="button" data-opt="reset">Reset ${W.label}</button>`,
+    const L = lang();
+    panel.querySelector('.w4d-track').setAttribute('aria-label', t('hyper.slider', L, { dim: W.label }));
+    controlsRow.innerHTML = W.controls.map((c) => `<button type="button" data-control="${c}" class="${c === view.control ? 'active' : ''}">${controlLabel(c, L)}</button>`).join('');
+    const infoBtn = `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">${t('hyper.info', L)}</button>`;
+    optionsRow.innerHTML = pending ? `<button type="button" data-opt="cancel">${t('qc.cancelSummon', L)}</button>${infoBtn}` : [
+      `<button type="button" data-opt="mode" class="${view.mode === 'window' ? 'active' : ''}">${t(`qc.mode.${view.mode}`, L)}</button>`,
+      `<button type="button" data-opt="reset">${t('hyper.reset', L, { dim: W.label })}</button>`,
       infoBtn,
     ].join('');
     slider.render();

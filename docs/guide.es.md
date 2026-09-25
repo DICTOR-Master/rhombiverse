@@ -2,7 +2,7 @@
 
 Rhombiverse y su gemelo, [Polyhedraverse](https://polyhedraverse.vercel.app), son dos maneras de mirar la misma geometría. Rhombiverse es el **paisaje**: las propias redes, que se extienden en todas direcciones. Polyhedraverse es la **galería de retratos**: las formas que viven en esas redes, de una en una y de cerca.
 
-Aquí cada pieza llena el espacio a la perfección sobre una red cristalina real, así que solo puedes poner una pieza donde la red tenga sitio para ella. Toca para añadir una pieza, mantén pulsado para quitarla y observa lo que has construido con distintas vistas, en 2D, 3D o 4D.
+Aquí cada pieza llena el espacio a la perfección sobre una red cristalina real, así que solo puedes poner una pieza donde la red tenga sitio para ella. Toca para añadir una pieza, mantén pulsado para quitarla y observa lo que has construido con distintas vistas, de 2D a 6D.
 
 La primera parte de esta guía recorre las tareas habituales. La segunda enumera todos los controles.
 
@@ -12,7 +12,7 @@ Los nombres de los botones aparecen tal como se ven en la aplicación (los que l
 
 ### Elige una dimensión
 
-Después de **ENTER** se abre el selector de dimensión: una figura que gira despacio y cuyas caras son **2D**, **3D** y **4D**, cada una con un icono. Pasa el cursor por una cara (o mantenla pulsada en una pantalla táctil) para ver su nombre y toca la que quieras. Arrastra para girar la figura y traer otras caras al frente.
+Después de **ENTER** se abre el selector de dimensión: una figura que gira despacio y cuyas caras son **2D**, **3D**, **4D**, **5D** y **6D**, cada una con un icono. Pasa el cursor por una cara (o mantenla pulsada en una pantalla táctil) para ver su nombre y toca la que quieras. Arrastra para girar la figura y traer otras caras al frente.
 
 Puedes cambiar más tarde desde **Menú → Change Dimension**, o desde el **Wizard** (arriba a la izquierda), que muestra todas las redes de cada dimensión con sus piezas como estructuras de alambre giratorias.
 
@@ -92,10 +92,43 @@ Ajustes también tiene una **Vista de sección**: elige un eje, arrastra el desl
 
 Aparece un panel 4D en la parte inferior de la pantalla.
 
-- **Slice / Projection** cambia cómo ves el 4D. **Slice** (por defecto) muestra la sección 3D a la profundidad actual. **Projection** muestra celdas 4D completas como sombras; toca una cara de una sombra para construir a través de ella. En Projection también puedes alternar entre **Parallel** (paralela) y **Perspective** (perspectiva).
-- **El deslizador** hace lo que indica el botón que tiene encima: **W-depth** mueve el corte a través de la cuarta dimensión, y **XW**, **YW** y **ZW** lo giran hacia la cuarta dimensión. Se ajusta en posiciones útiles. La marcada **FCC** es el mundo RD 3D normal, y la marcada **Pyrochlore** es el mundo Pyrochlore 3D.
-- **Reset 4D** devuelve todo a la posición inicial.
-- **Info** abre un panel que muestra el mundo y la pieza que colocas, lo que has construido, dónde está el corte (W-depth o Projection), los ángulos de giro XW/YW/ZW y las coordenadas 4D del centro de la última celda que tocaste o colocaste.
+- **Corte / Proyección** cambia cómo ves el 4D. **Corte** (por defecto) muestra la sección 3D a la profundidad actual. **Proyección** muestra celdas 4D completas como sombras; toca una cara de una sombra para construir a través de ella. En Proyección también puedes alternar entre **Paralela** y **Perspectiva**.
+- **El deslizador** hace lo que indica el botón que tiene encima: **Profundidad W** mueve el corte a través de la cuarta dimensión, y **XW**, **YW** y **ZW** lo giran hacia la cuarta dimensión. Se ajusta en posiciones útiles. La marcada **FCC** es el mundo RD 3D normal, y la marcada **Pyrochlore** es el mundo Pyrochlore 3D.
+- **Restablecer 4D** devuelve todo a la posición inicial.
+- **Info** abre un panel que muestra el mundo y la pieza que colocas, lo que has construido, dónde está el corte (Profundidad W o Proyección), los ángulos de giro XW/YW/ZW y las coordenadas 4D del centro de la última celda que tocaste o colocaste.
+
+## Pasar a 5D y 6D
+
+5D y 6D son **cuasicristales**: una red cúbica de cinco o seis dimensiones, cortada a través del espacio 3D. Las piezas llenan el espacio sin huecos, pero el patrón nunca se repite.
+
+- **6D** es el cuasicristal icosaédrico. Sus piezas son dos romboedros áureos: **prolate** (alargado) y **oblate** (achatado).
+- **5D** es el cuasicristal decagonal: capas del teselado de Penrose, hechas de prismas rómbicos **thick** (gruesos) y **thin** (finos).
+
+1. Elige **5D** o **6D** en el selector de dimensión, el Wizard o **Menú → Change Dimension**.
+2. Toca el contorno cian para colocar la primera pieza y luego toca una cara para añadir la pieza vecina. En 5D, las caras de arriba y de abajo añaden una capa encima o debajo.
+
+Tú no eliges la forma: el teselado decide qué pieza va en cada hueco.
+
+Aparece un panel en la parte inferior de la pantalla.
+
+- **El deslizador** hace lo que indica el botón que tiene encima. **Fasón 1**, **Fasón 2** y **Fasón 3** (solo en 6D) desplazan el corte de lado a través de las dimensiones ocultas: las piezas cambian, y unas salen del corte mientras otras entran. Las piezas que el corte oculta no se borran; vuelve atrás y reaparecen. **Aproximante** recorre cristales periódicos (1/1, 2/1, 3/2, 5/3, 8/5 …) cada vez más cercanos al cuasicristal verdadero, **τ**, en el extremo derecho.
+- **Construir / Ventana** cambia a la **vista de Ventana**, que muestra las dimensiones ocultas. La ventana es un triacontaedro rómbico en 6D y un conjunto de pentágonos en 5D. Cada vértice de tus piezas es un punto: blanco dentro de la ventana (el vértice está en el corte) y rojo fuera. Mueve un deslizador de fasón y verás cómo los puntos cruzan el borde de la ventana mientras las piezas aparecen y desaparecen.
+- **Restablecer 5D** / **Restablecer 6D** devuelve el deslizador al inicio: fasón 0 en τ.
+- **Info** muestra el mundo, lo que has construido, cuántas piezas están en el corte y cuántas oculta, los ajustes de fasón y aproximante y, en la vista de Ventana, cuántos vértices quedan dentro. También lista lo que has invocado: toca un elemento para volver a sus ajustes.
+
+**Lattice View** muestra como fantasmas el teselado de alrededor, un paso más allá, y cambia mientras deslizas un fasón. **World View** funciona como en 3D.
+
+### El Catálogo
+
+En 5D y 6D, el botón de abajo a la izquierda abre el **Catálogo** (las tarjetas 5D y 6D del Wizard también lo abren). Tiene tres tipos de elementos:
+
+- **Zonoedros:** formas hechas con las propias piezas del teselado, desde un solo romboedro hasta el triacontaedro rómbico, y en 5D prismas rómbicos, hexagonales, octogonales y decagonales.
+- **Politopos:** las sombras de politopos de dimensión superior, como el 6-ortoplex, cuya sombra es un icosaedro. Una sombra queda sobre el teselado sin bloquear piezas, y sus vértices se iluminan donde están en el corte. Mantén pulsada una para quitarla.
+- **Estrellas de vértice:** todas las formas en que las piezas se encuentran en un vértice (7 en 5D, 24 en 6D), también con uno o dos anillos de piezas alrededor. Toca un encabezado para abrir su lista.
+
+Cada elemento tiene un número de serie. Escríbelo en la casilla y toca **Invocar** para ir directamente a él.
+
+Al elegir un elemento, aparece un **contorno dorado** donde realmente se da en tu cuasicristal. Toca tu construcción para llevar el contorno al sitio más cercano, y toca el contorno para colocarlo como piezas normales. Si el elemento pertenece a otro aproximante, el deslizador se desplaza allí primero. **Cancelar invocación** lo detiene. Un **Undo** lo deshace y devuelve el deslizador a donde estaba.
 
 ## Guarda tu trabajo
 
@@ -103,7 +136,7 @@ Tu mundo se guarda automáticamente en este navegador, en todas las dimensiones,
 
 En **Ajustes**:
 
-- **Exportar Mundo** guarda todo (cada red 3D, tus baldosas 2D y tu construcción 4D) en un solo archivo. Úsalo como copia de seguridad o para llevar tu mundo a otro dispositivo.
+- **Exportar Mundo** guarda todo (cada red 3D, tus baldosas 2D y tus construcciones 4D, 5D y 6D) en un solo archivo. Úsalo como copia de seguridad o para llevar tu mundo a otro dispositivo.
 - **Importar Mundo** abre un archivo exportado. **Undo** deshace una importación.
 - **Mundo Nuevo** empieza de nuevo con un mundo vacío. **Clear World** (⊘) hace lo mismo desde la rueda de la esquina. Undo puede recuperarlo.
 
@@ -153,7 +186,7 @@ El menú es un dodecaedro rómbico. Cada cara es una sección: toca una cara par
 | Home | Piece, Color, Change Dimension |
 | Piece | RD family, Cube, Pyramid, TO, Flattened Octahedron, Disphenoid, CO, Octahedron |
 | RD family | RD, Hemi RD, Hourglass, RD Quarter, ED, Hex Prism, Rhombohedra, Pyrochlore |
-| Change Dimension | 2D, 3D, 4D |
+| Change Dimension | 2D, 3D, 4D, 5D, 6D |
 
 ## Ajustes
 

@@ -2,7 +2,7 @@
 
 Rhombiverse et son jumeau, [Polyhedraverse](https://polyhedraverse.vercel.app), sont deux façons de regarder la même géométrie. Rhombiverse est le **paysage** : les réseaux eux-mêmes, qui s'étendent dans toutes les directions. Polyhedraverse est la **galerie de portraits** : les formes qui habitent ces réseaux, une à la fois, vues de près.
 
-Ici, chaque pièce remplit parfaitement l'espace sur un vrai réseau cristallin : on ne peut donc poser une pièce que là où le réseau a de la place pour elle. Touchez pour ajouter une pièce, appuyez longuement pour en retirer une, et regardez ce que vous avez construit sous différentes vues, en 2D, 3D ou 4D.
+Ici, chaque pièce remplit parfaitement l'espace sur un vrai réseau cristallin : on ne peut donc poser une pièce que là où le réseau a de la place pour elle. Touchez pour ajouter une pièce, appuyez longuement pour en retirer une, et regardez ce que vous avez construit sous différentes vues, de la 2D à la 6D.
 
 La première partie de ce guide présente les tâches courantes. La seconde liste toutes les commandes.
 
@@ -12,7 +12,7 @@ Les noms des boutons sont écrits tels qu'ils apparaissent dans l'application (c
 
 ### Choisir une dimension
 
-Après **ENTER**, le sélecteur de dimension s'ouvre : une forme qui tourne lentement et dont les faces sont **2D**, **3D** et **4D**, chacune avec une icône. Survolez une face (ou appuyez longuement dessus sur un écran tactile) pour voir son nom, puis touchez celle que vous voulez. Faites glisser pour tourner la forme et amener d'autres faces devant.
+Après **ENTER**, le sélecteur de dimension s'ouvre : une forme qui tourne lentement et dont les faces sont **2D**, **3D**, **4D**, **5D** et **6D**, chacune avec une icône. Survolez une face (ou appuyez longuement dessus sur un écran tactile) pour voir son nom, puis touchez celle que vous voulez. Faites glisser pour tourner la forme et amener d'autres faces devant.
 
 Vous pourrez changer plus tard depuis **Menu → Change Dimension**, ou depuis le **Wizard** (en haut à gauche), qui présente tous les réseaux de chaque dimension avec leurs pièces en fil de fer qui tournent.
 
@@ -92,10 +92,43 @@ Paramètres propose aussi une **Vue en coupe** : choisissez un axe, faites gliss
 
 Un panneau 4D apparaît en bas de l'écran.
 
-- **Slice / Projection** change votre façon de voir la 4D. **Slice** (par défaut) montre la coupe 3D à la profondeur actuelle. **Projection** montre des cellules 4D entières comme des ombres ; touchez la face d'une ombre pour construire au travers. En Projection, vous pouvez aussi basculer entre **Parallel** (parallèle) et **Perspective**.
-- **Le curseur** fait ce qu'indique le bouton au-dessus : **W-depth** déplace la coupe à travers la quatrième dimension, et **XW**, **YW** et **ZW** la font tourner vers la quatrième dimension. Il s'enclenche à des positions utiles. Celle marquée **FCC** est le monde RD 3D ordinaire, et celle marquée **Pyrochlore** est le monde Pyrochlore 3D.
-- **Reset 4D** remet tout dans la position de départ.
-- **Info** ouvre un panneau qui indique le monde et la pièce que vous posez, ce que vous avez construit, où se trouve la coupe (W-depth, ou Projection), les angles de rotation XW/YW/ZW, et les coordonnées 4D du centre de la dernière cellule touchée ou posée.
+- **Coupe / Projection** change votre façon de voir la 4D. **Coupe** (par défaut) montre la coupe 3D à la profondeur actuelle. **Projection** montre des cellules 4D entières comme des ombres ; touchez la face d'une ombre pour construire au travers. En Projection, vous pouvez aussi basculer entre **Parallèle** et **Perspective**.
+- **Le curseur** fait ce qu'indique le bouton au-dessus : **Profondeur W** déplace la coupe à travers la quatrième dimension, et **XW**, **YW** et **ZW** la font tourner vers la quatrième dimension. Il s'enclenche à des positions utiles. Celle marquée **FCC** est le monde RD 3D ordinaire, et celle marquée **Pyrochlore** est le monde Pyrochlore 3D.
+- **Réinitialiser 4D** remet tout dans la position de départ.
+- **Infos** ouvre un panneau qui indique le monde et la pièce que vous posez, ce que vous avez construit, où se trouve la coupe (Profondeur W, ou Projection), les angles de rotation XW/YW/ZW, et les coordonnées 4D du centre de la dernière cellule touchée ou posée.
+
+## Passer en 5D et 6D
+
+La 5D et la 6D sont des **quasicristaux** : un réseau cubique à cinq ou six dimensions, coupé à travers l'espace 3D. Les pièces remplissent l'espace sans vide, mais le motif ne se répète jamais.
+
+- **6D** est le quasicristal icosaédrique. Ses pièces sont deux rhomboèdres dorés : **prolate** (allongé) et **oblate** (aplati).
+- **5D** est le quasicristal décagonal : des couches du pavage de Penrose, faites de prismes losanges **thick** (épais) et **thin** (fins).
+
+1. Choisissez **5D** ou **6D** dans le sélecteur de dimension, le Wizard ou **Menu → Change Dimension**.
+2. Touchez le contour cyan pour poser la première pièce, puis touchez une face pour ajouter la pièce voisine. En 5D, les faces du haut et du bas ajoutent une couche au-dessus ou en dessous.
+
+Vous ne choisissez pas la forme : c'est le pavage qui décide quelle pièce va dans chaque emplacement.
+
+Un panneau apparaît en bas de l'écran.
+
+- **Le curseur** fait ce qu'indique le bouton au-dessus. **Phason 1**, **Phason 2** et **Phason 3** (6D seulement) déplacent la coupe latéralement à travers les dimensions cachées : des pièces basculent, certaines quittent la coupe et d'autres y entrent. Les pièces masquées par la coupe ne sont pas supprimées ; revenez en arrière et elles réapparaissent. **Approximant** parcourt des cristaux périodiques (1/1, 2/1, 3/2, 5/3, 8/5 …) de plus en plus proches du vrai quasicristal, **τ**, tout à droite.
+- **Construire / Fenêtre** passe à la **vue Fenêtre**, qui montre les dimensions cachées. La fenêtre est un triacontaèdre rhombique en 6D et un ensemble de pentagones en 5D. Chaque sommet de vos pièces est un point : blanc dans la fenêtre (le sommet est dans la coupe), rouge dehors. Déplacez un curseur de phason et regardez les points franchir le bord de la fenêtre à mesure que des pièces apparaissent et disparaissent.
+- **Réinitialiser 5D** / **Réinitialiser 6D** remet le curseur au départ : phason 0 à τ.
+- **Infos** indique le monde, ce que vous avez construit, combien de pièces sont dans la coupe et combien elle en masque, les réglages de phason et d'approximant et, en vue Fenêtre, combien de sommets sont à l'intérieur. Les éléments invoqués y sont aussi listés : touchez-en un pour revenir à ses réglages.
+
+**Lattice View** montre en fantôme le pavage alentour, un cran plus loin, et il bascule quand vous déplacez un phason. **World View** fonctionne comme en 3D.
+
+### Le Catalogue
+
+En 5D et 6D, le bouton en bas à gauche ouvre le **Catalogue** (les cartes 5D et 6D du Wizard l'ouvrent aussi). Il propose trois sortes d'éléments :
+
+- **Zonoèdres :** des formes faites des propres pièces du pavage, d'un seul rhomboèdre jusqu'au triacontaèdre rhombique, et en 5D des prismes losange, hexagonal, octogonal et décagonal.
+- **Polytopes :** les ombres de polytopes de dimension supérieure, comme le 6-orthoplexe, dont l'ombre est un icosaèdre. Une ombre se pose sur le pavage sans bloquer les pièces, et ses sommets s'allument là où ils sont dans la coupe. Appuyez longuement sur une ombre pour la retirer.
+- **Étoiles de sommet :** toutes les façons dont les pièces se rejoignent en un sommet (7 en 5D, 24 en 6D), aussi avec un ou deux anneaux de pièces autour. Touchez un titre pour ouvrir sa liste.
+
+Chaque élément a un numéro de série. Saisissez-le dans la case et touchez **Invoquer** pour y aller directement.
+
+Quand vous choisissez un élément, un **contour doré** apparaît là où il se trouve vraiment dans votre quasicristal. Touchez votre construction pour amener le contour à l'endroit le plus proche, puis touchez le contour pour le poser en pièces ordinaires. Si l'élément appartient à un autre approximant, le curseur y glisse d'abord. **Annuler l'invocation** arrête. Un **Undo** l'annule et ramène le curseur là où il était.
 
 ## Enregistrer votre travail
 
@@ -103,7 +136,7 @@ Votre monde est enregistré automatiquement dans ce navigateur, pour toutes les 
 
 Dans **Paramètres** :
 
-- **Exporter le Monde** enregistre tout (chaque réseau 3D, vos carreaux 2D et votre construction 4D) dans un seul fichier. Utilisez-le pour faire une sauvegarde ou transférer votre monde sur un autre appareil.
+- **Exporter le Monde** enregistre tout (chaque réseau 3D, vos carreaux 2D et vos constructions 4D, 5D et 6D) dans un seul fichier. Utilisez-le pour faire une sauvegarde ou transférer votre monde sur un autre appareil.
 - **Importer un Monde** ouvre un fichier exporté. **Undo** annule une importation.
 - **Nouveau Monde** recommence avec un monde vide. **Clear World** (⊘) fait la même chose depuis la roue du coin. Undo peut le rétablir.
 
@@ -153,7 +186,7 @@ Le menu est un dodécaèdre rhombique. Chaque face est une section : touchez une
 | Home | Piece, Color, Change Dimension |
 | Piece | RD family, Cube, Pyramid, TO, Flattened Octahedron, Disphenoid, CO, Octahedron |
 | RD family | RD, Hemi RD, Hourglass, RD Quarter, ED, Hex Prism, Rhombohedra, Pyrochlore |
-| Change Dimension | 2D, 3D, 4D |
+| Change Dimension | 2D, 3D, 4D, 5D, 6D |
 
 ## Paramètres
 

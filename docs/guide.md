@@ -2,7 +2,7 @@
 
 Rhombiverse and its twin, [Polyhedraverse](https://polyhedraverse.vercel.app), are two ways of looking at the same geometry. Rhombiverse is the **landscape**: the lattices themselves, stretching out in every direction. Polyhedraverse is the **portrait gallery**: the shapes that live in those lattices, one at a time, up close.
 
-Here, every piece fills space perfectly on a real crystal lattice, so you can only put a piece where the lattice has room for it. Tap to add a piece, long-press to remove one, and look at what you've built in different views, in 2D, 3D or 4D.
+Here, every piece fills space perfectly on a real crystal lattice, so you can only put a piece where the lattice has room for it. Tap to add a piece, long-press to remove one, and look at what you've built in different views, from 2D up to 6D.
 
 The first part of this guide walks through common tasks. The second part lists every control.
 
@@ -10,7 +10,7 @@ The first part of this guide walks through common tasks. The second part lists e
 
 ### Pick a dimension
 
-After **ENTER**, the dimension picker opens: a slowly turning shape whose faces are **2D**, **3D** and **4D**, each marked with an icon. Hover over a face (or press and hold it on a touchscreen) to see its name, then tap the one you want. Drag to turn the shape and bring other faces round.
+After **ENTER**, the dimension picker opens: a slowly turning shape whose faces are **2D**, **3D**, **4D**, **5D** and **6D**, each marked with an icon. Hover over a face (or press and hold it on a touchscreen) to see its name, then tap the one you want. Drag to turn the shape and bring other faces round.
 
 You can switch later from **Menu → Change Dimension**, or from the **Wizard** (top left), which lists every lattice in each dimension with its pieces as rotating wireframes.
 
@@ -95,13 +95,46 @@ A 4D panel appears at the bottom of the screen.
 - **Reset 4D** puts everything back to the starting position.
 - **Info** opens a panel showing the world and piece you're placing, what you've built, where the slice is (W-depth, or Projection), the XW/YW/ZW turn angles, and the 4D centre coordinates of the last cell you tapped or placed.
 
+## Going into 5D and 6D
+
+5D and 6D are **quasicrystals**: a cube lattice in five or six dimensions, sliced through 3D space. The pieces fill space with no gaps, but the pattern never repeats.
+
+- **6D** is the icosahedral quasicrystal. Its pieces are two golden rhombohedra: **prolate** (tall) and **oblate** (flat).
+- **5D** is the decagonal quasicrystal: layers of the Penrose tiling, made of **thick** and **thin** rhombus prisms.
+
+1. Choose **5D** or **6D** in the dimension picker, the Wizard, or **Menu → Change Dimension**.
+2. Tap the cyan outline to place the first piece, then tap a face to add the neighbouring piece. In 5D, the top and bottom faces add a layer above or below.
+
+You don't choose the shape: the tiling decides which piece goes in each slot.
+
+A panel appears at the bottom of the screen.
+
+- **The slider** does what the button above it says. **Phason 1**, **Phason 2** and **Phason 3** (6D only) move the slice sideways through the hidden dimensions: pieces flip, and some leave the slice while others come in. Pieces hidden by the slice aren't deleted; slide back and they return. **Approximant** clicks through periodic crystals (1/1, 2/1, 3/2, 5/3, 8/5 …) that get closer and closer to the true quasicrystal, **τ**, at the right-hand end.
+- **Build / Window** switches to **Window View**, which shows the hidden dimensions. The window is a rhombic triacontahedron in 6D and a set of pentagons in 5D. Each corner of your pieces is a point: white inside the window (the corner is in the slice), red outside. Move a phason slider and watch points cross the window's edge as pieces appear and disappear.
+- **Reset 5D** / **Reset 6D** puts the slider back to the start: phason 0 at τ.
+- **Info** shows the world, what you've built, how many pieces are in the slice and how many it hides, the phason and approximant settings, and in Window View how many corners are inside. Items you've summoned are listed too: tap one to slide back to its settings.
+
+**Lattice View** shows the surrounding tiling one step out as ghosts, and they flip as you slide a phason. **World View** works as in 3D.
+
+### The Catalogue
+
+In 5D and 6D the bottom-left button opens the **Catalogue** (the Wizard's 5D and 6D cards open it too). It has three kinds of item:
+
+- **Zonohedra:** shapes made of the tiling's own pieces, from a single rhombohedron up to the rhombic triacontahedron, and in 5D rhombus, hexagon, octagon and decagon prisms.
+- **Polytopes:** the shadows of higher-dimensional polytopes, such as the 6-orthoplex, whose shadow is an icosahedron. A shadow lies over the tiling without blocking pieces, and its corners light up where they are in the slice. Long-press one to remove it.
+- **Vertex stars:** every way the pieces meet at a corner (7 in 5D, 24 in 6D), also with one or two rings of the pieces around them. Tap a heading to open its list.
+
+Every item has a serial number. Type one in the box and tap **Summon** to go straight to it.
+
+When you pick an item, a **gold outline** appears where it really occurs in your quasicrystal. Tap your build to move the outline to the nearest spot there, and tap the outline to place it as ordinary pieces. If the item belongs to a different approximant, the slider slides there first. **Cancel summon** stops. One **Undo** takes it back and slides the slider back to where it was.
+
 ## Saving your work
 
 Your World saves automatically in this browser, every dimension, after each change. It comes back when you reopen the site on the same device and browser.
 
 In **Settings**:
 
-- **Export World** saves everything, every 3D lattice, your 2D tiles and your 4D build, to one file. Use it to keep a backup or move your World to another device.
+- **Export World** saves everything, every 3D lattice, your 2D tiles and your 4D, 5D and 6D builds, to one file. Use it to keep a backup or move your World to another device.
 - **Import World** opens an exported file. **Undo** takes an import back.
 - **New World** starts again with an empty world. **Clear World** (⊘) does the same from the corner wheel. Undo can bring it back.
 
@@ -151,7 +184,7 @@ The menu is a rhombic dodecahedron. Each face is a section: tap a face to open i
 | Home | Piece, Colour, Change Dimension |
 | Piece | RD family, Cube, Pyramid, TO, Flattened Octahedron, Disphenoid, CO, Octahedron |
 | RD family | RD, Hemi RD, Hourglass, RD Quarter, ED, Hex Prism, Rhombohedra, Pyrochlore |
-| Change Dimension | 2D, 3D, 4D |
+| Change Dimension | 2D, 3D, 4D, 5D, 6D |
 
 ## Settings
 

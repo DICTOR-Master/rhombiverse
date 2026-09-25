@@ -26,6 +26,8 @@ import {
   cellAcrossFacet, throughGap, cornerPartner, dedupeSections, A4_FIRST, A4_REST_W,
 } from '../geometry-extensions/lattice-4d.js';
 import { createGearedSlider } from './geared-slider.js';
+import { t } from './i18n.js';
+import { getSettings, onSettingsChange } from './settings.js';
 
 // One store for every 4D kind (the worlds share one frame and coexist,
 // like 3D's); the key name predates the tesseract joining it.
@@ -98,16 +100,17 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
       if (c.removed) continue;
       counts.set(c.kind, (counts.get(c.kind) ?? 0) + 1);
     }
-    const built = counts.size ? [...counts].map(([k, n]) => `${n} ${KINDS_4D[k].label}`).join(', ') : 'nothing yet';
+    const lang = getSettings().language;
+    const built = counts.size ? [...counts].map(([k, n]) => `${n} ${KINDS_4D[k].label}`).join(', ') : t('hyper.info.nothingYet', lang);
     const wLabel = Math.abs(view.w) < 1e-9 && !isA4(kind) ? ' (FCC)' : Math.abs(view.w - A4_REST_W) < 1e-9 && isA4(kind) ? ' (Pyrochlore)' : '';
     const deg = (a) => `${fmt(a / DEG)}°`;
     const rows = [
-      ['World', WORLD_NAMES[kind] ?? 'Hyper-pyrochlore (4D Kagome)'],
-      ['Placing', KINDS_4D[kind].label],
-      ['Built', built],
-      ['View', view.mode === 'slice' ? `Slice at W-depth ${fmt(view.w)}${wLabel}` : `Projection, ${view.perspective ? 'perspective' : 'parallel'}`],
-      ['Turn', `XW ${deg(view.angles.xw)} · YW ${deg(view.angles.yw)} · ZW ${deg(view.angles.zw)}`],
-      ['Last cell', lastCell ? `${KINDS_4D[lastCell.kind].label} at (${lastCell.c.map(fmt).join(', ')})` : 'tap or place a cell'],
+      [t('hyper.info.world', lang), WORLD_NAMES[kind] ?? 'Hyper-pyrochlore (4D Kagome)'],
+      [t('4d.info.placing', lang), KINDS_4D[kind].label],
+      [t('hyper.info.built', lang), built],
+      [t('4d.info.view', lang), view.mode === 'slice' ? t('4d.info.sliceAt', lang, { w: fmt(view.w) }) + wLabel : t(`4d.info.projection.${view.perspective ? 'perspective' : 'parallel'}`, lang)],
+      [t('4d.info.turn', lang), `XW ${deg(view.angles.xw)} · YW ${deg(view.angles.yw)} · ZW ${deg(view.angles.zw)}`],
+      [t('4d.info.lastCell', lang), lastCell ? t('4d.info.cellAt', lang, { piece: KINDS_4D[lastCell.kind].label, coords: lastCell.c.map(fmt).join(', ') }) : t('4d.info.tapCell', lang)],
     ];
     info.innerHTML = rows.map(([k, v]) => `<div><span class="w4d-info-k">${k}</span> ${v}</div>`).join('');
   }
@@ -433,14 +436,14 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
   panel.id = 'world4d-panel';
   panel.innerHTML = `
     <div class="w4d-row w4d-controls"></div>
-    <div class="w4d-track" role="slider" aria-label="4D slider"><div class="w4d-ticks"></div><div class="w4d-thumb"></div></div>
+    <div class="w4d-track" role="slider"><div class="w4d-ticks"></div><div class="w4d-thumb"></div></div>
     <div class="w4d-row w4d-options"></div>`;
   document.body.appendChild(panel);
   const controlsRow = panel.querySelector('.w4d-controls');
   const optionsRow = panel.querySelector('.w4d-options');
   const track = panel.querySelector('.w4d-track');
 
-  const CONTROL_LABELS = { w: 'W-depth', xw: 'XW', yw: 'YW', zw: 'ZW' };
+  const controlLabel = (c, lang) => (c === 'w' ? t('4d.control.w', lang) : c.toUpperCase());
 
   const controlsShown = () => (view.mode === 'slice' ? ['w', 'xw', 'yw', 'zw'] : ['xw', 'yw', 'zw']);
   const isAngle = () => view.control !== 'w';
@@ -461,12 +464,14 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     document.body.classList.toggle('world4d-on', active);
     if (!active) return;
     if (!controlsShown().includes(view.control)) view.control = 'xw';
-    controlsRow.innerHTML = controlsShown().map((c) => `<button type="button" data-control="${c}" class="${c === view.control ? 'active' : ''}">${CONTROL_LABELS[c]}</button>`).join('');
+    const lang = getSettings().language;
+    track.setAttribute('aria-label', t('hyper.slider', lang, { dim: '4D' }));
+    controlsRow.innerHTML = controlsShown().map((c) => `<button type="button" data-control="${c}" class="${c === view.control ? 'active' : ''}">${controlLabel(c, lang)}</button>`).join('');
     optionsRow.innerHTML = [
-      `<button type="button" data-opt="mode">${view.mode === 'slice' ? 'Slice' : 'Projection'}</button>`,
-      view.mode === 'projection' ? `<button type="button" data-opt="perspective">${view.perspective ? 'Perspective' : 'Parallel'}</button>` : '',
-      '<button type="button" data-opt="reset">Reset 4D</button>',
-      `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">Info</button>`,
+      `<button type="button" data-opt="mode">${t(`4d.mode.${view.mode}`, lang)}</button>`,
+      view.mode === 'projection' ? `<button type="button" data-opt="perspective">${t(view.perspective ? '4d.perspective' : '4d.parallel', lang)}</button>` : '',
+      `<button type="button" data-opt="reset">${t('hyper.reset', lang, { dim: '4D' })}</button>`,
+      `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">${t('hyper.info', lang)}</button>`,
     ].join('');
     slider.render();
   }
@@ -487,7 +492,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     }
     if (b.dataset.opt === 'mode') {
       view.mode = view.mode === 'slice' ? 'projection' : 'slice';
-      showHudPrompt(view.mode === 'slice' ? 'Slice: the 3D cross-section at the current w-depth.' : 'Projection: whole 4D cells as shadows -- tap a facet shadow to build across it.', 3500);
+      showHudPrompt(t(`4d.prompt.${view.mode}`, getSettings().language), 3500);
     } else if (b.dataset.opt === 'perspective') {
       view.perspective = !view.perspective;
     } else if (b.dataset.opt === 'reset') {
@@ -508,6 +513,9 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     snap: () => (isAngle() ? ANGLE_SNAP : W_SNAP),
     onEnd: save,
   });
+  // A language change redraws the panel and Info (not on every setting).
+  let shownLang = getSettings().language;
+  onSettingsChange((st) => { if (st.language !== shownLang) { shownLang = st.language; renderPanel(); renderInfo(); } });
 
   return {
     group,

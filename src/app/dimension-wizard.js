@@ -49,6 +49,8 @@ import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } fro
 import { VALID_TRIPLES, unitTileVertices } from '../geometry-extensions/growth.js';
 import { PRISM_HEIGHT } from '../geometry-extensions/quasicrystal.js';
 import { loadCatalogue, findBySerial, pieceCount } from '../geometry-extensions/quasicrystal-catalogue.js';
+import { t, tn } from './i18n.js';
+import { getSettings } from './settings.js';
 
 const CSS = `
 .dim-wizard-overlay {
@@ -446,7 +448,8 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
   const openSections = new Set(['zonohedron']);
   async function showCatalogue(dim) {
     resetPreviews();
-    titleEl.textContent = `${dim} Catalogue`;
+    const L = getSettings().language;
+    titleEl.textContent = t('cat.title', L, { dim });
     const entries = await loadCatalogue();
     const tier = dim.toLowerCase();
     const k = tier === '6d' ? 3 : 2;
@@ -455,8 +458,8 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
         <button type="button" class="dim-wizard-card-btn" data-action="build">
           ${previewSlot(DIMENSIONS.find((x) => x.id === dim).preview)}
           <span class="dim-wizard-row-text">
-            <span class="dim-wizard-label">Build freely</span>
-            <span class="dim-wizard-desc">Start from one piece and add them yourself.</span>
+            <span class="dim-wizard-label">${t('cat.buildFreely', L)}</span>
+            <span class="dim-wizard-desc">${t('cat.buildFreelyDesc', L)}</span>
           </span>
         </button>`;
     const row = (x) => {
@@ -466,17 +469,17 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
           ${previewSlot(() => pieceEdges(`summon:${x.serial}`))}
           <span class="dim-wizard-row-text">
             <span class="dim-wizard-label">${x.name}</span>
-            <span class="dim-wizard-desc">#${x.serial} · ${n} piece${n === 1 ? '' : 's'}</span>
+            <span class="dim-wizard-desc">#${x.serial} · ${tn('cat.pieces', L, n)}</span>
           </span>
         </button>`;
     };
     const sections = [
-      { id: 'zonohedron', label: 'Zonohedra', desc: 'Shapes built from the tiling’s own pieces, found wherever they occur.', items: mine.filter((x) => x.kind === 'zonohedron') },
-      { id: 'polytope', label: 'Polytopes', desc: 'Shadows of higher-dimensional polytopes with corners on the lattice, placed at a vertex. They lie over the tiling without blocking pieces; corners in the slice light up.', items: mine.filter((x) => x.kind === 'polytope') },
+      { id: 'zonohedron', label: t('cat.zonohedra', L), desc: t('cat.zonohedraDesc', L), items: mine.filter((x) => x.kind === 'zonohedron') },
+      { id: 'polytope', label: t('cat.polytopes', L), desc: t('cat.polytopesDesc', L), items: mine.filter((x) => x.kind === 'polytope') },
       ...[1, 2, 3].map((r) => ({
         id: `patch${r}`,
-        label: r === 1 ? 'Vertex stars' : `Vertex stars, ${r} rings`,
-        desc: r === 1 ? 'Every way the pieces meet at a corner, most common first.' : `Each star with its ${r === 2 ? 'next ring' : 'next two rings'} of pieces, as it most often occurs.`,
+        label: r === 1 ? t('cat.stars', L) : t('cat.starsRings', L, { n: r }),
+        desc: t(r === 1 ? 'cat.starsDesc' : `cat.stars${r}Desc`, L),
         items: mine.filter((x) => x.kind === 'patch' && x.rings === r),
       })),
     ].filter((sec) => sec.items.length);
@@ -489,11 +492,11 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
         </button>${open ? sec.items.map(row).join('') : ''}`;
     }).join('');
     bodyEl.innerHTML = `
-      <button type="button" class="dim-wizard-back">← Back</button>
-      <div class="dim-wizard-sub">${dim}: build freely, or summon an item. It lands where it really occurs in the tiling, as ordinary pieces.</div>
+      <button type="button" class="dim-wizard-back">${t('cat.back', L)}</button>
+      <div class="dim-wizard-sub">${t('cat.sub', L, { dim })}</div>
       <div class="dim-wizard-serial-row">
-        <input type="number" inputmode="numeric" min="1" placeholder="Serial number" aria-label="Serial number">
-        <button type="button" class="dim-wizard-serial-go">Summon</button>
+        <input type="number" inputmode="numeric" min="1" placeholder="${t('cat.serial', L)}" aria-label="${t('cat.serial', L)}">
+        <button type="button" class="dim-wizard-serial-go">${t('cat.summon', L)}</button>
       </div>
       <div class="dim-wizard-serial-msg" aria-live="polite"></div>
       <div class="dim-wizard-grid">
@@ -521,7 +524,7 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
     const go = () => {
       const serial = Number(input.value);
       const entry = Number.isInteger(serial) ? findBySerial(entries, serial) : null;
-      if (!entry) { msg.textContent = input.value ? `No item with serial ${input.value}.` : 'Type a serial number.'; return; }
+      if (!entry) { msg.textContent = input.value ? t('cat.noSerial', L, { serial: input.value }) : t('cat.typeSerial', L); return; }
       close();
       onSelectFamily(entry.tier.toUpperCase(), `summon:${entry.serial}`);
     };

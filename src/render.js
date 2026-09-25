@@ -4376,6 +4376,7 @@ async function init() {
   // "families coexist, switch via the existing Piece-picker pattern"
   // principle the wizard plan already settled on for 3D's FCC/BCC. No
   // gating needed yet -- 3D is the only real dimension so far.
+  onSettingsChange(() => updateQuickSelect()); // the Catalogue title follows the language
   function updateQuickSelect() {
     updateRhomboAttachPanel();
     // The "6 pyramids on a cube" hint only applies to RD/Cube/Pyramid --
@@ -4393,7 +4394,7 @@ async function init() {
       // report 2026-08-29 ("the picker symbol at bottom doesnt change").
       // Checked first, ahead of the plain piece-type lookup below.
       if (qcWorlds.has(activeDimension)) {
-        quickShapeEl.innerHTML = iconFrame(MARKS.pieceRhombohedron, { title: 'Catalogue' });
+        quickShapeEl.innerHTML = iconFrame(MARKS.pieceRhombohedron, { title: t('cat.button', getSettings().language) });
       } else if (currentMode === 'cubocta') {
         quickShapeEl.innerHTML = iconFrame(MARKS.cuboctahedron, { title: 'Shape' });
       } else {
