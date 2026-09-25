@@ -165,7 +165,7 @@ El menú es un dodecaedro rómbico. Cada cara es una sección: toca una cara par
 | Calidad gráfica | Baja, Media o Alta |
 | Mostrar medidor de FPS | Contador de fotogramas por segundo |
 | Volumen | Nivel de sonido |
-| Idioma | English, 日本語, Español, Français, 한국어, 中文, Русский |
+| Idioma | English, 日本語, Español, Français, 한국어, 中文, Русский (también con el selector 🌐 de la parte superior de la pantalla de bienvenida y de esta guía) |
 | Asignar color automáticamente según el tipo de pieza | Da a cada tipo de pieza su propio color |
 | Vista de sección, eje, posición, Invertir | Corte a lo largo de un eje |
 | Build Cuboctahedron, Dualize Preview | Modos de construcción especiales |

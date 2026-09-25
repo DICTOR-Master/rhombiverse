@@ -165,7 +165,7 @@ Le menu est un dodécaèdre rhombique. Chaque face est une section : touchez une
 | Qualité graphique | Basse, Moyenne ou Haute |
 | Afficher le compteur de FPS | Compteur d'images par seconde |
 | Volume | Niveau sonore |
-| Langue | English, 日本語, Español, Français, 한국어, 中文, Русский |
+| Langue | English, 日本語, Español, Français, 한국어, 中文, Русский (aussi avec le sélecteur 🌐 en haut de l'écran d'accueil et de ce guide) |
 | Assigner automatiquement la couleur selon le type de pièce | Donne à chaque type de pièce sa propre couleur |
 | Vue en coupe, axe, position, Retourner | Coupe le long d'un axe |
 | Build Cuboctahedron, Dualize Preview | Modes de construction spéciaux |

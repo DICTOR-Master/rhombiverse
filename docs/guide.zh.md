@@ -165,7 +165,7 @@ Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel
 | 画面质量 | 低、中或高 |
 | 显示帧率计 | 帧率计数器 |
 | 音量 | 声音大小 |
-| 语言 | English、日本語、Español、Français、한국어、中文、Русский |
+| 语言 | English、日本語、Español、Français、한국어、中文、Русский（也可以用欢迎界面和本指南顶部的 🌐 选择器） |
 | 根据部件类型自动分配颜色 | 为每种部件指定各自的颜色 |
 | 剖面视图、轴、位置、翻转 | 沿一个轴剖切 |
 | Build Cuboctahedron、Dualize Preview | 特殊搭建模式 |

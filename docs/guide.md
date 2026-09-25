@@ -163,7 +163,7 @@ The menu is a rhombic dodecahedron. Each face is a section: tap a face to open i
 | Graphics quality | Low, Medium or High |
 | Show FPS meter | Frame-rate counter |
 | Volume | Sound level |
-| Language | English, 日本語, Español, Français, 한국어, 中文, Русский |
+| Language | English, 日本語, Español, Français, 한국어, 中文, Русский (also the 🌐 picker at the top of the welcome screen and this guide) |
 | Auto-assign colour by piece type | Gives each kind of piece its own colour |
 | Section view, axis, position, Flip | Cutaway along one axis |
 | Build Cuboctahedron, Dualize Preview | Special build modes |
