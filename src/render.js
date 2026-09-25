@@ -5655,7 +5655,9 @@ async function init() {
       const lattice2dPrimitive = piece?.startsWith('lattice2d:') ? LATTICE_PRIMITIVES.find((p) => `lattice2d:${p.id}` === piece) : null;
       const lattice2dMessages = lattice2dPrimitive && {
         add: `A ${lattice2dPrimitive.label} tile is already there.`,
-        remove: `No ${lattice2dPrimitive.label} tile there to remove -- Remove only clears an actual one, not the RD world around it. Tap directly on one you've placed.`,
+        remove: lattice2dPrimitive.id === 'kagome'
+          ? 'Nothing to remove there -- long-press one of the hexagons; its triangles go with it (a triangle is shared by up to three hexagons, so it can’t be removed on its own).'
+          : `No ${lattice2dPrimitive.label} tile there to remove -- long-press directly on a tile you've placed.`,
       };
       showHudPrompt((lattice2dMessages ?? messages[piece])?.[action] ?? 'Nothing to do there.', 3500);
     },
