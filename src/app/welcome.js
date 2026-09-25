@@ -5,7 +5,7 @@
 // World Systems retirement (see features.js/settings.js); there's only
 // one mode now.
 import { buildRDFaces } from './rhombic-wheel-3d-core.js';
-import { getSettings } from './settings.js';
+import { getSettings, onSettingsChange } from './settings.js';
 import { t } from './i18n.js';
 import { openGuide } from './guide.js';
 import { createLanguagePicker } from './language-picker.js';
@@ -158,13 +158,20 @@ function startLogoSpin(onEnterHit) {
 // spot instead -- the "What's New" changelog panel (src/app/changelog.js)
 // is still the real place for that content, this was always a secondary
 // teaser of it.
+// The overview line with each dimension (2D ... 6D) as a link that opens
+// the Wizard at that dimension. Redrawn here on a language change (not via
+// data-i18n, which would set plain text and drop the links).
+function overviewHtml(lang) {
+  return t('welcome.overview', lang).replace(/\b([2-6]D)\b/g, '<button type="button" class="dim-link" data-dim="$1">$1</button>');
+}
+
 function overlayHtml() {
   const lang = getSettings().language;
   return `
     <div id="welcome-card">
       <div class="welcome-lang"></div>
       <h1>Rhombiverse</h1>
-      <p class="overview" data-i18n="welcome.overview">${t('welcome.overview', lang)}</p>
+      <p class="overview">${overviewHtml(lang)}</p>
       <button type="button" class="how-to-link" id="welcome-how-to" data-i18n-html="welcome.howTo">${t('welcome.howTo', lang)}</button>
       <div class="rhombis-link">
         <img src="./assets/rhombis-favicon-64.png" alt="" width="28" height="28" />
@@ -193,7 +200,13 @@ function init() {
   // Delegated, so it survives overlayHtml() being re-rendered.
   overlay.addEventListener('click', (e) => {
     if (e.target.closest('#welcome-how-to')) openGuide();
+    const dim = e.target.closest('.dim-link')?.dataset.dim;
+    if (dim) {
+      hide();
+      window.dispatchEvent(new CustomEvent('rhombiverse:open-wizard', { detail: dim }));
+    }
   });
+  onSettingsChange((s) => { const p = overlay.querySelector('.overview'); if (p) p.innerHTML = overviewHtml(s.language); });
 
   let stopLogoSpin = () => {};
 

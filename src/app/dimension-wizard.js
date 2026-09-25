@@ -542,6 +542,16 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
     overlay.classList.add('open');
     showCatalogue(dim);
   }
+  // Straight to one dimension's screen (the welcome screen's 2D ... 6D).
+  function openDimension(dim) {
+    overlay.classList.add('open');
+    titleEl.textContent = t('wiz.title', getSettings().language); // the lattice screens keep the list's title
+    if (dim === '2D') showLattice2D();
+    else if (dim === '3D') showLattice3D();
+    else if (dim === '4D') showLattice4D();
+    else if (dim === '5D' || dim === '6D') showCatalogue(dim);
+    else showDimensions();
+  }
 
-  return { open, openCatalogue, close, get isOpen() { return overlay.classList.contains('open'); } };
+  return { open, openCatalogue, openDimension, close, get isOpen() { return overlay.classList.contains('open'); } };
 }

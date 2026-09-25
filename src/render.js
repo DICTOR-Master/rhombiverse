@@ -3698,6 +3698,7 @@ async function init() {
       // dimension-wizard.js's own showLattice2D/showLattice3D now pass
       // the real dimension alongside the action.
       onSelectFamily: (dimension, action) => {
+        dimensionWheel3D.close(); // chosen from the Wizard: the dimension picker is done
         if (qcWorlds.has(dimension)) { enterQuasicrystal(dimension, action); return; }
         activeDimension = dimension;
         applyDimensionVisibility();
@@ -3707,6 +3708,8 @@ async function init() {
       },
     });
     document.getElementById('hud-wizard-cue')?.addEventListener('click', () => dimensionWizard.open());
+    // The welcome screen's 2D, 3D, 4D, 5D & 6D links open the Wizard there.
+    window.addEventListener('rhombiverse:open-wizard', (e) => dimensionWizard.openDimension(e.detail));
     function toggleWheel3D() {
       if (pickers.isAnyPickerOpen()) { pickers.closeAnyPicker(); return; }
       if (wheel3D.isOpen) wheel3D.close();
