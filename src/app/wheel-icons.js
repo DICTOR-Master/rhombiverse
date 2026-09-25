@@ -90,9 +90,12 @@ const FRAME_R = 46; // frame circle/hexagon radius; viewBox is -50..50
 // between them read as a hexagon sliced in half, not a letter. A real,
 // separately-proportioned H (narrower, taller) sized to sit inside the
 // hexagon reads correctly instead.
-const HOME_HEX_R = 28;
-const HOME_H_HALF_W = 14;
-const HOME_H_HALF_H = 16;
+// 2026-09-25 (direct feedback: "two hexagon outlines ... might read
+// clearer with just one"): the inner hexagon is gone -- the H now sits
+// straight in iconFrame's own hexagon, a little larger. Polyhedraverse's
+// wheel uses this same mark for its Home face.
+const HOME_H_HALF_W = 18;
+const HOME_H_HALF_H = 22;
 
 // The frame itself: the universal hexagon outline. `inner` is the
 // concept-specific mark, drawn on top, sharing the same coordinate
@@ -498,15 +501,15 @@ export const MARKS = {
   // actual cog profile instead of a spiky one. Solid fill, evenodd
   // center hole (r=10), perfectly centered on (0,0) by construction.
   lab: `<path d="M20.33,-8.42 L29.54,-5.21 L29.54,5.21 L20.33,8.42 L24.57,17.21 L17.21,24.57 L8.42,20.33 L5.21,29.54 L-5.21,29.54 L-8.42,20.33 L-17.21,24.57 L-24.57,17.21 L-20.33,8.42 L-29.54,5.21 L-29.54,-5.21 L-20.33,-8.42 L-24.57,-17.21 L-17.21,-24.57 L-8.42,-20.33 L-5.21,-29.54 L5.21,-29.54 L8.42,-20.33 L17.21,-24.57 L24.57,-17.21 Z M10,0 A10,10 0 1,0 -10,0 A10,10 0 1,0 10,0 Z" fill="currentColor" fill-rule="evenodd"/>`,
-  // Home: a literal "H" (two uprights + a crossbar, see HOME_HEX_R/
-  // HOME_H_HALF_W/HOME_H_HALF_H above) centered inside an outline
+  // Home: a literal "H" (two uprights + a crossbar, see
+  // HOME_H_HALF_W/HOME_H_HALF_H above) centered in iconFrame's own
   // hexagon -- "H" for Home. Was a plain solid hexagon before; direct
   // user report 2026-08-29 that it read as near-identical to Piece/RD's
   // own solid hexagon (MARKS.pieceRD) fixed by giving Home a real,
   // literal distinguishing mark instead of just varying size/fill.
   // Unlike pieceRD's solid hexagon, Home's is outline (not filled) --
   // the anchor itself rather than a piece sample.
-  home: `<polygon points="${hexPts(HOME_HEX_R)}" ${THIN}/><path d="M-${HOME_H_HALF_W},-${HOME_H_HALF_H} V${HOME_H_HALF_H} M${HOME_H_HALF_W},-${HOME_H_HALF_H} V${HOME_H_HALF_H} M-${HOME_H_HALF_W},0 H${HOME_H_HALF_W}" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>`,
+  home: `<path d="M-${HOME_H_HALF_W},-${HOME_H_HALF_H} V${HOME_H_HALF_H} M${HOME_H_HALF_W},-${HOME_H_HALF_H} V${HOME_H_HALF_H} M-${HOME_H_HALF_W},0 H${HOME_H_HALF_W}" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/>`,
   // Cuboctahedron (Lattice Quick-View, added 2026-08-29): a real
   // silhouette, not an arbitrary glyph -- viewed down one of its own
   // 3-fold axes, a cuboctahedron's outline IS a regular hexagon (same
