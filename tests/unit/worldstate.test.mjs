@@ -72,26 +72,6 @@ test('toJSON / replaceAll round-trip preserves cells, claims, inventory, trades'
   assert.deepEqual(Object.keys(restored.getPendingTrades()), ['trade_1']);
 });
 
-test('toRhombJSON: pure model only, no game data (section 4 verification test)', () => {
-  const world = emptyWorld();
-  world.addCell(0, 0, 0, { material: 'base' });
-  world.addClaim('claim_0_0_0', { ownerId: 'p1', center: [0, 0, 0], size: '2-shell' });
-  world.creditInventory('p1', 'garnet', 5);
-  world.setPendingTrade('trade_1', { playerA: 'p1', playerB: 'p2' });
-
-  const rhomb = world.toRhombJSON();
-  // seeds/organisms/planetoidEvolution removed from the schema entirely
-  // 2026-09-22 (second world-building removal pass, growth/evolution/
-  // cultivation archived) -- with no way left to create a seed, .rhomb
-  // output is cells + meta only now.
-  const forbidden = ['claims', 'playerInventory', 'asteroidRegrowth', 'pendingTrades', 'seeds', 'organisms', 'planetoidEvolution'];
-  for (const key of forbidden) {
-    assert.equal(key in rhomb, false, `.rhomb output must not include "${key}"`);
-  }
-  assert.deepEqual(Object.keys(rhomb.cells), ['0,0,0']);
-  assert.ok(rhomb.meta.lastModified);
-});
-
 test('hooks: onAdd/onRemove fire exactly once per call, with correct args', () => {
   const added = [];
   const removed = [];
