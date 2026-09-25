@@ -234,6 +234,12 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     const cs = vis.map((t) => e.parCentre(t.n, t.I));
     return cs[0].map((_, j) => cs.reduce((acc, c) => acc + c[j], 0) / cs.length);
   };
+  // Big patches take a second or so to find: say so first, and let the
+  // prompt paint before the search runs.
+  function locateSoon(near, layer, after = () => {}) {
+    showHudPrompt(`Finding ${pending.entry.name}…`, 2500);
+    setTimeout(() => { if (pending) { locate(near, layer); after(); } }, 50);
+  }
   function locate(near, layer) {
     const occ = findOccurrence(engine(), offset(), pending.entry, near);
     if (!occ) { showHudPrompt(`${pending.entry.name} doesn't occur near there. Tap somewhere else.`, 3500); return; }
@@ -253,8 +259,9 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     const approx = entry.approximant ? APPROXIMANT_STOPS.findIndex((s) => s && s[0] === entry.approximant[0] && s[1] === entry.approximant[1]) : APPROXIMANT_STOPS.length - 1;
     const go = () => {
       const vis = visibleTiles();
-      locate(buildCentre(), vis.length ? Math.max(...vis.map((t) => t.layer ?? 0)) : 0);
-      showHudPrompt(`${entry.name}: tap the gold outline to place it, or tap the build to move it.`, 5000);
+      locateSoon(buildCentre(), vis.length ? Math.max(...vis.map((t) => t.layer ?? 0)) : 0, () => {
+        if (pending?.tiles.length) showHudPrompt(`${entry.name}: tap the gold outline to place it, or tap the build to move it.`, 5000);
+      });
     };
     if (approx !== view.approx) slideTo({ approx, phason: view.phason }, go);
     else go();
@@ -459,7 +466,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       // Summoning: the ghost places; anything else moves the ghost there.
       if (qc === 'ghost') return landSummon();
       const p = hit.point;
-      locate(toPar([p.x, p.y, p.z]), tile.layer ?? 0);
+      locateSoon(toPar([p.x, p.y, p.z]), tile.layer ?? 0);
       return true;
     }
     if (mode === 'chisel') {

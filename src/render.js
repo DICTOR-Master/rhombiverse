@@ -24,7 +24,7 @@ import { createDimensionWizard } from './app/dimension-wizard.js';
 import { createWorld4D } from './app/world-4d.js';
 import { createQuasicrystalWorld } from './app/world-quasicrystal.js';
 import { makeQuasicrystal, PRISM_HEIGHT } from './geometry-extensions/quasicrystal.js';
-import { loadCatalogue, findBySerial, zonotopeVertices } from './geometry-extensions/quasicrystal-catalogue.js';
+import { loadCatalogue, findBySerial, zonotopeVertices, localPatch } from './geometry-extensions/quasicrystal-catalogue.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
@@ -3603,7 +3603,11 @@ async function init() {
       if (action === 'tool:cuboctaBuild') return cuboctaGeometry;
       if (action.startsWith('summon:')) {
         const entry = findBySerial(catalogueEntries, Number(action.slice(7)));
-        return entry && convex(zonotopeVertices(qcEngines[entry.tier], entry, PRISM_HEIGHT));
+        if (!entry) return null;
+        const e = qcEngines[entry.tier];
+        if (entry.kind !== 'patch') return convex(zonotopeVertices(e, entry, PRISM_HEIGHT));
+        // A patch: its own tiles, centred on the star's vertex.
+        return mergeGeometries(localPatch(e, entry.window, entry.rings).map((t) => convex(e.tileVertices(t.n, t.I, 0))), false);
       }
       switch (piece) {
         case 'rd': return geometry;

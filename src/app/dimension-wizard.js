@@ -127,6 +127,9 @@ const CSS = `
   font: 600 14px system-ui, sans-serif; color: #9de0ff; background: rgba(124, 204, 255, 0.12);
   border: 1px solid rgba(124, 204, 255, 0.45); border-radius: 8px; padding: 8px 16px; cursor: pointer;
 }
+.dim-wizard-fold {
+  background: none; border: none; padding: 6px 0 2px; text-align: left; cursor: pointer; color: inherit; font: inherit; width: 100%;
+}
 .dim-wizard-serial-msg { min-height: 16px; font-size: 12px; color: #f9a; margin-bottom: 8px; }
 `;
 
@@ -438,6 +441,9 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
   // 5D/6D: one world each (the tiling picks every piece's shape), so the
   // screen is the catalogue: build freely, or summon an item, from the list
   // or by serial number (any tier's serial works from either screen).
+  // Sections: zonohedra open, the vertex-star sections folded until tapped
+  // (each open row runs a rotating preview, too many at once for a phone).
+  const openSections = new Set(['zonohedron']);
   async function showCatalogue(dim) {
     resetPreviews();
     titleEl.textContent = `${dim} Catalogue`;
@@ -453,7 +459,7 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
             <span class="dim-wizard-desc">Start from one piece and add them yourself.</span>
           </span>
         </button>`;
-    const rows = mine.map((x) => {
+    const row = (x) => {
       const n = pieceCount({ k }, x);
       return `
         <button type="button" class="dim-wizard-card-btn dim-wizard-piece" data-action="summon:${x.serial}">
@@ -463,6 +469,23 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
             <span class="dim-wizard-desc">#${x.serial} · ${n} piece${n === 1 ? '' : 's'}</span>
           </span>
         </button>`;
+    };
+    const sections = [
+      { id: 'zonohedron', label: 'Zonohedra', desc: 'Shapes built from the tiling’s own pieces, found wherever they occur.', items: mine.filter((x) => x.kind === 'zonohedron') },
+      ...[1, 2, 3].map((r) => ({
+        id: `patch${r}`,
+        label: r === 1 ? 'Vertex stars' : `Vertex stars, ${r} rings`,
+        desc: r === 1 ? 'Every way the pieces meet at a corner, most common first.' : `Each star with its ${r === 2 ? 'next ring' : 'next two rings'} of pieces, as it most often occurs.`,
+        items: mine.filter((x) => x.kind === 'patch' && x.rings === r),
+      })),
+    ].filter((sec) => sec.items.length);
+    const rows = sections.map((sec) => {
+      const open = openSections.has(sec.id);
+      return `
+        <button type="button" class="dim-wizard-section dim-wizard-fold" data-section="${sec.id}" aria-expanded="${open}">
+          <span class="dim-wizard-label">${open ? '▾' : '▸'} ${sec.label} (${sec.items.length})</span>
+          <span class="dim-wizard-desc">${sec.desc}</span>
+        </button>${open ? sec.items.map(row).join('') : ''}`;
     }).join('');
     bodyEl.innerHTML = `
       <button type="button" class="dim-wizard-back">← Back</button>
@@ -474,12 +497,18 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
       <div class="dim-wizard-serial-msg" aria-live="polite"></div>
       <div class="dim-wizard-grid">
         ${buildRow}
-        <div class="dim-wizard-section"><span class="dim-wizard-label">Zonohedra</span>
-          <span class="dim-wizard-desc">Shapes built from the tiling's own pieces, found wherever they occur.</span></div>
         ${rows}
       </div>`;
     mountPreviews();
     bodyEl.querySelector('.dim-wizard-back').addEventListener('click', showDimensions);
+    bodyEl.querySelectorAll('.dim-wizard-fold').forEach((el) => {
+      el.addEventListener('click', () => {
+        const id = el.dataset.section;
+        if (openSections.has(id)) openSections.delete(id); else openSections.add(id);
+        const top = bodyEl.parentElement.scrollTop;
+        showCatalogue(dim).then(() => { bodyEl.parentElement.scrollTop = top; });
+      });
+    });
     bodyEl.querySelectorAll('.dim-wizard-card-btn[data-action]').forEach((el) => {
       el.addEventListener('click', () => {
         close();

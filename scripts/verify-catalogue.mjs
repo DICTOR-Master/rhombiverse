@@ -4,7 +4,7 @@
 // points), landing as the right number of pieces with no overlap.
 import { readFileSync } from 'node:fs';
 import { makeQuasicrystal, BASE_OFFSET, TIERS } from '../src/geometry-extensions/quasicrystal.js';
-import { SERIAL_RANGES, findOccurrence, pieceCount, congruentSets } from '../src/geometry-extensions/quasicrystal-catalogue.js';
+import { SERIAL_RANGES, findOccurrence, pieceCount, congruentSets, localPatch, canonicalPatch } from '../src/geometry-extensions/quasicrystal-catalogue.js';
 import { tilesOverlap } from '../src/geometry-extensions/growth.js';
 
 let failures = 0;
@@ -19,13 +19,19 @@ const serials = entries.map((x) => x.serial);
 check('serials are unique', new Set(serials).size === serials.length);
 check('every serial is inside its kind\'s range', entries.every((x) => SERIAL_RANGES[x.kind] && x.serial >= SERIAL_RANGES[x.kind][0] && x.serial <= SERIAL_RANGES[x.kind][1]));
 check('names are unique', new Set(entries.map((x) => x.name)).size === entries.length);
-check('every entry is well-formed', entries.every((x) => TIERS[x.tier] && Array.isArray(x.directions)
-  && x.directions.length >= TIERS[x.tier].k && x.directions.every((i) => Number.isInteger(i) && i >= 0 && i < TIERS[x.tier].d)
-  && new Set(x.directions).size === x.directions.length
+const wellFormedShape = (x) => (x.kind === 'patch'
+  ? Array.isArray(x.window) && x.window.length === 3 && x.window.every(Number.isFinite) && [1, 2, 3].includes(x.rings) && x.reach > 0 && Number.isInteger(x.pieces)
+  : Array.isArray(x.directions) && x.directions.length >= TIERS[x.tier].k && x.directions.every((i) => Number.isInteger(i) && i >= 0 && i < TIERS[x.tier].d)
+    && new Set(x.directions).size === x.directions.length);
+check('every entry is well-formed', entries.every((x) => TIERS[x.tier] && wellFormedShape(x)
   && (x.tier === '5d' ? Number.isInteger(x.layers) && x.layers >= 1 : x.layers === undefined)
   && (x.approximant === null || (Array.isArray(x.approximant) && x.approximant.length === 2))));
-const shapeKeys = entries.map((x) => `${x.tier}|${congruentSets(makeQuasicrystal(x.tier), x.directions).map((s) => s.join('')).join(';')}|${x.layers ?? 1}`);
+const engines = { '5d': makeQuasicrystal('5d'), '6d': makeQuasicrystal('6d') };
+const shapeKeys = entries.map((x) => (x.kind === 'patch'
+  ? `${x.tier}|patch|${canonicalPatch(engines[x.tier], localPatch(engines[x.tier], x.window, x.rings))}`
+  : `${x.tier}|${congruentSets(engines[x.tier], x.directions).map((s) => s.join('')).join(';')}|${x.layers ?? 1}`));
 check('no two entries are the same shape', new Set(shapeKeys).size === entries.length);
+check('every patch entry is as big as it says', entries.filter((x) => x.kind === 'patch').every((x) => localPatch(engines[x.tier], x.window, x.rings).length === x.pieces));
 
 // Each entry lands: found near several points at several phasons, with the
 // right piece count, all real tiles, none overlapping.

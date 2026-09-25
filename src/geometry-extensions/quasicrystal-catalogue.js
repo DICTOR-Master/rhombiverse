@@ -12,6 +12,15 @@
 // lattice point n is present when, for every k-subset I of S, the tiling
 // has the tile (n + d, I) for some d in {0,1} on S \ I (a zonotope's
 // tilings use each k-subset exactly once).
+//
+// Patches (serials 3000-9999): the rings of tiles around one vertex. In a
+// quasicrystal a vertex's window point w (offset - perp(n)) fixes its whole
+// neighbourhood, so an entry is just { window: w, rings } (plus `pieces`,
+// its size, and `reach`, how far from w, in window units, its other
+// occurrences' points were seen). A vertex n of the current tiling carries
+// the patch when its own window point is within `reach` of an image of w
+// under a symmetry and the rings computed there match the entry's up to
+// rotation or reflection.
 import { subsets } from './quasicrystal.js';
 
 export const SERIAL_RANGES = {
@@ -56,10 +65,103 @@ function zonotopeAt(e, has, n, S) {
   return tiles;
 }
 
+const key = (t) => `${t.n.join(',')}|${t.I.join('')}`;
+const cornersOf = (t) => {
+  const out = [];
+  for (let mask = 0; mask < 1 << t.I.length; mask++) out.push(t.n.map((x, l) => x + (t.I.some((i, b) => i === l && mask & (1 << b)) ? 1 : 0)));
+  return out;
+};
+
+// Every tile of the tiling at `offset` with corner v.
+function starAt(e, offset, v) {
+  const out = [];
+  for (const I of subsets(e.d, e.k)) {
+    for (let mask = 0; mask < 1 << I.length; mask++) {
+      const n = v.map((x, l) => x - (I.some((i, b) => i === l && mask & (1 << b)) ? 1 : 0));
+      if (e.isTile(n, I, offset)) out.push({ n, I });
+    }
+  }
+  return out;
+}
+
+// The rings of tiles around vertex 0 of the tiling whose vertex 0 has
+// window point w (ring 1: the tiles at that vertex; each next ring: every
+// tile sharing a corner with the last), as tiles relative to that vertex.
+export function localPatch(e, w, rings) {
+  const zero = new Array(e.d).fill(0);
+  const tiles = new Map(starAt(e, w, zero).map((t) => [key(t), t]));
+  let frontier = [...tiles.values()];
+  for (let r = 1; r < rings; r++) {
+    const corners = new Map();
+    for (const t of frontier) for (const c of cornersOf(t)) corners.set(c.join(','), c);
+    const next = [];
+    for (const c of corners.values()) for (const t of starAt(e, w, c)) {
+      if (!tiles.has(key(t))) { tiles.set(key(t), t); next.push(t); }
+    }
+    frontier = next;
+  }
+  return [...tiles.values()];
+}
+
+// A patch's shape up to the tiling's symmetries (and translation: tiles
+// are relative to the centre vertex, which every symmetry fixes).
+export function canonicalPatch(e, tiles) {
+  let best = null;
+  for (const g of e.symmetries()) {
+    const s = tiles.map((t) => key(g.mapTile(t))).sort().join(';');
+    if (best === null || s < best) best = s;
+  }
+  return best;
+}
+
+// Vertices of the tiling within `radius` of the physical point `near`, by
+// walking tile edges (n -> n +- e_i) through the vertex window.
+function verticesNear(e, offset, near, radius) {
+  const start = e.seedTile(offset, near).n;
+  const out = new Map([[start.join(','), start]]);
+  const queue = [start];
+  while (queue.length) {
+    const v = queue.pop();
+    for (let i = 0; i < e.d; i++) for (const s of [1, -1]) {
+      const u = v.map((x, l) => x + (l === i ? s : 0));
+      const k = u.join(',');
+      if (out.has(k) || !e.isVertex(u, offset)) continue;
+      if (Math.hypot(...e.parOf(u).map((x, j) => x - near[j])) > radius) continue;
+      out.set(k, u);
+      queue.push(u);
+    }
+  }
+  return [...out.values()];
+}
+
+const patchCanon = new Map(); // serial -> canonical string (per tier engine)
+function findPatch(e, offset, entry, near) {
+  const cacheKey = `${e.tier}|${entry.serial}`;
+  if (!patchCanon.has(cacheKey)) patchCanon.set(cacheKey, canonicalPatch(e, localPatch(e, entry.window, entry.rings)));
+  const target = patchCanon.get(cacheKey);
+  const images = e.symmetries().map((g) => g.perpMap(entry.window));
+  for (const radius of [6, 11, 18]) {
+    const candidates = [];
+    for (const v of verticesNear(e, offset, near, radius)) {
+      const w = e.perpOf(v).map((x, i) => offset[i] - x);
+      if (!images.some((m) => Math.hypot(...m.map((x, i) => x - w[i])) <= entry.reach)) continue;
+      candidates.push({ v, w, dist: Math.hypot(...e.parOf(v).map((x, j) => x - near[j])) });
+    }
+    candidates.sort((a, b) => a.dist - b.dist);
+    for (const { v, w } of candidates) {
+      const local = localPatch(e, w, entry.rings);
+      if (canonicalPatch(e, local) !== target) continue;
+      return { tiles: local.map((t) => ({ n: t.n.map((x, i) => x + v[i]), I: t.I })), centre: e.parOf(v) };
+    }
+  }
+  return null;
+}
+
 // The nearest place (to the physical point `near`: 3D in 6D, the Penrose
-// plane's (x, z) in 5D) where the entry's shape occurs in the tiling at
-// `offset`: { tiles: [{ n, I }], centre } or null.
+// plane's (x, z) in 5D) where the entry occurs in the tiling at `offset`:
+// { tiles: [{ n, I }], centre } or null.
 export function findOccurrence(e, offset, entry, near) {
+  if (entry.kind === 'patch') return findPatch(e, offset, entry, near);
   const sets = congruentSets(e, entry.directions);
   for (const radius of [5, 9, 14]) {
     const tiles = e.patch(offset, radius, near);
@@ -84,6 +186,7 @@ export function findOccurrence(e, offset, entry, near) {
 
 // How many pieces an entry lands as.
 export function pieceCount(e, entry) {
+  if (entry.kind === 'patch') return entry.pieces * (entry.layers ?? 1);
   const m = entry.directions.length;
   let c = 1;
   for (let i = 0; i < e.k; i++) c = (c * (m - i)) / (i + 1);

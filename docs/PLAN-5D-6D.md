@@ -118,6 +118,16 @@ shapes in different hyperplanes. To design before filling that range.
 2–3 sizes, the named patches such as the cartwheel and Conway worms,
 and the icosahedral clusters), then the polytopes (zonotopal ones as
 ordinary pieces, the rest as the polytope piece type below).
+*7a shipped:* 62 vertex-star patches (serials 3001–3062), made by
+`scripts/generate-catalogue-patches.mjs`: an entry is a window point plus
+1–3 rings, landing where that exact patch occurs, any rotation or
+reflection. 5D: the 7 Penrose vertex stars (by shape; de Bruijn's S and S5
+share a first ring) at 1–3 rings. 6D: the 24 Ammann–Kramer vertex stars at
+1 ring, 17 of them at 2 rings (only surrounds seen 10+ times in the sample,
+so a summon lands nearby; 3 rings is hundreds of pieces and rarely
+repeats). Names are descriptive; de Bruijn's letters and literature names
+(cartwheel, Conway worms, icosahedral clusters) wait until their
+definitions are checked. *7b next:* polytopes, after a design session.
 
 **8. Words and docs**: all 7 languages for new UI strings, a guide
 section in all 7 guides, Almanac entries for the new pieces and

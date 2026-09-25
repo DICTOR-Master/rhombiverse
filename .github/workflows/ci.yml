@@ -23,7 +23,18 @@ jobs:
       - run: node --test tests/unit/
       # 5D/6D cut-and-project engine against the known tiling facts.
       - run: node scripts/verify-quasicrystal.mjs
-      # Every 5D/6D catalogue entry really occurs and lands.
+
+  catalogue:
+    # Every 5D/6D catalogue entry really occurs and lands, at 9 phason and
+    # position probes (about 6 min on the Pi; its own job so the unit-test
+    # job keeps its fast-fail limit).
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
       - run: node scripts/verify-catalogue.mjs
 
   browser-smoke-test:

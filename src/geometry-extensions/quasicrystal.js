@@ -43,6 +43,19 @@ function solve3(a, b, c, y) {
   return [det3(y, b, c) / d, det3(a, y, c) / d, det3(a, b, y) / d];
 }
 
+// Rotation by `angle` about `axis` (3D), as a function on vectors.
+function rotateAbout(axis, angle) {
+  const len = Math.hypot(...axis);
+  const [x, y, z] = axis.map((c) => c / len);
+  const c = Math.cos(angle), s = Math.sin(angle), C = 1 - c;
+  const m = [
+    [c + x * x * C, x * y * C - z * s, x * z * C + y * s],
+    [y * x * C + z * s, c + y * y * C, y * z * C - x * s],
+    [z * x * C - y * s, z * y * C + x * s, c + z * z * C],
+  ];
+  return (v) => m.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
+}
+
 // Orthonormal basis of the row space of `rows` (Gram-Schmidt).
 function orthonormalRows(rows) {
   const out = [];
@@ -388,6 +401,80 @@ export function makeQuasicrystal(tier, approximant = null) {
     return [...seen.values()].filter((t) => dist(t.n, t.I) <= radius);
   }
 
+  // The tiling's point symmetries (only at tau; an approximant has just
+  // the identity here): signed permutations g of the basis, e_i -> sign_i
+  // e_perm_i, from the symmetries of the par star (6D: the 120 of the
+  // icosahedral group with inversion; 5D: the 20 of the decagon). Each
+  // carries its action on perp space, so a vertex's window point w maps to
+  // g.perpMap(w) when the tiling is turned by g.
+  let symmetryCache = null;
+  function symmetries() {
+    if (symmetryCache) return symmetryCache;
+    const id = { perm: [...Array(d).keys()], sign: new Array(d).fill(1) };
+    if (approximant) return (symmetryCache = [withPerp(id)]);
+    const near = (a, b) => Math.hypot(...a.map((x, i) => x - b[i])) < 1e-9;
+    const fromRotation = (rot) => {
+      const perm = [], sign = [];
+      for (const v of par) {
+        const r = rot(v);
+        const j = par.findIndex((w) => near(w, r) || near(w, r.map((x) => -x)));
+        perm.push(j);
+        sign.push(near(par[j], r) ? 1 : -1);
+      }
+      return { perm, sign };
+    };
+    let gens;
+    if (tier === '6d') {
+      const axisDot = (u, w) => dot(u, w) - 1 / Math.sqrt(5);
+      const star = [...par, ...par.map((v) => v.map((x) => -x))];
+      const u0 = par[0];
+      const u1 = star.find((w) => Math.abs(axisDot(u0, w)) < 1e-9);
+      const u2 = star.find((w) => Math.abs(axisDot(u0, w)) < 1e-9 && Math.abs(axisDot(u1, w)) < 1e-9);
+      gens = [
+        fromRotation(rotateAbout(u0, (2 * Math.PI) / 5)),
+        fromRotation(rotateAbout(u0.map((x, i) => x + u1[i] + u2[i]), (2 * Math.PI) / 3)),
+        { perm: id.perm, sign: new Array(d).fill(-1) }, // inversion
+      ];
+    } else {
+      const a = Math.PI / 5;
+      gens = [
+        fromRotation((v) => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a)]),
+        fromRotation((v) => [v[0], -v[1]]), // mirror
+      ];
+    }
+    const key = (g) => `${g.perm.join()}|${g.sign.join()}`;
+    const after = (h, g) => ({ perm: g.perm.map((p) => h.perm[p]), sign: g.sign.map((sg, i) => sg * h.sign[g.perm[i]]) });
+    const seen = new Map([[key(id), id]]);
+    let frontier = [id];
+    while (frontier.length) {
+      const next = [];
+      for (const g of frontier) for (const h of gens) {
+        const c = after(h, g);
+        if (!seen.has(key(c))) { seen.set(key(c), c); next.push(c); }
+      }
+      frontier = next;
+    }
+    return (symmetryCache = [...seen.values()].map(withPerp));
+  }
+  // Perp action of g: write w in three independent perp vectors, map each
+  // basis vector through g.
+  function withPerp(g) {
+    const [a, b, c] = [0, 1, 2].map((i) => perp[i]);
+    const perpMap = (w) => {
+      const coef = solve3(a, b, c, w);
+      return [0, 1, 2].reduce((v, i) => addScaled(v, perp[g.perm[i]], coef[i] * g.sign[i]), [0, 0, 0]);
+    };
+    // A tile (relative to a vertex at the origin) under g: its cube spans
+    // -e where the sign flips, so it re-anchors there.
+    const mapTile = (t) => {
+      const n = new Array(d).fill(0);
+      t.n.forEach((x, i) => { n[g.perm[i]] += g.sign[i] * x; });
+      for (const i of t.I) if (g.sign[i] < 0) n[g.perm[i]] -= 1;
+      return { n, I: t.I.map((i) => g.perm[i]).sort((x, y) => x - y) };
+    };
+    return { ...g, perpMap, mapTile };
+  }
+
   // Distance between opposite window facets at their closest: the unit
   // the phason sliders move in.
   const windowWidth = 2 * Math.min(...windowPlanes.map((w) => w.half));
@@ -398,7 +485,7 @@ export function makeQuasicrystal(tier, approximant = null) {
     perpOf, parOf, parCentre,
     isTile, margin, isVertex, windowVertices, windowSlice, windowPlanes,
     tileVertices, tileType, tileFaces, tilesOnFace, neighbourAcross, faceAtPoint,
-    seedTile, patch,
+    seedTile, patch, symmetries,
   };
 }
 
