@@ -159,7 +159,7 @@ rhombiverse/
   src/
     render.js           # Three.js scene, per-frame loop, most UI wiring
     core/               # lattice math, placement/removal and input (build.js), world state, persistence
-    app/                # UI: wheels, Dimension wizard, 4D and 6D worlds and their slider, Almanac, settings, i18n, welcome, What's New
+    app/                # UI: wheels, Dimension wizard, 4D, 5D and 6D worlds and their slider, Almanac, settings, i18n, welcome, What's New
     geometry-extensions/  # every lattice beyond FCC: BCC, 2D tilings, ED, hex prism, rhombohedra,
                         #   Pyrochlore, 4D (lattice-4d.js), dual/Duality math, spherical view
     rhombis/            # RHOMBIS' own code

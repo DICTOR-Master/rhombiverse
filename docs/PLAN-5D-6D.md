@@ -78,8 +78,8 @@ modes. Browser check by touch on dicto-node: place, remove, slide,
 undo.
 
 **3. The 5D world.** Same engine and panel for Z⁵: Penrose rhombus
-prisms (layer height `PRISM_HEIGHT`, set to 1 edge; confirm with the
-user before building). Building across a prism's top or bottom face adds the next
+prisms (layer height `PRISM_HEIGHT` = 1 edge, confirmed). *Shipped:* one
+factory for both worlds, `src/app/world-quasicrystal.js`. Building across a prism's top or bottom face adds the next
 layer. Phason 3 is hidden.
 
 **4. Window View**, for both worlds.

@@ -47,6 +47,7 @@ import { mountWireframePreview } from './wireframe-preview.js';
 import { cellStructure, rotation4, matVec, project4, A4_FIRST } from '../geometry-extensions/lattice-4d.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
 import { VALID_TRIPLES, unitTileVertices } from '../geometry-extensions/growth.js';
+import { PRISM_HEIGHT } from '../geometry-extensions/quasicrystal.js';
 
 const CSS = `
 .dim-wizard-overlay {
@@ -167,11 +168,11 @@ const DIMENSIONS = [
   { id: '2D', label: '2D', desc: '5 tile types (Parallelogram, Triangle, Hexagon, Kite, Kagome), each at up to 4 named lattice angles, chosen from the in-scene panel.', enabled: true, preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: NAMED_LATTICE_ANGLES[0].angleDeg }) },
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, previewAction: 'tool:pieceType:rd' },
   { id: '4D', label: '4D', desc: 'Tesseract (Z4), D4 (24-cell, 16-cell) and Hyper-pyrochlore (4D Kagome).', enabled: true, preview: () => edges4D('cell24') },
-  { id: '5D', label: '5D', desc: 'Decagonal quasicrystal.', enabled: false },
+  { id: '5D', label: '5D', desc: 'Decagonal quasicrystal: Penrose thick and thin rhombus prisms in layers, sliced from Z⁵. The tiling picks each piece’s shape.', enabled: true, preview: () => edges5D() },
   { id: '6D', label: '6D', desc: 'Icosahedral quasicrystal: prolate and oblate golden rhombohedra, sliced from Z⁶. The tiling picks each piece’s shape.', enabled: true, preview: () => edges6D() },
 ];
 
-// 6D thumbnail: a prolate golden rhombohedron, the same tile world-6d.js
+// 6D thumbnail: a prolate golden rhombohedron, the same tile world-quasicrystal.js
 // places (growth.js's unit tile). Edges join corners one step apart.
 function edges6D() {
   const v = unitTileVertices(VALID_TRIPLES.find((t) => t.type === 'acute').dirs);
@@ -179,6 +180,20 @@ function edges6D() {
   const p = v.map((q) => q.map((x, i) => x - c[i]));
   const out = [];
   for (let a = 0; a < 8; a++) for (const bit of [1, 2, 4]) if (!(a & bit)) out.push([p[a], p[a | bit]]);
+  return out;
+}
+
+// 5D thumbnail: a thick Penrose rhombus prism (72 degrees, edge 1,
+// height PRISM_HEIGHT), the piece world-quasicrystal.js places.
+function edges5D() {
+  const a = (2 * Math.PI) / 5;
+  const e1 = [1, 0, 0], e2 = [Math.cos(a), 0, Math.sin(a)], up = [0, PRISM_HEIGHT, 0];
+  const v = [];
+  for (const i of [0, 1]) for (const j of [0, 1]) for (const k of [0, 1]) v.push([0, 1, 2].map((x) => i * e1[x] + j * e2[x] + k * up[x]));
+  const c = [0, 1, 2].map((x) => v.reduce((s, p) => s + p[x], 0) / 8);
+  const p = v.map((q) => q.map((x, i) => x - c[i]));
+  const out = [];
+  for (let m = 0; m < 8; m++) for (const bit of [1, 2, 4]) if (!(m & bit)) out.push([p[m], p[m | bit]]);
   return out;
 }
 
@@ -336,7 +351,7 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
         if (dim === '3D') showLattice3D();
         else if (dim === '2D') showLattice2D();
         else if (dim === '4D') showLattice4D();
-        else if (dim === '6D') { close(); onSelectFamily('6D', null); } // one world, nothing to pick
+        else if (dim === '5D' || dim === '6D') { close(); onSelectFamily(dim, null); } // one world, nothing to pick
       });
     });
   }

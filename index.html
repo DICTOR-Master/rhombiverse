@@ -139,9 +139,9 @@
        W-depth | XW | YW | ZW toggle, and Slice/Projection, Parallel/
        Perspective (Projection only), Reset 4D. Only shown in 4D. Bottom-
        center above the quick-select row, full width on phones, big touch
-       targets. The 6D panel (src/app/world-6d.js) is the same, with
-       Phason 1-3 | Approximant. */
-    #world4d-panel, #world6d-panel {
+       targets. The 5D/6D panels (src/app/world-quasicrystal.js) are the
+       same, with Phason 1-3 | Approximant. */
+    #world4d-panel, .qc-panel {
       display: none;
       position: fixed; left: 50%; transform: translateX(-50%);
       bottom: calc(52px + env(safe-area-inset-bottom, 0px));
@@ -149,10 +149,10 @@
       z-index: 900;
       flex-direction: column; align-items: stretch; gap: 6px;
     }
-    #world4d-panel.visible, #world6d-panel.visible { display: flex; }
+    #world4d-panel.visible, .qc-panel.visible { display: flex; }
     /* 4D Info (Info button in the 4D panel): top-left under the title,
        read-only, so taps pass straight through to the scene. */
-    #world4d-info, #world6d-info {
+    #world4d-info, .qc-info {
       display: none;
       position: fixed; top: 96px; left: 16px; z-index: 900;
       max-width: min(320px, calc(100vw - 32px));
@@ -163,12 +163,12 @@
       color: #cde; font: 12px/1.5 system-ui, sans-serif;
       pointer-events: none;
     }
-    #world4d-info.visible, #world6d-info.visible { display: block; }
-    #world4d-info .w4d-info-k, #world6d-info .w4d-info-k { color: #7cf; font-weight: 600; margin-right: 4px; }
+    #world4d-info.visible, .qc-info.visible { display: block; }
+    #world4d-info .w4d-info-k, .qc-info .w4d-info-k { color: #7cf; font-weight: 600; margin-right: 4px; }
     /* Toasts sit just above the 4D panel while it's showing, instead of
        on top of its buttons -- which puts them over the scene, so taps
        pass straight through them (toasts are text only). */
-    body.world4d-on #hud-prompt, body.world6d-on #hud-prompt { bottom: calc(190px + env(safe-area-inset-bottom, 0px)); pointer-events: none; }
+    body.world4d-on #hud-prompt, body.qc-world-on #hud-prompt { bottom: calc(190px + env(safe-area-inset-bottom, 0px)); pointer-events: none; }
     .w4d-row { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
     .w4d-row button {
       background: rgba(0, 0, 0, 0.45);

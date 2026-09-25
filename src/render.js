@@ -22,7 +22,7 @@ import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extens
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { createWorld4D } from './app/world-4d.js';
-import { createWorld6D } from './app/world-6d.js';
+import { createQuasicrystalWorld } from './app/world-quasicrystal.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
@@ -131,10 +131,12 @@ let activeDimension = null;
 // The 4D world (src/app/world-4d.js) -- created in init, switched on
 // only while activeDimension === '4D'.
 let world4d = null;
-// The 6D world (src/app/world-6d.js), likewise only while '6D' is active.
-let world6d = null;
-// 4D and 6D each own their scene, taps, Lattice View and Skeleton.
-const isOwnWorldDimension = () => activeDimension === '4D' || activeDimension === '6D';
+// The 5D and 6D quasicrystal worlds (src/app/world-quasicrystal.js), by
+// dimension, each switched on only while its dimension is active.
+const qcWorlds = new Map();
+// 4D, 5D and 6D each own their scene, taps, Lattice View and Skeleton.
+const isOwnWorldDimension = () => activeDimension === '4D' || qcWorlds.has(activeDimension);
+const activeOwnWorld = () => qcWorlds.get(activeDimension) ?? world4d;
 
 const camera = new THREE.PerspectiveCamera(
   getSettings().fov,
@@ -1906,7 +1908,7 @@ async function init() {
   });
   renderRhomboAttachButton();
   function updateRhomboAttachPanel() {
-    const attachable = activeDimension === '4D' ? ['cell24', 'cell16', ...A4_CYCLE] : activeDimension !== '2D' && activeDimension !== '6D' ? ['rhombohedra', 'pyrochlore'] : [];
+    const attachable = activeDimension === '4D' ? ['cell24', 'cell16', ...A4_CYCLE] : activeDimension !== '2D' && !isOwnWorldDimension() ? ['rhombohedra', 'pyrochlore'] : [];
     rhomboAttachBtn?.classList.toggle('hidden', !attachable.includes(attachPiece()));
     renderRhomboAttachButton();
   }
@@ -2318,7 +2320,7 @@ async function init() {
   // registerHistoryStores), so every mesh rebuilds exactly as after a
   // normal edit. Clear World / New World are undoable too.
   const MAX_UNDO = 40;
-  const historySteps = []; // { dims: Set<'2D'|'3D'|'4D'|'6D'>, before: Map<historyKey, jsonString> }
+  const historySteps = []; // { dims: Set<'2D'|'3D'|'4D'|'5D'|'6D'>, before: Map<historyKey, jsonString> }
   const historyLastSaved = new Map(); // historyKey -> jsonString, for registered stores only
   const historyRestorers = new Map(); // historyKey -> { dim, restore(json) }
   let historyPending = null;
@@ -2429,7 +2431,7 @@ async function init() {
       reg(lattice2dStorageKey(primitive.id), '2D', () => w2.toJSON(), (j) => { w2.replaceAll(j); onLattice2dChange(primitive.id); });
     }
     reg('world4d', '4D', () => world4d.snapshot(), (j) => world4d.restore(j));
-    reg('world6d', '6D', () => world6d.snapshot(), (j) => world6d.restore(j));
+    for (const [dim, w] of qcWorlds) reg(`world${dim.toLowerCase()}`, dim, () => w.snapshot(), (j) => w.restore(j));
     updateUndoButton();
   }
 
@@ -2658,8 +2660,11 @@ async function init() {
     // the active dimension, regardless of which (angle, primitive) is
     // currently toggled.
     dotMatrixMesh.visible = visible && activeDimension === '2D';
+    // Switch the others off first, so the active one's panel stays up.
+    for (const [dim, w] of qcWorlds) if (dim !== activeDimension) w.setActive(false);
     world4d?.setActive(activeDimension === '4D');
-    world6d?.setActive(activeDimension === '6D');
+    qcWorlds.get(activeDimension)?.setActive(true);
+    document.body.classList.toggle('qc-world-on', qcWorlds.has(activeDimension));
     // 4D/6D: X-Ray and Spherical don't apply (the slider IS the X-Ray),
     // so their HUD faces go blank and untappable (direct decision).
     hudWheel?.setFaceHidden?.('xray-toggle', isOwnWorldDimension());
@@ -2690,8 +2695,8 @@ async function init() {
     // than trying to redirect its click into the lattice panel, which is
     // already fixed-position and always visible in 2D, so there's nothing
     // for a click to usefully "open."
-    // 6D: the tiling decides each piece's shape, so there's nothing to pick.
-    document.getElementById('hud-quick-shape').style.display = activeDimension === '2D' || activeDimension === '6D' ? 'none' : '';
+    // 5D/6D: the tiling decides each piece's shape, so there's nothing to pick.
+    document.getElementById('hud-quick-shape').style.display = activeDimension === '2D' || qcWorlds.has(activeDimension) ? 'none' : '';
   }
   // Re-applies the same visibility rule whenever activeDimension itself
   // changes (not just when World View mode changes, which is
@@ -2850,7 +2855,7 @@ async function init() {
       applyWorldViewMaterials();
     }
     world4d?.setSkeleton(worldViewMode === 'skeleton');
-    world6d?.setSkeleton(worldViewMode === 'skeleton');
+    for (const w of qcWorlds.values()) w.setSkeleton(worldViewMode === 'skeleton');
     document.getElementById('world-view-toggle')?.classList.toggle('active', worldViewMode !== 'color');
   }
   const worldViewSelect = document.getElementById('world-view-select');
@@ -3538,9 +3543,9 @@ async function init() {
           wheel3D.open('piece4d');
           return;
         }
-        if (action === 'tool:selectDimension:6D') {
+        if (action === 'tool:selectDimension:5D' || action === 'tool:selectDimension:6D') {
           dimensionWheel3D.close();
-          enter6D();
+          enterQuasicrystal(action.slice(-2));
           return;
         }
         if (action === 'tool:selectDimension:2D') {
@@ -3609,12 +3614,12 @@ async function init() {
       edges.dispose();
       return out;
     }
-    // 6D (icosahedral quasicrystal): one world, and the tiling picks each
+    // 5D/6D (quasicrystals): one world each, and the tiling picks each
     // piece's shape, so there's no piece to choose on the way in.
-    function enter6D() {
-      activeDimension = '6D';
+    function enterQuasicrystal(dimension) {
+      activeDimension = dimension;
       applyDimensionVisibility();
-      applyDimensionCamera('6D');
+      applyDimensionCamera(dimension);
     }
     const dimensionWizard = createDimensionWizard({
       pieceEdges: wizardPieceEdges,
@@ -3626,7 +3631,7 @@ async function init() {
       // dimension-wizard.js's own showLattice2D/showLattice3D now pass
       // the real dimension alongside the action.
       onSelectFamily: (dimension, action) => {
-        if (dimension === '6D') { enter6D(); return; }
+        if (qcWorlds.has(dimension)) { enterQuasicrystal(dimension); return; }
         activeDimension = dimension;
         applyDimensionVisibility();
         applyDimensionCamera(dimension);
@@ -4184,7 +4189,7 @@ async function init() {
     if (latticeQuickViewMode !== 'off') clearDualizePreview(); // mutual exclusion -- see deactivateLatticeQuickView's own comment
     updateLatticeQuickViewIcon();
     world4d?.setLatticeView(latticeQuickViewMode !== 'off');
-    world6d?.setLatticeView(latticeQuickViewMode !== 'off');
+    for (const w of qcWorlds.values()) w.setLatticeView(latticeQuickViewMode !== 'off');
     showHudPrompt(isOwnWorldDimension() ? `Lattice View: ${latticeQuickViewMode === 'off' ? 'Off.' : `every open slot one step past your ${activeDimension} build.`}` : `Lattice View: ${LATTICE_QUICK_VIEW_LABELS[latticeQuickViewMode]}`, 4500);
     await rebuildLatticeQuickView(); // also syncs the toggle buttons' own 'active' state -- see syncLatticeQuickViewActiveState
   }
@@ -4659,12 +4664,17 @@ async function init() {
     // cells here after every edit (view changes never reach this).
     onChange: () => { if (historyRestorers.has('world4d')) recordHistory('world4d', world4d.snapshot()); },
   });
-  world6d = createWorld6D({
-    scene,
-    materialColor,
-    getMaterial: () => currentMaterialFor(document.getElementById('piece-type-select').value),
-    onChange: () => { if (historyRestorers.has('world6d')) recordHistory('world6d', world6d.snapshot()); },
-  });
+  for (const dim of ['5D', '6D']) {
+    const historyKey = `world${dim.toLowerCase()}`;
+    const w = createQuasicrystalWorld({
+      tier: dim.toLowerCase(),
+      scene,
+      materialColor,
+      getMaterial: () => currentMaterialFor(document.getElementById('piece-type-select').value),
+      onChange: () => { if (historyRestorers.has(historyKey)) recordHistory(historyKey, w.snapshot()); },
+    });
+    qcWorlds.set(dim, w);
+  }
   registerHistoryStores();
   createBuildController({
     renderer,
@@ -4915,12 +4925,12 @@ async function init() {
       place: (material) => { firstPlacementCurrent?.place(material); },
     },
     onRhombohedraChange,
-    // 4D/6D worlds: while one is active it is the ONLY raycast target
+    // 4D/5D/6D worlds: while one is active it is the ONLY raycast target
     // and handles every tap/long-press itself.
     ownWorld: {
       isActive: isOwnWorldDimension,
-      meshes: () => (activeDimension === '6D' ? world6d : world4d).meshes(),
-      handleTap: (hit, mode) => (activeDimension === '6D' ? world6d : world4d).handleTap(hit, mode),
+      meshes: () => activeOwnWorld().meshes(),
+      handleTap: (hit, mode) => activeOwnWorld().handleTap(hit, mode),
     },
     // Pyrochlore (3D Kagome): resolves a raycast hit on any of its 4
     // meshes to either { type: 'tt', cell } or { type: 'tet', kind,
@@ -5208,7 +5218,7 @@ async function init() {
     onPyrochloreChange();
     // "Erase everything" includes the 4D world (it was left untouched).
     world4d?.clear();
-    world6d?.clear();
+    for (const w of qcWorlds.values()) w.clear();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

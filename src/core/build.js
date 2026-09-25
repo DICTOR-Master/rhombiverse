@@ -216,8 +216,8 @@ export function createBuildController({
   // params. Truncated tetrahedra are the stored cells; cap tetrahedra
   // are derived, tappable to grow but never removable on their own.
   pyrochlore = null,
-  // A world that handles its own taps (4D: src/app/world-4d.js, 6D:
-  // src/app/world-6d.js): { isActive(), meshes(), handleTap(hit, mode) ->
+  // A world that handles its own taps (4D: src/app/world-4d.js, 5D/6D:
+  // src/app/world-quasicrystal.js): { isActive(), meshes(), handleTap(hit, mode) ->
   // placed/removed? }. While active it's the only pick target and owns
   // every tap -- nothing 3D is visible or clickable there.
   ownWorld = null,
@@ -1788,7 +1788,7 @@ export function createBuildController({
     if (!hit) return;
     if (firstPlacementTarget && hit.object === firstPlacementTarget.mesh) return; // nothing placed there yet to remove
     const mode = getMode();
-    // Long-press in 4D/6D removes the pressed piece (the world's own chisel).
+    // Long-press in 4D/5D/6D removes the pressed piece (the world's own chisel).
     if (ownWorld?.isActive()) {
       if (mode && !ownWorld.handleTap(hit, 'chisel') && onPieceNoOp) onPieceNoOp('remove');
       return;

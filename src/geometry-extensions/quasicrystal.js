@@ -273,10 +273,12 @@ export function makeQuasicrystal(tier, approximant = null) {
     return out;
   }
 
-  // Which of tileFaces(n, I) a physical point on the tile's surface is on
-  // (6D): the edge coordinate nearest 0 or 1.
-  function faceAtPoint(n, I, p) {
-    const v = tileVertices(n, I);
+  // Which face of a tile a physical point on its surface is on: the edge
+  // coordinate nearest 0 or 1. Returns 2j + side for edge j, so in 6D (and
+  // for a 5D prism's sides, j = 0, 1) it indexes tileFaces(n, I); a 5D
+  // prism's bottom is 4 and its top is 5.
+  function faceAtPoint(n, I, p, layer = 0) {
+    const v = tileVertices(n, I, layer);
     const o = v[0];
     const rel = [0, 1, 2].map((x) => p[x] - o[x]);
     const e = [v[4], v[2], v[1]].map((w) => [0, 1, 2].map((x) => w[x] - o[x]));

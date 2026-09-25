@@ -2,7 +2,7 @@
 // engine behind the 5D (Penrose, from Z^5) and 6D (Ammann-Kramer, from Z^6)
 // worlds, against the known facts about those tilings.
 import {
-  makeQuasicrystal, BASE_OFFSET, APPROXIMANT_STOPS, approximantPeriods, subsets, centroid, tileKey,
+  makeQuasicrystal, BASE_OFFSET, APPROXIMANT_STOPS, PRISM_HEIGHT, approximantPeriods, subsets, centroid, tileKey,
 } from '../src/geometry-extensions/quasicrystal.js';
 import { PHI, STAR_DIRECTIONS, tilesOverlap } from '../src/geometry-extensions/growth.js';
 
@@ -179,6 +179,25 @@ for (const tier of ['6d', '5d']) {
   check(`flips conserve volume (out ${vGone.toFixed(2)}, in ${vCome.toFixed(2)})`, Math.abs(vGone - vCome) < 0.25 * Math.max(vGone, 1));
   check('a phason step never moves a piece: unchanged tiles keep their key and position',
     [...before.keys()].filter((k) => after.has(k)).every((k) => dist(centre(before.get(k)), centre(after.get(k))) < 1e-12));
+
+  // Taps: the centre of each face of a tile resolves to that face (6D: 6
+  // faces; 5D prisms: 4 sides, then bottom and top, on a raised layer).
+  const layer = tier === '5d' ? 3 : 0;
+  check('the centre of every face of every patch tile resolves to that face', tiles.every((t) => {
+    const v = e.tileVertices(t.n, t.I, layer);
+    return [0, 1, 2, 3, 4, 5].every((f) => {
+      const j = f >> 1, side = f & 1;
+      const ids = [...Array(8).keys()].filter((i) => ((i >> (2 - j)) & 1) === side);
+      const c = [0, 1, 2].map((x) => ids.reduce((s, i) => s + v[i][x], 0) / 4);
+      return e.faceAtPoint(t.n, t.I, c, layer) === f;
+    });
+  }));
+  if (tier === '5d') {
+    check('5D prisms: layer k sits on layer k-1 (height PRISM_HEIGHT, no overlap)', tiles.every((t) => {
+      const lo = e.tileVertices(t.n, t.I, 0), hi = e.tileVertices(t.n, t.I, 1);
+      return !tilesOverlap(lo, hi) && Math.abs(hi[0][1] - lo[0][1] - PRISM_HEIGHT) < 1e-12 && Math.abs(lo[1][1] - lo[0][1] - PRISM_HEIGHT) < 1e-12;
+    }));
+  }
 
   // The first-placement target: a tile near the origin at any slider
   // position (phasons across +-1 window width, every approximant).
