@@ -544,9 +544,21 @@ document.getElementById('lab-close')?.addEventListener('click', () => {
 })();
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+// The main light rides with the camera (direct request 2026-09-25: an
+// underside turned toward you should be shaded like a top or side, not
+// flat ambient). It keeps the angle the old fixed sun at (5, 8, 4) had
+// from the default view at (6, 5, 8), so the opening view looks the same.
 const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-sun.position.set(5, 8, 4);
-scene.add(sun);
+{
+  const home = new THREE.PerspectiveCamera();
+  home.position.set(6, 5, 8);
+  home.lookAt(0, 0, 0);
+  home.updateMatrixWorld();
+  sun.position.copy(home.worldToLocal(new THREE.Vector3(5, 8, 4)));
+  sun.target.position.copy(home.worldToLocal(new THREE.Vector3(0, 0, 0)));
+}
+camera.add(sun, sun.target);
+scene.add(camera);
 
 function buildRDGeometry(scale = 1) {
   const points = rdRawVerts(scale).map(([x, y, z]) => new THREE.Vector3(x, y, z));
