@@ -27,6 +27,22 @@ purged in 3d87e35; restore reference 216ddbd), as pure geometry.
   - **Distance**: shell n is every cell at the n-th distance from the
     centre. Sizes 12, 6, 24, 12, 24, 8, 48, 6 … The hull passes through
     faceted shapes toward a sphere (the old planetoid growth).
+  - **Target**: shells measured by a chosen shape's own distance, so the
+    hull grows as that shape: **tetrahedron, cube, octahedron, rhombic
+    dodecahedron, cuboctahedron, truncated octahedron**. Measured
+    2026-09-26: every face of each lies on a lattice layer, so all are
+    exact. Fixed orientation, lined up with the lattice; the tetrahedron
+    comes in its 2 mirror orientations. No icosahedron or dodecahedron:
+    no lattice can give their golden-ratio faces (the crystallographic
+    restriction). No ED stretch: the ED lattice makes the regular shapes
+    inexact (decided against, 2026-09-26).
+- **Hulls are stepped (whole cells) by default, with a trim option** that
+  cuts the outer layer to perfectly flat faces. Cube faces use the app's
+  Cube and Pyramid pieces (RD = cube + 6 pyramids); octahedron and
+  tetrahedron faces need a new piece, the **corner cap** (RD =
+  octahedron + 8 caps, each 1/24 of the RD; a tetrahedral face removes
+  4 alternate caps). Caps don't touch the RD's centre, so they aren't
+  made of the 48 wedges: a separate small family.
 - **Both ways of building**: place pieces by hand (tap a face to add the
   neighbour, long-press to remove), and grow or shrink a whole shell at
   a time.
@@ -106,10 +122,15 @@ shells at any scale (reuse `cellsInShells`). `scripts/verify-shells.mjs`
 bands by shell from the centre cell, the Steps | Distance toggle, its
 own store, undo and Export/Import entry, listed as a 3D world.
 
-**3. Grow and shrink.** Add or remove the whole outer shell in one
-step (one undo step each), in either shell rule.
+**3. Grow, shrink and targets.** Add or remove the whole outer shell in
+one step (one undo step each), in any shell rule. The Target rule with
+its shape picker (stepped hulls). Engine: target gauges; verify:shells
+checks each target's faces are flat lattice layers.
 
-**4. Pieces and fragmenting.** Every split as a placeable piece, from a
+**4. Pieces, fragmenting and trimming.** The **trim option**: flat hull
+faces from Cube, Pyramid, corner caps and the RD's halves (engine and
+verify:shells extended with the caps; checked: RD = octahedron + 8 caps
+exactly). Every split as a placeable piece, from a
 picker grouped by split (halves … 48ths). Pieces snap into cell
 positions and orientations, and can mix with whole RDs. **Fragmenting**
 (user, 2026-09-26): target a placed piece or block, pick a breakdown
