@@ -15,7 +15,10 @@ purged in 3d87e35; restore reference 216ddbd), as pure geometry.
 ## The design (agreed with the user, 2026-09-26)
 
 - **Its own scene**, like the 4D and 5D/6D worlds: its own store, undo,
-  panel and tools. The main 3D world keeps one piece at a time.
+  panel and tools. The main 3D world keeps one piece at a time. It is
+  **listed as a 3D world** alongside FCC and BCC (the Wizard's 3D screen
+  and the Piece wheel).
+- **The first piece placed is the centre** the shells count out from.
 - **Shells are colour bands.** Every piece is coloured by the shell it
   falls in, counted out from a centre cell. Two shell rules, toggled:
   - **Steps**: shell n is every cell n neighbour-steps from the centre.
@@ -69,6 +72,8 @@ purged in 3d87e35; restore reference 216ddbd), as pure geometry.
   outline around its small pieces, showing which pieces are missing or
   extra; confirming replaces them with one big RD. Zooming in opens a
   big RD back into its pieces. Each is one undo step.
+- **Big RDs keep their inner bands**: a big RD remembers the shell
+  colours of the pieces it replaced, seen in X-Ray and Translucent.
 
 ## Stages
 
@@ -93,8 +98,7 @@ shells at any scale (reuse `cellsInShells`). `scripts/verify-shells.mjs`
 **2. The scene.** `src/app/world-shells.js` (same factory shape as
 `world-quasicrystal.js`): place RDs on the FCC lattice by hand, colour
 bands by shell from the centre cell, the Steps | Distance toggle, its
-own store, undo and Export/Import entry. Entry point: to decide (see
-open questions).
+own store, undo and Export/Import entry, listed as a 3D world.
 
 **3. Grow and shrink.** Add or remove the whole outer shell in one
 step (one undo step each), in either shell rule.
@@ -119,14 +123,10 @@ shipped stage.
 
 ## Open questions
 
-- **Entry point:** a Wizard card, a face on the dimension picker, a
-  Menu item, or a 3D world alongside FCC/BCC?
-- **The centre:** is it the first piece placed, or can it be moved?
 - **Colours:** keep the old per-shell hue step (render.js `shellTint`,
   0.15 per shell), or a chosen palette?
-- **Big RDs and bands:** once a cluster becomes one big RD, does it keep
-  its inner bands (visible in X-Ray or Translucent), or take one colour?
-- **Size limit:** the largest hull before it slows down on a phone.
+- **Size limit:** the largest hull before it slows down on a phone
+  (measure in stage 2).
 
 ## Rules that apply throughout
 
