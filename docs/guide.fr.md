@@ -120,15 +120,18 @@ Un panneau apparaît en bas de l'écran.
 
 ### Le Catalogue
 
-En 5D et 6D, le bouton en bas à gauche ouvre le **Catalogue** (les cartes 5D et 6D du Wizard l'ouvrent aussi). Il propose trois sortes d'éléments :
+En 5D et 6D, le bouton en bas à gauche ouvre le **Catalogue** (les cartes 5D et 6D du Wizard l'ouvrent aussi). Il propose quatre sortes d'éléments :
 
 - **Zonoèdres :** des formes faites des propres pièces du pavage, d'un seul rhomboèdre jusqu'au triacontaèdre rhombique, et en 5D des prismes losange, hexagonal, octogonal et décagonal.
 - **Polytopes :** les ombres de polytopes de dimension supérieure, comme le 6-orthoplexe, dont l'ombre est un icosaèdre. Une ombre se pose sur le pavage sans bloquer les pièces, et ses sommets s'allument là où ils sont dans la coupe. Appuyez longuement sur une ombre pour la retirer.
+- **Ponts :** des hyperprismes, polytopes prolongés d’un pas dans une dimension de plus, comme le prisme du 5-orthoplexe. Comme les polytopes, ils se posent en ombres.
 - **Étoiles de sommet :** toutes les façons dont les pièces se rejoignent en un sommet (7 en 5D, 24 en 6D), aussi avec un ou deux anneaux de pièces autour. Touchez un titre pour ouvrir sa liste.
 
 Chaque élément a un numéro de série. Saisissez-le dans la case et touchez **Invoquer** pour y aller directement.
 
 Quand vous choisissez un élément, un **contour doré** apparaît là où il se trouve vraiment dans votre quasicristal. Touchez votre construction pour amener le contour à l'endroit le plus proche, puis touchez le contour pour le poser en pièces ordinaires. Si l'élément appartient à un autre approximant, le curseur y glisse d'abord. **Annuler l'invocation** arrête. Un **Undo** l'annule et ramène le curseur là où il était.
+
+**Relier** (dans le panneau, dès que vous avez deux pièces) joint deux éléments : touchez une pièce de chacun, et la plus courte chaîne de vraies tuiles entre eux est posée comme un connecteur. Un **Undo** l’annule.
 
 ## Enregistrer votre travail
 

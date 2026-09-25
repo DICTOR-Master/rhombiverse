@@ -64,9 +64,11 @@ right-click) removes. The **User Guide** (in the app, or at
   dimensions (pieces flip), the **Approximant** slider steps through
   periodic crystals (1/1, 2/1, 3/2, 5/3 …) toward the true quasicrystal
   at τ, and **Window View** shows the acceptance window. The **Catalogue**
-  holds 112 items — zonohedra up to the rhombic triacontahedron, every
-  vertex star, and higher-dimensional polytope shadows — each summoned by
-  name or serial number to where it really occurs in your quasicrystal.
+  holds 155 items — zonohedra up to the rhombic triacontahedron, every
+  vertex star, higher-dimensional polytope shadows and 43 hyperprism
+  bridges — each summoned by name or serial number to where it really
+  occurs in your quasicrystal. **Connect** joins any two items with the
+  shortest chain of real tiles between them.
 - **Views** — World View (Colour, Translucent, Skeleton), Lattice View
   (the open slots around your build and its outer layers, fading inward),
   X-Ray cutaways (including diagonal cuts), Spherical, Duality Mode (the

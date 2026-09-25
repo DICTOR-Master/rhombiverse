@@ -118,15 +118,18 @@ A panel appears at the bottom of the screen.
 
 ### The Catalogue
 
-In 5D and 6D the bottom-left button opens the **Catalogue** (the Wizard's 5D and 6D cards open it too). It has three kinds of item:
+In 5D and 6D the bottom-left button opens the **Catalogue** (the Wizard's 5D and 6D cards open it too). It has four kinds of item:
 
 - **Zonohedra:** shapes made of the tiling's own pieces, from a single rhombohedron up to the rhombic triacontahedron, and in 5D rhombus, hexagon, octagon and decagon prisms.
 - **Polytopes:** the shadows of higher-dimensional polytopes, such as the 6-orthoplex, whose shadow is an icosahedron. A shadow lies over the tiling without blocking pieces, and its corners light up where they are in the slice. Long-press one to remove it.
+- **Bridges:** hyperprisms, polytopes carried one step through a further dimension, such as the 5-orthoplex prism. Like polytopes, they land as shadows.
 - **Vertex stars:** every way the pieces meet at a corner (7 in 5D, 24 in 6D), also with one or two rings of the pieces around them. Tap a heading to open its list.
 
 Every item has a serial number. Type one in the box and tap **Summon** to go straight to it.
 
 When you pick an item, a **gold outline** appears where it really occurs in your quasicrystal. Tap your build to move the outline to the nearest spot there, and tap the outline to place it as ordinary pieces. If the item belongs to a different approximant, the slider slides there first. **Cancel summon** stops. One **Undo** takes it back and slides the slider back to where it was.
+
+**Connect** (in the panel, once you have two pieces) joins two items: tap a piece of each, and the shortest chain of real tiles between them is placed as one connector. One **Undo** takes it back.
 
 ## Saving your work
 

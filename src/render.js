@@ -3657,9 +3657,9 @@ async function init() {
       // A polytope's preview is its whole projected wireframe, not just
       // the hull's outline (5D: the flat shadow, lifted into the x/z plane).
       const poly = action.startsWith('summon:') && findBySerial(catalogueEntries, Number(action.slice(7)));
-      if (poly?.kind === 'polytope') {
+      if (poly?.kind === 'polytope' || poly?.kind === 'bridge') {
         const e = qcEngines[poly.tier];
-        const { verts, edges } = polytopeShape(e.d, poly.family, poly.directions);
+        const { verts, edges } = polytopeShape(e.d, poly.family, poly.directions, poly.prism);
         const pts = verts.map((m) => { const q = e.parOf(m); return poly.tier === '5d' ? [q[0], 0, q[1]] : q; });
         return edges.map(([a, b]) => [pts[a], pts[b]]);
       }

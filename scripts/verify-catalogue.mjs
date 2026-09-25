@@ -19,15 +19,21 @@ const serials = entries.map((x) => x.serial);
 check('serials are unique', new Set(serials).size === serials.length);
 check('every serial is inside its kind\'s range', entries.every((x) => SERIAL_RANGES[x.kind] && x.serial >= SERIAL_RANGES[x.kind][0] && x.serial <= SERIAL_RANGES[x.kind][1]));
 check('names are unique', new Set(entries.map((x) => x.name)).size === entries.length);
-const wellFormedShape = (x) => (x.kind === 'polytope' && !['orthoplex', 'demicube', 'simplex'].includes(x.family) ? false : x.kind === 'patch'
+const wellFormedShape = (x) => ((x.kind === 'polytope' || x.kind === 'bridge') && !['orthoplex', 'demicube', 'simplex'].includes(x.family) ? false
+  : x.kind === 'bridge' && !(Number.isInteger(x.prism) && x.prism >= 0 && x.prism < TIERS[x.tier].d && !x.directions.includes(x.prism)) ? false : x.kind === 'patch'
   ? Array.isArray(x.window) && x.window.length === 3 && x.window.every(Number.isFinite) && [1, 2, 3].includes(x.rings) && x.reach > 0 && Number.isInteger(x.pieces)
-  : Array.isArray(x.directions) && x.directions.length >= TIERS[x.tier].k && x.directions.every((i) => Number.isInteger(i) && i >= 0 && i < TIERS[x.tier].d)
+  : Array.isArray(x.directions) && x.directions.length + (x.kind === 'bridge' ? 1 : 0) >= TIERS[x.tier].k && x.directions.every((i) => Number.isInteger(i) && i >= 0 && i < TIERS[x.tier].d)
     && new Set(x.directions).size === x.directions.length);
 check('every entry is well-formed', entries.every((x) => TIERS[x.tier] && wellFormedShape(x)
   && (x.tier === '5d' ? Number.isInteger(x.layers) && x.layers >= 1 : x.layers === undefined)
   && (x.approximant === null || (Array.isArray(x.approximant) && x.approximant.length === 2))));
 const engines = { '5d': makeQuasicrystal('5d'), '6d': makeQuasicrystal('6d') };
-const shapeKeys = entries.map((x) => (x.kind === 'polytope'
+// Bridges: the shadow's sorted corner-to-corner distances (congruent
+// shadows are the same entry).
+const shadowKey = (x) => { const e = engines[x.tier]; const p = polytopeShape(e.d, x.family, x.directions, x.prism).verts.map((m) => e.parOf(m)); const ds = []; for (let a = 0; a < p.length; a++) for (let b = a + 1; b < p.length; b++) ds.push(Math.hypot(...p[a].map((v, i) => v - p[b][i])).toFixed(4)); return ds.sort().join(','); };
+const shapeKeys = entries.map((x) => (x.kind === 'bridge'
+  ? `${x.tier}|bridge|${x.family}|${shadowKey(x)}`
+  : x.kind === 'polytope'
   ? `${x.tier}|polytope|${x.family}|${congruentSets(engines[x.tier], x.directions).map((s) => s.join('')).join(';')}`
   : x.kind === 'patch'
   ? `${x.tier}|patch|${canonicalPatch(engines[x.tier], localPatch(engines[x.tier], x.window, x.rings))}`
@@ -41,11 +47,11 @@ const spread = (pts) => {
     ? M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0])
     : M[0][0] * M[1][1] - M[0][1] * M[1][0];
 };
-check('every polytope shadow is full-dimensional, with the right corner count', entries.filter((x) => x.kind === 'polytope').every((x) => {
+check('every polytope and bridge shadow is full-dimensional, with the right corner count', entries.filter((x) => x.kind === 'polytope' || x.kind === 'bridge').every((x) => {
   const e = engines[x.tier];
-  const { verts, edges } = polytopeShape(e.d, x.family, x.directions);
+  const { verts, edges } = polytopeShape(e.d, x.family, x.directions, x.prism);
   const k = x.directions.length;
-  const expect = x.family === 'orthoplex' ? 2 * k : x.family === 'simplex' ? k + 1 : 2 ** (k - 1);
+  const expect = (x.family === 'orthoplex' ? 2 * k : x.family === 'simplex' ? k + 1 : 2 ** (k - 1)) * (x.kind === 'bridge' ? 2 : 1);
   return verts.length === expect && edges.length > 0 && spread(verts.map((m) => e.parOf(m))) > 1e-6;
 }));
 check('every patch entry is as big as it says', entries.filter((x) => x.kind === 'patch').every((x) => localPatch(engines[x.tier], x.window, x.rings).length === x.pieces));
@@ -64,7 +70,7 @@ for (const x of entries) {
       const occ = findOccurrence(e, off, x, near);
       if (!occ) { ok = false; continue; }
       worst = Math.max(worst, Math.hypot(...occ.centre.map((c, i) => c - near[i])));
-      if (x.kind === 'polytope') { ok &&= e.isVertex(occ.anchor, off); continue; }
+      if (x.kind === 'polytope' || x.kind === 'bridge') { ok &&= e.isVertex(occ.anchor, off); continue; }
       const inPlane = occ.tiles.length === pieceCount(e, x) / (x.layers ?? 1);
       const real = occ.tiles.every((t) => e.isTile(t.n, t.I, off));
       const V = occ.tiles.map((t) => e.tileVertices(t.n, t.I));
@@ -72,7 +78,7 @@ for (const x of entries) {
       ok &&= inPlane && real && apart;
     }
   }
-  check(`${x.serial} ${x.name}: ${x.kind === "polytope" ? "anchors at a tiling vertex" : `lands as ${pieceCount(makeQuasicrystal(x.tier), x)} real piece${pieceCount(makeQuasicrystal(x.tier), x) === 1 ? "" : "s"}`} near every probe (farthest ${worst.toFixed(1)} away)`, ok);
+  check(`${x.serial} ${x.name}: ${x.kind === "polytope" || x.kind === "bridge" ? "anchors at a tiling vertex" : `lands as ${pieceCount(makeQuasicrystal(x.tier), x)} real piece${pieceCount(makeQuasicrystal(x.tier), x) === 1 ? "" : "s"}`} near every probe (farthest ${worst.toFixed(1)} away)`, ok);
 }
 
 console.log(failures ? `\n${failures} check(s) FAILED` : '\nall catalogue checks passed');

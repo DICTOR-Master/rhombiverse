@@ -456,6 +456,7 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
     const sections = [
       { id: 'zonohedron', label: t('cat.zonohedra', L), desc: t('cat.zonohedraDesc', L), items: mine.filter((x) => x.kind === 'zonohedron') },
       { id: 'polytope', label: t('cat.polytopes', L), desc: t('cat.polytopesDesc', L), items: mine.filter((x) => x.kind === 'polytope') },
+      { id: 'bridge', label: t('cat.bridges', L), desc: t('cat.bridgesDesc', L), items: mine.filter((x) => x.kind === 'bridge') },
       ...[1, 2, 3].map((r) => ({
         id: `patch${r}`,
         label: r === 1 ? t('cat.stars', L) : t('cat.starsRings', L, { n: r }),

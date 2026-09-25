@@ -120,15 +120,18 @@ Aparece un panel en la parte inferior de la pantalla.
 
 ### El Catálogo
 
-En 5D y 6D, el botón de abajo a la izquierda abre el **Catálogo** (las tarjetas 5D y 6D del Wizard también lo abren). Tiene tres tipos de elementos:
+En 5D y 6D, el botón de abajo a la izquierda abre el **Catálogo** (las tarjetas 5D y 6D del Wizard también lo abren). Tiene cuatro tipos de elementos:
 
 - **Zonoedros:** formas hechas con las propias piezas del teselado, desde un solo romboedro hasta el triacontaedro rómbico, y en 5D prismas rómbicos, hexagonales, octogonales y decagonales.
 - **Politopos:** las sombras de politopos de dimensión superior, como el 6-ortoplex, cuya sombra es un icosaedro. Una sombra queda sobre el teselado sin bloquear piezas, y sus vértices se iluminan donde están en el corte. Mantén pulsada una para quitarla.
+- **Puentes:** hiperprismas, politopos llevados un paso a través de una dimensión más, como el prisma del 5-ortoplex. Igual que los politopos, aparecen como sombras.
 - **Estrellas de vértice:** todas las formas en que las piezas se encuentran en un vértice (7 en 5D, 24 en 6D), también con uno o dos anillos de piezas alrededor. Toca un encabezado para abrir su lista.
 
 Cada elemento tiene un número de serie. Escríbelo en la casilla y toca **Invocar** para ir directamente a él.
 
 Al elegir un elemento, aparece un **contorno dorado** donde realmente se da en tu cuasicristal. Toca tu construcción para llevar el contorno al sitio más cercano, y toca el contorno para colocarlo como piezas normales. Si el elemento pertenece a otro aproximante, el deslizador se desplaza allí primero. **Cancelar invocación** lo detiene. Un **Undo** lo deshace y devuelve el deslizador a donde estaba.
+
+**Conectar** (en el panel, cuando tienes dos piezas) une dos elementos: toca una pieza de cada uno y se coloca como un conector la cadena más corta de baldosas reales entre ellos. Un **Undo** lo deshace.
 
 ## Guarda tu trabajo
 

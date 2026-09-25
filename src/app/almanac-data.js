@@ -192,7 +192,7 @@ export const LATTICE_CONCEPT_ENTRIES = [
     kind: 'concept',
     id: 'concept:catalogueKinds',
     label: 'The 5D/6D Catalogue',
-    desc: "Three kinds of item. Zonohedra are convex shapes whose faces come in parallel pairs; the ones here are made entirely of the tiling's own pieces, up to the rhombic triacontahedron (20 golden rhombohedra). Polytopes are higher-dimensional shapes with corners on the lattice (orthoplexes, demicubes and simplex corners), shown as their shadows: the 6-orthoplex casts an icosahedron. Vertex stars are the ways pieces can meet at a corner: 7 in the Penrose layers and 24 in the icosahedral tiling. Every item lands where it really occurs.",
+    desc: "Four kinds of item. Zonohedra are convex shapes whose faces come in parallel pairs; the ones here are made entirely of the tiling's own pieces, up to the rhombic triacontahedron (20 golden rhombohedra). Polytopes are higher-dimensional shapes with corners on the lattice (orthoplexes, demicubes and simplex corners), shown as their shadows: the 6-orthoplex casts an icosahedron. Bridges are hyperprisms: a polytope carried one step through a further dimension, such as the 5-orthoplex prism, also shown as its shadow. Vertex stars are the ways pieces can meet at a corner: 7 in the Penrose layers and 24 in the icosahedral tiling. Every item lands where it really occurs, and Connect joins two items with the shortest chain of real tiles.",
     markKey: null,
   },
 ];

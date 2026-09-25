@@ -162,7 +162,7 @@ function findPatch(e, offset, entry, near) {
 // { tiles: [{ n, I }], centre } or null.
 export function findOccurrence(e, offset, entry, near) {
   if (entry.kind === 'patch') return findPatch(e, offset, entry, near);
-  if (entry.kind === 'polytope') return findAnchor(e, offset, near);
+  if (isShadowEntry(entry)) return findAnchor(e, offset, near);
   const sets = congruentSets(e, entry.directions);
   for (const radius of [5, 9, 14]) {
     const tiles = e.patch(offset, radius, near);
@@ -187,7 +187,7 @@ export function findOccurrence(e, offset, entry, near) {
 
 // How many pieces an entry lands as.
 export function pieceCount(e, entry) {
-  if (entry.kind === 'polytope') return 1;
+  if (isShadowEntry(entry)) return 1;
   if (entry.kind === 'patch') return entry.pieces * (entry.layers ?? 1);
   const m = entry.directions.length;
   let c = 1;
@@ -226,7 +226,21 @@ export function loadCatalogue() {
 //   demicube:  v + the even-size subsets of S; edges join corners two
 //              steps apart.
 // Returns lattice offsets from v and edges as index pairs.
-export function polytopeShape(d, family, S) {
+// Bridges (serials 2000-2999): hyperprisms, a polytope above carried one
+// step along a further axis `prism` (not in S): its corners and those
+// corners + e_prism, joined by the base edges twice and one edge per
+// corner. Still a lattice polytope, shown as a shadow like the others.
+export const isShadowEntry = (entry) => entry.kind === 'polytope' || entry.kind === 'bridge';
+export function polytopeShape(d, family, S, prism = null) {
+  if (prism !== null && prism !== undefined) {
+    const base = polytopeShape(d, family, S);
+    const n = base.verts.length;
+    const lifted = base.verts.map((v) => v.map((x, l) => (l === prism ? x + 1 : x)));
+    return {
+      verts: [...base.verts, ...lifted],
+      edges: [...base.edges, ...base.edges.map(([a, b]) => [a + n, b + n]), ...base.verts.map((_, i) => [i, i + n])],
+    };
+  }
   const unit = (i, s = 1) => Array.from({ length: d }, (_, l) => (l === i ? s : 0));
   let verts;
   if (family === 'orthoplex') verts = S.flatMap((i) => [unit(i), unit(i, -1)]);

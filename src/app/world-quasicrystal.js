@@ -51,7 +51,7 @@ import { makeQuasicrystal, BASE_OFFSET, APPROXIMANT_STOPS, TIERS, PRISM_HEIGHT, 
 import { createGearedSlider } from './geared-slider.js';
 import { t, tn } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
-import { findOccurrence, polytopeShape } from '../geometry-extensions/quasicrystal-catalogue.js';
+import { findOccurrence, polytopeShape, isShadowEntry } from '../geometry-extensions/quasicrystal-catalogue.js';
 
 const PHASON_LIMIT = 1; // window widths
 const PHASON_SNAP = 0.04;
@@ -105,8 +105,11 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   let summons = [];
   // Polytope shadows: key -> { family, directions, v, layer?, material, summon }.
   const polys = new Map();
-  const polyKey = (p) => `${p.family}|${p.directions.join('')}|${p.v.join(',')}${W.layered ? `|${p.layer}` : ''}`;
+  const polyKey = (p) => `${p.family}|${p.directions.join('')}${Number.isInteger(p.prism) ? `+${p.prism}` : ''}|${p.v.join(',')}${W.layered ? `|${p.layer}` : ''}`;
   let pending = null; // a summon in progress: { entry, tiles, layer, before }
+  // Connect: on while choosing two pieces; `connectFrom` is the first one.
+  let connecting = false;
+  let connectFrom = null;
   const view = { phason: [0, 0, 0], approx: APPROXIMANT_STOPS.length - 1, control: 'p1', mode: 'build' };
   let active = false;
   let skeleton = false;
@@ -172,7 +175,8 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       if (!Array.isArray(p.v) || p.v.length !== d || !p.v.every(Number.isInteger)) continue;
       if (!Array.isArray(p.directions) || p.directions.length < 3 || !p.directions.every((i) => Number.isInteger(i) && i >= 0 && i < d)) continue;
       if (W.layered && !Number.isInteger(p.layer)) continue;
-      const poly = { family: p.family, directions: p.directions, v: p.v, ...(W.layered ? { layer: p.layer } : {}), material: p.material, ...(Number.isInteger(p.summon) ? { summon: p.summon } : {}) };
+      const prism = Number.isInteger(p.prism) && p.prism >= 0 && p.prism < d && !p.directions.includes(p.prism) ? { prism: p.prism } : {};
+      const poly = { family: p.family, directions: p.directions, ...prism, v: p.v, ...(W.layered ? { layer: p.layer } : {}), material: p.material, ...(Number.isInteger(p.summon) ? { summon: p.summon } : {}) };
       polys.set(polyKey(poly), poly);
     }
   }
@@ -298,13 +302,52 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     if (before && !sameSettings(before, settingsNow())) slideTo(before);
     else rebuild();
   }
+  // Connector: the shortest chain of tiles of the current tiling joining
+  // the item (all pieces of its summon, or the single piece) holding tile a
+  // to the one holding tile b, placed as one summon (serial 0).
+  const MAX_CONNECT_SEARCH = 20000;
+  function itemOf(t) {
+    const tile = tiles.get(keyOf(t));
+    return tile?.summon ? [...tiles.values()].filter((x) => x.summon === tile.summon) : [t];
+  }
+  function connect(a, b) {
+    const from = itemOf(a), to = new Set(itemOf(b).map(keyOf));
+    if (from.some((t) => to.has(keyOf(t)))) { showHudPrompt(t('qc.connect.same', lang()), 3000); return false; }
+    const prev = new Map(from.map((t) => [keyOf(t), null]));
+    let frontier = from.map(pieceOf), found = null;
+    while (frontier.length && !found && prev.size < MAX_CONNECT_SEARCH) {
+      const next = [];
+      for (const t of frontier) {
+        for (let f = 0; f < faceCount && !found; f++) {
+          const u = across(t, f);
+          if (!u || prev.has(keyOf(u))) continue;
+          prev.set(keyOf(u), t);
+          if (to.has(keyOf(u))) found = u; else next.push(u);
+        }
+        if (found) break;
+      }
+      frontier = next;
+    }
+    if (!found) { showHudPrompt(t('qc.connect.none', lang()), 3000); return false; }
+    const chain = [];
+    for (let x = prev.get(keyOf(found)); x && prev.get(keyOf(x)) !== null; x = prev.get(keyOf(x))) chain.push(x);
+    const id = summons.reduce((m, x) => Math.max(m, x.id), 0) + 1;
+    const material = getMaterial();
+    let added = 0;
+    for (const x of chain) if (!tiles.has(keyOf(x))) { tiles.set(keyOf(x), { ...pieceOf(x), material, summon: id }); added++; }
+    if (!added) { showHudPrompt(t('qc.connect.touching', lang()), 3000); return false; }
+    summons.push({ id, serial: 0, name: '', settings: settingsNow(), before: settingsNow() });
+    save(); rebuild(); onChange();
+    showHudPrompt(tn('qc.connect.placed', lang(), added), 3000);
+    return true;
+  }
   function landSummon() {
     const id = summons.reduce((m, x) => Math.max(m, x.id), 0) + 1;
     const { entry } = pending;
     const material = getMaterial();
     let added = 0;
     if (pending.anchor) {
-      const poly = { family: entry.family, directions: entry.directions, v: pending.anchor, ...(W.layered ? { layer: pending.layer } : {}), material, summon: id };
+      const poly = { family: entry.family, directions: entry.directions, ...(Number.isInteger(entry.prism) ? { prism: entry.prism } : {}), v: pending.anchor, ...(W.layered ? { layer: pending.layer } : {}), material, summon: id };
       if (!polys.has(polyKey(poly))) { polys.set(polyKey(poly), poly); added = 1; }
     }
     for (const t of pending.tiles) {
@@ -364,7 +407,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     const recent = summons.slice(-SUMMON_ROWS);
     const summonRows = summons.length
       ? `<div><span class="w4d-info-k">${t('qc.info.summoned', L)}</span> ${t('qc.info.summonedHint', L)}${summons.length > recent.length ? ` ${t('qc.info.latest', L, { n: recent.length, total: summons.length })}` : ''}</div>${recent.map((x) =>
-        `<button type="button" class="qc-summon-row" data-summon="${x.id}">#${x.serial} ${x.name} <span class="qc-summon-set">${settingsLabel(x.settings)}</span></button>`).join('')}`
+        `<button type="button" class="qc-summon-row" data-summon="${x.id}">${x.serial ? `#${x.serial} ${x.name}` : t('qc.connect.name', L)} <span class="qc-summon-set">${settingsLabel(x.settings)}</span></button>`).join('')}`
       : '';
     info.innerHTML = rows.map(([key, v]) => `<div><span class="w4d-info-k">${key}</span> ${v}</div>`).join('') + summonRows;
   }
@@ -442,7 +485,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     // Polytopes: their hidden-dimension shadow, same edges.
     const polyCorners = [];
     for (const p of polys.values()) {
-      const { verts, edges } = polytopeShape(d, p.family, p.directions);
+      const { verts, edges } = polytopeShape(d, p.family, p.directions, p.prism);
       const corners = verts.map((o) => o.map((x, i) => x + p.v[i]));
       const segs = edges.flatMap(([a, b]) => [corners[a], corners[b]]).map((m) => new THREE.Vector3(...toScene(windowPoint(m))));
       const g = new THREE.BufferGeometry().setFromPoints(segs);
@@ -472,7 +515,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   // frame, and its edges. 5D: the flat shadow as a 1-layer prism.
   function polyGeometry(p) {
     const e = engine();
-    const { verts, edges } = polytopeShape(d, p.family, p.directions);
+    const { verts, edges } = polytopeShape(d, p.family, p.directions, p.prism);
     const corners = verts.map((o) => o.map((x, i) => x + p.v[i]));
     const at = (m, y) => { const q = e.parOf(m); return W.layered ? [q[0], y, q[1]] : q; };
     const base = corners.map((m) => at(m, (p.layer ?? 0) * PRISM_HEIGHT));
@@ -520,12 +563,13 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       return;
     }
     for (const t of visible) addTile(t, { color: materialColor(t.material), opacity: pieceOpacity, qc: 'tile' });
+    if (connectFrom) addTile(connectFrom, { color: GHOST_COLOR, opacity: 0.45, qc: 'ghost', lineMaterial: new THREE.LineBasicMaterial({ color: GHOST_COLOR }) });
     for (const p of polys.values()) {
       const color = materialColor(p.material);
       addPoly(p, { color, opacity: 0.22, qc: 'polytope', lineColor: color });
     }
     if (pending?.anchor) {
-      addPoly({ family: pending.entry.family, directions: pending.entry.directions, v: pending.anchor, layer: pending.layer }, { color: GHOST_COLOR, opacity: 0.3, qc: 'ghost', lineColor: GHOST_COLOR, litCorners: false });
+      addPoly({ family: pending.entry.family, directions: pending.entry.directions, prism: pending.entry.prism, v: pending.anchor, layer: pending.layer }, { color: GHOST_COLOR, opacity: 0.3, qc: 'ghost', lineColor: GHOST_COLOR, litCorners: false });
     }
     if (pending?.tiles.length) {
       const lineMaterial = new THREE.LineBasicMaterial({ color: GHOST_COLOR });
@@ -560,6 +604,15 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
       if (qc === 'ghost') return landSummon();
       const p = hit.point;
       locateSoon(toPar([p.x, p.y, p.z]), (tile ?? hit.object.userData.poly)?.layer ?? 0);
+      return true;
+    }
+    if (connecting && mode !== 'chisel') {
+      if (qc !== 'tile') { showHudPrompt(t('qc.connect.pieces', lang()), 3000); return true; }
+      if (!connectFrom) { connectFrom = tile; rebuild(); showHudPrompt(t('qc.connect.second', lang()), 3000); return true; }
+      const a = connectFrom;
+      connectFrom = null;
+      connecting = false;
+      connect(a, tile) || rebuild();
       return true;
     }
     if (qc === 'polytope') {
@@ -628,6 +681,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     const infoBtn = `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">${t('hyper.info', L)}</button>`;
     optionsRow.innerHTML = pending ? `<button type="button" data-opt="cancel">${t('qc.cancelSummon', L)}</button>${infoBtn}` : [
       `<button type="button" data-opt="mode" class="${view.mode === 'window' ? 'active' : ''}">${t(`qc.mode.${view.mode}`, L)}</button>`,
+      view.mode === 'build' && tiles.size >= 2 ? `<button type="button" data-opt="connect" class="${connecting ? 'active' : ''}">${t('qc.connect.button', L)}</button>` : '',
       `<button type="button" data-opt="reset">${t('hyper.reset', L, { dim: W.label })}</button>`,
       infoBtn,
     ].join('');
@@ -643,6 +697,13 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     const b = e.target.closest('button[data-opt]');
     if (!b) return;
     if (b.dataset.opt === 'cancel') { cancelSummon(); return; }
+    if (b.dataset.opt === 'connect') {
+      connecting = !connecting;
+      connectFrom = null;
+      if (connecting) showHudPrompt(t('qc.connect.first', lang()), 4000);
+      rebuild();
+      return;
+    }
     if (b.dataset.opt === 'info') infoOpen = !infoOpen;
     else if (b.dataset.opt === 'mode') { view.mode = view.mode === 'window' ? 'build' : 'window'; save(); }
     else if (b.dataset.opt === 'reset') { view.phason = [0, 0, 0]; view.approx = APPROXIMANT_STOPS.length - 1; save(); }

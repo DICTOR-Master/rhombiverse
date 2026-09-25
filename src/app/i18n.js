@@ -229,6 +229,18 @@ const en = {
   'hull.trim': 'Trim',
   'hull.prompt.trimShell': 'Trim cuts the hull flat once a shell around the centre is complete.',
   'hull.prompt.trimTo': 'The truncated octahedron only trims flat at some sizes: complete shell 4 first.',
+  'cat.bridges': 'Bridges: hyperprisms',
+  'cat.bridgesDesc': 'Polytopes carried one step through a further dimension, shown as their shadows like the polytopes above.',
+  'qc.connect.button': 'Connect',
+  'qc.connect.name': 'Connector',
+  'qc.connect.first': 'Connect: tap a piece of the first item.',
+  'qc.connect.second': 'Now tap a piece of the item to connect it to.',
+  'qc.connect.pieces': 'Connect joins pieces: tap a placed piece.',
+  'qc.connect.same': 'Those are the same item.',
+  'qc.connect.none': 'No chain of tiles joins those two nearby.',
+  'qc.connect.touching': 'Those two already touch.',
+  'qc.connect.placed.one': 'Connector placed ({n} new piece).',
+  'qc.connect.placed.other': 'Connector placed ({n} new pieces).',
 };
 
 const ja = {
@@ -419,6 +431,18 @@ const ja = {
   'hull.trim': 'トリム',
   'hull.prompt.trimShell': '中心のまわりのシェルが 1 つ完成すると、トリムでハルを平らに切りそろえられます。',
   'hull.prompt.trimTo': '切頂八面体は特定の大きさでしか平らに切れません。まずシェル 4 を完成させてください。',
+  'cat.bridges': 'ブリッジ：超角柱',
+  'cat.bridgesDesc': 'ポリトープをもう 1 つの次元方向へ 1 段ずらしてつないだ形。上のポリトープと同じく影として表示します。',
+  'qc.connect.button': 'つなぐ',
+  'qc.connect.name': 'コネクタ',
+  'qc.connect.first': 'つなぐ：1 つ目のアイテムのピースをタップしてください。',
+  'qc.connect.second': '次に、つなぐ先のアイテムのピースをタップしてください。',
+  'qc.connect.pieces': 'つなぐはピース同士を結びます。置いたピースをタップしてください。',
+  'qc.connect.same': 'それは同じアイテムです。',
+  'qc.connect.none': 'その 2 つを近くで結ぶタイルの鎖はありません。',
+  'qc.connect.touching': 'その 2 つはすでに接しています。',
+  'qc.connect.placed.one': 'コネクタを配置しました（新しいピース {n} 個）。',
+  'qc.connect.placed.other': 'コネクタを配置しました（新しいピース {n} 個）。',
 };
 
 const es = {
@@ -609,6 +633,18 @@ const es = {
   'hull.trim': 'Recortar',
   'hull.prompt.trimShell': 'Recortar deja la envolvente plana cuando hay una capa completa alrededor del centro.',
   'hull.prompt.trimTo': 'El octaedro truncado solo se recorta plano en algunos tamaños: completa primero la capa 4.',
+  'cat.bridges': 'Puentes: hiperprismas',
+  'cat.bridgesDesc': 'Politopos llevados un paso a través de una dimensión más, mostrados como sombras igual que los politopos de arriba.',
+  'qc.connect.button': 'Conectar',
+  'qc.connect.name': 'Conector',
+  'qc.connect.first': 'Conectar: toca una pieza del primer elemento.',
+  'qc.connect.second': 'Ahora toca una pieza del elemento al que quieres unirlo.',
+  'qc.connect.pieces': 'Conectar une piezas: toca una pieza colocada.',
+  'qc.connect.same': 'Son el mismo elemento.',
+  'qc.connect.none': 'Ninguna cadena de baldosas une esos dos cerca.',
+  'qc.connect.touching': 'Esos dos ya se tocan.',
+  'qc.connect.placed.one': 'Conector colocado ({n} pieza nueva).',
+  'qc.connect.placed.other': 'Conector colocado ({n} piezas nuevas).',
 };
 
 const fr = {
@@ -799,6 +835,18 @@ const fr = {
   'hull.trim': 'Rogner',
   'hull.prompt.trimShell': 'Rogner aplanit l’enveloppe dès qu’une couche autour du centre est complète.',
   'hull.prompt.trimTo': 'L’octaèdre tronqué ne se rogne à plat qu’à certaines tailles : complétez d’abord la couche 4.',
+  'cat.bridges': 'Ponts : hyperprismes',
+  'cat.bridgesDesc': 'Des polytopes prolongés d’un pas dans une dimension de plus, montrés en ombres comme les polytopes ci-dessus.',
+  'qc.connect.button': 'Relier',
+  'qc.connect.name': 'Connecteur',
+  'qc.connect.first': 'Relier : touchez une pièce du premier élément.',
+  'qc.connect.second': 'Touchez maintenant une pièce de l’élément à relier.',
+  'qc.connect.pieces': 'Relier joint des pièces : touchez une pièce posée.',
+  'qc.connect.same': 'C’est le même élément.',
+  'qc.connect.none': 'Aucune chaîne de tuiles ne relie ces deux-là à proximité.',
+  'qc.connect.touching': 'Ces deux-là se touchent déjà.',
+  'qc.connect.placed.one': 'Connecteur posé ({n} nouvelle pièce).',
+  'qc.connect.placed.other': 'Connecteur posé ({n} nouvelles pièces).',
 };
 
 const ko = {
@@ -989,6 +1037,18 @@ const ko = {
   'hull.trim': '다듬기',
   'hull.prompt.trimShell': '중심을 둘러싼 층이 하나 완성되면 다듬기로 껍질을 평평하게 자를 수 있습니다.',
   'hull.prompt.trimTo': '깎은 팔면체는 일부 크기에서만 평평하게 다듬어집니다. 먼저 4층을 완성하세요.',
+  'cat.bridges': '브리지: 초각기둥',
+  'cat.bridgesDesc': '폴리토프를 한 차원 더 한 걸음 이어 붙인 모양으로, 위의 폴리토프처럼 그림자로 보여 줍니다.',
+  'qc.connect.button': '잇기',
+  'qc.connect.name': '연결 조각',
+  'qc.connect.first': '잇기: 첫 번째 항목의 조각을 탭하세요.',
+  'qc.connect.second': '이제 이을 항목의 조각을 탭하세요.',
+  'qc.connect.pieces': '잇기는 조각끼리 연결합니다. 놓인 조각을 탭하세요.',
+  'qc.connect.same': '같은 항목입니다.',
+  'qc.connect.none': '근처에서 그 둘을 잇는 타일 사슬이 없습니다.',
+  'qc.connect.touching': '그 둘은 이미 닿아 있습니다.',
+  'qc.connect.placed.one': '연결 조각을 놓았습니다(새 조각 {n}개).',
+  'qc.connect.placed.other': '연결 조각을 놓았습니다(새 조각 {n}개).',
 };
 
 const zh = {
@@ -1179,6 +1239,18 @@ const zh = {
   'hull.trim': '修整',
   'hull.prompt.trimShell': '中心周围有一层完整后，修整就能把外壳切平。',
   'hull.prompt.trimTo': '截角八面体只在某些大小下能切平：请先完成第 4 层。',
+  'cat.bridges': '桥：超棱柱',
+  'cat.bridgesDesc': '把多胞体沿另一个维度延伸一步得到的形状，和上面的多胞体一样以影子显示。',
+  'qc.connect.button': '连接',
+  'qc.connect.name': '连接件',
+  'qc.connect.first': '连接：轻点第一个条目的一块。',
+  'qc.connect.second': '再轻点要连上的条目的一块。',
+  'qc.connect.pieces': '连接用于把块连起来：请轻点已放置的块。',
+  'qc.connect.same': '这是同一个条目。',
+  'qc.connect.none': '附近没有能连接这两者的块链。',
+  'qc.connect.touching': '这两者已经相接。',
+  'qc.connect.placed.one': '已放置连接件（新增 {n} 块）。',
+  'qc.connect.placed.other': '已放置连接件（新增 {n} 块）。',
 };
 
 const ru = {
@@ -1369,6 +1441,18 @@ const ru = {
   'hull.trim': 'Обрезать',
   'hull.prompt.trimShell': 'Обрезка делает оболочку ровной, когда вокруг центра есть полный слой.',
   'hull.prompt.trimTo': 'Усечённый октаэдр обрезается ровно только при некоторых размерах: сначала завершите слой 4.',
+  'cat.bridges': 'Мосты: гиперпризмы',
+  'cat.bridgesDesc': 'Политопы, продолженные на один шаг в ещё одно измерение; показаны тенями, как политопы выше.',
+  'qc.connect.button': 'Соединить',
+  'qc.connect.name': 'Соединитель',
+  'qc.connect.first': 'Соединить: коснитесь детали первого элемента.',
+  'qc.connect.second': 'Теперь коснитесь детали элемента, с которым соединить.',
+  'qc.connect.pieces': 'Соединение работает с деталями: коснитесь поставленной детали.',
+  'qc.connect.same': 'Это один и тот же элемент.',
+  'qc.connect.none': 'Поблизости нет цепочки плиток, соединяющей эти два.',
+  'qc.connect.touching': 'Эти два уже соприкасаются.',
+  'qc.connect.placed.one': 'Соединитель размещён (новых деталей: {n}).',
+  'qc.connect.placed.other': 'Соединитель размещён (новых деталей: {n}).',
 };
 
 const I18N = { en, ja, es, fr, ko, zh, ru };
