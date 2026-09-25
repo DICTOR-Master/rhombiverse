@@ -27,7 +27,7 @@ import { makeQuasicrystal, PRISM_HEIGHT } from './geometry-extensions/quasicryst
 import { loadCatalogue, findBySerial, zonotopeVertices, localPatch, polytopeShape } from './geometry-extensions/quasicrystal-catalogue.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
-import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
+import { NAMED_LATTICE_ANGLES, START_LATTICE_ANGLE, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
 import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWorld, rhombohedraMigrateLegacyCell, rhombohedraAttachOptions, rhombohedraOverlap } from './geometry-extensions/rhombohedra-lattice.js';
 import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats, pyrochloreNeighborOffsets, pyrochloreCapTetsOf, pyrochloreVisibleTets, pyrochloreTetCornerPartner } from './geometry-extensions/pyrochlore-lattice.js';
 import { FEATURES } from './app/features.js';
@@ -1680,7 +1680,7 @@ async function init() {
   const lattice2dClassMeshes = new Map(); // primitiveId -> InstancedMesh[]
   LATTICE_PRIMITIVES.forEach((primitive) => {
     const impl = LATTICE_PRIMITIVE_IMPLS[primitive.id];
-    const geometry = new ConvexGeometry(impl.tileVerts(NAMED_LATTICE_ANGLES[0].angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+    const geometry = new ConvexGeometry(impl.tileVerts(START_LATTICE_ANGLE.angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
     geometry.computeVertexNormals();
     const mesh = new THREE.InstancedMesh(geometry, material.clone(), MAX_CELLS);
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -1688,7 +1688,7 @@ async function init() {
     lattice2dMeshes.set(primitive.id, mesh);
     if (impl.companions) {
       lattice2dCompanionMeshes.set(primitive.id, impl.companions.map((companion) => {
-        const companionGeometry = new ConvexGeometry(companion.tileVerts(NAMED_LATTICE_ANGLES[0].angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+        const companionGeometry = new ConvexGeometry(companion.tileVerts(START_LATTICE_ANGLE.angleDeg, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
         companionGeometry.computeVertexNormals();
         // 3x: each hexagon touches 3 up + 3 down triangles, so up to 3
         // of each per placed cell (see kagomeStarTriangles).
@@ -1701,7 +1701,7 @@ async function init() {
     if (impl.classCount) {
       const classMeshes = [mesh];
       for (let c = 1; c < impl.maxClasses; c++) {
-        const classGeometry = new ConvexGeometry(impl.classTileVerts(NAMED_LATTICE_ANGLES[0].angleDeg, c, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+        const classGeometry = new ConvexGeometry(impl.classTileVerts(START_LATTICE_ANGLE.angleDeg, c, LATTICE2D_S, LATTICE2D_H).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
         classGeometry.computeVertexNormals();
         const classMesh = new THREE.InstancedMesh(classGeometry, material.clone(), MAX_CELLS);
         classMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -1710,7 +1710,7 @@ async function init() {
       }
       lattice2dClassMeshes.set(primitive.id, classMeshes);
     }
-    rebuildLattice2dInstances(mesh, lattice2dWorlds.get(primitive.id), primitive.id, NAMED_LATTICE_ANGLES[0].angleDeg, 'translation', lattice2dCompanionMeshes.get(primitive.id), lattice2dClassMeshes.get(primitive.id));
+    rebuildLattice2dInstances(mesh, lattice2dWorlds.get(primitive.id), primitive.id, START_LATTICE_ANGLE.angleDeg, 'translation', lattice2dCompanionMeshes.get(primitive.id), lattice2dClassMeshes.get(primitive.id));
   });
 
   // Dot-matrix overlay (Phase 4, direct instruction: "showing the dot
@@ -1790,7 +1790,7 @@ async function init() {
     dotMatrixMesh.instanceMatrix.needsUpdate = true;
     dotMatrixMesh.computeBoundingSphere();
   }
-  updateDotMatrix(NAMED_LATTICE_ANGLES[0].angleDeg);
+  updateDotMatrix(START_LATTICE_ANGLE.angleDeg);
 
   // Persistent 2D toggle panel (Phase 4, direct instruction: "a four
   // position toggle... to see transformations" -- an always-reachable
@@ -1805,7 +1805,7 @@ async function init() {
   // 'tool:pieceType:lattice2d:<id>' action beginFaceAttach-style
   // dispatch already handles), and redraws the dot-matrix overlay at
   // the new angle.
-  let activeLattice2dAngleId = NAMED_LATTICE_ANGLES[0].id;
+  let activeLattice2dAngleId = START_LATTICE_ANGLE.id;
   let activeLattice2dPrimitiveId = LATTICE_PRIMITIVES[0].id;
   // Rhombille (Part D): a second, contextual placement pattern for the
   // SAME 'parallelogram' primitive/world, offered only at the Triangular
@@ -3543,9 +3543,9 @@ async function init() {
         // construction (see its own "seed here, not just in the change
         // handler" comment above) -- unlike 3D there's no separate world
         // to seed here, just select a default piece type. Defaults to
-        // Parallelogram (LATTICE_PRIMITIVES' own first entry) at Square
-        // (NAMED_LATTICE_ANGLES' own first entry, and the toggle panel's
-        // own default -- see activeLattice2dAngleId's declaration),
+        // Parallelogram (LATTICE_PRIMITIVES' own first entry) at
+        // START_LATTICE_ANGLE (the toggle panel's own default -- see
+        // activeLattice2dAngleId's declaration),
         // matching this quick dimension-wheel shortcut's own "just pick
         // A reasonable default, the full picker is dimension-wizard.js's
         // job" role -- same relationship 3D's own 'rd' default above has

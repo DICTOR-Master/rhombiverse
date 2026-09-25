@@ -60,6 +60,12 @@ export const NAMED_LATTICE_ANGLES = [
   { id: 'triangular', label: 'Triangular / Hexagonal', angleDeg: 60 },
 ];
 
+// The angle a 2D session starts at, and the one the Wizard's previews
+// use: at Triangular (60 degrees) every tile is its textbook shape (60/120
+// rhombus, equilateral triangle, regular hexagon, 60-90-120-90 kite);
+// at Square the hexagon and kite both collapse to squares.
+export const START_LATTICE_ANGLE = NAMED_LATTICE_ANGLES.find((a) => a.id === 'triangular');
+
 export const LATTICE_PRIMITIVES = [
   { id: 'parallelogram', label: 'Parallelogram' },
   { id: 'triangle', label: 'Triangle' },

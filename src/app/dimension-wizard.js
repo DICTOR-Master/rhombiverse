@@ -45,7 +45,7 @@
 // real -- no other structural change needed.
 import { mountWireframePreview } from './wireframe-preview.js';
 import { cellStructure, rotation4, matVec, project4, A4_FIRST } from '../geometry-extensions/lattice-4d.js';
-import { NAMED_LATTICE_ANGLES, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
+import { START_LATTICE_ANGLE, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
 import { VALID_TRIPLES, unitTileVertices } from '../geometry-extensions/growth.js';
 import { PRISM_HEIGHT } from '../geometry-extensions/quasicrystal.js';
 import { loadCatalogue, findBySerial, pieceCount } from '../geometry-extensions/quasicrystal-catalogue.js';
@@ -181,7 +181,7 @@ const DIMENSIONS = [
   // which meant toggling angle silently swapped to an unrelated store
   // instead of reshaping the one you'd actually built. See
   // lattice2dSeedCell's own header in render.js for the full incident.
-  { id: '2D', label: '2D', desc: '5 tile types (Parallelogram, Triangle, Hexagon, Kite, Kagome), each at up to 4 named lattice angles, chosen from the in-scene panel.', enabled: true, preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: NAMED_LATTICE_ANGLES[0].angleDeg }) },
+  { id: '2D', label: '2D', desc: '5 tile types (Parallelogram, Triangle, Hexagon, Kite, Kagome), each at up to 4 named lattice angles, chosen from the in-scene panel.', enabled: true, preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: START_LATTICE_ANGLE.angleDeg }) },
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, previewAction: 'tool:pieceType:rd' },
   { id: '4D', label: '4D', desc: 'Tesseract (Z4), D4 (24-cell, 16-cell) and Hyper-pyrochlore (4D Kagome).', enabled: true, preview: () => edges4D('cell24') },
   { id: '5D', label: '5D', desc: 'Decagonal quasicrystal: Penrose thick and thin rhombus prisms in layers, sliced from Z⁵. The tiling picks each piece’s shape.', enabled: true, preview: () => edges5D() },
@@ -217,8 +217,8 @@ function edges5D() {
 // existing real action, one tool one doorway" reasoning as
 // LATTICES_3D below. Phase 6: one row per LATTICE_PRIMITIVES
 // entry (3, not 12) -- picking one here just sets which primitive
-// starts active; its own angle defaults to NAMED_LATTICE_ANGLES[0]
-// (Square) and from there is controlled entirely by render.js's own
+// starts active; its own angle defaults to START_LATTICE_ANGLE
+// (Triangular) and from there is controlled entirely by render.js's own
 // persistent toggle panel, not by anything on this screen. Action is
 // 'tool:pieceType:lattice2d:<primitiveId>', matching core/build.js's
 // own `lattice2d` param and render.js's dimensionAllowsMesh's own
@@ -227,7 +227,7 @@ const LATTICE_FAMILIES_2D = LATTICE_PRIMITIVES.map((primitive) => ({
   label: primitive.label,
   desc: `A flat layer of real ${primitive.label.toLowerCase()} tiles -- own separate lattice, pinned to z=0 in this same scene, buildable at any of 4 named angles via the in-scene toggle panel.`,
   action: `tool:pieceType:lattice2d:${primitive.id}`,
-  preview: () => lattice2dEdges({ primitiveId: primitive.id, angleDeg: NAMED_LATTICE_ANGLES[0].angleDeg }),
+  preview: () => lattice2dEdges({ primitiveId: primitive.id, angleDeg: START_LATTICE_ANGLE.angleDeg }),
 }));
 
 // LATTICES_3D (wizard parity, 2026-09-24): direct decision -- "every
