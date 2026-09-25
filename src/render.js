@@ -3515,7 +3515,12 @@ async function init() {
     // const just below has long since been assigned -- the exact same
     // closure timing this arrow function already relied on before the
     // extraction, just now also reachable from outside createRhombicWheel3D.
-    const handleWheelAction = (action) => {
+    // { quiet: true }: the dimension picker's own default-piece pick --
+    // selects the piece without auto-opening the colour picker, which is
+    // only wanted when a player deliberately picks a Piece from the menu
+    // (2026-09-25: it was popping up over the empty world on every entry
+    // into 2D/3D/4D, reading as a cluster of floating squares).
+    const handleWheelAction = (action, { quiet = false } = {}) => {
         // openCyborg/openLab reuse the real, already-shipped toggles.
         // openAlmanac now opens the real Almanac overlay (Stage 1 --
         // previously just a "not built yet" toast).
@@ -3646,7 +3651,7 @@ async function init() {
           updateHudIndicator();
           showHudPrompt(`Piece: ${PIECE_LABELS[value] ?? value}`, 3000);
           wheel3D.close();
-          pickers.openColorPicker((matValue, matLabel) => showHudPrompt(`Color: ${matLabel}`, 3000));
+          if (!quiet) pickers.openColorPicker((matValue, matLabel) => showHudPrompt(`Color: ${matLabel}`, 3000));
           return;
         }
         // Reuses the 2D wheel's own color-picker overlay (a real,
@@ -3812,7 +3817,7 @@ async function init() {
           applyDimensionCamera('3D');
           seedIfWorldEmpty();
           dimensionWheel3D.close();
-          handleWheelAction('tool:pieceType:rd');
+          handleWheelAction('tool:pieceType:rd', { quiet: true });
           return;
         }
         // 2D: every lattice2dWorlds entry is already seeded at
@@ -3830,7 +3835,7 @@ async function init() {
         // and open the separate 4D picker wheel, starting on the 24-cell.
         if (action === 'tool:selectDimension:4D') {
           activeDimension = '4D';
-          handleWheelAction('tool:pieceType:cell24');
+          handleWheelAction('tool:pieceType:cell24', { quiet: true });
           applyDimensionVisibility();
           applyDimensionCamera('4D');
           dimensionWheel3D.close();
@@ -3842,7 +3847,7 @@ async function init() {
           applyDimensionVisibility();
           applyDimensionCamera('2D');
           dimensionWheel3D.close();
-          handleWheelAction(`tool:pieceType:lattice2d:${LATTICE_PRIMITIVES[0].id}`);
+          handleWheelAction(`tool:pieceType:lattice2d:${LATTICE_PRIMITIVES[0].id}`, { quiet: true });
           return;
         }
         // WHEEL_DIMENSION's own noUniversalRing:true (see that config's
