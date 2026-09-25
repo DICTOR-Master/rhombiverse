@@ -8,7 +8,8 @@
       "The welcome screen now describes Rhombiverse as the landscape view of lattices, alongside Polyhedraverse's portrait gallery of shapes.",
       "2D now starts like 3D and 4D: an empty 2D world shows a cyan outline of your tile where the first one goes, instead of a tile already placed.",
       "Choosing a dimension no longer pops up the colour picker over the empty world.",
-      "The welcome screen now shows on every visit."
+      "The welcome screen now shows on every visit.",
+      "Undo is now on the main screen (↶, bottom right) and works everywhere: every 3D lattice, 2D and 4D, including Clear World. Each dimension keeps its own history. Hold it to step back several changes at once."
     ]
   },
   {

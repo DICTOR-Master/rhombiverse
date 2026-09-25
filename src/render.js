@@ -2556,48 +2556,129 @@ async function init() {
 
   rebuildInstances(mesh, world);
 
-  // Undo stack -- see docs/code-notes/render.md
-  const undoStack = [];
-  const MAX_UNDO = 20;
-  let lastSnapshot = JSON.stringify(world.toJSON());
+  // Undo history (2026-09-25, direct request: "a go back undo button
+  // would be universally useful"). Was a main-FCC-world-only stack; now
+  // every store records through persist() below, so an undo step covers
+  // whatever one action changed, in any store. Steps are tagged with the
+  // dimension(s) they touched, and undo only steps back through the
+  // CURRENT dimension's own history (2D, 3D and 4D each keep their own).
+  // Each store restores through its own change handler (see
+  // registerHistoryStores), so every mesh rebuilds exactly as after a
+  // normal edit. Clear World / New World are undoable too.
+  const MAX_UNDO = 40;
+  const historySteps = []; // { dims: Set<'2D'|'3D'|'4D'>, before: Map<historyKey, jsonString> }
+  const historyLastSaved = new Map(); // historyKey -> jsonString, for registered stores only
+  const historyRestorers = new Map(); // historyKey -> { dim, restore(json) }
+  let historyPending = null;
+  let historyRestoring = false;
+  const MAIN_HISTORY_KEY = 'main';
+
+  function recordHistory(historyKey, json) {
+    const str = JSON.stringify(json);
+    const prev = historyLastSaved.get(historyKey);
+    historyLastSaved.set(historyKey, str);
+    if (historyRestoring || prev === undefined || prev === str) return;
+    // Everything one action changes lands in the same task -- group it.
+    if (!historyPending) {
+      historyPending = { dims: new Set(), before: new Map() };
+      queueMicrotask(() => {
+        historySteps.push(historyPending);
+        historyPending = null;
+        if (historySteps.length > MAX_UNDO) historySteps.shift();
+        updateUndoButton();
+      });
+    }
+    if (!historyPending.before.has(historyKey)) historyPending.before.set(historyKey, prev);
+    historyPending.dims.add(historyRestorers.get(historyKey).dim);
+  }
+
+  // Every store's save goes through here instead of saveToLocalStorage
+  // directly (key undefined = the main FCC world's own default key).
+  function persist(json, storageKey) {
+    const historyKey = storageKey ?? MAIN_HISTORY_KEY;
+    if (historyRestorers.has(historyKey)) recordHistory(historyKey, json);
+    saveToLocalStorage(json, storageKey);
+  }
+
+  function currentDimensionSteps() {
+    return historySteps.filter((step) => step.dims.has(activeDimension));
+  }
+
+  function undoOneStep() {
+    let idx = -1;
+    for (let k = historySteps.length - 1; k >= 0; k--) if (historySteps[k].dims.has(activeDimension)) { idx = k; break; }
+    if (idx < 0) return false;
+    const [step] = historySteps.splice(idx, 1);
+    historyRestoring = true;
+    try {
+      for (const [historyKey, str] of step.before) historyRestorers.get(historyKey).restore(JSON.parse(str));
+    } finally {
+      historyRestoring = false;
+    }
+    return true;
+  }
 
   function updateUndoButton() {
     const btn = document.getElementById('undo-btn');
-    btn.disabled = undoStack.length === 0;
-    // B2: the icon itself no longer carries a numeric readout -- the
-    // scrub-timeline strip (renderUndoScrubStrip) is the count now.
+    if (btn) btn.disabled = currentDimensionSteps().length === 0;
   }
 
-  // See docs/code-notes/render.md
+  // Hold the button: a row of ticks, oldest first; tapping one steps
+  // back to just before that step.
   function renderUndoScrubStrip() {
     const strip = document.getElementById('undo-scrub-strip');
     strip.innerHTML = '';
-    if (undoStack.length === 0) return;
+    const n = currentDimensionSteps().length;
+    if (n === 0) return;
     const label = document.createElement('div');
     label.className = 'scrub-label';
-    label.textContent = `${undoStack.length} step${undoStack.length === 1 ? '' : 's'} back`;
+    label.textContent = `${n} step${n === 1 ? '' : 's'} back`;
     strip.appendChild(label);
-    undoStack.forEach((snapshot, i) => {
+    for (let i = 0; i < n; i++) {
+      const back = n - i;
       const tick = document.createElement('div');
       tick.className = 'scrub-tick';
-      tick.title = `Jump back ${undoStack.length - i} step${undoStack.length - i === 1 ? '' : 's'}`;
-      tick.addEventListener('click', () => jumpToUndoIndex(i));
+      tick.title = `Jump back ${back} step${back === 1 ? '' : 's'}`;
+      tick.addEventListener('click', () => undoSteps(back));
       strip.appendChild(tick);
-    });
+    }
   }
 
-  function jumpToUndoIndex(i) {
-    if (i < 0 || i >= undoStack.length) return;
-    const target = undoStack[i];
-    world.replaceAll(JSON.parse(target));
-    lastSnapshot = target;
-    undoStack.length = i; // drop this state and everything newer -- it's now the live state, not a past one
-    rebuildInstances(mesh, world, currentMode === 'report');
-    saveToLocalStorage(world.toJSON());
+  function undoSteps(count) {
+    let done = 0;
+    while (done < count && undoOneStep()) done++;
     updateUndoButton();
     renderUndoScrubStrip();
     renderRingList();
     document.getElementById('undo-scrub-strip').classList.remove('visible');
+    if (done) showHudPrompt(done === 1 ? 'Undone.' : `Undone ${done} steps.`, 1500);
+  }
+
+  // Called once every store exists (right after the 4D world is
+  // created). Baselines are each store's state at that moment; a restore
+  // replaces the store and runs its own change handler, whose persist()
+  // call is ignored by history while historyRestoring is set.
+  function registerHistoryStores() {
+    const reg = (historyKey, dim, get, restore) => {
+      historyRestorers.set(historyKey, { dim, restore });
+      historyLastSaved.set(historyKey, JSON.stringify(get()));
+    };
+    reg(MAIN_HISTORY_KEY, '3D', () => world.toJSON(), (j) => { world.replaceAll(j); onChange(); });
+    reg(BCC_STORAGE_KEY, '3D', () => bccWorld.toJSON(), (j) => { bccWorld.replaceAll(j); onBCCChange(); });
+    reg(ELONGDODECA_STORAGE_KEY, '3D', () => elongDodecaWorld.toJSON(), (j) => { elongDodecaWorld.replaceAll(j); onElongDodecaChange(); });
+    reg(HEXPRISM_STORAGE_KEY, '3D', () => hexPrismWorld.toJSON(), (j) => { hexPrismWorld.replaceAll(j); onHexPrismChange(); });
+    reg(PYROCHLORE_STORAGE_KEY, '3D', () => pyrochloreWorld.toJSON(), (j) => { pyrochloreWorld.replaceAll(j); onPyrochloreChange(); });
+    reg(RHOMBOHEDRA_STORAGE_KEY, '3D', () => rhombohedraWorld.toJSON(), (j) => { rhombohedraWorld.replaceAll(j); onRhombohedraChange(); });
+    reg(INTERSTITIAL_STORAGE_KEY, '3D', () => interstitialStore.toJSON(), (j) => { interstitialStore.replaceAll(j); onInterstitialChange(); });
+    reg(HEMISPHERE_STORAGE_KEY, '3D', () => hemisphereStore.toJSON(), (j) => { hemisphereStore.replaceAll(j); onHemisphereChange(); });
+    reg(CUBOCTA_STORAGE_KEY, '3D', () => cuboctaWorld.toJSON(), (j) => { cuboctaWorld.replaceAll(j); onCuboctaChange(); });
+    reg(CUBOCTA_GAP_STORAGE_KEY, '3D', () => octGapWorld.toJSON(), (j) => { octGapWorld.replaceAll(j); onOctGapChange(); });
+    for (const primitive of LATTICE_PRIMITIVES) {
+      const w2 = lattice2dWorlds.get(primitive.id);
+      reg(lattice2dStorageKey(primitive.id), '2D', () => w2.toJSON(), (j) => { w2.replaceAll(j); onLattice2dChange(primitive.id); });
+    }
+    reg('world4d', '4D', () => world4d.snapshot(), (j) => world4d.restore(j));
+    updateUndoButton();
   }
 
   // Ring list -- see docs/code-notes/render.md
@@ -2728,16 +2809,7 @@ async function init() {
     // rebuildLatticeQuickView's own header), so a build/remove while one
     // is active should update it too.
     if (latticeQuickViewMode !== 'off') rebuildLatticeQuickView();
-    const afterJSON = world.toJSON();
-    const afterStr = JSON.stringify(afterJSON);
-    if (afterStr !== lastSnapshot) {
-      undoStack.push(lastSnapshot);
-      if (undoStack.length > MAX_UNDO) undoStack.shift();
-    }
-    lastSnapshot = afterStr;
-    saveToLocalStorage(afterJSON);
-    updateUndoButton();
-    renderUndoScrubStrip();
+    persist(world.toJSON());
     renderRingList();
   }
 
@@ -2759,9 +2831,7 @@ async function init() {
   });
   undoBtn.addEventListener('pointerup', () => {
     clearTimeout(undoHoldTimer);
-    if (!undoHeld) {
-      jumpToUndoIndex(undoStack.length - 1);
-    }
+    if (!undoHeld) undoSteps(1);
     undoHeld = false;
   });
   undoBtn.addEventListener('pointerleave', () => {
@@ -2949,6 +3019,7 @@ async function init() {
     lattice2dPanel.classList.toggle('visible', activeDimension === '2D');
     updateRhomboAttachPanel();
     updateFirstPlacementTarget();
+    updateUndoButton(); // each dimension has its own undo history
     // In 2D, shapes are picked by lattice (the toggle panel above), not
     // by this dropdown -- lattice2dPanel already keeps #piece-type-select's
     // own value in sync (see applyLattice2dSelection), so showing this row
@@ -5430,7 +5501,11 @@ async function init() {
     materialColor,
     getMaterial: () => currentMaterialFor(document.getElementById('piece-type-select').value),
     showHudPrompt,
+    // Undo history: the 4D world saves itself, so it reports its built
+    // cells here after every edit (view changes never reach this).
+    onChange: () => { if (historyRestorers.has('world4d')) recordHistory('world4d', world4d.snapshot()); },
   });
+  registerHistoryStores();
   createBuildController({
     renderer,
     camera,
@@ -5742,7 +5817,7 @@ async function init() {
     rebuildBCCInstances(bccMesh, bccWorld);
     updateSectionEnabled(); // keeps bccMesh's own material in sync with X-Ray -- see that function's own header
     applyWorldViewMaterials(); // same reasoning -- see World View's own header
-    saveToLocalStorage(bccWorld.toJSON(), BCC_STORAGE_KEY);
+    persist(bccWorld.toJSON(), BCC_STORAGE_KEY);
   }
 
   // Elongated Dodecahedron build: own change handler, same reasoning as
@@ -5755,7 +5830,7 @@ async function init() {
     rebuildElongDodecaInstances(elongDodecaMesh, elongDodecaWorld);
     updateSectionEnabled();
     applyWorldViewMaterials();
-    saveToLocalStorage(elongDodecaWorld.toJSON(), ELONGDODECA_STORAGE_KEY);
+    persist(elongDodecaWorld.toJSON(), ELONGDODECA_STORAGE_KEY);
   }
 
   // Hex Prism build: own change handler. "Never truly empty" invariant
@@ -5766,7 +5841,7 @@ async function init() {
     rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld);
     updateSectionEnabled();
     applyWorldViewMaterials();
-    saveToLocalStorage(hexPrismWorld.toJSON(), HEXPRISM_STORAGE_KEY);
+    persist(hexPrismWorld.toJSON(), HEXPRISM_STORAGE_KEY);
   }
 
   // 2D lattice tier: ONE generic change handler for every primitive,
@@ -5783,7 +5858,7 @@ async function init() {
     updateFirstPlacementTarget();
     updateSectionEnabled();
     applyWorldViewMaterials();
-    saveToLocalStorage(world.toJSON(), lattice2dStorageKey(primitiveId));
+    persist(world.toJSON(), lattice2dStorageKey(primitiveId));
   }
 
   // Rhombohedra build (free lattice): own change handler, same "never
@@ -5794,7 +5869,7 @@ async function init() {
     updateSectionEnabled();
     applyWorldViewMaterials();
     if (worldViewMode === 'skeleton') rebuildWorldViewSkeleton();
-    saveToLocalStorage(pyrochloreWorld.toJSON(), PYROCHLORE_STORAGE_KEY);
+    persist(pyrochloreWorld.toJSON(), PYROCHLORE_STORAGE_KEY);
   }
 
   function onRhombohedraChange() {
@@ -5802,7 +5877,7 @@ async function init() {
     rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld);
     updateSectionEnabled();
     applyWorldViewMaterials();
-    saveToLocalStorage(rhombohedraWorld.toJSON(), RHOMBOHEDRA_STORAGE_KEY);
+    persist(rhombohedraWorld.toJSON(), RHOMBOHEDRA_STORAGE_KEY);
   }
 
   // Interstitial-lattice build: own change handler, same reasoning as
@@ -5815,7 +5890,7 @@ async function init() {
     rebuildInterstitialMeshes(interstitialStore);
     updateSectionEnabled(); // keeps newly created interstitial mesh materials in sync with X-Ray -- see that function's own header
     applyWorldViewMaterials(); // same reasoning -- see World View's own header
-    saveToLocalStorage(interstitialStore.toJSON(), INTERSTITIAL_STORAGE_KEY);
+    persist(interstitialStore.toJSON(), INTERSTITIAL_STORAGE_KEY);
   }
 
   // Hemisphere pieces: own change handler, same reasoning as onBCCChange/
@@ -5825,7 +5900,7 @@ async function init() {
     rebuildHemisphereMeshes(hemisphereStore);
     updateSectionEnabled(); // keeps newly created hemisphere mesh materials in sync with X-Ray -- see that function's own header
     applyWorldViewMaterials(); // same reasoning -- see World View's own header
-    saveToLocalStorage(hemisphereStore.toJSON(), HEMISPHERE_STORAGE_KEY);
+    persist(hemisphereStore.toJSON(), HEMISPHERE_STORAGE_KEY);
   }
   // Cuboctahedron Build: own change handler, same "never truly empty"
   // reasoning as onBCCChange/onInterstitialChange above.
@@ -5833,7 +5908,7 @@ async function init() {
     rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld);
     updateSectionEnabled(); // keeps cuboctaMesh's own material in sync with X-Ray -- see that function's own header
     applyWorldViewMaterials(); // same reasoning -- see World View's own header
-    saveToLocalStorage(cuboctaWorld.toJSON(), CUBOCTA_STORAGE_KEY);
+    persist(cuboctaWorld.toJSON(), CUBOCTA_STORAGE_KEY);
   }
   createCuboctaBuildController({
     renderer,
@@ -5855,7 +5930,7 @@ async function init() {
     rebuildOctGapInstances(octGapMesh, octGapWorld);
     updateSectionEnabled();
     applyWorldViewMaterials(); // same reasoning -- see World View's own header
-    saveToLocalStorage(octGapWorld.toJSON(), CUBOCTA_GAP_STORAGE_KEY);
+    persist(octGapWorld.toJSON(), CUBOCTA_GAP_STORAGE_KEY);
   }
   // Driven by the Piece picker's own 'octahedron' slot (a real, separate
   // value from 'ioct' -- direct user decision to keep the old flattened

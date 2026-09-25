@@ -79,12 +79,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
       const raw = localStorage.getItem(WORLD4D_STORAGE_KEY);
       if (!raw) return;
       const data = JSON.parse(raw);
-      for (const c of data.cells ?? []) {
-        if (!KINDS_4D[c.kind]) continue;
-        const center = fromKeyInts(c.kind, c.d);
-        if (!KINDS_4D[c.kind].isCenter(center)) continue;
-        cells.set(cellKey4(c.kind, c.d), { kind: c.kind, c: center, material: c.material, added: !!c.added, removed: !!c.removed });
-      }
+      setCellsFromJSON(data.cells);
       if (data.view) {
         Object.assign(view.angles, data.view.angles ?? {});
         if (typeof data.view.w === 'number') view.w = data.view.w;
@@ -94,11 +89,21 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
       }
     } catch { /* corrupt or blocked storage: start empty */ }
   }
+  const cellsJSON = () => [...cells.values()].map((c) => ({ kind: c.kind, d: keyInts(c.kind, c.c), material: c.material, ...(c.added ? { added: true } : {}), ...(c.removed ? { removed: true } : {}) }));
+  function setCellsFromJSON(list) {
+    cells.clear();
+    for (const c of list ?? []) {
+      if (!KINDS_4D[c.kind]) continue;
+      const center = fromKeyInts(c.kind, c.d);
+      if (!KINDS_4D[c.kind].isCenter(center)) continue;
+      cells.set(cellKey4(c.kind, c.d), { kind: c.kind, c: center, material: c.material, added: !!c.added, removed: !!c.removed });
+    }
+  }
   function save() {
     try {
       localStorage.setItem(WORLD4D_STORAGE_KEY, JSON.stringify({
         version: 1,
-        cells: [...cells.values()].map((c) => ({ kind: c.kind, d: keyInts(c.kind, c.c), material: c.material, ...(c.added ? { added: true } : {}), ...(c.removed ? { removed: true } : {}) })),
+        cells: cellsJSON(),
         view: { angles: view.angles, w: view.w, mode: view.mode, perspective: view.perspective, control: view.control },
       }));
     } catch { /* best-effort */ }
@@ -493,5 +498,9 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     get isActive() { return active; },
     get isEmpty() { return cells.size === 0; },
     clear() { cells.clear(); save(); rebuild(); onChange(); },
+    // Undo (render.js's history): the built cells only, never the view --
+    // moving the slider or switching Slice/Projection isn't an edit.
+    snapshot() { return cellsJSON(); },
+    restore(list) { setCellsFromJSON(list); save(); rebuild(); onChange(); },
   };
 }

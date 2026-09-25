@@ -613,27 +613,28 @@
        row of small rhombus ticks (oldest at the icon, most recent at
        the far end -- see render.js), each jumping straight to that
        state on click. */
-    #undo-widget { position: relative; margin-top: 6px; }
+    /* Fixed bottom-right, just left of What's New and About, same size
+       and style as the bottom-left quick buttons. */
+    #undo-widget { position: fixed; bottom: 8px; right: 88px; z-index: 900; }
     #undo-btn {
-      display: block;
-      width: 44px; height: 44px;
-      margin: 0 auto;
+      display: flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px;
+      padding: 0;
       font: 20px system-ui, sans-serif;
-      color: #fff;
-      background: #b45309;
-      border: 1.5px solid #f59e0b;
-      transform: rotate(45deg);
+      color: #9cd;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 6px;
       cursor: pointer;
+      touch-action: none;
     }
-    #undo-btn span { display: block; transform: rotate(-45deg); }
-    #undo-btn:hover:not(:disabled) { background: #d97706; }
+    #undo-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.15); }
     #undo-btn:disabled { opacity: 0.35; cursor: default; }
     #undo-scrub-strip {
       display: none;
       position: absolute;
-      left: 50%;
-      top: 52px;
-      transform: translateX(-50%);
+      right: 0;
+      bottom: 44px;
       background: rgba(6, 6, 12, 0.96);
       border: 1px solid rgba(124, 204, 255, 0.4);
       border-radius: 6px;
@@ -912,6 +913,12 @@
   <button id="clear-world-toggle" type="button" title="Clear World: erase everything and start fresh">⊘</button>
   <button id="reload-toggle" type="button" title="Reload: hard-refresh the app (use if something looks stuck/stale)">↻</button>
   <button id="lab-toggle" type="button" title="Settings" data-i18n-title="hud.settings">⚙</button>
+  <!-- Undo: on the main screen in every dimension (moved out of Settings
+       2026-09-25). Tap undoes one step; hold for the scrub strip. -->
+  <div id="undo-widget">
+    <button id="undo-btn" type="button" disabled title="Tap: undo one step. Hold: scrub back further." data-i18n-title="shells.undoTitle" aria-label="Undo">↶</button>
+    <div id="undo-scrub-strip"></div>
+  </div>
 
   <div id="lab-panel">
     <div id="lab-header"><span data-i18n="hud.settings">Settings</span><button id="lab-close" type="button" title="Close" data-i18n-title="lab.close">✕</button></div>
@@ -1097,10 +1104,6 @@
   </div>
   <h2 style="margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12); font: 700 13px system-ui, sans-serif; color: #9de0ff;" data-i18n="shells.header">Shells</h2>
   <div id="shells-panel">
-    <div id="undo-widget">
-      <button id="undo-btn" type="button" disabled title="Click: undo one step. Hold: scrub to any past state." data-i18n-title="shells.undoTitle"><span>↶</span></button>
-      <div id="undo-scrub-strip"></div>
-    </div>
     <h3 data-i18n="shells.subheader">Shells (click a built cell)</h3>
     <div id="ring-list"><div class="placeholder" data-i18n="shells.emptyHint">Click a built structure to see its shells.</div></div>
   </div>

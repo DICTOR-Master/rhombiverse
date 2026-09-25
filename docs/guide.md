@@ -25,7 +25,7 @@ The piece you place is shown in the **Shape** button at the top of the screen. T
 - **Phone or tablet:** long-press the piece.
 - **Mouse:** right-click the piece. Right-click removes in every mode.
 
-To take back your last change, tap **Undo** (↶). Hold Undo to scrub back through earlier states.
+To take back your last change, tap **Undo** (↶, bottom right). Hold it to scrub back several steps at once. Each dimension keeps its own undo history, so undoing in 2D never touches your 3D or 4D build.
 
 ### Move the camera
 
@@ -151,7 +151,7 @@ In **Settings**:
 | Colour | Build colour. Tap to change it |
 | Lattice View | Cycles through Off and a view for each piece |
 | Rhombohedra attach | Only shown for Rhombohedra: switches between Copy and Mirror |
-| Undo (↶) | Tap to undo one step. Hold to scrub back through earlier states |
+| Undo (↶, bottom right) | Tap to undo one step in the current dimension. Hold to scrub back further |
 | Menu | Opens the menu wheel (keyboard: Tab or Space) |
 
 ## Corner wheel
