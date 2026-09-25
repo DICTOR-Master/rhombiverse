@@ -1,7 +1,7 @@
 {
   "name": "rhombiverse",
   "private": true,
-  "description": "dependencies has the /api serverless functions' own deps (ai, zod). devDependencies has esbuild, used ONLY by scripts/build.mjs at Vercel build time to minify src/**/*.js for production -- local dev is untouched, still plain ES modules with zero build step (see README.md's 'Running locally').",
+  "description": "devDependencies has esbuild, used ONLY by scripts/build.mjs at Vercel build time to minify src/**/*.js for production -- local dev is untouched, still plain ES modules with zero build step (see README.md's 'Running locally').",
   "scripts": {
     "build": "node scripts/build.mjs",
     "verify:i18n": "node scripts/verify-i18n.mjs",
@@ -11,10 +11,6 @@
     "verify:rhombohedra": "node scripts/verify-rhombohedra.mjs",
     "verify:4d": "node scripts/verify-4d.mjs",
     "verify:copy": "node scripts/verify-copy.mjs"
-  },
-  "dependencies": {
-    "ai": "^6.0.0",
-    "zod": "^3.24.0"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

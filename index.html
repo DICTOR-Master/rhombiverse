@@ -27,8 +27,8 @@
          callout menu there); the -webkit-/plain user-select pair
          covers the general "don't let text selection start" case
          everywhere else touch-and-drag already means something else
-         (orbiting the camera, building, the wheel). Real inputs (BYOK
-         key, import/export) get selection back explicitly below. */
+         (orbiting the camera, building, the wheel). Real inputs
+         (import/export) get selection back explicitly below. */
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
@@ -249,29 +249,6 @@
     }
     #xray-toggle:hover { background: rgba(255, 255, 255, 0.15); }
     #xray-toggle.active { background: rgba(120, 190, 255, 0.4); border-color: #7cf; color: #fff; }
-    #cyborg-toggle {
-      position: fixed; top: 12px; right: 88px; z-index: 900;
-      width: 30px; height: 30px;
-      border-radius: 50%;
-      color: #ddd;
-      background: rgba(0, 0, 0, 0.45);
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      font: 14px system-ui, sans-serif;
-      cursor: pointer;
-    }
-    #cyborg-toggle:hover { background: rgba(255, 255, 255, 0.15); }
-    #cyborg-toggle.active { background: rgba(120, 190, 255, 0.4); border-color: #7cf; color: #fff; }
-    #sculpture-mode-toggle {
-      position: fixed; top: 12px; right: 126px; z-index: 900;
-      width: 30px; height: 30px;
-      border-radius: 50%;
-      color: #ddd;
-      background: rgba(0, 0, 0, 0.45);
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      font: 15px system-ui, sans-serif;
-      cursor: pointer;
-    }
-    #sculpture-mode-toggle:hover { background: rgba(255, 255, 255, 0.15); }
     #duality-toggle {
       position: fixed; top: 12px; right: 164px; z-index: 900;
       width: 30px; height: 30px;
@@ -340,37 +317,11 @@
        already own keeps working exactly as before; the new wheel just
        calls .click() on them programmatically, same reuse pattern as
        every other real action in this app. */
-    #sculpture-mode-toggle, #cyborg-toggle, #xray-toggle, #duality-toggle,
+    #xray-toggle, #duality-toggle,
     #spherical-toggle, #bcc-toggle, #rhombic-wheel-3d-toggle, #clear-world-toggle,
     #reload-toggle, #lab-toggle, #world-view-toggle {
       display: none;
     }
-
-    /* B4b: standalone Sculpture Mode banner -- shown only while active,
-       makes it unmistakable this is the isolated scratch space, not the
-       shared world. */
-    #sculpture-mode-banner {
-      display: none;
-      position: fixed; top: 54px; left: 50%; transform: translateX(-50%);
-      z-index: 960;
-      background: rgba(20, 10, 30, 0.9);
-      border: 1px solid rgba(200, 140, 255, 0.5);
-      border-radius: 6px;
-      padding: 6px 14px;
-      color: #eaf6ff;
-      font: 12px system-ui, sans-serif;
-      align-items: center; gap: 10px;
-    }
-    #sculpture-mode-exit {
-      background: rgba(200, 140, 255, 0.25);
-      border: 1px solid rgba(200, 140, 255, 0.6);
-      color: #fff;
-      font: inherit;
-      padding: 3px 10px;
-      cursor: pointer;
-      clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
-    }
-    #sculpture-mode-exit:hover { background: rgba(200, 140, 255, 0.4); }
 
     /* Ghost block preview -- a translucent single-cell (or two-cell,
        while "holding") outline shown at the next valid FCC position on
@@ -521,84 +472,22 @@
       box-shadow: 0 0 6px rgba(124, 204, 255, 0.7);
     }
 
-    /* B4a Sculpt panel -- same rhombic-grammar parallelogram/tessellate
-       language as the Lab panel (B2), its own overlay since it's opened
-       from the wheel's Create category, not the Lab entry point. */
-    #sculpt-panel {
-      display: none;
-      position: fixed;
-      top: 54px; left: 12px; bottom: 12px;
-      width: 300px;
-      max-width: calc(100vw - 24px);
-      background: rgba(6, 6, 12, 0.94);
-      border: 1px solid rgba(124, 204, 255, 0.3);
-      border-radius: 8px;
-      z-index: 975;
-      overflow-y: auto;
-      box-sizing: border-box;
-      padding: 10px 12px 16px;
-      color: #ddd;
-      font: 13px/1.4 system-ui, sans-serif;
-    }
-    #sculpt-panel.open { display: block; }
-    #sculpt-header {
-      display: flex; align-items: center; justify-content: space-between;
-      font: 700 13px system-ui, sans-serif;
-      color: #9de0ff;
-      margin-bottom: 6px;
-    }
-    #sculpt-close { background: none; border: none; color: #9de0ff; cursor: pointer; font: 13px system-ui, sans-serif; opacity: 0.8; }
-    #sculpt-close:hover { opacity: 1; }
-
     /* Narrow viewports: full-height sidebars (top:54 to bottom:12,
        ~300px wide) are fine on a desktop monitor, but on a phone that's
        most of the screen's width AND height, leaving only a sliver of
        tappable canvas. Dock them as a bottom sheet instead so the
-       canvas stays reachable for sculpting/lab work by touch. */
+       canvas stays reachable for touch. */
     @media (max-width: 640px) {
-      #lab-panel, #sculpt-panel {
+      #lab-panel {
         left: 12px; right: 12px; width: auto; max-width: none;
         top: auto; bottom: 12px; max-height: 42vh;
       }
     }
-    .sculpt-section-label { margin: 10px 0 4px; font: 700 11px system-ui, sans-serif; color: #9cd; letter-spacing: 0.03em; }
-    .sculpt-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-    .sculpt-hint { opacity: 0.7; margin-top: 6px; font-size: 12px; }
+    .panel-hint { opacity: 0.7; margin-top: 6px; font-size: 12px; }
     #rhombis-settings-link { margin: 0 0 14px; opacity: 0.85; }
     #rhombis-settings-link a { color: #9de0ff; text-decoration: none; }
     #rhombis-settings-link a:hover { text-decoration: underline; }
-    .sculpt-btn {
-      font: inherit; color: inherit;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      padding: 5px 10px;
-      cursor: pointer;
-      clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
-    }
-    .sculpt-btn:hover {
-      background-color: rgba(60, 110, 160, 0.5);
-      background-image:
-        repeating-linear-gradient(45deg, rgba(157,224,255,0.22) 0 5px, transparent 5px 12px),
-        repeating-linear-gradient(-45deg, rgba(157,224,255,0.22) 0 5px, transparent 5px 12px);
-      border-color: #9de0ff;
-    }
-    .sculpt-btn.active {
-      background-color: rgba(120, 190, 255, 0.4);
-      border-color: #7cf;
-      color: #fff;
-    }
-    #sculpt-brush-radius { width: 4em; font: inherit; }
-    /* Sculpt's (#sculpt-suggestion) Semi-Cyborg accept/dismiss card. */
-    .assist-suggestion {
-      margin-top: 10px;
-      padding: 8px 10px;
-      background: rgba(124, 204, 255, 0.1);
-      border: 1px solid rgba(124, 204, 255, 0.4);
-      border-radius: 6px;
-    }
-    .assist-suggestion-text { margin-bottom: 6px; font-size: 12px; }
-    .assist-nl-input { flex: 1; min-width: 0; font: inherit; padding: 4px 6px; background: rgba(255,255,255,0.08); border: 1px solid rgba(124,204,255,0.35); color: inherit; }
-
+ 
     /* Lab panel is already a single scrollable overlay at any viewport
        size (see #lab-panel above) -- on a narrow/touch viewport it just
        widens toward full-screen rather than needing a separate two-
@@ -615,12 +504,6 @@
       }
     }
 
-    #shells-panel {
-      color: #ddd;
-      font: 13px/1.4 system-ui, sans-serif;
-      user-select: none;
-      margin-top: 14px;
-    }
     /* B2: "replace any numeric Undo readout with a held-icon (up arrow
        with a rotate icon) miniature scrub-timeline of past world
        states." A quick click still undoes one step (same underlying
@@ -677,42 +560,6 @@
       color: #bcd; font: 10px system-ui, sans-serif; opacity: 0.75;
       margin-bottom: 2px;
     }
-    #shells-panel h3 { margin: 10px 0 4px; font-size: 13px; opacity: 0.85; }
-    #ring-list { max-height: 460px; overflow-y: auto; }
-    #ring-list svg { display: block; margin: 4px auto 8px; }
-    #ring-list svg circle[stroke] { transition: filter 0.1s; }
-    #ring-list svg circle[stroke]:hover { filter: brightness(1.35); }
-    #ring-list .ring-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      padding: 3px 0;
-    }
-    #ring-list .ring-item span { flex: 1; }
-    #ring-list .ring-recolor {
-      font: 11px system-ui, sans-serif;
-      color: #fff;
-      background: rgba(60, 130, 220, 0.55);
-      border: 1px solid rgba(120, 170, 255, 0.6);
-      border-radius: 4px;
-      padding: 2px 6px;
-      cursor: pointer;
-    }
-    #ring-list .ring-recolor:hover { background: rgba(60, 130, 220, 0.85); }
-    #ring-list .ring-remove {
-      font: bold 13px monospace;
-      color: #fff;
-      background: rgba(220, 60, 60, 0.55);
-      border: 1px solid rgba(255, 120, 120, 0.6);
-      border-radius: 4px;
-      width: 20px;
-      height: 20px;
-      line-height: 1;
-      cursor: pointer;
-    }
-    #ring-list .ring-remove:hover { background: rgba(220, 60, 60, 0.85); }
-    #ring-list .placeholder { opacity: 0.6; }
 
     #welcome-overlay {
       position: fixed;
@@ -910,15 +757,12 @@
   <div id="hud-wordmark">RHOMBIVERSE</div>
   <div id="fps-meter"></div>
   <div id="hud-prompt"></div>
-  <div id="sculpture-mode-banner"><span data-i18n="hud.sculptureModeBanner">Sculpture Mode -- isolated scratch space, separate from your main build</span><button id="sculpture-mode-exit" type="button" data-i18n="hud.exitToUniverse">Exit to Universe</button></div>
   <div id="hud-wheel-cue" title="Tab / Space also opens this" data-i18n="hud.menu">Menu</div>
   <div id="hud-wizard-cue" title="Browse dimensions and lattice families">Wizard</div>
   <button id="hud-quick-shape" type="button" title="Shape (tap to change)"></button>
   <button id="hud-quick-color" type="button" title="Color (tap to change)"></button>
   <button id="hud-quick-lattice-view" type="button" title="Lattice View (tap to cycle)"></button>
   <button id="hud-quick-attach" type="button" class="hidden" title="Rhombohedra attach: Copy / Mirror (tap to switch)"></button>
-  <button id="sculpture-mode-toggle" type="button" title="Sculpture Mode: a separate, isolated scratch workspace">◆</button>
-  <button id="cyborg-toggle" type="button" title="Cyborg Mode: guided walkthrough">◈</button>
   <button id="xray-toggle" type="button" title="X-Ray: drag a cutaway plane through the structure">⛶</button>
   <button id="world-view-toggle" type="button" title="World View: Color / Translucent / Skeleton (tap to cycle)"></button>
   <button id="duality-toggle" type="button" title="Duality: view this structure's aperiodic shadow">◐</button>
@@ -937,7 +781,7 @@
 
   <div id="lab-panel">
     <div id="lab-header"><span data-i18n="hud.settings">Settings</span><button id="lab-close" type="button" title="Close" data-i18n-title="lab.close">✕</button></div>
-    <div class="sculpt-hint" id="rhombis-settings-link" data-i18n-html="lab.rhombisLinkHint">New here, or just want a quick puzzle? <a href="./rhombis.html">Try RHOMBIS</a> any time.</div>
+    <div class="panel-hint" id="rhombis-settings-link" data-i18n-html="lab.rhombisLinkHint">New here, or just want a quick puzzle? <a href="./rhombis.html">Try RHOMBIS</a> any time.</div>
     <h2 data-i18n="hud.settings">Settings</h2>
     <div id="lab-settings-section">
       <div class="row"><label for="setting-sensitivity" data-i18n="setting.sensitivity">Look sensitivity</label><input id="setting-sensitivity" type="range" min="0.25" max="2.5" step="0.05" value="1" /></div>
@@ -952,7 +796,6 @@
       </div>
       <div class="row"><label for="setting-fps-meter" data-i18n="setting.fpsMeter">Show FPS meter</label><input id="setting-fps-meter" type="checkbox" /></div>
       <div class="row"><label for="setting-volume" data-i18n="setting.volume">Volume</label><input id="setting-volume" type="range" min="0" max="1" step="0.05" value="0.5" /></div>
-      <div class="row"><label for="setting-workspace-mode" data-i18n="setting.workspaceMode">Model workspace (pause Cuboctahedron Build)</label><input id="setting-workspace-mode" type="checkbox" /></div>
       <div class="row"><label for="setting-language" data-i18n="setting.language">Language</label>
         <select id="setting-language"></select>
       </div>
@@ -963,32 +806,10 @@
         <button id="dualize-toggle" class="mode-btn" data-mode="dualize" type="button">Dualize Preview</button>
       </div>
     </div>
-    <h2>Your Own AI (optional)</h2>
-    <div id="byok-section">
-      <div class="sculpt-row">
-        <label>Provider
-          <select id="byok-provider">
-            <option value="none">Off (use this site's shared AI)</option>
-            <option value="anthropic">Anthropic (your own key)</option>
-            <option value="openai">OpenAI (your own key)</option>
-          </select>
-        </label>
-      </div>
-      <div id="byok-fields" style="display:none;">
-        <div class="sculpt-row"><input id="byok-api-key" class="assist-nl-input" type="password" placeholder="Your API key" autocomplete="off" /></div>
-        <div class="sculpt-row"><input id="byok-model" class="assist-nl-input" type="text" placeholder="e.g. claude-haiku-4-5-20251001" autocomplete="off" /></div>
-      </div>
-      <div class="sculpt-hint">Stored only in your own browser, sent only to your chosen provider directly -- never to this site's server. Powers Full-Cyborg (Sculpt) in place of the shared AI Gateway.</div>
-    </div>
     <h2>Advanced Building &amp; World (technical names)</h2>
     <div id="controls">
     <div class="row" style="display:none;">
       <button class="mode-btn active" data-mode="build" type="button">Build</button>
-      <button class="mode-btn" data-mode="fill" type="button">Fill</button>
-      <button class="mode-btn" data-mode="round" type="button">Round</button>
-      <button class="mode-btn" data-mode="excavate" type="button">Excavate</button>
-      <button class="mode-btn" data-mode="sculpt" type="button">Sculpt</button>
-      <button class="mode-btn" data-mode="chisel" type="button">Remove</button>
     </div>
     <div id="color-row" class="row">
       <label><span data-i18n="color.label">Color:</span>
@@ -1055,18 +876,8 @@
       </label>
     </div>
     <div id="piece-try-hint" class="hint" data-i18n="piece.tryHint">Try placing 6 pyramids on a cube. Then 12. Then remove the outer 6.</div>
-    <div id="shell-radius-row" class="row">
-      <label><span data-i18n="shell.fillRadius">Shell fill radius:</span> <input id="shell-count" type="number" min="1" max="15" value="3" /></label>
-    </div>
-    <div id="hollow-from-row" class="row">
-      <label><span data-i18n="shell.hollowFrom">Hollow from shell:</span> <input id="hollow-from" type="number" min="1" max="15" value="1" /></label>
-    </div>
     <div id="mode-hint" class="hint"></div>
-    <h2>Moderation</h2>
-    <div class="row">
-      <button class="mode-btn" data-mode="report" type="button">Report Mode (flag / approve)</button>
-    </div>
-    <h2>World, Import/Export &amp; Sharing</h2>
+    <h2>World, Import &amp; Export</h2>
     <hr style="border-color: rgba(255,255,255,0.15); margin: 8px 0;" />
     <div class="row">
       <label><span data-i18n="world.view">World view:</span>
@@ -1097,132 +908,20 @@
       <label><input id="section-flip" type="checkbox" /> <span data-i18n="world.flip">Flip</span></label>
     </div>
     <div class="hint" data-i18n="world.rightClickHint">
-      Right-click always removes the clicked cell, in every mode.
+      Long-press (or right-click) removes a piece.
     </div>
     <div class="buttons">
       <button id="new-world" type="button" data-i18n="world.new">New World</button>
       <button id="export-json" type="button" data-i18n="world.exportJson">Export World</button>
-      <button id="export-rhomb" type="button" title="Pure geometry only -- cells and seeds, no other data" data-i18n="world.exportRhomb" data-i18n-title="world.exportRhombTitle">Export Model (.rhomb)</button>
       <label class="file-btn">
         <span data-i18n="world.import">Import World</span>
         <input id="import-json" type="file" accept="application/json" hidden />
       </label>
-      <button id="share-world" type="button" data-i18n="world.share">Share World (copy link)</button>
     </div>
-    <div id="share-world-hint" class="hint"></div>
-    <!-- "Load a World" preset picker (Showcase World, planetoid Body
-         Types) removed 2026-09-22 -- every bundled preset carried
-         game-world framing (planetoids, or literal grown-seed/organism
-         data); both deleted 2026-09-24.
-         Nothing left to load; Export/Import World above still works for
-         your own builds. -->
-  </div>
-  <h2 style="margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12); font: 700 13px system-ui, sans-serif; color: #9de0ff;" data-i18n="shells.header">Shells</h2>
-  <div id="shells-panel">
-    <h3 data-i18n="shells.subheader">Shells (click a built cell)</h3>
-    <div id="ring-list"><div class="placeholder" data-i18n="shells.emptyHint">Click a built structure to see its shells.</div></div>
+    <div class="hint">Your World saves automatically in this browser. Export World saves every dimension to a file; Import World opens one.</div>
   </div>
   </div>
 
-  <!-- B4a: Sculpture tool panel (Create -> Sculpt). Several independent
-       controls at once (tier/mode/mirror/brush/NL box), so it's its own
-       dedicated overlay rather than a wheel picker strip. -->
-  <div id="sculpt-panel">
-    <div id="sculpt-header"><span>Sculpt</span><button id="sculpt-close" type="button" title="Close">✕</button></div>
-
-    <div class="sculpt-section-label">Assistance</div>
-    <div class="sculpt-row" id="sculpt-tier-row">
-      <button class="sculpt-btn tier-btn active" data-tier="manual" type="button">Manual</button>
-      <button class="sculpt-btn tier-btn" data-tier="semi-cyborg" type="button">Semi-Cyborg</button>
-      <button class="sculpt-btn tier-btn" data-tier="full-cyborg" type="button">Full-Cyborg</button>
-    </div>
-
-    <div class="sculpt-section-label">Mode</div>
-    <div class="sculpt-row" id="sculpt-mode-row">
-      <button class="sculpt-btn mode-toggle-btn active" data-sculpt-mode="add" type="button">Model (add)</button>
-      <button class="sculpt-btn mode-toggle-btn" data-sculpt-mode="remove" type="button">Chisel (subtract)</button>
-    </div>
-
-    <div class="sculpt-section-label">Symmetry Mirror</div>
-    <div class="sculpt-row" id="sculpt-mirror-row">
-      <button class="sculpt-btn mirror-btn active" data-plane="" type="button">None</button>
-      <button class="sculpt-btn mirror-btn" data-plane="x" type="button">X</button>
-      <button class="sculpt-btn mirror-btn" data-plane="y" type="button">Y</button>
-      <button class="sculpt-btn mirror-btn" data-plane="z" type="button">Z</button>
-      <button class="sculpt-btn mirror-btn" data-plane="xy" type="button">X↔Y</button>
-      <button class="sculpt-btn mirror-btn" data-plane="xz" type="button">X↔Z</button>
-      <button class="sculpt-btn mirror-btn" data-plane="yz" type="button">Y↔Z</button>
-    </div>
-    <div class="sculpt-row" id="sculpt-full-symmetry-row">
-      <button class="sculpt-btn full-symmetry-btn" id="sculpt-full-symmetry-btn" type="button">Full symmetry (48)</button>
-    </div>
-
-    <div class="sculpt-section-label">Shell-Radius Brush</div>
-    <div class="sculpt-row">
-      <input id="sculpt-brush-radius" type="number" min="0" max="10" value="0" />
-      <span class="sculpt-hint">0 = single cell</span>
-    </div>
-
-    <!-- Dual structure (core, gated on FEATURES.dualSculpture -- see
-         CLAUDE.md's "Core vs. Modules"). Each cell's inscribed
-         cube (3-valent RD vertices) / octahedron (4-valent RD vertices),
-         per dual.js. -->
-    <div id="dual-section" class="sculpt-section-label">Dual Structure</div>
-    <div id="dual-toggle-row" class="sculpt-row">
-      <label><input id="dual-show" type="checkbox" /> Show Dual</label>
-      <label>Focus:
-        <select id="dual-focus">
-          <option value="none">None</option>
-          <option value="cube">Cube</option>
-          <option value="octa">Octa</option>
-          <option value="both">Both</option>
-        </select>
-      </label>
-    </div>
-    <div id="dual-options-row" class="sculpt-row">
-      <label><input id="dual-snap" type="checkbox" /> Snap to Dual</label>
-      <label><input id="dual-shell" type="checkbox" /> Dual Shell</label>
-    </div>
-    <div class="sculpt-row" id="dual-symmetry-row">
-      <button class="sculpt-btn dual-symmetry-btn" data-dual-symmetry="cube" type="button">Cube symmetry</button>
-      <button class="sculpt-btn dual-symmetry-btn" data-dual-symmetry="octa" type="button">Octa symmetry</button>
-    </div>
-
-    <div id="sculpt-suggestion" style="display:none;">
-      <div id="sculpt-suggestion-text"></div>
-      <div class="sculpt-row">
-        <button id="sculpt-suggestion-accept" type="button">Accept</button>
-        <button id="sculpt-suggestion-dismiss" type="button">Dismiss</button>
-      </div>
-    </div>
-
-    <div id="sculpt-fullcyborg-section" style="display:none;">
-      <div class="sculpt-section-label">Describe what to build</div>
-      <div class="sculpt-row">
-        <input id="sculpt-nl-input" type="text" placeholder="e.g. make a small dome here" maxlength="200" />
-        <button id="sculpt-nl-go" type="button">Go</button>
-      </div>
-      <div id="sculpt-nl-result" class="sculpt-hint"></div>
-    </div>
-    <div id="sculpt-fullcyborg-gated" class="sculpt-hint" style="display:none;">
-      Full-Cyborg in the shared world is built and ready, but stays off until moderation review is verified (B7) -- try it in standalone Sculpture Mode instead, where it's enabled from the start.
-    </div>
-
-    <div class="sculpt-hint">Click a face to Model onto it, or click a cell to Chisel it away. Right-click always removes, same as everywhere else.</div>
-
-    <div id="sculpt-standalone-section" style="display:none;">
-      <div class="sculpt-section-label">Export</div>
-      <div class="sculpt-row">
-        <button class="sculpt-btn" id="sculpture-export-stl" type="button">STL</button>
-        <button class="sculpt-btn" id="sculpture-export-obj" type="button">OBJ</button>
-        <button class="sculpt-btn" id="sculpture-export-gltf" type="button">GLTF</button>
-      </div>
-      <div class="sculpt-section-label">Bridge back to the shared world</div>
-      <div class="sculpt-row">
-        <button class="sculpt-btn" id="sculpture-place-in-world" type="button">Place a copy in-world</button>
-      </div>
-    </div>
-  </div>
 
   <script type="module" src="./src/render.js"></script>
   <script type="module" src="./src/app/welcome.js"></script>

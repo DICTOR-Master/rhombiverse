@@ -120,10 +120,13 @@ async function main() {
     assert.ok(clicked, `.mode-btn[data-mode="${modeName}"] should exist and be clickable`);
   }
 
-  await clickMode('fill');
-  const shellRowVisible = await page.$eval('#shell-radius-row', (el) => getComputedStyle(el).display !== 'none');
-  assert.ok(shellRowVisible, 'Fill mode should reveal the shell-radius row');
+  // One piece at a time (2026-09-25): Build is the only user mode left
+  // (Fill/Round/Excavate/Sculpt/Report are gone) -- it must still exist,
+  // since other code resets to it by clicking this button.
   await clickMode('build');
+  for (const gone of ['fill', 'round', 'excavate', 'sculpt', 'report']) {
+    assert.equal(await page.$(`.mode-btn[data-mode="${gone}"]`), null, `${gone} mode should be gone`);
+  }
 
   // Tab now opens the Rhombic Wheel 3D directly (reclaimed from the
   // old 2D wheel) -- just confirm the overlay opens/closes, not any
