@@ -26,6 +26,9 @@ used to be called rhombiverse). Don't cross-reference the two.
 GitHub: https://github.com/DICTOR-Master/rhombiverse (`gh` is authenticated).
 Live: https://rhombiverse.vercel.app
 
+Planned next: 5D/6D quasicrystal worlds, agreed design and stages in
+`docs/PLAN-5D-6D.md`.
+
 ## Scope guardrails
 
 Rhombiverse is pure, deterministic geometry. Do not add, even partially,
