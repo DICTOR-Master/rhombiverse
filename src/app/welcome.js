@@ -9,6 +9,7 @@ import { buildRDFaces } from './rhombic-wheel-3d-core.js';
 import { getSettings } from './settings.js';
 import { t } from './i18n.js';
 import { openGuide } from './guide.js';
+import { createLanguagePicker } from './language-picker.js';
 
 // The welcome screen shows on every visit (direct decision 2026-09-25:
 // the "Don't show this again" opt-out was removed). This is the key that
@@ -162,17 +163,18 @@ function overlayHtml() {
   const lang = getSettings().language;
   return `
     <div id="welcome-card">
+      <div class="welcome-lang"></div>
       <h1>Rhombiverse</h1>
-      <p class="overview">${t('welcome.overview', lang)}</p>
-      <button type="button" class="how-to-link" id="welcome-how-to">${t('welcome.howTo', lang)}</button>
+      <p class="overview" data-i18n="welcome.overview">${t('welcome.overview', lang)}</p>
+      <button type="button" class="how-to-link" id="welcome-how-to" data-i18n-html="welcome.howTo">${t('welcome.howTo', lang)}</button>
       <div class="rhombis-link">
         <img src="./assets/rhombis-favicon-64.png" alt="" width="28" height="28" />
-        <a href="./rhombis.html">${t('welcome.rhombisLink', lang)}</a>
+        <a href="./rhombis.html" data-i18n-html="welcome.rhombisLink">${t('welcome.rhombisLink', lang)}</a>
       </div>
       ${logoSvg()}
       <div class="polyhedraverse-link">
         <img src="./assets/polyhedraverse-favicon-64.png" alt="" width="28" height="28" />
-        <a href="https://polyhedraverse.vercel.app" target="_blank" rel="noopener">${t('welcome.polyhedraverseLink', lang)}</a>
+        <a href="https://polyhedraverse.vercel.app" target="_blank" rel="noopener" data-i18n-html="welcome.polyhedraverseLink">${t('welcome.polyhedraverseLink', lang)}</a>
       </div>
       <div class="legal-links">
         <a href="./legal.html?doc=terms" target="_blank" rel="noopener">Terms</a>
@@ -188,6 +190,7 @@ function init() {
   overlay.id = 'welcome-overlay';
   overlay.innerHTML = overlayHtml();
   document.body.appendChild(overlay);
+  overlay.querySelector('.welcome-lang').appendChild(createLanguagePicker());
   // Delegated, so it survives overlayHtml() being re-rendered.
   overlay.addEventListener('click', (e) => {
     if (e.target.closest('#welcome-how-to')) openGuide();
@@ -204,6 +207,7 @@ function init() {
   aboutBtn.id = 'about-btn';
   aboutBtn.type = 'button';
   aboutBtn.title = t('welcome.aboutTitle', getSettings().language);
+  aboutBtn.dataset.i18nTitle = 'welcome.aboutTitle';
   aboutBtn.textContent = 'ℹ';
   document.body.appendChild(aboutBtn);
 

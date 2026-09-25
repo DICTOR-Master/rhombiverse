@@ -71,6 +71,10 @@ const en = {
   'welcome.aboutTitle': 'About Rhombiverse',
   'welcome.overview': 'The landscape view: lattices of space-filling shapes, in 2D, 3D and 4D.',
   'welcome.howTo': 'How to use &rarr;',
+  'guide.openPage': 'Open as a page to share &rarr;',
+  'guide.close': 'Close (Esc)',
+  'guide.loading': 'Loading…',
+  'guide.failed': 'The guide could not be loaded. Check your connection and try again.',
 };
 
 const ja = {
@@ -108,6 +112,10 @@ const ja = {
   'welcome.aboutTitle': 'Rhombiverseについて',
   'welcome.overview': 'ランドスケープ（風景）ビュー：空間を埋め尽くす形の格子を、2D・3D・4Dで。',
   'welcome.howTo': '使い方 &rarr;',
+  'guide.openPage': '共有用のページで開く &rarr;',
+  'guide.close': '閉じる (Esc)',
+  'guide.loading': '読み込み中…',
+  'guide.failed': 'ガイドを読み込めませんでした。接続を確認して、もう一度お試しください。',
 };
 
 const es = {
@@ -145,6 +153,10 @@ const es = {
   'welcome.aboutTitle': 'Acerca de Rhombiverse',
   'welcome.overview': 'La vista de paisaje: redes de formas que llenan el espacio, en 2D, 3D y 4D.',
   'welcome.howTo': 'Cómo usarlo &rarr;',
+  'guide.openPage': 'Abrir como página para compartir &rarr;',
+  'guide.close': 'Cerrar (Esc)',
+  'guide.loading': 'Cargando…',
+  'guide.failed': 'No se pudo cargar la guía. Comprueba tu conexión y vuelve a intentarlo.',
 };
 
 const fr = {
@@ -182,6 +194,10 @@ const fr = {
   'welcome.aboutTitle': 'À propos de Rhombiverse',
   'welcome.overview': 'La vue paysage : des réseaux de formes qui remplissent l\'espace, en 2D, 3D et 4D.',
   'welcome.howTo': 'Mode d\'emploi &rarr;',
+  'guide.openPage': 'Ouvrir en page à partager &rarr;',
+  'guide.close': 'Fermer (Échap)',
+  'guide.loading': 'Chargement…',
+  'guide.failed': 'Le guide n\'a pas pu être chargé. Vérifiez votre connexion et réessayez.',
 };
 
 const ko = {
@@ -219,6 +235,10 @@ const ko = {
   'welcome.aboutTitle': 'Rhombiverse 정보',
   'welcome.overview': '풍경 보기: 공간을 빈틈없이 채우는 도형들의 격자를 2D, 3D, 4D로.',
   'welcome.howTo': '사용 방법 &rarr;',
+  'guide.openPage': '공유용 페이지로 열기 &rarr;',
+  'guide.close': '닫기 (Esc)',
+  'guide.loading': '불러오는 중…',
+  'guide.failed': '안내서를 불러오지 못했습니다. 연결을 확인하고 다시 시도하세요.',
 };
 
 const zh = {
@@ -256,6 +276,10 @@ const zh = {
   'welcome.aboutTitle': '关于 Rhombiverse',
   'welcome.overview': '风景视图：由填满空间的形状构成的晶格，涵盖 2D、3D 和 4D。',
   'welcome.howTo': '使用指南 &rarr;',
+  'guide.openPage': '以可分享的页面打开 &rarr;',
+  'guide.close': '关闭 (Esc)',
+  'guide.loading': '加载中…',
+  'guide.failed': '无法加载指南。请检查网络连接后重试。',
 };
 
 const ru = {
@@ -293,6 +317,10 @@ const ru = {
   'welcome.aboutTitle': 'О Rhombiverse',
   'welcome.overview': 'Пейзажный вид: решётки из фигур, заполняющих пространство, в 2D, 3D и 4D.',
   'welcome.howTo': 'Как пользоваться &rarr;',
+  'guide.openPage': 'Открыть как страницу, чтобы поделиться &rarr;',
+  'guide.close': 'Закрыть (Esc)',
+  'guide.loading': 'Загрузка…',
+  'guide.failed': 'Не удалось загрузить руководство. Проверьте подключение и попробуйте ещё раз.',
 };
 
 const I18N = { en, ja, es, fr, ko, zh, ru };

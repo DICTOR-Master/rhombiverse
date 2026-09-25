@@ -9,25 +9,50 @@
   <style>
     html, body { margin: 0; background: #0a0c14; }
     body { padding: 24px 16px 64px; }
-    .back { display: block; max-width: 760px; margin: 0 auto 20px; font: 14px system-ui, sans-serif; color: #9de0ff; }
+    .bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; max-width: 760px; margin: 0 auto 20px; }
+    .back { font: 14px system-ui, sans-serif; color: #9de0ff; }
   </style>
 </head>
 <body>
-  <a class="back" href="./">&larr; Open Rhombiverse</a>
+  <div class="bar"><a class="back" href="./">&larr; Open Rhombiverse</a></div>
   <main class="md-guide">Loading…</main>
   <script type="module">
     import { renderMarkdown, GUIDE_CSS } from './src/app/markdown.js';
+    import { guideUrl } from './src/app/guide.js';
+    import { createLanguagePicker } from './src/app/language-picker.js';
+    import { getSettings, onSettingsChange } from './src/app/settings.js';
+    import { t, LANG_ORDER } from './src/app/i18n.js';
     const style = document.createElement('style');
     style.textContent = GUIDE_CSS;
     document.head.appendChild(style);
     const main = document.querySelector('main');
-    fetch('./docs/guide.md')
-      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((md) => {
-        main.innerHTML = renderMarkdown(md);
-        if (location.hash) document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView();
-      })
-      .catch(() => { main.textContent = 'The guide could not be loaded. Check your connection and try again.'; });
+    // A shared link's ?lang= wins; otherwise the language saved in Settings.
+    const fromUrl = new URLSearchParams(location.search).get('lang');
+    let lang = LANG_ORDER.includes(fromUrl) ? fromUrl : getSettings().language;
+    const picker = createLanguagePicker();
+    picker.querySelector('select').value = lang;
+    document.querySelector('.bar').appendChild(picker);
+    const get = (url) => fetch(url).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))));
+    function load(first) {
+      document.documentElement.lang = lang;
+      main.textContent = t('guide.loading', lang);
+      get(guideUrl(lang))
+        .catch(() => (lang === 'en' ? Promise.reject(new Error('no guide')) : get(guideUrl('en'))))
+        .then((md) => {
+          main.innerHTML = renderMarkdown(md);
+          if (first && location.hash) document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView();
+        })
+        .catch(() => { main.textContent = t('guide.failed', lang); });
+    }
+    onSettingsChange((s) => {
+      if (s.language === lang) return;
+      lang = s.language;
+      const url = new URL(location.href);
+      if (lang === 'en') url.searchParams.delete('lang'); else url.searchParams.set('lang', lang);
+      history.replaceState(null, '', url);
+      load(false);
+    });
+    load(true);
   </script>
 </body>
 </html>
