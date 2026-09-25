@@ -1,6 +1,6 @@
 # Plan: Shells, a hull-building 3D scene
 
-Status: agreed design; stages 1-3 shipped. Delete this file once every stage
+Status: agreed design; stages 1-3 and 4a shipped. Delete this file once every stage
 has shipped (the code and the guide then describe the feature).
 
 ## The idea
@@ -134,7 +134,14 @@ one step (one undo step each), in any shell rule. The Target rule with
 its shape picker (stepped hulls). Engine: target gauges; verify:shells
 checks each target's faces are flat lattice layers.
 
-**4. Pieces, fragmenting and trimming.** The **trim option**: flat hull
+**4. Pieces, fragmenting and trimming.** *4a shipped:* Build | Fragment
+toggle. Fragment: tap to target a cell, Breakdown dropdown (Whole … 48ths),
+Turn cycles the cut's orientation; Whole merges back. Build: a Piece
+dropdown; with a split chosen, a tap places that split's piece under the
+finger (outer face: the next cell; cut face: the same cell), checked
+exactly for overlap. Long-press removes one fragment; Lattice View ghosts
+a fragmented cell's missing pieces (tap to put back). Larger-scale loose
+pieces come with stage 5. *4b next:* trimming. The **trim option**: flat hull
 faces from Cube, Pyramid, corner caps and the RD's halves (engine and
 verify:shells extended with the caps; checked: RD = octahedron + 8 caps
 exactly). Every split as a placeable piece, from a

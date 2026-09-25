@@ -5,7 +5,7 @@
 // - the big RD at x2, x3, x4 and x6 is filled exactly by small pieces of
 //   the family, with the measured counts;
 // - shell sizes for both shell rules.
-import { SPLITS, SPLIT_BY_ID, OH, pieceSolid, solidFromPlanes, scaleDecomposition, shells, identifyPiece, HULLS, HULL_IDS, hullShell, hullShellOf } from '../src/geometry-extensions/rd-pieces.js';
+import { SPLITS, SPLIT_BY_ID, OH, pieceSolid, solidFromPlanes, scaleDecomposition, shells, identifyPiece, HULLS, HULL_IDS, hullShell, hullShellOf, splitOrientations, pieceAt, piecesOverlap, pointInPiece } from '../src/geometry-extensions/rd-pieces.js';
 import { rdQuarterPieces, hemisphereSplit, NEIGHBOR_OFFSETS } from '../src/core/lattice.js';
 
 let failures = 0;
@@ -93,6 +93,29 @@ for (const [h, N] of Object.entries(FACES)) {
   check(`hull "${h}": every face is a flat layer of equal size`, new Set(perFace).size === 1 && perFace[0] > 1, `${perFace[0]} cells per face`);
 }
 void HULLS;
+// Fragments. Each orientation of a split is itself a full split of the
+// RD (its pieces equal, non-overlapping, filling it); pieces of one
+// orientation never overlap each other; pieceAt finds the piece under a
+// point; a whole RD overlaps every piece in its cell and none next door.
+for (const s of SPLITS) {
+  const ors = splitOrientations(s.id);
+  const ok = ors.every((gs) => gs.length === s.count
+    && Math.abs(gs.map((g) => pieceSolid(s.id, g).volume).reduce((a, b) => a + b, 0) - 2) < 1e-7
+    && gs.every((g, i) => gs.slice(i + 1).every((h) => !piecesOverlap({ split: s.id, g, cell: [0, 0, 0] }, { split: s.id, g: h, cell: [0, 0, 0] }))));
+  check(`${s.id}: ${ors.length} orientation(s), each a full split of the RD`, ok);
+}
+{
+  const pts = [[0.3, 0.1, 0.05], [-0.2, 0.4, 0.1], [0.05, -0.1, -0.6], [0.45, 0.3, 0.15]];
+  const ok = SPLITS.every((s) => pts.every((p) => { const hit = pieceAt(s.id, [0, 0, 0], p); return hit && pointInPiece(s.id, hit.g, [0, 0, 0], p); }));
+  check('pieceAt: every split finds the piece holding a point, and it really holds it', ok);
+  check('pieceAt: a point outside the RD finds nothing', pieceAt('48th', [0, 0, 0], [1.2, 0, 0]) === null);
+  const whole = { split: 'whole', g: 0, cell: [0, 0, 0] };
+  check('overlap: a whole RD overlaps every 48th in its cell', splitOrientations('48th')[0].every((g) => piecesOverlap(whole, { split: '48th', g, cell: [0, 0, 0] })));
+  check('overlap: a whole RD overlaps nothing in the cell next door', splitOrientations('48th')[0].every((g) => !piecesOverlap(whole, { split: '48th', g, cell: [1, 1, 0] })));
+  const a = { split: 'half-axis', g: splitOrientations('half-axis')[0][0], cell: [0, 0, 0] };
+  const crossing = splitOrientations('half-axis').flat().filter((g) => piecesOverlap(a, { split: 'half-axis', g, cell: [0, 0, 0] })).length;
+  check('overlap: an x-half overlaps every half of the other two axes (and itself), not its opposite', crossing === 5, `${crossing} of 6`);
+}
 check('OH has 48 distinct elements', new Set(OH.map((m) => m.flat().join())).size === 48);
 
 console.log(`\n${failures} failures.`);

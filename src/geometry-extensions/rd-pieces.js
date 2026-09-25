@@ -305,3 +305,52 @@ export function hullShell(hull, n, centre) {
   const t = hullTable(hull, 0, n);
   return (t.byGauge.get(t.values[n - 1]) ?? []).map((c) => [c[0] + centre[0], c[1] + centre[1], c[2] + centre[2]]);
 }
+
+// ---- fragments: orientations, hit tests, overlap ----
+// The RD's symmetry element r applied after g (OH indices).
+export const composeOH = (r, g) => OH_INDEX.get(matKey(mul(OH[r], OH[g])));
+// A split's distinct orientations: each is the list of symmetry elements
+// of its pieces (turned as a whole by some r). Whole, and splits whose
+// piece set every symmetry keeps, have just one.
+const orientationCache = new Map();
+export function splitOrientations(splitId) {
+  if (orientationCache.has(splitId)) return orientationCache.get(splitId);
+  const s = SPLIT_BY_ID.get(splitId);
+  const seen = new Set();
+  const out = [];
+  for (let r = 0; r < OH.length; r++) {
+    const gs = s.elements.map((g) => composeOH(r, g));
+    const key = gs.map((g) => vertexKey(s.piece0.verts.map((v) => apply(OH[g], v)))).sort().join('#');
+    if (!seen.has(key)) { seen.add(key); out.push(gs); }
+  }
+  orientationCache.set(splitId, out);
+  return out;
+}
+// Half-spaces of piece (split, g) at `cell`, scale k.
+export function piecePlanes(splitId, g, cell = [0, 0, 0], k = 1) {
+  const m = OH[g];
+  return SPLIT_BY_ID.get(splitId).planes.map((p) => {
+    const n = apply(m, p.n);
+    return { n, d: k * p.d + k * dot(n, cell) };
+  });
+}
+export const pointInPiece = (splitId, g, cell, point, k = 1, eps = 1e-9) => piecePlanes(splitId, g, cell, k).every((p) => dot(p.n, point) <= p.d + eps);
+// Which piece of a split (among all 48 orientations) holds `point` in
+// `cell`: the one the point is deepest inside. null if none holds it.
+export function pieceAt(splitId, cell, point, k = 1) {
+  let best = null, bestDepth = -Infinity;
+  const seen = new Set();
+  for (let g = 0; g < OH.length; g++) {
+    const planes = piecePlanes(splitId, g, cell, k);
+    const key = planes.map((p) => `${p.n.join()}|${p.d}`).sort().join('#');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const depth = Math.min(...planes.map((p) => (p.d - dot(p.n, point)) / Math.hypot(...p.n)));
+    if (depth > bestDepth) { bestDepth = depth; best = g; }
+  }
+  return bestDepth >= -1e-9 ? { split: splitId, g: best } : null;
+}
+// Do two pieces overlap (share volume)? Exact, from their half-spaces.
+export function piecesOverlap(a, b) {
+  return solidFromPlanes([...piecePlanes(a.split, a.g, a.cell, a.k ?? 1), ...piecePlanes(b.split, b.g, b.cell, b.k ?? 1)]).volume > 1e-7;
+}
