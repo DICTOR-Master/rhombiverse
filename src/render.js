@@ -6087,6 +6087,8 @@ async function init() {
     clearLocalStorage(PYROCHLORE_STORAGE_KEY);
     pyrochloreWorld.replaceAll({ worldName: 'Pyrochlore Lattice', version: 1, cells: {}, meta: {} });
     onPyrochloreChange();
+    // "Erase everything" includes the 4D world (it was left untouched).
+    world4d?.clear();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);
