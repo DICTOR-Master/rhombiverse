@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Rhombiverse User Guide</title>
-  <meta name="description" content="Rhombiverse User Guide: place, remove and view space-filling shapes on real lattices in 2D, 3D and 4D, plus a reference for every control." />
+  <meta name="description" content="Rhombiverse User Guide: build space-filling shapes on real lattices from 2D to 6D, including 4D worlds, 5D and 6D quasicrystals and Shells hulls, plus a reference for every control." />
+  <link rel="canonical" href="https://rhombiverse.vercel.app/guide" />
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <style>
     html, body { margin: 0; background: #0a0c14; }
@@ -35,6 +36,11 @@
     const get = (url) => fetch(url).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))));
     function load(first) {
       document.documentElement.lang = lang;
+      // English is pre-rendered into the page at build (for search engines).
+      if (first && lang === 'en' && main.dataset.prerendered === 'en') {
+        if (location.hash) document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView();
+        return;
+      }
       main.textContent = t('guide.loading', lang);
       get(guideUrl(lang))
         .catch(() => (lang === 'en' ? Promise.reject(new Error('no guide')) : get(guideUrl('en'))))

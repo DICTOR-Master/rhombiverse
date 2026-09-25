@@ -17,7 +17,8 @@
 // additional win, since HTTP/2 already parallelizes the separate
 // requests -- not worth it for what the actual profiled bottleneck was.
 import { build } from 'esbuild';
-import { mkdir, cp, readdir, rm } from 'node:fs/promises';
+import { mkdir, cp, readdir, rm, readFile, writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -47,6 +48,21 @@ async function main() {
   for (const entry of staticEntries) {
     await cp(path.join(root, entry), path.join(dist, entry), { recursive: true });
   }
+
+  // Search engines: the English guide pre-rendered into guide.html (the
+  // page's script still swaps in the reader's language), plus robots.txt
+  // and a sitemap dated with this build.
+  const { renderMarkdown } = await import(pathToFileURL(path.join(root, 'src/app/markdown.js')).href);
+  const guidePath = path.join(dist, 'guide.html');
+  const guideHtml = await readFile(guidePath, 'utf8');
+  const guideBody = renderMarkdown(await readFile(path.join(root, 'docs/guide.md'), 'utf8'));
+  if (!guideHtml.includes('<main class="md-guide">Loading…</main>')) throw new Error('guide.html: <main> placeholder not found');
+  await writeFile(guidePath, guideHtml.replace('<main class="md-guide">Loading…</main>', `<main class="md-guide" data-prerendered="en">${guideBody}</main>`));
+  const SITE = 'https://rhombiverse.vercel.app';
+  const today = new Date().toISOString().slice(0, 10);
+  await writeFile(path.join(dist, 'robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
+  const pages = ['/', '/guide', ...['ja', 'es', 'fr', 'ko', 'zh', 'ru'].map((l) => `/guide?lang=${l}`), '/rhombis.html', '/terms', '/privacy'];
+  await writeFile(path.join(dist, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pages.map((u) => `  <url><loc>${SITE}${u.replace('&', '&amp;')}</loc><lastmod>${today}</lastmod></url>`).join('\n')}\n</urlset>\n`);
 
   const jsFiles = await findJsFiles(path.join(root, 'src'));
   await build({
