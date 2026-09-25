@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import {
   buildRDFaces, faceKey, ensureOutwardWinding,
   SKELETON_COLOR, FACE_STYLE, computeLabelVisibility, LABEL_STYLE,
-  resolveWheelFaces, ALL_WHEELS, applyWorkspaceModeGate, applyBCCLatticeGate,
+  resolveWheelFaces, ALL_WHEELS, applyBCCLatticeGate,
   ACTION_TO_MARK,
 } from './rhombic-wheel-3d-core.js';
 import { iconFrame, MARKS } from './wheel-icons.js';
@@ -174,7 +174,6 @@ function injectCssOnce() {
 
 export function createRhombicWheel3D({
   onAction, // (actionString) => void -- caller resolves navigateHome/navigateTo:x/tool:x/openLab/etc.
-  getWorkspaceMode, // () => 'model' | 'world' -- read fresh on every build, not snapshotted at construction (reframe Stage 2)
   // Dimension-select wheel (2026-09-22): a SECOND, independent instance
   // of this factory now exists (render.js's own dimensionWheel3D) --
   // every DOM id below used to be a bare hardcoded literal, which was
@@ -248,7 +247,7 @@ export function createRhombicWheel3D({
     clearFaces();
     currentWheelId = wheelId;
     const resolved = applyBCCLatticeGate(
-      applyWorkspaceModeGate(resolveWheelFaces(wheelConfig), getWorkspaceMode?.() ?? 'world'),
+      resolveWheelFaces(wheelConfig),
       FEATURES.bccLattice
     );
     for (const face of buildRDFaces()) {

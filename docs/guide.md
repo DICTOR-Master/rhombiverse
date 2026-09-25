@@ -18,7 +18,7 @@ You can switch later from **Menu → Change Dimension**, or from the **Wizard** 
 
 An empty world shows a **cyan outline** where the first piece goes. Tap it. Then tap a face of any piece (a side, in 2D) to add a neighbour on the other side of it.
 
-The piece you place is shown in the **Shape** button at the top of the screen. Tap it to choose a different piece.
+You build one piece at a time. 3D starts with the **RD** (rhombic dodecahedron) selected. The piece you're placing is shown in the **Shape** button at the bottom left; tap it to choose a different one.
 
 ### Remove a piece
 
@@ -64,26 +64,7 @@ Try this on FCC: place 6 Pyramids on a Cube, then 12, then remove the outer 6.
 
 ### Colours
 
-Tap the **Colour** button to choose from 14 colours. With **Auto-assign colour by piece type** turned on (in Settings), each kind of piece gets its own colour.
-
-## Building faster
-
-Open **Menu → Build** for these tools:
-
-- **Add:** tap a face to add one piece (the normal tool).
-- **Repeat:** drag across faces to place a row of pieces.
-- **Fill:** tap to fill a gap.
-- **Symmetry:** opens the Sculpt panel (see [Sculpting with symmetry](#sculpting-with-symmetry)).
-
-Open **Menu → Alter** to change what's already there:
-
-- **Dig:** tap a piece to remove it.
-- **Smooth:** tap to round off a corner.
-- **Remove:** tap to remove single pieces.
-
-### Shells
-
-A structure grows outwards in shells, one layer at a time. In **Settings**, **Shell fill radius** builds a solid ball of that many shells, and **Hollow from shell** leaves it hollow inside. Tap a built structure to list its shells and recolour any one of them.
+Tap the **Colour** button (bottom left) to choose from 14 colours. The colour you pick sticks to the piece you're placing. With **Auto-assign colour by piece type** turned on (in Settings), each kind of piece starts with its own colour until you pick one.
 
 ## Looking at your build
 
@@ -112,31 +93,19 @@ A 4D panel appears at the bottom of the screen.
 - **Reset 4D** puts everything back to the starting position.
 - **Info** opens a panel showing the world and piece you're placing, what you've built, where the slice is (W-depth, or Projection), the XW/YW/ZW turn angles, and the 4D centre coordinates of the last cell you tapped or placed.
 
-## Sculpting with symmetry
+## Saving your work
 
-Open **Symmetry** (Menu → Build) to build with mirrors.
-
-- **Model** adds pieces and **Chisel** removes them.
-- Choose a mirror plane (X, Y, Z or a diagonal), or **Full symmetry (48)** to copy every change 48 ways (full cubic symmetry).
-- **Brush radius** changes how much each tap touches.
-
-**Sculpture Mode** (◆) is a separate scratch space that doesn't touch your main build. From there you can export STL, OBJ or GLTF files, or **Place a copy in-world**.
-
-**Assistance tiers:** Manual is the default. Semi-Cyborg and Full-Cyborg let an AI suggest shapes from a short description (for example "make a small dome here"). This is optional. It works with the shared key or your own key, which you can add in Settings.
-
-## Saving and sharing
+Your World saves automatically in this browser, every dimension, after each change. It comes back when you reopen the site on the same device and browser.
 
 In **Settings**:
 
-- **Share World (copy link):** copies a link that contains the whole world. Nothing is stored on a server.
-- **Export World / Import World:** saves the world to a file and opens it again.
-- **Export Model (.rhomb):** saves the geometry only.
-- **New World:** starts again with an empty world. **Clear World** (⊘) does the same from the corner wheel.
+- **Export World** saves everything, every 3D lattice, your 2D tiles and your 4D build, to one file. Use it to keep a backup or move your World to another device.
+- **Import World** opens an exported file. **Undo** takes an import back.
+- **New World** starts again with an empty world. **Clear World** (⊘) does the same from the corner wheel. Undo can bring it back.
 
 ## Learning the maths
 
 - **Almanac:** the maths and geometry behind every piece and lattice. Open it from Menu → Almanac.
-- **Cyborg Mode** (◈) is a guided walkthrough that can suggest what to build next.
 - **What's New** lists recent changes.
 
 ---
@@ -148,8 +117,8 @@ In **Settings**:
 | Control | What it does |
 |---|---|
 | Wizard (top left) | Browse dimensions and lattices, each with its pieces |
-| Shape | The piece you're placing. Tap to change it |
-| Colour | Build colour. Tap to change it |
+| Shape (bottom left) | The piece you're placing. Tap to change it |
+| Colour (bottom left) | Build colour. Tap to change it |
 | Lattice View | Cycles through Off and a view for each piece |
 | Rhombohedra attach | Only shown for Rhombohedra: switches between Copy and Mirror |
 | Undo (↶, bottom right) | Tap to undo one step in the current dimension. Hold to scrub back further |
@@ -163,8 +132,6 @@ Drag the small wheel in the corner to turn it. Tap a face to use it.
 |---|---|
 | ⚙ | Settings |
 | ⛶ | X-Ray |
-| ◈ | Cyborg Mode |
-| ◆ | Sculpture Mode |
 | ◐ | Duality |
 | ⬡ | BCC Lattice |
 | ◇ | Menu |
@@ -175,16 +142,13 @@ Drag the small wheel in the corner to turn it. Tap a face to use it.
 
 ## Menu wheel
 
-The menu is a rhombic dodecahedron. Each face is a section: tap a face to open it, and use **Home** to go back. **Cyborg**, **Settings** and **Almanac** are always on the top faces.
+The menu is a rhombic dodecahedron. Each face is a section: tap a face to open it, and use **Home** to go back. **Settings** and **Almanac** are always on the top faces.
 
 | Section | Contents |
 |---|---|
-| Home | Build, Alter, Blueprint, Change Dimension |
-| Build | Add, Repeat, Fill, Symmetry, Piece, Colour |
+| Home | Piece, Colour, Change Dimension |
 | Piece | RD family, Cube, Pyramid, TO, Flattened Octahedron, Disphenoid, CO, Octahedron |
 | RD family | RD, Hemi RD, Hourglass, RD Quarter, ED, Hex Prism, Rhombohedra, Pyrochlore |
-| Alter | Dig, Smooth, Remove |
-| Blueprint | Dome: opens Sculpt with "dome" filled in |
 | Change Dimension | 2D, 3D, 4D |
 
 ## Settings
@@ -197,14 +161,11 @@ The menu is a rhombic dodecahedron. Each face is a section: tap a face to open i
 | Graphics quality | Low, Medium or High |
 | Show FPS meter | Frame-rate counter |
 | Volume | Sound level |
-| Model workspace | Pauses Cuboctahedron Build |
 | Language | English, 日本語, Español, Français, 한국어, 中文, Русский |
 | Auto-assign colour by piece type | Gives each kind of piece its own colour |
-| Shell fill radius / Hollow from shell | Builds a solid or hollow ball of shells |
 | Section view, axis, position, Flip | Cutaway along one axis |
 | Build Cuboctahedron, Dualize Preview | Special build modes |
-| AI key (provider, key, model) | Optional: use your own AI key for the assistance tiers |
-| New World, Export World, Export Model (.rhomb), Import World, Share World | Save, load and share |
+| New World, Export World, Import World | Start again, back up, and restore (every dimension) |
 
 ## Keyboard and mouse
 

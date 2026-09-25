@@ -134,10 +134,7 @@ function injectCssOnce() {
 }
 
 export function createWheelPickers({
-  modeButtonSelector = '.mode-btn',
   materialSelectId = 'color-select',
-  onModeChosen = () => {},
-  onDragPlacementChange = () => {},
   onMenuSound = () => {},
   onSelectionChange = () => {},
   getMaterialColor = () => '#8899aa',
@@ -145,8 +142,6 @@ export function createWheelPickers({
   onMaterialHoverEnd = () => {},
 } = {}) {
   injectCssOnce();
-
-  let dragPlacementEnabled = false;
 
   const pickerStrip = document.createElement('div');
   pickerStrip.id = 'wheel-picker-strip';
@@ -261,16 +256,6 @@ export function createWheelPickers({
     else if (pickerStrip.classList.contains('open')) closePicker();
   });
 
-  function clickModeShim(modeName) {
-    const buttons = document.querySelectorAll(modeButtonSelector);
-    for (const btn of buttons) {
-      if (btn.dataset.mode === modeName) {
-        btn.click();
-        return;
-      }
-    }
-  }
-
   // Renamed from openMaterialPicker (2026-09-23, direct instruction: "it
   // should be color picker/color... etc") -- the underlying DOM/CSS
   // (#color-wheel-*) and every user-visible label already say Color;
@@ -300,18 +285,9 @@ export function createWheelPickers({
   // openPickerStrip/pickerStrip themselves stay: isAnyPickerOpen/
   // closeAnyPicker (below) still check/close the strip generically for
   // the color-picker-close-on-navigate interplay render.js relies on.
-  function toggleDragPlacement() {
-    dragPlacementEnabled = !dragPlacementEnabled;
-    onDragPlacementChange(dragPlacementEnabled);
-    clickModeShim('build');
-    onModeChosen('build');
-    return dragPlacementEnabled;
-  }
 
   return {
     openColorPicker,
-    toggleDragPlacement,
-    isDragPlacementEnabled: () => dragPlacementEnabled,
     // For a caller (the 3D wheel's Tab/Space/HUD-cue handling) that
     // wants to close whichever of these is open before doing anything
     // else, same UX the old 2D wheel had for its own Tab/Space handler.

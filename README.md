@@ -52,18 +52,13 @@ removes.
   build plus every open slot one step out), X-Ray cutaways (including
   diagonal cuts), Spherical, Duality Mode (the aperiodic tiling a crystal
   structure casts) and Dualize (FCC ↔ BCC).
-- **Build tools** — 14 colors (or auto-assign per piece), Repeat, and
-  Fill/Round/Excavate for shell-based structures; Alter (Dig, Smooth,
-  Remove) reshapes what's there.
-- **Sculpt** — a symmetry/mirror tool (order-48 cubic) with Model and
-  Chisel modes, plus a separate Sculpture Mode scratch space. An optional
-  AI-assisted tier uses your own API key or the shared one — never
-  required.
+- **One piece at a time** — tap a face to add a piece, long-press (or
+  right-click) to remove one; 14 colors (or auto-assign per piece); Undo
+  (↶) per dimension, with hold-to-scrub.
 - **Almanac** — the math and geometry behind every piece and lattice.
-- **Cyborg Mode** — an optional guided walkthrough that can suggest a next
-  thing to build.
-- **Share and save** — share a world as a link (pure client-side, no
-  server), export/import as a file, and **What's New** for recent changes.
+- **Save** — your World saves automatically in the browser; Export /
+  Import World saves every dimension to one file. **What's New** lists
+  recent changes.
 - **7 languages** (English, 日本語, Español, Français, 한국어, 中文,
   Русский), set in Settings.
 - **RHOMBIS** — a separate 3D packing-puzzle game built on the same
@@ -71,8 +66,6 @@ removes.
 
 It works on phones, tablets and desktop — touch first.
 
-The history of features retired on the way here (the old world-building
-systems) is kept for developers in `docs/HISTORY-retired-systems.md`.
 
 ## RHOMBIS
 
@@ -163,17 +156,15 @@ lattice, needing no new mesh geometry at all), never re-derived.
 rhombiverse/
   index.html            # the app: static entry point, Three.js via import map (no bundling; see "Running locally")
   rhombis.html          # RHOMBIS, the standalone packing-puzzle game
-  api/                  # Vercel serverless functions (AI Gateway proxy for Sculpt and Cyborg suggestions)
   src/
     render.js           # Three.js scene, per-frame loop, most UI wiring
-    core/               # lattice math, placement/removal and input (build.js), world state, persistence, Sculpt
+    core/               # lattice math, placement/removal and input (build.js), world state, persistence
     app/                # UI: wheels, Dimension wizard, 4D world and slider, Almanac, settings, i18n, welcome, What's New
     geometry-extensions/  # every lattice beyond FCC: BCC, 2D tilings, ED, hex prism, rhombohedra,
                         #   Pyrochlore, 4D (lattice-4d.js), dual/Duality math, spherical view
     rhombis/            # RHOMBIS' own code
   data/
     starter-world.json  # the empty world every visit starts from
-    cyborg/             # Cyborg Mode walkthrough script
     changelog.json      # What's New
   scripts/              # build, and the verify:* checks (geometry, i18n, stale wording)
   tests/                # unit tests and the browser smoke test
@@ -190,7 +181,7 @@ standalone addenda, each extending specific phases of the plan:
 | Doc | Extends |
 |---|---|
 | `RHOMBIVERSE_PRINCIPLES.md` | Cross-cutting law: Grounded Simplicity, Isolation, Adaptive Damping |
-| `RHOMBIVERSE_UIUX_BUILD_PLAN.md` | The Rhombic Wheel control surface, Sculpture/Duality Modes, Cyborg Mode + AI assistance, onboarding, world sharing (tracks B1–B7) |
+| `RHOMBIVERSE_UIUX_BUILD_PLAN.md` | The Rhombic Wheel control surface and Duality Mode (several other tracks it describes have since been removed) |
 | `RHOMBIVERSE_COMPLIANCE.md` | Legal/safety checklist, phased by when each item is required |
 
 ## Contributing
@@ -211,10 +202,8 @@ cd ~/rhombiverse
 python3 -m http.server 8000
 ```
 
-Then open `http://localhost:8000`. Shared World mode, the AI Gateway
-fallback, and the public Gallery need real Supabase/Vercel backends
-(`src/app/sync.js`, `api/`) — everything else works fully offline against
-`localStorage`.
+Then open `http://localhost:8000`. Everything works fully offline — there
+is no server side; your World lives in the browser's `localStorage`.
 
 Production (Vercel) additionally runs `npm run build` (`scripts/build.mjs`)
 before deploying — real profiling on the actual Pi 500 this app is played

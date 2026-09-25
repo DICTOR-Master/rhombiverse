@@ -3,14 +3,16 @@
     "date": "2026-09-25",
     "title": "How to use Rhombiverse",
     "items": [
-      "New: a How to use guide, opened from the welcome screen (the ℹ button brings the welcome screen back any time). It walks through placing, removing and viewing pieces, 4D, sculpting and sharing, then lists every control.",
+      "Simpler: one piece at a time. Tap adds a piece and long-press removes one; the older bulk tools (Fill, Dig, Smooth, Shells, Repeat), Sculpt, Sculpture Mode and Cyborg are gone, and the menu's Home now holds just Piece, Color and Change Dimension.",
+      "New: a How to use guide, opened from the welcome screen (the ℹ button brings the welcome screen back any time). It walks through choosing a dimension, placing, removing and viewing pieces, 4D and saving, then lists every control.",
       "The same guide is also a page you can share: rhombiverse.vercel.app/guide.",
       "The welcome screen now describes Rhombiverse as the landscape view of lattices, alongside Polyhedraverse's portrait gallery of shapes.",
       "2D now starts like 3D and 4D: an empty 2D world shows a cyan outline of your tile where the first one goes, instead of a tile already placed.",
       "Choosing a dimension no longer pops up the colour picker over the empty world.",
       "The welcome screen now shows on every visit.",
       "Undo is now on the main screen (↶, bottom right) and works everywhere: every 3D lattice, 2D and 4D, including Clear World. Each dimension keeps its own history. Hold it to step back several changes at once.",
-      "4D Info: a new Info button in the 4D panel shows what you've built, where the slice sits, the turn angles, and the exact 4D coordinates of the last cell you tapped or placed."
+      "4D Info: a new Info button in the 4D panel shows what you've built, where the slice sits, the turn angles, and the exact 4D coordinates of the last cell you tapped or placed.",
+      "Export World now saves every dimension -- every 3D lattice, your 2D tiles and your 4D build -- in one file, and Import World brings it all back (Undo can take an import back)."
     ]
   },
   {
@@ -411,9 +413,6 @@
     "title": "New Faces on the Wheel",
     "items": [
       "Settings is now a real gear -- bold, centered, and easy to spot at a glance instead of a small faint glyph.",
-      "Cyborg has a proper symbol: a Metropolis-inspired robot head, stepped headphone-style ears and all.",
-      "Smooth is now a hexagon touching its own circle from the inside, one clean blended line -- not the barely-there rounded hexagon it used to be.",
-      "Blueprint's icon is a pair of dividing compasses now, not an unclear tick-marked line.",
       "Dropped the faint circle that used to sit behind every hexagon icon on the wheel -- just the hexagon now, noticeably sharper.",
       "Boosted contrast on several corner-HUD symbols (Spherical, X-Ray, Reload, BCC Lattice) that were hard to make out against the medallion."
     ]
@@ -422,17 +421,9 @@
     "date": "2026-09-02",
     "title": "A Simpler Wheel",
     "items": [
-      "Two departments retired: Construct (a pure hop with no content of its own) and Rhombisis (three of its four faces just duplicated tools already on Build and Blueprint). Build and Alter now sit directly on Home; BCC Build moved there too.",
       "Every wheel shows real content the moment you land on it now, not a blank face mixed in with the first ones you see.",
-      "\"Rhombitect\" is now Blueprint -- plain English, matching the rest of the wheel. \"Lab / Settings\" is just Settings everywhere.",
+      "\"Lab / Settings\" is just Settings everywhere.",
       "The welcome screen's ENTER is a large, always-clickable label now, fixed at the center of the rotating logo -- no more waiting for a swinging face to catch it, and the old pulsing glow faces are gone."
-    ]
-  },
-  {
-    "date": "2026-09-02",
-    "title": "Never Wonder Where the Wheel Went",
-    "items": [
-      "Generating a body right where you're standing can still fill your whole view -- a toast now confirms it happened and reminds you Tab or Menu still opens the wheel from there."
     ]
   },
   {
@@ -459,13 +450,6 @@
       "Cuboctahedron Build can now grow face to face with its neighbors, not just corner to corner -- click closer to a flat face on an existing one instead of a point to grow that way, filling in the space between them.",
       "New Piece: Octahedron -- fills the gap that opens up between cuboctahedra face to face. Select it and click near a Cuboctahedron's own corner. A real, exact fit, not a rough approximation -- and separate from the existing Flattened Octahedron (renamed from Octahedron Site, to be less easily confused with the new one), which still builds the same BCC-interstitial bundle it always has.",
       "The Piece wheel's own Material face is gone -- picking any Piece now opens the color swatch right after, so shape and material stay a single step apart. Material's still one tap away from the bottom-left color icon too."
-    ]
-  },
-  {
-    "date": "2026-08-31",
-    "title": "Just the Shape, No Strings Attached",
-    "items": [
-      "New: Export Model (.rhomb) in the Lab panel -- a pure-geometry export of your cells. Export World is unchanged, still there for the full picture."
     ]
   },
   {
@@ -588,7 +572,7 @@
       "Fixed: switching the dual-lattice view mode quickly could leave a stale preview on screen even after choosing FCC only.",
       "Fixed: the corner HUD wheel's own background could mismatch the World behind it -- it now always matches exactly.",
       "Fixed: the corner HUD wheel looked flat when still -- it now reads as a real 3D shape at rest, not just while spinning.",
-      "Fixed: touching the screen on iPhone/iPad could bring up text-selection/Copy -- disabled everywhere except real text fields (like your own AI key)."
+      "Fixed: touching the screen on iPhone/iPad could bring up text-selection/Copy -- disabled everywhere except real text fields."
     ]
   },
   {
@@ -658,7 +642,7 @@
     "title": "One wheel, everywhere",
     "items": [
       "The old flat menu is gone -- the Rhombic Wheel in 3D is now the only way to navigate, covering every department, tool, and picker the old one did.",
-      "A small gold Rhombic Wheel now sits permanently in the corner, replacing the old row of separate buttons -- rotate it by hand to reach Lab, X-Ray, Cyborg, Sculpture Mode, Duality, BCC, Clear World, and Reload.",
+      "A small gold Rhombic Wheel now sits permanently in the corner, replacing the old row of separate buttons -- rotate it by hand to reach Settings, X-Ray, Duality, BCC, Clear World, and Reload.",
       "Every open face on both wheels now shows something -- a temporary shortcut to a real function elsewhere -- instead of sitting blank."
     ]
   },
@@ -667,7 +651,7 @@
     "title": "The wheel becomes the shape",
     "items": [
       "A new toggle in the top-right opens the Rhombic Wheel in 3D -- navigate its departments on the real rhombic-dodecahedron shape itself, not a flat menu.",
-      "Lenses, Cyborg, Lab Settings, and the Almanac are reachable from every wheel, in the exact same spot every time."
+      "Settings and the Almanac are reachable from every wheel, in the exact same spot every time."
     ]
   },
   {
@@ -679,19 +663,10 @@
     ]
   },
   {
-    "date": "2026-08-24",
-    "title": "Sculpture Mode, truly its own space",
-    "items": [
-      "Sculpture Mode no longer shows the real World's presets -- it's a genuinely isolated scratch space now, not just in spirit.",
-      "Cyborg Mode's AI assistance (Semi- and Full-Cyborg) is now dual-aware -- build outward along a cube or octahedron vertex and it can suggest completing that whole inscribed solid, not just a mirror-plane edge."
-    ]
-  },
-  {
     "date": "2026-08-23",
     "title": "The geometry comes first",
     "items": [
-      "Rhombiverse is now explicit about what it is: an instrument for exploring and sculpting rhombic-dodecahedron space -- the FCC lattice geometry is the core.",
-      "New in Sculpture Mode: the cube and octahedron inscribed in every block, made visible and sculptable -- a Show Dual overlay, Snap to Dual, a Dual Shell brush, Cube/Octa symmetry presets, and Full symmetry (48)."
+      "Rhombiverse is now explicit about what it is: an instrument for exploring and building rhombic-dodecahedron space -- the FCC lattice geometry is the core."
     ]
   },
   {
@@ -699,9 +674,7 @@
     "title": "The Rhombic Wheel, and everything behind it",
     "items": [
       "One control surface for everything: the Rhombic Wheel (Tab / Space, or tap Menu) replaces the old always-visible sidebar.",
-      "Sculpt: a real symmetry/mirror tool with Model and Chisel modes, plus a standalone Sculpture Mode scratch workspace.",
       "Duality Mode: see the tiling a structure casts.",
-      "Cyborg Mode: an optional guided walkthrough, plus real AI assistance for Sculpt -- bring your own API key or use the shared one, never required to use.",
       "World sharing via a link, and a sequenced first-visit tour instead of a tutorial modal.",
       "A pass of real mobile/touch fixes: tap-to-open the wheel, bottom-sheet tool panels, first-use hints on the icon toggles."
     ]

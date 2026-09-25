@@ -249,102 +249,6 @@ export const MARKS = {
   // broken model that fused into a plain rhombus). Two overlapping
   // triangles, with the central hexagon they share lightly filled.
   piece2dKagome: `<polygon points="-6.93,-12 6.93,-12 13.86,0 6.93,12 -6.93,12 -13.86,0" fill="currentColor" opacity="0.25"/><polygon points="0,-24 20.78,12 -20.78,12" ${THIN}/><polygon points="0,24 20.78,-12 -20.78,-12" ${THIN}/>`,
-  // Fill: "+" shown across three hexagons.
-  fill: `
-    <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>
-    <polygon points="${hexPts(16, 0, 0)}" ${THIN}/>
-    <polygon points="${hexPts(16, 26, 0)}" ${THIN}/>
-    <path d="M0,-9 V9 M-9,0 H9" ${STROKE}/>`,
-  // Dig: direct report 2026-09-02 -- "the symbol it replaced [Alter's
-  // old borrowed icon] seems to be doing double duty as dig." Confirmed
-  // live: the old mark (three hexagons, a bare "-" at center) was
-  // nearly identical to Fill's own mark (same three hexagons, a "+" at
-  // center) -- the only difference was a barely-visible center glyph,
-  // not two distinct symbols for two different tools. Redrawn as
-  // concentric shells -- same radii as MARKS.shellBrush below (14/24/34,
-  // a real shared scale, not arbitrary), outer two solid (real, kept
-  // material), innermost dashed (excavated/absent) -- directly depicts
-  // what Dig actually does (hollow a shell-built structure down to a
-  // chosen radius), distinct from Fill's own "add material" cross at a
-  // glance.
-  dig: `
-    <polygon points="${hexPts(34)}" ${THIN}/>
-    <polygon points="${hexPts(24)}" ${THIN}/>
-    <polygon points="${hexPts(14)}" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 3" fill="none"/>`,
-  // Alter (wheel-doorway face, "navigateTo:alter"): direct request
-  // 2026-09-02, "should change to be like six segment recycling
-  // symbol" -- was reusing Dig's own mark (its first of 4 tools),
-  // reasonable at the time but not a real symbol of its own. 6 chevron
-  // arrows at true 60-degree rotational symmetry (computed from trig,
-  // not eyeballed), each a 2-segment bent line ending in a solid
-  // arrowhead -- reshaping/reclaiming existing structure, the same
-  // idea a recycling symbol stands for. Went through 4 live-reviewed
-  // rounds against a real proof-sheet artifact: 3 arrows read "too
-  // thin," 6 arrows at stroke-width 9 "too chunky, crowds the frame,"
-  // scaled in to fit with real margin, then thinned again ("slightly
-  // more delicate") to the final stroke-width 3.2 below.
-  alter: `
-    <g stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="currentColor">
-      <path d="M1.15,-10.94 L10.8,-20.31 L17.09,-15.39" fill="none"/>
-      <polygon points="13.14,-12.77 21.82,-11.7 18.68,-19.86"/>
-      <path d="M10.05,-4.47 L22.99,-0.8 L21.87,7.11" fill="none"/>
-      <polygon points="17.63,5 21.04,13.05 26.54,6.25"/>
-      <path d="M8.9,6.47 L12.19,19.51 L4.78,22.5" fill="none"/>
-      <polygon points="4.49,17.76 -0.78,24.75 7.86,26.11"/>
-      <path d="M-1.15,10.94 L-10.8,20.31 L-17.09,15.39" fill="none"/>
-      <polygon points="-13.14,12.77 -21.82,11.7 -18.68,19.86"/>
-      <path d="M-10.05,4.47 L-22.99,0.8 L-21.87,-7.11" fill="none"/>
-      <polygon points="-17.63,-5 -21.04,-13.05 -26.54,-6.25"/>
-      <path d="M-8.9,-6.47 L-12.19,-19.51 L-4.78,-22.5" fill="none"/>
-      <polygon points="-4.49,-17.76 0.78,-24.75 -7.86,-26.11"/>
-    </g>`,
-  // Smooth: direct report 2026-09-02, "has never been right" -- the old
-  // mark (a hexagon with every corner rounded by a small radius) reads
-  // almost identically to the frame hexagon drawn behind every icon
-  // (same shape family, same silhouette), barely visible as its own
-  // symbol. Went through a few rounds of live review before landing
-  // here (a filled-band nested pair, then a single filleted-hexagon
-  // path, both real attempts but not quite right) -- final direction:
-  // "a hex inside a perfect circle outside, [with] the separating lines
-  // blended into a thick but as fine as possible boundary." Built as
-  // ONE filled shape: evenodd fill between a circle and a hexagon
-  // inscribed in it at the exact same circumradius (32, both touching
-  // at all 6 vertices) -- the two boundaries merge into a single solid
-  // band, hexagonal on the inner edge, circular on the outer edge,
-  // tapering to true zero width exactly at the 6 touch points. That
-  // taper is the thinnest the band can possibly be while still
-  // connecting a hexagon to its own circumscribed circle -- a real
-  // geometric consequence of touching at the same radius, not a
-  // stroke-width guess. Confirmed "you got it."
-  smooth: `<path d="M32,0 A32,32 0 1,0 -32,0 A32,32 0 1,0 32,0 Z M0,-32 L27.71,-16 L27.71,16 L0,32 L-27.71,16 L-27.71,-16 Z" fill="currentColor" fill-rule="evenodd"/>`,
-  // Trade: one black rhombus, one white rhombus, "=" between them.
-  trade: `
-    <polygon points="${rhombusPts(28, 36, -22, 0)}" fill="currentColor"/>
-    <polygon points="${rhombusPts(28, 36, 22, 0)}" fill="none" stroke="currentColor" stroke-width="2"/>
-    <path d="M-4,-4 H4 M-4,4 H4" ${STROKE}/>`,
-  // Blueprint (wheel id "rhombitect", unchanged internally): a pair of
-  // dividing compasses -- the precise-coordinate-building theme this
-  // wheel is actually about (Dome/Spiral Column/Templates/Generate a
-  // Body), drawn as a real drafting tool rather than an abstraction.
-  // Replaces a ruled vertical line with 3 ticks, direct report
-  // 2026-09-02 ("really dont get what the E even means" -- the 3
-  // right-pointing ticks off a vertical spine read exactly as a
-  // capital E, not a ruled edge). Pivot joint (filled dot) at top, two
-  // straight legs splaying to sharp points, a small curved crossbar
-  // partway down suggesting the adjustable hinge real dividers have.
-  rhombitect: `
-    <circle cx="0" cy="-32" r="4" fill="currentColor"/>
-    <path d="M0,-32 L-23,32 M0,-32 L23,32" ${STROKE}/>
-    <path d="M-14,0 Q0,8 14,0" stroke="currentColor" stroke-width="2" fill="none"/>`,
-  // Cultivate/rhombivate and Explore marks removed 2026-09-22 (second
-  // world-building removal pass) along with growth/evolution/cultivation
-  // and walking/exploring -- neither action resolves to a mark anymore
-  // (see ACTION_TO_MARK, rhombic-wheel-3d-core.js).
-  // Lenses: three overlapping upright diamonds.
-  lenses: `
-    <polygon points="${rhombusPts(24, 31, 0, -12)}" ${THIN}/>
-    <polygon points="${rhombusPts(24, 31, -14, 10)}" ${THIN}/>
-    <polygon points="${rhombusPts(24, 31, 14, 10)}" ${THIN}/>`,
   // Lattice View: Off -- a plain bold hexagon, real content instead of
   // a blank frame. Direct report 2026-09-02 ("lattice view symbols are
   // still feint on HUD"): the corner HUD wheel's own BCC Lattice face
@@ -368,70 +272,6 @@ export const MARKS = {
     <polygon points="${rhombusPts(22, 22, 0, 24)}" ${THIN}/>
     <polygon points="${rhombusPts(22, 22, -24, 0)}" ${THIN}/>
     <polygon points="${rhombusPts(22, 22, 0, -24)}" ${THIN}/>`,
-  // Duality: a black diamond nested inside a white diamond, and a white diamond
-  // nested inside a black diamond, diagonally opposite.
-  duality: `
-    <polygon points="${rhombusPts(30, 30, -12, -12)}" fill="none" stroke="currentColor" stroke-width="2"/>
-    <polygon points="${rhombusPts(14, 14, -12, -12)}" fill="currentColor"/>
-    <polygon points="${rhombusPts(30, 30, 12, 12)}" fill="currentColor"/>
-    <polygon points="${rhombusPts(14, 14, 12, 12)}" fill="none" stroke="currentColor" stroke-width="2"/>`,
-  // Shell Brush (modifier): concentric hexagon rings.
-  shellBrush: `
-    <polygon points="${hexPts(14)}" ${THIN}/>
-    <polygon points="${hexPts(24)}" ${THIN}/>
-    <polygon points="${hexPts(34)}" ${THIN}/>`,
-  // Symmetry Mirror (modifier): hexagon (the frame's own) bisected by a
-  // mirror line, faint reflected half showing through -- a real
-  // translucent fill over the right half (the frame hexagon's own
-  // vertices at x>=0: top, upper-right, lower-right, bottom), not
-  // low-opacity lines retracing the frame's own edges (invisible against
-  // them).
-  symmetryMirror: `
-    <polygon points="0,-46 39.84,-23 39.84,23 0,46" fill="currentColor" opacity="0.22"/>
-    <path d="M0,-46 V46" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>`,
-  // Cyborg: direct request 2026-09-02 -- "a symbolic robot head like
-  // from metropolis would suit Cyborg much better" than the plain ◈
-  // glyph, "with step pyramid type ears." Researched, not guessed: the
-  // Maschinenmensch ("Maria") from Fritz Lang's Metropolis (1927),
-  // designed by Walter Schulze-Mittendorff -- Art Deco, a smooth
-  // mask-like head (its own look explicitly evokes Tutankhamun's golden
-  // funerary mask) over banded/ribbed segmented plating. Sources:
-  // reactormag.com/metropolis-a-fever-dream-of-mankind-our-machines-and-
-  // maria, mikekalil.com/blog/robot-maria-metropolis,
-  // en.wikipedia.org/wiki/Walter_Schulze-Mittendorff.
-  //
-  // Went through 5 rounds of direct visual review (a proof-sheet
-  // artifact, not blind pushes -- ears/head/eyes/neck each got real
-  // live feedback before landing here):
-  //  v1 (rounded rect + 2 dot eyes + 3 flat collar lines): "not
-  //     immediately recognizable as robot, too much neck," and its
-  //     head (y=-38..4) sat crowded against the frame's own y=-46 edge.
-  //  v2 ("headphone-cup" ears, single gradual taper): "looks like long
-  //     corks, not a stepped pyramid" -- the step-width jump (3->9
-  //     units) was too gentle against a 16-unit ear to read as blocks.
-  //  v3 (2-level jump -- tiny tabs + one huge spike): "worse" -- only 2
-  //     real sizes isn't a staircase, just a spike with flat flanges.
-  //  v4 (this one): 4 real tiers per half (2/5/8/11 units of
-  //     protrusion), each a distinct step, graduating up to the widest
-  //     point at the vertical center, mirrored top/bottom -- confirmed
-  //     "perfect."
-  // Head is a true ellipse (not a rounded rect -- "wanted a bit more
-  // beautiful than square"), nudged up slightly off dead-center
-  // (cy=-5) per "a little bit more towards top" without repeating v1's
-  // crowded extreme. Eyes sized down from the first oval-head pass.
-  // Neck: two open rings (not v1's 3 solid bars) -- narrower one next
-  // to the head, wider one below, reading as a neck that flares
-  // outward going down.
-  // Applies everywhere Cyborg appears -- see the matching (simplified
-  // for its much smaller render size) SVG in hud-wheel-3d.js's
-  // HUD_FACES, replacing that file's own bare ◈ glyph.
-  cyborg: `
-    <path d="M19,-13 L21,-13 L21,-11 L24,-11 L24,-9 L27,-9 L27,-7 L30,-7 L30,-3 L27,-3 L27,-1 L24,-1 L24,1 L21,1 L21,3 L19,3 Z M-19,-13 L-21,-13 L-21,-11 L-24,-11 L-24,-9 L-27,-9 L-27,-7 L-30,-7 L-30,-3 L-27,-3 L-27,-1 L-24,-1 L-24,1 L-21,1 L-21,3 L-19,3 Z" fill="currentColor"/>
-    <ellipse cx="0" cy="-5" rx="20" ry="24" fill="none" stroke="currentColor" stroke-width="3"/>
-    <circle cx="-8" cy="-9" r="5.5" fill="currentColor"/>
-    <circle cx="8" cy="-9" r="5.5" fill="currentColor"/>
-    <ellipse cx="0" cy="22" rx="8" ry="3" fill="none" stroke="currentColor" stroke-width="2.2"/>
-    <ellipse cx="0" cy="28" rx="10" ry="3" fill="none" stroke="currentColor" stroke-width="2.2"/>`,
 
   // --- 2026-08-26 second pass: the actions the spec's own table never
   // resolved. Not in RHOMBIVERSE_SPEC_ICON_SYSTEM.md itself -- designed
@@ -457,34 +297,6 @@ export const MARKS = {
     <polygon points="${hexPts(16, 0, -22)}" fill="#8b2e2e" stroke="currentColor" stroke-width="1" stroke-opacity="0.4"/>
     <polygon points="${hexPts(16, 19.05, 11)}" fill="#bfe3f0" stroke="currentColor" stroke-width="1" stroke-opacity="0.4"/>
     <polygon points="${hexPts(16, -19.05, 11)}" fill="#5a5a5a" stroke="currentColor" stroke-width="1" stroke-opacity="0.4"/>`,
-  // Repeat: three small hexagons (same layout as Fill) with a
-  // directional arrow instead of Fill's "+" -- shares Fill's "acts
-  // across three cells" language, distinguishes the drag GESTURE from
-  // Fill's result.
-  repeat: `
-    <polygon points="${hexPts(16, -26, 0)}" ${THIN}/>
-    <polygon points="${hexPts(16, 0, 0)}" ${THIN}/>
-    <polygon points="${hexPts(16, 26, 0)}" ${THIN}/>
-    <path d="M-30,0 H26 M18,-8 L26,0 L18,8" ${STROKE}/>`,
-  // Generate a Body/Plant/Growth Params/Prune marks removed 2026-09-22
-  // (second world-building removal pass) along with planetoidgen.js and
-  // growth/evolution/cultivation -- none of these actions resolve to a
-  // mark anymore (see ACTION_TO_MARK, rhombic-wheel-3d-core.js).
-  // Offer: single rhombus with an outward arrow -- giving something away.
-  offer: `
-    <polygon points="${rhombusPts(26, 34)}" ${THIN}/>
-    <path d="M8,0 H30 M22,-7 L30,0 L22,7" ${STROKE}/>`,
-  // Accept: single rhombus with an inward arrow -- taking something in.
-  accept: `
-    <polygon points="${rhombusPts(26, 34)}" ${THIN}/>
-    <path d="M30,0 H8 M16,-7 L8,0 L16,7" ${STROKE}/>`,
-  // Inventory: hexagon (the frame's own) with a small 2x2 grid of filled
-  // squares -- stored items.
-  inventory: `
-    <rect x="-16" y="-16" width="12" height="12" fill="currentColor"/>
-    <rect x="4" y="-16" width="12" height="12" fill="currentColor"/>
-    <rect x="-16" y="4" width="12" height="12" fill="currentColor"/>
-    <rect x="4" y="4" width="12" height="12" fill="currentColor"/>`,
   // --- Universal-ring gaps (appear on every wheel, not spec-resolved) ---
   // Settings (mark key "lab", unchanged internally): real SVG gear, not
   // the bare ⚙ Unicode glyph. Direct report chain, 2026-09-02: first

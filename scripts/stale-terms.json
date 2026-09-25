@@ -38,10 +38,21 @@
     "saplings?",
     "evolv\\w*",
     "evolution",
-    "claims"
+    "claims",
+    "sculpt\\w*",
+    "cyborg",
+    "excavat\\w*",
+    "shell fill",
+    "hollow from",
+    "share world",
+    "report mode",
+    "model workspace",
+    "blueprint",
+    "rhombitect"
   ],
   "allow": [
     "cross-species",
-    "same-species"
+    "same-species",
+    "Sculpt, Sculpture Mode and Cyborg are gone"
   ]
 }

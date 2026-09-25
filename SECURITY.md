@@ -16,15 +16,9 @@ You should get an acknowledgment within a few days.
 
 ## Scope
 
-Rhombiverse has two tiers today: a static, `localStorage`-only local
-World (no accounts, no backend — client-side issues like XSS via
-imported world JSON or rendered text are the main realistic surface
-there), and an opt-in Shared World backed by Supabase (anonymous
-sign-in, Postgres with row-level security keyed off `auth.uid()`, a
-per-identity rate limit, and daily snapshot backups — see
-`supabase/schema.sql` and `RHOMBIVERSE_PLAN.md` Phase 5). Reports
-touching Shared World's backend, RLS policies, or rate limiting are in
-scope too, not just the client.
+Rhombiverse is a static, `localStorage`-only app: no accounts and no
+backend. Client-side issues, such as XSS via an imported World file or
+rendered text, are the main realistic surface.
 
 ## Supported versions
 

@@ -140,24 +140,6 @@ export function createWorldStore(worldJSON, hooks = {}) {
         meta: { ...meta, lastModified: new Date().toISOString() },
       };
     },
-    // Pure-model export (.rhomb; RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md
-    // section 4) -- same fields as toJSON() minus everything game-only
-    // (claims/playerInventory/asteroidRegrowth/pendingTrades). `seeds`/
-    // `organisms`/`planetoidEvolution` removed from the schema entirely
-    // 2026-09-22 (second world-building removal pass, growth/evolution/
-    // cultivation archived) -- with no way left to create a seed, keeping
-    // an always-empty schema slice would be an orphaned invariant, not a
-    // real feature. Deliberately NOT a nested {model, game} wrapper -- see
-    // commit message / plan doc for why a flat filtered object was chosen
-    // over restructuring the live schema every save already round-trips.
-    toRhombJSON() {
-      return {
-        worldName,
-        version,
-        cells: Object.fromEntries(cells),
-        meta: { ...meta, lastModified: new Date().toISOString() },
-      };
-    },
     replaceAll(newWorldJSON) {
       worldName = newWorldJSON.worldName;
       version = newWorldJSON.version;

@@ -143,14 +143,14 @@ export const LABEL_STYLE = {
 // every wheel below now declares that key itself -- real content
 // where one exists (Piece -> Cuboctahedron), SPARE everywhere else.
 export const UNIVERSAL_RING = {
-  "top|sy-1sz1": { kind: "universal", label: "Cyborg",         action: "openCyborg",
-                   desc: "Assistance Spectrum controls — Manual, Semi-Cyborg, Full-Cyborg tiers." },
+  // Was Cyborg (guided walkthrough + AI suggestions), shelved 2026-09-25.
+  "top|sy-1sz1": { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
   // Direct instruction 2026-09-02: "get rid of lab everywhere" -- label
   // only, dropped from "Lab / Settings" to plain "Settings"; internal
   // id/action ("openLab", #lab-toggle, #lab-panel) unchanged, same
   // label-only-rename pattern already used for Rhombitect/Rhombivate.
   "top|sx1sz1":  { kind: "universal", label: "Settings", action: "openLab",
-                   desc: "Your own AI key, advanced building, moderation, import/export and sharing, and shells." },
+                   desc: "Camera, graphics, sound, language, colours, and saving/loading your World." },
   "top|sx-1sz1": { kind: "universal", label: "Almanac",        action: "openAlmanac",
                    desc: "Math & Geometry reference — the demonstrations behind everything you build." }
 };
@@ -196,50 +196,6 @@ export function resolveWheelFaces(wheelConfig) {
   return faces;
 }
 
-// Model vs. World Separation (reframe Stage 2, direct user decision
-// 2026-08-28): split by static vs. dynamic -- anything that grows,
-// decays, or moves on its own needs live simulation to mean anything,
-// so it's locked out while workspaceMode is 'model'. Build's Symmetry
-// and Rhombitect's/Blueprint's Generate a Body stay available in both
-// modes (pure geometry, no clock involved). Action-keyed (not
-// face-key-keyed) so every existing "temporary duplicate" face sharing
-// one of these actions is gated for free, with no separate list to keep
-// in sync.
-//
-// Cultivate/Plant/Explore removed from this set 2026-09-22 (second
-// world-building removal pass) -- growth/evolution/cultivation and
-// walking/exploring were archived along with the systems these actions
-// pointed at; their wheel faces are plain Spare now (see WHEEL_HOME/
-// WHEEL_RHOMBITECT below), not gated ones. Cuboctahedron Build is the
-// one remaining real reason this gate exists at all.
-const WORLD_ONLY_FACE_ACTIONS = new Set([
-  "tool:cuboctaBuild",    // Piece's Cuboctahedron Build
-  // "tool:bccBuild" removed 2026-09-02 -- the standalone BCC Build face
-  // it gated is retired; BCC-lattice placement now happens entirely via
-  // Piece:TO + the universal Add/Remove tool ("tool:add"/"tool:remove",
-  // static placement, never gated by Model-workspace mode -- correctly,
-  // since it's not continuously-simulated).
-]);
-
-// Applied after resolveWheelFaces(), never before -- operates on the
-// full 12-key resolved map so it also reaches the universal ring/5th
-// slot uniformly (none of those actions are in the gated set today, but
-// this stays correct if that ever changes). Locked faces keep their
-// real label (so the wheel still reads as "there, just unavailable
-// right now" rather than a bare mystery Spare) but are re-kinded to
-// "spare" -- the existing, already-correct non-clickable/dashed/dimmed
-// treatment, reused rather than inventing a second disabled-face style.
-export function applyWorkspaceModeGate(resolvedFaces, workspaceMode) {
-  if (workspaceMode !== "model") return resolvedFaces;
-  const gated = { ...resolvedFaces };
-  for (const [key, data] of Object.entries(resolvedFaces)) {
-    if (data.action && WORLD_ONLY_FACE_ACTIONS.has(data.action)) {
-      gated[key] = { kind: "spare", label: data.label, action: null,
-        desc: `${data.label} needs World workspace mode (Settings panel) — switch there to use it.` };
-    }
-  }
-  return gated;
-}
 
 // World Systems retirement: the "Trade" face this gate used to mask
 // (Offer/Accept/Inventory, the resource/decay economy) is now a plain
@@ -316,143 +272,28 @@ export const DUPLICATE_HOME_FACE = {
 // session notes for the full before/after audit.
 export const WHEEL_HOME = {
   id: "home",
-  // Home's 5th universal slot: previously hosted Rhombisis (see history
-  // above); now hosts Alter directly, the second of the two departments
-  // freed up by retiring Construct.
-  fifthSlotOverride: { kind: "dept", label: "Alter", action: "navigateTo:alter",
-    desc: "Dig, Smooth, and Remove." },
+  // One piece at a time (2026-09-25): tap adds and long-press removes, so
+  // there's no Build department (it only held Add/Remove) and no Alter
+  // or Blueprint. Home is just Piece, Color and Change Dimension.
+  fifthSlotOverride: { kind: "dept", label: "Piece", action: "navigateTo:piece",
+    desc: "Choose which piece a tap adds." },
   faces: {
-    "equator|sx1sy1":   { kind: "dept", label: "Build",  action: "navigateTo:build",
-      desc: "Add, Symmetry, Fill, and Piece. Was one click deeper, behind Construct -- moved directly onto Home." },
-    "equator|sx1sy-1":  { kind: "dept", label: "Blueprint", action: "navigateTo:rhombitect",
-      desc: "Precise coordinate building — Dome. Was labeled \"Rhombitect\"; renamed to plain English, same wheel underneath." },
-    // Was "Cultivate" (Plant/Prune/Growth Parameters) -- growth/
-    // evolution/cultivation retired 2026-09-22 along with the rest of
-    // the second world-building removal pass (see README.md). Now real
-    // again, same day: the dimension-select wizard's own "Change
-    // Dimension" doorway (tool:changeDimension, handled in render.js's
-    // onAction) -- reopens WHEEL_DIMENSION, focused back on whichever
-    // dimension is already active.
+    "equator|sx1sy1":   { kind: "dept", label: "Color", action: "tool:color", desc: "Pick a build color." },
+    "equator|sx1sy-1":  { kind: "dept", label: "Change Dimension", action: "tool:changeDimension", temporary: true,
+      desc: "Switch between 2D, 3D and 4D. Duplicated here for quick access from a spare slot." },
     "equator|sx-1sy1":  { kind: "dept", label: "Change Dimension", action: "tool:changeDimension",
-      desc: "Switch which dimension tier you're building in." },
-    // Was "Trade" (Offer/Accept/Inventory) -- the resource/decay economy
-    // was retired 2026-09-17 along with the rest of World Systems (see
-    // README.md); this face is a genuine, honest blank now rather than a
-    // real department masked at render time by a gate.
-    "equator|sx-1sy-1": { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
-    // Was "Explore" (Rhombinaut/walk mode) -- retired 2026-09-22 along
-    // with gravity/planetoids, its own reason for existing. Genuine
-    // blank now, same treatment as Trade/Cultivate above.
+      desc: "Switch between 2D, 3D and 4D." },
+    "equator|sx-1sy-1": { kind: "dept", label: "Color", action: "tool:color", temporary: true,
+      desc: "Pick a build color. Duplicated here for quick access from a spare slot." },
     "bottom|sy1sz-1":   { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
-    // Cultivate's own duplicate, same retirement as its true original
-    // above -- also now a genuine blank.
     "bottom|sx1sz-1":   { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
-    // Direct follow-up report, same day: this swap freed up a real
-    // blank spot that's discoverable by rotating -- "another blank face
-    // as it spins." Verified non-adjacent numerically (bottom|sx-1sz-1's
-    // 4 neighbors are Cultivate/Trade/Explore/Alter, none of which is
-    // Build) -- filled with a Build duplicate rather than leaving a
-    // genuine dead end, same standing "duplicate a spare rather than
-    // leave it blank" policy as everywhere else in this file.
-    "bottom|sx-1sz-1":  { kind: "dept", label: "Build", action: "navigateTo:build", temporary: true,
-      desc: "Add, Symmetry, Fill, and Piece. Duplicated here for quick access from a spare slot." },
-    // Direct report 2026-09-02: top|sy1sz1 is one of only 3 faces
-    // visible at a wheel's default opening rotation (equator|sx1sy1,
-    // top|sx1sz1, top|sy1sz1 -- see WHEEL_PIECE's own header comment)
-    // -- leaving it SPARE on 6 of 7 wheels meant landing on almost any
-    // wheel showed "1 real face + Lab/Settings + a blank," reading as
-    // mostly empty even though the other faces were real, just not yet
-    // rotated into view. Fixed by SWAPPING content with an existing
-    // real, non-adjacent face rather than adding a new duplicate (the
-    // user's own two suggested fixes -- a duplicate, or reshuffling so
-    // real content isn't clustered -- reshuffling needs no new
-    // duplicate-adjacency bookkeeping at all, so it's the simpler of
-    // the two here). BCC Build originally filled this slot and had no
-    // existing duplicate anywhere on Home, so nothing else needed
-    // updating to keep it reachable at the time.
-    //
-    // BCC Build itself retired 2026-09-02 (direct report): it was a
-    // genuinely separate, duplicate implementation of the exact
-    // bootstrap/extend mechanic Piece:TO's own handleToClick already
-    // provided (see core/build.js, core/bcc-build.md) -- not a second
-    // real doorway to a shared action, an actual reimplementation. Its
-    // face here is replaced with a Piece duplicate (its own true
-    // original lives on WHEEL_BUILD, a different wheel's own key
-    // namespace, so the same-wheel adjacency rule doesn't apply) --
-    // Piece is the one remaining doorway to BCC/TO placement now, so
-    // giving it direct Home-level visibility makes real sense post-
-    // removal, not an arbitrary filler pick.
+    "bottom|sx-1sz-1":  { kind: "dept", label: "Color", action: "tool:color", temporary: true,
+      desc: "Pick a build color. Duplicated here for quick access from a spare slot." },
     "top|sy1sz1":       { kind: "dept", label: "Piece", action: "navigateTo:piece", temporary: true,
-      desc: "Choose what Add/Remove operate on: RD, Cube, Pyramid, Truncated Octahedron, Flattened Octahedron, Octahedron, or Disphenoid. Duplicated here for quick access from a spare slot." }
+      desc: "Choose which piece a tap adds. Duplicated here for quick access from a spare slot." }
   }
 };
 
-export const WHEEL_BUILD = {
-  id: "build",
-  faces: {
-    // Universal Add/Remove + Piece picker (direct instruction 2026-08-26):
-    // retires Rhombi-model/Pyramid-model/Cube-model as separate buttons --
-    // ONE Add, piece-tier-aware via the new Piece picker below
-    // (core/build.js's getPieceType(): RD/Cube/Pyramid). Was "Rhombi-
-    // model" (tool:rhombiModel).
-    "equator|sx1sy1":  { kind: "dept", label: "Add", action: "tool:add", desc: "Click a face to add a piece there -- see Piece for which kind (RD / Cube / Pyramid)." },
-    // Renamed from "Rhombi-sculpt" so it no longer reads as a same-job-
-    // different-name twin of the new plain "Remove" (WHEEL_ALTER) --
-    // this one still opens the full rich panel (symmetry/mirror/brush),
-    // a genuinely different, richer tool. Same action string/mechanism.
-    "equator|sx1sy-1": { kind: "dept", label: "Symmetry", action: "tool:symmetry", desc: "Opens the Symmetry panel -- brush, mirror, and symmetry tools, no World required." },
-    "equator|sx-1sy1": { kind: "dept", label: "Fill", action: "tool:fill", desc: "Fill mode -- click to fill in a gap." },
-    // Direct follow-up report, same day: the top|sy1sz1 swap below freed
-    // up a real blank spot that's discoverable by rotating. Verified
-    // non-adjacent numerically (equator|sx-1sy-1's own 4 neighbors are
-    // top|sy-1sz1, bottom|sy-1sz-1, top|sx-1sz1, and bottom|sx-1sz-1 --
-    // Add's true original, equator|sx1sy1, isn't among them) -- filled
-    // with an Add duplicate (this wheel's single most-used action)
-    // rather than leaving a genuine dead end.
-    "equator|sx-1sy-1": { kind: "dept", label: "Add", action: "tool:add", temporary: true,
-      desc: "Click a face to add a piece there -- see Piece for which kind (RD / Cube / Pyramid). Duplicated here for quick access from a spare slot." },
-    // Piece picker (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md follow-up,
-    // 2026-08-26): what Add/Remove operate on -- RD (a full block),
-    // Cube (bare, no pyramids), or Pyramid (edit one pyramid on an
-    // already-placed cell). Replaces the DUPLICATE_HOME_FACE that used
-    // to live here, per this file's own stated policy on that face type
-    // ("as real tools get built out... replace the relevant
-    // DUPLICATE_HOME_FACE with the actual feature"). Home is still always
-    // reachable via the 5th slot (bottom|sy-1sz-1, injected on every
-    // non-Home wheel), so nothing is stranded.
-    //
-    // Was a separate mini 3D widget (piece-cluster-3d.js), retired
-    // 2026-08-28: with 6 real piece tiers now (RD/Cube/Pyramid/TO/
-    // Octahedron Site/Disphenoid) that widget needed either a second
-    // fixed camera angle or an artificial flip animation to show them
-    // all -- direct feedback: use "the same main real wheel" instead,
-    // the same way every other multi-option department already works
-    // (navigateTo: a real WHEEL_PIECE layer, discovered by the wheel's
-    // own genuine drag-rotation, not a bespoke second scene). See
-    // WHEEL_PIECE below.
-    "bottom|sy1sz-1":  { kind: "dept", label: "Piece", action: "navigateTo:piece",
-      desc: "Choose what Add/Remove operate on: RD, Cube, Pyramid, Truncated Octahedron, Flattened Octahedron, Octahedron, or Disphenoid." },
-    // Repeat is the 2D wheel's own real "tool-drag" leaf (drag across
-    // faces to place a run of cells) -- reused via the new
-    // toggleDragPlacement() export, same pattern as Material/Generate
-    // a Body/Species above.
-    "bottom|sx1sz-1":  { kind: "dept", label: "Repeat", action: "tool:repeat", desc: "Drag across faces to place a run of cells." },
-    // Was a "Pattern -- coming soon" stub; unbuilt faces were removed
-    // 2026-09-25 (nothing unnecessary shown), so per the blank-face
-    // policy it duplicates its antipode, the universal Settings face.
-    "bottom|sx-1sz-1": { kind: "universal", label: "Settings", action: "openLab", temporary: true,
-      desc: "Your own AI key, advanced building, import/export and sharing, and shells. Duplicated here for quick access from a spare slot." },
-    // Direct report 2026-09-02: top|sy1sz1 is one of only 3 faces
-    // visible at a wheel's default opening rotation -- leaving it SPARE
-    // made landing on this wheel look mostly empty (Add + Lab/Settings
-    // + a blank). Filled by swapping in Material (used on nearly every
-    // placement, arguably the most-reached-for face on this wheel) from
-    // its old equator|sx-1sy-1 slot rather than adding a new duplicate
-    // -- see WHEEL_HOME's own top|sy1sz1 comment for the full reasoning
-    // shared across every wheel this same fix touches.
-    "top|sy1sz1":      { kind: "dept", label: "Color", action: "tool:color", desc: "Pick a build color." }
-  }
-};
 
 // Piece (added 2026-08-28, replacing the separate piece-cluster-3d.js
 // widget -- see WHEEL_BUILD's own comment above for the full reasoning).
@@ -538,92 +379,6 @@ export const WHEEL_PIECE = {
   }
 };
 
-export const WHEEL_ALTER = {
-  id: "alter",
-  faces: {
-    "equator|sx1sy1":  { kind: "dept", label: "Dig", action: "tool:dig", desc: "Excavate mode -- click a cell to remove it." },
-    "equator|sx1sy-1": { kind: "dept", label: "Smooth", action: "tool:smooth", desc: "Round mode -- click to smooth a corner." },
-    // Was a "Replace -- not built yet" stub (no replace mode exists
-    // anywhere); removed 2026-09-25, so per the blank-face policy it
-    // duplicates its antipode, Smooth.
-    "equator|sx-1sy1": { kind: "dept", label: "Smooth", action: "tool:smooth", temporary: true,
-      desc: "Round mode -- click to smooth a corner. Duplicated here for quick access from a spare slot." },
-    // Temporary duplicate at Dig's true geometric antipode (equator|
-    // sx-1sy-1 <-> equator|sx1sy1, verified numerically) -- standing
-    // policy: a blank face duplicates its antipode's content until
-    // real content exists for it, direct user directive 2026-08-25.
-    "equator|sx-1sy-1": { kind: "dept", label: "Dig", action: "tool:dig", temporary: true, desc: "Excavate mode -- click a cell to remove it. Duplicated here for quick access from a spare slot." },
-    "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
-    // Universal Remove (direct instruction 2026-08-26, retiring the
-    // earlier separate Cube-sculpt/Pyramid-sculpt buttons): a plain
-    // "click a piece, it's gone" action, piece-tier-aware via WHEEL_
-    // BUILD's Piece picker (RD/Cube = the whole cell; Pyramid = just
-    // that one pyramid). Fills what was a genuine SPARE here (not a
-    // duplicate -- the adjacency-to-Smooth concern noted below only ever
-    // applied to a Smooth duplicate, not to real new distinct content).
-    // Alter/"remove" is its natural department, mirroring how Dig is
-    // Rhombi-model's whole-block-tier counterpart.
-    // Direct follow-up report, same day: moving Remove to top|sy1sz1
-    // freed up a real blank spot that's discoverable by rotating.
-    // Verified non-adjacent numerically (bottom|sx1sz-1's own 4
-    // neighbors are equator|sx1sy1 [Dig], equator|sx1sy-1 [Smooth],
-    // bottom|sy1sz-1, and bottom|sy-1sz-1 -- Remove's new true
-    // original, top|sy1sz1, isn't among them). Replace (equator|sx-1sy1)
-    // skipped as a duplicate target -- it's a non-functional stub, same
-    // reasoning as elsewhere in this wheel.
-    "bottom|sx1sz-1":  { kind: "dept", label: "Remove", action: "tool:remove", temporary: true,
-      desc: "Click a piece to remove it -- see Piece (Build wheel) for which kind (RD / Cube / Pyramid). Duplicated here for quick access from a spare slot." },
-    // Smooth's duplicate -- confirmed non-adjacent to both
-    // equator|sx1sy-1 (its true original) and top|sy1sz1 (Remove's new
-    // slot, since neither is in top|sy1sz1's own 4-face adjacency set).
-    "bottom|sx-1sz-1": { kind: "dept", label: "Smooth", action: "tool:smooth", temporary: true,
-      desc: "Round mode -- click to smooth a corner. Duplicated here for quick access from a spare slot." },
-    // Note: Dig already has 2 copies (original + equator-antipode
-    // duplicate) which between them saturate both edge-adjacent
-    // neighbors of every open bottom slot here -- no 3rd copy of Dig
-    // can avoid colliding with a sibling, so it isn't force-duplicated
-    // a 3rd time.
-    // Direct report 2026-09-02: top|sy1sz1 is one of only 3 faces
-    // visible at a wheel's default opening rotation -- leaving it SPARE
-    // made landing on this wheel look mostly empty (Dig + Lab/Settings
-    // + a blank). Filled by swapping in Remove (the universal
-    // Add's own counterpart, real everyday content) from its old
-    // bottom|sx1sz-1 slot rather than adding a new duplicate -- see
-    // WHEEL_HOME's own top|sy1sz1 comment for the shared reasoning.
-    "top|sy1sz1":      { kind: "dept", label: "Remove", action: "tool:remove",
-      desc: "Click a piece to remove it -- see Piece (Build wheel) for which kind (RD / Cube / Pyramid)." }
-  }
-};
-
-export const WHEEL_RHOMBITECT = {
-  id: "rhombitect",
-  faces: {
-    // Dome routes to the Sculpt panel's real "dome" shape keyword --
-    // a judgment call (never a documented 1-click action before), see
-    // render.js's onAction handler. The two faces after it were "not
-    // built yet" stubs (Spiral Column, Templates), removed 2026-09-25;
-    // they're each other's antipodes, so there's nothing to duplicate.
-    "equator|sx1sy1":  { kind: "dept", label: "Dome", action: "tool:dome", desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it." },
-    "equator|sx1sy-1": SPARE,
-    "equator|sx-1sy1": SPARE,
-    "equator|sx-1sy-1": { kind: "dept", label: "Dome", action: "tool:dome", temporary: true,
-      desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it. Duplicated here for quick access from a spare slot." },
-    "bottom|sy1sz-1":  DUPLICATE_HOME_FACE,
-    // Was "Generate a Body" (planetoidgen.js) -- retired 2026-09-22
-    // along with gravity/planetoids, its own reason for existing.
-    // Genuine, honest blank now, same treatment as Trade on WHEEL_HOME.
-    "bottom|sx1sz-1":  { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
-    "bottom|sx-1sz-1": { kind: "dept", label: "Dome", action: "tool:dome", temporary: true,
-      desc: "Opens Sculpt with \"dome\" prefilled -- press Go to build it. Duplicated here for quick access from a spare slot." },
-    // Was Generate a Body's own true-original slot (one of only 3 faces
-    // visible at a wheel's default opening rotation) -- also now a
-    // genuine blank rather than inventing a 3rd Dome duplicate to fill
-    // it; Dome already has 2 copies (true original + equator-antipode
-    // duplicate above), matching this file's own standing policy of not
-    // over-duplicating one action past what real coverage needs.
-    "top|sy1sz1":      { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." }
-  }
-};
 
 // WHEEL_CULTIVATE (Plant/Prune/Growth Parameters) removed 2026-09-22
 // along with the rest of the second world-building removal pass (growth/
@@ -834,9 +589,8 @@ export const WHEEL_PIECE_4D = {
 };
 
 export const ALL_WHEELS = {
-  home: WHEEL_HOME, build: WHEEL_BUILD, alter: WHEEL_ALTER,
+  home: WHEEL_HOME,
   dimension: WHEEL_DIMENSION,
-  rhombitect: WHEEL_RHOMBITECT,
   piece: WHEEL_PIECE, rdFamily: WHEEL_RD_FAMILY,
   piece4d: WHEEL_PIECE_4D,
 };
@@ -870,9 +624,6 @@ export const ACTION_TO_MARK = {
   // marks). 'tool:symmetry' reuses the existing `symmetryMirror` modifier
   // mark below (a real match for what that panel actually does) rather
   // than the old generic "-" now spoken for by 'tool:remove'.
-  'tool:add': 'add',
-  'tool:remove': 'remove',
-  'tool:symmetry': 'symmetryMirror',
   // Piece: the doorway face (WHEEL_BUILD's own "Piece") shows the
   // clustered-shapes mark as a preview of what's inside, same pattern
   // as navigateTo:build/alter below; each of the 6 real tiers inside
@@ -929,24 +680,16 @@ export const ACTION_TO_MARK = {
   'tool:pieceType:lattice2d:parallelogram': 'piece2dParallelogram',
   'tool:pieceType:lattice2d:triangle': 'piece2dTriangle',
   'tool:pieceType:lattice2d:hexagon': 'piece2dHexagon',
-  'tool:fill': 'fill',
-  'tool:dig': 'dig',
-  'tool:smooth': 'smooth',
-  'navigateTo:rhombitect': 'rhombitect', // wheel now labeled "Blueprint"; mark/id name unchanged
   openAlmanac: 'almanac',
-  openCyborg: 'cyborg',
   // 2026-08-26 second pass -- see wheel-icons.js for full design notes
   // on each of these (not in the spec's own table, resolved here).
   'tool:color': 'color',
-  'tool:repeat': 'repeat',
   // Build's department-nav face reuses its own wheel's primary tool
   // icon -- the face is a doorway into that wheel, so Add doubles as a
   // preview of what's inside. Alter used to do the same with Dig, but
   // got its own real mark (a 6-arrow recycling symbol) 2026-09-02 --
   // direct request, see wheel-icons.js's MARKS.alter for the full
   // design-review history.
-  'navigateTo:build': 'add',
-  'navigateTo:alter': 'alter',
   // Universal ring (every wheel): Lab/Settings and Home.
   openLab: 'lab',
   navigateHome: 'home',

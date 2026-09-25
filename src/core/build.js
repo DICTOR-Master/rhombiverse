@@ -7,7 +7,6 @@
 import * as THREE from 'three';
 import {
   NEIGHBOR_OFFSETS,
-  cellsInShells,
   cellKey,
   parseCellKey,
   cellToWorld,
@@ -121,83 +120,6 @@ export function resolveGrowthOffset(faceNormal) {
   return matchNeighborOffset(faceNormal);
 }
 
-function distanceFromCenter(cx, cy, cz, x, y, z) {
-  const [cwx, cwy, cwz] = cellToWorld(cx, cy, cz);
-  const [wx, wy, wz] = cellToWorld(x, y, z);
-  return Math.hypot(wx - cwx, wy - cwy, wz - cwz);
-}
-
-function roundStructure(world, centerKey) {
-  const [cx, cy, cz] = parseCellKey(centerKey);
-  const structure = world
-    .entries()
-    .filter((c) => c.shellCenter === centerKey && c.shell !== undefined);
-  if (structure.length === 0) return;
-
-  const maxShellNum = Math.max(...structure.map((c) => c.shell));
-  const outer = structure.filter((c) => c.shell === maxShellNum);
-
-  const dist = (x, y, z) => distanceFromCenter(cx, cy, cz, x, y, z);
-  const targetRadius = outer.reduce((sum, c) => sum + dist(c.x, c.y, c.z), 0) / outer.length;
-  const TOLERANCE = 0.75; // tunable heuristic, not physically derived
-
-  const materialCounts = {};
-  for (const c of outer) materialCounts[c.material] = (materialCounts[c.material] || 0) + 1;
-  const fillMaterial = Object.entries(materialCounts).sort((a, b) => b[1] - a[1])[0][0];
-
-  for (const c of structure) {
-    if (dist(c.x, c.y, c.z) > targetRadius + TOLERANCE) {
-      world.removeCell(c.x, c.y, c.z);
-    }
-  }
-
-  for (const cand of cellsInShells(cx, cy, cz, maxShellNum + 1)) {
-    const d = dist(cand.x, cand.y, cand.z);
-    if (
-      d >= targetRadius - TOLERANCE &&
-      d <= targetRadius + TOLERANCE &&
-      !world.has(cand.x, cand.y, cand.z)
-    ) {
-      world.addCell(cand.x, cand.y, cand.z, {
-        material: fillMaterial,
-        shell: cand.shell,
-        shellCenter: centerKey,
-      });
-    }
-  }
-}
-
-function excavateStructure(world, centerKey, minShell) {
-  const structure = world
-    .entries()
-    .filter((c) => c.shellCenter === centerKey && c.shell !== undefined);
-  for (const c of structure) {
-    if (c.shell < minShell) {
-      world.removeCell(c.x, c.y, c.z);
-    }
-  }
-}
-
-export function removeShell(world, centerKey, shellNumber) {
-  const structure = world
-    .entries()
-    .filter((c) => c.shellCenter === centerKey && c.shell === shellNumber);
-  for (const c of structure) {
-    world.removeCell(c.x, c.y, c.z);
-  }
-}
-
-export function recolorShell(world, centerKey, shellNumber, material, canPlaceMaterial = () => true) {
-  const structure = world
-    .entries()
-    .filter((c) => c.shellCenter === centerKey && c.shell === shellNumber);
-  for (const c of structure) {
-    if (!canPlaceMaterial(material, c.x, c.y, c.z)) continue;
-    const { x, y, z, ...data } = c;
-    world.addCell(x, y, z, { ...data, material });
-  }
-}
-
 export function createBuildController({
   renderer,
   camera,
@@ -213,8 +135,6 @@ export function createBuildController({
   world,
   onChange,
   getMode,
-  getShellCount,
-  getMinShell,
   getMaterial,
   // Piece tier (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md, direct follow-up
   // 2026-08-26): 'rd' (default) | 'cube' | 'pyramid' | 'to' -- what the
@@ -320,7 +240,6 @@ export function createBuildController({
   hemisphereStore = null,
   hemisphereGroup = null,
   onHemisphereChange = () => {},
-  onCellClicked,
   // Real bug fix (see pick()'s own header on meshTargets for the full
   // incident): whether the main FCC world `mesh` should even be
   // considered a raycast candidate right now -- defaults to always-true
@@ -345,7 +264,6 @@ export function createBuildController({
   // on any existing block. (action: 'add' | 'remove') => void, so the
   // caller can surface a real "nothing to do" prompt instead of silence.
   onPieceNoOp = null,
-  getDragPlacementEnabled = () => false,
 }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -475,7 +393,6 @@ export function createBuildController({
   // Suppressed after a drag-placement gesture so the browser's own
   // post-drag synthetic 'click' doesn't ALSO place a cell at the
   // release point.
-  let suppressNextClick = false;
 
   // TO piece tier: reuses core/bcc-build.js's own bootstrap-vs-extend
   // logic exactly (see that file for the full explanation) rather than
@@ -1524,10 +1441,6 @@ export function createBuildController({
   }
 
   function onClick(event) {
-    if (suppressNextClick) {
-      suppressNextClick = false;
-      return;
-    }
     // iPhone Safari can still deliver a synthesized click after a
     // long-press despite onTouchEnd's preventDefault -- that click would
     // immediately re-add what the long-press just removed (direct
@@ -1623,76 +1536,15 @@ export function createBuildController({
 
     const cell = cellAt(hit);
     if (!cell) return;
-    if (mode === 'sculpt') return; // Sculpt mode's click handling lives in render.js/sculpture.js
     if (mode === 'bcc') return; // BCC mode's click handling lives in core/bcc-build.js
     if (mode === 'cubocta') return; // Cuboctahedron Build's click handling lives in core/cubocta-build.js
     if (mode === 'dualize') return; // Dualize mode's click handling lives in render.js (reframe Stage 3)
 
-    if (onCellClicked) onCellClicked(cell);
 
-    if (mode === 'excavate') {
-      if (cell.shellCenter) {
-        excavateStructure(world, cell.shellCenter, getMinShell());
-        onChange();
-        if (onRemoved) onRemoved(cell);
-      }
-      return;
-    }
 
-    if (mode === 'round') {
-      if (cell.shellCenter) {
-        roundStructure(world, cell.shellCenter);
-        onChange();
-        if (onPlaced) onPlaced(cell);
-      }
-      return;
-    }
 
-    if (mode === 'report') {
-      const newStatus = cell.status === 'flagged' ? 'approved' : 'flagged';
-      const { x, y, z, ...data } = cell;
-      world.addCell(x, y, z, { ...data, status: newStatus });
-      onChange();
-      return;
-    }
 
-    if (mode === 'replace') {
-      const material = getMaterial();
-      if (!canPlaceMaterial(material, cell.x, cell.y, cell.z)) return;
-      const { x, y, z, ...data } = cell;
-      world.addCell(x, y, z, { ...data, material });
-      onChange();
-      if (onPlaced) onPlaced(cell);
-      return;
-    }
 
-    if (mode === 'fill') {
-      const maxShell = getShellCount();
-      const minShell = Math.min(getMinShell(), maxShell);
-      const material = getMaterial();
-      // If the clicked cell already belongs to a shell-filled structure,
-      // grow THAT structure's true center outward instead of starting a
-      // new one where you happened to click.
-      const centerKey = cell.shellCenter || cellKey(cell.x, cell.y, cell.z);
-      const [ccx, ccy, ccz] = parseCellKey(centerKey);
-
-      if (!cell.shellCenter) {
-        const { x, y, z, ...data } = cell;
-        world.addCell(x, y, z, { ...data, shellCenter: centerKey });
-      }
-
-      for (const c of cellsInShells(ccx, ccy, ccz, maxShell, minShell)) {
-        if (!world.has(c.x, c.y, c.z) && canPlaceMaterial(material, c.x, c.y, c.z)) {
-          world.addCell(c.x, c.y, c.z, { material, shell: c.shell, shellCenter: centerKey });
-        }
-      }
-      // Re-report focus with the now-definitive centerKey -- without this
-      // the ring panel wouldn't show the shells just built until a second click.
-      if (onCellClicked) onCellClicked({ shellCenter: centerKey });
-      onChange();
-      if (onPlaced) onPlaced(cell);
-      return;
-    }
 
     // Remove ("chisel" internally -- 'sculpt' was already taken by the
     // rich brush/mirror/symmetry panel, a genuinely different tool, see
@@ -2028,110 +1880,30 @@ export function createBuildController({
     if (onRemoved) onRemoved(cell);
   }
 
-  // Hover ghost ("intelligent ghost block", B1): translucent preview of the
-  // next valid FCC position on hover; holding the button (without dragging)
-  // shows a second preview one cell further out. Only meaningful in 'build' mode.
-  const HOLD_MS = 220;
-  const DRAG_MOVE_TOLERANCE = 6; // px, matches the touch long-press's own drift tolerance
-  let pointerDownPos = null;
-  let holdTimer = null;
-  let holding = false;
-  let dragging = false;
-  let lastDragCellKey = null;
+  // Hover ghost: a translucent preview of where a tap would add the next
+  // piece. Only meaningful in 'build' mode.
 
-  function ghostCellsForHit(hit, showSecond) {
+  function ghostCellsForHit(hit) {
     if (!hit) return null;
     const cell = cellAt(hit);
     if (!cell) return null;
-    // resolveGrowthOffset/no isValidCell gate -- kept consistent with
-    // the real placement handler above (see its own comment): every
-    // integer position is a real, safe growth target now, only real
-    // occupancy still matters. A stale ghost that doesn't match where a
-    // click would actually place a cell would be a real, confusing bug.
     const [dx, dy, dz] = resolveGrowthOffset(hit.face.normal);
     const nx = cell.x + dx;
     const ny = cell.y + dy;
     const nz = cell.z + dz;
-    const first = { x: nx, y: ny, z: nz, occupied: world.has(nx, ny, nz) };
-    if (!showSecond) return [first];
-    const nx2 = nx + dx;
-    const ny2 = ny + dy;
-    const nz2 = nz + dz;
-    return [first, { x: nx2, y: ny2, z: nz2, occupied: world.has(nx2, ny2, nz2) }];
+    return [{ x: nx, y: ny, z: nz, occupied: world.has(nx, ny, nz) }];
   }
 
+  // One piece at a time (2026-09-25): the ghost always previews the single
+  // piece a tap would place. Repeat (drag to place a run) and the
+  // hold-for-a-two-cell-preview were removed.
   function onPointerMove(event) {
     const mode = getMode();
-    if (!mode) {
-      if (onHoverEnd) onHoverEnd();
-      return;
-    }
-
-    if (pointerDownPos) {
-      const moved = Math.hypot(event.clientX - pointerDownPos.x, event.clientY - pointerDownPos.y);
-      // Drag-placement (Repeat) doesn't apply to the 'pyramid'/'to'/'ioct'/
-      // 'idis' piece tiers -- same reason as the ghost preview below,
-      // none is simple neighbor placement. 'halfrd'/'hourglass' join them
-      // for the same reason (their own handleHemisphereClick resolves a
-      // direction + side/canonical-pair from the clicked face, not a
-      // plain "next FCC neighbor" cell). 'rd'/'cube' both still drag normally.
-      // 'lattice2d:*' excluded too -- a REAL latent bug found while
-      // investigating a separate iPad tap report (drag placement itself
-      // is off by default, so this wasn't the active cause of that
-      // report, but it's a genuine bug regardless): this whole branch
-      // below uses the closure's own MAIN FCC `world`/`cellAt` and
-      // `resolveGrowthOffset` unconditionally, with zero awareness of
-      // `lattice2d`'s own per-combo stores -- if drag placement were
-      // ever turned on while a lattice2d piece was active, any pointer
-      // movement past DRAG_MOVE_TOLERANCE would set `dragging = true`,
-      // `cellAt(hit)` would fail to resolve (wrong instance-id space)
-      // and place nothing, and -- worse -- `onPointerUp` would still
-      // set `suppressNextClick = true`, silently eating the real click
-      // handling done. Excluding it here is correct until this branch
-      // gets genuine lattice2d awareness, not just a stopgap.
-      if (moved > DRAG_MOVE_TOLERANCE && !dragging && getDragPlacementEnabled() && mode === 'build' && !getPieceType().startsWith('lattice2d:') && !['pyramid', 'to', 'ioct', 'idis', 'pyrochlore', ...HEMISPHERE_PIECE_TYPES].includes(getPieceType())) {
-        dragging = true;
-        clearTimeout(holdTimer);
-        holding = false;
-      }
-    }
-
-    if (dragging) {
-      const hit = pick(event);
-      const cells = ghostCellsForHit(hit, false);
-      if (cells && !cells[0].occupied) {
-        const key = `${cells[0].x},${cells[0].y},${cells[0].z}`;
-        if (key !== lastDragCellKey) {
-          lastDragCellKey = key;
-          const material = getMaterial();
-          if (canPlaceMaterial(material, cells[0].x, cells[0].y, cells[0].z)) {
-            const data = getPieceType() === 'cube' ? { material, pyramids: 0 } : { material };
-            world.addCell(cells[0].x, cells[0].y, cells[0].z, data);
-            onChange();
-            if (onPlaced) onPlaced(cells[0]);
-          }
-        }
-      }
-      if (onHover) onHover(cells ?? [], !!cells);
-      return;
-    }
-
-    // 'pyramid' piece-tier Add doesn't place a new adjacent cell (it
-    // edits the clicked cell's own pyramids); 'to'/'ioct'/'idis' place
-    // into genuinely different worlds/lattices via their own bootstrap-
-    // vs-extend logic; 'halfrd'/'hourglass' resolve a direction + side
-    // from the clicked face rather than a plain neighbor cell -- none
-    // fits the "next valid FCC position" ghost preview below. 'rd'/
-    // 'cube' both still use it identically. 'lattice2d:*' excluded too,
-    // same reason as the drag-placement branch above -- this ghost
-    // preview also runs through the main FCC world's own `cellAt`/
-    // `resolveGrowthOffset`, with no lattice2d awareness at all.
     if (mode !== 'build' || getPieceType().startsWith('lattice2d:') || ['pyramid', 'to', 'ioct', 'idis', 'pyrochlore', ...HEMISPHERE_PIECE_TYPES].includes(getPieceType())) {
       if (onHoverEnd) onHoverEnd();
       return;
     }
-    const hit = pick(event);
-    const cells = ghostCellsForHit(hit, holding);
+    const cells = ghostCellsForHit(pick(event));
     if (cells) {
       if (onHover) onHover(cells, !cells[0].occupied);
     } else if (onHoverEnd) {
@@ -2139,40 +1911,10 @@ export function createBuildController({
     }
   }
 
-  function onPointerDown(event) {
-    if (event.button !== 0) return; // left button only -- right-click is remove, handled separately
-    pointerDownPos = { x: event.clientX, y: event.clientY };
-    dragging = false;
-    lastDragCellKey = null;
-    clearTimeout(holdTimer);
-    holdTimer = setTimeout(() => {
-      holding = true;
-      const hit = pick(event);
-      const cells = ghostCellsForHit(hit, true);
-      if (cells && onHover) onHover(cells, !cells[0].occupied);
-    }, HOLD_MS);
-  }
-
-  function onPointerUp() {
-    clearTimeout(holdTimer);
-    holding = false;
-    if (dragging) suppressNextClick = true;
-    dragging = false;
-    pointerDownPos = null;
-    lastDragCellKey = null;
-  }
-
   function onPointerLeave() {
-    clearTimeout(holdTimer);
-    holding = false;
-    dragging = false;
-    pointerDownPos = null;
     if (onHoverEnd) onHoverEnd();
   }
 
-  // Touch support (2026-08-13): tap-to-build needed zero new code (browsers
-  // already synthesize 'click' from a tap). Long-press maps to remove,
-  // reusing onContextMenu via a synthetic event rather than duplicating it.
   let touchStartX = 0;
   let touchStartY = 0;
   let longPressTimer = null;
@@ -2229,8 +1971,6 @@ export function createBuildController({
   renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: true });
   renderer.domElement.addEventListener('touchend', onTouchEnd);
   renderer.domElement.addEventListener('pointermove', onPointerMove);
-  renderer.domElement.addEventListener('pointerdown', onPointerDown);
-  renderer.domElement.addEventListener('pointerup', onPointerUp);
   renderer.domElement.addEventListener('pointerleave', onPointerLeave);
 
   return function dispose() {
@@ -2240,10 +1980,7 @@ export function createBuildController({
     renderer.domElement.removeEventListener('touchmove', onTouchMove);
     renderer.domElement.removeEventListener('touchend', onTouchEnd);
     renderer.domElement.removeEventListener('pointermove', onPointerMove);
-    renderer.domElement.removeEventListener('pointerdown', onPointerDown);
-    renderer.domElement.removeEventListener('pointerup', onPointerUp);
     renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
     clearTimeout(longPressTimer);
-    clearTimeout(holdTimer);
   };
 }

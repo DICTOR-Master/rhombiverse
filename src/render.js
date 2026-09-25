@@ -29,30 +29,13 @@ import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWor
 import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats, pyrochloreNeighborOffsets, pyrochloreCapTetsOf, pyrochloreVisibleTets, pyrochloreTetCornerPartner } from './geometry-extensions/pyrochlore-lattice.js';
 import { FEATURES } from './app/features.js';
 import { loadWorld, createWorldStore } from './core/worldstate-core.js';
-import { createBuildController, removeShell, recolorShell } from './core/build.js';
+import { createBuildController } from './core/build.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR, QUALITY_LEVELS_ASCENDING } from './app/settings.js';
 import { t, LANG_ORDER, LANG_META } from './app/i18n.js';
 import { playPlaceSound, playRemoveSound, playMenuSound } from './app/sfx.js';
 import { createWheelPickers } from './app/wheel-pickers.js';
 import { MARKS, iconFrame, swatchMark } from './app/wheel-icons.js';
 import { createHudWheel3D } from './app/hud-wheel-3d.js';
-import { createCyborgMode } from './app/cyborg.js';
-import { requestBYOKJson } from './app/byok.js';
-import {
-  MIRROR_PLANES,
-  createSculptureSession,
-  sculptStroke,
-  updateSemiCyborgSuggestion,
-  acceptSuggestion as acceptSculptSuggestion,
-  dismissSuggestion as dismissSculptSuggestion,
-  parseFullCyborgIntent,
-  requestFullCyborgIntent,
-  canFullCyborgEditAt,
-  executeFullCyborgIntent,
-  applyDualSymmetry,
-  applyFullSymmetry,
-  shellBrushCells,
-} from './core/sculpture.js';
 import { matchNeighborOffset } from './core/build.js';
 import { saveCameraState, loadCameraState } from './app/camera-persistence.js';
 import {
@@ -72,14 +55,6 @@ import {
   RHOMBOHEDRA_STORAGE_KEY,
   PYROCHLORE_STORAGE_KEY,
 } from './core/persistence.js';
-import {
-  compressionSupported,
-  encodeWorldForUrl,
-  decodeWorldFromUrl,
-  buildShareUrl,
-  getSharedWorldParam,
-  clearSharedWorldParam,
-} from './app/worldshare.js';
 import { VALID_TRIPLES, unitTileVertices } from './geometry-extensions/growth.js';
 // World-building/game systems (mining, trade, claims, achievements,
 // animals, hazards, hydrosphere, gravity/planetoids, growth/evolution/
@@ -138,58 +113,11 @@ const PYROCHLORE_FIRST = [2, 0, 0];
 const PYROCHLORE_LEGACY_SEEDS = [[-10, 0, 0], [-6, 0, 0], [-3, -1, 1]];
 const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
 
-// Performance guardrail (reframe Stage 6): warn before loading a World
-// large enough to risk a real slowdown on lower-power hardware (this
-// app is played on a Raspberry Pi) -- not a hard block, just a heads-up
-// with a chance to back out, matching the confirm()-gated pattern
-// already used for every other destructive world-replace action here.
-// Well above realistic normal use (the built-in Showcase World is 459
-// cells) but with real headroom below MAX_CELLS, so it only fires for
-// genuinely oversized imports/presets, not everyday structures.
-const LARGE_WORLD_CELL_WARNING_THRESHOLD = 5000;
-function confirmLargeWorldLoad(worldJSON) {
-  const cellCount = Object.keys(worldJSON.cells ?? {}).length;
-  if (cellCount <= LARGE_WORLD_CELL_WARNING_THRESHOLD) return true;
-  return confirm(
-    `This World has ${cellCount.toLocaleString()} cells, which may run slowly on lower-power devices. Load it anyway?`
-  );
-}
-const MAX_SHELL = 15; // enforced cap on shell-count UI inputs, see docs/code-notes/render.md
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05050a);
 
-// B4b: standalone Sculpture Mode -- "a fresh, fully isolated lattice
-// space: no connection to the player's claim, no authorId, no
-// moderation state, no persistence in shared world-state." A genuinely
-// separate THREE.Scene (not a swap of `scene`'s own contents), so it
-// never touches the dozens of scene.add() call sites the main world
-// already has scattered through init() (gravity/claims/organisms/
-// asteroids/etc. -- none of which apply to a bare scratch lattice
-// anyway). The render loop (animate(), bottom of this file) picks
-// whichever scene sculptureModeActive selects; camera/renderer/
-// OrbitControls are reused as-is since they're scene-agnostic.
-const sculptureScene = new THREE.Scene();
-sculptureScene.background = new THREE.Color(0x0a0a14);
-sculptureScene.add(new THREE.AmbientLight(0xffffff, 0.5));
-const sculptureSun = new THREE.DirectionalLight(0xffffff, 1.2);
-sculptureSun.position.set(5, 8, 4);
-sculptureScene.add(sculptureSun);
-let sculptureModeActive = false;
-let sculptureWorld = null; // created lazily, first time Sculpture Mode is entered
-let sculptureMesh = null; // created inside init(), once geometry/material exist
 
-// Model vs. World Separation (reframe Stage 2): a live, in-session toggle
-// over the SAME data -- not a new file/schema (RHOMBIVERSE_PLAN.md's
-// "world is data" rule) and not the reload-requiring pureGeometry/
-// Rhombeometry setting (that's a session-startup choice of which SYSTEMS
-// exist at all; this is a live pause on the ones that do). Default
-// 'world' preserves today's always-simulating behavior unchanged for
-// anyone who never touches the new toggle.
-let workspaceMode = 'world';
-// Bridges init()-scoped wheel3D.refresh() out to wireSettingsPanel()'s IIFE
-// below, which runs at module-eval time before init() (and wheel3D) exist.
-let refreshWheel3D = () => {};
 // Dimension-select wizard (2026-09-22): which dimension tier the app is
 // currently in ('3D' the only real value in Phase 1; null before a
 // choice is made, which only ever happens for the instant between page
@@ -224,7 +152,7 @@ document.getElementById('app').appendChild(renderer.domElement);
 // full WebGLRenderer, always running, would make the exact perf
 // mistake this session already found and fixed for the modal wheel).
 const hudWheel = createHudWheel3D(renderer, {
-  getBackgroundColor: () => (sculptureModeActive ? sculptureScene.background : scene.background),
+  getBackgroundColor: () => scene.background,
 });
 
 // Touch/drag-only rotation, scoped to the wheel's own small on-screen
@@ -375,7 +303,6 @@ const ORBIT_TOUCH_ONE_DEFAULT = controls.touches.ONE;
 // -- that view has nothing to do with the main world and would
 // otherwise clobber the real saved position with a scratch-space one.
 function persistCameraState() {
-  if (sculptureModeActive) return;
   saveCameraState(camera.position, controls.target);
 }
 controls.addEventListener('end', persistCameraState);
@@ -445,29 +372,6 @@ function applyDimensionCamera(dimension) {
   }
 }
 
-// B3 (Cyborg Mode, RHOMBIVERSE_UIUX_BUILD_PLAN.md): the 'cameraRotated'
-// success-condition event a first-build-session subscript step listens
-// for. OrbitControls' own 'change' event fires identically for rotate/
-// zoom/pan with no way to tell them apart, so this tracks a real
-// left-button drag directly instead -- dispatched globally (not scoped
-// to cyborg.js) since it's a real, generically useful signal, same
-// spirit as build.js's onPlaced/onHover callbacks.
-let camRotateStart = null;
-renderer.domElement.addEventListener('pointerdown', (e) => {
-  if (e.button === 0) camRotateStart = { x: e.clientX, y: e.clientY };
-});
-window.addEventListener('pointermove', (e) => {
-  if (!camRotateStart) return;
-  const moved = Math.hypot(e.clientX - camRotateStart.x, e.clientY - camRotateStart.y);
-  if (moved > 6) {
-    window.dispatchEvent(new CustomEvent('rhombiverse:cameraRotated'));
-    camRotateStart = null; // one dispatch per drag gesture is enough
-  }
-});
-window.addEventListener('pointerup', () => {
-  camRotateStart = null;
-});
-
 // UI-chrome translations (src/app/i18n.js), Phase 1 scope only -- see
 // that file's own header for exactly what's covered/deferred. Applies
 // every element tagged data-i18n/-title/-placeholder/-html; the
@@ -510,14 +414,6 @@ onSettingsChange((s) => {
   if (languageSelect && languageSelect.value !== s.language) languageSelect.value = s.language;
 });
 
-// Walk mode (RHOMBIVERSE_PLAN.md Phase 5.5) was archived 2026-09-22
-// (second world-building removal pass) along with gravity/planetoids --
-// `walking` is kept, permanently false, since a number of unrelated
-// mode guards elsewhere (Duality/Sculpt/Cuboctahedron) still read it
-// defensively; nothing sets it true anymore, so those guards are
-// harmless no-ops now rather than load-bearing. `player` (the walk
-// controller) had no other consumer, so it's gone entirely.
-let walking = false;
 // Assigned inside init() once updateHudIndicator exists there.
 let refreshHudIndicator = () => {};
 
@@ -597,76 +493,6 @@ document.getElementById('lab-close')?.addEventListener('click', () => {
   labPanelEl.classList.remove('open');
 });
 
-// See docs/code-notes/render.md
-let cyborgWorldRef = null;
-function buildCyborgWorldSummary() {
-  if (!cyborgWorldRef) return 'Nothing built yet.';
-  const cells = cyborgWorldRef.entries();
-  const materialCounts = {};
-  for (const cell of cells) materialCounts[cell.material] = (materialCounts[cell.material] ?? 0) + 1;
-  const materialList = Object.entries(materialCounts).map(([m, n]) => `${n} ${m}`).join(', ') || 'nothing yet';
-  // Pure geometry only (seeds/organisms were retired -- and getSeeds/
-  // getOrganisms no longer exist on the world store, so the old lines
-  // here would have thrown).
-  return `${cells.length} blocks built (${materialList}).`;
-}
-
-// Kept in sync with api/cyborg-suggest.js's own copy -- see docs/code-notes/render.md
-const CYBORG_SUGGEST_SYSTEM_PROMPT = `You are a creative building companion for Rhombiverse, a spatial editor where every block is a rhombic dodecahedron.
-
-Given a short description of what someone has already built, suggest ONE small, concrete, achievable next thing for them to build -- something more interesting than "place another block", but still doable in a few minutes. Name a shape, direction, or technique (e.g. "try a mirrored arch to the east", "switch to BCC and wrap your tower in truncated octahedra", "hollow out the center and add windows"). Keep it under 140 characters, friendly, and specific to what they've actually built so far -- don't suggest something they've clearly already done. Never mention that you are an AI.
-
-Respond with a JSON object with exactly one field: suggestion (string, <140 chars).`;
-
-const LOCAL_CYBORG_SUGGESTIONS = [
-  'Try building a small dome and see how it looks from inside.',
-  'Switch lattice (FCC to BCC) and see how the same idea looks built from truncated octahedra.',
-  "Add a mirrored wing to double a shape you've already built.",
-  "Orbit to the far side of what you've built and extend it in a new direction.",
-  'Try a different material for the next few blocks -- see how the color changes the feel of the shape.',
-  'Hollow out part of a solid structure and see what it looks like from inside.',
-];
-let lastLocalCyborgSuggestion = -1;
-function pickLocalCyborgSuggestion() {
-  if (LOCAL_CYBORG_SUGGESTIONS.length === 1) return LOCAL_CYBORG_SUGGESTIONS[0];
-  let i;
-  do {
-    i = Math.floor(Math.random() * LOCAL_CYBORG_SUGGESTIONS.length);
-  } while (i === lastLocalCyborgSuggestion);
-  lastLocalCyborgSuggestion = i;
-  return LOCAL_CYBORG_SUGGESTIONS[i];
-}
-
-async function getCyborgSuggestion() {
-  const summary = buildCyborgWorldSummary();
-  try {
-    const decision = await requestBYOKJson(CYBORG_SUGGEST_SYSTEM_PROMPT, summary);
-    if (decision?.suggestion) return decision.suggestion;
-  } catch (err) {
-    console.warn('Rhombiverse: personal AI key call failed for Cyborg suggestion, trying the shared AI Gateway instead', err);
-  }
-  try {
-    const res = await fetch('/api/cyborg-suggest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ summary }),
-    });
-    if (!res.ok) throw new Error(`cyborg-suggest API returned ${res.status}`);
-    const data = await res.json();
-    if (!data.suggestion) throw new Error('no suggestion in response');
-    return data.suggestion;
-  } catch (err) {
-    console.warn('Rhombiverse: Cyborg suggestion AI Gateway call failed, using a local suggestion instead', err);
-    return pickLocalCyborgSuggestion();
-  }
-}
-
-const cyborgMode = createCyborgMode({ getSuggestion: getCyborgSuggestion });
-const cyborgToggleEl = document.getElementById('cyborg-toggle');
-cyborgToggleEl.addEventListener('click', async () => {
-  await cyborgMode.toggle();
-  cyborgToggleEl.classList.toggle('active', cyborgMode.isEnabled());
-});
 
 // B6 onboarding sequence removed 2026-09-22 -- narrated Full World/game
 // content (an "already-built World," "growing life", other players) that
@@ -674,13 +500,6 @@ cyborgToggleEl.addEventListener('click', async () => {
 // unreachable (gated on !pureGeometry, which settings.js forces true
 // unconditionally). The old onboarding.json (retired game content) was deleted 2026-09-24.
 
-// See docs/code-notes/render.md
-let pendingPersonaChoice = null;
-let applyPersonaChoiceFn = null;
-window.addEventListener('rhombiverse:personaChosen', (e) => {
-  if (applyPersonaChoiceFn) applyPersonaChoiceFn(e.detail.persona);
-  else pendingPersonaChoice = e.detail.persona;
-});
 
 // Settings inputs (Lab panel only, per B1) -- initialized from whatever
 // was last saved/defaulted in settings.js, then pushed back on any change.
@@ -714,43 +533,7 @@ window.addEventListener('rhombiverse:personaChosen', (e) => {
   // retired (see features.js/settings.js), there's no longer a real
   // choice to expose here.
 
-  // Model vs. World Separation (reframe Stage 2): unlike pureGeometry
-  // above, this is a live, no-reload toggle. Originally gated the whole
-  // simulation heartbeat (growth/evolution/gravity ticks); those systems
-  // were archived 2026-09-22 (second world-building removal pass) along
-  // with the heartbeat itself, so this toggle now only gates Cuboctahedron
-  // Build (WORLD_ONLY_FACE_ACTIONS, rhombic-wheel-3d-core.js) -- a
-  // persistent-World-only system for unrelated reasons. Kept rather than
-  // removed since that gate is still real.
-  const workspaceModeInput = document.getElementById('setting-workspace-mode');
-  workspaceModeInput.checked = workspaceMode === 'model';
-  workspaceModeInput.addEventListener('change', () => {
-    workspaceMode = workspaceModeInput.checked ? 'model' : 'world';
-    refreshWheel3D();
-    showHudPrompt(
-      workspaceMode === 'model'
-        ? 'Model workspace: Cuboctahedron Build paused (a persistent-World-only system). Geometry and material tools stay available.'
-        : 'World workspace: Cuboctahedron Build available again.',
-      5000,
-    );
-  });
 
-  // Bring-Your-Own-AI-Key (mid-B5 addition) -- see byok.js's own header
-  // for why this is plain fetch, not the @anthropic-ai/sdk package.
-  const byokProviderSelect = document.getElementById('byok-provider');
-  const byokFields = document.getElementById('byok-fields');
-  const byokApiKeyInput = document.getElementById('byok-api-key');
-  const byokModelInput = document.getElementById('byok-model');
-  byokProviderSelect.value = s.byokProvider;
-  byokApiKeyInput.value = s.byokApiKey;
-  byokModelInput.value = s.byokModel;
-  byokFields.style.display = s.byokProvider === 'none' ? 'none' : '';
-  byokProviderSelect.addEventListener('change', () => {
-    updateSettings({ byokProvider: byokProviderSelect.value });
-    byokFields.style.display = byokProviderSelect.value === 'none' ? 'none' : '';
-  });
-  byokApiKeyInput.addEventListener('input', () => updateSettings({ byokApiKey: byokApiKeyInput.value }));
-  byokModelInput.addEventListener('input', () => updateSettings({ byokModel: byokModelInput.value }));
 })();
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
@@ -1041,11 +824,9 @@ function shellTint(shell) {
 }
 
 const GENERATED_TINT = new THREE.Color(0x2a0a30); // see docs/code-notes/render.md
-const FLAGGED_TINT = new THREE.Color(0xff2020);
 
 // See docs/code-notes/render.md
 function instanceColorFor(cell) {
-  if (cell.status === 'flagged' || cell.status === 'removed') return FLAGGED_TINT;
   if (cell.generatedByBlackHole) return GENERATED_TINT;
   const base = materialColor(cell.material);
   if (!cell.shell) return base;
@@ -1055,8 +836,8 @@ function instanceColorFor(cell) {
 let cellOrder = []; // instanceId -> {x, y, z, ...cellData}, see docs/code-notes/render.md
 
 // See docs/code-notes/render.md
-function visibleCells(world, inReportMode) {
-  const base = inReportMode ? world.entries() : world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
+function visibleCells(world) {
+  const base = world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
   // Pyramid Sub-Cell (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md, docs/code-notes/
   // core/pyramid.md): a partial cell can't be an instance of the shared
   // InstancedMesh -- InstancedMesh requires every instance to share the
@@ -1074,8 +855,8 @@ function isPartialCell(cell) {
   return cell.cube === false || (cell.pyramids !== undefined && cell.pyramids !== FULL_PYRAMIDS);
 }
 
-function rebuildInstances(mesh, world, inReportMode = false) {
-  cellOrder = visibleCells(world, inReportMode);
+function rebuildInstances(mesh, world) {
+  cellOrder = visibleCells(world);
   const m = new THREE.Matrix4();
   cellOrder.forEach((cell, i) => {
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
@@ -1088,7 +869,7 @@ function rebuildInstances(mesh, world, inReportMode = false) {
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   // Forces a bounding-sphere recompute -- see docs/code-notes/render.md
   mesh.computeBoundingSphere();
-  rebuildPartialCellMeshes(world, inReportMode);
+  rebuildPartialCellMeshes(world);
 }
 
 // Pyramid Sub-Cell: one individual Mesh per partial cell, kept in its own
@@ -1176,8 +957,8 @@ function buildPartialCellObject3D(cell, key) {
   return object3D;
 }
 
-function rebuildPartialCellMeshes(world, inReportMode = false) {
-  const source = inReportMode ? world.entries() : world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
+function rebuildPartialCellMeshes(world) {
+  const source = world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
   const wanted = new Map();
   for (const cell of source) {
     if (isPartialCell(cell)) wanted.set(cellKey(cell.x, cell.y, cell.z), cell);
@@ -1666,48 +1447,17 @@ async function init() {
   wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
   wireFirstUseHint('spherical-toggle', 'Spherical: renders shapes in a simplified near-spherical form -- a client-side view only, your cells are untouched.');
   wireFirstUseHint('bcc-toggle', 'Lattice View: click to cycle a preview lens through every Piece type -- RD, Cube, Pyramid (shown on your real World), then Cuboctahedron and Octahedron, then BCC/TO, Flattened Octahedron, and Disphenoid (a hypothetical patch near you), then Off.');
-  wireFirstUseHint('clear-world-toggle', 'Clear World: erase everything and start fresh from a single seed cell.');
+  wireFirstUseHint('clear-world-toggle', 'Clear World: erase everything in every dimension and start fresh (Undo can bring it back).');
   wireFirstUseHint('reload-toggle', 'Reload: hard-refresh the app if anything looks stuck or stale.');
-  wireFirstUseHint('sculpture-mode-toggle', 'Sculpture Mode: a separate, isolated scratch workspace -- nothing here touches your real World.');
-  wireFirstUseHint('cyborg-toggle', 'Cyborg Mode: a guided walkthrough, step by step.');
   wireFirstUseHint('xray-toggle', 'X-Ray: drag a cutaway plane through the structure to see inside it.');
-  wireFirstUseHint('lab-toggle', 'Settings: advanced settings and tools live here.');
+  wireFirstUseHint('lab-toggle', 'Settings: camera, graphics, sound, language, colors, and Export / Import World.');
   // Moved from the welcome card's own quickstart line -- see docs/code-notes/render.md
-  wireFirstUseHint('hud-wheel-cue', 'Tab / Space (or tap Menu) opens the Rhombic Wheel -- build, sculpt, grow, and more, all from here.');
-  wireFirstUseHint('export-json', 'Export your World anytime to keep a copy.');
+  wireFirstUseHint('hud-wheel-cue', 'Tab / Space (or tap Menu) opens the menu wheel.');
+  wireFirstUseHint('export-json', 'Export World saves every dimension to one file -- Import World opens it again.');
 
-  // World load priority (shared link / saved / blank starter) -- see
-  // docs/code-notes/render.md. No bundled demo/preset World loads on
-  // first visit anymore (Showcase World and the "Body Types" planetoid
-  // presets were removed 2026-09-22, along with the game-world framing
-  // they carried) -- every first visit starts from the same single-cell
-  // starter, geometry only, no tour, no other players, nothing pre-built.
-  const sharedParam = getSharedWorldParam();
-  let sharedWorldJSON = null;
-  if (sharedParam) {
-    try {
-      sharedWorldJSON = await decodeWorldFromUrl(sharedParam);
-    } catch (err) {
-      console.warn('Rhombiverse: failed to decode shared world link', err);
-    }
-    clearSharedWorldParam();
-  }
-
+  // The saved World (this browser), or the empty starter on a first visit.
   const savedJSON = loadFromLocalStorage();
-  let worldJSON;
-  if (sharedWorldJSON) {
-    worldJSON = sharedWorldJSON;
-  } else if (savedJSON) {
-    worldJSON = savedJSON;
-  } else {
-    worldJSON = await loadWorld('./data/starter-world.json');
-  }
-  const world = createWorldStore(worldJSON);
-  cyborgWorldRef = world;
-  if (sharedWorldJSON) {
-    saveToLocalStorage(world.toJSON());
-    showHudPrompt('Loaded a shared World from your link.', 5000);
-  }
+  const world = createWorldStore(savedJSON ?? await loadWorld('./data/starter-world.json'));
   // Declared early -- see docs/code-notes/render.md
   let currentMode = 'build';
 
@@ -2555,12 +2305,6 @@ async function init() {
   const hemisphereStore = createHemisphereStore(hemisphereSavedJSON);
   rebuildHemisphereMeshes(hemisphereStore);
 
-  // B4b's standalone mesh -- same geometry/material recipe as the main
-  // world's (a real sculpture should look identical either place), own
-  // InstancedMesh/capacity since it's a genuinely separate scene.
-  sculptureMesh = new THREE.InstancedMesh(geometry, material.clone(), MAX_CELLS);
-  sculptureMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  sculptureScene.add(sculptureMesh);
 
   // (Lattice Zoom -- the orange sub-lattice that faded in when the
   // camera got close -- was removed 2026-09-24: a leftover of the retired
@@ -2661,7 +2405,6 @@ async function init() {
     while (done < count && undoOneStep()) done++;
     updateUndoButton();
     renderUndoScrubStrip();
-    renderRingList();
     document.getElementById('undo-scrub-strip').classList.remove('visible');
     if (done) showHudPrompt(done === 1 ? 'Undone.' : `Undone ${done} steps.`, 1500);
   }
@@ -2672,7 +2415,7 @@ async function init() {
   // call is ignored by history while historyRestoring is set.
   function registerHistoryStores() {
     const reg = (historyKey, dim, get, restore) => {
-      historyRestorers.set(historyKey, { dim, restore });
+      historyRestorers.set(historyKey, { dim, restore, get });
       historyLastSaved.set(historyKey, JSON.stringify(get()));
     };
     reg(MAIN_HISTORY_KEY, '3D', () => world.toJSON(), (j) => { world.replaceAll(j); onChange(); });
@@ -2693,108 +2436,6 @@ async function init() {
     updateUndoButton();
   }
 
-  // Ring list -- see docs/code-notes/render.md
-  let focusedCenterKey = null;
-
-  function shellHue(shell) {
-    return ((shell * 0.15) % 1) * 360;
-  }
-
-  const SVG_NS = 'http://www.w3.org/2000/svg';
-
-  // See docs/code-notes/render.md
-  function renderRingDiagram(shells, counts) {
-    const size = 176;
-    const cx = size / 2;
-    const cy = size / 2;
-    const maxRadius = size / 2 - 6;
-    const maxShell = shells[shells.length - 1];
-    const radiusFor = (n) => (n / maxShell) * maxRadius;
-
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
-    svg.setAttribute('width', size);
-    svg.setAttribute('height', size);
-
-    for (let i = shells.length - 1; i >= 0; i--) {
-      const shell = shells[i];
-      const circle = document.createElementNS(SVG_NS, 'circle');
-      circle.setAttribute('cx', cx);
-      circle.setAttribute('cy', cy);
-      circle.setAttribute('r', radiusFor(shell));
-      circle.setAttribute('fill', `hsl(${shellHue(shell)}, 65%, 50%)`);
-      circle.setAttribute('stroke', 'rgba(0,0,0,0.5)');
-      circle.style.cursor = 'pointer';
-      circle.addEventListener('click', () => {
-        removeShell(world, focusedCenterKey, shell);
-        onChange();
-      });
-      const title = document.createElementNS(SVG_NS, 'title');
-      title.textContent = `Shell ${shell} · ${counts.get(shell)} cells (click to remove)`;
-      circle.appendChild(title);
-      svg.appendChild(circle);
-    }
-
-    const centerDot = document.createElementNS(SVG_NS, 'circle');
-    centerDot.setAttribute('cx', cx);
-    centerDot.setAttribute('cy', cy);
-    centerDot.setAttribute('r', 3);
-    centerDot.setAttribute('fill', '#fff');
-    svg.appendChild(centerDot);
-
-    return svg;
-  }
-
-  function renderRingList() {
-    const container = document.getElementById('ring-list');
-    container.innerHTML = '';
-    if (!focusedCenterKey) {
-      container.innerHTML = `<div class="placeholder" data-i18n="shells.emptyHint">${t('shells.emptyHint', getSettings().language)}</div>`;
-      return;
-    }
-    const structure = world
-      .entries()
-      .filter((c) => c.shellCenter === focusedCenterKey && c.shell !== undefined);
-    if (structure.length === 0) {
-      container.innerHTML = '<div class="placeholder">No shells in this structure.</div>';
-      return;
-    }
-    const counts = new Map();
-    for (const c of structure) counts.set(c.shell, (counts.get(c.shell) || 0) + 1);
-    const shells = [...counts.keys()].sort((a, b) => a - b);
-
-    container.appendChild(renderRingDiagram(shells, counts));
-
-    for (const shell of shells) {
-      const row = document.createElement('div');
-      row.className = 'ring-item';
-      const label = document.createElement('span');
-      label.textContent = `Shell ${shell} · ${counts.get(shell)} cells`;
-      const recolorBtn = document.createElement('button');
-      recolorBtn.type = 'button';
-      recolorBtn.className = 'ring-recolor';
-      recolorBtn.textContent = t('shells.recolor', getSettings().language);
-      recolorBtn.title = t('shells.recolorTitle', getSettings().language);
-      recolorBtn.addEventListener('click', () => {
-        recolorShell(world, focusedCenterKey, shell, materialSelect.value, canPlaceMaterial);
-        onChange();
-      });
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'ring-remove';
-      removeBtn.textContent = '×';
-      removeBtn.title = `Remove shell ${shell}`;
-      removeBtn.addEventListener('click', () => {
-        removeShell(world, focusedCenterKey, shell);
-        onChange();
-      });
-      row.appendChild(label);
-      row.appendChild(recolorBtn);
-      row.appendChild(removeBtn);
-      container.appendChild(row);
-    }
-  }
-
   function onChange() {
     // Invariant (direct instruction, 2026-08-29): the world must never
     // reach zero cells. With nothing left to click a face of, Add has no
@@ -2812,7 +2453,7 @@ async function init() {
     // first will place... getting very crowded with seeds"). An empty
     // world is no longer a dead end: the target is always tappable. See
     // firstPlacementSpec.
-    rebuildInstances(mesh, world, currentMode === 'report');
+    rebuildInstances(mesh, world);
     updateSectionEnabled(); // keeps newly created partial-cell (Pyramid) mesh materials in sync with X-Ray -- see that function's own header
     applyWorldViewMaterials(); // same reasoning as updateSectionEnabled() above -- see World View's own header
     if (worldViewMode === 'skeleton') rebuildWorldViewSkeleton();
@@ -2822,7 +2463,6 @@ async function init() {
     // is active should update it too.
     if (latticeQuickViewMode !== 'off') rebuildLatticeQuickView();
     persist(world.toJSON());
-    renderRingList();
   }
 
   // See docs/code-notes/render.md
@@ -3135,60 +2775,58 @@ async function init() {
     // Spherical Toggle, the same sphere templates that rebuild swaps
     // those meshes' OWN .geometry to -- just as loose geometries
     // instead of instance matrices.
-    if (!sculptureModeActive) {
-      for (const cell of bccWorld.entries()) {
-        const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
-        const g = sphericalModeActive ? sphericalGeometries.truncatedOctahedron.clone() : buildBCCGeometry(bccShapeScaleFor(SCALE));
+    for (const cell of bccWorld.entries()) {
+      const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+      const g = sphericalModeActive ? sphericalGeometries.truncatedOctahedron.clone() : buildBCCGeometry(bccShapeScaleFor(SCALE));
+      pieces.push(g.translate(wx, wy, wz));
+    }
+    for (const cell of cuboctaWorld.entries()) {
+      const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
+      const g = sphericalModeActive ? sphericalGeometries.cuboctahedron.clone() : buildCuboctaGeometry(SCALE);
+      pieces.push(g.translate(wx, wy, wz));
+    }
+    for (const cell of octGapWorld.entries()) {
+      const [wx, wy, wz] = octGapCellToWorld(cell.x, cell.y, cell.z, SCALE);
+      const g = sphericalModeActive ? sphericalGeometries.octahedron.clone() : buildOctGapGeometry(SCALE);
+      pieces.push(g.translate(wx, wy, wz));
+    }
+    // View-mode backfill (2026-09-24): ED, Hex Prism, Rhombohedra --
+    // same geometry/position recipe as each one's own instance rebuild.
+    for (const cell of elongDodecaWorld.entries()) {
+      const [wx, wy, wz] = elongDodecaCellToWorld(cell.x, cell.y, cell.z, SCALE);
+      pieces.push((sphericalModeActive ? sphericalGeometries.elongDodeca : elongDodecaGeometry).clone().translate(wx, wy, wz));
+    }
+    for (const cell of hexPrismWorld.entries()) {
+      const [wx, wy, wz] = hexCellToWorld(cell.x, cell.y, cell.z, HEX_PRISM_R, HEX_PRISM_H);
+      pieces.push((sphericalModeActive ? sphericalGeometries.hexPrism : hexPrismGeometry).clone().translate(wx, wy, wz));
+    }
+    for (const cell of rhombohedraWorld.entries()) {
+      pieces.push((sphericalModeActive ? sphericalGeometries.rhombohedron : rhombohedraGeometry).clone().applyMatrix4(rhombohedraInstanceMatrix(cell)));
+    }
+    // Pyrochlore (3D Kagome): TTs + their derived cap tets, same
+    // geometry/position recipe as rebuildPyrochloreInstances.
+    const pyroCells = pyrochloreWorld.entries().filter((c) => pyrochloreSiteOrientation(c.x, c.y, c.z) !== 0);
+    for (const cell of pyroCells) {
+      const [wx, wy, wz] = pyrochloreCellToWorld(cell.x, cell.y, cell.z, PYROCHLORE_S);
+      const g = sphericalModeActive ? sphericalGeometries.truncatedTetrahedron.clone() : pyrochloreTTGeometries[pyrochloreSiteOrientation(cell.x, cell.y, cell.z) === 1 ? 0 : 1].clone();
+      pieces.push(g.translate(wx, wy, wz));
+    }
+    const pyroTets = pyrochloreVisibleTets(pyrochloreWorld.entries());
+    ['up', 'down'].forEach((kind, idx) => {
+      for (const { center } of pyroTets[kind]) {
+        const [wx, wy, wz] = pyrochloreCellToWorld(center[0], center[1], center[2], PYROCHLORE_S);
+        const g = sphericalModeActive ? sphericalGeometries.tetrahedron.clone() : pyrochloreTetGeometries[idx].clone();
         pieces.push(g.translate(wx, wy, wz));
       }
-      for (const cell of cuboctaWorld.entries()) {
-        const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
-        const g = sphericalModeActive ? sphericalGeometries.cuboctahedron.clone() : buildCuboctaGeometry(SCALE);
-        pieces.push(g.translate(wx, wy, wz));
-      }
-      for (const cell of octGapWorld.entries()) {
-        const [wx, wy, wz] = octGapCellToWorld(cell.x, cell.y, cell.z, SCALE);
-        const g = sphericalModeActive ? sphericalGeometries.octahedron.clone() : buildOctGapGeometry(SCALE);
-        pieces.push(g.translate(wx, wy, wz));
-      }
-      // View-mode backfill (2026-09-24): ED, Hex Prism, Rhombohedra --
-      // same geometry/position recipe as each one's own instance rebuild.
-      for (const cell of elongDodecaWorld.entries()) {
-        const [wx, wy, wz] = elongDodecaCellToWorld(cell.x, cell.y, cell.z, SCALE);
-        pieces.push((sphericalModeActive ? sphericalGeometries.elongDodeca : elongDodecaGeometry).clone().translate(wx, wy, wz));
-      }
-      for (const cell of hexPrismWorld.entries()) {
-        const [wx, wy, wz] = hexCellToWorld(cell.x, cell.y, cell.z, HEX_PRISM_R, HEX_PRISM_H);
-        pieces.push((sphericalModeActive ? sphericalGeometries.hexPrism : hexPrismGeometry).clone().translate(wx, wy, wz));
-      }
-      for (const cell of rhombohedraWorld.entries()) {
-        pieces.push((sphericalModeActive ? sphericalGeometries.rhombohedron : rhombohedraGeometry).clone().applyMatrix4(rhombohedraInstanceMatrix(cell)));
-      }
-      // Pyrochlore (3D Kagome): TTs + their derived cap tets, same
-      // geometry/position recipe as rebuildPyrochloreInstances.
-      const pyroCells = pyrochloreWorld.entries().filter((c) => pyrochloreSiteOrientation(c.x, c.y, c.z) !== 0);
-      for (const cell of pyroCells) {
-        const [wx, wy, wz] = pyrochloreCellToWorld(cell.x, cell.y, cell.z, PYROCHLORE_S);
-        const g = sphericalModeActive ? sphericalGeometries.truncatedTetrahedron.clone() : pyrochloreTTGeometries[pyrochloreSiteOrientation(cell.x, cell.y, cell.z) === 1 ? 0 : 1].clone();
-        pieces.push(g.translate(wx, wy, wz));
-      }
-      const pyroTets = pyrochloreVisibleTets(pyrochloreWorld.entries());
-      ['up', 'down'].forEach((kind, idx) => {
-        for (const { center } of pyroTets[kind]) {
-          const [wx, wy, wz] = pyrochloreCellToWorld(center[0], center[1], center[2], PYROCHLORE_S);
-          const g = sphericalModeActive ? sphericalGeometries.tetrahedron.clone() : pyrochloreTetGeometries[idx].clone();
-          pieces.push(g.translate(wx, wy, wz));
-        }
-      });
-      for (const cell of interstitialStore.entries()) {
-        if (sphericalModeActive) {
-          const [cx, cy, cz] = disphenoidCentroid(cell.verts);
-          pieces.push(disphenoidSphereTemplate.clone().translate(cx, cy, cz));
-        } else {
-          // Already baked in absolute world-space vertices (see
-          // buildInterstitialGeometry's own header) -- no translate needed.
-          pieces.push(buildInterstitialGeometry(cell.verts, SCALE));
-        }
+    });
+    for (const cell of interstitialStore.entries()) {
+      if (sphericalModeActive) {
+        const [cx, cy, cz] = disphenoidCentroid(cell.verts);
+        pieces.push(disphenoidSphereTemplate.clone().translate(cx, cy, cz));
+      } else {
+        // Already baked in absolute world-space vertices (see
+        // buildInterstitialGeometry's own header) -- no translate needed.
+        pieces.push(buildInterstitialGeometry(cell.verts, SCALE));
       }
     }
     if (pieces.length === 0) return;
@@ -3318,9 +2956,7 @@ async function init() {
     return VALID_TRIPLES[h % VALID_TRIPLES.length];
   }
   function activeWorldTriple() {
-    return sculptureModeActive
-      ? { world: sculptureWorld, scene: sculptureScene }
-      : { world, scene };
+    return { world, scene };
   }
   async function rebuildDualityShadow() {
     const { world: w, scene: s } = activeWorldTriple();
@@ -3350,7 +2986,7 @@ async function init() {
     dualityModeActive = !dualityModeActive;
     document.getElementById('duality-toggle').classList.toggle('active', dualityModeActive);
     const { world: w, scene: s } = activeWorldTriple();
-    const activeMesh = sculptureModeActive ? sculptureMesh : mesh;
+    const activeMesh = mesh;
     activeMesh.visible = !dualityModeActive;
     if (dualityModeActive) {
       showHudPrompt('Duality: showing this structure’s real Ammann-rhombohedra shadow (a client-side render only -- your cells are untouched).', 5000);
@@ -3625,7 +3261,6 @@ async function init() {
         // 2026-08-29 -- X-Ray stays reachable via the corner HUD wheel's
         // own #xray-toggle face and the Lab panel, so no wheel face
         // routes to it here any more.)
-        if (action === 'openCyborg') { wheel3D.close(); cyborgToggleEl?.click(); return; }
         if (action === 'openLab') { wheel3D.close(); labToggleEl?.click(); return; }
         if (action === 'openAlmanac') { wheel3D.close(); almanac.open(); return; }
         // Real tool wiring below -- reuses existing, already-working
@@ -3638,10 +3273,6 @@ async function init() {
         // both wheels should share.
         const clickMode = (modeName) => document.querySelector(`.mode-btn[data-mode="${modeName}"]`)?.click();
 
-        // --- Alter: Dig/Smooth are direct 1:1 mode matches. ---
-        if (action === 'tool:dig') { clickMode('excavate'); wheel3D.close(); return; }
-        if (action === 'tool:smooth') { clickMode('round'); wheel3D.close(); return; }
-
         // --- Build: direct matches, high confidence ---
         // Universal Add/Remove, direct instruction 2026-08-26: retires the
         // separate Rhombi-model/Pyramid-model/Cube-model (and their own
@@ -3650,17 +3281,13 @@ async function init() {
         // (core/build.js's getPieceType()). 'build'/'chisel' are the
         // internal mode strings (unchanged/new respectively); the LABELS
         // are the generic ones now. Was "Rhombi-model" (tool:rhombiModel).
-        if (action === 'tool:add') { clickMode('build'); wheel3D.close(); return; }
-        if (action === 'tool:fill') { clickMode('fill'); wheel3D.close(); return; }
         // Was "Rhombi-sculpt" (tool:rhombiSculpt) -- same rich brush/
         // mirror/symmetry panel as always, just renamed so it doesn't
         // read as a same-job-different-name twin of the new plain Remove
         // action below (that confusion was the whole point of this pass).
-        if (action === 'tool:symmetry') { clickMode('sculpt'); openSculptPanel(); wheel3D.close(); return; }
         // New: a plain "click a piece, it's gone" action -- piece-tier
         // aware (RD/Cube = the whole cell, Pyramid = just that one
         // pyramid). Real logic in core/build.js's 'chisel' mode.
-        if (action === 'tool:remove') { clickMode('chisel'); wheel3D.close(); return; }
         // Piece tiers: terminal actions from the real WHEEL_PIECE layer
         // (rhombic-wheel-3d-core.js), replacing the old separate
         // piece-cluster-3d.js widget/pickers.openPieceTypePicker
@@ -3764,20 +3391,6 @@ async function init() {
           pickers.openColorPicker((value, label) => showHudPrompt(`Color: ${label}`, 3000));
           return;
         }
-        // Real toggle, same as the 2D wheel's own "Repeat" leaf --
-        // reuses wheel.js's toggleDragPlacement() rather than
-        // duplicating the drag-placement state/logic here.
-        if (action === 'tool:repeat') {
-          const enabled = pickers.toggleDragPlacement();
-          showHudPrompt(
-            enabled
-              ? 'Repeat armed: drag across faces to place a run of cells. Camera orbit is off while Repeat is active -- pick Rhombi-model to get it back.'
-              : 'Repeat off.',
-            4500
-          );
-          wheel3D.close();
-          return;
-        }
 
         // --- Piece: Cuboctahedron Build (core/cubocta-build.js), the RD
         // lattice's own dual shape -- 2026-08-29, freed onto Piece's
@@ -3853,24 +3466,13 @@ async function init() {
         // recognizes "dome"); prefilling it is a real, grounded action,
         // not invented, but was never a documented 1-click wheel
         // action before now. ---
-        if (action === 'tool:dome') {
-          clickMode('sculpt');
-          openSculptPanel();
-          const input = document.getElementById('sculpt-nl-input');
-          if (input) input.value = 'dome';
-          showHudPrompt('Dome shape ready in the Sculpt panel -- press Go to build it.', 4000);
-          wheel3D.close();
-          return;
-        }
 
         if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
     };
     selectPieceAction = handleWheelAction;
     const wheel3D = createRhombicWheel3D({
-      getWorkspaceMode: () => workspaceMode,
       onAction: handleWheelAction,
     });
-    refreshWheel3D = () => wheel3D.refresh();
     // Direct instruction 2026-08-26: "there should always automatically
     // be 1 cell because you open cell place menu." Real gap found live --
     // every whole-cell Add mode (RD/Cube/TO) places a NEW cell adjacent
@@ -3906,7 +3508,6 @@ async function init() {
     // switches this same instance to WHEEL_HOME's own content.
     const dimensionWheel3D = createRhombicWheel3D({
       instanceId: 'dimension',
-      getWorkspaceMode: () => workspaceMode,
       onAction: (action) => {
         if (action === 'tool:selectDimension:3D') {
           activeDimension = '3D';
@@ -4579,8 +4180,6 @@ async function init() {
   document.getElementById('hud-quick-lattice-view')?.addEventListener('click', cycleLatticeQuickView);
   updateLatticeQuickViewIcon();
 
-  const shellCountInput = document.getElementById('shell-count');
-  const hollowFromInput = document.getElementById('hollow-from');
   const materialSelect = document.getElementById('color-select');
   const autoAssignMaterialCheckbox = document.getElementById('auto-assign-color');
 
@@ -4654,26 +4253,17 @@ async function init() {
     autoAssignMaterialsRow.style.display = autoAssignMaterialCheckbox.checked ? 'flex' : 'none';
   }
 
-  const getShellCount = () => Math.min(Math.max(1, Number(shellCountInput.value) || 1), MAX_SHELL);
+  const DUALIZE_RADIUS = 3; // shells around the clicked cell that Dualize previews
 
   // See docs/code-notes/render.md
   const MODE_HINTS = {
     build: 'Click a face to add one cell using the selected material.',
-    fill: 'Click a cell to fill shells (hollow from–radius) outward around it, approximating a sphere. A second click on the same structure grows it further.',
-    round: 'Click a shell-tagged cell to smooth its outer boundary by true distance from center.',
-    excavate: 'Click a shell-tagged structure to hollow out its interior below "Hollow from shell".',
-    report: 'Shows flagged/removed cells (normally hidden) in red. Click one to flag it, click a flagged one to approve it back.',
-    sculpt: 'Model (add) onto a face, or Chisel (subtract) a clicked cell -- see the Sculpt panel for tier/mirror/brush.',
     bcc: 'Click a face of an existing BCC cell to extend it, or a face of your normal World to start one nearby. Right-click removes a BCC cell. Overlap with your normal World is expected -- it\'s how the two lattices join.',
     cubocta: 'Click a face of your normal World to place a cuboctahedron there, or near a POINT of an existing one to grow toward that neighbor -- click closer to a flat face instead of a point to grow face to face with its next-door neighbor. Right-click removes one. Overlap with your normal World is expected. To fill the gap that opens up between face-to-face cuboctahedra, switch to Build/Chisel mode and pick Octahedron from the Piece menu instead -- click near a corner of an existing cuboctahedron.',
-    dualize: 'Click an existing structure (FCC or a real placed BCC/TO cell) to preview its region (radius = Shell fill radius) reinterpreted through the other lattice. View-only -- nothing is written to your World.',
+    dualize: 'Click an existing structure (FCC or a real placed BCC/TO cell) to preview the region around it reinterpreted through the other lattice. View-only -- nothing is written to your World.',
   };
   function updateModeUI() {
-    const showRadius = currentMode === 'fill' || currentMode === 'dualize';
-    const showHollowFrom = currentMode === 'fill' || currentMode === 'excavate';
-    document.getElementById('shell-radius-row').style.display = showRadius ? '' : 'none';
-    document.getElementById('hollow-from-row').style.display = showHollowFrom ? '' : 'none';
-    document.getElementById('mode-hint').textContent = MODE_HINTS[currentMode];
+    document.getElementById('mode-hint').textContent = MODE_HINTS[currentMode] ?? '';
     updateHudIndicator();
   }
 
@@ -4836,7 +4426,7 @@ async function init() {
       // a stale, orphaned overlay of your last-previewed region.
       if (currentMode !== 'dualize') clearDualizePreview();
       updateModeUI();
-      rebuildInstances(mesh, world, currentMode === 'report');
+      rebuildInstances(mesh, world);
       closeMobilePanels();
     });
   });
@@ -4964,7 +4554,7 @@ async function init() {
   const dualizeRaycaster = new THREE.Raycaster();
   const dualizePointer = new THREE.Vector2();
   renderer.domElement.addEventListener('click', async (event) => {
-    if (currentMode !== 'dualize' || walking) return;
+    if (currentMode !== 'dualize') return;
     const rect = renderer.domElement.getBoundingClientRect();
     dualizePointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     dualizePointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -4977,7 +4567,7 @@ async function init() {
     const hitBcc = hits[0].object === bccMesh;
     const cell = hitBcc ? bccCellOrder[hits[0].instanceId] : cellOrder[hits[0].instanceId];
     if (!cell) return;
-    await rebuildDualizePreview(hitBcc ? 'bcc' : 'fcc', cell.x, cell.y, cell.z, getShellCount());
+    await rebuildDualizePreview(hitBcc ? 'bcc' : 'fcc', cell.x, cell.y, cell.z, DUALIZE_RADIUS);
   });
 
   // Interpenetrating Lattice Preview (direct user request 2026-08-28)
@@ -4988,463 +4578,6 @@ async function init() {
   // confirmation to retire rather than keep both.
 
   const canPlaceMaterial = () => true;
-
-  // See docs/code-notes/render.md
-  const FULL_CYBORG_INWORLD_ENABLED = false;
-  const sculptSession = createSculptureSession(LOCAL_PLAYER_ID);
-  let sculptMirrorPlane = '';
-  let sculptActionMode = 'add';
-
-  const sculptPanelEl = document.getElementById('sculpt-panel');
-  const sculptSuggestionEl = document.getElementById('sculpt-suggestion');
-  const sculptSuggestionTextEl = document.getElementById('sculpt-suggestion-text');
-  const sculptFullCyborgSection = document.getElementById('sculpt-fullcyborg-section');
-  const sculptFullCyborgGated = document.getElementById('sculpt-fullcyborg-gated');
-
-  function openSculptPanel() {
-    sculptPanelEl.classList.add('open');
-    // Moved here from the welcome card's own quickstart line (trimmed
-    // down 2026-08-24) -- same one-time-toast idiom wireFirstUseHint
-    // uses elsewhere, just triggered by opening the panel instead of a
-    // hover/tap on an icon, since Sculpt is reached through the wheel.
-    if (!seenHints.has('sculpt-panel-open')) {
-      seenHints.add('sculpt-panel-open');
-      localStorage.setItem(HINT_SEEN_KEY, JSON.stringify([...seenHints]));
-      showHudPrompt('Sculpt: symmetry and mirror tools, no World required.', 4500);
-    }
-  }
-  function closeSculptPanel() {
-    sculptPanelEl.classList.remove('open');
-  }
-  document.getElementById('sculpt-close').addEventListener('click', closeSculptPanel);
-
-  document.querySelectorAll('#sculpt-tier-row .tier-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#sculpt-tier-row .tier-btn').forEach((b) => b.classList.toggle('active', b === btn));
-      sculptSession.assistanceTier = btn.dataset.tier;
-      sculptSession.pendingSuggestion = null;
-      sculptSuggestionEl.style.display = 'none';
-      const isFullCyborg = sculptSession.assistanceTier === 'full-cyborg';
-      // Standalone Sculpture Mode enables Full-Cyborg unconditionally
-      // (nothing there touches shared world-state); in-world stays
-      // behind FULL_CYBORG_INWORLD_ENABLED until B7's moderation work is
-      // verified.
-      const fullCyborgUsable = sculptureModeActive || FULL_CYBORG_INWORLD_ENABLED;
-      sculptFullCyborgSection.style.display = isFullCyborg && fullCyborgUsable ? '' : 'none';
-      sculptFullCyborgGated.style.display = isFullCyborg && !fullCyborgUsable ? '' : 'none';
-    });
-  });
-
-  document.querySelectorAll('#sculpt-mode-row .mode-toggle-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#sculpt-mode-row .mode-toggle-btn').forEach((b) => b.classList.toggle('active', b === btn));
-      sculptActionMode = btn.dataset.sculptMode;
-    });
-  });
-
-  // See docs/code-notes/render.md
-  let sculptDualPreset = ''; // '' | 'cube' | 'octa'
-  let sculptFullSymmetry = false;
-  function clearOtherSymmetrySelectors(exceptGroup) {
-    if (exceptGroup !== 'mirror') {
-      document.querySelectorAll('#sculpt-mirror-row .mirror-btn').forEach((b) => b.classList.toggle('active', b.dataset.plane === ''));
-      sculptMirrorPlane = '';
-    }
-    if (exceptGroup !== 'dual') {
-      document.querySelectorAll('#dual-symmetry-row .dual-symmetry-btn').forEach((b) => b.classList.remove('active'));
-      sculptDualPreset = '';
-    }
-    if (exceptGroup !== 'full') {
-      document.getElementById('sculpt-full-symmetry-btn')?.classList.remove('active');
-      sculptFullSymmetry = false;
-    }
-  }
-
-  document.querySelectorAll('#sculpt-mirror-row .mirror-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#sculpt-mirror-row .mirror-btn').forEach((b) => b.classList.toggle('active', b === btn));
-      sculptMirrorPlane = btn.dataset.plane;
-      clearOtherSymmetrySelectors('mirror');
-    });
-  });
-
-  document.getElementById('sculpt-full-symmetry-btn')?.addEventListener('click', () => {
-    const btn = document.getElementById('sculpt-full-symmetry-btn');
-    const turningOn = !btn.classList.contains('active');
-    clearOtherSymmetrySelectors(turningOn ? 'full' : null);
-    btn.classList.toggle('active', turningOn);
-    sculptFullSymmetry = turningOn;
-  });
-
-  if (FEATURES.dualSculpture) {
-    document.querySelectorAll('#dual-symmetry-row .dual-symmetry-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const wasActive = btn.classList.contains('active');
-        const turningOn = !wasActive;
-        clearOtherSymmetrySelectors(turningOn ? 'dual' : null);
-        btn.classList.toggle('active', turningOn);
-        sculptDualPreset = turningOn ? btn.dataset.dualSymmetry : '';
-      });
-    });
-  }
-
-  const sculptBrushRadiusInput = document.getElementById('sculpt-brush-radius');
-
-  function renderSculptSuggestion() {
-    const s = sculptSession.pendingSuggestion;
-    if (!s) {
-      sculptSuggestionEl.style.display = 'none';
-      return;
-    }
-    sculptSuggestionTextEl.textContent = `Suggestion: ${s.reason} (${s.action === 'remove' ? 'Chisel' : 'Model'}, ${s.cells.length} cell${s.cells.length === 1 ? '' : 's'}).`;
-    sculptSuggestionEl.style.display = '';
-  }
-  document.getElementById('sculpt-suggestion-accept').addEventListener('click', () => {
-    acceptSculptSuggestion(sculptSession, sculptTarget.world, sculptTarget.canPlaceMaterial);
-    sculptTarget.apply();
-    rebuildDualOverlay();
-    renderSculptSuggestion();
-  });
-  document.getElementById('sculpt-suggestion-dismiss').addEventListener('click', () => {
-    dismissSculptSuggestion(sculptSession);
-    renderSculptSuggestion();
-  });
-
-  document.getElementById('sculpt-nl-go').addEventListener('click', async () => {
-    const input = document.getElementById('sculpt-nl-input');
-    const resultEl = document.getElementById('sculpt-nl-result');
-    const text = input.value.trim();
-    if (!text) return;
-    resultEl.textContent = 'Thinking…';
-    const origin = { x: 0, y: 0, z: 0 }; // TODO: last-hovered cell once Sculpt mode grows ghost-hover support
-    const dualFocusForIntent = FEATURES.dualSculpture ? dualFocusEl?.value : undefined;
-    const intent = await requestFullCyborgIntent(text, origin, sculptMirrorPlane, dualFocusForIntent);
-    if (intent.unrecognized) {
-      resultEl.textContent = intent.description;
-      return;
-    }
-    const material = materialSelect.value;
-    const { applied, skipped } = executeFullCyborgIntent(
-      sculptTarget.world,
-      intent,
-      sculptTarget.world.getClaims(),
-      LOCAL_PLAYER_ID,
-      material,
-      sculptTarget.canPlaceMaterial
-    );
-    resultEl.textContent = `${intent.description}${intent.viaAI ? ' (AI)' : ' (local parser)'} -- ${applied.length} cell${applied.length === 1 ? '' : 's'} placed${skipped.length ? `, ${skipped.length} skipped (outside your claim)` : ''}.`;
-    if (applied.length > 0) {
-      sculptTarget.apply();
-      rebuildDualOverlay();
-    }
-    input.value = '';
-  });
-
-  // See docs/code-notes/render.md
-  const sculptTarget = {
-    world,
-    mesh,
-    canPlaceMaterial,
-    apply: onChange,
-  };
-
-  // Dual structure -- see docs/code-notes/render.md
-  const dualShowEl = document.getElementById('dual-show');
-  const dualFocusEl = document.getElementById('dual-focus');
-  const dualSnapEl = document.getElementById('dual-snap');
-  const dualShellEl = document.getElementById('dual-shell');
-  [
-    'dual-section', 'dual-toggle-row', 'dual-options-row', 'dual-symmetry-row',
-  ].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = FEATURES.dualSculpture ? '' : 'none';
-  });
-
-  let dualCubeOverlay = null;
-  let dualOctaOverlay = null;
-  function clearDualOverlay() {
-    [dualCubeOverlay, dualOctaOverlay].forEach((m) => {
-      if (!m) return;
-      m.parent?.remove(m);
-      m.geometry.dispose();
-      m.material.dispose();
-    });
-    dualCubeOverlay = null;
-    dualOctaOverlay = null;
-  }
-
-  // See docs/code-notes/render.md
-  function cellDuals() {
-    return sculptTarget.world.entries().map((cell) => {
-      const [cx, cy, cz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
-      const verts = rdRawVerts(SCALE).map(([x, y, z]) => [x + cx, y + cy, z + cz]);
-      return { cell, center: [cx, cy, cz], dual: getDual(verts, [cx, cy, cz]) };
-    });
-  }
-
-  function rebuildDualOverlay() {
-    clearDualOverlay();
-    const showingSolid = FEATURES.dualSculpture && dualShowEl?.checked && dualFocusEl?.value !== 'none';
-    sculptTarget.mesh.material.transparent = showingSolid;
-    sculptTarget.mesh.material.opacity = showingSolid ? 0.35 : 1;
-    if (!showingSolid) return;
-    const focus = dualFocusEl.value;
-    const cubePts = [];
-    const octaPts = [];
-    for (const { dual } of cellDuals()) {
-      if (focus === 'cube' || focus === 'both') {
-        for (const [a, b] of dual.cubeEdges) {
-          cubePts.push(new THREE.Vector3(...dual.cube[a]), new THREE.Vector3(...dual.cube[b]));
-        }
-      }
-      if (focus === 'octa' || focus === 'both') {
-        for (const [a, b] of dual.octaEdges) {
-          octaPts.push(new THREE.Vector3(...dual.octa[a]), new THREE.Vector3(...dual.octa[b]));
-        }
-      }
-    }
-    const targetScene = sculptureModeActive ? sculptureScene : scene;
-    if (cubePts.length) {
-      const geo = new THREE.BufferGeometry().setFromPoints(cubePts);
-      dualCubeOverlay = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x7ccdff }));
-      targetScene.add(dualCubeOverlay);
-    }
-    if (octaPts.length) {
-      const geo = new THREE.BufferGeometry().setFromPoints(octaPts);
-      dualOctaOverlay = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xff9a4f }));
-      targetScene.add(dualOctaOverlay);
-    }
-  }
-
-  if (FEATURES.dualSculpture) {
-    dualShowEl?.addEventListener('change', rebuildDualOverlay);
-    dualFocusEl?.addEventListener('change', rebuildDualOverlay);
-  }
-
-  // See docs/code-notes/render.md
-  const DUAL_SNAP_THRESHOLD = SCALE * 0.35;
-  function snappedSculptTarget(hitPoint, cell) {
-    if (!FEATURES.dualSculpture || !dualSnapEl?.checked || dualFocusEl.value === 'none') return null;
-    const [cx, cy, cz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
-    const verts = rdRawVerts(SCALE).map(([x, y, z]) => [x + cx, y + cy, z + cz]);
-    const dual = getDual(verts, [cx, cy, cz]);
-    const snapped = snapToDual([hitPoint.x, hitPoint.y, hitPoint.z], dual, dualFocusEl.value, DUAL_SNAP_THRESHOLD);
-    if (!snapped) return null;
-    return { which: snapped.which, cell };
-  }
-
-  const sculptRaycaster = new THREE.Raycaster();
-  const sculptPointer = new THREE.Vector2();
-  renderer.domElement.addEventListener('click', (event) => {
-    if (!sculptureModeActive && (currentMode !== 'sculpt' || walking)) return;
-    const rect = renderer.domElement.getBoundingClientRect();
-    sculptPointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    sculptPointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    sculptRaycaster.setFromCamera(sculptPointer, camera);
-    const hits = sculptRaycaster.intersectObject(sculptTarget.mesh);
-    if (hits.length === 0 || hits[0].instanceId === undefined) return;
-    const hit = hits[0];
-    const cell = cellOrder[hit.instanceId];
-    if (!cell) return;
-
-    // Snap to Dual (Phase 2, steps 5-6) -- see docs/code-notes/render.md
-    const dualSnap = snappedSculptTarget(hit.point, cell);
-    if (dualSnap) {
-      clearOtherSymmetrySelectors('dual');
-      sculptDualPreset = dualSnap.which;
-      document.querySelectorAll('#dual-symmetry-row .dual-symmetry-btn').forEach((b) => {
-        b.classList.toggle('active', b.dataset.dualSymmetry === dualSnap.which);
-      });
-      showHudPrompt(`Snapped to the inscribed ${dualSnap.which === 'cube' ? 'cube' : 'octahedron'} -- ${dualSnap.which === 'cube' ? 'Cube' : 'Octa'} symmetry selected.`, 2500);
-    }
-
-    let targetX, targetY, targetZ;
-    if (sculptActionMode === 'add') {
-      const [dx, dy, dz] = matchNeighborOffset(hit.face.normal);
-      targetX = cell.x + dx;
-      targetY = cell.y + dy;
-      targetZ = cell.z + dz;
-    } else {
-      targetX = cell.x;
-      targetY = cell.y;
-      targetZ = cell.z;
-    }
-
-    const radius = Math.max(0, Math.min(10, Number(sculptBrushRadiusInput.value) || 0));
-    const material = materialSelect.value;
-    const isSemiCyborg = sculptSession.assistanceTier === 'semi-cyborg';
-    // Dual Shell -- see docs/code-notes/render.md
-    const useDualShell = FEATURES.dualSculpture && dualShellEl?.checked && dualFocusEl.value !== 'none';
-    const shellOffsets = useDualShell
-      ? (dualFocusEl.value === 'both' ? [...DUAL_DIRS.cube, ...DUAL_DIRS.octa] : DUAL_DIRS[dualFocusEl.value])
-      : undefined;
-
-    let touched;
-    // Symmetry application order -- see docs/code-notes/render.md
-    if (!isSemiCyborg && sculptFullSymmetry) {
-      touched = [];
-      for (const c of shellBrushCells(targetX, targetY, targetZ, radius, shellOffsets)) {
-        touched.push(...applyFullSymmetry(sculptTarget.world, sculptActionMode, c.x, c.y, c.z, material, sculptTarget.canPlaceMaterial));
-      }
-    } else if (!isSemiCyborg && sculptDualPreset) {
-      touched = [];
-      for (const c of shellBrushCells(targetX, targetY, targetZ, radius, shellOffsets)) {
-        touched.push(...applyDualSymmetry(sculptTarget.world, sculptActionMode, c.x, c.y, c.z, material, DUAL_DIRS[sculptDualPreset], sculptTarget.canPlaceMaterial));
-      }
-    } else {
-      touched = sculptStroke(sculptTarget.world, sculptActionMode, targetX, targetY, targetZ, radius, material, isSemiCyborg ? null : sculptMirrorPlane || null, sculptTarget.canPlaceMaterial, shellOffsets);
-    }
-    if (touched.length === 0) return;
-    sculptTarget.apply();
-    rebuildDualOverlay();
-
-    if (isSemiCyborg) {
-      const lastCell = { ...touched[touched.length - 1], action: sculptActionMode, material };
-      const dualFocusForSuggestion = FEATURES.dualSculpture ? dualFocusEl?.value : undefined;
-      updateSemiCyborgSuggestion(sculptSession, sculptTarget.world, lastCell, sculptMirrorPlane || null, dualFocusForSuggestion);
-      renderSculptSuggestion();
-    }
-  });
-
-  // --- B4b: standalone Sculpture Mode ---------------------------------
-  const permissiveCanPlaceMaterial = () => true; // no frost-line stars exist in a bare scratch lattice
-  const sculptureBanner = document.getElementById('sculpture-mode-banner');
-  const savedCameraState = { position: new THREE.Vector3(), target: new THREE.Vector3() };
-
-  function enterSculptureMode() {
-    if (sculptureModeActive) return;
-    // See docs/code-notes/render.md
-    document.getElementById('duality-toggle')?.classList.contains('active') && document.getElementById('duality-toggle').click();
-    savedCameraState.position.copy(camera.position);
-    savedCameraState.target.copy(controls.target);
-    if (!sculptureWorld) {
-      sculptureWorld = createWorldStore({ worldName: 'Sculpture Scratch', version: 1, cells: {}, meta: {} });
-      sculptureWorld.addCell(0, 0, 0, { material: 'base' });
-    }
-    sculptureModeActive = true;
-    sculptTarget.world = sculptureWorld;
-    sculptTarget.mesh = sculptureMesh;
-    sculptTarget.canPlaceMaterial = permissiveCanPlaceMaterial;
-    sculptTarget.apply = () => rebuildInstances(sculptureMesh, sculptureWorld);
-    rebuildInstances(sculptureMesh, sculptureWorld);
-    clearDualOverlay();
-    rebuildDualOverlay();
-    camera.position.set(6, 5, 8);
-    controls.target.set(0, 0, 0);
-    sculptFullCyborgGated.style.display = 'none';
-    if (sculptSession.assistanceTier === 'full-cyborg') sculptFullCyborgSection.style.display = '';
-    sculptureBanner.style.display = 'flex';
-    document.getElementById('sculpt-standalone-section').style.display = '';
-    openSculptPanel();
-    clickModeShimSculpt();
-    updateHudIndicator();
-  }
-
-  function exitSculptureMode() {
-    if (!sculptureModeActive) return;
-    document.getElementById('duality-toggle')?.classList.contains('active') && document.getElementById('duality-toggle').click();
-    sculptureModeActive = false;
-    sculptTarget.world = world;
-    sculptTarget.mesh = mesh;
-    sculptTarget.canPlaceMaterial = canPlaceMaterial;
-    sculptTarget.apply = onChange;
-    clearDualOverlay();
-    rebuildDualOverlay();
-    camera.position.copy(savedCameraState.position);
-    controls.target.copy(savedCameraState.target);
-    sculptFullCyborgGated.style.display = sculptSession.assistanceTier === 'full-cyborg' && !FULL_CYBORG_INWORLD_ENABLED ? '' : 'none';
-    if (sculptSession.assistanceTier === 'full-cyborg' && !FULL_CYBORG_INWORLD_ENABLED) sculptFullCyborgSection.style.display = 'none';
-    sculptureBanner.style.display = 'none';
-    document.getElementById('sculpt-standalone-section').style.display = 'none';
-    updateHudIndicator();
-  }
-
-  function clickModeShimSculpt() {
-    const btn = document.querySelector('.mode-btn[data-mode="sculpt"]');
-    if (btn) btn.click();
-  }
-
-  document.getElementById('sculpture-mode-toggle')?.addEventListener('click', enterSculptureMode);
-  document.getElementById('sculpture-mode-exit')?.addEventListener('click', exitSculptureMode);
-
-  // See docs/code-notes/render.md
-  async function exportSculpture(format) {
-    if (!sculptureWorld) return;
-    const cells = sculptureWorld.entries();
-    if (cells.length === 0) {
-      showHudPrompt('Nothing to export yet -- Model a few cells first.');
-      return;
-    }
-    const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
-    const pieces = cells.map((cell) => {
-      const g = geometry.clone();
-      const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
-      g.translate(wx, wy, wz);
-      return g;
-    });
-    const merged = mergeGeometries(pieces, false);
-    const exportMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ color: 0x8899aa }));
-    const filenameBase = `rhombiverse-sculpture-${Date.now()}`;
-
-    if (format === 'stl') {
-      const { STLExporter } = await import('three/addons/exporters/STLExporter.js');
-      const data = new STLExporter().parse(exportMesh, { binary: true });
-      downloadBlob(new Blob([data], { type: 'application/octet-stream' }), `${filenameBase}.stl`);
-    } else if (format === 'obj') {
-      const { OBJExporter } = await import('three/addons/exporters/OBJExporter.js');
-      const data = new OBJExporter().parse(exportMesh);
-      downloadBlob(new Blob([data], { type: 'text/plain' }), `${filenameBase}.obj`);
-    } else if (format === 'gltf') {
-      const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
-      new GLTFExporter().parse(
-        exportMesh,
-        (result) => {
-          const json = result instanceof ArrayBuffer ? null : JSON.stringify(result, null, 2);
-          downloadBlob(
-            json ? new Blob([json], { type: 'application/json' }) : new Blob([result], { type: 'application/octet-stream' }),
-            json ? `${filenameBase}.gltf` : `${filenameBase}.glb`
-          );
-        },
-        (err) => console.error('Rhombiverse: GLTF export failed', err),
-        { binary: false }
-      );
-    }
-    pieces.forEach((g) => g.dispose());
-    merged.dispose();
-  }
-  function downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-  document.getElementById('sculpture-export-stl')?.addEventListener('click', () => exportSculpture('stl'));
-  document.getElementById('sculpture-export-obj')?.addEventListener('click', () => exportSculpture('obj'));
-  document.getElementById('sculpture-export-gltf')?.addEventListener('click', () => exportSculpture('gltf'));
-
-  // See docs/code-notes/render.md
-  document.getElementById('sculpture-place-in-world')?.addEventListener('click', () => {
-    if (!sculptureWorld) return;
-    const cells = sculptureWorld.entries();
-    if (cells.length === 0) return;
-    const xs = cells.map((c) => c.x);
-    let offsetX = Math.max(...xs) - Math.min(...xs) + 6;
-    if (offsetX % 2 !== 0) offsetX += 1;
-    let placed = 0;
-    for (const cell of cells) {
-      const nx = cell.x + offsetX;
-      const ny = cell.y;
-      const nz = cell.z;
-      if (isValidCell(nx, ny, nz) && !world.has(nx, ny, nz)) {
-        world.addCell(nx, ny, nz, { material: cell.material });
-        placed += 1;
-      }
-    }
-    onChange();
-    showHudPrompt(`Placed a copy of your sculpture in-world (${placed} cells), next to the origin.`);
-  });
 
   // See docs/code-notes/render.md
   const ghostMaterial = new THREE.MeshBasicMaterial({
@@ -5547,7 +4680,6 @@ async function init() {
     onHover: (cells, valid) => {
       if (cells && cells.length > 0) {
         showGhost(cells);
-        window.dispatchEvent(new CustomEvent('rhombiverse:faceHovered')); // B3, see docs/code-notes/render.md
       } else {
         hideGhost();
       }
@@ -5556,7 +4688,6 @@ async function init() {
     onPlaced: (cell) => {
       flashAt(cell, 0x9de0ff);
       playPlaceSound();
-      window.dispatchEvent(new CustomEvent('rhombiverse:cellPlaced', { detail: cell })); // B3
       // Hemi RD cluster stamps ('hemi3'/'hemi4', core/build.js's own
       // addHemisphereCluster) attach a real label naming which of the 8
       // corners or 3 axes was actually resolved -- direct instruction
@@ -5674,10 +4805,7 @@ async function init() {
       showHudPrompt((lattice2dMessages ?? messages[piece])?.[action] ?? 'Nothing to do there.', 3500);
     },
     getMeshPickable: () => dimensionAllowsMesh('mesh'),
-    getDragPlacementEnabled: () => pickers.isDragPlacementEnabled(),
-    getMode: () => (walking ? null : currentMode),
-    getShellCount,
-    getMinShell: () => Math.min(Math.max(1, Number(hollowFromInput.value) || 1), getShellCount()),
+    getMode: () => currentMode,
     getMaterial: () => currentMaterialFor(document.getElementById('piece-type-select').value),
     getPieceType: () => document.getElementById('piece-type-select').value,
     // TO ("adopted family member", direct instruction 2026-08-26): lets
@@ -5805,10 +4933,6 @@ async function init() {
     onHemisphereChange,
     canPlaceMaterial,
     getOwnerId: () => LOCAL_PLAYER_ID,
-    onCellClicked: (cell) => {
-      focusedCenterKey = cell.shellCenter || null;
-      renderRingList();
-    },
   });
 
   // BCC dual-lattice build: own change handler, deliberately NOT the main
@@ -5934,7 +5058,7 @@ async function init() {
     cuboctaWorld,
     onChange: onCuboctaChange,
     getMaterial: () => currentMaterialFor('cubocta'),
-    isActive: () => !walking && currentMode === 'cubocta' && FEATURES.bccLattice,
+    isActive: () => currentMode === 'cubocta' && FEATURES.bccLattice,
   });
 
   // Cuboctahedron gap-octahedron Build: own change handler -- genuinely
@@ -5963,7 +5087,6 @@ async function init() {
     onChange: onOctGapChange,
     getMaterial: () => currentMaterialFor('octahedron'),
     isActive: () =>
-      !walking &&
       (currentMode === 'build' || currentMode === 'chisel') &&
       FEATURES.bccLattice &&
       document.getElementById('piece-type-select')?.value === 'octahedron',
@@ -5976,13 +5099,6 @@ async function init() {
   // picker overlays and the drag-placement toggle alive independent of
   // either wheel's own UI -- these are used directly by the 3D wheel.
   const pickers = createWheelPickers({
-    onModeChosen: () => {
-      updateModeUI();
-      rebuildInstances(mesh, world, currentMode === 'report');
-    },
-    onDragPlacementChange: (enabled) => {
-      controls.mouseButtons.LEFT = enabled ? null : ORBIT_LEFT_DEFAULT;
-    },
     onMenuSound: playMenuSound,
     onSelectionChange: updateHudIndicator,
     getMaterialColor: (value) => `#${(MATERIAL_COLORS[value] ?? MATERIAL_COLORS.base).toString(16).padStart(6, '0')}`,
@@ -5997,30 +5113,6 @@ async function init() {
   });
   updateHudIndicator();
 
-  // See docs/code-notes/render.md
-  // Ported 2026-08-25 off the old 2D wheel's DOM (simulated clicks on
-  // .wheel-item text) onto the real underlying primitives directly --
-  // the same ones the Rhombic Wheel 3D itself now drives, see
-  // rhombic-wheel-3d-core.js's tool:* actions in render.js's onAction.
-  // No UI dependency at all now, 2D or 3D.
-  applyPersonaChoiceFn = (persona) => {
-    const clickMode = (modeName) => document.querySelector(`.mode-btn[data-mode="${modeName}"]`)?.click();
-    // 'rhombinaut' (Explore/walk) and 'rhombiologist' (Cultivate/plant)
-    // removed 2026-09-22 along with those systems -- this whole
-    // personaChosen mechanism has no live dispatcher anywhere in the app
-    // today (grepped: nothing fires 'rhombiverse:personaChosen'), so
-    // these branches were already unreachable; trimmed rather than left
-    // referencing archived UI.
-    if (persona === 'rhombisculptor') {
-      clickMode('sculpt');
-      openSculptPanel();
-    }
-    // 'rhombitect' (Build): already the default state, nothing to do.
-  };
-  if (pendingPersonaChoice) {
-    applyPersonaChoiceFn(pendingPersonaChoice);
-    pendingPersonaChoice = null;
-  }
 
   // Shared by both the Lab panel's own "New World" button and the always-
   // visible HUD clear-world-toggle added alongside it (2026-08-25) -- same
@@ -6108,32 +5200,14 @@ async function init() {
     location.reload();
   });
 
+  // Export / Import World: every dimension in one file -- all the stores
+  // the undo history knows (every 3D lattice, the 2D tiles, the 4D world).
+  // Import also accepts an older single-world file (the main FCC world
+  // only). An import is one undo step.
   document.getElementById('export-json').addEventListener('click', () => {
-    exportWorldFile(world.toJSON());
-  });
-
-  // .rhomb: pure-model export, no game data (RHOMBIVERSE_CLAUDE_CODE_IMPLEMENTATION_PLAN.md
-  // section 4) -- always extractable regardless of workspaceMode/pureGeometry.
-  document.getElementById('export-rhomb')?.addEventListener('click', () => {
-    exportWorldFile(world.toRhombJSON(), 'rhombiverse-model.rhomb');
-  });
-
-  document.getElementById('share-world')?.addEventListener('click', async () => {
-    const hint = document.getElementById('share-world-hint');
-    if (!compressionSupported()) {
-      hint.textContent = "Your browser doesn't support the compression this needs -- try a recent Chrome/Firefox/Safari.";
-      return;
-    }
-    hint.textContent = t('share.compressing', getSettings().language);
-    try {
-      const encoded = await encodeWorldForUrl(world.toJSON());
-      const shareUrl = buildShareUrl(encoded);
-      await navigator.clipboard.writeText(shareUrl);
-      hint.textContent = `Link copied (${shareUrl.length} chars) -- paste it anywhere; opening it loads this exact World.`;
-    } catch (err) {
-      console.warn('Rhombiverse: world share failed', err);
-      hint.textContent = t('share.failed', getSettings().language);
-    }
+    const stores = {};
+    for (const [key, { get }] of historyRestorers) stores[key] = get();
+    exportWorldFile({ app: 'rhombiverse', format: 'world-bundle', version: 1, exportedAt: new Date().toISOString(), stores });
   });
 
   const importInput = document.getElementById('import-json');
@@ -6142,9 +5216,21 @@ async function init() {
     if (!file) return;
     try {
       const parsed = await importWorldFile(file);
-      if (!confirmLargeWorldLoad(parsed)) return;
-      world.replaceAll(parsed);
-      onChange();
+      if (parsed?.format === 'world-bundle' && parsed.stores && typeof parsed.stores === 'object') {
+        let loaded = 0;
+        for (const [key, json] of Object.entries(parsed.stores)) {
+          const entry = historyRestorers.get(key);
+          if (!entry || !json) continue;
+          entry.restore(json);
+          loaded++;
+        }
+        if (!loaded) throw new Error('no known stores in bundle');
+        showHudPrompt('World imported.', 2500);
+      } else {
+        if (!parsed?.cells) throw new Error('not a World file');
+        world.replaceAll(parsed);
+        onChange();
+      }
     } catch (err) {
       alert('That file is not valid Rhombiverse world JSON.');
       console.warn('Rhombiverse: import failed', err);
@@ -6153,11 +5239,6 @@ async function init() {
     }
   });
 
-  // Preset-world picker (Showcase World, planetoid Body Types) removed
-  // 2026-09-22 along with the rest of the game-world content -- see
-  // the old presets (deleted 2026-09-24). Building your own World, Export/Import, and
-  // World sharing (compressed link) above are all that remain, and are
-  // untouched.
 }
 
 function onResize() {
@@ -6224,7 +5305,7 @@ function animate() {
   // Everything else above (controls damping) still
   // runs -- only the render call itself is skipped.
   if (!isRhombicWheel3DOpen()) {
-    renderer.render(sculptureModeActive ? sculptureScene : scene, camera);
+    renderer.render(scene, camera);
   }
   // Always renders, regardless of the modal wheel's open state -- it's
   // a persistent HUD element, not something that should disappear

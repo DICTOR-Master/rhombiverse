@@ -27,12 +27,6 @@ const DEFAULTS = {
   // attached to runs regardless of whether the meter is shown -- see
   // render.js's animate().
   showFPSMeter: false,
-  // Bring-Your-Own-AI-Key: key/model live ONLY here (this visitor's own
-  // localStorage), never sent to this site's server -- see byok.js and
-  // the companion doc.
-  byokProvider: 'none',
-  byokApiKey: '',
-  byokModel: '',
   // Rhombeometry mode default -- see companion doc for why this is true
   // and why changing it needs a reload. As of the World Systems retirement
   // (mining/trade/claims/achievements/animals/hydrosphere -- see

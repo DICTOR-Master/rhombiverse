@@ -66,7 +66,7 @@ const CSS = `
      inherently thin single-line marks (Spherical's ◯, X-Ray's ⛶,
      Reload's ↻, Menu's ◇) that font-weight:700 barely thickens -- bold
      Latin weight doesn't reliably apply to symbol codepoints the same
-     font falls back to -- while filled glyphs (Lab's ⚙, Cyborg's ◈)
+     font falls back to -- while filled glyphs (Settings' ⚙)
      read fine already. -webkit-text-stroke adds real stroke width to
      every glyph's own outline (not a halo/shadow) -- a small value
      visibly bolds the thin ones without over-thickening the already-
@@ -96,7 +96,6 @@ function injectCssOnce() {
 // raising the shared base size, which would overshoot the ones that
 // already read correctly.
 const SYMBOL_SCALE = {
-  'cyborg-toggle': 1.25,
   'bcc-toggle': 1.3,
   'clear-world-toggle': 1.25,
 };
@@ -112,21 +111,6 @@ const HUD_FACES = {
   // elId (#lab-toggle) unchanged.
   'equator|sx1sy1':   { symbol: '⚙', elId: 'lab-toggle',              title: 'Settings' },
   'equator|sx1sy-1':  { symbol: '⛶', elId: 'xray-toggle',             title: 'X-Ray' },
-  // Real SVG robot head, not the bare ◈ glyph -- same final design as
-  // wheel-icons.js's MARKS.cyborg (see that file's own comment for the
-  // full 5-round review history and Metropolis/Maschinenmensch
-  // sourcing), scaled into this file's own tiny coordinate convention.
-  // Ellipse head, big round eyes, two open neck rings (narrow-then-
-  // wide going down). Ears simplified to 2 tiers instead of the main
-  // mark's 4 -- at this face's true render size (~1/19th the main
-  // wheel's), 4 sub-1-unit steps would blur into noise; 2 clear tiers
-  // (a small tab + one bold peak at the vertical center) keep the
-  // "graduated, not a smooth cork" silhouette legible at actual size.
-  'equator|sx-1sy1':  {
-    svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><path d="M1,-0.68 L1.1,-0.68 L1.1,-0.47 L1.5,-0.47 L1.5,-0.05 L1.1,-0.05 L1.1,0.16 L1,0.16 Z M-1,-0.68 L-1.1,-0.68 L-1.1,-0.47 L-1.5,-0.47 L-1.5,-0.05 L-1.1,-0.05 L-1.1,0.16 L-1,0.16 Z" fill="currentColor"/><ellipse cx="0" cy="-0.26" rx="1.04" ry="1.25" fill="none" stroke="currentColor" stroke-width="0.16"/><circle cx="-0.42" cy="-0.47" r="0.29" fill="currentColor"/><circle cx="0.42" cy="-0.47" r="0.29" fill="currentColor"/><ellipse cx="0" cy="1.14" rx="0.42" ry="0.16" fill="none" stroke="currentColor" stroke-width="0.16"/><ellipse cx="0" cy="1.46" rx="0.52" ry="0.16" fill="none" stroke="currentColor" stroke-width="0.16"/></svg>',
-    elId: 'cyborg-toggle', title: 'Cyborg Mode',
-  },
-  'equator|sx-1sy-1': { symbol: '◆', elId: 'sculpture-mode-toggle',   title: 'Sculpture Mode' },
   'top|sy1sz1':       { symbol: '◐', elId: 'duality-toggle',          title: 'Duality' },
   // Real SVG hexagon, not the bare ⬡ Unicode glyph: direct report
   // 2026-09-02 ("some single line lattice wheel symbols on HUD are
