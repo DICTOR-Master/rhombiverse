@@ -149,6 +149,21 @@
       flex-direction: column; align-items: stretch; gap: 6px;
     }
     #world4d-panel.visible { display: flex; }
+    /* 4D Info (Info button in the 4D panel): top-left under the title,
+       read-only, so taps pass straight through to the scene. */
+    #world4d-info {
+      display: none;
+      position: fixed; top: 96px; left: 16px; z-index: 900;
+      max-width: min(320px, calc(100vw - 32px));
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      color: #cde; font: 12px/1.5 system-ui, sans-serif;
+      pointer-events: none;
+    }
+    #world4d-info.visible { display: block; }
+    #world4d-info .w4d-info-k { color: #7cf; font-weight: 600; margin-right: 4px; }
     /* Toasts sit just above the 4D panel while it's showing, instead of
        on top of its buttons -- which puts them over the scene, so taps
        pass straight through them (toasts are text only). */

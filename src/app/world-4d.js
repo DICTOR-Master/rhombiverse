@@ -73,6 +73,42 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
   let active = false;
   let skeleton = false;
   let latticeView = false;
+  // Info panel (Info button in the 4D panel): what's built, where the
+  // slice is, and the last cell tapped or placed, with its 4D centre.
+  let infoOpen = false;
+  let lastCell = null; // { kind, c }
+
+  const info = document.createElement('div');
+  info.id = 'world4d-info';
+  info.setAttribute('aria-live', 'polite');
+  document.body.appendChild(info);
+  const fmt = (x) => {
+    const r = Math.round(x * 1000) / 1000;
+    return (Object.is(r, -0) ? 0 : r).toString();
+  };
+  const WORLD_NAMES = { tesseract: 'Z4 (Tesseract)', cell24: 'D4', cell16: 'D4' };
+  function renderInfo() {
+    const show = active && infoOpen;
+    info.classList.toggle('visible', show);
+    if (!show) return;
+    const counts = new Map();
+    for (const c of cells.values()) {
+      if (c.removed) continue;
+      counts.set(c.kind, (counts.get(c.kind) ?? 0) + 1);
+    }
+    const built = counts.size ? [...counts].map(([k, n]) => `${n} ${KINDS_4D[k].label}`).join(', ') : 'nothing yet';
+    const wLabel = Math.abs(view.w) < 1e-9 && !isA4(kind) ? ' (FCC)' : Math.abs(view.w - A4_REST_W) < 1e-9 && isA4(kind) ? ' (Pyrochlore)' : '';
+    const deg = (a) => `${fmt(a / DEG)}°`;
+    const rows = [
+      ['World', WORLD_NAMES[kind] ?? 'Hyper-pyrochlore (4D Kagome)'],
+      ['Placing', KINDS_4D[kind].label],
+      ['Built', built],
+      ['View', view.mode === 'slice' ? `Slice at W-depth ${fmt(view.w)}${wLabel}` : `Projection, ${view.perspective ? 'perspective' : 'parallel'}`],
+      ['Turn', `XW ${deg(view.angles.xw)} · YW ${deg(view.angles.yw)} · ZW ${deg(view.angles.zw)}`],
+      ['Last cell', lastCell ? `${KINDS_4D[lastCell.kind].label} at (${lastCell.c.map(fmt).join(', ')})` : 'tap or place a cell'],
+    ];
+    info.innerHTML = rows.map(([k, v]) => `<div><span class="w4d-info-k">${k}</span> ${v}</div>`).join('');
+  }
 
   function load() {
     try {
@@ -253,6 +289,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
   }
 
   function rebuild() {
+    renderInfo();
     clearGroup();
     if (!active) return;
     const R = rotation4(view.angles);
@@ -306,6 +343,11 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     return pickTargets.filter((m) => (isA4(kind) ? isA4(m.userData.kind) : m.userData.kind === kind));
   }
   function place(k, c, extra = {}) {
+    const ok = placeCell(k, c, extra);
+    if (ok) { lastCell = { kind: k, c: fromKeyInts(k, keyInts(k, c)) }; renderInfo(); }
+    return ok;
+  }
+  function placeCell(k, c, extra = {}) {
     const snapped = fromKeyInts(k, keyInts(k, c));
     if (!KINDS_4D[k].isCenter(snapped)) return false;
     const key = keyOf(k, snapped);
@@ -344,6 +386,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
   }
   function handleTap(hit, mode) {
     const u = hit.object.userData;
+    if (u.world4d === 'cell') lastCell = { kind: u.kind, c: u.c };
     if (mode === 'chisel') {
       if (u.world4d !== 'cell') return false;
       const key = keyOf(u.kind, u.c);
@@ -398,6 +441,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
   const ticks = panel.querySelector('.w4d-ticks');
 
   const CONTROL_LABELS = { w: 'W-depth', xw: 'XW', yw: 'YW', zw: 'ZW' };
+
   const controlsShown = () => (view.mode === 'slice' ? ['w', 'xw', 'yw', 'zw'] : ['xw', 'yw', 'zw']);
   const isAngle = () => view.control !== 'w';
   const valueOf = () => (isAngle() ? view.angles[view.control] : view.w);
@@ -422,6 +466,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
       `<button type="button" data-opt="mode">${view.mode === 'slice' ? 'Slice' : 'Projection'}</button>`,
       view.mode === 'projection' ? `<button type="button" data-opt="perspective">${view.perspective ? 'Perspective' : 'Parallel'}</button>` : '',
       '<button type="button" data-opt="reset">Reset 4D</button>',
+      `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">Info</button>`,
     ].join('');
     const L = limit();
     ticks.innerHTML = detents().map(({ v, label, below }) => `<span class="w4d-tick${below ? ' w4d-tick-below' : ''}" style="left:${((v + L) / (2 * L)) * 100}%">${label}</span>`).join('');
@@ -436,6 +481,12 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
   optionsRow.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-opt]');
     if (!b) return;
+    if (b.dataset.opt === 'info') {
+      infoOpen = !infoOpen;
+      renderPanel();
+      renderInfo();
+      return;
+    }
     if (b.dataset.opt === 'mode') {
       view.mode = view.mode === 'slice' ? 'projection' : 'slice';
       showHudPrompt(view.mode === 'slice' ? 'Slice: the 3D cross-section at the current w-depth.' : 'Projection: whole 4D cells as shadows -- tap a facet shadow to build across it.', 3500);

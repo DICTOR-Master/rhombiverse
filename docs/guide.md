@@ -110,6 +110,7 @@ A 4D panel appears at the bottom of the screen.
 - **Slice / Projection** switches how you see 4D. **Slice** (the default) shows the 3D cross-section at the current depth. **Projection** shows whole 4D cells as shadows; tap a shadow's face to build across it. In Projection you can also switch between **Parallel** and **Perspective**.
 - **The slider** does what the button above it says: **W-depth** moves the slice through the fourth dimension, and **XW**, **YW** and **ZW** turn it into the fourth dimension. It clicks into place at useful stops. The one labelled **FCC** is the ordinary 3D RD world, and the one labelled **Pyrochlore** is the 3D Pyrochlore world.
 - **Reset 4D** puts everything back to the starting position.
+- **Info** opens a panel showing the world and piece you're placing, what you've built, where the slice is (W-depth, or Projection), the XW/YW/ZW turn angles, and the 4D centre coordinates of the last cell you tapped or placed.
 
 ## Sculpting with symmetry
 
