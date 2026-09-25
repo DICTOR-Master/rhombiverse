@@ -3904,18 +3904,38 @@ async function init() {
   let latticeQuickViewGeneration = 0;
 
   function clearLatticeQuickView() {
-    if (latticeQuickViewMesh) {
-      latticeQuickViewMesh.parent?.remove(latticeQuickViewMesh);
-      latticeQuickViewMesh.geometry.dispose();
-      latticeQuickViewMesh.material.dispose();
-      latticeQuickViewMesh = null;
+    for (const g of [latticeQuickViewMesh, latticeQuickViewEdges]) {
+      if (!g) continue;
+      g.parent?.remove(g);
+      for (const child of g.children) { child.geometry.dispose(); child.material.dispose(); }
     }
-    if (latticeQuickViewEdges) {
-      latticeQuickViewEdges.parent?.remove(latticeQuickViewEdges);
-      latticeQuickViewEdges.geometry.dispose();
-      latticeQuickViewEdges.material.dispose();
-      latticeQuickViewEdges = null;
+    latticeQuickViewMesh = null;
+    latticeQuickViewEdges = null;
+  }
+  // Lattice View shows only the build's outer bands (direct request,
+  // 2026-09-26: a big build's ghosts piled up toward the centre): the open
+  // slots outside it (band 0) and its 3 outermost layers (bands 1-3),
+  // fading inward. A built cell's band is its depth: 1 if it has an open
+  // neighbour, else one more than its shallowest neighbour. Cells deeper
+  // than LATTICE_VIEW_LAYERS get no ghost.
+  const LATTICE_VIEW_LAYERS = 3;
+  const LATTICE_VIEW_FADE = [1, 1, 0.5, 0.25]; // opacity by band
+  function buildDepths(list, offsetsOf) {
+    const key = (c) => c.join(',');
+    const built = new Set(list.map(key));
+    const depth = new Map();
+    let frontier = list.filter((c) => offsetsOf(c).some(([dx, dy, dz]) => !built.has(key([c[0] + dx, c[1] + dy, c[2] + dz]))));
+    for (const c of frontier) depth.set(key(c), 1);
+    for (let d = 2; d <= LATTICE_VIEW_LAYERS && frontier.length; d++) {
+      const next = [];
+      for (const c of frontier) for (const [dx, dy, dz] of offsetsOf(c)) {
+        const n = [c[0] + dx, c[1] + dy, c[2] + dz];
+        const k = key(n);
+        if (built.has(k) && !depth.has(k)) { depth.set(k, d); next.push(n); }
+      }
+      frontier = next;
     }
+    return depth;
   }
   // Also resets the toggle buttons' own 'active' state and mode, unlike
   // clearLatticeQuickView() alone -- used wherever something ELSE
@@ -4018,10 +4038,29 @@ async function init() {
     if (myGeneration !== latticeQuickViewGeneration) return;
 
     const isFccFamily = latticeQuickViewMode === 'rd' || latticeQuickViewMode === 'cube' || latticeQuickViewMode === 'pyramid' || latticeQuickViewMode === 'rdquarter';
-    const pieces = [];
-    const cells = w ? w.entries() : [];
+    const pieces = []; // { g, band }
+    const put = (g, band) => pieces.push({ g, band });
+    const allCells = w ? w.entries() : [];
+    // The FCC build's outer bands, plus its open slots as band 0 (so every
+    // FCC-based mode extends past the build, like ED/Hex/Pyrochlore do):
+    // `cells` is those cells, `bandOf` reads one's band.
+    const bandMap = buildDepths(allCells.map((c) => [c.x, c.y, c.z]), () => NEIGHBOR_OFFSETS);
+    const builtKeys = new Set(allCells.map((c) => `${c.x},${c.y},${c.z}`));
+    const cells = allCells.filter((c) => bandMap.has(`${c.x},${c.y},${c.z}`));
+    for (const c of allCells) {
+      if (bandMap.get(`${c.x},${c.y},${c.z}`) !== 1) continue;
+      for (const [dx, dy, dz] of NEIGHBOR_OFFSETS) {
+        const k = `${c.x + dx},${c.y + dy},${c.z + dz}`;
+        if (builtKeys.has(k) || bandMap.has(k)) continue;
+        bandMap.set(k, 0);
+        cells.push({ x: c.x + dx, y: c.y + dy, z: c.z + dz });
+      }
+    }
+    const bandOf = (c) => bandMap.get(`${c.x},${c.y},${c.z}`);
+    // Derived anchors take the shallowest band of the cells that made them.
+    const setAnchor = (map, p, band) => { const k = p.join(','); const old = map.get(k); if (!old || band < old.band) map.set(k, { p, band }); };
     if (isFccFamily) {
-      for (const cell of cells) pieces.push(...fccQuickViewPieces(cell, latticeQuickViewMode));
+      for (const cell of cells) for (const g of fccQuickViewPieces(cell, latticeQuickViewMode)) put(g, bandOf(cell));
     } else if (latticeQuickViewMode === 'cubocta') {
       // Cuboctahedron is native to the SAME FCC lattice as world.entries()
       // itself (its 12 vertices are exactly NEIGHBOR_OFFSETS -- see
@@ -4048,17 +4087,16 @@ async function init() {
       // of CUBOCTA_AXIS_OFFSETS as that one representative direction, no
       // new constant needed. Deduped via the same anchor-Map pattern the
       // BCC-family modes below already use.
-      const cuboctaAnchors = new Map(); // "x,y,z" -> [x, y, z]
+      const cuboctaAnchors = new Map(); // "x,y,z" -> { p, band }
       const [repDx, repDy, repDz] = CUBOCTA_AXIS_OFFSETS[0];
       for (const cell of cells) {
-        cuboctaAnchors.set(`${cell.x},${cell.y},${cell.z}`, [cell.x, cell.y, cell.z]);
-        const p = [cell.x + repDx, cell.y + repDy, cell.z + repDz];
-        cuboctaAnchors.set(p.join(','), p);
+        setAnchor(cuboctaAnchors, [cell.x, cell.y, cell.z], bandOf(cell));
+        setAnchor(cuboctaAnchors, [cell.x + repDx, cell.y + repDy, cell.z + repDz], bandOf(cell));
       }
-      for (const [x, y, z] of cuboctaAnchors.values()) {
+      for (const { p: [x, y, z], band } of cuboctaAnchors.values()) {
         const [wx, wy, wz] = cellToWorld(x, y, z, SCALE);
         const verts = cuboctahedronVertices(SCALE).map(([vx, vy, vz]) => new THREE.Vector3(vx + wx, vy + wy, vz + wz));
-        pieces.push(new ConvexGeometry(verts));
+        put(new ConvexGeometry(verts), band);
       }
     } else if (latticeQuickViewMode === 'octahedron') {
       // Cuboctahedron gap-fill Octahedron: lives directly in the SAME
@@ -4068,17 +4106,14 @@ async function init() {
       // cell, at the fixed LATTICE_QUICK_VIEW_OCTAHEDRON_DIRECTIONS
       // corners, deduped the same way the BCC-family anchors below are
       // (adjacent cells can share the same cube-center).
-      const anchors = new Map(); // "i,j,k" -> [i, j, k]
+      const anchors = new Map(); // "i,j,k" -> { p, band }
       for (const cell of cells) {
-        for (const dir of LATTICE_QUICK_VIEW_OCTAHEDRON_DIRECTIONS) {
-          const p = octGapCellForCOCell(cell, dir);
-          anchors.set(p.join(','), p);
-        }
+        for (const dir of LATTICE_QUICK_VIEW_OCTAHEDRON_DIRECTIONS) setAnchor(anchors, octGapCellForCOCell(cell, dir), bandOf(cell));
       }
-      for (const [i, j, k] of anchors.values()) {
+      for (const { p: [i, j, k], band } of anchors.values()) {
         const [wx, wy, wz] = octGapCellToWorld(i, j, k, SCALE);
         const verts = octGapVertices(SCALE).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
-        pieces.push(new ConvexGeometry(verts));
+        put(new ConvexGeometry(verts), band);
       }
     } else if (['elongdodeca', 'hexprism', 'rhombohedra', 'pyrochlore'].includes(latticeQuickViewMode)) {
       // Own-lattice pieces (2026-09-24, direct instruction: "follow rules
@@ -4092,13 +4127,22 @@ async function init() {
         const isED = latticeQuickViewMode === 'elongdodeca';
         const own = isED ? elongDodecaWorld.entries() : hexPrismWorld.entries();
         const offsets = isED ? NEIGHBOR_OFFSETS : HEX_NEIGHBOR_OFFSETS;
-        const slots = new Map();
+        const depth = buildDepths(own.map((c) => [c.x, c.y, c.z]), () => offsets);
+        const slots = new Map(); // key -> { p, band }
         for (const c of own) {
-          slots.set(`${c.x},${c.y},${c.z}`, [c.x, c.y, c.z]);
-          for (const [dx, dy, dz] of offsets) slots.set(`${c.x + dx},${c.y + dy},${c.z + dz}`, [c.x + dx, c.y + dy, c.z + dz]);
+          const band = depth.get(`${c.x},${c.y},${c.z}`);
+          if (band === undefined) continue;
+          slots.set(`${c.x},${c.y},${c.z}`, { p: [c.x, c.y, c.z], band });
+        }
+        for (const c of own) {
+          if (depth.get(`${c.x},${c.y},${c.z}`) !== 1) continue;
+          for (const [dx, dy, dz] of offsets) {
+            const k = `${c.x + dx},${c.y + dy},${c.z + dz}`;
+            if (!slots.has(k) && !depth.has(k)) slots.set(k, { p: [c.x + dx, c.y + dy, c.z + dz], band: 0 });
+          }
         }
         const verts = isED ? elongatedDodecahedronVerts(SCALE) : hexPrismVerts(HEX_PRISM_R, HEX_PRISM_H);
-        for (const [x, y, z] of slots.values()) pieces.push(at(verts, isED ? elongDodecaCellToWorld(x, y, z, SCALE) : hexCellToWorld(x, y, z, HEX_PRISM_R, HEX_PRISM_H)));
+        for (const { p: [x, y, z], band } of slots.values()) put(at(verts, isED ? elongDodecaCellToWorld(x, y, z, SCALE) : hexCellToWorld(x, y, z, HEX_PRISM_R, HEX_PRISM_H)), band);
       } else if (latticeQuickViewMode === 'rhombohedra') {
         const own = rhombohedraWorld.entries();
         const slots = new Map(own.map((c) => [`${c.x},${c.y},${c.z}`, { x: c.x, y: c.y, z: c.z, o: c.o ?? 0 }]));
@@ -4113,16 +4157,25 @@ async function init() {
           }
         }
         const base = rhombohedraTileVerts(RHOMBOHEDRA_S);
-        for (const cell of slots.values()) pieces.push(new ConvexGeometry(base.map(([x, y, z]) => new THREE.Vector3(x, y, z))).applyMatrix4(rhombohedraInstanceMatrix(cell)));
+        for (const cell of slots.values()) put(new ConvexGeometry(base.map(([x, y, z]) => new THREE.Vector3(x, y, z))).applyMatrix4(rhombohedraInstanceMatrix(cell)), 1);
       } else {
         const own = pyrochloreWorld.entries().filter((c) => pyrochloreSiteOrientation(c.x, c.y, c.z) !== 0);
-        const slots = new Map();
+        const ttOffsets = ([x, y, z]) => pyrochloreNeighborOffsets(pyrochloreSiteOrientation(x, y, z));
+        const depth = buildDepths(own.map((c) => [c.x, c.y, c.z]), ttOffsets);
+        const slots = new Map(); // key -> { x, y, z, band }
         for (const c of own) {
-          slots.set(`${c.x},${c.y},${c.z}`, { x: c.x, y: c.y, z: c.z });
-          for (const [dx, dy, dz] of pyrochloreNeighborOffsets(pyrochloreSiteOrientation(c.x, c.y, c.z))) slots.set(`${c.x + dx},${c.y + dy},${c.z + dz}`, { x: c.x + dx, y: c.y + dy, z: c.z + dz });
+          const band = depth.get(`${c.x},${c.y},${c.z}`);
+          if (band !== undefined) slots.set(`${c.x},${c.y},${c.z}`, { x: c.x, y: c.y, z: c.z, band });
+        }
+        for (const c of own) {
+          if (depth.get(`${c.x},${c.y},${c.z}`) !== 1) continue;
+          for (const [dx, dy, dz] of ttOffsets([c.x, c.y, c.z])) {
+            const k = `${c.x + dx},${c.y + dy},${c.z + dz}`;
+            if (!slots.has(k) && !depth.has(k)) slots.set(k, { x: c.x + dx, y: c.y + dy, z: c.z + dz, band: 0 });
+          }
         }
         const all = [...slots.values()];
-        for (const c of all) pieces.push(at(truncatedTetrahedronVerts(pyrochloreSiteOrientation(c.x, c.y, c.z), PYROCHLORE_S), pyrochloreCellToWorld(c.x, c.y, c.z, PYROCHLORE_S)));
+        for (const c of all) put(at(truncatedTetrahedronVerts(pyrochloreSiteOrientation(c.x, c.y, c.z), PYROCHLORE_S), pyrochloreCellToWorld(c.x, c.y, c.z, PYROCHLORE_S)), c.band);
         // Tets: caps of every TT slot, plus the built world's own visible
         // tets (incl. Small-tet additions) and, for each of those, the 4
         // tets sharing its corners -- so a tets-only build extends too.
@@ -4140,7 +4193,7 @@ async function init() {
             }
           }
         }
-        for (const { kind, center } of tetSlots.values()) pieces.push(at(tetrahedronVerts(kind, PYROCHLORE_S), pyrochloreCellToWorld(center[0], center[1], center[2], PYROCHLORE_S)));
+        for (const { kind, center } of tetSlots.values()) put(at(tetrahedronVerts(kind, PYROCHLORE_S), pyrochloreCellToWorld(center[0], center[1], center[2], PYROCHLORE_S)), 1);
       }
     } else {
       // BCC-family modes: nearest BCC dual point(s) for EVERY real cell
@@ -4151,11 +4204,11 @@ async function init() {
       // FCC->BCC direction already uses, deduped across the whole
       // structure so cells near the same dual point don't produce
       // overlapping duplicates.
-      const anchors = new Map(); // "x,y,z" -> [x, y, z]
+      const anchors = new Map(); // "x,y,z" -> { p, band }
       for (const cell of cells) {
-        for (const p of nearestBCCPoints([cell.x, cell.y, cell.z])) anchors.set(p.join(','), p);
+        for (const p of nearestBCCPoints([cell.x, cell.y, cell.z])) setAnchor(anchors, p, bandOf(cell));
       }
-      for (const [x, y, z] of anchors.values()) pieces.push(...bccFamilyQuickViewPieces({ x, y, z }, latticeQuickViewMode));
+      for (const { p: [x, y, z], band } of anchors.values()) for (const g of bccFamilyQuickViewPieces({ x, y, z }, latticeQuickViewMode)) put(g, band);
     }
     // Defensive only past this point -- nearestBCCPoints always returns
     // a real anchor for any input, and the World is never truly empty
@@ -4165,9 +4218,7 @@ async function init() {
       syncLatticeQuickViewActiveState(false);
       return;
     }
-    const merged = mergeGeometries(pieces, false);
-    pieces.forEach((g) => g.dispose());
-    latticeQuickViewMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
+    const baseMaterial = new THREE.MeshStandardMaterial({
       color: SKELETON_COLOR, emissive: SKELETON_COLOR, emissiveIntensity: 0.6, flatShading: true,
       // 'cubocta' previews 2 shapes per real cell (its own position +
       // one representative axis-neighbor, see this mode's own branch
@@ -4222,14 +4273,28 @@ async function init() {
       // front of it, the same as every other mode already effectively
       // is at their own scale -- depthTest off only for this one mode.
       depthTest: latticeQuickViewMode !== 'cubocta',
-    }));
+    });
+    // Same "2 shapes per cell vs. every other mode's 1" reasoning as the
+    // fill material's own opacity above -- half the edge opacity too.
+    const edgeOpacity = latticeQuickViewMode === 'cubocta' ? 0.5 : 1;
+    latticeQuickViewMesh = new THREE.Group();
+    latticeQuickViewEdges = new THREE.Group();
+    for (let band = 0; band <= LATTICE_VIEW_LAYERS; band++) {
+      const list = pieces.filter((x) => x.band === band).map((x) => x.g);
+      if (!list.length) continue;
+      const merged = mergeGeometries(list, false);
+      list.forEach((g) => g.dispose());
+      const fade = LATTICE_VIEW_FADE[band];
+      const material = baseMaterial.clone();
+      material.opacity *= fade;
+      latticeQuickViewMesh.add(new THREE.Mesh(merged, material));
+      latticeQuickViewEdges.add(new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({
+        color: 0xffffff, depthTest: latticeQuickViewMode !== 'cubocta',
+        transparent: edgeOpacity * fade < 1, opacity: edgeOpacity * fade,
+      })));
+    }
+    baseMaterial.dispose();
     s.add(latticeQuickViewMesh);
-    latticeQuickViewEdges = new THREE.LineSegments(new THREE.EdgesGeometry(merged), new THREE.LineBasicMaterial({
-      color: 0xffffff, depthTest: latticeQuickViewMode !== 'cubocta',
-      // Same "2 shapes per cell vs. every other mode's 1" reasoning as
-      // the fill material's own opacity above -- half here too.
-      transparent: latticeQuickViewMode === 'cubocta', opacity: latticeQuickViewMode === 'cubocta' ? 0.5 : 1,
-    }));
     s.add(latticeQuickViewEdges);
     syncLatticeQuickViewActiveState(true);
   }
