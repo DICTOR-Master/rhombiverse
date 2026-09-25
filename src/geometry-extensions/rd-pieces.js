@@ -1,0 +1,247 @@
+// RD pieces and the scale ladder, for the Shells scene (docs/PLAN-SHELLS.md,
+// stage 1). Pure geometry, no three.js, so scripts/verify-shells.mjs runs
+// it in Node.
+//
+// Frame: the app's FCC lattice (core/lattice.js): cells are integer points
+// with an even coordinate sum, and the unit RD is |x|+|y|, |x|+|z|,
+// |y|+|z| <= 1 (corners (±1,0,0) and (±½,±½,±½), volume 2).
+//
+// Every piece is a convex solid given by half-spaces: the RD's 12 face
+// planes plus a few planes through its centre. A split is its first
+// piece plus the symmetry subgroup whose images of it are the other
+// pieces; a piece is (split, symmetry element) placed at a lattice cell
+// and scale. The scale ladder: k * FCC sits inside FCC, so a big RD of
+// scale k is filled exactly by small cells cut by its face planes, which
+// are mirror planes of the small tiling -- the cut pieces are always
+// members of this family (measured in verify-shells).
+
+const EPS = 1e-9;
+
+// ---- symmetry: the RD's 48 elements (signed permutation matrices) ----
+const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+export const OH = PERMS.flatMap((p) => [1, -1].flatMap((sx) => [1, -1].flatMap((sy) => [1, -1].map((sz) => {
+  const s = [sx, sy, sz];
+  return [0, 1, 2].map((r) => [0, 1, 2].map((c) => (p[r] === c ? s[r] : 0)));
+}))));
+const matKey = (m) => m.flat().join(',');
+const OH_INDEX = new Map(OH.map((m, i) => [matKey(m), i]));
+const mul = (a, b) => a.map((row) => [0, 1, 2].map((c) => row[0] * b[0][c] + row[1] * b[1][c] + row[2] * b[2][c]));
+export const apply = (m, v) => m.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
+// Closure of a set of generators (indices into OH).
+function subgroup(gens) {
+  const I = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  const seen = new Map([[matKey(I), I]]);
+  const queue = [I];
+  while (queue.length) {
+    const m = queue.pop();
+    for (const g of gens) {
+      const n = mul(g, m);
+      if (!seen.has(matKey(n))) { seen.set(matKey(n), n); queue.push(n); }
+    }
+  }
+  return [...seen.values()].map((m) => OH_INDEX.get(matKey(m)));
+}
+const reflect = (n) => { // reflection across the plane through 0 with normal n (n a coordinate or face-diagonal axis)
+  const nn = n[0] * n[0] + n[1] * n[1] + n[2] * n[2];
+  return [0, 1, 2].map((r) => [0, 1, 2].map((c) => (r === c ? 1 : 0) - (2 * n[r] * n[c]) / nn));
+};
+const CYCLE = [[0, 0, 1], [1, 0, 0], [0, 1, 0]]; // (x,y,z) -> (z,x,y), the 3-fold turn about (1,1,1)
+const SWAP_XY = [[0, 1, 0], [1, 0, 0], [0, 0, 1]];
+const HALF_TURN = (a) => [0, 1, 2].map((r) => [0, 1, 2].map((c) => (r === c ? (r === a ? 1 : -1) : 0)));
+
+// ---- convex solids ----
+// A plane is { n, d } meaning n·x <= d. The RD's 12 faces:
+const RD_PLANES = [];
+for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) for (const si of [1, -1]) for (const sj of [1, -1]) {
+  const n = [0, 0, 0]; n[i] = si; n[j] = sj;
+  RD_PLANES.push({ n, d: 1 });
+}
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+function solve3(p, q, r) {
+  const det = dot(p.n, cross(q.n, r.n));
+  if (Math.abs(det) < EPS) return null;
+  const v = [0, 0, 0];
+  const a = cross(q.n, r.n), b = cross(r.n, p.n), c = cross(p.n, q.n);
+  for (let i = 0; i < 3; i++) v[i] = (p.d * a[i] + q.d * b[i] + r.d * c[i]) / det;
+  return v;
+}
+function dedupe(points) {
+  const out = [];
+  for (const v of points) if (!out.some((w) => Math.abs(w[0] - v[0]) + Math.abs(w[1] - v[1]) + Math.abs(w[2] - v[2]) < 1e-7)) out.push(v);
+  return out;
+}
+// Vertices, faces (ordered loops) and volume of { x : n·x <= d for every plane }.
+export function solidFromPlanes(planes) {
+  const pts = [];
+  for (let a = 0; a < planes.length; a++) for (let b = a + 1; b < planes.length; b++) for (let c = b + 1; c < planes.length; c++) {
+    const v = solve3(planes[a], planes[b], planes[c]);
+    if (v && planes.every((p) => dot(p.n, v) <= p.d + EPS)) pts.push(v);
+  }
+  const verts = dedupe(pts);
+  if (verts.length < 4) return { verts: [], faces: [], volume: 0, planes };
+  const centre = verts.reduce((s, v) => [s[0] + v[0] / verts.length, s[1] + v[1] / verts.length, s[2] + v[2] / verts.length], [0, 0, 0]);
+  const faces = [];
+  let volume = 0;
+  const seenFace = new Set();
+  for (const p of planes) {
+    const on = verts.map((v, i) => [v, i]).filter(([v]) => Math.abs(dot(p.n, v) - p.d) < 1e-7);
+    if (on.length < 3) continue;
+    const key = on.map(([, i]) => i).sort((x, y) => x - y).join(',');
+    if (seenFace.has(key)) continue;
+    seenFace.add(key);
+    // order the face's vertices around its own centre
+    const fc = on.reduce((s, [v]) => [s[0] + v[0] / on.length, s[1] + v[1] / on.length, s[2] + v[2] / on.length], [0, 0, 0]);
+    const u = sub(on[0][0], fc);
+    const w = cross(p.n, u);
+    on.sort(([a], [b]) => Math.atan2(dot(sub(a, fc), w), dot(sub(a, fc), u)) - Math.atan2(dot(sub(b, fc), w), dot(sub(b, fc), u)));
+    faces.push(on.map(([, i]) => i));
+    for (let t = 1; t + 1 < on.length; t++) volume += Math.abs(dot(sub(on[0][0], centre), cross(sub(on[t][0], centre), sub(on[t + 1][0], centre)))) / 6;
+  }
+  return { verts, faces, volume, planes };
+}
+// Cone planes through the centre, given as normals m with m·x >= 0.
+const cone = (normals) => normals.map((m) => ({ n: m.map((x) => -x), d: 0 }));
+
+// ---- the splits ----
+// Twelfths: the pyramid on the RD face towards (1,1,0), i.e. where x+y is
+// the largest of the 12 forms ±x_i ± x_j.
+const FORMS = [];
+for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) for (const si of [1, -1]) for (const sj of [1, -1]) { const f = [0, 0, 0]; f[i] = si; f[j] = sj; FORMS.push(f); }
+const TWELFTH_CONE = FORMS.map((f) => sub([1, 1, 0], f)).filter((m) => m.some((x) => x !== 0));
+// Rhombohedral quarter: core/lattice.js rdQuarterPieces()[0] (anchor at
+// the cube corner (-½,-½,-½), opposite corner at the centre). Its own
+// planes, from its 8 corners.
+function rhombohedronPlanes() {
+  const a = [-0.5, -0.5, -0.5];
+  const e = [[-0.5, 0.5, 0.5], [0.5, -0.5, 0.5], [0.5, 0.5, -0.5]]; // anchor -> (-1,0,0), (0,-1,0), (0,0,-1)
+  const planes = [];
+  for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) {
+    const n = cross(e[i], e[j]);
+    const k = 3 - i - j;
+    const s = Math.sign(dot(n, e[k]));
+    // two parallel faces: through a, and through a + e[k]
+    planes.push({ n: n.map((x) => -s * x), d: -s * dot(n, a) });
+    planes.push({ n: n.map((x) => s * x), d: s * dot(n, [a[0] + e[k][0], a[1] + e[k][1], a[2] + e[k][2]]) });
+  }
+  return planes;
+}
+
+const R = (n) => OH_INDEX.get(matKey(reflect(n)));
+const M = (m) => OH_INDEX.get(matKey(m));
+const SPLIT_DEFS = [
+  { id: 'whole', count: 1, planes: [], gens: [] },
+  { id: 'half-axis', count: 2, planes: cone([[1, 0, 0]]), gens: [R([1, 0, 0])] },
+  { id: 'half-diagonal', count: 2, planes: cone([[1, 1, 0]]), gens: [R([1, 1, 0])] },
+  { id: 'third', count: 3, planes: cone([[1, -1, 0], [1, 0, -1]]), gens: [M(CYCLE)] },
+  { id: 'quarter-mirror', count: 4, planes: cone([[1, 0, 0], [0, 1, 0]]), gens: [R([1, 0, 0]), R([0, 1, 0])] },
+  { id: 'quarter-rhombohedron', count: 4, planes: rhombohedronPlanes(), gens: [M(HALF_TURN(2)), M(HALF_TURN(1))] },
+  { id: 'sixth', count: 6, planes: cone([[1, -1, 0], [1, 1, 0], [1, 0, -1], [1, 0, 1]]), gens: [M(CYCLE), R([1, 0, 0])] },
+  { id: 'eighth', count: 8, planes: cone([[1, 0, 0], [0, 1, 0], [0, 0, 1]]), gens: [R([1, 0, 0]), R([0, 1, 0]), R([0, 0, 1])] },
+  { id: 'twelfth', count: 12, planes: cone(TWELFTH_CONE), gens: OH.map((_, i) => i) },
+  { id: 'sixteenth', count: 16, planes: cone([[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, -1, 0]]), gens: [R([1, 0, 0]), R([0, 1, 0]), R([0, 0, 1]), M(SWAP_XY)] },
+  { id: '24th', count: 24, planes: cone([[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, -1, 0], [1, 0, -1]]), gens: [R([1, 0, 0]), R([0, 1, 0]), R([0, 0, 1]), M(CYCLE)] },
+  { id: '48th', count: 48, planes: cone([[1, -1, 0], [0, 1, -1], [0, 0, 1]]), gens: OH.map((_, i) => i) },
+];
+
+export const SPLITS = SPLIT_DEFS.map((s) => {
+  const piece0 = solidFromPlanes([...RD_PLANES, ...s.planes]);
+  // One symmetry element per distinct piece of the split.
+  const elements = [];
+  const keys = new Set();
+  for (const g of subgroup(s.gens.map((i) => OH[i]))) {
+    const k = vertexKey(piece0.verts.map((v) => apply(OH[g], v)));
+    if (!keys.has(k)) { keys.add(k); elements.push(g); }
+  }
+  return { id: s.id, count: s.count, planes: [...RD_PLANES, ...s.planes], piece0, elements };
+});
+export const SPLIT_BY_ID = new Map(SPLITS.map((s) => [s.id, s]));
+
+function vertexKey(verts) {
+  return verts.map((v) => v.map((x) => (Math.round(x * 1e6) / 1e6 + 0).toFixed(6)).join(':')).sort().join('|');
+}
+
+// The solid of piece (split, symmetry element g) at `cell`, scaled by k.
+export function pieceSolid(splitId, g, cell = [0, 0, 0], k = 1) {
+  const s = SPLIT_BY_ID.get(splitId);
+  const m = OH[g];
+  const planes = s.planes.map((p) => ({ n: apply(m, p.n), d: p.d }));
+  const moved = planes.map((p) => ({ n: p.n, d: k * p.d + k * dot(p.n, cell) }));
+  return solidFromPlanes(moved);
+}
+
+// Which split and symmetry element a solid centred on the origin is, or
+// null. Matches by vertex set.
+export function identifyPiece(verts) {
+  const key = vertexKey(verts);
+  for (const s of SPLITS) {
+    if (s.piece0.verts.length !== verts.length) continue;
+    for (let g = 0; g < OH.length; g++) {
+      if (vertexKey(s.piece0.verts.map((v) => apply(OH[g], v))) === key) return { split: s.id, g };
+    }
+  }
+  return null;
+}
+
+// ---- the scale ladder ----
+// The big RD of scale k at coarse cell `big` (a cell of the coarse lattice
+// k*FCC, given in coarse cell coordinates), split into small cells: one
+// entry per small cell it touches, { cell (small coordinates), split, g,
+// volume }. Cut by the big RD's own 12 face planes.
+export function scaleDecomposition(k, big = [0, 0, 0]) {
+  const centre = big.map((x) => k * x);
+  const bigPlanes = RD_PLANES.map((p) => ({ n: p.n, d: k * p.d + dot(p.n, centre) }));
+  const out = [];
+  for (let x = -k - 1; x <= k + 1; x++) for (let y = -k - 1; y <= k + 1; y++) for (let z = -k - 1; z <= k + 1; z++) {
+    if ((x + y + z) % 2 !== 0) continue;
+    const cell = [centre[0] + x, centre[1] + y, centre[2] + z];
+    const small = RD_PLANES.map((p) => ({ n: p.n, d: p.d + dot(p.n, cell) }));
+    const part = solidFromPlanes([...small, ...bigPlanes]);
+    if (part.volume < 1e-7) continue;
+    const local = part.verts.map((v) => sub(v, cell));
+    const id = identifyPiece(local);
+    out.push({ cell, split: id?.split ?? null, g: id?.g ?? null, volume: part.volume });
+  }
+  return out;
+}
+
+// ---- shells ----
+// Cells of the lattice k*FCC around `centre` (small coordinates, on that
+// lattice), grouped into shells. 'steps': neighbour steps (hull stays a
+// cuboctahedron). 'distance': distinct distances from the centre (hull
+// tends to a sphere). Returns [[cells of shell 1], [cells of shell 2], …].
+const STEPS = [];
+for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) for (const si of [1, -1]) for (const sj of [1, -1]) { const s = [0, 0, 0]; s[i] = si; s[j] = sj; STEPS.push(s); }
+export function shells(rule, count, centre = [0, 0, 0], k = 1) {
+  if (rule === 'steps') {
+    const seen = new Set([centre.join(',')]);
+    let frontier = [centre];
+    const out = [];
+    for (let n = 0; n < count; n++) {
+      const next = [];
+      for (const c of frontier) for (const s of STEPS) {
+        const d = [c[0] + k * s[0], c[1] + k * s[1], c[2] + k * s[2]];
+        const key = d.join(',');
+        if (!seen.has(key)) { seen.add(key); next.push(d); }
+      }
+      out.push(next);
+      frontier = next;
+    }
+    return out;
+  }
+  // distance: search a cube big enough for `count` distinct radii
+  const byR2 = new Map();
+  for (let reach = 2; ; reach += 2) {
+    byR2.clear();
+    for (let x = -reach; x <= reach; x++) for (let y = -reach; y <= reach; y++) for (let z = -reach; z <= reach; z++) {
+      if ((x + y + z) % 2 !== 0 || (x === 0 && y === 0 && z === 0)) continue;
+      const r2 = x * x + y * y + z * z;
+      if (!byR2.has(r2)) byR2.set(r2, []);
+      byR2.get(r2).push([centre[0] + k * x, centre[1] + k * y, centre[2] + k * z]);
+    }
+    const radii = [...byR2.keys()].sort((a, b) => a - b).slice(0, count);
+    // complete only if the search cube holds every cell up to the last radius
+    if (radii.length === count && radii[count - 1] <= reach * reach) return radii.map((r2) => byR2.get(r2));
+  }
+}

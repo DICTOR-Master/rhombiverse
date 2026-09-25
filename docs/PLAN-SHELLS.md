@@ -1,6 +1,6 @@
 # Plan: Shells, a hull-building 3D scene
 
-Status: agreed design, not started. Delete this file once every stage
+Status: agreed design; stage 1 shipped. Delete this file once every stage
 has shipped (the code and the guide then describe the feature).
 
 ## The idea
@@ -82,7 +82,10 @@ purged in 3d87e35; restore reference 216ddbd), as pure geometry.
 
 Each stage ships on its own, fully working, with its checks passing.
 
-**1. Geometry engine and checks (no UI).**
+**1. Geometry engine and checks (no UI).** *Shipped:* all 68 checks
+pass. Confirmed: the ×4 corner quarters are the rhombohedral quarters
+(the app's RD Quarter) and the ×3 thirds are the 3-way-axis thirds; the
+app's RD Quarter and Hemi RD pieces are exact members of the family.
 `src/geometry-extensions/rd-pieces.js`: every split in the table as
 real solids (vertices and faces), placed by lattice cell and symmetry
 element; the scale decomposition (a big RD at ×k → its list of small
@@ -106,9 +109,12 @@ own store, undo and Export/Import entry, listed as a 3D world.
 **3. Grow and shrink.** Add or remove the whole outer shell in one
 step (one undo step each), in either shell rule.
 
-**4. Pieces.** Every split as a placeable piece, from a picker grouped
-by split (halves … 48ths). Pieces snap into cell positions and
-orientations, and can mix with whole RDs.
+**4. Pieces and fragmenting.** Every split as a placeable piece, from a
+picker grouped by split (halves … 48ths). Pieces snap into cell
+positions and orientations, and can mix with whole RDs. **Fragmenting**
+(user, 2026-09-26): target a placed piece or block, pick a breakdown
+from a dropdown, and it splits into that many pieces in place (one undo
+step); pieces keep their shell colour.
 
 **5. Scale ladder.** Zoom out: pick a scale (×2, ×3 …), see the big-RD
 outline over the build with missing and extra pieces marked, confirm to
@@ -116,7 +122,10 @@ replace. Zoom in: a big RD opens into its pieces. Big and small pieces
 can then sit together, joined by the boundary pieces.
 
 **6. Views and Info.** World View (Colour, Translucent, Skeleton) and
-X-Ray to see the bands inside; Info shows counts per shell, per piece
+X-Ray to see the bands inside. The **shell viewer** from the old Shells
+panel (restore reference 216ddbd, `renderRingDiagram`): concentric
+rings, one per shell in its colour, with counts; tap a ring to show,
+hide, recolour or remove that shell. Info shows counts per shell, per piece
 kind and per scale, and the hull's shape.
 
 **7. Words and docs.** All 7 languages for the new UI, a User Guide

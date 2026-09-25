@@ -23,6 +23,8 @@ jobs:
       - run: node --test tests/unit/
       # 5D/6D cut-and-project engine against the known tiling facts.
       - run: node scripts/verify-quasicrystal.mjs
+      # Shells scene: RD splits, the scale ladder and shell sizes.
+      - run: node scripts/verify-shells.mjs
 
   catalogue:
     # Every 5D/6D catalogue entry really occurs and lands, at 9 phason and

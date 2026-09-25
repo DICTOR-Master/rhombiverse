@@ -12,6 +12,7 @@
     "verify:4d": "node scripts/verify-4d.mjs",
     "verify:quasicrystal": "node scripts/verify-quasicrystal.mjs",
     "verify:catalogue": "node scripts/verify-catalogue.mjs",
+    "verify:shells": "node scripts/verify-shells.mjs",
     "verify:copy": "node scripts/verify-copy.mjs"
   },
   "devDependencies": {
