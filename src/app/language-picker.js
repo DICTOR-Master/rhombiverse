@@ -1,5 +1,5 @@
 // Language picker (🌐 + each language's own name) for the welcome screen
-// and the How to use guide. It writes the same `language` setting as
+// and the User Guide. It writes the same `language` setting as
 // Settings → Language, so every place stays in step: changing it here
 // re-translates the whole UI through render.js's onSettingsChange
 // listener, and a change made anywhere else updates this picker.

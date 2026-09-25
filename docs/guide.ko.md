@@ -1,4 +1,4 @@
-# Rhombiverse 사용 방법
+# Rhombiverse 사용자 가이드
 
 Rhombiverse와 그 쌍둥이인 [Polyhedraverse](https://polyhedraverse.vercel.app)는 같은 기하학을 바라보는 두 가지 방법입니다. Rhombiverse는 **풍경**입니다. 사방으로 뻗어 나가는 격자 그 자체를 보여 줍니다. Polyhedraverse는 **초상화 갤러리**입니다. 그 격자에 사는 도형을 하나씩 가까이에서 보여 줍니다.
 

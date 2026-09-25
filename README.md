@@ -175,7 +175,7 @@ rhombiverse/
 
 | Doc | What it is |
 |---|---|
-| `docs/guide.md` (+ `guide.<lang>.md`) | How to use Rhombiverse, also served at /guide |
+| `docs/guide.md` (+ `guide.<lang>.md`) | The Rhombiverse User Guide, also served at /guide |
 | `docs/RHOMBIVERSE_PRINCIPLES.md` | The design law: real geometry, simplest version, world as data |
 | `docs/RHOMBIVERSE_COMPLIANCE.md` | What's in place legally, and what to re-check before adding a backend |
 | `CLAUDE.md` | Technical onboarding: scope, running and checking, conventions |

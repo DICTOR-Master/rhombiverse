@@ -1,4 +1,4 @@
-// In-app "How to use" guide: renders docs/guide.md (the same file
+// In-app User Guide: renders docs/guide.md (the same file
 // guide.html serves as the shareable /guide page) in a full-screen
 // overlay. English only for now -- the guide itself isn't translated.
 import { renderMarkdown, GUIDE_CSS } from './markdown.js';
@@ -49,7 +49,7 @@ function build() {
   overlay = document.createElement('div');
   overlay.id = 'guide-overlay';
   overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-label', 'How to use Rhombiverse');
+  overlay.setAttribute('aria-label', 'Rhombiverse User Guide');
   overlay.innerHTML = `
     <div id="guide-bar">
       <button id="guide-close" type="button" title="Close (Esc)" aria-label="Close">✕</button>

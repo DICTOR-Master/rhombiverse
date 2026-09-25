@@ -1,4 +1,4 @@
-# Rhombiverse 使用指南
+# Rhombiverse 用户指南
 
 Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel.app) 是观察同一种几何的两种方式。Rhombiverse 是**风景**：向四面八方延伸的晶格本身。Polyhedraverse 是**肖像画廊**：住在这些晶格里的形状，一次一个，近距离展示。
 

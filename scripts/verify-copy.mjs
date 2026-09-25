@@ -80,7 +80,7 @@ for (const f of fs.readdirSync(root).filter((n) => n.endsWith('.html'))) {
   html.split('\n').forEach((line, i) => check(path.join(root, f), line, `line ${i + 1}`));
 }
 
-// README, the How-to guide, and the published legal/security pages
+// README, the User Guide, and the published legal/security pages
 // (scripts/build.mjs ships them).
 for (const f of ['README.md', 'docs/guide.md', ...['ja', 'es', 'fr', 'ko', 'zh', 'ru'].map((l) => `docs/guide.${l}.md`), 'TERMS.md', 'PRIVACY.md', 'SECURITY.md']) {
   if (!fs.existsSync(path.join(root, f))) continue;
