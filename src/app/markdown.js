@@ -20,6 +20,8 @@ function inline(s) {
     });
 }
 
+const indentOf = (l) => l.match(/^\s*/)[0].length;
+
 const cells = (row) => row.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
 
 export function renderMarkdown(md) {
@@ -47,11 +49,23 @@ export function renderMarkdown(md) {
     const list = line.match(/^(\s*)(-|\d+\.)\s+/);
     if (list) {
       const ordered = list[2] !== '-';
+      const base = list[1].length;
+      const marker = /^\s*(-|\d+\.)\s+/;
       const items = [];
-      while (i < lines.length && /^\s*(-|\d+\.)\s+/.test(lines[i])) {
-        let item = lines[i++].replace(/^\s*(-|\d+\.)\s+/, '');
-        while (i < lines.length && lines[i].trim() && /^\s{2,}\S/.test(lines[i]) && !/^\s*(-|\d+\.)\s+/.test(lines[i])) item += ` ${lines[i++].trim()}`;
-        items.push(`<li>${inline(item)}</li>`);
+      while (i < lines.length && marker.test(lines[i]) && indentOf(lines[i]) === base) {
+        let item = inline(lines[i++].replace(marker, ''));
+        // Wrapped continuation text of this item.
+        const text = [];
+        while (i < lines.length && lines[i].trim() && indentOf(lines[i]) > base && !marker.test(lines[i])) text.push(lines[i++].trim());
+        if (text.length) item += ` ${inline(text.join(' '))}`;
+        // A more-indented block right after it is a nested list.
+        const nested = [];
+        while (i < lines.length && lines[i].trim() && indentOf(lines[i]) > base) nested.push(lines[i++]);
+        if (nested.length) {
+          const cut = Math.min(...nested.map(indentOf));
+          item += renderMarkdown(nested.map((l) => l.slice(cut)).join('\n'));
+        }
+        items.push(`<li>${item}</li>`);
       }
       out.push(ordered ? `<ol>${items.join('')}</ol>` : `<ul>${items.join('')}</ul>`);
       continue;

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rhombiverse</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <style>
+    html, body { margin: 0; background: #0a0c14; }
+    body { padding: 24px 16px 64px; }
+    .back { display: block; max-width: 760px; margin: 0 auto 20px; font: 14px system-ui, sans-serif; color: #9de0ff; }
+  </style>
+</head>
+<body>
+  <a class="back" href="./">&larr; Open Rhombiverse</a>
+  <main class="md-guide">Loading…</main>
+  <script type="module">
+    // Terms / Privacy / Security, rendered from the same .md files the
+    // repo keeps (served at /terms, /privacy, /security via vercel.json).
+    import { renderMarkdown, GUIDE_CSS } from './src/app/markdown.js';
+    const DOCS = { terms: ['TERMS.md', 'Terms of Service'], privacy: ['PRIVACY.md', 'Privacy'], security: ['SECURITY.md', 'Security'] };
+    // ?doc= when opened directly; the path itself (/privacy) behind the
+    // vercel.json rewrite, where the browser never sees the query.
+    const key = new URLSearchParams(location.search).get('doc') ?? location.pathname.replace(/^.*\//, '');
+    const [file, title] = DOCS[key] ?? DOCS.terms;
+    document.title = `${title} · Rhombiverse`;
+    const style = document.createElement('style');
+    style.textContent = GUIDE_CSS;
+    document.head.appendChild(style);
+    const main = document.querySelector('main');
+    fetch(`./${file}`)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((md) => { main.innerHTML = renderMarkdown(md); })
+      .catch(() => { main.textContent = 'This page could not be loaded. Check your connection and try again.'; });
+  </script>
+</body>
+</html>

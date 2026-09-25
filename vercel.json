@@ -5,6 +5,18 @@
     {
       "source": "/guide",
       "destination": "/guide.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/legal.html?doc=terms"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/legal.html?doc=privacy"
+    },
+    {
+      "source": "/security",
+      "destination": "/legal.html?doc=security"
     }
   ],
   "headers": [

@@ -176,9 +176,9 @@ function overlayHtml() {
         <a href="https://polyhedraverse.vercel.app" target="_blank" rel="noopener">${t('welcome.polyhedraverseLink', lang)}</a>
       </div>
       <div class="legal-links">
-        <a href="./TERMS.md" target="_blank" rel="noopener">Terms</a>
-        · <a href="./PRIVACY.md" target="_blank" rel="noopener">Privacy</a>
-        · <a href="./SECURITY.md" target="_blank" rel="noopener">Security</a>
+        <a href="./legal.html?doc=terms" target="_blank" rel="noopener">Terms</a>
+        · <a href="./legal.html?doc=privacy" target="_blank" rel="noopener">Privacy</a>
+        · <a href="./legal.html?doc=security" target="_blank" rel="noopener">Security</a>
         · <a href="https://github.com/DICTOR-Master/rhombiverse" target="_blank" rel="noopener">Source</a>
       </div>
     </div>`;
