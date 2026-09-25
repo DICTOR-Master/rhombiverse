@@ -467,7 +467,7 @@ export const WHEEL_RD_FAMILY = {
     // into an already-solid cell (its own volume becomes fully
     // enclosed, unclickable from outside).
     "bottom|sx1sz-1":   { kind: "dept", label: "Rhombohedra", action: "tool:pieceType:rhombohedra",
-      desc: "The same real rhombohedron as RD Quarter, but its own free-standing lattice -- click an existing face to grow in any of 6 real directions." },
+      desc: "The same real rhombohedron as RD Quarter, but its own free-standing lattice -- click an existing face to add the next one, in any of 6 real directions." },
     // Pyrochlore (3D Kagome) -- direct request 2026-09-24, placed in
     // this wheel's one remaining spare slot (direct decision). Not RD-
     // family either, but registered to the RD world's own FCC frame:

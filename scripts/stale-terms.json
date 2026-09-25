@@ -1,5 +1,5 @@
 {
-  "_comment": "Words from Rhombiverse's retired world-building/game era (mining, claims, planets, planting...) that must never reach user-visible text again. scripts/verify-copy.mjs checks every user-facing string against these (case-insensitive, whole words). Add a term whenever you spot a new leftover. `allow` phrases are real geometry/chemistry wording that merely contains a term (rock salt's ionic species) and are removed before checking.",
+  "_comment": "Words from Rhombiverse's retired world-building/game era (mining, claims, planets, planting...) that must never reach user-visible text again. scripts/verify-copy.mjs checks every user-facing string against these (case-insensitive, whole words). Add a term whenever you spot a new leftover. `allow` phrases are real geometry/chemistry wording that merely contains a term (rock salt's ionic species) and are removed before checking. `appTerms` are checked everywhere except What's New, whose older entries are left as the history they are.",
   "terms": [
     "mining",
     "minable",
@@ -53,6 +53,12 @@
   "allow": [
     "cross-species",
     "same-species",
-    "Sculpt, Sculpture Mode and Cyborg are gone"
+    "Sculpt, Sculpture Mode and Cyborg are gone",
+    "growth.js",
+    "as the project grows",
+    "growth (face-reflection)"
+  ],
+  "appTerms": [
+    "grow(s|n|ing|th)?"
   ]
 }

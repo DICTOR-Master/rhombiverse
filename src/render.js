@@ -1882,7 +1882,7 @@ async function init() {
     if (A4_CYCLE.includes(attachPiece())) {
       const next = A4_CYCLE[(A4_CYCLE.indexOf(attachPiece()) + 1) % A4_CYCLE.length];
       selectPieceAction?.(`tool:pieceType:${next}`);
-      showHudPrompt({ a4trunc: 'Truncated: tap a big face to grow straight through the gap -- the 5-cells come with them.', a4bitrunc: 'Bitruncated: tap a truncated 5-cell\u2019s big face to fill the gap there.', a4cell5: '5-cell: tap near a 5-cell\u2019s corner to add the one sharing it; long-press any 5-cell to remove just that one.' }[next], 4500);
+      showHudPrompt({ a4trunc: 'Truncated: tap a big face to add the next one straight through the gap -- the 5-cells come with them.', a4bitrunc: 'Bitruncated: tap a truncated 5-cell\u2019s big face to fill the gap there.', a4cell5: '5-cell: tap near a 5-cell\u2019s corner to add the one sharing it; long-press any 5-cell to remove just that one.' }[next], 4500);
       return;
     }
     if (attachPiece() === 'pyrochlore') {
@@ -4247,7 +4247,7 @@ async function init() {
   const MODE_HINTS = {
     build: 'Click a face to add one cell using the selected material.',
     bcc: 'Click a face of an existing BCC cell to extend it, or a face of your normal World to start one nearby. Right-click removes a BCC cell. Overlap with your normal World is expected -- it\'s how the two lattices join.',
-    cubocta: 'Click a face of your normal World to place a cuboctahedron there, or near a POINT of an existing one to grow toward that neighbor -- click closer to a flat face instead of a point to grow face to face with its next-door neighbor. Right-click removes one. Overlap with your normal World is expected. To fill the gap that opens up between face-to-face cuboctahedra, switch to Build/Chisel mode and pick Octahedron from the Piece menu instead -- click near a corner of an existing cuboctahedron.',
+    cubocta: 'Click a face of your normal World to place a cuboctahedron there, or near a POINT of an existing one to add the neighbor there -- click closer to a flat face instead of a point to add one face to face with its next-door neighbor. Right-click removes one. Overlap with your normal World is expected. To fill the gap that opens up between face-to-face cuboctahedra, switch to Build/Chisel mode and pick Octahedron from the Piece menu instead -- click near a corner of an existing cuboctahedron.',
     dualize: 'Click an existing structure (FCC or a real placed BCC/TO cell) to preview the region around it reinterpreted through the other lattice. View-only -- nothing is written to your World.',
   };
   function updateModeUI() {
@@ -4701,7 +4701,7 @@ async function init() {
       const piece = document.getElementById('piece-type-select')?.value;
       const messages = {
         a4trunc: {
-          add: 'Nothing new to grow there -- tap a truncated 5-cell\u2019s big face to grow straight through the gap, or tap one of its 5-cells or a gap cell.',
+          add: 'Nothing new to add there -- tap a truncated 5-cell\u2019s big face to add the next one straight through the gap, or tap one of its 5-cells or a gap cell.',
           remove: 'Long-press a placed cell to remove it.',
         },
         a4bitrunc: {
@@ -4741,7 +4741,7 @@ async function init() {
           remove: 'No RD Quarter there to remove -- tap directly on one you’ve placed.',
         },
         pyrochlore: {
-          add: 'A truncated tetrahedron is already there -- tap a hexagon face or one of the small tetrahedra to grow in a new direction.',
+          add: 'A truncated tetrahedron is already there -- tap a hexagon face or one of the small tetrahedra to add one in a new direction.',
           remove: 'Long-press a truncated tetrahedron itself to remove it -- the small tetrahedra are shared between neighbors and go away on their own.',
         },
         hexprism: {

@@ -9,8 +9,10 @@ import path from 'node:path';
 import { transformSync } from 'esbuild';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-const { terms, allow = [] } = JSON.parse(fs.readFileSync(path.join(root, 'scripts/stale-terms.json'), 'utf8'));
-const re = new RegExp(`\\b(${terms.join('|')})\\b`, 'i');
+const { terms, appTerms = [], allow = [] } = JSON.parse(fs.readFileSync(path.join(root, 'scripts/stale-terms.json'), 'utf8'));
+const re = new RegExp(`\\b(${[...terms, ...appTerms].join('|')})\\b`, 'i');
+// What's New keeps its older wording as history, so appTerms don't apply there.
+const historyRe = new RegExp(`\\b(${terms.join('|')})\\b`, 'i');
 const allowRe = allow.length ? new RegExp(allow.map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'gi') : null;
 
 function walk(dir, out = []) {
@@ -65,8 +67,8 @@ function jsStrings(code) {
 }
 
 const hits = [];
-const check = (file, text, where) => {
-  const m = (allowRe ? text.replace(allowRe, '') : text).match(re);
+const check = (file, text, where, pattern = re) => {
+  const m = (allowRe ? text.replace(allowRe, '') : text).match(pattern);
   if (m) hits.push(`${path.relative(root, file)}${where ? ` (${where})` : ''}: "${m[0]}" in ${JSON.stringify(text.length > 140 ? `${text.slice(Math.max(0, m.index - 60), m.index + 60)}` : text)}`);
 };
 
@@ -86,7 +88,7 @@ for (const f of ['README.md', 'docs/guide.md', ...['ja', 'es', 'fr', 'ko', 'zh',
 }
 
 for (const [i, e] of JSON.parse(fs.readFileSync(path.join(root, 'data/changelog.json'), 'utf8')).entries()) {
-  for (const t of [e.title, ...(e.items ?? [])]) check(path.join(root, 'data/changelog.json'), t, `entry ${i}: ${e.date}`);
+  for (const t of [e.title, ...(e.items ?? [])]) check(path.join(root, 'data/changelog.json'), t, `entry ${i}: ${e.date}`, historyRe);
 }
 
 if (hits.length) {
