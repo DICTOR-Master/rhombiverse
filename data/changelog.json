@@ -5,7 +5,10 @@
     "items": [
       "New: a How to use guide, opened from the welcome screen (the ℹ button brings the welcome screen back any time). It walks through placing, removing and viewing pieces, 4D, sculpting and sharing, then lists every control.",
       "The same guide is also a page you can share: rhombiverse.vercel.app/guide.",
-      "The welcome screen now describes Rhombiverse as the landscape view of lattices, alongside Polyhedraverse's portrait gallery of shapes."
+      "The welcome screen now describes Rhombiverse as the landscape view of lattices, alongside Polyhedraverse's portrait gallery of shapes.",
+      "2D now starts like 3D and 4D: an empty 2D world shows a cyan outline of your tile where the first one goes, instead of a tile already placed.",
+      "Choosing a dimension no longer pops up the colour picker over the empty world.",
+      "The welcome screen now shows on every visit."
     ]
   },
   {

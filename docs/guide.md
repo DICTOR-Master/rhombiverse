@@ -16,10 +16,7 @@ You can switch later from **Menu → Change Dimension**, or from the **Wizard** 
 
 ### Place your first piece
 
-- **3D and 4D:** a **cyan outline** shows where the first piece goes. Tap it.
-- **2D:** the first tile is already in place.
-
-Then tap a face of any piece (a side, in 2D) to add a neighbour on the other side of it.
+An empty world shows a **cyan outline** where the first piece goes. Tap it. Then tap a face of any piece (a side, in 2D) to add a neighbour on the other side of it.
 
 The piece you place is shown in the **Shape** button at the top of the screen. Tap it to choose a different piece.
 

@@ -118,16 +118,6 @@ const LATTICE2D_S = SCALE * 2.5;
 // header), not the tile's side-face normals, so shrinking this doesn't
 // touch click behavior at all.
 const LATTICE2D_H = 0.03 * SCALE;
-// One seed color PER combination (12 of MATERIAL_COLORS' 14 keys below
-// -- everything except 'base' itself and 'blackstar-glassite', whose
-// near-black tone reads poorly against the scene's own dark background)
-// -- direct correction, 2026-09-23 ("dull colors to start with for
-// shapes"): every seed used to hardcode 'base' (a flat gray), so all 12
-// combinations' own first tile looked identical and unremarkable. Plain
-// string keys, not a reference to MATERIAL_COLORS itself (declared much
-// later in this file) -- this only needs to name them, not look up
-// their values.
-const LATTICE2D_SEED_COLORS = ['garnet', 'ferrostone', 'glassite', 'star-glassite', 'ice99', 'water', 'emerald', 'gold', 'amethyst', 'rose-quartz', 'citrine', 'turquoise'];
 // Rhombohedra (free lattice): same real scale as everything else -- a
 // genuine 3D solid, no special height/thinness constant needed.
 const RHOMBOHEDRA_S = SCALE;
@@ -1798,13 +1788,12 @@ async function init() {
   // primitive) -- same "seed here, not just in the change handler"
   // reasoning as hexPrismWorld above.
   const lattice2dWorlds = new Map(); // primitiveId -> world store
-  LATTICE_PRIMITIVES.forEach((primitive, idx) => {
+  LATTICE_PRIMITIVES.forEach((primitive) => {
     const savedJSON = loadFromLocalStorage(lattice2dStorageKey(primitive.id));
+    // No seed tile (2026-09-25, direct request): an empty 2D world shows
+    // the cyan first-placement outline instead, same as 3D and 4D -- see
+    // firstPlacementSpec.
     const world = createWorldStore(savedJSON ?? { worldName: `2D Lattice (${primitive.label})`, version: 1, cells: {}, meta: {} });
-    if (world.entries().length === 0) {
-      const [sx, sy] = lattice2dSeedCell();
-      world.addCell(sx, sy, 0, { material: LATTICE2D_SEED_COLORS[idx % LATTICE2D_SEED_COLORS.length] });
-    }
     lattice2dWorlds.set(primitive.id, world);
   });
 
@@ -2305,6 +2294,7 @@ async function init() {
     const primitive = LATTICE_PRIMITIVES.find((p) => p.id === activeLattice2dPrimitiveId);
     updateDotMatrix(angleDeg);
     rebuildLattice2dInstances(lattice2dMeshes.get(primitive.id), lattice2dWorlds.get(primitive.id), primitive.id, angleDeg, activeLattice2dArrangementId, lattice2dCompanionMeshes.get(primitive.id), lattice2dClassMeshes.get(primitive.id));
+    updateFirstPlacementTarget(); // the empty-world outline follows the tile/angle/arrangement
     document.getElementById('piece-type-select').value = `lattice2d:${primitive.id}`;
     // Re-derives which single lattice2d mesh dimensionAllowsMesh now
     // permits (the newly active primitive) and hides every other one --
@@ -2446,7 +2436,31 @@ async function init() {
   // selected piece's target ever shows, so nothing crowds the origin.
   const RD_FAMILY_PIECES = ['rd', 'cube', 'pyramid', 'halfrd', 'hourglass', 'rdquarter', 'hemi3', 'hemi4', 'hemiTri'];
   function firstPlacementSpec() {
-    if (activeDimension === '2D' || activeDimension === '4D') return null; // 4D draws its own cyan target (world-4d.js)
+    if (activeDimension === '4D') return null; // 4D draws its own cyan target (world-4d.js)
+    if (activeDimension === '2D') {
+      // The active tile at cell (0,0,0), drawn exactly as
+      // rebuildLattice2dInstances would draw it at the current angle and
+      // arrangement (its own class/orientation rules included).
+      const primitiveId = activeLattice2dPrimitiveId;
+      const w2 = lattice2dWorlds.get(primitiveId);
+      if (!w2 || w2.entries().length) return null;
+      const impl = resolveLattice2dImpl(primitiveId, activeLattice2dArrangementId);
+      const angleDeg = currentLattice2dAngleDeg();
+      let verts;
+      let rot = 0;
+      if (impl.classCount && impl.classCount(angleDeg) > 1) {
+        verts = impl.classTileVerts(angleDeg, impl.classOf(0, angleDeg), LATTICE2D_S, LATTICE2D_H);
+        rot = impl.classInstanceRotationRad(0, angleDeg);
+      } else {
+        verts = impl.tileVerts(angleDeg, LATTICE2D_S, LATTICE2D_H);
+        if (impl.hasOrientation) rot = impl.instanceRotationRad(angleDeg, 0);
+      }
+      const [sx, sy] = lattice2dSeedCell();
+      const [wx, wy, wz] = impl.cellToWorld(sx, sy, 0, angleDeg, LATTICE2D_S, 0);
+      const geom = new ConvexGeometry(verts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+      geom.applyMatrix4(new THREE.Matrix4().makeRotationZ(rot).setPosition(wx, wy, wz));
+      return { geometry: geom, place: (material) => { w2.addCell(sx, sy, 0, { material }); onLattice2dChange(primitiveId); } };
+    }
     const piece = document.getElementById('piece-type-select')?.value;
     if (currentMode === 'cubocta') {
       return cuboctaWorld.entries().length ? null : { geometry: cuboctaGeometry.clone(), place: (material) => { cuboctaWorld.addCell(0, 0, 0, { material }); onCuboctaChange(); } };
@@ -5764,13 +5778,9 @@ async function init() {
   // change and a toggle-driven change never disagree about what angle
   // the structure should be shown at.
   function onLattice2dChange(primitiveId) {
-    const idx = LATTICE_PRIMITIVES.findIndex((p) => p.id === primitiveId);
     const world = lattice2dWorlds.get(primitiveId);
-    if (world.entries().length === 0) {
-      const [sx, sy] = lattice2dSeedCell();
-      world.addCell(sx, sy, 0, { material: LATTICE2D_SEED_COLORS[idx % LATTICE2D_SEED_COLORS.length] });
-    }
     rebuildLattice2dInstances(lattice2dMeshes.get(primitiveId), world, primitiveId, currentLattice2dAngleDeg(), activeLattice2dArrangementId, lattice2dCompanionMeshes.get(primitiveId), lattice2dClassMeshes.get(primitiveId));
+    updateFirstPlacementTarget();
     updateSectionEnabled();
     applyWorldViewMaterials();
     saveToLocalStorage(world.toJSON(), lattice2dStorageKey(primitiveId));
