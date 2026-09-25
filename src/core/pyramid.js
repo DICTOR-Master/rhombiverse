@@ -5,7 +5,7 @@
 // 6-bit `pyramids` bitmask; an ABSENT `pyramids` field means "full RD, all
 // 6 present" (the pre-existing, still-overwhelmingly-common case) so
 // untouched cells and saved worlds need no migration and no schema bloat.
-// Full design rationale/history: docs/code-notes/core/pyramid.md
+//
 import { PYRAMID_AXES } from './lattice.js';
 
 export const FULL_PYRAMIDS = (1 << PYRAMID_AXES.length) - 1; // 0b111111 = 63
@@ -48,7 +48,7 @@ export function withoutPyramid(pyramids, axisKey) {
 }
 
 // --- Identifying which of the 6 pyramids a raycast hit -----------------
-// See docs/code-notes/core/pyramid.md for the full derivation: a rhombic
+// The derivation: a rhombic
 // face's own two candidate pyramids share it (real ConvexGeometry
 // triangulation puts 2 apex vertices + 1 cube vertex per hit triangle, not
 // 1 apex per pyramid-owned triangle, so the hit triangle's own vertices

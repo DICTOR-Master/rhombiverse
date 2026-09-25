@@ -1,6 +1,6 @@
 // Three.js scene, camera, RD mesh generation, instanced rendering, and most
-// app orchestration. See RHOMBIVERSE_PLAN.md section 4 for the phase history.
-// Full design rationale/history for the code below: docs/code-notes/render.md
+// app orchestration.
+//
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
@@ -111,7 +111,7 @@ const PYROCHLORE_S = SCALE;
 // remove untouched legacy seeds on load.
 const PYROCHLORE_FIRST = [2, 0, 0];
 const PYROCHLORE_LEGACY_SEEDS = [[-10, 0, 0], [-6, 0, 0], [-3, -1, 1]];
-const MAX_CELLS = 20000; // fixed InstancedMesh capacity, see docs/code-notes/render.md
+const MAX_CELLS = 20000; // fixed InstancedMesh capacity
 
 
 const scene = new THREE.Scene();
@@ -218,9 +218,7 @@ const hudWheel = createHudWheel3D(renderer, {
 }
 
 // Section view: a single cutaway clipping plane through the whole scene
-// (RHOMBIVERSE_PLAN.md doesn't cover this -- added at the user's request
-// so the shell system, previously invisible from outside a solid
-// structure, can actually be seen and understood). Disabled by default
+// (lets you see inside a solid structure). Disabled by default
 // (empty clippingPlanes array); #section-enable populates
 // material.clippingPlanes with this same Plane object, so mutating its
 // normal/constant here is picked up automatically next frame with no
@@ -541,7 +539,6 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.2);
 sun.position.set(5, 8, 4);
 scene.add(sun);
 
-// See docs/code-notes/render.md
 function buildRDGeometry(scale = 1) {
   const points = rdRawVerts(scale).map(([x, y, z]) => new THREE.Vector3(x, y, z));
   const geometry = new ConvexGeometry(points);
@@ -720,7 +717,6 @@ function sphericalClassificationFor(scale) {
   };
 }
 
-// See docs/code-notes/render.md
 // emerald/gold added 2026-08-29, direct request -- buildable colors
 // only (deliberately NOT wired into asteroids.js's YIELD_WEIGHTS,
 // trade.js's FREE_THRESHOLDS, TRADE_MATERIALS, or planetoidgen.js's
@@ -813,7 +809,6 @@ const AUTO_ASSIGN_PIECE_LABELS = {
 };
 const AUTO_ASSIGN_STORAGE_KEY = 'rhombiverse-auto-assign-materials';
 
-// See docs/code-notes/render.md
 const _shellColorCache = new Map();
 function shellTint(shell) {
   if (!shell) return new THREE.Color(1, 1, 1);
@@ -823,9 +818,8 @@ function shellTint(shell) {
   return _shellColorCache.get(shell);
 }
 
-const GENERATED_TINT = new THREE.Color(0x2a0a30); // see docs/code-notes/render.md
+const GENERATED_TINT = new THREE.Color(0x2a0a30);
 
-// See docs/code-notes/render.md
 function instanceColorFor(cell) {
   if (cell.generatedByBlackHole) return GENERATED_TINT;
   const base = materialColor(cell.material);
@@ -833,13 +827,11 @@ function instanceColorFor(cell) {
   return base.clone().lerp(shellTint(cell.shell), 0.35);
 }
 
-let cellOrder = []; // instanceId -> {x, y, z, ...cellData}, see docs/code-notes/render.md
+let cellOrder = []; // instanceId -> {x, y, z, ...cellData}
 
-// See docs/code-notes/render.md
 function visibleCells(world) {
   const base = world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
-  // Pyramid Sub-Cell (RHOMBIVERSE_SPEC_PYRAMID_SUBCELL.md, docs/code-notes/
-  // core/pyramid.md): a partial cell can't be an instance of the shared
+  // Pyramid Sub-Cell: a partial cell can't be an instance of the shared
   // InstancedMesh -- InstancedMesh requires every instance to share the
   // exact same BufferGeometry, and a partial cell's real shape (cube +
   // some subset of its 6 pyramids) genuinely differs per cell. It gets its
@@ -867,7 +859,7 @@ function rebuildInstances(mesh, world) {
   mesh.count = cellOrder.length;
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  // Forces a bounding-sphere recompute -- see docs/code-notes/render.md
+  // Forces a bounding-sphere recompute.
   mesh.computeBoundingSphere();
   rebuildPartialCellMeshes(world);
 }
@@ -1451,14 +1443,13 @@ async function init() {
   wireFirstUseHint('reload-toggle', 'Reload: hard-refresh the app if anything looks stuck or stale.');
   wireFirstUseHint('xray-toggle', 'X-Ray: drag a cutaway plane through the structure to see inside it.');
   wireFirstUseHint('lab-toggle', 'Settings: camera, graphics, sound, language, colors, and Export / Import World.');
-  // Moved from the welcome card's own quickstart line -- see docs/code-notes/render.md
   wireFirstUseHint('hud-wheel-cue', 'Tab / Space (or tap Menu) opens the menu wheel.');
   wireFirstUseHint('export-json', 'Export World saves every dimension to one file -- Import World opens it again.');
 
   // The saved World (this browser), or the empty starter on a first visit.
   const savedJSON = loadFromLocalStorage();
   const world = createWorldStore(savedJSON ?? await loadWorld('./data/starter-world.json'));
-  // Declared early -- see docs/code-notes/render.md
+  // Declared early: read by handlers set up before its first use.
   let currentMode = 'build';
 
   // BCC dual-lattice build: a second, independent world store, own
@@ -2465,7 +2456,6 @@ async function init() {
     persist(world.toJSON());
   }
 
-  // See docs/code-notes/render.md
   const UNDO_HOLD_MS = 220;
   let undoHoldTimer = null;
   let undoHeld = false;
@@ -2496,7 +2486,6 @@ async function init() {
   });
   updateUndoButton();
 
-  // See docs/code-notes/render.md
   // Real report 2026-08-29: X-Ray's cross-section left most of a real
   // structure uncut -- BCC/Octahedron Site/Disphenoid pieces (added
   // well after X-Ray itself) never respected the section plane at all.
@@ -2948,7 +2937,7 @@ async function init() {
     }
   });
 
-  // B5 Duality Mode -- see docs/code-notes/render.md
+  // Duality Mode
   let dualityModeActive = false;
   let dualityShadowMesh = null;
   function tripleForCell(x, y, z) {
@@ -4255,7 +4244,6 @@ async function init() {
 
   const DUALIZE_RADIUS = 3; // shells around the clicked cell that Dualize previews
 
-  // See docs/code-notes/render.md
   const MODE_HINTS = {
     build: 'Click a face to add one cell using the selected material.',
     bcc: 'Click a face of an existing BCC cell to extend it, or a face of your normal World to start one nearby. Right-click removes a BCC cell. Overlap with your normal World is expected -- it\'s how the two lattices join.',
@@ -4579,7 +4567,6 @@ async function init() {
 
   const canPlaceMaterial = () => true;
 
-  // See docs/code-notes/render.md
   const ghostMaterial = new THREE.MeshBasicMaterial({
     color: 0x9de0ff,
     transparent: true,
@@ -4615,7 +4602,6 @@ async function init() {
     });
   }
 
-  // See docs/code-notes/render.md
   function flashAt(cell, color) {
     const edges = new THREE.EdgesGeometry(geometry);
     const flashMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
@@ -5094,7 +5080,7 @@ async function init() {
 
   // The old 2D radial menu (wheel.js) was removed 2026-08-25 -- the
   // Rhombic Wheel 3D is now the sole navigation surface, per direct
-  // user decision. See docs/code-notes/app/rhombic-wheel-3d.md.
+  // user decision.
   // createWheelPickers keeps the real material/generator/species
   // picker overlays and the drag-placement toggle alive independent of
   // either wheel's own UI -- these are used directly by the 3D wheel.

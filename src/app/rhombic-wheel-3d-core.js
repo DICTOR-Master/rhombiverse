@@ -7,8 +7,7 @@
 // truth for the RD face geometry, the universal-ring content, and every
 // per-wheel face config -- resolveWheelFaces() is the one function that
 // makes it structurally impossible for a wheel to drift from the
-// universal ring. Full design rationale: docs/code-notes/app/
-// rhombic-wheel-3d.md.
+// universal ring.
 //
 // Deliberately no THREE.js/DOM here -- rhombic-wheel-3d.js consumes
 // these exports and does all scene/camera/raycaster/DOM work, reusing
@@ -602,8 +601,7 @@ export const ALL_WHEELS = {
 // face table: the spec explicitly says not to guess silently, and
 // several real actions (tool:material, tool:repeat, tool:generateBody,
 // tool:offer/accept/inventory, tool:plant/growthParams/prune, and the
-// Build/Alter department-nav faces themselves) have no resolved row.
-// See docs/code-notes/app/wheel-icons.md for the full gap list.
+// department-nav faces themselves) have no resolved row.
 //
 // Lives here (rhombic-wheel-3d-core.js), not rhombic-wheel-3d.js, even
 // though it's only ever consumed there for real icon rendering -- moved

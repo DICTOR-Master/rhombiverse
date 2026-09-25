@@ -62,7 +62,7 @@ To take back your last change, tap **Undo** (↶, bottom right). Hold it to scru
 
 Try this on FCC: place six Pyramids to form a Cube. Then add one Pyramid to each face of the Cube, and it becomes an RD. Remove those six again to go back to a Cube.
 
-**RD Quarter** is one of the 4 rhombohedra an RD splits into. Tap an RD near one of its corners to fill that corner in, then tap a quarter's face to place its mirror image across that face. The mirror image always lands back on the RD lattice, so you can grow quarters from cell to cell. For a free rhombohedron lattice with Copy as well as Mirror, use **Rhombohedra**.
+**RD Quarter** is one of the 4 rhombohedra an RD splits into. Tap an RD near one of its corners to fill that corner in, then tap a quarter's face to place its mirror image across that face. The mirror image always lands back on the RD lattice, so you can extend quarters from cell to cell. For a free rhombohedron lattice with Copy as well as Mirror, use **Rhombohedra**.
 
 ### Colours
 

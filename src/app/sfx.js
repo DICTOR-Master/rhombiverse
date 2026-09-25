@@ -1,5 +1,5 @@
 // Tiny WebAudio blip generator (no audio assets, no build step).
-// Full rationale: docs/code-notes/app/sfx.md
+//
 import { getSettings, onSettingsChange } from './settings.js';
 
 let ctx = null;
@@ -22,7 +22,7 @@ function ensureContext() {
 function blip(freq, durationSec) {
   const audioCtx = ensureContext();
   if (!audioCtx) return;
-  // Safe to always call resume() here -- see docs/code-notes/app/sfx.md
+  // Safe to always call resume() here.
   if (audioCtx.state === 'suspended') audioCtx.resume();
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();

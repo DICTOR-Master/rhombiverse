@@ -3,8 +3,7 @@
 // is built from the hexagon/rhombus vocabulary already native to this
 // project (RHOMBIVERSE_PRINCIPLES.md's "Grounded Simplicity"), computed
 // from real trig, not hand-eyeballed pixel coordinates -- see the
-// generator this file's marks were computed with, referenced in
-// docs/code-notes/app/wheel-icons.md. Full design rationale there too.
+// generator this file's marks were computed with.
 //
 // Frame (spec section 2): a regular hexagon -- this SAME outline IS
 // "the one hexagon" a single-hexagon mark (e.g. Rhombi-model's "+

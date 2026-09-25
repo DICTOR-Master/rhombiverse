@@ -1,7 +1,6 @@
 // Versioned "What's New" changelog panel (B7). Self-contained like
 // welcome.js -- a DOM/localStorage concern only, independent of
-// render.js/world state. Full design rationale/history:
-// docs/code-notes/app/changelog.md
+// render.js/world state.
 const SEEN_KEY = 'rhombiverse-changelog-seen';
 
 function panelHtml(entries) {

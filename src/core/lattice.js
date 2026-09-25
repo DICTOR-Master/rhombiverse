@@ -1,6 +1,8 @@
 // RD/FCC lattice math: coordinate validation, 12-neighbor lookup, world<->screen
-// conversion. See RHOMBIVERSE_PLAN.md section 2.
-// Full design rationale/history for every export below: docs/code-notes/core/lattice.md
+// conversion. Valid cell: (x, y, z) integers with x + y + z even; each of
+// the RD's 12 faces is one of the 12 neighbour offsets (±1, ±1, 0) and
+// permutations.
+//
 
 export const CUBE_VERTS = [-1, 1].flatMap((x) =>
   [-1, 1].flatMap((y) => [-1, 1].map((z) => [x, y, z]))
@@ -218,7 +220,7 @@ export function neighbors(x, y, z) {
 // confirmed numerically before this was written (all 12 equidistant
 // from center, exactly 24 equal-length edges among them, every vertex
 // degree 4, Euler's formula giving the real 8-triangle+6-square face
-// count -- see docs/code-notes/core/lattice.md).
+// count).
 //
 // Scale: HALF of NEIGHBOR_OFFSETS, not the raw neighbor-distance vectors
 // -- also verified numerically (a real support-function check across all

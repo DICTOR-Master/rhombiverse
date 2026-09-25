@@ -1,5 +1,5 @@
 // Dual cube/octahedron structure inscribed in each RD (core, not
-// optional). Full design rationale/history: docs/code-notes/core/dual.md
+// optional).
 //
 // Relationship to lattice.js's pyramidPieces() (RHOMBIVERSE_SPEC_PYRAMID_
 // SUBCELL.md): getDual() below does the same 8-cube/6-octa split of the
@@ -26,7 +26,7 @@ export const OCTA_EDGES = [
 ];
 
 // Lattice-index offsets (not world-space directions), even-sum scaled
-// to satisfy this lattice's parity constraint -- see docs/code-notes.
+// to satisfy this lattice's parity constraint.
 export const DUAL_DIRS = {
   cube: [-2, 2].flatMap((x) =>
     [-2, 2].flatMap((y) => [-2, 2].map((z) => [x, y, z]))

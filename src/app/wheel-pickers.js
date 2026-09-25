@@ -1,7 +1,6 @@
 // Color/generator/species picker overlays + the drag-placement
 // ("Repeat") toggle -- real, independent functionality extracted out
-// of the old 2D wheel.js (removed 2026-08-25, see CLAUDE.md/docs/
-// code-notes/app/rhombic-wheel-3d.md) so the Rhombic Wheel 3D -- now
+// of the old 2D wheel.js (removed 2026-08-25) so the Rhombic Wheel 3D -- now
 // the sole navigation surface -- doesn't depend on a second UI's
 // internals for real features. These overlays were always independent
 // DOM (their own fixed-position elements, never part of the old
@@ -121,8 +120,7 @@ const CSS = `
    attempts first (a flat SVG, then a real WebGL mini-render in the
    now-deleted app/piece-cluster-3d.js) before landing here -- both read
    as a second, lesser navigation surface once actually compared
-   against the real wheel. See docs/code-notes/app/wheel-pickers.md for
-   that history. */
+   against the real wheel. */
 `;
 
 function injectCssOnce() {

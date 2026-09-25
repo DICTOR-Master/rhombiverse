@@ -9,8 +9,7 @@
 // axis -- the actual real reason this space group is called "R"
 // (rhombohedral-centered), not an invented flourish. Pure math only,
 // no `three` import (matches every other geometry-extensions file's own
-// "unit-testable under node --test" convention). Full design rationale:
-// docs/code-notes/geometry-extensions/calcite-lattice.md
+// "unit-testable under node --test" convention).
 import { isCationSite, isAnionSite, CATION_ANION_OFFSETS } from './rock-salt-lattice.js';
 
 export { isCationSite, isAnionSite, CATION_ANION_OFFSETS };

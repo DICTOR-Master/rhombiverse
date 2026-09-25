@@ -4,7 +4,7 @@ Rhombiverse is a free, browser-based geometry builder. Everything is made
 of shapes that fill space perfectly — starting from the rhombic
 dodecahedron, the natural cell of the face-centered cubic (FCC) lattice —
 and every piece traces back to real crystallography and real mathematics.
-It is pure geometry: you place, grow, slice and view shapes on real
+It is pure geometry: you place, remove, slice and view shapes on real
 lattices, nothing more.
 
 Try it at **[rhombiverse.vercel.app](https://rhombiverse.vercel.app)** — no
@@ -168,29 +168,24 @@ rhombiverse/
     changelog.json      # What's New
   scripts/              # build, and the verify:* checks (geometry, i18n, stale wording)
   tests/                # unit tests and the browser smoke test
-  docs/                 # design specs (see below)
-  RHOMBIVERSE_PLAN.md   # construction-order plan
+  docs/                 # the user guide (7 languages), principles, compliance checklist
 ```
 
-## Design documents (`docs/`)
+## Documents
 
-Read `RHOMBIVERSE_PLAN.md` (repo root) first, then `docs/RHOMBIVERSE_PRINCIPLES.md`
-(the cross-cutting design law every other doc complies with). The rest are
-standalone addenda, each extending specific phases of the plan:
-
-| Doc | Extends |
+| Doc | What it is |
 |---|---|
-| `RHOMBIVERSE_PRINCIPLES.md` | Cross-cutting law: Grounded Simplicity, Isolation, Adaptive Damping |
-| `RHOMBIVERSE_UIUX_BUILD_PLAN.md` | The Rhombic Wheel control surface and Duality Mode (several other tracks it describes have since been removed) |
-| `RHOMBIVERSE_COMPLIANCE.md` | Legal/safety checklist, phased by when each item is required |
+| `docs/guide.md` (+ `guide.<lang>.md`) | How to use Rhombiverse, also served at /guide |
+| `docs/RHOMBIVERSE_PRINCIPLES.md` | The design law: real geometry, simplest version, world as data |
+| `docs/RHOMBIVERSE_COMPLIANCE.md` | What's in place legally, and what to re-check before adding a backend |
+| `CLAUDE.md` | Technical onboarding: scope, running and checking, conventions |
 
 ## Contributing
 
 Humans and AI coding agents are both welcome to open PRs — see
 `CONTRIBUTING.md` for how this project actually works and
 `CODE_OF_CONDUCT.md` for the community standard. `CLAUDE.md` is the
-real technical onboarding doc, worth reading before `RHOMBIVERSE_PLAN.md`
-if you're jumping straight into code.
+real technical onboarding doc.
 
 ## Running locally
 

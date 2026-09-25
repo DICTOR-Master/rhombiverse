@@ -9,41 +9,30 @@ tested and clearly described" means in practice.
 
 ## Start here
 
-1. **`CLAUDE.md`** (repo root) is the real onboarding document — it's
-   written specifically for "a future session with no memory of the
-   conversation that scaffolded this repo, so it can pick up cold,"
-   which makes it just as useful for a human picking this up cold. It
-   has the current implementation status, real bugs that were found and
-   fixed (and why), and hard-won gotchas worth not re-discovering the
-   hard way.
-2. **`RHOMBIVERSE_PLAN.md`** (repo root) — the phased build order and
-   the project's "golden rule" (the world is data, not baked geometry).
-3. **`docs/RHOMBIVERSE_PRINCIPLES.md`** — the three binding design laws
-   (Grounded Simplicity, Isolation, Adaptive Damping) every spec and
-   most real design decisions in this repo trace back to. Short, and
-   worth reading before writing any nontrivial change.
-4. **`docs/`** — one design-spec doc per subsystem (planetoid gravity,
-   black hole, star system, asteroids, trade, regions/claims, etc.),
-   each with its own "Success Checks" section.
+1. **`CLAUDE.md`** (repo root) is the technical onboarding doc, for
+   humans as much as agents: what the app is, its scope guardrails, how
+   to run and check it, and the conventions that matter.
+2. **`docs/RHOMBIVERSE_PRINCIPLES.md`**: the short design law every
+   decision here traces back to.
+3. **`docs/guide.md`**: how the app is used, the same text users read.
 
 ## Ground rules this project actually follows
 
 - **No build step for local dev, by design.** Plain ES modules loaded
   via an import map in `index.html` — no bundler, no `npm install`
   needed to run or edit the app itself; any static file server works.
-  Production (Vercel) does run `npm run build` (`scripts/build.mjs`,
-  added 2026-08-24) to minify each `src/**/*.js` file in place for real
+  Production (Vercel) does run `npm run build` (`scripts/build.mjs`) to minify each `src/**/*.js` file in place for real
   measured performance — no bundling, same module graph, doesn't
   change local dev at all. Don't add bundling, or anything that would
   make local dev need tooling, unless a real requirement forces it.
-- **Grounded Simplicity.** Borrow real physics/math/crystallography
-  over inventing something arbitrary; prefer the simplest version that
-  still works. If you're tuning a constant with no real-world anchor
+- **Grounded Simplicity.** Borrow real math and crystallography over
+  inventing something arbitrary; prefer the simplest version that still
+  works. If you're tuning a constant with no real-world anchor
   (this repo has a few), say so in a comment rather than presenting it
   as derived.
-- **The world is data.** New mechanics extend the same JSON world-state
-  additively — a new top-level key or new per-cell field, never a
-  breaking schema change to something that already exists.
+- **The world is data.** A build is plain JSON, one store per lattice.
+  Extend it rather than breaking what's saved, and migrate old saves on
+  load.
 - **Comments explain WHY, not WHAT.** Well-named code and this repo's
   own docs already say what something does. A comment earns its place
   by capturing a non-obvious constraint, a bug that was actually hit, or
@@ -97,6 +86,4 @@ Regular bugs: open a GitHub issue. Security issues: see `SECURITY.md`
 
 This project follows the Contributor Covenant — see
 `CODE_OF_CONDUCT.md`. Short version: be respectful, assume good faith,
-and the same "open commons" spirit described in `TERMS.md`'s Shared
-World section applies here too — to the codebase, not just the Shared
-World itself.
+and help each other out.

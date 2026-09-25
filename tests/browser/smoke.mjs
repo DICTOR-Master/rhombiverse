@@ -102,8 +102,7 @@ async function main() {
   // the sole navigation surface now. Its own labels are continuously
   // repositioned every frame by a live render loop, which reproducibly
   // defeats Playwright's actionability/stability polling (see
-  // CLAUDE.md and docs/code-notes/app/rhombic-wheel-3d.md for two
-  // separate real incidents of this exact class of issue) -- clicking
+  // CLAUDE.md) -- clicking
   // through the 3D wheel's own faces is not a reliable CI interaction.
   // Mode switching itself is tested directly against the real
   // underlying primitive instead (.mode-btn[data-mode=...], the same

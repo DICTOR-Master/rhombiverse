@@ -1,9 +1,8 @@
 // Raycasts to find which of the 12 faces of a clicked RD was hit, then
 // acts according to the currently selected build MODE (an explicit
 // #mode-* button in index.html, read via getMode() -- see render.js).
-// RHOMBIVERSE_PLAN.md section 4. Right-click always removes the clicked
-// cell, in every mode. Full design rationale/history for every export
-// below: docs/code-notes/core/build.md
+// Right-click always removes the clicked
+// cell, in every mode.
 import * as THREE from 'three';
 import {
   NEIGHBOR_OFFSETS,

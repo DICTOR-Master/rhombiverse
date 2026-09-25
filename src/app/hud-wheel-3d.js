@@ -16,8 +16,7 @@
 // Rendering: shares the MAIN scene's own THREE.WebGLRenderer via a
 // scissor/viewport sub-region every frame rather than creating a
 // second renderer -- this session already found and fixed a real perf
-// cost from two simultaneous full-scene WebGL renders (see docs/
-// code-notes/app/rhombic-wheel-3d.md); a persistent, always-on mini
+// cost from two simultaneous full-scene WebGL renders; a persistent, always-on mini
 // wheel would make that same mistake permanent instead of a transient
 // modal-open cost, so it shares the existing renderer/canvas instead
 // of standing up its own.

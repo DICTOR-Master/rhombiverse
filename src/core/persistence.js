@@ -1,5 +1,5 @@
 // World-state persistence backend (localStorage for now, swappable later).
-// Full rationale: docs/code-notes/core/persistence.md
+//
 const STORAGE_KEY = 'rhombiverse-world';
 
 // The BCC dual-lattice build (geometry-extensions/bcc-build.md) is a

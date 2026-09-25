@@ -1,7 +1,6 @@
 // BCC (body-centered-cubic) lattice math -- reciprocal/dual to the FCC
 // lattice (src/core/lattice.js). Pure math only, Phase 1 -- not wired
-// into rendering yet. Full design rationale/history:
-// docs/code-notes/geometry-extensions/dual-lattice.md
+// into rendering yet.
 
 export function isBCC(x, y, z) {
   const px = ((x % 2) + 2) % 2;

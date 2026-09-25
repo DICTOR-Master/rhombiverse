@@ -107,8 +107,8 @@ test('NEIGHBOR_OFFSETS: 12 entries, each preserves lattice parity', () => {
   assert.equal(NEIGHBOR_OFFSETS.length, 12);
   for (const [dx, dy, dz] of NEIGHBOR_OFFSETS) {
     // Adding any offset to a valid cell must stay valid -- so each
-    // offset's own coordinate sum must be even (RHOMBIVERSE_PLAN.md
-    // section 2's own invariant). Math.abs guards against JS's `%`
+    // offset's own coordinate sum must be even (the FCC parity
+    // invariant). Math.abs guards against JS's `%`
     // returning -0 for a negative even dividend (e.g. -2 % 2 === -0),
     // which assert/strict's Object.is-based equal would otherwise
     // (correctly, per JS semantics) treat as distinct from 0.

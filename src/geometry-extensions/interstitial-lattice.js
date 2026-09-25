@@ -12,8 +12,7 @@
 // at 2) -- a genuine tetragonal disphenoid, zero exceptions, volumes
 // summing exactly to the patch's own convex-hull volume (zero gaps, a
 // guarantee of Delaunay triangulation, not something that needed
-// separate checking). Full design rationale: docs/code-notes/
-// geometry-extensions/interstitial-lattice.md
+// separate checking).
 //
 // The "flattened octahedron" (the site materials-science actually names)
 // is NOT a separate primitive: it is exactly 4 of these disphenoids

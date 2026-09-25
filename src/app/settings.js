@@ -1,5 +1,5 @@
 // Single source of truth for the B1 Settings panel, a tiny pub/sub
-// store. Full design rationale/history: docs/code-notes/app/settings.md
+// store.
 const SETTINGS_KEY = 'rhombiverse-settings';
 
 export const QUALITY_PIXEL_RATIO_FACTOR = {

@@ -90,12 +90,12 @@ of both panels (e.g. `boundingBox().x + width*0.8, y + height*0.75` at a
 
 Related gotcha, found verifying Lattice Zoom Stage 5 (2026-08-13): the
 same silent-swallow problem also hits `page.mouse.click()`, and `#controls`'
-real width is MODE-DEPENDENT — it grows noticeably wider in Plant mode
-(the "Evolving..." species optgroup/hint text) than in Build mode, enough
+real width is MODE-DEPENDENT — it gets noticeably wider in modes with
+longer panel text, enough
 to newly cover a 1000px-wide viewport's exact center even though that
 same point was clear in Build mode moments earlier. A click swallowed
 this way produces no error either — the click handler simply never
-fires, so whatever it was supposed to do (here, planting an organism)
+fires, so whatever it was supposed to do (here, placing a piece)
 silently doesn't happen. Before trusting ANY click/wheel test against a
 specific screen point, verify with `document.elementFromPoint(x, y)`
 that the target really is the canvas (or whatever's expected), not an
@@ -110,11 +110,10 @@ that a later zoom-toward-target sequence never reaches it, reading as a
 feature bug until traced back to the click position.
 
 Real, important gotcha found investigating a live crash while building
-the Lattice Zoom showcase-world preset (2026-08-14): **`chromium.launch()`
+the Lattice Zoom showcase-world preset: **`chromium.launch()`
 in this environment defaults to headless, which means SOFTWARE rendering
 (SwiftShader) unless a real display is available AND explicitly used.**
-A content-heavy real scene (a real ~460-cell planetoid with real growth/
-organism geometry) reliably hung and crashed a headless Chromium tab
+A content-heavy real scene (a real ~460-cell build) reliably hung and crashed a headless Chromium tab
 after ~40s of real interaction — genuinely looked like a real app bug at
 first (and real, separate performance bugs WERE found and fixed this
 same session via `node --cpu-prof`, unrelated to this rendering issue).

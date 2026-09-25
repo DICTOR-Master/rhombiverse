@@ -1,18 +1,9 @@
-// Load/save/serialize the world-state JSON (schema: RHOMBIVERSE_PLAN.md
-// section 3), and an in-memory mutable store over it. Persistence to
+// Load/save/serialize the world-state JSON ({ worldName, version, cells:
+// { "x,y,z": { material, ... } }, meta }), and an in-memory mutable store
+// over it. Persistence to
 // storage lives in persistence.js -- this module only tracks state in
-// memory. Full design rationale/history for every export below:
-// docs/code-notes/core/worldstate-core.md
+// memory.
 import { cellKey, parseCellKey } from './lattice.js';
-
-// Core vs. Modules boundary (RHOMBIVERSE_PLAN.md, 2026-08-23) used to
-// have a claimIdAt integration point here too (render.js supplied the
-// real one via setRegionsIntegration(), gated behind FEATURES.economy).
-// Removed 2026-08-31 along with the claimId cell-stamping it only
-// existed to feed (see addCell below). sculpture.js's own
-// setRegionsIntegration() hook (same reasoning) was removed 2026-09-22,
-// never having had a live caller; gravity.js's was archived along with
-// the rest of that system the same day.
 
 export async function loadWorld(url) {
   const res = await fetch(url);
@@ -48,7 +39,7 @@ export function createWorldStore(worldJSON, hooks = {}) {
       // `cell.claimId` back either -- claims are tracked entirely via the
       // `claims` map + claimIdAt(). Both were dead weight on every cell.
       // region/status are NOT included in that cleanup -- they're
-      // documented schema-v1 fields (RHOMBIVERSE_PLAN.md section 3) for
+      // schema-v1 fields for
       // moderation, and `status` is live-read for flagged/removed
       // rendering (render.js).
       const { gravitySource, gravityWeight, claimId, ...rest } = data;

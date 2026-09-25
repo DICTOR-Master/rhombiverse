@@ -43,10 +43,6 @@ Almanac's Stage 1 (below) is almost entirely **importing this existing array**, 
 
 A handful of standing facts that don't belong to any single piece — why RD tiles space with no gaps (real space-filling honeycomb, not approximate), the BCC lattice, RD's dual relationship to the FCC lattice's own Voronoi cell, why the interstitial pieces (Flattened Octahedron / Disphenoid) exist at all. These are genuinely new copy, but short — this is a reference card, not a textbook. Cite `RHOMBIVERSE_PRINCIPLES.md`'s real-physics grounding examples as the tone to match (plain, factual, no invented lore where real crystallography already answers the question).
 
-### 3c. World Systems note (one entry, historical)
-
-World Systems (mining/trade/claims/achievements/animals/hazards) was retired to Shared World only (commit `890615a`). Almanac is a natural, low-stakes place for a single "what happened to X" entry for anyone who remembers the old mode — keeps that history discoverable without it cluttering the active UI anywhere else. Optional; not blocking any other stage.
-
 ---
 
 ## 4. UI Shell — Reuse, Don't Invent

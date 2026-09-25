@@ -2,8 +2,7 @@
 // globally-consistent BCC lattice sharing the FCC world's own coordinate
 // frame and cellToWorld transform, at BCC's own real, established
 // self-tiling scale -- not independently re-derived or re-centered per
-// FCC cell. Full rationale: docs/code-notes/geometry-extensions/
-// bcc-detail-lattice.md
+// FCC cell.
 //
 // Why not the earlier per-cell-nested design (kept containment margins,
 // re-centered on each parent RD): direct user feedback (2026-08-25) --

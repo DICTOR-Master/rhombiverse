@@ -168,7 +168,4 @@ export const LATTICE_CONCEPT_ENTRIES = [
   },
 ];
 
-// (The old "What Happened to World Systems?" history entry was removed
-// 2026-09-24, direct instruction: Rhombiverse is pure geometry only, and
-// the Almanac shouldn't point at retired game systems at all.)
 export const ALMANAC_ENTRIES = [...PIECE_ENTRIES, ...LATTICE_CONCEPT_ENTRIES];

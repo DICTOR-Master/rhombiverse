@@ -1,7 +1,6 @@
 // First-run welcome/entry overlay: rotating RD logo with a static
 // integrated "ENTER" label, legal-doc links. Purely a DOM/localStorage
-// concern, independent of render.js/world state. Full design
-// rationale/history: docs/code-notes/app/welcome.md. Used to also offer
+// concern, independent of render.js/world state. Used to also offer
 // a Pure Rhombeometry / Full World mode choice here -- removed along with
 // World Systems retirement (see features.js/settings.js); there's only
 // one mode now.

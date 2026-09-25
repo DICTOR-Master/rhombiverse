@@ -7,8 +7,7 @@
 // Self-contained: its own THREE.Scene/Camera/WebGLRenderer/Raycaster in
 // a modal overlay canvas, not the main world scene -- this is a
 // navigation wheel the user orbits by dragging, independent of wherever
-// the camera happens to be in the world when it's opened. Full
-// rationale: docs/code-notes/app/rhombic-wheel-3d.md.
+// the camera happens to be in the world when it's opened.
 import * as THREE from 'three';
 import {
   buildRDFaces, faceKey, ensureOutwardWinding,

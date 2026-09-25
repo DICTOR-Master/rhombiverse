@@ -1,7 +1,6 @@
 // Persists the orbit camera's position/look-at target across reloads, so
 // the view resumes where you left off instead of resetting to the fixed
-// default spawn every load. Full rationale: docs/code-notes/app/
-// camera-persistence.md
+// default spawn every load.
 const CAMERA_KEY = 'rhombiverse-camera';
 
 export function saveCameraState(position, target) {

@@ -7,8 +7,7 @@
 // isValidCell), the anion sublattice is simply every ODD-sum point, and
 // together the two sublattices are a genuine SIMPLE CUBIC lattice (real
 // coordination number 6, the defining property), not a third bespoke
-// lattice type. Full design rationale: docs/code-notes/
-// geometry-extensions/rock-salt-lattice.md
+// lattice type.
 //
 // Consequence that matters for rendering: each ion's own real Voronoi
 // cell in a simple cubic lattice is an ordinary CUBE (edge = the

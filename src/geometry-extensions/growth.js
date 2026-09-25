@@ -10,8 +10,7 @@
 // star directions, the valid acute/oblate rhombohedron triples they form,
 // a single tile's vertices, and a real 3D SAT overlap test between two
 // tiles. render.js's live Duality Mode feature (VALID_TRIPLES,
-// unitTileVertices) depends on this directly. Full design rationale/history
-// for the math itself: docs/code-notes/geometry-extensions/growth.md
+// unitTileVertices) depends on this directly.
 
 export const PHI = (1 + Math.sqrt(5)) / 2;
 
@@ -146,8 +145,7 @@ function maxRadiusFrom(verts, center) {
 
 // Real 3D SAT overlap test between two tiles, with a cheap bounding-sphere
 // pre-check (never changes the answer, only skips the expensive exact
-// test). See docs/code-notes/geometry-extensions/growth.md for the full
-// derivation and the 2026-08-13/2026-08-24 bug/perf histories. Not called
+// test). Not called
 // by any live feature today (its one live caller, evolution.js, was
 // archived in the same pass this file was trimmed) -- kept because it's
 // genuine deterministic geometry, not simulation, and a lattice-overlap

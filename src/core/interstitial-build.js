@@ -6,8 +6,7 @@
 // not a separate addEventListener-based controller) -- that was this
 // file's first draft, reverted once it became clear a second, parallel
 // set of click/contextmenu listeners would double-handle every click
-// alongside core/build.js's own. Full design rationale: docs/code-notes/
-// core/interstitial-build.md
+// alongside core/build.js's own.
 import { disphenoidKey } from '../geometry-extensions/interstitial-lattice.js';
 
 // Deliberately NOT core/worldstate-core.js's createWorldStore: that
