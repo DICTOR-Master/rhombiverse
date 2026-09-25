@@ -166,7 +166,7 @@ export const LATTICE_CONCEPT_ENTRIES = [
     desc: "The rhombic dodecahedron (RD) is the real Voronoi cell of a face-centered cubic (FCC) lattice -- the same reason honeybees' hexagonal cells and closest-sphere-packing both relate to this shape. RD tiles 3D space with zero gaps, which is why it -- not a cube -- is Rhombiverse's own base building cell.",
     markKey: null,
   },
-  // 5D/6D (stage 8 of docs/PLAN-5D-6D.md).
+  // 5D/6D quasicrystals.
   {
     kind: 'concept',
     id: 'concept:cutAndProject',

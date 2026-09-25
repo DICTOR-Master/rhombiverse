@@ -2,7 +2,7 @@
 // engine: pure geometry, no THREE. An entry names a shape (a few
 // parameters); the app finds where that shape genuinely occurs in the
 // current tiling, so a summoned item always lands as real pieces of the
-// same quasicrystal as the build (docs/PLAN-5D-6D.md, stage 6).
+// same quasicrystal as the build.
 //
 // Zonohedra (serials 1000-1999): the zonotope spanned by a set S of basis
 // directions (6D: 3-6 icosahedral axes, from a golden rhombohedron to the

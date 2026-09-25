@@ -9,7 +9,7 @@
 // render.js switches it on for its dimension and routes taps to it, as it
 // does for 4D.
 //
-// Decisions this file implements (docs/PLAN-5D-6D.md, stages 2-3):
+// Decisions this file implements:
 // - The tiling decides the shape: tapping a face adds the one tile the
 //   tiling has across it. No Shape choice. In 5D a prism's top or bottom
 //   adds the same rhombus on the next layer.

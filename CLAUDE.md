@@ -27,8 +27,8 @@ used to be called rhombiverse). Don't cross-reference the two.
 GitHub: https://github.com/DICTOR-Master/rhombiverse (`gh` is authenticated).
 Live: https://rhombiverse.vercel.app
 
-Planned next: 5D/6D quasicrystal worlds, agreed design and stages in
-`docs/PLAN-5D-6D.md`.
+In progress: the Shells scene, agreed design and stages in
+`docs/PLAN-SHELLS.md`. 5D/6D shipped in full (plan closed 2026-09-26).
 
 ## Scope guardrails
 
