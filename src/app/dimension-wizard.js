@@ -135,17 +135,15 @@ function injectCssOnce() {
 // exactly (a single source of truth, not 2 independently-hand-written
 // copies of the same construction that could silently drift apart).
 function lattice2dEdges(combo) {
+  // Flat outline only (the tile's top face), flagged `coin` so the
+  // preview spins it like a coin -- edge-on and back -- instead of
+  // tumbling a 3D prism (direct request 2026-09-25: 2D previews "should
+  // be 2D rotating and disappearing into edge like spinning coins").
   const impl = LATTICE_PRIMITIVE_IMPLS[combo.primitiveId];
-  const verts = impl.tileVerts(combo.angleDeg, 1, 1); // h=1 for a clearly visible prism at preview scale
-  const n = verts.length / 2;
-  const top = verts.slice(0, n);
-  const bot = verts.slice(n);
-  const edges = [];
-  for (let i = 0; i < n; i++) {
-    edges.push([top[i], top[(i + 1) % n]]);
-    edges.push([bot[i], bot[(i + 1) % n]]);
-    edges.push([top[i], bot[i]]);
-  }
+  const verts = impl.tileVerts(combo.angleDeg, 1, 1);
+  const top = verts.slice(0, verts.length / 2).map(([x, y]) => [x, y, 0]);
+  const edges = top.map((p, i) => [p, top[(i + 1) % top.length]]);
+  edges.coin = true;
   return edges;
 }
 
@@ -165,7 +163,7 @@ const DIMENSIONS = [
   // which meant toggling angle silently swapped to an unrelated store
   // instead of reshaping the one you'd actually built. See
   // lattice2dSeedCell's own header in render.js for the full incident.
-  { id: '2D', label: '2D', desc: '3 real tile primitives (Parallelogram, Triangle, Hexagon), each buildable at any of 4 named lattice angles via the in-scene toggle panel.', enabled: true, preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: NAMED_LATTICE_ANGLES[0].angleDeg }) },
+  { id: '2D', label: '2D', desc: '5 tile types (Parallelogram, Triangle, Hexagon, Kite, Kagome), each at up to 4 named lattice angles, chosen from the in-scene panel.', enabled: true, preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: NAMED_LATTICE_ANGLES[0].angleDeg }) },
   { id: '3D', label: '3D', desc: 'FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app’s existing lattice core.', enabled: true, previewAction: 'tool:pieceType:rd' },
   { id: '4D', label: '4D', desc: 'Tesseract (Z4), D4 (24-cell, 16-cell) and Hyper-pyrochlore (4D Kagome).', enabled: true, preview: () => edges4D('cell24') },
   { id: '5D', label: '5D', desc: 'Decagonal quasicrystal.', enabled: false },

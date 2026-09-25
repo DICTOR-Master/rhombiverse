@@ -14,7 +14,10 @@
 // Input is a plain list of edges as point pairs, [[a, b], ...] with
 // a/b = [x, y, z] -- whatever the caller's own real geometry source
 // produces (render.js's EdgesGeometry of the real piece geometry, the
-// 2D tile prisms, ...), so this file owns no geometry of its own.
+// 2D tile outlines, ...), so this file owns no geometry of its own.
+// An edge list flagged `edges.coin = true` (a flat 2D tile) spins like
+// a coin instead: no tilt, turning about the vertical axis, so it
+// narrows to its edge and back, with no depth dimming.
 
 const LINE_COLOR = '#7cf';
 const LINE_COLOR_DIM = 'rgba(124, 204, 255, 0.35)';
@@ -70,7 +73,8 @@ export function mountWireframePreview(canvas, edges, size) {
   const draw = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const half = (size * dpr) / 2;
-    const rotated = centered.map(([a, b]) => [rotateX(rotateY(a, angle), TILT), rotateX(rotateY(b, angle), TILT)]);
+    const tilt = edges.coin ? 0 : TILT;
+    const rotated = centered.map(([a, b]) => [rotateX(rotateY(a, angle), tilt), rotateX(rotateY(b, angle), tilt)]);
     const zs = rotated.flat().map((p) => p[2]);
     const minZ = Math.min(...zs);
     const zRange = Math.max(Math.max(...zs) - minZ, 1e-6);
@@ -79,7 +83,7 @@ export function mountWireframePreview(canvas, edges, size) {
       .sort((e1, e2) => e1.avgZ - e2.avgZ);
     ctx.lineWidth = Math.max(1, dpr);
     for (const { a, b, avgZ } of byDepth) {
-      ctx.strokeStyle = (avgZ - minZ) / zRange > 0.5 ? LINE_COLOR : LINE_COLOR_DIM;
+      ctx.strokeStyle = edges.coin || (avgZ - minZ) / zRange > 0.5 ? LINE_COLOR : LINE_COLOR_DIM;
       ctx.beginPath();
       ctx.moveTo(half + a[0] * scale, half - a[1] * scale);
       ctx.lineTo(half + b[0] * scale, half - b[1] * scale);
