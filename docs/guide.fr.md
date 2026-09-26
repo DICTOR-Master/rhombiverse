@@ -169,7 +169,7 @@ Dans **Paramètres** :
 
 | Commande | Ce qu'elle fait |
 |---|---|
-| Wizard (en haut à gauche) | Parcourir les dimensions et les réseaux, chacun avec ses pièces |
+| Wizard (en haut à gauche) | Parcourir les dimensions et les réseaux, chacun avec ses pièces. La grande étiquette orange à côté indique la dimension où vous êtes |
 | Shape (en bas à gauche) | La pièce que vous posez. Touchez pour la changer |
 | Couleur (en bas à gauche) | Couleur de construction. Touchez pour la changer |
 | Lattice View | Alterne entre Off et une vue pour chaque pièce |

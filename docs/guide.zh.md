@@ -169,7 +169,7 @@ Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel
 
 | 控件 | 作用 |
 |---|---|
-| Wizard（左上） | 浏览各个维度和晶格及其部件 |
+| Wizard（左上） | 浏览各个维度和晶格及其部件。旁边的橙色大字显示你所在的维度 |
 | Shape（左下） | 当前要放置的部件。轻点更换 |
 | 颜色（左下） | 搭建颜色。轻点更换 |
 | Lattice View | 在 Off 和每种部件的视图之间循环 |

@@ -1498,6 +1498,14 @@ async function init() {
   wireFirstUseHint('xray-toggle', 'X-Ray: drag a cutaway plane through the structure to see inside it.');
   wireFirstUseHint('lab-toggle', 'Settings: camera, graphics, sound, language, colors, and Export / Import World.');
   wireFirstUseHint('hud-wheel-cue', 'Tab / Space (or tap Menu) opens the menu wheel.');
+  // The quick-select row starts just right of the Menu box, whose width
+  // changes with the language.
+  const menuCueEl = document.getElementById('hud-wheel-cue');
+  if (menuCueEl && 'ResizeObserver' in window) {
+    new ResizeObserver(() => {
+      document.documentElement.style.setProperty('--quick-x', `${Math.round(menuCueEl.getBoundingClientRect().right + 8)}px`);
+    }).observe(menuCueEl);
+  }
   wireFirstUseHint('export-json', 'Export World saves every dimension to one file -- Import World opens it again.');
 
   // The saved World (this browser), or the empty starter on a first visit.
@@ -5551,8 +5559,12 @@ let fpsSampleWindowStart = performance.now();
 let lowFPSSampleStreak = 0;
 let lastDegradeAt = 0;
 
+const hudDimEl = document.getElementById('hud-dim');
 function animate() {
   requestAnimationFrame(animate);
+  // The dimension beside Wizard (a cheap per-frame check: several paths
+  // change activeDimension; not yet chosen means the default 3D world).
+  if (hudDimEl && hudDimEl.textContent !== (activeDimension ?? '3D')) hudDimEl.textContent = activeDimension ?? '3D';
   const now = performance.now();
   const dt = Math.min(0.1, (now - lastFrameTime) / 1000); // clamp avoids a huge step after a backgrounded tab regains focus
   lastFrameTime = now;

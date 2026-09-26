@@ -77,13 +77,17 @@
       user-select: none;
     }
     #hud-prompt.visible { display: block; }
-    #hud-wheel-cue {
-      position: fixed; bottom: 14px; left: 16px; z-index: 900;
-      color: #9cd; font: 11px system-ui, sans-serif; opacity: 0.7;
+    /* Menu and Wizard: boxed like the quick-select buttons beside Menu. */
+    #hud-wheel-cue, #hud-wizard-cue {
+      box-sizing: border-box; height: 36px; padding: 0 10px;
+      display: flex; align-items: center;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 6px;
+      color: #9cd; font: 11px system-ui, sans-serif; white-space: nowrap;
       user-select: none; cursor: pointer;
-      padding: 6px 4px; margin: -6px -4px; /* bumps the tap target up without moving the text */
     }
-    #hud-wheel-cue:hover { opacity: 1; }
+    #hud-wheel-cue:hover, #hud-wizard-cue:hover { background: rgba(255, 255, 255, 0.15); }
+    #hud-wheel-cue { position: fixed; bottom: 8px; left: 16px; z-index: 900; }
     /* Dimension wizard cue: top-left, mirroring #hud-wheel-cue's own
        bottom-left styling -- direct instruction, "top left for
        wireframe wizard" -- a second, parallel entry point alongside the
@@ -92,13 +96,18 @@
        sandbox rather than forced open (that's the dedicated dimension-
        select wheel's own job now, on load). Positioned just below
        #hud-wordmark (top:14px/left:16px) to avoid overlapping it. */
-    #hud-wizard-cue {
+    #hud-wizard-row {
       position: fixed; top: 38px; left: 16px; z-index: 900;
-      color: #9cd; font: 11px system-ui, sans-serif; opacity: 0.7;
-      user-select: none; cursor: pointer;
-      padding: 6px 4px; margin: -6px -4px;
+      display: flex; align-items: center; gap: 12px;
     }
-    #hud-wizard-cue:hover { opacity: 1; }
+    /* The dimension you're in, beside Wizard: orange, twice the
+       wordmark's height. Empty (hidden) until a dimension is open. */
+    #hud-dim {
+      color: #f59e0b; font: 700 30px/1 system-ui, sans-serif;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      user-select: none; pointer-events: none;
+    }
+    #hud-dim:empty { display: none; }
     /* 2D lattice toggle panel (Phase 4, direct instruction: "a four
        position toggle... to see transformations" -- a persistent, always-
        reachable live control while building in 2D, not a one-shot pick
@@ -236,8 +245,10 @@
     }
     #hud-quick-shape svg, #hud-quick-color svg, #hud-quick-lattice-view svg, #hud-quick-attach svg { width: 24px; height: 24px; }
     #hud-quick-shape:hover, #hud-quick-color:hover, #hud-quick-lattice-view:hover, #hud-quick-attach:hover { background: rgba(255, 255, 255, 0.15); }
-    #hud-quick-shape { left: 64px; }
-    #hud-quick-color { left: 106px; }
+    /* --quick-x: where the row starts, just right of the Menu box
+       (render.js measures it, since Menu's width depends on language). */
+    #hud-quick-shape { left: var(--quick-x, 64px); }
+    #hud-quick-color { left: calc(var(--quick-x, 64px) + 42px); }
     /* Lattice View quick-select: third bottom-left icon, direct request
        2026-08-29 ("a third square at the bottom left going through all
        options including off") -- cycles the SAME underlying state as
@@ -245,12 +256,12 @@
        cycleLatticeQuickView), just a second, more-visible access point.
        Rhombeometry-only, matching every other BCC/interstitial-lattice
        control (see FEATURES.bccLattice gating in render.js). */
-    #hud-quick-lattice-view { left: 148px; }
+    #hud-quick-lattice-view { left: calc(var(--quick-x, 64px) + 84px); }
     #hud-quick-lattice-view.active { border-color: #39ff88; background: rgba(57, 255, 136, 0.18); }
     /* Rhombohedra Copy | Mirror attach toggle: 4th bottom-left icon,
        direct request ("put it in row at bottom with other 3"), shown only
        while Rhombohedra is the 3D piece (render.js updateRhomboAttachButton). */
-    #hud-quick-attach { left: 190px; }
+    #hud-quick-attach { left: calc(var(--quick-x, 64px) + 126px); }
     #hud-quick-attach.hidden { display: none; }
     #lab-toggle {
       position: fixed; top: 12px; right: 12px; z-index: 900;
@@ -793,7 +804,10 @@
   <div id="fps-meter"></div>
   <div id="hud-prompt"></div>
   <div id="hud-wheel-cue" title="Tab / Space also opens this" data-i18n="hud.menu">Menu</div>
-  <div id="hud-wizard-cue" data-i18n-title="wiz.cueTitle" title="Browse dimensions, lattices and pieces">Wizard</div>
+  <div id="hud-wizard-row">
+    <div id="hud-wizard-cue" data-i18n-title="wiz.cueTitle" title="Browse dimensions, lattices and pieces">Wizard</div>
+    <div id="hud-dim"></div>
+  </div>
   <button id="hud-quick-shape" type="button" title="Shape (tap to change)"></button>
   <button id="hud-quick-color" type="button" title="Color (tap to change)"></button>
   <button id="hud-quick-lattice-view" type="button" title="Lattice View (tap to cycle)"></button>

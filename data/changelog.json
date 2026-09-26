@@ -3,6 +3,7 @@
     "date": "2026-09-26",
     "title": "Colours & Shells",
     "items": [
+      "The dimension you're in (2D to 6D) now shows in large orange letters beside Wizard, top left. Wizard and Menu are boxed like the other buttons, so they read as buttons.",
       "Colours: a new Cyan / Type / Pick setting (in Settings), matching Polyhedraverse. Cyan, now the default, shows every piece cyan; Type shows each kind of piece in its own colour, live; Pick shows each piece in the colour it was placed with. Switching never loses placed colours, and picking a colour while in Cyan switches to Pick.",
       "Shells: Info now has the ring diagram back, one coloured ring per shell. Tap a ring (or a shell's Hide button) to hide that shell and see the bands inside, like peeling an onion; remove any single shell with ✕; and pick the band colours: Hue steps, Rainbow, Warm or Cool.",
       "Shells: bigger RDs. A Scale menu (×1 to ×4) places whole RDs and single parts at that size, snapped to the bigger lattice. In Fragment mode, Merge ×2 or ×3 outlines the big RD around the targeted piece and shows the small pieces it still needs; Confirm swaps in one big RD, and pieces sticking out keep their outside parts. A big RD opens back into small pieces from the Breakdown menu.",

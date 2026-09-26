@@ -167,7 +167,7 @@ In **Settings**:
 
 | Control | What it does |
 |---|---|
-| Wizard (top left) | Browse dimensions and lattices, each with its pieces |
+| Wizard (top left) | Browse dimensions and lattices, each with its pieces. The large orange label beside it shows the dimension you're in |
 | Shape (bottom left) | The piece you're placing. Tap to change it |
 | Colour (bottom left) | Build colour. Tap to change it |
 | Lattice View | Cycles through Off and a view for each piece |

@@ -169,7 +169,7 @@ En **Ajustes**:
 
 | Control | Qué hace |
 |---|---|
-| Wizard (arriba a la izquierda) | Recorre dimensiones y redes, cada una con sus piezas |
+| Wizard (arriba a la izquierda) | Recorre dimensiones y redes, cada una con sus piezas. La etiqueta naranja grande a su lado muestra la dimensión en la que estás |
 | Shape (abajo a la izquierda) | La pieza que colocas. Tócalo para cambiarla |
 | Color (abajo a la izquierda) | Color de construcción. Tócalo para cambiarlo |
 | Lattice View | Alterna entre Off y una vista para cada pieza |
