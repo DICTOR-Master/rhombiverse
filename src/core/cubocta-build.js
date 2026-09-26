@@ -97,7 +97,7 @@ export function createCuboctaBuildController({
   }
 
   function onClick(event) {
-    if (!isActive()) return;
+    if (!isActive() || event.rvPlaced) return; // the same tap just placed the first CO (build.js)
     const hit = pick(event);
     if (!hit || hit.instanceId === undefined) return;
 

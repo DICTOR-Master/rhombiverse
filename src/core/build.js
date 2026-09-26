@@ -1487,9 +1487,14 @@ export function createBuildController({
     // First-placement target: a tap on the cyan outline places the
     // selected piece's first piece there (Add mode only).
     if (firstPlacementTarget && hit.object === firstPlacementTarget.mesh) {
-      if (mode === 'build') {
+      // Cuboctahedron Build has its own mode but the same first placement
+      // (it could never be tapped before: direct report, 2026-09-26).
+      if (mode === 'build' || mode === 'cubocta') {
         const material = getMaterial();
         firstPlacementTarget.place(material);
+        // This tap is used up: other canvas click handlers (cubocta-build.js)
+        // would otherwise see the new piece under it and add a neighbour.
+        event.rvPlaced = true;
         if (onPlaced) onPlaced({ x: 0, y: 0, z: 0, material });
       }
       return;

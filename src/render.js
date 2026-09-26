@@ -3507,7 +3507,7 @@ async function init() {
           clickMode('cubocta');
           showHudPrompt('Piece: CO', 3000);
           wheel3D.close();
-          pickers.openColorPicker((value, label) => showHudPrompt(`Color: ${label}`, 3000));
+          if (!quiet) pickers.openColorPicker((value, label) => showHudPrompt(`Color: ${label}`, 3000));
           return;
         }
 
@@ -3715,7 +3715,10 @@ async function init() {
         applyDimensionVisibility();
         applyDimensionCamera(dimension);
         if (dimension === '3D') seedIfWorldEmpty();
-        handleWheelAction(action);
+        // Quiet, like the dimension picker: no colour picker popping up over
+        // the first-placement outline (it caught the first tap -- direct
+        // report, 2026-09-26). The Colour button is still one tap away.
+        handleWheelAction(action, { quiet: true });
       },
     });
     document.getElementById('hud-wizard-cue')?.addEventListener('click', () => dimensionWizard.open());
