@@ -41,6 +41,8 @@ Pour annuler votre dernière modification, touchez **Undo** (↶, en bas à droi
 
 **2D :** carreaux Parallelogram (parallélogramme), Triangle, Hexagon (hexagone), Kite (cerf-volant) et Kagome, choisis dans le panneau du haut, chacun avec jusqu'à quatre angles de réseau (90°, 70,53°, 63,43° et 60°).
 
+**Kaléidoscope 2D** (Wizard → 2D → Kaleidoscope) : un monde à part. Construisez avec des losanges de Penrose épais et fins, des pentagones, des triangles, des hexagones et des carrés (tous de même côté, donc deux pièces quelconques s'accolent côte à côte). Accoler ajoute la pièce de l'autre côté du bord touché ; Libre la lâche où vous touchez et la fait glisser jusqu'à s'aligner à côté d'une partenaire. Les miroirs font de votre construction un kaléidoscope : un Anneau de 1 à 12 miroirs, ou un triangle de trois (△60°, △45°, △30°) répété sur tout l'écran, réglé avec le curseur. Tourner fait pivoter la construction face aux miroirs, Pivoter la fait tourner en continu, Secouer libère toutes les pièces et les laisse se reposer en un nouveau motif. Sûr tient les losanges à la règle d'assemblage de Penrose, qui forment donc toujours un vrai pavage de Penrose ; Guides montre les lignes des miroirs ; Lattice View montre chaque place où la pièce tient. En 2D, le bouton pinceau (Paint) recolore les pièces déjà posées : activez-le, choisissez une couleur, touchez une pièce.
+
 **3D :**
 
 | Réseau | Pièces |

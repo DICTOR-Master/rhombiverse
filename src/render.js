@@ -25,6 +25,7 @@ import { createWorld4D } from './app/world-4d.js';
 import { createQuasicrystalWorld } from './app/world-quasicrystal.js';
 import { createShellsWorld } from './app/world-shells.js';
 import { createGoldenWorld } from './app/world-golden.js';
+import { createKaleidoWorld } from './app/world-kaleidoscope.js';
 import { makeQuasicrystal, PRISM_HEIGHT } from './geometry-extensions/quasicrystal.js';
 import { loadCatalogue, findBySerial, zonotopeVertices, localPatch, polytopeShape } from './geometry-extensions/quasicrystal-catalogue.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
@@ -138,13 +139,16 @@ let world4d = null;
 // The 5D and 6D quasicrystal worlds (src/app/world-quasicrystal.js), by
 // dimension, each switched on only while its dimension is active.
 const qcWorlds = new Map();
-// 3D worlds of their own (src/app/world-shells.js, world-golden.js): on
-// while 3D is active and one is the chosen piece ('shells' | 'golden').
+// Worlds of their own inside 2D/3D (src/app/world-shells.js,
+// world-golden.js, world-kaleidoscope.js): on while their dimension is
+// active and one is the chosen piece ('shells' | 'golden' | 'kaleido').
 let shellsWorld = null;
 let goldenWorld = null;
+let kaleidoWorld = null;
 let own3D = null;
-const own3DWorld = () => (own3D === 'shells' ? shellsWorld : own3D === 'golden' ? goldenWorld : null);
-const own3DActive = () => activeDimension === '3D' && !!own3DWorld();
+const OWN_WORLD_DIMENSION = { shells: '3D', golden: '3D', kaleido: '2D' };
+const own3DWorld = () => ({ shells: shellsWorld, golden: goldenWorld, kaleido: kaleidoWorld })[own3D] ?? null;
+const own3DActive = () => !!own3DWorld() && activeDimension === OWN_WORLD_DIMENSION[own3D];
 // 4D, 5D, 6D and the own 3D worlds each own their scene, taps, Lattice View and Skeleton.
 const isOwnWorldDimension = () => activeDimension === '4D' || qcWorlds.has(activeDimension) || own3DActive();
 const activeOwnWorld = () => (own3DActive() ? own3DWorld() : qcWorlds.get(activeDimension) ?? world4d);
@@ -819,6 +823,12 @@ const AUTO_ASSIGN_MATERIAL_BY_PIECE = {
   'lattice2d:hexagon': 'emerald',
   'lattice2d:kite': 'amethyst',
   'lattice2d:kagome': 'gold',
+  'kaleido:thick': 'gold',
+  'kaleido:thin': 'water',
+  'kaleido:pentagon': 'garnet',
+  'kaleido:triangle': 'emerald',
+  'kaleido:hexagon': 'amethyst',
+  'kaleido:square': 'citrine',
 };
 const AUTO_ASSIGN_PIECE_LABELS = {
   rd: 'RD (full block)',
@@ -843,6 +853,12 @@ const AUTO_ASSIGN_PIECE_LABELS = {
   'lattice2d:hexagon': '2D Hexagon',
   'lattice2d:kite': '2D Kite',
   'lattice2d:kagome': '2D Kagome',
+  'kaleido:thick': 'Kaleidoscope: Thick rhombus',
+  'kaleido:thin': 'Kaleidoscope: Thin rhombus',
+  'kaleido:pentagon': 'Kaleidoscope: Pentagon',
+  'kaleido:triangle': 'Kaleidoscope: Triangle',
+  'kaleido:hexagon': 'Kaleidoscope: Hexagon',
+  'kaleido:square': 'Kaleidoscope: Square',
 };
 
 // Piece colour mode (2026-09-26, parity with Polyhedraverse's Green /
@@ -2539,6 +2555,7 @@ async function init() {
     for (const [dim, w] of qcWorlds) reg(`world${dim.toLowerCase()}`, dim, () => w.snapshot(), (j) => w.restore(j));
     reg('worldshells', '3D', () => shellsWorld.snapshot(), (j) => shellsWorld.restore(j));
     reg('worldgolden', '3D', () => goldenWorld.snapshot(), (j) => goldenWorld.restore(j));
+    reg('worldkaleido', '2D', () => kaleidoWorld.snapshot(), (j) => kaleidoWorld.restore(j));
     updateUndoButton();
   }
 
@@ -2766,19 +2783,20 @@ async function init() {
     // combination -- both stay visible/reachable for as long as 2D is
     // the active dimension, regardless of which (angle, primitive) is
     // currently toggled.
-    dotMatrixMesh.visible = visible && activeDimension === '2D';
+    dotMatrixMesh.visible = visible && activeDimension === '2D' && !own3DActive();
     // Switch the others off first, so the active one's panel stays up.
     for (const [dim, w] of qcWorlds) if (dim !== activeDimension) w.setActive(false);
     world4d?.setActive(activeDimension === '4D');
     qcWorlds.get(activeDimension)?.setActive(true);
     shellsWorld?.setActive(own3DActive() && own3D === 'shells');
     goldenWorld?.setActive(own3DActive() && own3D === 'golden');
+    kaleidoWorld?.setActive(own3DActive() && own3D === 'kaleido');
     document.body.classList.toggle('qc-world-on', qcWorlds.has(activeDimension) || own3DActive());
     // 4D/6D: X-Ray and Spherical don't apply (the slider IS the X-Ray),
     // so their HUD faces go blank and untappable (direct decision).
     hudWheel?.setFaceHidden?.('xray-toggle', isOwnWorldDimension());
     hudWheel?.setFaceHidden?.('spherical-toggle', isOwnWorldDimension());
-    lattice2dPanel.classList.toggle('visible', activeDimension === '2D');
+    lattice2dPanel.classList.toggle('visible', activeDimension === '2D' && !own3DActive());
     updateRhomboAttachPanel();
     updateFirstPlacementTarget();
     updateUndoButton(); // each dimension has its own undo history
@@ -3385,12 +3403,12 @@ async function init() {
         // 2026-08-29 -- X-Ray stays reachable via the corner HUD wheel's
         // own #xray-toggle face and the Lab panel, so no wheel face
         // routes to it here any more.)
-        if (action === 'tool:shellsWorld' || action === 'tool:goldenWorld') {
-          own3D = action === 'tool:shellsWorld' ? 'shells' : 'golden';
+        if (action === 'tool:shellsWorld' || action === 'tool:goldenWorld' || action === 'tool:kaleidoWorld') {
+          own3D = { 'tool:shellsWorld': 'shells', 'tool:goldenWorld': 'golden', 'tool:kaleidoWorld': 'kaleido' }[action];
           wheel3D.close();
           applyDimensionVisibility();
           updateQuickSelect();
-          showHudPrompt(own3D === 'shells' ? 'Shells' : 'Golden Rhombohedra', 2500);
+          showHudPrompt({ shells: 'Shells', golden: 'Golden Rhombohedra', kaleido: 'Kaleidoscope' }[own3D], 2500);
           return;
         }
         if (own3D && (action?.startsWith('tool:pieceType:') || action === 'tool:cuboctaBuild')) {
@@ -4418,6 +4436,7 @@ async function init() {
     for (const w of qcWorlds.values()) w.setLatticeView(latticeQuickViewMode !== 'off');
     shellsWorld?.setLatticeView(latticeQuickViewMode !== 'off');
     goldenWorld?.setLatticeView(latticeQuickViewMode !== 'off');
+    kaleidoWorld?.setLatticeView(latticeQuickViewMode !== 'off');
     showHudPrompt(isOwnWorldDimension() ? `Lattice View: ${latticeQuickViewMode === 'off' ? 'Off.' : `every open slot one step past your ${activeDimension} build.`}` : `Lattice View: ${LATTICE_QUICK_VIEW_LABELS[latticeQuickViewMode]}`, 4500);
     await rebuildLatticeQuickView(); // also syncs the toggle buttons' own 'active' state -- see syncLatticeQuickViewActiveState
   }
@@ -4975,6 +4994,16 @@ async function init() {
     showHudPrompt,
     onChange: () => { if (historyRestorers.has('worldgolden')) recordHistory('worldgolden', goldenWorld.snapshot()); },
   });
+  kaleidoWorld = createKaleidoWorld({
+    scene,
+    // One edge length = the 2D hexagon's edge at 60°, so tiles look the same size.
+    edge: LATTICE2D_S / Math.sqrt(3),
+    colorFor: (tile, out) => out.copy(instanceColorFor({ material: tile.material }, `kaleido:${tile.shape}`)),
+    getMaterial: (shape) => currentMaterialFor(`kaleido:${shape}`),
+    isPainting: () => paint2d && activeDimension === '2D',
+    showHudPrompt,
+    onChange: () => { if (historyRestorers.has('worldkaleido')) recordHistory('worldkaleido', kaleidoWorld.snapshot()); },
+  });
   registerHistoryStores();
   createBuildController({
     renderer,
@@ -5522,6 +5551,7 @@ async function init() {
     for (const w of qcWorlds.values()) w.clear();
     shellsWorld?.clear();
     goldenWorld?.clear();
+    kaleidoWorld?.clear();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

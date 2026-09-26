@@ -36,6 +36,7 @@
 // out of scope steps visible" -- direct instruction. All wording goes
 // through i18n.js ('wiz.*' and 'cat.*'); lattice, piece and tile names
 // stay English.
+import { tileOnEdge } from '../geometry-extensions/kaleidoscope.js';
 import { mountWireframePreview } from './wireframe-preview.js';
 import { cellStructure, rotation4, matVec, project4, A4_FIRST } from '../geometry-extensions/lattice-4d.js';
 import { START_LATTICE_ANGLE, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
@@ -207,12 +208,26 @@ function edges5D() {
 // 'tool:pieceType:lattice2d:<primitiveId>', matching core/build.js's
 // own `lattice2d` param and render.js's dimensionAllowsMesh's own
 // 'lattice2d:' prefix check exactly.
-const LATTICE_FAMILIES_2D = LATTICE_PRIMITIVES.map((primitive) => ({
-  id: primitive.id,
-  label: primitive.label,
-  action: `tool:pieceType:lattice2d:${primitive.id}`,
-  preview: () => lattice2dEdges({ primitiveId: primitive.id, angleDeg: START_LATTICE_ANGLE.angleDeg }),
-}));
+const LATTICE_FAMILIES_2D = [
+  ...LATTICE_PRIMITIVES.map((primitive) => ({
+    id: primitive.id,
+    label: primitive.label,
+    action: `tool:pieceType:lattice2d:${primitive.id}`,
+    preview: () => lattice2dEdges({ primitiveId: primitive.id, angleDeg: START_LATTICE_ANGLE.angleDeg }),
+  })),
+  // Kaleidoscope, a 2D world of its own: previewed as the star of five
+  // thick rhombi it opens with (5 mirrors reflecting the first one).
+  { id: 'kaleido', label: 'Kaleidoscope', action: 'tool:kaleidoWorld', preview: kaleidoStarEdges },
+];
+function kaleidoStarEdges() {
+  const edges = [];
+  for (let j = 0; j < 5; j++) {
+    const v = tileOnEdge('thick', [0, 0], [Math.cos((2 * Math.PI * j) / 5) * 0.6, Math.sin((2 * Math.PI * j) / 5) * 0.6]);
+    v.forEach((p, i) => { const q = v[(i + 1) % v.length]; edges.push([[p[0], p[1], 0], [q[0], q[1], 0]]); });
+  }
+  edges.coin = true;
+  return edges;
+}
 
 // LATTICES_3D (wizard parity, 2026-09-24): direct decision -- "every
 // piece listed under the lattice it inhabits", wireframes in the wizard,

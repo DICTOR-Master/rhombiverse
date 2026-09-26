@@ -31,6 +31,11 @@ right-click) removes. The **User Guide** (in the app, or at
 - **2D** — five tiles (Parallelogram, Triangle, Hexagon, Kite, Kagome) on
   four lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular),
   plus the Rhombille pattern.
+  **Kaleidoscope**, a 2D world of its own: Penrose thick and thin rhombi,
+  pentagons, triangles, hexagons and squares reflected by a ring of 1–12
+  mirrors or a triangle of three; Attach or Loose (pieces slide into place
+  beside a partner), Turn, Spin, Shake, and a Safe mode that keeps the
+  rhombi to Penrose's matching rule. Paint recolours placed 2D pieces.
 - **3D** — every piece listed under the lattice it lives on:
   - **FCC**: rhombic dodecahedron (RD), Hemi RD, Hourglass, RD Quarter,
     Cube, Pyramid

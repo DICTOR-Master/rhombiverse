@@ -41,6 +41,8 @@ Para deshacer tu último cambio, toca **Undo** (↶, abajo a la derecha). Manten
 
 **2D:** baldosas Parallelogram (paralelogramo), Triangle (triángulo), Hexagon (hexágono), Kite (cometa) y Kagome, que se eligen en el panel superior, cada una con hasta cuatro ángulos de red (90°, 70,53°, 63,43° y 60°).
 
+**Caleidoscopio 2D** (Wizard → 2D → Kaleidoscope): un mundo propio. Construye con rombos de Penrose gruesos y finos, pentágonos, triángulos, hexágonos y cuadrados (todos con el mismo lado, así que cualquier par encaja lado con lado). Unir añade la pieza al otro lado del borde que tocas; Suelto la deja caer donde tocas y la desliza hasta encajar junto a una pareja. Los espejos convierten tu construcción en un caleidoscopio: un Anillo de 1 a 12 espejos, o un triángulo de tres (△60°, △45°, △30°) que se repite por la pantalla, ajustado con el deslizador. Girar rota tu construcción frente a los espejos, Rodar la mantiene girando, Agitar suelta todas las piezas y las deja asentarse en un nuevo dibujo. Seguro mantiene los rombos dentro de la regla de encaje de Penrose, así que siempre forman un verdadero teselado de Penrose; Guías muestra las líneas de los espejos; Lattice View muestra cada sitio donde cabe la pieza. En 2D, el botón del pincel (Paint) cambia el color de las piezas ya colocadas: actívalo, elige un color y toca una pieza.
+
 **3D:**
 
 | Red | Piezas |

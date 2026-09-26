@@ -25,6 +25,8 @@ jobs:
       - run: node scripts/verify-quasicrystal.mjs
       # Shells scene: RD splits, the scale ladder and shell sizes.
       - run: node scripts/verify-shells.mjs
+      # Kaleidoscope: shapes, mirrors, clipping, Penrose Safe rule.
+      - run: node scripts/verify-kaleidoscope.mjs
 
   catalogue:
     # Every 5D/6D catalogue entry really occurs and lands, at 9 phason and

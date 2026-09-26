@@ -39,6 +39,8 @@ To take back your last change, tap **Undo** (↶, bottom right). Hold it to scru
 
 **2D:** Parallelogram, Triangle, Hexagon, Kite and Kagome tiles, chosen from the panel at the top, each at up to four lattice angles (90°, 70.53°, 63.43° and 60°).
 
+**2D Kaleidoscope** (Wizard → 2D → Kaleidoscope): a world of its own. Build with thick and thin Penrose rhombi, pentagons, triangles, hexagons and squares (all the same edge length, so any two fit edge to edge). Attach adds the piece across the edge you tap; Loose drops it where you tap and lets it slide along until it lines up beside a partner. Mirrors reflect your build into a kaleidoscope: a Ring of 1 to 12 mirrors, or a triangle of three (△60°, △45°, △30°) repeating across the screen, set with the slider. Turn rotates your build against the mirrors, Spin keeps it turning, Shake loosens every piece and lets them settle into a new pattern. Safe keeps the rhombi to Penrose's matching rule, so they always form a true Penrose tiling; Guides shows the mirror lines; Lattice View shows every spot the piece fits. In any 2D build, the brush button (Paint) recolours pieces you've already placed: turn it on, pick a colour, tap a piece.
+
 **3D:**
 
 | Lattice | Pieces |
