@@ -1,6 +1,6 @@
 # Plan: Shells, a hull-building 3D scene
 
-Status: agreed design; stages 1-5 shipped. Delete this file once every stage
+Status: agreed design; stages 1-6 shipped. Delete this file once every stage
 has shipped (the code and the guide then describe the feature).
 
 ## The idea
@@ -172,7 +172,11 @@ outline over the build with missing and extra pieces marked, confirm to
 replace. Zoom in: a big RD opens into its pieces. Big and small pieces
 can then sit together, joined by the boundary pieces.
 
-**6. Views and Info.** World View (Colour, Translucent, Skeleton) and
+**6. Views and Info.** *Shipped:* the ring diagram in Info (one ring per
+shell in its colour; tap to hide or show; hidden rings dashed), a row per
+shell with Hide/Show and remove, and a palette choice (Hue steps default,
+Rainbow, Warm, Cool). Hiding outer shells stands in for X-Ray here (X-Ray
+stays off in own-worlds): it peels the hull to its inner bands. World View (Colour, Translucent, Skeleton) and
 X-Ray to see the bands inside. The **shell viewer** from the old Shells
 panel (restore reference 216ddbd, `renderRingDiagram`): concentric
 rings, one per shell in its colour, with counts; tap a ring to show,

@@ -189,6 +189,15 @@
     }
     .w4d-row button.active { background: rgba(120, 190, 255, 0.4); border-color: #7cf; color: #fff; }
     .hull-pick { color: #9cd; font: 12px system-ui, sans-serif; display: flex; align-items: center; gap: 6px; }
+    /* The Info box passes taps through to the scene; these take them. */
+    .qc-info .hull-rings circle, .qc-info .hull-palette select, .qc-info .hull-shell-row button { pointer-events: auto; }
+    .qc-info .hull-rings { display: block; margin: 6px auto; }
+    .qc-info .hull-ring-hint { opacity: 0.75; font-size: 11px; margin-top: 4px; }
+    .qc-info .hull-palette { display: block; margin: 2px 0 6px; }
+    .qc-info .hull-palette select { background: rgba(0,0,0,0.45); color: #cde; border: 1px solid rgba(255,255,255,0.25); border-radius: 5px; font: 12px system-ui, sans-serif; }
+    .qc-info .hull-shell-row { display: flex; align-items: center; gap: 5px; }
+    .qc-info .hull-shell-row button { background: rgba(0,0,0,0.4); color: #9cd; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; font: 11px system-ui, sans-serif; padding: 2px 7px; min-height: 26px; cursor: pointer; }
+    .qc-info .hull-swatch { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
     .hull-select {
       background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.25); color: #cde;
       font: 13px system-ui, sans-serif; border-radius: 6px; padding: 6px 8px; min-height: 32px;

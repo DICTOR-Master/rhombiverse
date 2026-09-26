@@ -259,6 +259,15 @@ const en = {
   'hull.prompt.merge': 'Merge: the gold outline is the big RD; ghosts show the small pieces it still needs. Confirm swaps in one big RD; pieces sticking out keep their outside parts.',
   'hull.prompt.mergeBlocked': 'Another big piece is in the way.',
   'hull.info.big': 'Big pieces',
+  'hull.info.ringHint': 'Tap a ring to hide or show that shell.',
+  'hull.info.palette': 'Colours:',
+  'hull.palette.hue': 'Hue steps',
+  'hull.palette.rainbow': 'Rainbow',
+  'hull.palette.warm': 'Warm',
+  'hull.palette.cool': 'Cool',
+  'hull.info.hide': 'Hide',
+  'hull.info.show': 'Show',
+  'hull.info.removeShell': 'Remove shell {n}',
 };
 
 const ja = {
@@ -479,6 +488,15 @@ const ja = {
   'hull.prompt.merge': '統合：金色の輪郭が大きな RD です。まだ足りない小さなピースは幽霊で表示されます。確定すると大きな RD 1 つに置き換わり、はみ出したピースは外側の部分が残ります。',
   'hull.prompt.mergeBlocked': '別の大きなピースが邪魔をしています。',
   'hull.info.big': '大きなピース',
+  'hull.info.ringHint': 'リングをタップすると、そのシェルを隠したり表示したりできます。',
+  'hull.info.palette': '色：',
+  'hull.palette.hue': '色相ステップ',
+  'hull.palette.rainbow': '虹色',
+  'hull.palette.warm': '暖色',
+  'hull.palette.cool': '寒色',
+  'hull.info.hide': '隠す',
+  'hull.info.show': '表示',
+  'hull.info.removeShell': 'シェル {n} を取り除く',
 };
 
 const es = {
@@ -699,6 +717,15 @@ const es = {
   'hull.prompt.merge': 'Fusionar: el contorno dorado es el RD grande; los fantasmas muestran las piezas pequeñas que aún le faltan. Confirmar pone un solo RD grande; las piezas que sobresalen conservan su parte exterior.',
   'hull.prompt.mergeBlocked': 'Otra pieza grande estorba.',
   'hull.info.big': 'Piezas grandes',
+  'hull.info.ringHint': 'Toca un anillo para ocultar o mostrar esa capa.',
+  'hull.info.palette': 'Colores:',
+  'hull.palette.hue': 'Pasos de tono',
+  'hull.palette.rainbow': 'Arcoíris',
+  'hull.palette.warm': 'Cálidos',
+  'hull.palette.cool': 'Fríos',
+  'hull.info.hide': 'Ocultar',
+  'hull.info.show': 'Mostrar',
+  'hull.info.removeShell': 'Quitar la capa {n}',
 };
 
 const fr = {
@@ -919,6 +946,15 @@ const fr = {
   'hull.prompt.merge': 'Fusionner : le contour doré est le grand RD ; les fantômes montrent les petites pièces qui lui manquent. Confirmer le remplace par un seul grand RD ; les pièces qui dépassent gardent leur partie extérieure.',
   'hull.prompt.mergeBlocked': 'Une autre grande pièce gêne.',
   'hull.info.big': 'Grandes pièces',
+  'hull.info.ringHint': 'Touchez un anneau pour masquer ou afficher cette couche.',
+  'hull.info.palette': 'Couleurs :',
+  'hull.palette.hue': 'Pas de teinte',
+  'hull.palette.rainbow': 'Arc-en-ciel',
+  'hull.palette.warm': 'Chaudes',
+  'hull.palette.cool': 'Froides',
+  'hull.info.hide': 'Masquer',
+  'hull.info.show': 'Afficher',
+  'hull.info.removeShell': 'Retirer la couche {n}',
 };
 
 const ko = {
@@ -1139,6 +1175,15 @@ const ko = {
   'hull.prompt.merge': '합치기: 금색 윤곽이 큰 RD입니다. 아직 필요한 작은 조각은 유령으로 보입니다. 확인하면 큰 RD 하나로 바뀌고, 삐져나온 조각은 바깥 부분이 남습니다.',
   'hull.prompt.mergeBlocked': '다른 큰 조각이 가로막고 있습니다.',
   'hull.info.big': '큰 조각',
+  'hull.info.ringHint': '고리를 탭하면 그 층을 숨기거나 보여 줍니다.',
+  'hull.info.palette': '색:',
+  'hull.palette.hue': '색상 단계',
+  'hull.palette.rainbow': '무지개',
+  'hull.palette.warm': '따뜻한 색',
+  'hull.palette.cool': '차가운 색',
+  'hull.info.hide': '숨기기',
+  'hull.info.show': '보이기',
+  'hull.info.removeShell': '{n}층 없애기',
 };
 
 const zh = {
@@ -1359,6 +1404,15 @@ const zh = {
   'hull.prompt.merge': '合并：金色轮廓是大 RD；虚影显示它还缺的小部件。确认后换成一个大 RD，伸出去的部件保留外侧部分。',
   'hull.prompt.mergeBlocked': '另一个大部件挡住了。',
   'hull.info.big': '大部件',
+  'hull.info.ringHint': '轻点一个环即可隐藏或显示那一层。',
+  'hull.info.palette': '颜色：',
+  'hull.palette.hue': '色相步进',
+  'hull.palette.rainbow': '彩虹',
+  'hull.palette.warm': '暖色',
+  'hull.palette.cool': '冷色',
+  'hull.info.hide': '隐藏',
+  'hull.info.show': '显示',
+  'hull.info.removeShell': '移除第 {n} 层',
 };
 
 const ru = {
@@ -1579,6 +1633,15 @@ const ru = {
   'hull.prompt.merge': 'Объединение: золотой контур — большой RD; призраки показывают недостающие маленькие детали. «Подтвердить» заменит их одним большим RD; у выступающих деталей останутся внешние части.',
   'hull.prompt.mergeBlocked': 'Мешает другая большая деталь.',
   'hull.info.big': 'Большие детали',
+  'hull.info.ringHint': 'Коснитесь кольца, чтобы скрыть или показать этот слой.',
+  'hull.info.palette': 'Цвета:',
+  'hull.palette.hue': 'Шаги оттенка',
+  'hull.palette.rainbow': 'Радуга',
+  'hull.palette.warm': 'Тёплые',
+  'hull.palette.cool': 'Холодные',
+  'hull.info.hide': 'Скрыть',
+  'hull.info.show': 'Показать',
+  'hull.info.removeShell': 'Убрать слой {n}',
 };
 
 const I18N = { en, ja, es, fr, ko, zh, ru };

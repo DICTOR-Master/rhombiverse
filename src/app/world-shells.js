@@ -41,7 +41,16 @@ const lang = () => getSettings().language;
 const keyOf = (c) => c.join(',');
 // The old Shells panel's colours: the centre white, shell n a hue step of
 // 0.15 round the colour wheel.
-const shellColor = (n, out = new THREE.Color()) => (n === 0 ? out.setRGB(1, 1, 1) : out.setHSL((n * 0.15) % 1, 0.65, 0.55));
+// Band colours by palette (the centre is always white). 'hue' is the old
+// Shells panel's step of 0.15 round the colour wheel, the default.
+const PALETTES = {
+  hue: (n) => [(n * 0.15) % 1, 0.65, 0.55],
+  rainbow: (n) => [((n - 1) * 0.083) % 1, 0.75, 0.55],
+  warm: (n) => [((n - 1) * 0.029) % 0.16, 0.8, n % 2 ? 0.52 : 0.64],
+  cool: (n) => [0.45 + (((n - 1) * 0.047) % 0.28), 0.6, n % 2 ? 0.5 : 0.63],
+};
+const PALETTE_IDS = Object.keys(PALETTES);
+const shellColor = (n, out = new THREE.Color(), palette = 'hue') => (n === 0 ? out.setRGB(1, 1, 1) : out.setHSL(...PALETTES[palette](n)));
 const isCell = (c) => Array.isArray(c) && c.length === 3 && c.every(Number.isInteger) && (c[0] + c[1] + c[2]) % 2 === 0;
 
 export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = () => {}, fitView = () => {} }) {
@@ -58,7 +67,9 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
   const bigKey = (k, c) => `${k}|${c.join(',')}`;
   const SCALES = [1, 2, 3, 4];
   let centre = null; // the first piece's cell
-  const view = { hull: 'steps', mode: 'build', piece: 'whole', trim: false, scale: 1 };
+  const view = { hull: 'steps', mode: 'build', piece: 'whole', trim: false, scale: 1, palette: 'hue', hidden: [] };
+  const colorOfShell = (n, out) => shellColor(n, out, view.palette);
+  const isHidden = (n) => view.hidden.includes(n);
   let pendingMerge = null; // { k, c }: the big RD's outline, shown before Confirm
   let target = null; // Fragment mode: the targeted cell's key
   let active = false;
@@ -118,6 +129,8 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
       if (SPLIT_IDS.includes(data.view?.piece)) view.piece = data.view.piece;
       view.trim = data.view?.trim === true;
       if (SCALES.includes(data.view?.scale)) view.scale = data.view.scale;
+      if (PALETTE_IDS.includes(data.view?.palette)) view.palette = data.view.palette;
+      if (Array.isArray(data.view?.hidden)) view.hidden = data.view.hidden.filter(Number.isInteger);
     } catch { /* corrupt or blocked storage: start empty */ }
   }
   function save() {
@@ -208,7 +221,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     for (const k of drawn) {
       const cell = cells.get(k).c;
       const n = shell.get(k);
-      shellColor(n, c);
+      colorOfShell(n, c);
       if (skeleton) e.copy(c); else e.setHex(EDGE_COLOR);
       NEIGHBOR_OFFSETS.forEach(([dx, dy, dz], f) => {
         const nk = keyOf([cell[0] + dx, cell[1] + dy, cell[2] + dz]);
@@ -229,7 +242,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     const c = new THREE.Color(), e = new THREE.Color();
     for (const { key: k, part: pi, solid, big } of items) {
       const cell = big ? bigs.get(k).c : cells.get(k).c;
-      shellColor(big ? shellOf(cell.map((x) => x * bigs.get(k).k)) : shell.get(k), c);
+      colorOfShell(big ? shellOf(cell.map((x) => x * bigs.get(k).k)) : shell.get(k), c);
       if (skeleton) e.copy(c); else e.setHex(EDGE_COLOR);
       for (const loop of solid.faces) {
         const q = loop.map((i) => solid.verts[i]);
@@ -312,6 +325,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
       const full = new Set();
       const items = [];
       for (const [k, { c, parts }] of cells) {
+        if (isHidden(shell.get(k))) continue;
         if (!parts) {
           const cut = planes ? wholeCut(planes, c) : 'inside';
           if (cut === 'inside') full.add(k);
@@ -326,6 +340,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
       }
       // Big pieces: drawn whole (not trimmed).
       for (const [k, b] of bigs) {
+        if (isHidden(shellOf(b.c.map((x) => x * b.k)))) continue;
         if (!b.parts) items.push({ key: k, part: -1, solid: pieceSolid('whole', 0, b.c, b.k), big: true });
         else b.parts.forEach((q, pi) => items.push({ key: k, part: pi, solid: pieceSolid(q.split, q.g, b.c, b.k), big: true }));
       }
@@ -650,8 +665,19 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
       const total = hullShell(view.hull, n, centre).length;
       const got = have.get(n) ?? 0;
       if (got === total && complete === n - 1) complete = n;
-      rows.push(t('hull.info.shellRow', L, { n, have: got, total }));
+      rows.push({ n, text: t('hull.info.shellRow', L, { n, have: got, total }) });
     }
+    // The old Shells panel's ring diagram: one ring per shell in its colour,
+    // tap to hide or show it (hidden rings dashed).
+    const size = 150, R = size / 2 - 4;
+    const hex = (n) => `#${colorOfShell(n, new THREE.Color()).getHexString()}`;
+    const rings = [];
+    for (let n = top; n >= 0; n--) {
+      const rad = ((n + 1) / (top + 1)) * R;
+      rings.push(`<circle cx="${size / 2}" cy="${size / 2}" r="${rad.toFixed(1)}" fill="${isHidden(n) ? 'none' : hex(n)}" stroke="${isHidden(n) ? hex(n) : 'rgba(0,0,0,0.5)'}" stroke-dasharray="${isHidden(n) ? '4 3' : ''}" data-shell-toggle="${n}" style="cursor:pointer"><title>${t('hull.info.shellRow', L, { n, have: have.get(n) ?? 0, total: n ? hullShell(view.hull, n, centre).length : 1 })}</title></circle>`);
+    }
+    const ringSvg = `<svg class="hull-rings" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="${t('hull.info.ringHint', L)}">${rings.join('')}</svg>`;
+    const palette = `<label class="hull-palette">${t('hull.info.palette', L)} <select data-palette>${PALETTE_IDS.map((id) => `<option value="${id}"${id === view.palette ? ' selected' : ''}>${t(`hull.palette.${id}`, L)}</option>`).join('')}</select></label>`;
     info.innerHTML = [
       row(t('hull.info.hull', L), t(HULL_LABEL_KEY[view.hull], L)),
       row(t('hull.info.centre', L), `(${centre.join(', ')})`),
@@ -659,9 +685,31 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
       fragments ? row(t('hull.info.fragments', L), String(fragments)) : '',
       bigs.size ? row(t('hull.info.big', L), [...bigs.values()].map((b) => `×${b.k}`).join(', ')) : '',
       row(t('hull.info.shells', L), t('hull.info.complete', L, { n: complete })),
-      ...rows.slice(-INFO_SHELL_ROWS).map((r) => `<div class="hull-shell-row">${r}</div>`),
+      `<div class="hull-ring-hint">${t('hull.info.ringHint', L)}</div>`,
+      ringSvg,
+      palette,
+      ...rows.slice(-INFO_SHELL_ROWS).map((r) => `<div class="hull-shell-row"><span class="hull-swatch" style="background:${hex(r.n)}"></span>${r.text}`
+        + ` <button type="button" data-shell-toggle="${r.n}">${t(isHidden(r.n) ? 'hull.info.show' : 'hull.info.hide', L)}</button>`
+        + ` <button type="button" data-shell-remove="${r.n}" title="${t('hull.info.removeShell', L, { n: r.n })}">✕</button></div>`),
     ].join('');
   }
+  info.addEventListener('click', (e) => {
+    const toggle = e.target.closest('[data-shell-toggle]');
+    const removeBtn = e.target.closest('[data-shell-remove]');
+    if (toggle) {
+      const n = Number(toggle.dataset.shellToggle);
+      view.hidden = isHidden(n) ? view.hidden.filter((x) => x !== n) : [...view.hidden, n];
+      save(); rebuild();
+    } else if (removeBtn) {
+      const n = Number(removeBtn.dataset.shellRemove);
+      for (const [k, { c }] of cells) if (shellOf(c) === n) { cells.delete(k); if (target === k) target = null; }
+      if (!cells.size) centre = null;
+      commit();
+    }
+  });
+  info.addEventListener('change', (e) => {
+    if (e.target.matches('[data-palette]') && PALETTE_IDS.includes(e.target.value)) { view.palette = e.target.value; save(); rebuild(); }
+  });
 
   // ---- panel ----
   const panel = document.createElement('div');
