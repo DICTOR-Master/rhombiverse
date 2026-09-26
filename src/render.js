@@ -770,6 +770,7 @@ function sphericalClassificationFor(scale) {
 // this pass (falling back to MATERIAL_COLORS.base). Same 14 colors,
 // same values -- only the human-facing label changed.
 const MATERIAL_COLORS = {
+  cyan: 0x22c3e6,
   base: 0x8899aa,
   garnet: 0x8b2e2e,
   ferrostone: 0x5a5a5a,
@@ -790,23 +791,11 @@ function materialColor(material) {
   return new THREE.Color(MATERIAL_COLORS[material] ?? MATERIAL_COLORS.base);
 }
 
-// Auto-assign (direct request 2026-09-02, "By piece type"): when the
-// #auto-assign-color checkbox is on, each piece type places with its
-// own material instead of whatever #color-select currently shows --
-// see currentMaterialFor() below, wired into the 3 piece-placing
-// controllers only (main build, Cuboctahedron, octahedron-gap), not the
-// Recolor tool or Sculpture/AI material assignment, which stay explicit
-// picks. 'cubocta' is a virtual key -- Piece:CO has no entry of its own
-// in #piece-type-select (it's a separate mode), so its own getMaterial
-// call site passes this key directly.
-//
-// These are DEFAULTS only -- direct follow-up 2026-09-02 ("autoselected
-// colors for all shapes adjustable"): the real, live-in-effect mapping
-// is autoAssignOverrides (below), user-editable via the per-piece
-// dropdowns #auto-assign-colors-row builds, persisted to
-// localStorage. This object is what a dropdown falls back to before the
-// user has ever touched it for that piece, and what Reset (if added
-// later) would restore.
+// Each piece type's colour in the Type colour mode (see COLOR_MODES
+// below). 'cubocta' is a virtual key: the Cuboctahedron is a separate
+// mode, not a #piece-type-select entry, so its placer passes it directly.
+// These are defaults: the live mapping is autoAssignOverrides, edited in
+// the Type list (#auto-assign-colors-row) and saved to localStorage.
 const AUTO_ASSIGN_MATERIAL_BY_PIECE = {
   rd: 'base',
   cube: 'ferrostone',
@@ -821,6 +810,11 @@ const AUTO_ASSIGN_MATERIAL_BY_PIECE = {
   hemi3: 'base',
   hemi4: 'base',
   hemiTri: 'base',
+  elongdodeca: 'rose-quartz',
+  hexprism: 'water',
+  rhombohedra: 'glassite',
+  pyrochlore: 'emerald',
+  lattice2d: 'base',
 };
 const AUTO_ASSIGN_PIECE_LABELS = {
   rd: 'RD (full block)',
@@ -836,8 +830,36 @@ const AUTO_ASSIGN_PIECE_LABELS = {
   hemi3: 'Hemi RD: Corner Cluster',
   hemi4: 'Hemi RD: Band Cluster',
   hemiTri: 'Hemi RD: Triangle Cluster',
+  elongdodeca: 'Elongated Dodecahedron',
+  hexprism: 'Hexagonal Prism',
+  rhombohedra: 'Rhombohedra',
+  pyrochlore: 'Pyrochlore (3D Kagome)',
+  lattice2d: '2D tiles',
 };
+
+// Piece colour mode (2026-09-26, parity with Polyhedraverse's Green /
+// Family / Pick): 'cyan' shows every piece cyan (the default), 'type'
+// shows each piece in its piece type's colour (live, from the Type
+// list), 'pick' shows each piece's own saved colour (cell.material).
+// Only 'pick' reads stored colours, so switching never loses them.
+const COLOR_MODES = ['cyan', 'type', 'pick'];
 const AUTO_ASSIGN_STORAGE_KEY = 'rhombiverse-auto-assign-materials';
+const COLOR_MODE_STORAGE_KEY = 'rhombiverse-color-mode';
+// Read from storage here, not in the settings setup, because the worlds
+// are first drawn before that runs. The setup then points typeMaterial at
+// the live, editable Type list.
+const colorView = {
+  mode: (() => { try { const m = localStorage.getItem(COLOR_MODE_STORAGE_KEY); return COLOR_MODES.includes(m) ? m : 'cyan'; } catch { return 'cyan'; } })(),
+  typeMaterial: (() => {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(AUTO_ASSIGN_STORAGE_KEY)) ?? {}; } catch { /* defaults */ }
+    return (type) => saved[type] ?? AUTO_ASSIGN_MATERIAL_BY_PIECE[type] ?? 'base';
+  })(),
+};
+/** A stored colour as currently shown: the 4D/5D/6D worlds only store a colour, so Cyan applies and Type/Pick show what was placed. */
+function viewMaterialColor(material) {
+  return colorView.mode === 'cyan' ? new THREE.Color(MATERIAL_COLORS.cyan) : materialColor(material);
+}
 
 const _shellColorCache = new Map();
 function shellTint(shell) {
@@ -850,9 +872,11 @@ function shellTint(shell) {
 
 const GENERATED_TINT = new THREE.Color(0x2a0a30);
 
-function instanceColorFor(cell) {
+function instanceColorFor(cell, type) {
   if (cell.generatedByBlackHole) return GENERATED_TINT;
-  const base = materialColor(cell.material);
+  const base = colorView.mode === 'cyan' ? new THREE.Color(MATERIAL_COLORS.cyan)
+    : colorView.mode === 'type' && type ? materialColor(colorView.typeMaterial(type))
+    : materialColor(cell.material);
   if (!cell.shell) return base;
   return base.clone().lerp(shellTint(cell.shell), 0.35);
 }
@@ -884,7 +908,7 @@ function rebuildInstances(mesh, world) {
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
     m.makeTranslation(wx, wy, wz);
     mesh.setMatrixAt(i, m);
-    mesh.setColorAt(i, instanceColorFor(cell));
+    mesh.setColorAt(i, instanceColorFor(cell, 'rd'));
   });
   mesh.count = cellOrder.length;
   mesh.instanceMatrix.needsUpdate = true;
@@ -962,7 +986,7 @@ function buildPartialCellObject3D(cell, key) {
   let object3D;
   if (!hasCube(cell)) {
     const group = new THREE.Group();
-    for (const mesh of buildPyramidOnlyMeshes(cell, instanceColorFor(cell))) {
+    for (const mesh of buildPyramidOnlyMeshes(cell, instanceColorFor(cell, 'pyramid'))) {
       mesh.userData.cellKey = key;
       group.add(mesh);
     }
@@ -970,7 +994,7 @@ function buildPartialCellObject3D(cell, key) {
   } else {
     const geom = buildPartialCellGeometry(effectivePyramids(cell));
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
-    mat.color.copy(instanceColorFor(cell));
+    mat.color.copy(instanceColorFor(cell, 'cube'));
     object3D = new THREE.Mesh(geom, mat);
   }
   const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
@@ -1071,7 +1095,7 @@ function rebuildInterstitialMeshes(store) {
     if (interstitialMeshes.has(key)) continue;
     const geom = buildInterstitialGeometry(cell.verts, SCALE);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
-    mat.color.copy(instanceColorFor(cell));
+    mat.color.copy(instanceColorFor(cell, cell.verts.length === 4 ? 'idis' : 'ioct'));
     const m = new THREE.Mesh(geom, mat);
     m.userData.key = key;
     interstitialGroup.add(m);
@@ -1167,7 +1191,7 @@ function rebuildHemisphereMeshes(store) {
     if (hemisphereMeshes.has(key)) continue;
     const geom = buildHemisphereGeometry(piece, SCALE);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
-    mat.color.copy(instanceColorFor(piece));
+    mat.color.copy(instanceColorFor(piece, piece.type));
     const m = new THREE.Mesh(geom, mat);
     m.userData.key = key;
     hemisphereGroup.add(m);
@@ -1182,7 +1206,7 @@ function rebuildBCCInstances(bccMesh, bccWorld) {
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
     m.makeTranslation(wx, wy, wz);
     bccMesh.setMatrixAt(i, m);
-    bccMesh.setColorAt(i, instanceColorFor(cell));
+    bccMesh.setColorAt(i, instanceColorFor(cell, 'to'));
   });
   bccMesh.count = bccCellOrder.length;
   bccMesh.instanceMatrix.needsUpdate = true;
@@ -1202,7 +1226,7 @@ function rebuildElongDodecaInstances(elongDodecaMesh, elongDodecaWorld) {
     const [wx, wy, wz] = elongDodecaCellToWorld(cell.x, cell.y, cell.z, SCALE);
     m.makeTranslation(wx, wy, wz);
     elongDodecaMesh.setMatrixAt(i, m);
-    elongDodecaMesh.setColorAt(i, instanceColorFor(cell));
+    elongDodecaMesh.setColorAt(i, instanceColorFor(cell, 'elongdodeca'));
   });
   elongDodecaMesh.count = elongDodecaCellOrder.length;
   elongDodecaMesh.instanceMatrix.needsUpdate = true;
@@ -1219,7 +1243,7 @@ function rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld) {
     const [wx, wy, wz] = hexCellToWorld(cell.x, cell.y, cell.z, HEX_PRISM_R, HEX_PRISM_H);
     m.makeTranslation(wx, wy, wz);
     hexPrismMesh.setMatrixAt(i, m);
-    hexPrismMesh.setColorAt(i, instanceColorFor(cell));
+    hexPrismMesh.setColorAt(i, instanceColorFor(cell, 'hexprism'));
   });
   hexPrismMesh.count = hexPrismCellOrder.length;
   hexPrismMesh.instanceMatrix.needsUpdate = true;
@@ -1305,7 +1329,7 @@ function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangeme
           m.makeScale(0, 0, 0);
         }
         classMesh.setMatrixAt(i, m);
-        classMesh.setColorAt(i, instanceColorFor(cell));
+        classMesh.setColorAt(i, instanceColorFor(cell, 'lattice2d'));
       });
       classMesh.count = cellOrder.length;
       classMesh.instanceMatrix.needsUpdate = true;
@@ -1333,7 +1357,7 @@ function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangeme
         m.makeTranslation(wx, wy, wz);
       }
       mesh.setMatrixAt(i, m);
-      mesh.setColorAt(i, instanceColorFor(cell));
+      mesh.setColorAt(i, instanceColorFor(cell, 'lattice2d'));
     });
     mesh.count = cellOrder.length;
     mesh.instanceMatrix.needsUpdate = true;
@@ -1353,7 +1377,7 @@ function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangeme
       instances.forEach(({ world: [wx, wy], owner }, i) => {
         cm.makeTranslation(wx, wy, 0);
         companionMesh.setMatrixAt(i, cm);
-        companionMesh.setColorAt(i, instanceColorFor(cellOrder[owner]).clone().lerp(KAGOME_TRIANGLE_LIGHTEN_TO, KAGOME_TRIANGLE_LIGHTEN));
+        companionMesh.setColorAt(i, instanceColorFor(cellOrder[owner], 'lattice2d').clone().lerp(KAGOME_TRIANGLE_LIGHTEN_TO, KAGOME_TRIANGLE_LIGHTEN));
       });
       lattice2dCompanionOwners.set(companionMesh, instances.map((inst) => inst.owner));
       companionMesh.count = instances.length;
@@ -1381,7 +1405,7 @@ function rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld) {
   rhombohedraCellOrder.forEach((cell, i) => {
     m.copy(rhombohedraInstanceMatrix(cell));
     rhombohedraMesh.setMatrixAt(i, m);
-    rhombohedraMesh.setColorAt(i, instanceColorFor(cell));
+    rhombohedraMesh.setColorAt(i, instanceColorFor(cell, 'rhombohedra'));
   });
   rhombohedraMesh.count = rhombohedraCellOrder.length;
   rhombohedraMesh.instanceMatrix.needsUpdate = true;
@@ -1404,7 +1428,7 @@ function rebuildPyrochloreInstances(ttMeshes, tetMeshes, pyrochloreWorld) {
       const [wx, wy, wz] = pyrochloreCellToWorld(cell.x, cell.y, cell.z, PYROCHLORE_S);
       m.makeTranslation(wx, wy, wz);
       ttMesh.setMatrixAt(i, m);
-      ttMesh.setColorAt(i, instanceColorFor(cell));
+      ttMesh.setColorAt(i, instanceColorFor(cell, 'pyrochlore'));
     });
     ttMesh.count = order.length;
     ttMesh.instanceMatrix.needsUpdate = true;
@@ -1421,7 +1445,7 @@ function rebuildPyrochloreInstances(ttMeshes, tetMeshes, pyrochloreWorld) {
       const [wx, wy, wz] = pyrochloreCellToWorld(center[0], center[1], center[2], PYROCHLORE_S);
       m.makeTranslation(wx, wy, wz);
       tetMesh.setMatrixAt(i, m);
-      tetMesh.setColorAt(i, instanceColorFor(cell).clone().lerp(KAGOME_TRIANGLE_LIGHTEN_TO, KAGOME_TRIANGLE_LIGHTEN));
+      tetMesh.setColorAt(i, instanceColorFor(cell, 'pyrochlore').clone().lerp(KAGOME_TRIANGLE_LIGHTEN_TO, KAGOME_TRIANGLE_LIGHTEN));
     });
     pyrochloreTetInstances.set(tetMesh, list.map(({ center, cell }) => ({ kind, center, cell })));
     tetMesh.count = list.length;
@@ -1440,7 +1464,7 @@ function rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld) {
     const [wx, wy, wz] = cellToWorld(cell.x, cell.y, cell.z, SCALE);
     m.makeTranslation(wx, wy, wz);
     cuboctaMesh.setMatrixAt(i, m);
-    cuboctaMesh.setColorAt(i, instanceColorFor(cell));
+    cuboctaMesh.setColorAt(i, instanceColorFor(cell, 'cubocta'));
   });
   cuboctaMesh.count = cuboctaCellOrder.length;
   cuboctaMesh.instanceMatrix.needsUpdate = true;
@@ -1457,7 +1481,7 @@ function rebuildOctGapInstances(octGapMesh, octGapWorld) {
     const [wx, wy, wz] = octGapCellToWorld(cell.x, cell.y, cell.z, SCALE);
     m.makeTranslation(wx, wy, wz);
     octGapMesh.setMatrixAt(i, m);
-    octGapMesh.setColorAt(i, instanceColorFor(cell));
+    octGapMesh.setColorAt(i, instanceColorFor(cell, 'octahedron'));
   });
   octGapMesh.count = octGapCellOrder.length;
   octGapMesh.instanceMatrix.needsUpdate = true;
@@ -2434,6 +2458,13 @@ async function init() {
   // created). Baselines are each store's state at that moment; a restore
   // replaces the store and runs its own change handler, whose persist()
   // call is ignored by history while historyRestoring is set.
+  // Redraws every piece in its current colour (a colour-mode or Type
+  // colour change): each store re-renders through its own restore, the
+  // same path undo uses. Nothing changes, so no undo step is recorded.
+  function repaintAllPieces() {
+    for (const { get, restore } of historyRestorers.values()) restore(get());
+  }
+
   function registerHistoryStores() {
     const reg = (historyKey, dim, get, restore) => {
       historyRestorers.set(historyKey, { dim, restore, get });
@@ -3202,7 +3233,7 @@ async function init() {
       } else if (active) {
         if (!partialAddedSphereMeshes.has(key)) {
           const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
-          mat.color.copy(instanceColorFor(entry.cell));
+          mat.color.copy(instanceColorFor(entry.cell, 'rd'));
           const sphereMesh = new THREE.Mesh(partialSphereGeometryFor(entry.cell), mat);
           entry.mesh.children.forEach((c) => { c.visible = false; });
           entry.mesh.add(sphereMesh);
@@ -4350,7 +4381,6 @@ async function init() {
   updateLatticeQuickViewIcon();
 
   const materialSelect = document.getElementById('color-select');
-  const autoAssignMaterialCheckbox = document.getElementById('auto-assign-color');
 
   // Per-piece overrides on top of AUTO_ASSIGN_MATERIAL_BY_PIECE's own
   // defaults -- direct follow-up 2026-09-02 ("autoselected colors for
@@ -4374,12 +4404,14 @@ async function init() {
   // currently selected -- same "sticky until you change it again"
   // model, just reachable from the dropdown the user is actually
   // looking at, not only the Settings-panel per-piece list.
+  // The colour a new piece is saved with: what the current colour mode
+  // shows, so switching to Pick later shows each piece as it was placed.
   function currentMaterialFor(pieceType) {
-    if (autoAssignMaterialCheckbox?.checked) {
-      return autoAssignOverrides[pieceType] ?? AUTO_ASSIGN_MATERIAL_BY_PIECE[pieceType] ?? materialSelect.value;
-    }
+    if (colorView.mode === 'cyan') return 'cyan';
+    if (colorView.mode === 'type') return autoAssignOverrides[pieceType] ?? AUTO_ASSIGN_MATERIAL_BY_PIECE[pieceType] ?? materialSelect.value;
     return materialSelect.value;
   }
+  colorView.typeMaterial = (type) => autoAssignOverrides[type] ?? AUTO_ASSIGN_MATERIAL_BY_PIECE[type] ?? 'base';
 
   // Builds the "Auto-assign colors" mini-panel -- one label + color
   // dropdown per piece type, options cloned straight from #color-
@@ -4402,25 +4434,32 @@ async function init() {
       select.addEventListener('change', () => {
         autoAssignOverrides[pieceType] = select.value;
         try { localStorage.setItem(AUTO_ASSIGN_STORAGE_KEY, JSON.stringify(autoAssignOverrides)); } catch { /* best-effort only */ }
+        repaintAllPieces();
       });
       wrap.append(span, select);
       autoAssignMaterialsRow.appendChild(wrap);
     }
   }
-  autoAssignMaterialCheckbox?.addEventListener('change', () => {
-    if (autoAssignMaterialsRow) autoAssignMaterialsRow.style.display = autoAssignMaterialCheckbox.checked ? 'flex' : 'none';
-  });
-  // Auto-assign now defaults ON (direct instruction 2026-09-02, "default
-  // auto assign color with manual override" -- the checkbox's own HTML
-  // `checked` attribute already covers a fresh page load; this covers
-  // the row's own visibility matching that same default, since it
-  // otherwise only syncs on the checkbox's 'change' event). Manual
-  // override is still one click away either way -- uncheck for the
-  // plain color picker, or use the per-piece dropdowns above without
-  // unchecking anything.
-  if (autoAssignMaterialsRow && autoAssignMaterialCheckbox) {
-    autoAssignMaterialsRow.style.display = autoAssignMaterialCheckbox.checked ? 'flex' : 'none';
+  // Cyan / Type / Pick (see COLOR_MODES). Only the controls the mode
+  // uses are shown: the Type list in Type, the colour picker in Pick.
+  const colorModeButtons = document.querySelectorAll('.color-mode-btn');
+  const colorRow = document.getElementById('color-row');
+  function showColorMode() {
+    colorModeButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.colorMode === colorView.mode));
+    if (colorRow) colorRow.style.display = colorView.mode === 'pick' ? '' : 'none';
+    if (autoAssignMaterialsRow) autoAssignMaterialsRow.style.display = colorView.mode === 'type' ? 'flex' : 'none';
   }
+  function setColorMode(mode) {
+    if (!COLOR_MODES.includes(mode) || mode === colorView.mode) return;
+    colorView.mode = mode;
+    try { localStorage.setItem(COLOR_MODE_STORAGE_KEY, mode); } catch { /* best-effort only */ }
+    showColorMode();
+    repaintAllPieces();
+    refreshHudIndicator?.();
+  }
+  materialSelect.value = currentMaterialFor(document.getElementById('piece-type-select')?.value);
+  colorModeButtons.forEach((btn) => btn.addEventListener('click', () => setColorMode(btn.dataset.colorMode)));
+  showColorMode();
 
   const DUALIZE_RADIUS = 3; // shells around the clicked cell that Dualize previews
 
@@ -4512,7 +4551,7 @@ async function init() {
       }
     }
     if (quickMaterialEl) {
-      const hex = `#${materialColor(materialSelect.value).getHexString()}`;
+      const hex = `#${materialColor(currentMaterialFor(document.getElementById('piece-type-select').value)).getHexString()}`;
       quickMaterialEl.innerHTML = iconFrame(swatchMark(hex), { title: 'Material' });
     }
   }
@@ -4543,7 +4582,8 @@ async function init() {
   // materialSelect.value already IS the live color (currentMaterialFor's
   // own plain fallback), nothing extra to persist.
   materialSelect.addEventListener('change', () => {
-    if (!autoAssignMaterialCheckbox?.checked) return;
+    if (colorView.mode === 'cyan') { setColorMode('pick'); return; }
+    if (colorView.mode !== 'type') return;
     const pieceType = document.getElementById('piece-type-select')?.value;
     if (!pieceType) return;
     autoAssignOverrides[pieceType] = materialSelect.value;
@@ -4558,6 +4598,7 @@ async function init() {
         select.value = materialSelect.value;
       }
     }
+    repaintAllPieces();
   });
   // Real bug, caught live 2026-08-31 ("picking CO... disphenoid coming
   // instead", eventually pinned down to "picker shape is flat
@@ -4814,7 +4855,7 @@ async function init() {
 
   world4d = createWorld4D({
     scene,
-    materialColor,
+    materialColor: viewMaterialColor,
     getMaterial: () => currentMaterialFor(document.getElementById('piece-type-select').value),
     showHudPrompt,
     // Undo history: the 4D world saves itself, so it reports its built
@@ -4847,7 +4888,7 @@ async function init() {
     const w = createQuasicrystalWorld({
       tier: dim.toLowerCase(),
       scene,
-      materialColor,
+      materialColor: viewMaterialColor,
       getMaterial: () => currentMaterialFor(document.getElementById('piece-type-select').value),
       showHudPrompt,
       focusOn: focusCameraOn,

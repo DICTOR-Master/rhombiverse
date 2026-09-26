@@ -66,7 +66,7 @@ Try this on FCC: place six Pyramids to form a Cube. Then add one Pyramid to each
 
 ### Colours
 
-Tap the **Colour** button (bottom left) to choose from 14 colours. The colour you pick sticks to the piece you're placing. With **Auto-assign colour by piece type** turned on (in Settings), each kind of piece starts with its own colour until you pick one.
+Pieces are coloured by the **Colours** setting (in Settings): **Cyan** (every piece cyan, the default), **Type** (each kind of piece in its own colour, editable in the list shown) or **Pick** (each piece keeps the colour it was placed with). Tap the **Colour** button (bottom left) to choose from 15 colours: in Cyan this switches to Pick, and in Type it changes the colour of the kind of piece you're placing. Switching never loses the colours pieces were placed with.
 
 ## Looking at your build
 
@@ -213,7 +213,7 @@ The menu is a rhombic dodecahedron. Each face is a section: tap a face to open i
 | Show FPS meter | Frame-rate counter |
 | Volume | Sound level |
 | Language | English, 日本語, Español, Français, 한국어, 中文, Русский (also the 🌐 picker at the top of the welcome screen and this guide) |
-| Auto-assign colour by piece type | Gives each kind of piece its own colour |
+| Colours | Cyan, Type or Pick: how pieces are coloured |
 | Section view, axis, position, Flip | Cutaway along one axis |
 | Build Cuboctahedron, Dualize Preview | Special build modes |
 | New World, Export World, Import World | Start again, back up, and restore (every dimension) |

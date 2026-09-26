@@ -524,6 +524,9 @@
     @media (pointer: coarse), (max-width: 700px) {
       #lab-panel { width: calc(100vw - 24px); }
       #controls button, #controls .file-btn, #controls select, #controls input,
+      .color-mode-group { display: inline-flex; border: 1px solid rgba(157,224,255,.35); border-radius: 999px; overflow: hidden; }
+      .color-mode-btn { background: transparent; color: inherit; border: 0; padding: 4px 12px; font: inherit; cursor: pointer; }
+      .color-mode-btn.active { background: #22c3e6; color: #001018; }
       .ring-recolor, .ring-remove {
         min-height: 40px;
         font-size: 15px;
@@ -843,9 +846,18 @@
     <div class="row" style="display:none;">
       <button class="mode-btn active" data-mode="build" type="button">Build</button>
     </div>
+    <div id="color-mode-row" class="row">
+      <span data-i18n="color.mode">Colours:</span>
+      <span class="color-mode-group" role="group">
+        <button type="button" class="color-mode-btn" data-color-mode="cyan" data-i18n="color.modeCyan">Cyan</button>
+        <button type="button" class="color-mode-btn" data-color-mode="type" data-i18n="color.modeType">Type</button>
+        <button type="button" class="color-mode-btn" data-color-mode="pick" data-i18n="color.modePick">Pick</button>
+      </span>
+    </div>
     <div id="color-row" class="row">
       <label><span data-i18n="color.label">Color:</span>
         <select id="color-select">
+          <option value="cyan">Cyan</option>
           <option value="base">Default</option>
           <option value="garnet">Red</option>
           <option value="ferrostone">Gray</option>
@@ -862,9 +874,6 @@
           <option value="turquoise">Teal</option>
         </select>
       </label>
-    </div>
-    <div id="auto-assign-row" class="row">
-      <label><input id="auto-assign-color" type="checkbox" checked /> <span data-i18n="color.autoAssign">Auto-assign color by piece type</span></label>
     </div>
     <div id="auto-assign-colors-row" class="row" style="display: none; flex-direction: column; align-items: stretch; gap: 4px;"></div>
     <div id="piece-type-row" class="row">

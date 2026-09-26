@@ -68,7 +68,7 @@ Essayez ceci en FCC : posez six Pyramid pour former un Cube. Ajoutez ensuite une
 
 ### Couleurs
 
-Touchez le **bouton de couleur** (en bas à gauche) pour choisir parmi 14 couleurs. La couleur choisie reste attachée à la pièce que vous posez. Avec **Assigner automatiquement la couleur selon le type de pièce** activé (dans Paramètres), chaque type de pièce commence avec sa propre couleur jusqu'à ce que vous en choisissiez une.
+Les pièces sont colorées selon le réglage **Couleurs** (dans Réglages) : **Cyan** (toutes cyan, par défaut), **Type** (chaque type de pièce dans sa couleur, modifiable dans la liste affichée) ou **Choisir** (chaque pièce garde la couleur avec laquelle elle a été posée). Touchez le **bouton de couleur** (en bas à gauche) pour choisir parmi 15 couleurs : en Cyan, cela passe à Choisir ; en Type, cela change la couleur du type de pièce que vous posez. Changer de mode ne perd jamais les couleurs de pose.
 
 ## Regarder votre construction
 
@@ -215,7 +215,7 @@ Le menu est un dodécaèdre rhombique. Chaque face est une section : touchez une
 | Afficher le compteur de FPS | Compteur d'images par seconde |
 | Volume | Niveau sonore |
 | Langue | English, 日本語, Español, Français, 한국어, 中文, Русский (aussi avec le sélecteur 🌐 en haut de l'écran d'accueil et de ce guide) |
-| Assigner automatiquement la couleur selon le type de pièce | Donne à chaque type de pièce sa propre couleur |
+| Couleurs | Cyan, Type ou Choisir : la coloration des pièces |
 | Vue en coupe, axe, position, Retourner | Coupe le long d'un axe |
 | Build Cuboctahedron, Dualize Preview | Modes de construction spéciaux |
 | Nouveau Monde, Exporter le Monde, Importer un Monde | Recommencer, sauvegarder et restaurer (toutes les dimensions) |
