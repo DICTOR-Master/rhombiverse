@@ -373,8 +373,6 @@ export const WHEEL_PIECE = {
     // Octahedron -- a genuinely new piece, kept distinct from the old
     // "Octahedron Site" 4-disphenoid bundle above rather than replacing
     // it, direct user decision 2026-08-31.
-    "top|sx1sz1":       { kind: "dept", label: "Golden Rhombohedra", action: "tool:goldenWorld",
-      desc: "The 3D Penrose pair: build freely with prolate and oblate golden rhombohedra." },
     "top|sy1sz1":       { kind: "dept", label: "Octahedron", action: "tool:pieceType:octahedron",
       desc: "Fills the gap between cuboctahedra face to face -- click near a Cuboctahedron's own corner." },
   }
@@ -433,8 +431,6 @@ export const WHEEL_RD_FAMILY = {
   id: "rdFamily",
   faces: {
     "equator|sx1sy1":   { kind: "dept", label: "RD", action: "tool:pieceType:rd", desc: "A full block -- cube plus all 6 pyramids." },
-    "top|sx1sz1":       { kind: "dept", label: "Shells", action: "tool:shellsWorld",
-      desc: "Build hulls from shells of RDs, each shell its own colour band." },
     "equator|sx1sy-1":  { kind: "dept", label: "Hemi RD", action: "tool:pieceType:halfrd",
       desc: "One real hemisphereSplit() half of an RD -- click an existing face to add the neighbor's near half." },
     "equator|sx-1sy1":  { kind: "dept", label: "Hourglass", action: "tool:pieceType:hourglass",
@@ -639,8 +635,6 @@ export const ACTION_TO_MARK = {
   // below.
   'navigateTo:rdFamily': 'pieceRD',
   'tool:pieceType:rd': 'pieceRD',
-  'tool:shellsWorld': 'pieceRD',
-  'tool:goldenWorld': 'pieceRhombohedron',
   // Real 3D-profile marks, added 2026-09-06 -- see wheel-icons.js's own
   // pieceHalfRD/pieceHourglass/pieceHemi3/pieceHemi4 header for the full
   // derivation (real orthographic silhouettes, not hand-drawn).

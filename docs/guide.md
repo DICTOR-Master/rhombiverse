@@ -133,7 +133,7 @@ When you pick an item, a **gold outline** appears where it really occurs in your
 
 ## Shells
 
-A 3D world for building **hulls**: shells of rhombic dodecahedra (RDs), each shell its own colour band, counted out from your first piece. Choose it in the Wizard's 3D screen or on the RD wheel.
+A 3D world for building **hulls**: shells of rhombic dodecahedra (RDs), each shell its own colour band, counted out from your first piece. Choose it in the Wizard's 3D screen.
 
 - **+ Shell** fills the next shell, **− Shell** removes the outermost. **Hull** chooses how shells count: **Steps** (a cuboctahedron: 13, 55, 147 … pieces), **Distance** (toward a sphere), or a target shape (tetrahedron, cube, octahedron, RD or truncated octahedron). **Trim** cuts the hull exactly flat into that shape.
 - **Fragment** mode: tap a piece, then pick a **Breakdown** (halves, thirds, quarters, sixths, eighths, twelfths, sixteenths, 24ths or 48ths); **Turn** changes the cut. In Build mode the **Piece** menu places single parts too.
@@ -142,7 +142,7 @@ A 3D world for building **hulls**: shells of rhombic dodecahedra (RDs), each she
 
 ## Golden Rhombohedra
 
-A 3D world for the two pieces of the 3D Penrose tiling. Choose it in the Wizard's 3D screen or on the Piece wheel. Tap the cyan outline, then tap a face to add the **Prolate** or **Oblate** piece chosen in the Piece menu. **Penrose check** colours pieces green where they belong to the true aperiodic tiling and red where your build has drifted; Lattice View shows the true tiling around you, and tapping a ghost places it.
+A 3D world for the two pieces of the 3D Penrose tiling. Choose it in the Wizard's 3D screen. Tap the cyan outline, then tap a face to add the **Prolate** or **Oblate** piece chosen in the Piece menu. **Penrose check** colours pieces green where they belong to the true aperiodic tiling and red where your build has drifted; Lattice View shows the true tiling around you, and tapping a ghost places it.
 
 ## Saving your work
 

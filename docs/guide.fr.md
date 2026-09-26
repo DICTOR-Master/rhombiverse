@@ -135,7 +135,7 @@ Quand vous choisissez un élément, un **contour doré** apparaît là où il se
 
 ## Couches
 
-Un monde 3D pour construire des **enveloppes** : des couches de dodécaèdres rhombiques (RD), chaque couche avec sa bande de couleur, comptées depuis votre première pièce. Choisissez-le dans l'écran 3D du Wizard ou sur la roue RD.
+Un monde 3D pour construire des **enveloppes** : des couches de dodécaèdres rhombiques (RD), chaque couche avec sa bande de couleur, comptées depuis votre première pièce. Choisissez-le dans l'écran 3D du Wizard.
 
 - **+ Couche** remplit la couche suivante, **− Couche** retire la plus extérieure. **Enveloppe** choisit comment les couches se comptent : **Pas** (un cuboctaèdre : 13, 55, 147 … pièces), **Distance** (vers une sphère), ou une forme cible (tétraèdre, cube, octaèdre, RD ou octaèdre tronqué). **Rogner** coupe l'enveloppe exactement à plat selon cette forme.
 - Mode **Fragmenter** : touchez une pièce, puis choisissez une **Découpe** (moitiés, tiers, quarts, sixièmes, huitièmes, douzièmes, seizièmes, vingt-quatrièmes ou quarante-huitièmes) ; **Tourner** change la coupe. En mode Construire, le menu **Pièce** pose aussi des parties seules.
@@ -144,7 +144,7 @@ Un monde 3D pour construire des **enveloppes** : des couches de dodécaèdres rh
 
 ## Rhomboèdres dorés
 
-Un monde 3D avec les deux pièces du pavage de Penrose en 3D. Choisissez-le dans l'écran 3D du Wizard ou sur la roue des pièces. Touchez le contour cyan, puis une face pour ajouter la pièce **Allongée** ou **Aplatie** choisie dans le menu Pièce. Le **Contrôle Penrose** colore en vert les pièces qui appartiennent au vrai pavage apériodique et en rouge celles qui s'en écartent ; Lattice View montre le vrai pavage autour, et toucher un fantôme le pose.
+Un monde 3D avec les deux pièces du pavage de Penrose en 3D. Choisissez-le dans l'écran 3D du Wizard. Touchez le contour cyan, puis une face pour ajouter la pièce **Allongée** ou **Aplatie** choisie dans le menu Pièce. Le **Contrôle Penrose** colore en vert les pièces qui appartiennent au vrai pavage apériodique et en rouge celles qui s'en écartent ; Lattice View montre le vrai pavage autour, et toucher un fantôme le pose.
 
 ## Enregistrer votre travail
 

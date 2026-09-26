@@ -12,10 +12,11 @@ const wizardActions = LATTICES_3D.flatMap((lat) => lat.pieces.map((p) => p.actio
 test('every wheel piece appears in the wizard exactly once', () => {
   const wheelActions = [...Object.values(WHEEL_PIECE.faces), ...Object.values(WHEEL_RD_FAMILY.faces)]
     .map((f) => f.action)
-    .filter((a) => a && (a.startsWith('tool:pieceType:') || a === 'tool:cuboctaBuild' || a === 'tool:shellsWorld' || a === 'tool:goldenWorld'));
+    .filter((a) => a && (a.startsWith('tool:pieceType:') || a === 'tool:cuboctaBuild' ));
   for (const a of new Set(wheelActions)) {
     assert.equal(wizardActions.filter((w) => w === a).length, 1, `${a} listed once`);
   }
   assert.equal(new Set(wizardActions).size, wizardActions.length, 'no duplicates');
-  for (const a of wizardActions) assert.ok(wheelActions.includes(a), `${a} is a real wheel action`);
+  // Shells and Golden Rhombohedra are Wizard-only (the wheels have no free face).
+  for (const a of wizardActions.filter((w) => w !== 'tool:shellsWorld' && w !== 'tool:goldenWorld')) assert.ok(wheelActions.includes(a), `${a} is a real wheel action`);
 });

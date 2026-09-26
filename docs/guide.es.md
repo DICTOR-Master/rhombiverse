@@ -135,7 +135,7 @@ Al elegir un elemento, aparece un **contorno dorado** donde realmente se da en t
 
 ## Capas
 
-Un mundo 3D para construir **envolventes**: capas de dodecaedros rómbicos (RD), cada capa con su banda de color, contadas desde tu primera pieza. Elígelo en la pantalla 3D del Wizard o en la rueda RD.
+Un mundo 3D para construir **envolventes**: capas de dodecaedros rómbicos (RD), cada capa con su banda de color, contadas desde tu primera pieza. Elígelo en la pantalla 3D del Wizard.
 
 - **+ Capa** llena la siguiente capa y **− Capa** quita la más exterior. **Envolvente** elige cómo se cuentan: **Pasos** (un cuboctaedro: 13, 55, 147 … piezas), **Distancia** (hacia una esfera) o una forma objetivo (tetraedro, cubo, octaedro, RD u octaedro truncado). **Recortar** deja la envolvente exactamente plana con esa forma.
 - Modo **Fragmentar**: toca una pieza y elige una **División** (mitades, tercios, cuartos, sextos, octavos, doceavos, dieciseisavos, veinticuatroavos o cuarentaiochoavos); **Girar** cambia el corte. En el modo Construir, el menú **Pieza** coloca también partes sueltas.
@@ -144,7 +144,7 @@ Un mundo 3D para construir **envolventes**: capas de dodecaedros rómbicos (RD),
 
 ## Romboedros áureos
 
-Un mundo 3D con las dos piezas del teselado de Penrose en 3D. Elígelo en la pantalla 3D del Wizard o en la rueda de piezas. Toca el contorno cian y luego una cara para añadir la pieza **Alargada** o **Achatada** elegida en el menú Pieza. El **Control Penrose** pinta de verde las piezas que pertenecen al verdadero teselado aperiódico y de rojo las que se han desviado; Lattice View muestra el teselado verdadero alrededor, y tocar un fantasma lo coloca.
+Un mundo 3D con las dos piezas del teselado de Penrose en 3D. Elígelo en la pantalla 3D del Wizard. Toca el contorno cian y luego una cara para añadir la pieza **Alargada** o **Achatada** elegida en el menú Pieza. El **Control Penrose** pinta de verde las piezas que pertenecen al verdadero teselado aperiódico y de rojo las que se han desviado; Lattice View muestra el teselado verdadero alrededor, y tocar un fantasma lo coloca.
 
 ## Guarda tu trabajo
 
