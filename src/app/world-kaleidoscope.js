@@ -362,7 +362,7 @@ export function createKaleidoWorld({ scene, edge = 1, colorFor, getMaterial, isP
     const v = fold(view.mirror, view.k, view.size, [hit.point.x / edge, hit.point.y / edge]);
     const b = toBuild(v);
     // A ghost is drawn where it really goes, so it's hit unfolded.
-    const ghost = mode !== 'chisel' && !isPainting() && ghosts.find((g) => contains(g.verts, raw));
+    const ghost = mode === 'build' && !isPainting() && ghosts.find((g) => contains(g.verts, raw));
     if (ghost) { tiles.push({ shape: view.shape, verts: ghost.verts, idx: ghost.idx, material: getMaterial(view.shape) }); commit(); return true; }
     if (mode === 'chisel') {
       const x = tileAt(b);
@@ -371,7 +371,7 @@ export function createKaleidoWorld({ scene, edge = 1, colorFor, getMaterial, isP
       commit();
       return true;
     }
-    if (isPainting()) {
+    if (mode === 'paint' || isPainting()) {
       const x = tileAt(b);
       const material = x && getMaterial(x.shape);
       if (!x || x.material === material) return false;

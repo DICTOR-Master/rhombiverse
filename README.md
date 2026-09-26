@@ -35,7 +35,10 @@ right-click) removes. The **User Guide** (in the app, or at
   pentagons, triangles, hexagons and squares reflected by a ring of 1–12
   mirrors or a triangle of three; Attach or Loose (pieces slide into place
   beside a partner), Turn, Spin, Shake, and a Safe mode that keeps the
-  rhombi to Penrose's matching rule. Paint recolours placed 2D pieces.
+  rhombi to Penrose's matching rule.
+- **Paint** — in every dimension, the brush recolours pieces you've
+  already placed (except Shells and Golden Rhombohedra, coloured by band
+  and type).
 - **3D** — every piece listed under the lattice it lives on:
   - **FCC**: rhombic dodecahedron (RD), Hemi RD, Hourglass, RD Quarter,
     Cube, Pyramid

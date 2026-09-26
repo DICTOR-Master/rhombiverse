@@ -221,6 +221,9 @@ export function createBuildController({
   // placed/removed? }. While active it's the only pick target and owns
   // every tap -- nothing 3D is visible or clickable there.
   ownWorld = null,
+  // Paint (render.js paintHit): while on, a tap recolours the placed
+  // piece it hits instead of building.
+  paint = null,
   // First-placement target (render.js firstPlacementSpec): { mesh,
   // place(material) } -- a cyan outline shown while the selected piece's
   // world is empty, replacing the old physical seeds (2026-09-24).
@@ -1489,6 +1492,12 @@ export function createBuildController({
 
     const mode = getMode();
     if (!mode) return; // e.g. Walk mode active -- editing is disabled while walking
+    // 2D tiles paint in their own handler (and the Kaleidoscope's taps
+    // there), everything else here.
+    if (mode === 'build' && paint?.isOn() && !getPieceType().startsWith('lattice2d:')) {
+      if (!paint.apply(hit) && onPieceNoOp) onPieceNoOp('paint');
+      return;
+    }
     if ((mode === 'build' || mode === 'chisel') && ownWorld?.isActive()) {
       if (!ownWorld.handleTap(hit, mode) && onPieceNoOp) onPieceNoOp(mode === 'build' ? 'add' : 'remove');
       return;

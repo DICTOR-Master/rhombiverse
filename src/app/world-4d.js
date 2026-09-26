@@ -391,6 +391,15 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
   }
   function handleTap(hit, mode) {
     const u = hit.object.userData;
+    // Paint: the tapped cell takes the picked colour.
+    if (mode === 'paint') {
+      const cell = u.world4d === 'cell' ? cells.get(keyOf(u.kind, u.c)) : null;
+      const material = getMaterial();
+      if (!cell || cell.material === material) return false;
+      cell.material = material;
+      save(); rebuild(); onChange();
+      return true;
+    }
     if (u.world4d === 'cell') lastCell = { kind: u.kind, c: u.c };
     if (mode === 'chisel') {
       if (u.world4d !== 'cell') return false;

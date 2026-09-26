@@ -104,6 +104,15 @@ const CSS = `
   border-color: #fff;
   z-index: 2;
 }
+#color-wheel-paint {
+  position: absolute; top: 34px; left: 0; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #9cd; font: 12px system-ui, sans-serif; border-radius: 14px;
+  padding: 5px 10px; cursor: pointer; z-index: 3; white-space: nowrap;
+}
+#color-wheel-paint svg { width: 16px; height: 16px; }
+#color-wheel-paint.active { background: rgba(120, 190, 255, 0.4); border-color: #7cf; color: #fff; }
 #color-wheel-hint {
   position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%);
   color: #eaf6ff; font: 13px system-ui, sans-serif;
@@ -122,6 +131,8 @@ const CSS = `
    as a second, lesser navigation surface once actually compared
    against the real wheel. */
 `;
+
+export const PAINT_ICON = '<svg viewBox="-30 -30 60 60"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M-4,4 L16,-16 a5,5 0 0 1 7,7 L3,11 Z"/><path d="M-4,4 C-12,4 -14,10 -14,14 C-14,20 -20,22 -24,22 C-16,26 -2,24 3,11"/></g></svg>';
 
 function injectCssOnce() {
   if (document.getElementById('wheel-pickers-style')) return;
@@ -160,9 +171,21 @@ export function createWheelPickers({
     onMaterialHoverEnd();
   }
 
-  function openMaterialWheel(options, onPick, currentValue) {
+  function openMaterialWheel(options, onPick, currentValue, paint) {
     materialWheelRoot.innerHTML = '';
     materialWheelRoot.appendChild(materialWheelHint);
+    // Paint switch in the middle of the wheel (where the world has
+    // per-piece colours): on, tapping a placed piece recolours it.
+    if (paint) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'color-wheel-paint';
+      btn.className = paint.on ? 'active' : '';
+      btn.innerHTML = `${PAINT_ICON}<span>Paint</span>`;
+      btn.title = 'Paint: tap a placed piece to give it the picked colour';
+      btn.addEventListener('click', () => { onMenuSound(); paint.toggle(); btn.classList.toggle('active', paint.isOn()); });
+      materialWheelRoot.appendChild(btn);
+    }
     materialWheelHint.textContent = 'Hover to preview · click to select';
     const positions = positionsFor(options.length, 100);
     options.forEach((opt, i) => {
@@ -266,7 +289,7 @@ export function createWheelPickers({
   // module, never shown to a user, and the underlying `cell.material`
   // data concept they ultimately front-end for isn't being renamed (see
   // MATERIAL_COLORS' own header in render.js for why).
-  function openColorPicker(onPick) {
+  function openColorPicker(onPick, paint) {
     const select = document.getElementById(materialSelectId);
     const options = readSelectOptions(select);
     // Fire 'change' so a wheel pick behaves exactly like a dropdown pick --
@@ -274,7 +297,7 @@ export function createWheelPickers({
     // override. Setting .value alone doesn't fire it, so with auto-assign
     // on (the default) the RD stayed grey whatever colour was picked
     // (direct report 2026-09-25).
-    openMaterialWheel(options, (value, label) => { select.value = value; select.dispatchEvent(new Event('change')); onPick?.(value, label); }, select.value);
+    openMaterialWheel(options, (value, label) => { select.value = value; select.dispatchEvent(new Event('change')); onPick?.(value, label); }, select.value, paint);
   }
   // openSpeciesPicker/openGeneratorPicker (both used openPickerStrip, below)
   // removed 2026-09-22 (second world-building removal pass) -- their only

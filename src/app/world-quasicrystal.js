@@ -599,6 +599,15 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
   }
   function handleTap(hit, mode) {
     const { qc, tile } = hit.object.userData;
+    // Paint: the tapped piece (or polytope shadow) takes the picked colour.
+    if (mode === 'paint') {
+      const item = qc === 'tile' ? tiles.get(keyOf(tile)) : qc === 'polytope' ? polys.get(polyKey(hit.object.userData.poly)) : null;
+      const material = getMaterial();
+      if (!item || item.material === material) return false;
+      item.material = material;
+      save(); rebuild(); onChange();
+      return true;
+    }
     if (mode !== 'chisel' && pending) {
       // Summoning: the ghost places; anything else moves the ghost there.
       if (qc === 'ghost') return landSummon();

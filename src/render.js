@@ -39,7 +39,7 @@ import { createBuildController } from './core/build.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR, QUALITY_LEVELS_ASCENDING } from './app/settings.js';
 import { t, LANG_ORDER, LANG_META } from './app/i18n.js';
 import { playPlaceSound, playRemoveSound, playMenuSound } from './app/sfx.js';
-import { createWheelPickers } from './app/wheel-pickers.js';
+import { createWheelPickers, PAINT_ICON } from './app/wheel-pickers.js';
 import { MARKS, iconFrame, swatchMark } from './app/wheel-icons.js';
 import { createHudWheel3D } from './app/hud-wheel-3d.js';
 import { matchNeighborOffset } from './core/build.js';
@@ -1952,21 +1952,33 @@ async function init() {
     cell24: '<svg viewBox="-30 -30 60 60"><polygon points="0,-24 20.78,-12 20.78,12 0,24 -20.78,12 -20.78,-12" fill="none" stroke="currentColor" stroke-width="3"/><polygon points="0,-12 10.39,6 -10.39,6" fill="currentColor" opacity="0.35"/></svg>',
     cell16: '<svg viewBox="-30 -30 60 60"><polygon points="0,-24 24,0 0,24 -24,0" fill="none" stroke="currentColor" stroke-width="3"/><path d="M0,-24 V24 M-24,0 H24" stroke="currentColor" stroke-width="1.5" opacity="0.6"/></svg>',
   };
-  // 2D Paint (2026-09-26): the same slot, shown in 2D. While on, a tap
-  // on a placed tile gives it the picked colour instead of adding one;
-  // it turns Pick on, since only Pick shows each tile's own colour.
-  let paint2d = false;
-  function setPaint2d(on) {
-    paint2d = on;
-    rhomboAttachBtn?.classList.toggle('active', on);
+  // Paint (2D 2026-09-26, every dimension the same day): while on, a
+  // tap on a placed piece gives it the picked colour instead of adding
+  // one; it turns Pick on, since only Pick shows each piece's own colour.
+  // Where pieces have no colour of their own (Shells' bands, Golden's
+  // types) it's hidden. Reached from the colour wheel's middle, and from
+  // this bottom-row slot whenever no attach toggle needs it.
+  let paintOn = false;
+  const paintAvailable = () => !!activeDimension && !(own3DActive() && (own3D === 'shells' || own3D === 'golden'));
+  const attachNeeded = () => (activeDimension === '4D' ? ['cell24', 'cell16', ...A4_CYCLE] : activeDimension !== '2D' && !isOwnWorldDimension() ? ['rhombohedra', 'pyrochlore'] : []).includes(attachPiece());
+  const paintInSlot = () => paintAvailable() && !attachNeeded();
+  function setPaint(on) {
+    paintOn = on;
+    rhomboAttachBtn?.classList.toggle('active', on && paintInSlot());
+    document.getElementById('hud-quick-color')?.classList.toggle('painting', on);
     renderRhomboAttachButton();
   }
-  const PAINT_ICON = '<svg viewBox="-30 -30 60 60"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M-4,4 L16,-16 a5,5 0 0 1 7,7 L3,11 Z"/><path d="M-4,4 C-12,4 -14,10 -14,14 C-14,20 -20,22 -24,22 C-16,26 -2,24 3,11"/></g></svg>';
+  function togglePaint() {
+    setPaint(!paintOn);
+    if (paintOn && colorView.mode !== 'pick') setColorMode('pick');
+    showHudPrompt(paintOn ? 'Paint: tap a placed piece to give it the picked colour.' : 'Paint off: taps add pieces again.', 3000);
+  }
+  const paintPickerOption = () => (paintAvailable() ? { on: paintOn, isOn: () => paintOn, toggle: togglePaint } : undefined);
   function renderRhomboAttachButton() {
     if (!rhomboAttachBtn) return;
-    if (activeDimension === '2D') {
+    if (paintInSlot()) {
       rhomboAttachBtn.innerHTML = PAINT_ICON;
-      rhomboAttachBtn.title = `Paint: ${paint2d ? 'on' : 'off'} (tap to switch)`;
+      rhomboAttachBtn.title = `Paint: ${paintOn ? 'on' : 'off'} (tap to switch)`;
       return;
     }
     if (A4_CYCLE.includes(attachPiece())) {
@@ -1988,12 +2000,7 @@ async function init() {
     rhomboAttachBtn.title = `Rhombohedra attach: ${rhomboAttachMode === 'mirror' ? 'Mirror' : 'Copy'} (tap to switch)`;
   }
   rhomboAttachBtn?.addEventListener('click', () => {
-    if (activeDimension === '2D') {
-      setPaint2d(!paint2d);
-      if (paint2d && colorView.mode !== 'pick') setColorMode('pick');
-      showHudPrompt(paint2d ? 'Paint: tap a tile to give it the picked colour.' : 'Paint off: taps add tiles again.', 3000);
-      return;
-    }
+    if (paintInSlot()) { togglePaint(); return; }
     if (attachPiece() === 'cell24' || attachPiece() === 'cell16') {
       selectPieceAction?.(`tool:pieceType:${attachPiece() === 'cell24' ? 'cell16' : 'cell24'}`);
       return;
@@ -2020,10 +2027,9 @@ async function init() {
   });
   renderRhomboAttachButton();
   function updateRhomboAttachPanel() {
-    const attachable = activeDimension === '4D' ? ['cell24', 'cell16', ...A4_CYCLE] : activeDimension !== '2D' && !isOwnWorldDimension() ? ['rhombohedra', 'pyrochlore'] : [];
-    const show2dPaint = activeDimension === '2D';
-    if (!show2dPaint && paint2d) setPaint2d(false);
-    rhomboAttachBtn?.classList.toggle('hidden', !show2dPaint && !attachable.includes(attachPiece()));
+    if (paintOn && !paintAvailable()) setPaint(false);
+    rhomboAttachBtn?.classList.toggle('hidden', !paintInSlot() && !attachNeeded());
+    rhomboAttachBtn?.classList.toggle('active', paintOn && paintInSlot());
     renderRhomboAttachButton();
   }
 
@@ -3529,7 +3535,7 @@ async function init() {
           updateHudIndicator();
           showHudPrompt(`Piece: ${PIECE_LABELS[value] ?? value}`, 3000);
           wheel3D.close();
-          if (!quiet) pickers.openColorPicker((matValue, matLabel) => showHudPrompt(`Color: ${matLabel}`, 3000));
+          if (!quiet) pickers.openColorPicker((matValue, matLabel) => showHudPrompt(`Color: ${matLabel}`, 3000), paintPickerOption());
           return;
         }
         // Reuses the 2D wheel's own color-picker overlay (a real,
@@ -3542,7 +3548,7 @@ async function init() {
         // WHEEL_PIECE face label, already renamed to "Color".
         if (action === 'tool:color') {
           wheel3D.close();
-          pickers.openColorPicker((value, label) => showHudPrompt(`Color: ${label}`, 3000));
+          pickers.openColorPicker((value, label) => showHudPrompt(`Color: ${label}`, 3000), paintPickerOption());
           return;
         }
 
@@ -3611,7 +3617,7 @@ async function init() {
           clickMode('cubocta');
           showHudPrompt('Piece: CO', 3000);
           wheel3D.close();
-          if (!quiet) pickers.openColorPicker((value, label) => showHudPrompt(`Color: ${label}`, 3000));
+          if (!quiet) pickers.openColorPicker((value, label) => showHudPrompt(`Color: ${label}`, 3000), paintPickerOption());
           return;
         }
 
@@ -3889,7 +3895,7 @@ async function init() {
     });
     document.getElementById('hud-quick-color')?.addEventListener('click', () => {
       if (wheel3D.isOpen) wheel3D.close();
-      pickers.openColorPicker((value, label) => showHudPrompt(`Color: ${label}`, 3000));
+      pickers.openColorPicker((value, label) => showHudPrompt(`Color: ${label}`, 3000), paintPickerOption());
     });
   }
 
@@ -4516,7 +4522,7 @@ async function init() {
   function setColorMode(mode) {
     if (!COLOR_MODES.includes(mode) || mode === colorView.mode) return;
     colorView.mode = mode;
-    if (mode !== 'pick' && paint2d) setPaint2d(false);
+    if (mode !== 'pick' && paintOn) setPaint(false);
     try { localStorage.setItem(COLOR_MODE_STORAGE_KEY, mode); } catch { /* best-effort only */ }
     showColorMode();
     repaintAllPieces();
@@ -5000,12 +5006,54 @@ async function init() {
     edge: LATTICE2D_S / Math.sqrt(3),
     colorFor: (tile, out) => out.copy(instanceColorFor({ material: tile.material }, `kaleido:${tile.shape}`)),
     getMaterial: (shape) => currentMaterialFor(`kaleido:${shape}`),
-    isPainting: () => paint2d && activeDimension === '2D',
+    isPainting: () => paintOn && activeDimension === '2D',
     showHudPrompt,
     onChange: () => { if (historyRestorers.has('worldkaleido')) recordHistory('worldkaleido', kaleidoWorld.snapshot()); },
   });
   registerHistoryStores();
+  // Paint (see paintOn): recolour whichever placed piece the tap hit,
+  // found by the mesh it's drawn in, whatever piece is selected. 2D
+  // tiles go through their own handler (build.js), the own worlds
+  // through their handleTap(hit, 'paint').
+  function paintHit(hit) {
+    if (isOwnWorldDimension()) return activeOwnWorld().handleTap(hit, 'paint');
+    const o = hit?.object;
+    if (!o) return false;
+    const material = materialSelect.value;
+    const recolor = (store, cell, done) => {
+      if (!cell || cell.material === material) return false;
+      const { x, y, z, ...data } = cell;
+      store.addCell(x, y, z, { ...data, material });
+      done();
+      return true;
+    };
+    if (o === mesh) return recolor(world, cellOrder[hit.instanceId], onChange);
+    if (partialCellMeshes.has(o.userData?.cellKey)) return recolor(world, partialCellMeshes.get(o.userData.cellKey).cell, onChange);
+    const flat = [
+      [bccMesh, bccWorld, bccCellOrder, onBCCChange],
+      [elongDodecaMesh, elongDodecaWorld, elongDodecaCellOrder, onElongDodecaChange],
+      [hexPrismMesh, hexPrismWorld, hexPrismCellOrder, onHexPrismChange],
+      [rhombohedraMesh, rhombohedraWorld, rhombohedraCellOrder, onRhombohedraChange],
+      [cuboctaMesh, cuboctaWorld, cuboctaCellOrder, onCuboctaChange],
+      [octGapMesh, octGapWorld, octGapCellOrder, onOctGapChange],
+    ].find(([m]) => m === o);
+    if (flat) return recolor(flat[1], flat[2][hit.instanceId], flat[3]);
+    const tt = pyrochloreTTMeshes.indexOf(o);
+    if (tt !== -1) return recolor(pyrochloreWorld, pyrochloreCellOrders[tt][hit.instanceId], onPyrochloreChange);
+    const tet = pyrochloreTetInstances.get(o)?.[hit.instanceId];
+    if (tet) return recolor(pyrochloreWorld, tet.cell, onPyrochloreChange);
+    for (const [group, store, done] of [[interstitialGroup, interstitialStore, onInterstitialChange], [hemisphereGroup, hemisphereStore, onHemisphereChange]]) {
+      if (o.parent !== group) continue;
+      const piece = store.get(o.userData.key);
+      if (!piece || piece.material === material) return false;
+      piece.material = material;
+      done();
+      return true;
+    }
+    return false;
+  }
   createBuildController({
+    paint: { isOn: () => paintOn && paintAvailable(), apply: paintHit },
     renderer,
     camera,
     mesh,
@@ -5066,6 +5114,7 @@ async function init() {
     // most likely one being Remove+TO tapped on ordinary (non-TO) world
     // geometry, since most of what's actually on screen is RD, not TO.
     onPieceNoOp: (action) => {
+      if (action === 'paint') { showHudPrompt('Paint: tap a placed piece that isn\u2019t already the picked colour.', 3000); return; }
       const piece = document.getElementById('piece-type-select')?.value;
       const messages = {
         a4trunc: {
@@ -5241,7 +5290,7 @@ async function init() {
       // resolveLattice2dImpl this file's own rebuildLattice2dInstances
       // already uses keeps them permanently in agreement.
       getImpl: (primitiveId) => resolveLattice2dImpl(primitiveId, activeLattice2dArrangementId),
-      isPainting: () => paint2d && activeDimension === '2D',
+      isPainting: () => paintOn && activeDimension === '2D',
     },
     rhombohedraWorld,
     rhombohedraMesh,
