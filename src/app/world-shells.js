@@ -1,5 +1,5 @@
 // Shells: a 3D world of its own for building hulls out of shells of RDs
-// (docs/PLAN-SHELLS.md). Listed as a 3D lattice ('tool:shellsWorld');
+// Listed as a 3D lattice ('tool:shellsWorld');
 // while it's on, render.js routes every tap here (the same own-world path
 // as 4D/5D/6D) and hides the other 3D worlds.
 //

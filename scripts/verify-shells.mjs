@@ -1,4 +1,4 @@
-// Checks src/geometry-extensions/rd-pieces.js (docs/PLAN-SHELLS.md stage 1)
+// Checks src/geometry-extensions/rd-pieces.js
 // from the solids themselves, not by sampling:
 // - every split's pieces have equal volume, fill the RD (volumes sum to
 //   the RD's) and never overlap (every pair meets in zero volume);

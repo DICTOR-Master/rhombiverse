@@ -195,6 +195,28 @@ export const LATTICE_CONCEPT_ENTRIES = [
     desc: "Four kinds of item. Zonohedra are convex shapes whose faces come in parallel pairs; the ones here are made entirely of the tiling's own pieces, up to the rhombic triacontahedron (20 golden rhombohedra). Polytopes are higher-dimensional shapes with corners on the lattice (orthoplexes, demicubes and simplex corners), shown as their shadows: the 6-orthoplex casts an icosahedron. Bridges are hyperprisms: a polytope carried one step through a further dimension, such as the 5-orthoplex prism, also shown as its shadow. Vertex stars are the ways pieces can meet at a corner: 7 in the Penrose layers and 24 in the icosahedral tiling. Every item lands where it really occurs, and Connect joins two items with the shortest chain of real tiles.",
     markKey: null,
   },
+  // Shells.
+  {
+    kind: 'concept',
+    id: 'concept:shellsMagicNumbers',
+    label: 'Shells and Magic Numbers',
+    desc: "Count out from one RD a neighbour-step at a time and each new shell holds 10n² + 2 pieces: 12, 42, 92, 162 … The running totals, 1, 13, 55, 147, 309, are the cuboctahedral magic numbers of real atom clusters, and the hull stays a cuboctahedron at every size. Count by distance instead and the shells regroup (12, 6, 24, 12 …) and the hull heads toward a sphere. Measured by a target shape's own distance, the hull takes that shape; tetrahedron, cube, octahedron, RD and cuboctahedron all have faces on lattice layers, so they can be trimmed exactly flat. No lattice can do the same for an icosahedron.",
+    markKey: null,
+  },
+  {
+    kind: 'concept',
+    id: 'concept:rdSplits',
+    label: 'Splitting the RD',
+    desc: "The RD has 48 symmetries, and cutting it along some of its mirror planes splits it into identical pieces: halves, thirds, quarters, sixths, eighths, twelfths, sixteenths, 24ths and, finest of all, 48 wedges, one per symmetry. Every divisor of 48 except 1 works. Some splits come in two forms: halves across the square axes or the diagonals, quarters by two mirrors or as the RD's four rhombohedra (the RD Quarter piece).",
+    markKey: null,
+  },
+  {
+    kind: 'concept',
+    id: 'concept:scaleLadder',
+    label: 'The Scale Ladder',
+    desc: "The FCC lattice scaled by 2, 3 or 4 sits exactly inside itself, so a bigger RD is filled exactly by small pieces. Its faces lie on the small tiling's mirror planes, which cut the boundary RDs into members of the split family: a ×2 RD is 1 whole RD, 12 halves and 6 sixths (8 RDs of volume); ×3 is 19 whole and 24 thirds; ×4 adds quarters at its three-way corners. Only halves, thirds, quarters and sixths are ever needed at the boundary.",
+    markKey: null,
+  },
 ];
 
 export const ALMANAC_ENTRIES = [...PIECE_ENTRIES, ...LATTICE_CONCEPT_ENTRIES];

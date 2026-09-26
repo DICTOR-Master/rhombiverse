@@ -1,6 +1,5 @@
-// RD pieces and the scale ladder, for the Shells scene (docs/PLAN-SHELLS.md,
-// stage 1). Pure geometry, no three.js, so scripts/verify-shells.mjs runs
-// it in Node.
+// RD pieces and the scale ladder, for the Shells scene. Pure geometry, no
+// three.js, so scripts/verify-shells.mjs runs it in Node.
 //
 // Frame: the app's FCC lattice (core/lattice.js): cells are integer points
 // with an even coordinate sum, and the unit RD is |x|+|y|, |x|+|z|,
