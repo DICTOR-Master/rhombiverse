@@ -19,7 +19,7 @@
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { rdRawVerts, facePieces, NEIGHBOR_OFFSETS } from '../core/lattice.js';
-import { HULL_IDS, hullShell, hullShellOf, SPLITS, SPLIT_BY_ID, pieceSolid, splitOrientations, pieceAt, piecesOverlap, TRIMMABLE, hullPlanes, trimGauge, trimPiece } from '../geometry-extensions/rd-pieces.js';
+import { HULL_IDS, hullShell, hullShellOf, SPLITS, SPLIT_BY_ID, pieceSolid, splitOrientations, pieceAt, piecesOverlap, TRIMMABLE, hullPlanes, trimGauge, trimPiece, scaleDecomposition, nearestFcc, canonicalG } from '../geometry-extensions/rd-pieces.js';
 import { t, tn } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 
@@ -52,8 +52,14 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
   // ---- state ----
   // key -> { c: [x, y, z], parts: null (a whole RD) | [{ split, g }] }
   const cells = new Map();
+  // Bigger pieces (stage 5, the scale ladder): key `${k}|x,y,z` -> { c
+  // (a cell of the coarse lattice k*FCC, in coarse coordinates), k, parts }.
+  const bigs = new Map();
+  const bigKey = (k, c) => `${k}|${c.join(',')}`;
+  const SCALES = [1, 2, 3, 4];
   let centre = null; // the first piece's cell
-  const view = { hull: 'steps', mode: 'build', piece: 'whole', trim: false };
+  const view = { hull: 'steps', mode: 'build', piece: 'whole', trim: false, scale: 1 };
+  let pendingMerge = null; // { k, c }: the big RD's outline, shown before Confirm
   let target = null; // Fragment mode: the targeted cell's key
   let active = false;
   let skeleton = false;
@@ -82,14 +88,23 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
       if (!cells.has(k)) cells.set(k, { c: [...p.c], parts: [] });
       cells.get(k).parts.push({ split: p.split, g: p.g });
     }
+    bigs.clear();
+    for (const b of Array.isArray(data?.scaled) ? data.scaled : []) {
+      if (!isCell(b?.c) || !SCALES.includes(b.k) || b.k === 1) continue;
+      const parts = Array.isArray(b.parts) ? b.parts.filter((q) => SPLIT_BY_ID.has(q?.split) && q.split !== 'whole' && Number.isInteger(q.g) && q.g >= 0 && q.g < 48).map((q) => ({ split: q.split, g: q.g })) : null;
+      if (parts && !parts.length) continue;
+      bigs.set(bigKey(b.k, b.c), { c: [...b.c], k: b.k, parts });
+    }
     const k = Array.isArray(data?.centre) ? keyOf(data.centre) : null;
     if (k && cells.has(k)) centre = cells.get(k).c;
     else if (cells.size) centre = [...cells.values()][0].c;
-    if (target && !cells.has(target)) target = null;
+    if (target && !cells.has(target) && !bigs.has(target)) target = null;
+    pendingMerge = null;
   }
   const toJSON = () => ({
     cells: [...cells.values()].filter((e) => e.parts === null).map((e) => e.c),
     parts: [...cells.values()].filter((e) => e.parts).flatMap((e) => e.parts.map((p) => ({ c: e.c, split: p.split, g: p.g }))),
+    scaled: [...bigs.values()].map((b) => ({ c: b.c, k: b.k, ...(b.parts ? { parts: b.parts } : {}) })),
     centre,
   });
   function load() {
@@ -102,6 +117,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
       if (data.view?.mode === 'fragment') view.mode = 'fragment';
       if (SPLIT_IDS.includes(data.view?.piece)) view.piece = data.view.piece;
       view.trim = data.view?.trim === true;
+      if (SCALES.includes(data.view?.scale)) view.scale = data.view.scale;
     } catch { /* corrupt or blocked storage: start empty */ }
   }
   function save() {
@@ -211,17 +227,17 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     const b = meshBuilder();
     partTris = [];
     const c = new THREE.Color(), e = new THREE.Color();
-    for (const { key: k, part: pi, solid } of items) {
-      const cell = cells.get(k).c;
-      shellColor(shell.get(k), c);
+    for (const { key: k, part: pi, solid, big } of items) {
+      const cell = big ? bigs.get(k).c : cells.get(k).c;
+      shellColor(big ? shellOf(cell.map((x) => x * bigs.get(k).k)) : shell.get(k), c);
       if (skeleton) e.copy(c); else e.setHex(EDGE_COLOR);
       for (const loop of solid.faces) {
         const q = loop.map((i) => solid.verts[i]);
         const m = q.reduce((s, v) => [s[0] + v[0] / q.length, s[1] + v[1] / q.length, s[2] + v[2] / q.length], [0, 0, 0]);
-        const f = NEIGHBOR_OFFSETS.findIndex((o) => Math.abs(o[0] * (m[0] - cell[0]) + o[1] * (m[1] - cell[1]) + o[2] * (m[2] - cell[2]) - 1) < 1e-7);
+        const f = big ? -2 : NEIGHBOR_OFFSETS.findIndex((o) => Math.abs(o[0] * (m[0] - cell[0]) + o[1] * (m[1] - cell[1]) + o[2] * (m[2] - cell[2]) - 1) < 1e-7);
         if (f >= 0 && blocks(keyOf([cell[0] + NEIGHBOR_OFFSETS[f][0], cell[1] + NEIGHBOR_OFFSETS[f][1], cell[2] + NEIGHBOR_OFFSETS[f][2]]))) continue;
         const tris = b.face(q, c, e);
-        for (let i = 0; i < tris; i++) partTris.push({ key: k, part: pi, f });
+        for (let i = 0; i < tris; i++) partTris.push({ key: k, part: pi, f, big: !!big });
       }
     }
     return b.build(pieceMaterial, 'parts');
@@ -283,7 +299,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     renderInfo();
     clearGroup();
     if (!active) return;
-    if (cells.size) {
+    if (cells.size || bigs.size) {
       pieceMaterial.transparent = opacity < 1;
       pieceMaterial.opacity = opacity;
       pieceMaterial.depthWrite = opacity >= 1;
@@ -308,6 +324,11 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
           else if (cut) items.push({ key: k, part: pi, solid: cut });
         });
       }
+      // Big pieces: drawn whole (not trimmed).
+      for (const [k, b] of bigs) {
+        if (!b.parts) items.push({ key: k, part: -1, solid: pieceSolid('whole', 0, b.c, b.k), big: true });
+        else b.parts.forEach((q, pi) => items.push({ key: k, part: pi, solid: pieceSolid(q.split, q.g, b.c, b.k), big: true }));
+      }
       const blocks = (k) => full.has(k);
       for (const { mesh, lines } of [buildSkin(opacity < 1 || skeleton, shell, full, blocks), buildParts(shell, items, blocks)]) {
         mesh.visible = !skeleton;
@@ -322,6 +343,19 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
       pickTargets.push(first);
     }
     if (view.mode === 'fragment' && target && cells.has(target)) group.add(rdOutlines([cells.get(target).c], TARGET_COLOR));
+    if (view.mode === 'fragment' && target && bigs.has(target)) group.add(solidOutline(pieceSolid('whole', 0, bigs.get(target).c, bigs.get(target).k), TARGET_COLOR));
+    if (pendingMerge) {
+      // The big RD's outline, and the small pieces it still needs as ghosts.
+      group.add(solidOutline(pieceSolid('whole', 0, pendingMerge.c, pendingMerge.k), TARGET_COLOR));
+      const b = meshBuilder();
+      const gc = new THREE.Color(SLOT_COLOR);
+      for (const x of mergeMissing(pendingMerge)) {
+        const solid = pieceSolid(x.split, x.g, x.cell);
+        for (const loop of solid.faces) b.face(loop.map((i) => solid.verts[i]), gc, gc);
+      }
+      const ghosts = b.build(slotMaterial, 'mergeGhost');
+      group.add(ghosts.mesh, ghosts.lines);
+    }
     if (latticeView && cells.size) {
       slotCells = openSlots();
       const slots = instanced(slotCells, slotMaterial);
@@ -334,10 +368,132 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     renderPanel();
   }
 
+  // A solid's edges as gold lines (a big RD's outline).
+  function solidOutline(solid, color) {
+    const pos = [];
+    for (const loop of solid.faces) for (let i = 0; i < loop.length; i++) pos.push(...solid.verts[loop[i]], ...solid.verts[loop[(i + 1) % loop.length]]);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    return new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color }));
+  }
+
   // ---- building ----
   function commit() { save(); rebuild(); onChange(); }
+  // Every placed piece as { split, g, cell, k } (for exact overlap tests).
+  function allPieces() {
+    const out = [];
+    for (const { c, parts } of cells.values()) {
+      if (!parts) out.push({ split: 'whole', g: 0, cell: c, k: 1 });
+      else for (const q of parts) out.push({ split: q.split, g: q.g, cell: c, k: 1 });
+    }
+    for (const b of bigs.values()) {
+      if (!b.parts) out.push({ split: 'whole', g: 0, cell: b.c, k: b.k });
+      else for (const q of b.parts) out.push({ split: q.split, g: q.g, cell: b.c, k: b.k });
+    }
+    return out;
+  }
+  const fineCentre = (x) => x.cell.map((v) => v * x.k);
+  const near = (a, b) => Math.hypot(...fineCentre(a).map((v, i) => v - fineCentre(b)[i])) < 1.1 * (a.k + b.k) + 0.1;
+  const overlapsBig = (piece) => [...bigs.values()].some((b) => {
+    const big = { split: 'whole', g: 0, cell: b.c, k: b.k, ...(b.parts ? {} : {}) };
+    if (!near(piece, big)) return false;
+    if (!b.parts) return piecesOverlap(piece, big);
+    return b.parts.some((q) => piecesOverlap(piece, { split: q.split, g: q.g, cell: b.c, k: b.k }));
+  });
+  // Placing at scale k > 1 (or onto a big piece): the piece of `split` whose
+  // k-lattice cell holds `probe` (a point just past the tapped face).
+  function placeAt(split, k, probe) {
+    const C = nearestFcc(probe.map((v) => v / k));
+    let piece;
+    if (split === 'whole') piece = { split: 'whole', g: 0, cell: C, k };
+    else {
+      const hit = pieceAt(split, C, probe, k);
+      if (!hit) return false;
+      piece = { split, g: canonicalG(split, hit.g), cell: C, k };
+    }
+    if (allPieces().some((x) => near(piece, x) && piecesOverlap(piece, x))) { showHudPrompt(t('hull.prompt.noFit', lang()), 2500); return false; }
+    if (k === 1) {
+      const key = keyOf(C);
+      if (split === 'whole') cells.set(key, { c: C, parts: null });
+      else if (cells.has(key)) cells.get(key).parts.push({ split, g: piece.g });
+      else cells.set(key, { c: C, parts: [{ split, g: piece.g }] });
+      if (!centre) centre = C;
+    } else {
+      const key = bigKey(k, C);
+      if (split === 'whole') bigs.set(key, { c: C, k, parts: null });
+      else if (bigs.has(key)) bigs.get(key).parts.push({ split, g: piece.g });
+      else bigs.set(key, { c: C, k, parts: [{ split, g: piece.g }] });
+    }
+    commit();
+    return true;
+  }
+  // Merge: the big RD of scale k holding the targeted piece, as an outline.
+  // mergeMissing: the small pieces inside it not yet built.
+  function mergeMissing({ k, c }) {
+    const out = [];
+    for (const d0 of scaleDecomposition(k, c)) {
+      const d = { ...d0, g: d0.split === 'whole' ? 0 : canonicalG(d0.split, d0.g) };
+      const entry = cells.get(keyOf(d.cell));
+      if (entry && (entry.parts === null || entry.parts.some((q) => q.split === d.split && q.g === d.g))) continue;
+      out.push({ split: d.split, g: d.g, cell: d.cell });
+    }
+    return out;
+  }
+  function startMerge(k) {
+    const entry = target && cells.get(target);
+    if (!entry) return;
+    pendingMerge = { k, c: nearestFcc(entry.c.map((v) => v / k)) };
+    rebuild();
+    showHudPrompt(t('hull.prompt.merge', lang()), 4500);
+  }
+  function confirmMerge() {
+    const { k, c } = pendingMerge;
+    const big = { split: 'whole', g: 0, cell: c, k };
+    if ([...bigs.values()].some((b) => piecesOverlap(big, { split: 'whole', g: 0, cell: b.c, k: b.k }))) {
+      showHudPrompt(t('hull.prompt.mergeBlocked', lang()), 3000);
+      return;
+    }
+    for (const d0 of scaleDecomposition(k, c)) {
+      const d = { ...d0, g: d0.split === 'whole' ? 0 : canonicalG(d0.split, d0.g) };
+      const key = keyOf(d.cell);
+      const entry = cells.get(key);
+      if (!entry) continue;
+      if (entry.parts === null) {
+        // A whole RD cut by the big RD's face: its inside part goes, the
+        // rest of the same split stays as fragments.
+        if (d.split === 'whole') cells.delete(key);
+        else entry.parts = splitOrientations(d.split).find((gs) => gs.includes(d.g)).filter((g) => g !== d.g).map((g) => ({ split: d.split, g }));
+      } else {
+        entry.parts = entry.parts.filter((q) => !piecesOverlap(big, { split: q.split, g: q.g, cell: entry.c, k: 1 }));
+        if (!entry.parts.length) cells.delete(key);
+      }
+    }
+    bigs.set(bigKey(k, c), { c, k, parts: null });
+    if (centre && !cells.has(keyOf(centre))) centre = cells.size ? [...cells.values()][0].c : centre;
+    target = bigKey(k, c);
+    pendingMerge = null;
+    commit();
+  }
+  // Zoom in: a whole big RD opens back into its small pieces.
+  function openBig(key) {
+    const b = bigs.get(key);
+    if (!b || b.parts) return;
+    bigs.delete(key);
+    for (const d0 of scaleDecomposition(b.k, b.c)) {
+      const d = { ...d0, g: d0.split === 'whole' ? 0 : canonicalG(d0.split, d0.g) };
+      const ck = keyOf(d.cell);
+      const entry = cells.get(ck);
+      if (d.split === 'whole') { cells.set(ck, { c: d.cell, parts: null }); continue; }
+      if (entry?.parts === null) continue;
+      if (entry) entry.parts.push({ split: d.split, g: d.g });
+      else cells.set(ck, { c: d.cell, parts: [{ split: d.split, g: d.g }] });
+    }
+    target = null;
+    commit();
+  }
   function placeWhole(cell) {
     if (cells.has(keyOf(cell))) return false;
+    if (overlapsBig({ split: 'whole', g: 0, cell, k: 1 })) { showHudPrompt(t('hull.prompt.noFit', lang()), 2500); return false; }
     cells.set(keyOf(cell), { c: cell, parts: null });
     if (!centre) centre = cell;
     commit();
@@ -352,12 +508,13 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     if (!hit) return false;
     const entry = cells.get(k);
     const piece = { split, g: hit.g, cell };
-    if (entry?.parts.some((p) => piecesOverlap(piece, { ...p, cell }))) {
+    if (entry?.parts.some((p) => piecesOverlap(piece, { ...p, cell })) || overlapsBig({ ...piece, k: 1 })) {
       showHudPrompt(t('hull.prompt.noFit', lang()), 2500);
       return false;
     }
-    if (entry) entry.parts.push({ split, g: hit.g });
-    else cells.set(k, { c: cell, parts: [{ split, g: hit.g }] });
+    const g = canonicalG(split, hit.g);
+    if (entry) entry.parts.push({ split, g });
+    else cells.set(k, { c: cell, parts: [{ split, g }] });
     if (!centre) centre = cell;
     commit();
     return true;
@@ -379,7 +536,8 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
   // Fragment mode: break the target cell into `split` (filling any gaps),
   // or make it whole again.
   function applyBreakdown(split) {
-    const entry = target && cells.get(target);
+    if (split === 'open') { openBig(target); return; }
+    const entry = target && (cells.get(target) ?? bigs.get(target));
     if (!entry) return;
     if (split === 'whole') { entry.parts = null; commit(); return; }
     const ors = splitOrientations(split);
@@ -388,7 +546,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     commit();
   }
   function turnTarget() {
-    const entry = target && cells.get(target);
+    const entry = target && (cells.get(target) ?? bigs.get(target));
     const split = entry?.parts?.[0]?.split;
     if (!split) return;
     const ors = splitOrientations(split);
@@ -400,7 +558,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
   function addShell() {
     if (!centre) { placeWhole([0, 0, 0]); return; }
     for (let n = 1; ; n++) {
-      const missing = hullShell(view.hull, n, centre).filter((c) => !cells.has(keyOf(c)));
+      const missing = hullShell(view.hull, n, centre).filter((c) => !cells.has(keyOf(c)) && !overlapsBig({ split: 'whole', g: 0, cell: c, k: 1 }));
       if (!missing.length) continue;
       if (cells.size + missing.length > MAX_PIECES) {
         showHudPrompt(t('hull.prompt.limit', lang(), { max: MAX_PIECES }), 3500);
@@ -440,8 +598,20 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     }
     const tri = kind === 'skin' ? skinTris[hit.faceIndex] : kind === 'parts' ? partTris[hit.faceIndex] : null;
     if (!tri) return false;
+    if (chisel && tri.big) {
+      const b = bigs.get(tri.key);
+      if (tri.part < 0 || !b.parts) bigs.delete(tri.key);
+      else { b.parts.splice(tri.part, 1); if (!b.parts.length) bigs.delete(tri.key); }
+      if (target === tri.key) target = null;
+      commit();
+      return true;
+    }
     if (chisel) return kind === 'skin' || tri.part < 0 ? removeCell(tri.key) : removePart(tri.key, tri.part);
-    if (view.mode === 'fragment') { target = tri.key; rebuild(); return true; }
+    if (view.mode === 'fragment') { target = tri.key; pendingMerge = null; rebuild(); return true; }
+    if (view.scale > 1 || tri.big) {
+      const nn = hit.face.normal;
+      return placeAt(view.piece, view.scale, [hit.point.x + nn.x * 0.02, hit.point.y + nn.y * 0.02, hit.point.z + nn.z * 0.02]);
+    }
     // Build: across an outer RD face into the next cell, or (a fragment's
     // cut face) into the same cell.
     const cell = cells.get(tri.key).c;
@@ -487,6 +657,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
       row(t('hull.info.centre', L), `(${centre.join(', ')})`),
       row(t('hull.info.pieces', L), String(cells.size)),
       fragments ? row(t('hull.info.fragments', L), String(fragments)) : '',
+      bigs.size ? row(t('hull.info.big', L), [...bigs.values()].map((b) => `×${b.k}`).join(', ')) : '',
       row(t('hull.info.shells', L), t('hull.info.complete', L, { n: complete })),
       ...rows.slice(-INFO_SHELL_ROWS).map((r) => `<div class="hull-shell-row">${r}</div>`),
     ].join('');
@@ -500,16 +671,19 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     <div class="w4d-row">
       <label class="hull-pick"><span class="hull-pick-label"></span> <select class="hull-select" data-select="hull"></select></label>
       <label class="hull-pick hull-piece-pick"><span class="hull-piece-label"></span> <select class="hull-select" data-select="piece"></select></label>
+      <label class="hull-pick hull-scale-pick"><span class="hull-scale-label"></span> <select class="hull-select" data-select="scale"></select></label>
     </div>
     <div class="w4d-row w4d-options"></div>`;
   document.body.appendChild(panel);
   const hullSelect = panel.querySelector('[data-select="hull"]');
   const pieceSelect = panel.querySelector('[data-select="piece"]');
   const piecePick = panel.querySelector('.hull-piece-pick');
+  const scaleSelect = panel.querySelector('[data-select="scale"]');
+  const scalePick = panel.querySelector('.hull-scale-pick');
   const optionsRow = panel.querySelector('.w4d-options');
   // The target's breakdown: its split if it holds one split's pieces.
   const targetSplit = () => {
-    const parts = target && cells.get(target)?.parts;
+    const parts = target && (cells.get(target) ?? bigs.get(target))?.parts;
     if (parts === null) return 'whole';
     return parts?.length && parts.every((p) => p.split === parts[0].split) ? parts[0].split : '';
   };
@@ -524,11 +698,22 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     // until a piece is targeted).
     panel.querySelector('.hull-piece-label').textContent = t(fragment ? 'hull.breakdown' : 'hull.piece', L);
     const current = fragment ? targetSplit() : view.piece;
+    const bigTarget = fragment && target && bigs.has(target);
     pieceSelect.innerHTML = (current === '' ? `<option value="" selected>${t('hull.split.mixed', L)}</option>` : '')
-      + SPLIT_IDS.map((id) => `<option value="${id}"${id === current ? ' selected' : ''}>${splitLabel(id, L)}</option>`).join('');
-    piecePick.hidden = fragment && !(target && cells.has(target));
-    const turnable = fragment && target && cells.get(target)?.parts?.length && targetSplit() && splitOrientations(targetSplit()).length > 1;
+      + SPLIT_IDS.map((id) => `<option value="${id}"${id === current ? ' selected' : ''}>${splitLabel(id, L)}</option>`).join('')
+      + (bigTarget && !bigs.get(target).parts ? `<option value="open">${t('hull.split.open', L)}</option>` : '');
+    piecePick.hidden = fragment && !(target && (cells.has(target) || bigs.has(target)));
+    panel.querySelector('.hull-scale-label').textContent = t('hull.scale', L);
+    scaleSelect.innerHTML = SCALES.map((k) => `<option value="${k}"${k === view.scale ? ' selected' : ''}>×${k}</option>`).join('');
+    scalePick.hidden = fragment;
+    const turnable = fragment && target && (cells.get(target) ?? bigs.get(target))?.parts?.length && targetSplit() && splitOrientations(targetSplit()).length > 1;
+    if (pendingMerge) {
+      optionsRow.innerHTML = `<button type="button" data-opt="confirmMerge" class="active">${t('hull.confirmMerge', L)}</button><button type="button" data-opt="cancelMerge">${t('hull.cancel', L)}</button>`;
+      return;
+    }
+    const mergeable = fragment && target && cells.has(target);
     optionsRow.innerHTML = [
+      ...(mergeable ? [2, 3].map((k) => `<button type="button" data-opt="merge" data-k="${k}">${t('hull.merge', L, { k })}</button>`) : []),
       `<button type="button" data-opt="mode" class="${fragment ? 'active' : ''}">${t(fragment ? 'hull.mode.fragment' : 'hull.mode.build', L)}</button>`,
       turnable ? `<button type="button" data-opt="turn">${t('hull.turn', L)}</button>` : '',
       !fragment && TRIMMABLE.includes(view.hull) ? `<button type="button" data-opt="trim" class="${view.trim ? 'active' : ''}">${t('hull.trim', L)}</button>` : '',
@@ -543,7 +728,14 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     save(); rebuild();
     showHudPrompt(t('hull.prompt.hull', lang(), { name: t(HULL_LABEL_KEY[view.hull], lang()) }), 3000);
   });
+  scaleSelect.addEventListener('change', () => {
+    const k = Number(scaleSelect.value);
+    if (!SCALES.includes(k)) return;
+    view.scale = k;
+    save();
+  });
   pieceSelect.addEventListener('change', () => {
+    if (pieceSelect.value === 'open' && view.mode === 'fragment') { applyBreakdown('open'); return; }
     if (!SPLIT_IDS.includes(pieceSelect.value)) return;
     if (view.mode === 'fragment') { applyBreakdown(pieceSelect.value); return; }
     view.piece = pieceSelect.value;
@@ -555,6 +747,9 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     if (b.dataset.opt === 'add') addShell();
     else if (b.dataset.opt === 'remove') removeShell();
     else if (b.dataset.opt === 'turn') turnTarget();
+    else if (b.dataset.opt === 'merge') startMerge(Number(b.dataset.k));
+    else if (b.dataset.opt === 'confirmMerge') confirmMerge();
+    else if (b.dataset.opt === 'cancelMerge') { pendingMerge = null; rebuild(); }
     else if (b.dataset.opt === 'trim') {
       view.trim = !view.trim;
       save(); rebuild();
@@ -564,6 +759,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     else if (b.dataset.opt === 'mode') {
       view.mode = view.mode === 'fragment' ? 'build' : 'fragment';
       target = null;
+      pendingMerge = null;
       save(); rebuild();
       if (view.mode === 'fragment') showHudPrompt(t('hull.prompt.target', lang()), 3500);
     }
@@ -586,9 +782,9 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     setSkeleton(on) { skeleton = on; if (active) rebuild(); },
     setTranslucent(o) { if (o !== opacity) { opacity = o; if (active) rebuild(); } },
     setLatticeView(on) { latticeView = on; if (active) rebuild(); },
-    get isEmpty() { return cells.size === 0; },
+    get isEmpty() { return cells.size === 0 && bigs.size === 0; },
     get pieceCount() { return cells.size; },
-    clear() { cells.clear(); centre = null; target = null; commit(); },
+    clear() { cells.clear(); bigs.clear(); centre = null; target = null; pendingMerge = null; commit(); },
     // Undo (render.js's history): the pieces and the centre, never the view.
     snapshot: toJSON,
     restore(json) { setFromJSON(json); save(); rebuild(); onChange(); },

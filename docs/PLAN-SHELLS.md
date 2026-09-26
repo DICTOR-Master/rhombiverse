@@ -1,6 +1,6 @@
 # Plan: Shells, a hull-building 3D scene
 
-Status: agreed design; stages 1-4 shipped. Delete this file once every stage
+Status: agreed design; stages 1-5 shipped. Delete this file once every stage
 has shipped (the code and the guide then describe the feature).
 
 ## The idea
@@ -158,7 +158,16 @@ positions and orientations, and can mix with whole RDs. **Fragmenting**
 from a dropdown, and it splits into that many pieces in place (one undo
 step); pieces keep their shell colour.
 
-**5. Scale ladder.** Zoom out: pick a scale (×2, ×3 …), see the big-RD
+**5. Scale ladder.** *Shipped:* a Scale dropdown (×1–×4) places whole
+RDs and loose fragments at that size on the k·FCC lattice (probe past the
+tapped face, nearest coarse cell, exact overlap checks across scales).
+Merge ×2/×3 from a targeted piece: gold outline plus ghosts of the missing
+small pieces, then Confirm swaps in one big RD (cut cells keep their
+outside parts as fragments of the same split; gaps are filled). A
+targeted big RD offers "Open into ×1 pieces". Volume checked exactly
+(merge adds exactly the filled gaps; open conserves). canonicalG
+normalises piece labels across sources. Not yet: big RDs aren't trimmed
+or banded inside. Zoom out: pick a scale (×2, ×3 …), see the big-RD
 outline over the build with missing and extra pieces marked, confirm to
 replace. Zoom in: a big RD opens into its pieces. Big and small pieces
 can then sit together, joined by the boundary pieces.

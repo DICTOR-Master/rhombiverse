@@ -400,3 +400,30 @@ export function trimPiece(planes, splitId, g, cell) {
   const cut = solidFromPlanes([...own, ...planes]);
   return cut.volume > 1e-7 ? cut : null;
 }
+
+// The FCC lattice point nearest to p (integers with an even sum): round,
+// then fix the parity on the coordinate that was furthest from an integer.
+export function nearestFcc(p) {
+  const r = p.map(Math.round);
+  if ((r[0] + r[1] + r[2]) % 2 !== 0) {
+    let i = 0;
+    for (let j = 1; j < 3; j++) if (Math.abs(p[j] - r[j]) > Math.abs(p[i] - r[i])) i = j;
+    r[i] += p[i] > r[i] ? 1 : -1;
+  }
+  return r;
+}
+
+// The same piece can come from several symmetry elements (its stabiliser).
+// canonicalG: the element splitOrientations uses for that piece, so pieces
+// from different sources (scaleDecomposition's identifyPiece, pieceAt,
+// fragment lists) compare by g directly.
+const canonicalCache = new Map();
+export function canonicalG(splitId, g) {
+  const key = `${splitId}|${g}`;
+  if (canonicalCache.has(key)) return canonicalCache.get(key);
+  const s = SPLIT_BY_ID.get(splitId);
+  const target = vertexKey(s.piece0.verts.map((v) => apply(OH[g], v)));
+  const found = splitOrientations(splitId).flat().find((h) => vertexKey(s.piece0.verts.map((v) => apply(OH[h], v))) === target) ?? g;
+  canonicalCache.set(key, found);
+  return found;
+}

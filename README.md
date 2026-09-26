@@ -49,7 +49,9 @@ right-click) removes. The **User Guide** (in the app, or at
   one tap; **Trim** cuts the hull exactly flat into its target shape;
   **Fragment** breaks any piece into its symmetric parts — halves, thirds,
   quarters, sixths, eighths, twelfths, sixteenths, 24ths or all 48 wedges —
-  and single parts can be placed on their own.
+  and single parts can be placed on their own. A **Scale** menu builds with
+  bigger RDs (×2 to ×4), and **Merge** turns a cluster of small pieces into
+  one big RD, or opens one back up.
 - **Golden Rhombohedra** (a 3D world of its own) — build freely with the
   prolate and oblate golden rhombohedra, the two pieces of the 3D Penrose
   (Ammann–Kramer) tiling. The **Penrose check** colours each piece green

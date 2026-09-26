@@ -251,6 +251,14 @@ const en = {
   'golden.info.matching': '{n} of {total} pieces belong to it',
   'golden.prompt.noFit': 'No {piece} rhombohedron fits across that face.',
   'golden.prompt.check': 'Penrose check: green pieces belong to the true aperiodic tiling, red ones have drifted from it.',
+  'hull.scale': 'Scale:',
+  'hull.merge': 'Merge ×{k}',
+  'hull.confirmMerge': 'Confirm merge',
+  'hull.cancel': 'Cancel',
+  'hull.split.open': 'Open into ×1 pieces',
+  'hull.prompt.merge': 'Merge: the gold outline is the big RD; ghosts show the small pieces it still needs. Confirm swaps in one big RD; pieces sticking out keep their outside parts.',
+  'hull.prompt.mergeBlocked': 'Another big piece is in the way.',
+  'hull.info.big': 'Big pieces',
 };
 
 const ja = {
@@ -463,6 +471,14 @@ const ja = {
   'golden.info.matching': '{total} 個中 {n} 個が一致',
   'golden.prompt.noFit': 'その面の向こうに合う{piece}菱面体はありません。',
   'golden.prompt.check': 'ペンローズ判定：緑のピースは真の非周期タイリングに属し、赤はそこから外れています。',
+  'hull.scale': 'スケール：',
+  'hull.merge': '×{k} に統合',
+  'hull.confirmMerge': '統合を確定',
+  'hull.cancel': 'キャンセル',
+  'hull.split.open': '×1 のピースに開く',
+  'hull.prompt.merge': '統合：金色の輪郭が大きな RD です。まだ足りない小さなピースは幽霊で表示されます。確定すると大きな RD 1 つに置き換わり、はみ出したピースは外側の部分が残ります。',
+  'hull.prompt.mergeBlocked': '別の大きなピースが邪魔をしています。',
+  'hull.info.big': '大きなピース',
 };
 
 const es = {
@@ -675,6 +691,14 @@ const es = {
   'golden.info.matching': '{n} de {total} piezas pertenecen a él',
   'golden.prompt.noFit': 'Ningún romboedro {piece} cabe al otro lado de esa cara.',
   'golden.prompt.check': 'Control Penrose: las piezas verdes pertenecen al verdadero teselado aperiódico; las rojas se han desviado.',
+  'hull.scale': 'Escala:',
+  'hull.merge': 'Fusionar ×{k}',
+  'hull.confirmMerge': 'Confirmar fusión',
+  'hull.cancel': 'Cancelar',
+  'hull.split.open': 'Abrir en piezas ×1',
+  'hull.prompt.merge': 'Fusionar: el contorno dorado es el RD grande; los fantasmas muestran las piezas pequeñas que aún le faltan. Confirmar pone un solo RD grande; las piezas que sobresalen conservan su parte exterior.',
+  'hull.prompt.mergeBlocked': 'Otra pieza grande estorba.',
+  'hull.info.big': 'Piezas grandes',
 };
 
 const fr = {
@@ -887,6 +911,14 @@ const fr = {
   'golden.info.matching': '{n} pièces sur {total} en font partie',
   'golden.prompt.noFit': 'Aucun rhomboèdre {piece} ne tient de l’autre côté de cette face.',
   'golden.prompt.check': 'Contrôle Penrose : les pièces vertes appartiennent au vrai pavage apériodique, les rouges s’en sont écartées.',
+  'hull.scale': 'Échelle :',
+  'hull.merge': 'Fusionner ×{k}',
+  'hull.confirmMerge': 'Confirmer la fusion',
+  'hull.cancel': 'Annuler',
+  'hull.split.open': 'Ouvrir en pièces ×1',
+  'hull.prompt.merge': 'Fusionner : le contour doré est le grand RD ; les fantômes montrent les petites pièces qui lui manquent. Confirmer le remplace par un seul grand RD ; les pièces qui dépassent gardent leur partie extérieure.',
+  'hull.prompt.mergeBlocked': 'Une autre grande pièce gêne.',
+  'hull.info.big': 'Grandes pièces',
 };
 
 const ko = {
@@ -1099,6 +1131,14 @@ const ko = {
   'golden.info.matching': '{total}개 중 {n}개가 속함',
   'golden.prompt.noFit': '그 면 너머에 맞는 {piece} 능면체가 없습니다.',
   'golden.prompt.check': '펜로즈 검사: 초록 조각은 진짜 비주기 타일링에 속하고, 빨간 조각은 거기서 벗어났습니다.',
+  'hull.scale': '배율:',
+  'hull.merge': '×{k}로 합치기',
+  'hull.confirmMerge': '합치기 확인',
+  'hull.cancel': '취소',
+  'hull.split.open': '×1 조각으로 열기',
+  'hull.prompt.merge': '합치기: 금색 윤곽이 큰 RD입니다. 아직 필요한 작은 조각은 유령으로 보입니다. 확인하면 큰 RD 하나로 바뀌고, 삐져나온 조각은 바깥 부분이 남습니다.',
+  'hull.prompt.mergeBlocked': '다른 큰 조각이 가로막고 있습니다.',
+  'hull.info.big': '큰 조각',
 };
 
 const zh = {
@@ -1311,6 +1351,14 @@ const zh = {
   'golden.info.matching': '{total} 块中有 {n} 块属于它',
   'golden.prompt.noFit': '那个面的另一侧放不下{piece}菱面体。',
   'golden.prompt.check': '彭罗斯检查：绿色的块属于真正的非周期铺砌，红色的已偏离。',
+  'hull.scale': '比例：',
+  'hull.merge': '合并为 ×{k}',
+  'hull.confirmMerge': '确认合并',
+  'hull.cancel': '取消',
+  'hull.split.open': '拆开为 ×1 部件',
+  'hull.prompt.merge': '合并：金色轮廓是大 RD；虚影显示它还缺的小部件。确认后换成一个大 RD，伸出去的部件保留外侧部分。',
+  'hull.prompt.mergeBlocked': '另一个大部件挡住了。',
+  'hull.info.big': '大部件',
 };
 
 const ru = {
@@ -1523,6 +1571,14 @@ const ru = {
   'golden.info.matching': 'принадлежит ему: {n} из {total}',
   'golden.prompt.noFit': 'За этой гранью не помещается ромбоэдр «{piece}».',
   'golden.prompt.check': 'Проверка Пенроуза: зелёные детали принадлежат настоящему апериодическому разбиению, красные от него отклонились.',
+  'hull.scale': 'Масштаб:',
+  'hull.merge': 'Объединить ×{k}',
+  'hull.confirmMerge': 'Подтвердить',
+  'hull.cancel': 'Отмена',
+  'hull.split.open': 'Разобрать на детали ×1',
+  'hull.prompt.merge': 'Объединение: золотой контур — большой RD; призраки показывают недостающие маленькие детали. «Подтвердить» заменит их одним большим RD; у выступающих деталей останутся внешние части.',
+  'hull.prompt.mergeBlocked': 'Мешает другая большая деталь.',
+  'hull.info.big': 'Большие детали',
 };
 
 const I18N = { en, ja, es, fr, ko, zh, ru };

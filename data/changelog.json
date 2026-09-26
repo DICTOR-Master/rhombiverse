@@ -3,6 +3,7 @@
     "date": "2026-09-26",
     "title": "Shells",
     "items": [
+      "Shells: bigger RDs. A Scale menu (×1 to ×4) places whole RDs and single parts at that size, snapped to the bigger lattice. In Fragment mode, Merge ×2 or ×3 outlines the big RD around the targeted piece and shows the small pieces it still needs; Confirm swaps in one big RD, and pieces sticking out keep their outside parts. A big RD opens back into small pieces from the Breakdown menu.",
       "Golden Rhombohedra, a new 3D world (Wizard → 3D, or the Piece wheel): build freely with the prolate and oblate golden rhombohedra, the two pieces of the 3D Penrose tiling. Tap a face to add the chosen piece across it. The Penrose check colours each piece green where it belongs to the true aperiodic tiling and red where your build has drifted, and Lattice View shows the true tiling around your build: tap a ghost to place it.",
       "The welcome screen's 2D, 3D, 4D, 5D & 6D are now shortcuts: tap one to open the Wizard straight at that dimension (the 5D and 6D Catalogues included).",
       "5D and 6D: the Catalogue has a new Bridges section of 43 hyperprisms (polytopes carried one step through a further dimension, from triangle and square prisms up to the 5-orthoplex and 5-demicube prisms), placed as shadows like the polytopes. And Connect joins any two items or pieces with the shortest chain of real tiles between them, as one connector you can undo.",
