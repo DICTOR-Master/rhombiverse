@@ -1490,6 +1490,18 @@ function rebuildOctGapInstances(octGapMesh, octGapWorld) {
 }
 
 async function init() {
+  // Lattice View state, declared first: dimension switches (which can
+  // run early in startup) rebuild it.
+  let latticeQuickViewMode = 'off';
+  let latticeQuickViewMesh = null;
+  let latticeQuickViewEdges = null;
+  // Real bug the old system already hit and fixed live (2026-08-28),
+  // same guard kept here even though the only remaining overlapping
+  // caller is onChange() vs. a direct cycle click: a generation
+  // counter, bumped at the start of every call, lets a call whose own
+  // await resolves AFTER a newer call already started discard its
+  // stale result instead of touching the scene.
+  let latticeQuickViewGeneration = 0;
   wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
   wireFirstUseHint('spherical-toggle', 'Spherical: renders shapes in a simplified near-spherical form -- a client-side view only, your cells are untouched.');
   wireFirstUseHint('bcc-toggle', 'Lattice View: click to cycle a preview lens through every Piece type -- RD, Cube, Pyramid (shown on your real World), then Cuboctahedron and Octahedron, then BCC/TO, Flattened Octahedron, and Disphenoid (a hypothetical patch near you), then Off.');
@@ -2773,6 +2785,10 @@ async function init() {
   // so the two mechanisms never fight each other.
   function applyDimensionVisibility() {
     setSolidWorldVisible(worldViewMode !== 'skeleton');
+    // The 3D/2D Lattice View overlay belongs to the dimension it was drawn
+    // in: redraw it for the new one (4D/5D/6D clear it and draw their own).
+    // Real bug, direct report: "I had the 3D kagome lattice come into 5D".
+    if (latticeQuickViewMode !== 'off') rebuildLatticeQuickView();
   }
   function clearWorldViewSkeleton() {
     if (skeletonMesh) {
@@ -3948,16 +3964,6 @@ async function init() {
     [1, 1, 1],
     [-1, -1, -1],
   ];
-  let latticeQuickViewMode = 'off';
-  let latticeQuickViewMesh = null;
-  let latticeQuickViewEdges = null;
-  // Real bug the old system already hit and fixed live (2026-08-28),
-  // same guard kept here even though the only remaining overlapping
-  // caller is onChange() vs. a direct cycle click: a generation
-  // counter, bumped at the start of every call, lets a call whose own
-  // await resolves AFTER a newer call already started discard its
-  // stale result instead of touching the scene.
-  let latticeQuickViewGeneration = 0;
 
   function clearLatticeQuickView() {
     for (const g of [latticeQuickViewMesh, latticeQuickViewEdges]) {
