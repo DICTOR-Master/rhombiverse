@@ -657,6 +657,16 @@ export function createBuildController({
     if (mode !== 'build' && store.companionMeshes?.includes(hit.object)) { if (onPieceNoOp) onPieceNoOp(action); return; }
     const cell = store.cellAt(hit.instanceId, hit.object);
     if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    // Paint: recolour the tapped tile. A Kagome triangle is shared by up
+    // to 3 hexagons, so (as with removing) only a hexagon tap counts.
+    if (mode === 'build' && lattice2d.isPainting?.()) {
+      const { x, y, z, ...data } = cell;
+      const material = getMaterial();
+      if (store.companionMeshes?.includes(hit.object) || data.material === material) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      store.world.addCell(x, y, z, { ...data, material });
+      lattice2d.onChange(primitiveId);
+      return;
+    }
     const angleDeg = lattice2d.getAngleDeg();
     if (mode === 'build') {
       const s = lattice2d.s;

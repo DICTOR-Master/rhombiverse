@@ -814,7 +814,11 @@ const AUTO_ASSIGN_MATERIAL_BY_PIECE = {
   hexprism: 'water',
   rhombohedra: 'glassite',
   pyrochlore: 'emerald',
-  lattice2d: 'base',
+  'lattice2d:parallelogram': 'water',
+  'lattice2d:triangle': 'garnet',
+  'lattice2d:hexagon': 'emerald',
+  'lattice2d:kite': 'amethyst',
+  'lattice2d:kagome': 'gold',
 };
 const AUTO_ASSIGN_PIECE_LABELS = {
   rd: 'RD (full block)',
@@ -834,7 +838,11 @@ const AUTO_ASSIGN_PIECE_LABELS = {
   hexprism: 'Hexagonal Prism',
   rhombohedra: 'Rhombohedra',
   pyrochlore: 'Pyrochlore (3D Kagome)',
-  lattice2d: '2D tiles',
+  'lattice2d:parallelogram': '2D Parallelogram',
+  'lattice2d:triangle': '2D Triangle',
+  'lattice2d:hexagon': '2D Hexagon',
+  'lattice2d:kite': '2D Kite',
+  'lattice2d:kagome': '2D Kagome',
 };
 
 // Piece colour mode (2026-09-26, parity with Polyhedraverse's Green /
@@ -1329,7 +1337,7 @@ function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangeme
           m.makeScale(0, 0, 0);
         }
         classMesh.setMatrixAt(i, m);
-        classMesh.setColorAt(i, instanceColorFor(cell, 'lattice2d'));
+        classMesh.setColorAt(i, instanceColorFor(cell, `lattice2d:${primitiveId}`));
       });
       classMesh.count = cellOrder.length;
       classMesh.instanceMatrix.needsUpdate = true;
@@ -1357,7 +1365,7 @@ function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangeme
         m.makeTranslation(wx, wy, wz);
       }
       mesh.setMatrixAt(i, m);
-      mesh.setColorAt(i, instanceColorFor(cell, 'lattice2d'));
+      mesh.setColorAt(i, instanceColorFor(cell, `lattice2d:${primitiveId}`));
     });
     mesh.count = cellOrder.length;
     mesh.instanceMatrix.needsUpdate = true;
@@ -1377,7 +1385,7 @@ function rebuildLattice2dInstances(mesh, world, primitiveId, angleDeg, arrangeme
       instances.forEach(({ world: [wx, wy], owner }, i) => {
         cm.makeTranslation(wx, wy, 0);
         companionMesh.setMatrixAt(i, cm);
-        companionMesh.setColorAt(i, instanceColorFor(cellOrder[owner], 'lattice2d').clone().lerp(KAGOME_TRIANGLE_LIGHTEN_TO, KAGOME_TRIANGLE_LIGHTEN));
+        companionMesh.setColorAt(i, instanceColorFor(cellOrder[owner], `lattice2d:${primitiveId}`).clone().lerp(KAGOME_TRIANGLE_LIGHTEN_TO, KAGOME_TRIANGLE_LIGHTEN));
       });
       lattice2dCompanionOwners.set(companionMesh, instances.map((inst) => inst.owner));
       companionMesh.count = instances.length;
@@ -1928,8 +1936,23 @@ async function init() {
     cell24: '<svg viewBox="-30 -30 60 60"><polygon points="0,-24 20.78,-12 20.78,12 0,24 -20.78,12 -20.78,-12" fill="none" stroke="currentColor" stroke-width="3"/><polygon points="0,-12 10.39,6 -10.39,6" fill="currentColor" opacity="0.35"/></svg>',
     cell16: '<svg viewBox="-30 -30 60 60"><polygon points="0,-24 24,0 0,24 -24,0" fill="none" stroke="currentColor" stroke-width="3"/><path d="M0,-24 V24 M-24,0 H24" stroke="currentColor" stroke-width="1.5" opacity="0.6"/></svg>',
   };
+  // 2D Paint (2026-09-26): the same slot, shown in 2D. While on, a tap
+  // on a placed tile gives it the picked colour instead of adding one;
+  // it turns Pick on, since only Pick shows each tile's own colour.
+  let paint2d = false;
+  function setPaint2d(on) {
+    paint2d = on;
+    rhomboAttachBtn?.classList.toggle('active', on);
+    renderRhomboAttachButton();
+  }
+  const PAINT_ICON = '<svg viewBox="-30 -30 60 60"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M-4,4 L16,-16 a5,5 0 0 1 7,7 L3,11 Z"/><path d="M-4,4 C-12,4 -14,10 -14,14 C-14,20 -20,22 -24,22 C-16,26 -2,24 3,11"/></g></svg>';
   function renderRhomboAttachButton() {
     if (!rhomboAttachBtn) return;
+    if (activeDimension === '2D') {
+      rhomboAttachBtn.innerHTML = PAINT_ICON;
+      rhomboAttachBtn.title = `Paint: ${paint2d ? 'on' : 'off'} (tap to switch)`;
+      return;
+    }
     if (A4_CYCLE.includes(attachPiece())) {
       rhomboAttachBtn.innerHTML = `<svg viewBox="-30 -30 60 60">${MARKS[{ a4trunc: 'pieceTrunc5Cell', a4bitrunc: 'pieceBitrunc5Cell', a4cell5: 'piece5Cell' }[attachPiece()]]}</svg>`;
       rhomboAttachBtn.title = `Hyper-pyrochlore: ${A4_ATTACH_LABELS[attachPiece()]} (tap to switch)`;
@@ -1949,6 +1972,12 @@ async function init() {
     rhomboAttachBtn.title = `Rhombohedra attach: ${rhomboAttachMode === 'mirror' ? 'Mirror' : 'Copy'} (tap to switch)`;
   }
   rhomboAttachBtn?.addEventListener('click', () => {
+    if (activeDimension === '2D') {
+      setPaint2d(!paint2d);
+      if (paint2d && colorView.mode !== 'pick') setColorMode('pick');
+      showHudPrompt(paint2d ? 'Paint: tap a tile to give it the picked colour.' : 'Paint off: taps add tiles again.', 3000);
+      return;
+    }
     if (attachPiece() === 'cell24' || attachPiece() === 'cell16') {
       selectPieceAction?.(`tool:pieceType:${attachPiece() === 'cell24' ? 'cell16' : 'cell24'}`);
       return;
@@ -1976,7 +2005,9 @@ async function init() {
   renderRhomboAttachButton();
   function updateRhomboAttachPanel() {
     const attachable = activeDimension === '4D' ? ['cell24', 'cell16', ...A4_CYCLE] : activeDimension !== '2D' && !isOwnWorldDimension() ? ['rhombohedra', 'pyrochlore'] : [];
-    rhomboAttachBtn?.classList.toggle('hidden', !attachable.includes(attachPiece()));
+    const show2dPaint = activeDimension === '2D';
+    if (!show2dPaint && paint2d) setPaint2d(false);
+    rhomboAttachBtn?.classList.toggle('hidden', !show2dPaint && !attachable.includes(attachPiece()));
     renderRhomboAttachButton();
   }
 
@@ -4466,6 +4497,7 @@ async function init() {
   function setColorMode(mode) {
     if (!COLOR_MODES.includes(mode) || mode === colorView.mode) return;
     colorView.mode = mode;
+    if (mode !== 'pick' && paint2d) setPaint2d(false);
     try { localStorage.setItem(COLOR_MODE_STORAGE_KEY, mode); } catch { /* best-effort only */ }
     showColorMode();
     repaintAllPieces();
@@ -5180,6 +5212,7 @@ async function init() {
       // resolveLattice2dImpl this file's own rebuildLattice2dInstances
       // already uses keeps them permanently in agreement.
       getImpl: (primitiveId) => resolveLattice2dImpl(primitiveId, activeLattice2dArrangementId),
+      isPainting: () => paint2d && activeDimension === '2D',
     },
     rhombohedraWorld,
     rhombohedraMesh,

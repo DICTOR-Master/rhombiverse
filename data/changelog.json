@@ -3,6 +3,7 @@
     "date": "2026-09-26",
     "title": "Colours & Shells",
     "items": [
+      "2D: each shape now has its own colour in Type mode (Parallelogram, Triangle, Hexagon, Kite and Kagome, each changeable in Settings), and a new Paint button (the brush, bottom row) recolours tiles you've already placed: turn it on, pick a colour and tap a tile. Paint switches to Pick so each tile shows its own colour; turn it off to add tiles again.",
       "The dimension you're in (2D to 6D) now shows in large orange letters beside Wizard, top left. Wizard and Menu are boxed like the other buttons, so they read as buttons.",
       "Colours: a new Cyan / Type / Pick setting (in Settings), matching Polyhedraverse. Cyan, now the default, shows every piece cyan; Type shows each kind of piece in its own colour, live; Pick shows each piece in the colour it was placed with. Switching never loses placed colours, and picking a colour while in Cyan switches to Pick.",
       "Shells: Info now has the ring diagram back, one coloured ring per shell. Tap a ring (or a shell's Hide button) to hide that shell and see the bands inside, like peeling an onion; remove any single shell with ✕; and pick the band colours: Hue steps, Rainbow, Warm or Cool.",
