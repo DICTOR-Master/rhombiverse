@@ -50,6 +50,11 @@ right-click) removes. The **User Guide** (in the app, or at
   **Fragment** breaks any piece into its symmetric parts — halves, thirds,
   quarters, sixths, eighths, twelfths, sixteenths, 24ths or all 48 wedges —
   and single parts can be placed on their own.
+- **Golden Rhombohedra** (a 3D world of its own) — build freely with the
+  prolate and oblate golden rhombohedra, the two pieces of the 3D Penrose
+  (Ammann–Kramer) tiling. The **Penrose check** colours each piece green
+  where it belongs to the true aperiodic tiling and red where the build has
+  drifted; Lattice View shows the true tiling around your build.
 - **4D** — three worlds sharing one frame with the RD world:
   **Tesseract** (Z4), **D4** (the 24-cell, the 4D RD, whose slice at
   w = 0 is exactly the RD world, and the 16-cell) and **Hyper-pyrochlore

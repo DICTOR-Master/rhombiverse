@@ -373,6 +373,8 @@ export const WHEEL_PIECE = {
     // Octahedron -- a genuinely new piece, kept distinct from the old
     // "Octahedron Site" 4-disphenoid bundle above rather than replacing
     // it, direct user decision 2026-08-31.
+    "top|sx1sz1":       { kind: "dept", label: "Golden Rhombohedra", action: "tool:goldenWorld",
+      desc: "The 3D Penrose pair: build freely with prolate and oblate golden rhombohedra." },
     "top|sy1sz1":       { kind: "dept", label: "Octahedron", action: "tool:pieceType:octahedron",
       desc: "Fills the gap between cuboctahedra face to face -- click near a Cuboctahedron's own corner." },
   }
@@ -638,6 +640,7 @@ export const ACTION_TO_MARK = {
   'navigateTo:rdFamily': 'pieceRD',
   'tool:pieceType:rd': 'pieceRD',
   'tool:shellsWorld': 'pieceRD',
+  'tool:goldenWorld': 'pieceRhombohedron',
   // Real 3D-profile marks, added 2026-09-06 -- see wheel-icons.js's own
   // pieceHalfRD/pieceHourglass/pieceHemi3/pieceHemi4 header for the full
   // derivation (real orthographic silhouettes, not hand-drawn).

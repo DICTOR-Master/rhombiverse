@@ -261,6 +261,9 @@ export const LATTICES_3D = [
   { key: 'shells', label: 'Shells', pieces: [
     { label: 'Shells', action: 'tool:shellsWorld' },
   ] },
+  { key: 'golden', label: 'Golden Rhombohedra', pieces: [
+    { label: 'Golden Rhombohedra', action: 'tool:goldenWorld' },
+  ] },
 ];
 
 // 4D thumbnails (direct decision, option B): each cell's 4D edges turned

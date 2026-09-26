@@ -241,6 +241,16 @@ const en = {
   'qc.connect.touching': 'Those two already touch.',
   'qc.connect.placed.one': 'Connector placed ({n} new piece).',
   'qc.connect.placed.other': 'Connector placed ({n} new pieces).',
+  'wiz.3d.golden': 'The 3D Penrose pair: build freely with prolate and oblate golden rhombohedra, and see where your build follows the true aperiodic tiling.',
+  'golden.prolate': 'Prolate',
+  'golden.oblate': 'Oblate',
+  'golden.check': 'Penrose check',
+  'golden.info.pieces': 'Pieces',
+  'golden.info.counts': '{prolate} prolate, {oblate} oblate',
+  'golden.info.penrose': 'Penrose tiling',
+  'golden.info.matching': '{n} of {total} pieces belong to it',
+  'golden.prompt.noFit': 'No {piece} rhombohedron fits across that face.',
+  'golden.prompt.check': 'Penrose check: green pieces belong to the true aperiodic tiling, red ones have drifted from it.',
 };
 
 const ja = {
@@ -443,6 +453,16 @@ const ja = {
   'qc.connect.touching': 'その 2 つはすでに接しています。',
   'qc.connect.placed.one': 'コネクタを配置しました（新しいピース {n} 個）。',
   'qc.connect.placed.other': 'コネクタを配置しました（新しいピース {n} 個）。',
+  'wiz.3d.golden': '3D ペンローズの 2 ピース：細長い黄金菱面体と平たい黄金菱面体を自由に組み、真の非周期タイリングにどこまで沿っているかを確かめます。',
+  'golden.prolate': '細長い',
+  'golden.oblate': '平たい',
+  'golden.check': 'ペンローズ判定',
+  'golden.info.pieces': 'ピース',
+  'golden.info.counts': '細長い {prolate}、平たい {oblate}',
+  'golden.info.penrose': 'ペンローズ・タイリング',
+  'golden.info.matching': '{total} 個中 {n} 個が一致',
+  'golden.prompt.noFit': 'その面の向こうに合う{piece}菱面体はありません。',
+  'golden.prompt.check': 'ペンローズ判定：緑のピースは真の非周期タイリングに属し、赤はそこから外れています。',
 };
 
 const es = {
@@ -645,6 +665,16 @@ const es = {
   'qc.connect.touching': 'Esos dos ya se tocan.',
   'qc.connect.placed.one': 'Conector colocado ({n} pieza nueva).',
   'qc.connect.placed.other': 'Conector colocado ({n} piezas nuevas).',
+  'wiz.3d.golden': 'La pareja de Penrose en 3D: construye libremente con romboedros áureos alargados y achatados, y mira dónde sigue tu construcción al verdadero teselado aperiódico.',
+  'golden.prolate': 'Alargado',
+  'golden.oblate': 'Achatado',
+  'golden.check': 'Control Penrose',
+  'golden.info.pieces': 'Piezas',
+  'golden.info.counts': '{prolate} alargados, {oblate} achatados',
+  'golden.info.penrose': 'Teselado de Penrose',
+  'golden.info.matching': '{n} de {total} piezas pertenecen a él',
+  'golden.prompt.noFit': 'Ningún romboedro {piece} cabe al otro lado de esa cara.',
+  'golden.prompt.check': 'Control Penrose: las piezas verdes pertenecen al verdadero teselado aperiódico; las rojas se han desviado.',
 };
 
 const fr = {
@@ -847,6 +877,16 @@ const fr = {
   'qc.connect.touching': 'Ces deux-là se touchent déjà.',
   'qc.connect.placed.one': 'Connecteur posé ({n} nouvelle pièce).',
   'qc.connect.placed.other': 'Connecteur posé ({n} nouvelles pièces).',
+  'wiz.3d.golden': 'La paire de Penrose en 3D : construisez librement avec des rhomboèdres dorés allongés et aplatis, et voyez où votre construction suit le vrai pavage apériodique.',
+  'golden.prolate': 'Allongé',
+  'golden.oblate': 'Aplati',
+  'golden.check': 'Contrôle Penrose',
+  'golden.info.pieces': 'Pièces',
+  'golden.info.counts': '{prolate} allongés, {oblate} aplatis',
+  'golden.info.penrose': 'Pavage de Penrose',
+  'golden.info.matching': '{n} pièces sur {total} en font partie',
+  'golden.prompt.noFit': 'Aucun rhomboèdre {piece} ne tient de l’autre côté de cette face.',
+  'golden.prompt.check': 'Contrôle Penrose : les pièces vertes appartiennent au vrai pavage apériodique, les rouges s’en sont écartées.',
 };
 
 const ko = {
@@ -1049,6 +1089,16 @@ const ko = {
   'qc.connect.touching': '그 둘은 이미 닿아 있습니다.',
   'qc.connect.placed.one': '연결 조각을 놓았습니다(새 조각 {n}개).',
   'qc.connect.placed.other': '연결 조각을 놓았습니다(새 조각 {n}개).',
+  'wiz.3d.golden': '3D 펜로즈 한 쌍: 길쭉한 황금 능면체와 납작한 황금 능면체로 자유롭게 쌓고, 진짜 비주기 타일링을 어디까지 따르는지 확인합니다.',
+  'golden.prolate': '길쭉한',
+  'golden.oblate': '납작한',
+  'golden.check': '펜로즈 검사',
+  'golden.info.pieces': '조각',
+  'golden.info.counts': '길쭉한 {prolate}개, 납작한 {oblate}개',
+  'golden.info.penrose': '펜로즈 타일링',
+  'golden.info.matching': '{total}개 중 {n}개가 속함',
+  'golden.prompt.noFit': '그 면 너머에 맞는 {piece} 능면체가 없습니다.',
+  'golden.prompt.check': '펜로즈 검사: 초록 조각은 진짜 비주기 타일링에 속하고, 빨간 조각은 거기서 벗어났습니다.',
 };
 
 const zh = {
@@ -1251,6 +1301,16 @@ const zh = {
   'qc.connect.touching': '这两者已经相接。',
   'qc.connect.placed.one': '已放置连接件（新增 {n} 块）。',
   'qc.connect.placed.other': '已放置连接件（新增 {n} 块）。',
+  'wiz.3d.golden': '3D 彭罗斯的两块：用细长和扁平的黄金菱面体自由搭建，并查看你的搭建在哪里符合真正的非周期铺砌。',
+  'golden.prolate': '细长',
+  'golden.oblate': '扁平',
+  'golden.check': '彭罗斯检查',
+  'golden.info.pieces': '块',
+  'golden.info.counts': '细长 {prolate} 块，扁平 {oblate} 块',
+  'golden.info.penrose': '彭罗斯铺砌',
+  'golden.info.matching': '{total} 块中有 {n} 块属于它',
+  'golden.prompt.noFit': '那个面的另一侧放不下{piece}菱面体。',
+  'golden.prompt.check': '彭罗斯检查：绿色的块属于真正的非周期铺砌，红色的已偏离。',
 };
 
 const ru = {
@@ -1453,6 +1513,16 @@ const ru = {
   'qc.connect.touching': 'Эти два уже соприкасаются.',
   'qc.connect.placed.one': 'Соединитель размещён (новых деталей: {n}).',
   'qc.connect.placed.other': 'Соединитель размещён (новых деталей: {n}).',
+  'wiz.3d.golden': '3D-пара Пенроуза: стройте свободно из вытянутых и сплюснутых золотых ромбоэдров и смотрите, где постройка следует настоящему апериодическому разбиению.',
+  'golden.prolate': 'Вытянутый',
+  'golden.oblate': 'Сплюснутый',
+  'golden.check': 'Проверка Пенроуза',
+  'golden.info.pieces': 'Детали',
+  'golden.info.counts': 'вытянутых: {prolate}, сплюснутых: {oblate}',
+  'golden.info.penrose': 'Разбиение Пенроуза',
+  'golden.info.matching': 'принадлежит ему: {n} из {total}',
+  'golden.prompt.noFit': 'За этой гранью не помещается ромбоэдр «{piece}».',
+  'golden.prompt.check': 'Проверка Пенроуза: зелёные детали принадлежат настоящему апериодическому разбиению, красные от него отклонились.',
 };
 
 const I18N = { en, ja, es, fr, ko, zh, ru };
