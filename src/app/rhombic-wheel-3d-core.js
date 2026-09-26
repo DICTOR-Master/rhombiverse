@@ -343,7 +343,7 @@ export const WHEEL_PIECE = {
     // have meant evicting something real. A sub-wheel gives the RD family
     // room to grow (this user: "I have some more ideas for piece
     // variety") without reopening WHEEL_PIECE's own already-settled layout.
-    "equator|sx1sy1":   { kind: "dept", label: "RD", action: "navigateTo:rdFamily", desc: "RD and its real derived pieces -- Hemi RD, Hourglass, and more." },
+    "equator|sx1sy1":   { kind: "dept", label: "RD Family", action: "navigateTo:rdFamily", desc: "RD and its real derived pieces -- Hemi RD, Hourglass, and more." },
     "equator|sx1sy-1":  { kind: "dept", label: "Cube", action: "tool:pieceType:cube", desc: "A bare block, no pyramids -- build up from here with the Pyramid tier." },
     "equator|sx-1sy1":  { kind: "dept", label: "Pyramid", action: "tool:pieceType:pyramid", desc: "Add or remove one pyramid on an already-placed cell." },
     "equator|sx-1sy-1": { kind: "dept", label: "TO", action: "tool:pieceType:to", desc: "Truncated Octahedron -- the BCC lattice's own real space-filling cell." },
