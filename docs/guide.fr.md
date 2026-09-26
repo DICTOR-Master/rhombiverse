@@ -133,6 +133,10 @@ Quand vous choisissez un élément, un **contour doré** apparaît là où il se
 
 **Relier** (dans le panneau, dès que vous avez deux pièces) joint deux éléments : touchez une pièce de chacun, et la plus courte chaîne de vraies tuiles entre eux est posée comme un connecteur. Un **Undo** l’annule.
 
+## Rhomboèdres dorés
+
+Un monde 3D avec les deux pièces du pavage de Penrose en 3D. Choisissez-le dans l'écran 3D du Wizard ou sur la roue des pièces. Touchez le contour cyan, puis une face pour ajouter la pièce **Allongée** ou **Aplatie** choisie dans le menu Pièce. Le **Contrôle Penrose** colore en vert les pièces qui appartiennent au vrai pavage apériodique et en rouge celles qui s'en écartent ; Lattice View montre le vrai pavage autour, et toucher un fantôme le pose.
+
 ## Enregistrer votre travail
 
 Votre monde est enregistré automatiquement dans ce navigateur, pour toutes les dimensions, après chaque modification. Il revient quand vous rouvrez le site sur le même appareil et le même navigateur.

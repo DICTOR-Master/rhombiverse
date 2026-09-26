@@ -131,6 +131,10 @@ When you pick an item, a **gold outline** appears where it really occurs in your
 
 **Connect** (in the panel, once you have two pieces) joins two items: tap a piece of each, and the shortest chain of real tiles between them is placed as one connector. One **Undo** takes it back.
 
+## Golden Rhombohedra
+
+A 3D world for the two pieces of the 3D Penrose tiling. Choose it in the Wizard's 3D screen or on the Piece wheel. Tap the cyan outline, then tap a face to add the **Prolate** or **Oblate** piece chosen in the Piece menu. **Penrose check** colours pieces green where they belong to the true aperiodic tiling and red where your build has drifted; Lattice View shows the true tiling around you, and tapping a ghost places it.
+
 ## Saving your work
 
 Your World saves automatically in this browser, every dimension, after each change. It comes back when you reopen the site on the same device and browser.

@@ -133,6 +133,10 @@ Al elegir un elemento, aparece un **contorno dorado** donde realmente se da en t
 
 **Conectar** (en el panel, cuando tienes dos piezas) une dos elementos: toca una pieza de cada uno y se coloca como un conector la cadena más corta de baldosas reales entre ellos. Un **Undo** lo deshace.
 
+## Romboedros áureos
+
+Un mundo 3D con las dos piezas del teselado de Penrose en 3D. Elígelo en la pantalla 3D del Wizard o en la rueda de piezas. Toca el contorno cian y luego una cara para añadir la pieza **Alargada** o **Achatada** elegida en el menú Pieza. El **Control Penrose** pinta de verde las piezas que pertenecen al verdadero teselado aperiódico y de rojo las que se han desviado; Lattice View muestra el teselado verdadero alrededor, y tocar un fantasma lo coloca.
+
 ## Guarda tu trabajo
 
 Tu mundo se guarda automáticamente en este navegador, en todas las dimensiones, después de cada cambio. Vuelve a aparecer cuando abres el sitio en el mismo dispositivo y navegador.

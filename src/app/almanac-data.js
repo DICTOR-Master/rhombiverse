@@ -185,7 +185,7 @@ export const LATTICE_CONCEPT_ENTRIES = [
     kind: 'concept',
     id: 'concept:quasicrystalPieces',
     label: 'Golden Rhombohedra and Penrose Prisms',
-    desc: "The 6D icosahedral quasicrystal is built from two golden rhombohedra, whose faces are rhombi with diagonals in the golden ratio: the prolate one (tall) and the oblate one (flat). This is the Ammann–Kramer tiling, a model for real icosahedral quasicrystals such as the Al–Mn alloy Dan Shechtman found in 1982. The 5D decagonal quasicrystal is the Penrose rhombus tiling stacked in layers, built from thick (72°) and thin (36°) rhombus prisms, like real decagonal quasicrystals that are quasiperiodic in a plane and periodic along one axis.",
+    desc: "The 6D icosahedral quasicrystal is built from two golden rhombohedra, whose faces are rhombi with diagonals in the golden ratio: the prolate one (tall) and the oblate one (flat). This is the Ammann–Kramer tiling, a model for real icosahedral quasicrystals such as the Al–Mn alloy Dan Shechtman found in 1982. The 5D decagonal quasicrystal is the Penrose rhombus tiling stacked in layers, built from thick (72°) and thin (36°) rhombus prisms, like real decagonal quasicrystals that are quasiperiodic in a plane and periodic along one axis. In the 3D Golden Rhombohedra world you can place both pieces freely: the Penrose check shows green where your build belongs to the true aperiodic tiling and red where it has drifted, since face-to-face matching alone never forces aperiodicity.",
     markKey: null,
   },
   {
