@@ -159,24 +159,30 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
         s += units;
       });
     }
+    if (view.inside) { group.add(cab); } else group.remove(cab);
     const lo = WINDOW[0], hi = L + WINDOW[1];
-    const tube = new THREE.Mesh(new THREE.TubeGeometry(new TrajectoryCurve(lo, hi), Math.ceil((hi - lo) * 2), TUBE_R, 16, false), tubeMaterial);
-    tube.userData.ownGeometry = true;
-    built.add(tube);
-    if (view.inside) aimInside();
+    // Outside, the faint tube seen from without; Inside, the cab's own
+    // tunnel takes its place.
+    if (!view.inside) {
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(new TrajectoryCurve(lo, hi), Math.ceil((hi - lo) * 2), TUBE_R, 16, false), tubeMaterial);
+      tube.userData.ownGeometry = true;
+      built.add(tube);
+    }
     renderReadout();
   }
   // Positions every bullet for the current moment (at rest: where it was
   // placed; playing: carried along by the stream).
   function placeStream() {
     const L = chainEnd(), P = period();
-    const shift = playing ? -(playT % P) : 0;
-    const lo = WINDOW[0], hi = L + WINDOW[1];
+    // Inside you ride the train itself: one chain, not the repeating
+    // stream, carried on without wrapping.
+    const shift = !playing ? 0 : view.inside ? -playT : -(playT % P);
+    const lo = view.inside ? shift - 1 : WINDOW[0], hi = view.inside ? shift + L + 1 : L + WINDOW[1];
     for (const { mesh, entries } of stream) {
       let n = 0;
       for (const { s0, units, color } of entries) {
-        const kMin = playing ? Math.ceil((lo - s0 - shift - units) / P) : 0;
-        const kMax = playing ? Math.floor((hi - s0 - shift) / P) : 0;
+        const kMin = playing && !view.inside ? Math.ceil((lo - s0 - shift - units) / P) : 0;
+        const kMax = playing && !view.inside ? Math.floor((hi - s0 - shift) / P) : 0;
         for (let k = kMin; k <= kMax && n < mesh.instanceMatrix.count; k++) {
           const mid = s0 + shift + k * P + units / 2;
           q.setFromAxisAngle(zAxis, heading(mid) - Math.PI / 2);
@@ -190,22 +196,39 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
+    if (view.inside) aimInside(shift);
   }
 
   // ---- views ----
-  // Inside: the observer on the trajectory just before the chain's start,
-  // where it's heading, looking along it, so the bullets come toward you.
-  function aimInside() {
-    const ahead = -4;
-    // Inside the tube, just above the bullets' path, looking along it:
-    // the chain runs straight to a vanishing point.
-    // Tilted down ~15°, which lifts the near bullets and the vanishing
-    // point up the screen, clear of the panel.
-    const eye = place(ahead, R * 1.2);
-    const look = place(ahead + 12, R * 1.2 - 12 * S * Math.tan(Math.PI / 12));
+  // Inside (direct request: "inside tunnel view, outside not visible,
+  // like being driver of tube train"): you sit on the tube's axis at the
+  // front of the chain (its start, the way Play drives it), looking ahead
+  // down the tunnel. The walls close in all round; rings mark each cell
+  // of the dimension, so while playing the tunnel streams past. The tube
+  // is straight inside, so a length of it simply travels with the cab.
+  const cab = new THREE.Group();
+  const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x0f1a24, side: THREE.BackSide });
+  const ringMaterial = new THREE.MeshBasicMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.35 });
+  const CAB_AHEAD = 160, RING_COUNT = CAB_AHEAD + 2;
+  const tunnel = new THREE.Mesh(new THREE.CylinderGeometry(TUBE_R, TUBE_R, (CAB_AHEAD + 4) * S, 24, 1, true), wallMaterial);
+  tunnel.rotation.z = Math.PI / 2; // the cylinder's own axis is y; the tube runs along x inside
+  const rings = new THREE.InstancedMesh(new THREE.TorusGeometry(TUBE_R * 0.98, TUBE_R * 0.03, 6, 32), ringMaterial, RING_COUNT);
+  rings.frustumCulled = false;
+  cab.add(tunnel, rings);
+  function aimInside(front = 0) {
+    const eyeS = front - 0.15;
+    // The tunnel ahead (toward -s), from just behind the cab.
+    tunnel.position.set((eyeS - CAB_AHEAD / 2 + 2) * S, 0, 0);
+    const ringQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+    const first = Math.floor(eyeS) + 1;
+    for (let i = 0; i < RING_COUNT; i++) {
+      m4.compose(new THREE.Vector3((first - i) * S, 0, 0), ringQ, one);
+      rings.setMatrixAt(i, m4);
+    }
+    rings.instanceMatrix.needsUpdate = true;
     camera.up.set(0, 0, 1);
-    camera.position.copy(eye);
-    controls.target.copy(look);
+    camera.position.set(eyeS * S, 0, 0);
+    controls.target.set((eyeS - 10) * S, 0, 0);
     controls.enabled = false;
     controls.update();
   }
