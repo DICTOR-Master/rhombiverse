@@ -72,14 +72,14 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // Where a point of the trajectory is drawn. Outside: through E(s).
   // Inside: straight, since from within a 1D world only distance along s
   // exists (E is for looking from outside; the plan's §6.2).
-  // Inside, the tunnel rises very gently ahead of you (direct request:
-  // "a very slight upward curve of horizon / vanishing point ... so the
-  // signal fades into distance"): a parabola, level where you stand.
+  // Inside, the trajectory runs straight down the tunnel; you stand a
+  // little above its path, so it runs up the screen to the vanishing
+  // point and you see the cells' tops in the distance (direct request:
+  // "see signal moving up and out by seeing a little of top view in the
+  // distance; then rings won't be necessary to define the tunnel").
   const EYE_U = 2;
-  const RISE = 0.0025; // world units of rise per (world unit ahead)^2
-  const ahead = (s) => Math.max(0, (s - EYE_U) * S);
-  const insidePoint = (s, z = 0) => new THREE.Vector3(s * S, 0, z + RISE * ahead(s) ** 2);
-  const insideTangent = (s) => new THREE.Vector3(1, 0, 2 * RISE * ahead(s)).normalize();
+  const insidePoint = (s, z = 0) => new THREE.Vector3(s * S, 0, z);
+  const insideTangent = () => new THREE.Vector3(1, 0, 0);
   const place = (s, z = 0) => (view.inside ? insidePoint(s, z) : at(s, z));
   // A cell's orientation (its own axis is y, nose at +y) at s.
   const yAxis = new THREE.Vector3(0, 1, 0);
@@ -223,10 +223,11 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // Inside (direct requests: "inside tunnel view, outside not visible";
   // "the only colour shapes should be the cyan signal patches moving
   // through you, not continuous rings; you are not travelling, the signal
-  // is"): you stand still on the tube's axis just ahead of the train,
+  // is"): you stand still in the tube just ahead of the train, a little
+  // above its path,
   // looking down the tunnel. Send and the signal comes from behind, passes
-  // through you and travels away. Plain dark walls, rising very gently
-  // ahead so the signal climbs away and fades into the distance.
+  // just beneath you and travels away, up the screen and into the
+  // distance. Plain dark walls; the path itself shows the way.
   const cab = new THREE.Group();
   const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x0f1a24, side: THREE.BackSide });
   const TUNNEL = [-10, 160];
@@ -236,29 +237,18 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // Smooth circles (direct request: "does there have to be rough
   // crenulation ... is smooth circle not possible?"): plenty of segments.
   const tunnel = new THREE.Mesh(new THREE.TubeGeometry(new InsideCurve(), (TUNNEL[1] - TUNNEL[0]) * 2, TUBE_R, 96, false), wallMaterial);
-  // The dimension's cell walls, faintly, and still ("maybe a slight
-  // opacity of cell walls, but that isn't moving").
-  const wallRingMaterial = new THREE.MeshBasicMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.1, depthWrite: false });
-  const ringCount = Math.floor(TUNNEL[1] - EYE_U);
-  const walls = new THREE.InstancedMesh(new THREE.TorusGeometry(TUBE_R * 0.98, TUBE_R * 0.02, 6, 96), wallRingMaterial, ringCount);
-  {
-    const zAxisRing = new THREE.Vector3(0, 0, 1); // the torus lies across its own z
-    for (let i = 0; i < ringCount; i++) {
-      const k = Math.ceil(EYE_U) + i;
-      walls.setMatrixAt(i, m4.compose(insidePoint(k), new THREE.Quaternion().setFromUnitVectors(zAxisRing, insideTangent(k)), one));
-    }
-  }
-  walls.frustumCulled = false;
-  cab.add(tunnel, walls);
+  cab.add(tunnel);
   // You're in the signal's path: cells are cut where you stand, and only
   // their outward faces drawn, so each one emerges from beyond the view,
   // its hollow tail toward you, and shrinks away down the tunnel.
   const atYou = new THREE.Plane(new THREE.Vector3(1, 0, 0), -(EYE_U + 0.1) * S); // right at you: each cell emerges as big as the view ("all the way from outside the rings") and shrinks away
+  const EYE_H = R * 1.25; // above the path: just over the passing cells, inside the tube
   function aimInside() {
     camera.up.set(0, 0, 1);
-    camera.position.copy(insidePoint(EYE_U));
-    // Along the rising tunnel, so the view tilts up a touch with it.
-    controls.target.copy(insidePoint(EYE_U + 14));
+    camera.position.copy(insidePoint(EYE_U, EYE_H));
+    // Level, a touch down: the horizon sits above the middle, the path
+    // climbing up the screen toward it.
+    controls.target.copy(insidePoint(EYE_U + 20, EYE_H - 0.35));
     controls.enabled = false;
     controls.update();
   }
