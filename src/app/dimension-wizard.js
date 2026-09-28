@@ -180,7 +180,7 @@ const DIMENSIONS = [
 // 1D: a stretch of the Signal trajectory, • — • as segments along E(s).
 function signalEdges() {
   const out = [];
-  const pt = (s) => { const [x, y] = embed(s); return [x * 0.3 - 1.05, y * 0.3, 0]; };
+  const pt = (s) => { const [x, y] = embed(s); return [x * 0.3, y * 0.3 - 1.05, 0]; };
   let s = 0;
   for (const u of [1, 3, 1]) {
     for (let k = 0; k < u * 4; k++) out.push([pt(s + k / 4), pt(s + (k + 1) / 4)]);

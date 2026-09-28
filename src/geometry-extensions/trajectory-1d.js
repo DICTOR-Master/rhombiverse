@@ -95,8 +95,10 @@ export function streamAt(cells, s, t, dir = 1) {
 // Unit speed, direction theta(s) drifting slowly: two sines of long,
 // incommensurate periods, so it never quite repeats. Nearly straight
 // (direct request: "too curved, should be stretching off to infinity"):
-// a few degrees of drift over dozens of cells.
-const theta = (s) => 0.07 * Math.sin(s / 31) + 0.04 * Math.sin(s / 83 + 1.3);
+// a few degrees of drift over dozens of cells. Running up the screen
+// (direct request: "nearly vertical, not horizontal"), which suits a
+// phone held upright.
+const theta = (s) => Math.PI / 2 + 0.07 * Math.sin(s / 31) + 0.04 * Math.sin(s / 83 + 1.3);
 const STEP = 0.05;
 const table = new Map(); // integer step index -> [x, y]
 table.set(0, [0, 0]);

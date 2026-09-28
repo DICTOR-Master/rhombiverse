@@ -60,8 +60,8 @@ check('characters with no Morse code are skipped', decode(morseSequence('a~b')) 
   const [xa, ya] = embed(0), [xb, yb] = embed(200);
   check('and is really shorter where it bends: E is not distance-preserving', Math.hypot(xb - xa, yb - ya) < 200 - 0.2, `${Math.hypot(xb - xa, yb - ya).toFixed(2)} on screen for 200 along s`);
   let straight = true;
-  for (let s = -100; s < 300; s += 1.3) if (Math.abs(tangentAngle(s)) > 0.12) straight = false;
-  check('nearly straight: the direction never drifts more than 7° either way', straight);
+  for (let s = -100; s < 300; s += 1.3) if (Math.abs(tangentAngle(s) - Math.PI / 2) > 0.12) straight = false;
+  check('nearly straight and vertical: never more than 7° off straight up the screen', straight);
 }
 
 console.log(`\n${failures} failure${failures === 1 ? '' : 's'}.`);

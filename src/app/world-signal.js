@@ -9,18 +9,20 @@
 // - Typing a message shows it as ghost cells after the chain; each tap
 //   places the next one. The panel reads the chain back as text.
 // - The bullets are the trajectory (direct correction: "bullets should
-//   not sit on a line - they are the line"): nothing else is drawn.
+//   not sit on a line - they are the line"), formed inside a faint tube:
+//   the 1D dimension itself, stretching off to infinity both ways.
 // - Outside (the default): the chain seen from above, following E(s).
 //   Inside: the observer on the trajectory, just ahead of where the chain
 //   is heading, looking back along it.
 // - Play (user-started, like the Kaleidoscope's Spin) moves the bullets
 //   themselves ("bullets themselves should be moving"): the chain streams
-//   along the trajectory, repeating, Forward (toward its start, so a
-//   reader there gets the message in order) or Reverse. Speed on the
-//   slider. Breathing and undulation are later.
+//   along the trajectory, repeating, toward its start, so a reader there
+//   gets the message in order. Fixed speed; breathing and undulation are
+//   later.
+// - Controls: one row of symbols (• — ␣, view, ▶) and the message field
+//   ("the controls are too complicated").
 import * as THREE from 'three';
 import { morseSequence, decode, layout, totalUnits, cellUnits, embed, tangentAngle } from '../geometry-extensions/trajectory-1d.js';
-import { createGearedSlider } from './geared-slider.js';
 import { bulletGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
@@ -32,7 +34,7 @@ const PAD = 0.07; // space between neighbouring cells (world)
 const FIRST_COLOR = 0x00e5ff;
 const GHOST_COLOR = 0x9de0ff;
 const TYPES = ['dot', 'dash', 'gap'];
-const SPEEDS = [0.5, 1, 2, 4, 8, 16]; // units per second
+const SPEED = 4; // units per second
 const lang = () => getSettings().language;
 const at = (s, z = 0) => { const [x, y] = embed(s); return new THREE.Vector3(x * S, y * S, z); };
 
@@ -43,7 +45,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
 
   // ---- state ----
   let cells = []; // { type, units?, material }
-  const view = { type: 'dot', inside: false, speed: 3, dir: 1 };
+  const view = { type: 'dot', inside: false };
   let message = '';
   let pending = []; // ghost cells of the typed message still to place
   let active = false;
@@ -61,12 +63,10 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     if (data) {
       setFromJSON(data);
       if (TYPES.includes(data.view?.type)) view.type = data.view.type;
-      if (Number.isInteger(data.view?.speed) && data.view.speed >= 0 && data.view.speed < SPEEDS.length) view.speed = data.view.speed;
-      if (data.view?.dir === -1) view.dir = -1;
     }
   } catch { /* corrupt or blocked storage: start empty */ }
   function save() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, ...toJSON(), view: { type: view.type, speed: view.speed, dir: view.dir } })); } catch { /* best-effort */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, ...toJSON(), view: { type: view.type } })); } catch { /* best-effort */ }
   }
 
   // Where a point of the trajectory is drawn. Outside: through E(s).
@@ -76,11 +76,11 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   const heading = (s) => (view.inside ? 0 : tangentAngle(s));
 
   // ---- drawing ----
-  // The bullets are the trajectory: no line is drawn under them. Each
+  // The bullets are the trajectory, inside its tube; no line. Each
   // cell is the shared 1D cell (bullet-cell.js), centred on E(s), nose
   // along the trajectory. Play moves the bullets themselves: the chain
   // streams along the trajectory, repeating (one pass P = the chain plus
-  // a word gap), toward its start when Forward, so a reader there gets the
+  // a word gap), toward its start, so a reader there gets the
   // message in order: at time t the point s shows the chain's s + t
   // (streamAt in trajectory-1d.js, checked against m(t)).
   const cellGeometry = (units) => bulletGeometry(units * S, R, PAD);
@@ -97,9 +97,16 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   const tmpColor = new THREE.Color();
   let stream = []; // { mesh, entries: [{ s0, units, color }] } per cell shape
   const WINDOW = [-200, 400]; // how far before the start / past the end the trajectory is drawn
-  // Empty cells: the trajectory beyond the chain, stretching off both
-  // ways toward infinity (the Construction Interface's unfilled cells).
-  const emptyMaterial = new THREE.MeshStandardMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide });
+  // The tube the bullets form in (direct request, 2026-09-29): the 1D
+  // dimension itself, a faint channel just wider than a cell, stretching
+  // off both ways toward infinity. From Inside it's the tunnel you look
+  // down.
+  const TUBE_R = R * 1.45;
+  const tubeMaterial = new THREE.MeshStandardMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
+  class TrajectoryCurve extends THREE.Curve {
+    constructor(lo, hi) { super(); this.lo = lo; this.hi = hi; }
+    getPoint(u, target = new THREE.Vector3()) { return target.copy(place(this.lo + u * (this.hi - this.lo))); }
+  }
 
   function placeCell(mesh, s0, units) {
     const mid = s0 + units / 2;
@@ -110,6 +117,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     for (const child of [...built.children]) {
       built.remove(child);
       if (child.isInstancedMesh) child.dispose();
+      else if (child.userData.ownGeometry) child.geometry.dispose();
     }
     stream = [];
   }
@@ -139,9 +147,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       stream.push({ mesh, entries });
     }
     placeStream();
-    // What a tap adds next: the message's ghosts, else the chosen cell;
-    // then empty cells on out to the edges (while playing, the stream
-    // itself fills the trajectory).
+    // What a tap adds next: the message's ghosts, else the chosen cell.
     if (!playing) {
       const next = pending.length ? pending : [{ type: view.type, ...(view.type === 'gap' ? { units: 1 } : {}) }];
       let s = L;
@@ -152,18 +158,11 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
         built.add(mesh);
         s += units;
       });
-      const spots = [];
-      for (let e = -1; e >= WINDOW[0]; e--) spots.push(e);
-      for (let e = Math.ceil(s); e < L + WINDOW[1]; e++) spots.push(e);
-      const empty = new THREE.InstancedMesh(cellGeometry(1), emptyMaterial, spots.length);
-      empty.frustumCulled = false;
-      spots.forEach((e, i) => {
-        q.setFromAxisAngle(zAxis, heading(e + 0.5) - Math.PI / 2);
-        m4.compose(place(e + 0.5), q, one);
-        empty.setMatrixAt(i, m4);
-      });
-      built.add(empty);
     }
+    const lo = WINDOW[0], hi = L + WINDOW[1];
+    const tube = new THREE.Mesh(new THREE.TubeGeometry(new TrajectoryCurve(lo, hi), Math.ceil((hi - lo) * 2), TUBE_R, 16, false), tubeMaterial);
+    tube.userData.ownGeometry = true;
+    built.add(tube);
     if (view.inside) aimInside();
     renderReadout();
   }
@@ -171,7 +170,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // placed; playing: carried along by the stream).
   function placeStream() {
     const L = chainEnd(), P = period();
-    const shift = playing ? -view.dir * (playT % P) : 0;
+    const shift = playing ? -(playT % P) : 0;
     const lo = WINDOW[0], hi = L + WINDOW[1];
     for (const { mesh, entries } of stream) {
       let n = 0;
@@ -194,15 +193,16 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   }
 
   // ---- views ----
-  // Inside: the observer on the trajectory just ahead of where the chain
-  // is heading (before its start for Forward, past its end for Reverse),
-  // looking back along it, so the bullets come toward you.
+  // Inside: the observer on the trajectory just before the chain's start,
+  // where it's heading, looking along it, so the bullets come toward you.
   function aimInside() {
-    const ahead = view.dir > 0 ? -4 : chainEnd() + 4;
-    // Level, just above the trajectory, looking far along it: the chain
-    // runs straight to a vanishing point.
-    const eye = place(ahead, R * 1.6);
-    const look = place(ahead + view.dir * 60, R * 1.6);
+    const ahead = -4;
+    // Inside the tube, just above the bullets' path, looking along it:
+    // the chain runs straight to a vanishing point.
+    // Tilted down ~15°, which lifts the near bullets and the vanishing
+    // point up the screen, clear of the panel.
+    const eye = place(ahead, R * 1.2);
+    const look = place(ahead + 12, R * 1.2 - 12 * S * Math.tan(Math.PI / 12));
     camera.up.set(0, 0, 1);
     camera.position.copy(eye);
     controls.target.copy(look);
@@ -215,10 +215,17 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     else { camera.up.set(0, 1, 0); controls.enabled = true; resetView(); frameOutside(); }
   }
   // Outside: centre the view on the chain.
+  // Outside looks up the trajectory from behind and above, so it runs
+  // up the screen and narrows into the distance (direct request: "closer
+  // is wider"), focused on the chain's end, where taps add.
   function frameOutside() {
-    const mid = place(chainEnd() / 2);
-    controls.target.set(mid.x, mid.y, 0);
-    camera.position.set(mid.x, mid.y, camera.position.z || 12);
+    // The chain's end at the middle of the screen, clear of the panel
+    // below ("the controls are blocking the closer circle").
+    const focus = chainEnd();
+    const t = place(focus), back = place(focus - 6);
+    camera.up.set(0, 0, 1);
+    controls.target.copy(t);
+    camera.position.set(back.x, back.y, 3.4);
     controls.update();
   }
 
@@ -227,7 +234,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   function tick(now) {
     raf = 0;
     if (!active || !playing) return;
-    playT += ((now - last) / 1000) * SPEEDS[view.speed];
+    playT += ((now - last) / 1000) * SPEED;
     last = now;
     placeStream();
     raf = requestAnimationFrame(tick);
@@ -244,13 +251,9 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // when it has drifted off, keeping the camera's height.
   function followEnd() {
     if (view.inside) return;
-    const end = place(chainEnd());
-    const ndc = end.clone().project(camera);
-    if (Math.abs(ndc.x) < 0.6 && Math.abs(ndc.y) < 0.45) return;
-    const delta = new THREE.Vector3(end.x - controls.target.x, end.y - controls.target.y, 0);
-    controls.target.add(delta);
-    camera.position.add(delta);
-    controls.update();
+    const ndc = place(chainEnd()).project(camera);
+    if (Math.abs(ndc.x) < 0.6 && ndc.y > -0.3 && ndc.y < 0.45) return;
+    frameOutside();
   }
 
   // ---- building ----
@@ -298,45 +301,36 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   panel.className = 'qc-panel';
   panel.innerHTML = `
     <div class="w4d-row w4d-controls sig-cells"></div>
-    <div class="w4d-row sig-message-row"><input type="text" class="sig-message" maxlength="80" autocomplete="off" spellcheck="false"><span class="sig-readout"></span></div>
-    <div class="w4d-track" role="slider"><div class="w4d-ticks"></div><div class="w4d-thumb"></div></div>
-    <div class="w4d-row w4d-options sig-options"></div>`;
+    <div class="w4d-row sig-message-row"><input type="text" class="sig-message" maxlength="80" autocomplete="off" spellcheck="false"><span class="sig-readout"></span></div>`;
   document.body.appendChild(panel);
   const cellsRow = panel.querySelector('.sig-cells');
-  const optionsRow = panel.querySelector('.sig-options');
   const input = panel.querySelector('.sig-message');
   const readout = panel.querySelector('.sig-readout');
-  const track = panel.querySelector('.w4d-track');
-  const toSlider = (i) => -1 + (2 * i) / (SPEEDS.length - 1);
-  const slider = createGearedSlider(track, {
-    value: () => toSlider(view.speed),
-    setValue: (v) => { const i = Math.round(((v + 1) / 2) * (SPEEDS.length - 1)); if (i !== view.speed) { view.speed = i; slider.render(); } },
-    limit: () => 1,
-    perSweep: () => 2,
-    detents: () => SPEEDS.map((sp, i) => ({ v: toSlider(i), label: `×${sp}` })),
-    snap: () => 1,
-    onEnd: () => { save(); },
-  });
   function renderReadout() {
     const text = decode(cells);
     readout.textContent = text ? `“${text}”` : '';
   }
+  // One row of symbols (direct request: "the controls are too
+  // complicated"): the three cells, the view, play. Words only as
+  // tooltips.
+  // The view button shows the view you're in: an eye looking on from
+  // Outside, a tunnel mouth Inside.
+  const VIEW_ICONS = {
+    outside: '<svg viewBox="-12 -12 24 24" width="20" height="20"><path d="M-11,0 C-6,-7 6,-7 11,0 C6,7 -6,7 -11,0 Z" fill="none" stroke="currentColor" stroke-width="2"/><circle r="3.5" fill="currentColor"/></svg>',
+    inside: '<svg viewBox="-12 -12 24 24" width="20" height="20"><circle r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle r="1.8" fill="currentColor"/></svg>',
+  };
   function renderPanel() {
     panel.classList.toggle('visible', active);
     if (!active) return;
     const L = lang();
-    const btn = (attr, val, label, on) => `<button type="button" data-${attr}="${val}" class="${on ? 'active' : ''}">${label}</button>`;
+    const btn = (attr, val, label, on, title) => `<button type="button" class="sig-sym${on ? ' active' : ''}" data-${attr}="${val}" title="${title}" aria-label="${title}">${label}</button>`;
+    const nextView = view.inside ? 'outside' : 'inside';
     cellsRow.innerHTML = [
-      ...TYPES.map((ty) => btn('type', ty, `${{ dot: '•', dash: '—', gap: '·' }[ty]} ${t(`sig.${ty}`, L)}`, ty === view.type && !pending.length)),
-      btn('view', 'outside', t('sig.outside', L), !view.inside),
-      btn('view', 'inside', t('sig.inside', L), view.inside),
-    ].join('');
-    optionsRow.innerHTML = [
-      btn('opt', 'play', playing ? `■ ${t('sig.stop', L)}` : `▶ ${t('sig.play', L)}`, playing),
-      btn('opt', 'dir', view.dir > 0 ? `→ ${t('sig.forward', L)}` : `← ${t('sig.reverse', L)}`, false),
+      ...TYPES.map((ty) => btn('type', ty, { dot: '•', dash: '—', gap: '␣' }[ty], ty === view.type && !pending.length, t(`sig.${ty}`, L))),
+      btn('view', nextView, VIEW_ICONS[view.inside ? 'inside' : 'outside'], false, t(`sig.${nextView}`, L)),
+      btn('opt', 'play', playing ? '■' : '▶', playing, t(playing ? 'sig.stop' : 'sig.play', L)),
     ].join('');
     input.placeholder = t('sig.message', L);
-    slider.render();
     renderReadout();
   }
   input.addEventListener('input', () => {
@@ -355,7 +349,6 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     if (d.type && TYPES.includes(d.type)) { view.type = d.type; pending = []; input.value = ''; }
     else if (d.view) setInside(d.view === 'inside');
     else if (d.opt === 'play') { setPlaying(!playing); return; }
-    else if (d.opt === 'dir') { view.dir = -view.dir; playT = 0; }
     save(); draw(); renderPanel();
   });
   let shownLang = lang();
@@ -371,7 +364,9 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       group.visible = on;
       if (!on) {
         playing = false;
-        if (view.inside) { view.inside = false; camera.up.set(0, 1, 0); controls.enabled = true; }
+        view.inside = false;
+        camera.up.set(0, 1, 0);
+        controls.enabled = true;
         panel.classList.remove('visible');
       }
       renderPanel();
