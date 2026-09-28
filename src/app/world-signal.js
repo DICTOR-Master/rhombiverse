@@ -49,6 +49,12 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   const view = { inside: false };
   let message = '';
   let pending = []; // ghost cells of the typed message still to place
+  // A typed message replaces the chain (direct report: "my message added
+  // to hello world ... impossible to delete or go back"): until its first
+  // cell is placed, it previews in place of the old one; editing the text
+  // re-derives the preview, keeping any placed cells that still match.
+  let draftStarted = false;
+  const shown = () => (pending.length && !draftStarted ? [] : cells);
   let active = false;
   let playing = false;
   let playT = 0;
@@ -144,7 +150,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     }
     stream = [];
   }
-  const chainEnd = () => totalUnits(cells);
+  const chainEnd = () => totalUnits(shown());
   const period = () => chainEnd() + 7;
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
   function draw() {
@@ -154,7 +160,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     // One instanced mesh per cell shape (dot, dash, each gap length),
     // sized for every repeat the stream can show.
     const byKey = new Map();
-    for (const { cell, s0 } of layout(cells)) {
+    for (const { cell, s0 } of layout(shown())) {
       const units = cellUnits(cell);
       const k = `${cell.type === 'gap' ? 'gap' : 'solid'}|${units}`;
       if (!byKey.has(k)) byKey.set(k, []);
@@ -360,16 +366,19 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       return true;
     }
     if (!pending.length) { if (!cells.length) showHudPrompt(t('sig.prompt.empty', lang()), 3000); return !cells.length; }
+    if (!draftStarted) { cells = []; draftStarted = true; }
     const next = pending.shift();
     cells.push({ ...next, material: getMaterial(next.type) });
-    if (!pending.length) { message = ''; input.value = ''; }
+    if (!pending.length) { message = ''; input.value = ''; draftStarted = false; }
     commit();
     return true;
   }
   // Send: the rest of the message joins the chain, and the chain sets off.
   function send() {
+    if (pending.length && !draftStarted) cells = [];
     for (const c of pending) cells.push({ ...c, material: getMaterial(c.type) });
     pending = [];
+    draftStarted = false;
     message = '';
     input.value = '';
     if (!cells.some((c) => c.type !== 'gap')) { showHudPrompt(t('sig.prompt.empty', lang()), 3000); draw(); return; }
@@ -415,9 +424,15 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   }
   input.addEventListener('input', () => {
     message = input.value;
-    pending = morseSequence(message);
-    // After an existing chain, a word gap first (it's a new word).
-    if (pending.length && cells.length && cells[cells.length - 1].type !== 'gap') pending.unshift({ type: 'gap', units: 7 });
+    const seq = morseSequence(message);
+    if (draftStarted) {
+      // Keep the placed cells that still match the edited text.
+      let k = 0;
+      while (k < cells.length && k < seq.length && cells[k].type === seq[k].type && (cells[k].units ?? 1) === (seq[k].units ?? 1)) k++;
+      cells = cells.slice(0, k);
+      pending = seq.slice(k);
+      if (!message) draftStarted = false;
+    } else pending = seq;
     draw(); renderPanel();
   });
   // Typing shouldn't reach the scene's keyboard shortcuts; Enter sends.
@@ -459,7 +474,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       if (on) { setFog(true); frameOutside(); }
     },
     get isEmpty() { return cells.length === 0; },
-    clear() { cells = []; pending = []; input.value = ''; playing = false; commit(); },
+    clear() { cells = []; pending = []; draftStarted = false; input.value = ''; playing = false; commit(); },
     snapshot: toJSON,
     restore(json) { setFromJSON(json); save(); draw(); renderPanel(); onChange(); },
     toJSON,
