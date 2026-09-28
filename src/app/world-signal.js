@@ -28,7 +28,7 @@ import { getSettings, onSettingsChange } from './settings.js';
 const STORAGE_KEY = 'rhombiverse-1d-signal-world';
 const S = 0.35; // world units per unit of s
 const R = 0.1; // cell radius (world)
-const PAD = 0.07; // space between neighbouring cells (world)
+const PAD = 0.003; // a hair between nose and cup: flush joins (direct report: "an obvious ridge where they aren't joining cleanly"), without the two surfaces flickering
 const NEXT_COLOR = 0xf59e0b; // the HUD's orange
 const GHOST_COLOR = 0x9de0ff;
 const TYPES = ['dot', 'dash', 'gap'];

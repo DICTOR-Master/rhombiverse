@@ -22,7 +22,7 @@ import { getSettings, onSettingsChange } from './settings.js';
 const STORAGE_KEY = 'rhombiverse-1d-construct-world';
 const U = 1; // world units per cell
 const R = 0.1;
-const PAD = 0.08;
+const PAD = 0.003; // flush joins along a line, as in Signal
 const PRIMITIVE = { id: 'square', label: 'Square', d: 2 };
 const lang = () => getSettings().language;
 
