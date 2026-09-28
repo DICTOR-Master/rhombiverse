@@ -13,8 +13,8 @@
 //   they are the line"), formed inside a faint tube: the 1D dimension
 //   itself, stretching off to infinity both ways.
 // - Outside (the default): from behind and above, the line running up the
-//   screen and narrowing into the distance. Inside: the driver's cab of a
-//   tube train, looking down the tunnel.
+//   screen and narrowing into the distance. Inside: standing still in the
+//   tunnel; the signal passes through you and travels away.
 // - Playing moves the bullets themselves: the chain streams along the
 //   trajectory, repeating, toward its start, so a reader there gets the
 //   message in order. Fixed speed; breathing and undulation are later.
@@ -152,8 +152,8 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     }
     placeStream();
     // The typed message still to place, as ghosts; the next one in
-    // orange: tap to place it.
-    if (!playing) {
+    // orange: tap to place it (Outside only).
+    if (!playing && !view.inside) {
       let s = L;
       pending.forEach((c, i) => {
         const units = cellUnits(c);
@@ -178,13 +178,13 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // placed; playing: carried along by the stream).
   function placeStream() {
     const L = chainEnd(), P = period();
-    // Inside you ride the train itself: one chain, not the repeating
-    // stream, carried on without wrapping.
-    const shift = !playing ? 0 : view.inside ? playT : playT % P;
+    const shift = playing ? playT % P : 0;
     const lo = -L - BEHIND, hi = AHEAD;
-    const repeat = playing && !view.inside;
+    const repeat = playing;
     for (const { mesh, entries } of stream) {
       let n = 0;
+      // Inside, only the signal itself: no gap cells.
+      if (view.inside && mesh.material === gapMaterial) { mesh.count = 0; continue; }
       for (const { s0, units, color } of entries) {
         const base = uMid(s0, units) + shift;
         const kMin = repeat ? Math.ceil((lo - base) / P) : 0;
@@ -202,44 +202,51 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
-    if (view.inside) aimInside(shift);
   }
 
   // ---- views ----
-  // Inside (direct request: "inside tunnel view, outside not visible,
-  // like being driver of tube train"): you sit on the tube's axis at the
-  // front of the train (its engine, the message's first cell), looking
-  // ahead down the tunnel. The walls close in all round; rings mark each cell
-  // of the dimension, so while playing the tunnel streams past. The tube
-  // is straight inside, so a length of it simply travels with the cab.
+  // Inside (direct requests: "inside tunnel view, outside not visible";
+  // "the only colour shapes should be the cyan signal patches moving
+  // through you, not continuous rings; you are not travelling, the signal
+  // is"): you stand still on the tube's axis just ahead of the train,
+  // looking down the tunnel. Send and the signal comes from behind, passes
+  // through you and travels away. Plain dark walls; straight inside, as
+  // the dimension has no other shape from within.
   const cab = new THREE.Group();
   const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x0f1a24, side: THREE.BackSide });
-  const ringMaterial = new THREE.MeshBasicMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.35 });
-  const CAB_AHEAD = 160, RING_COUNT = CAB_AHEAD + 2;
-  const tunnel = new THREE.Mesh(new THREE.CylinderGeometry(TUBE_R, TUBE_R, (CAB_AHEAD + 4) * S, 24, 1, true), wallMaterial);
+  const EYE_U = 2;
+  const TUNNEL = [-10, AHEAD];
+  const tunnel = new THREE.Mesh(new THREE.CylinderGeometry(TUBE_R, TUBE_R, (TUNNEL[1] - TUNNEL[0]) * S, 24, 1, true), wallMaterial);
   tunnel.rotation.z = Math.PI / 2; // the cylinder's own axis is y; the tube runs along x inside
-  const rings = new THREE.InstancedMesh(new THREE.TorusGeometry(TUBE_R * 0.98, TUBE_R * 0.03, 6, 32), ringMaterial, RING_COUNT);
-  rings.frustumCulled = false;
-  cab.add(tunnel, rings);
-  function aimInside(front = 0) {
-    const eyeS = front + 0.15;
-    // The tunnel ahead (toward +u), from just behind the cab.
-    tunnel.position.set((eyeS + CAB_AHEAD / 2 - 2) * S, 0, 0);
+  tunnel.position.set(((TUNNEL[0] + TUNNEL[1]) / 2) * S, 0, 0);
+  // The dimension's cell walls, faintly, and still ("maybe a slight
+  // opacity of cell walls, but that isn't moving").
+  const wallRingMaterial = new THREE.MeshBasicMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.1, depthWrite: false });
+  const ringCount = Math.floor(TUNNEL[1] - EYE_U);
+  const walls = new THREE.InstancedMesh(new THREE.TorusGeometry(TUBE_R * 0.98, TUBE_R * 0.02, 6, 32), wallRingMaterial, ringCount);
+  {
     const ringQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-    const first = Math.floor(eyeS) - 1;
-    for (let i = 0; i < RING_COUNT; i++) {
-      m4.compose(new THREE.Vector3((first + i) * S, 0, 0), ringQ, one);
-      rings.setMatrixAt(i, m4);
-    }
-    rings.instanceMatrix.needsUpdate = true;
+    for (let i = 0; i < ringCount; i++) walls.setMatrixAt(i, m4.compose(new THREE.Vector3((Math.ceil(EYE_U) + i) * S, 0, 0), ringQ, one));
+  }
+  walls.frustumCulled = false;
+  cab.add(tunnel, walls);
+  // You're in the signal's path: cells are cut where you stand, so each
+  // one emerges from you and travels away instead of engulfing the view.
+  const atYou = new THREE.Plane(new THREE.Vector3(1, 0, 0), -(EYE_U + 1.2) * S); // a cell's length ahead: nearer, one would fill the view
+  function aimInside() {
     camera.up.set(0, 0, 1);
-    camera.position.set(eyeS * S, 0, 0);
-    controls.target.set((eyeS + 10) * S, 0, 0);
+    camera.position.set(EYE_U * S, 0, 0);
+    controls.target.set((EYE_U + 10) * S, 0, 0);
     controls.enabled = false;
     controls.update();
   }
   function setInside(on) {
     view.inside = on;
+    // Inside, only outward faces: a cell around you isn't drawn from
+    // within (no flood of colour), you see it again once it's ahead.
+    solidMaterial.clippingPlanes = on ? [atYou] : [];
+    solidMaterial.side = on ? THREE.FrontSide : THREE.DoubleSide;
+    solidMaterial.needsUpdate = true;
     if (on) aimInside();
     else { camera.up.set(0, 1, 0); controls.enabled = true; resetView(); frameOutside(); }
   }
@@ -403,6 +410,9 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       if (!on) {
         playing = false;
         view.inside = false;
+        solidMaterial.clippingPlanes = [];
+        solidMaterial.side = THREE.DoubleSide;
+        solidMaterial.needsUpdate = true;
         camera.up.set(0, 1, 0);
         controls.enabled = true;
         panel.classList.remove('visible');
