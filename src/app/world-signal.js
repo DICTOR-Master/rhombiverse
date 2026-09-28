@@ -244,16 +244,17 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   const TUNNEL_R = R * 3.2;
   const tunnel = new THREE.Mesh(new THREE.TubeGeometry(new InsideCurve(), (TUNNEL[1] - TUNNEL[0]) * 2, TUNNEL_R, 96, false), wallMaterial);
   cab.add(tunnel);
-  // On the path's axis (direct request: "inside view should show full
-  // circle of diameter"): every cell is seen end-on, a full circle; one
-  // passing you fills the screen with cyan ("if a cell is coming that
-  // part of the screen should be full of cyan"); never cut, so no dark
-  // gaps; the path narrows to a sharp point at the horizon.
-  const EYE_H = 0;
+  // Above the path: a passing cell fills the bottom of the view unbroken
+  // ("if a cell is coming that part of the screen should be full of cyan";
+  // cutting it where you stand left a dark gap under it), and the path
+  // narrows to a sharp point at the horizon. (Tried on the axis for "full
+  // circle" cells; the user preferred this: "inside view was perfect
+  // before".)
+  const EYE_H = R * 2.2;
   function aimInside() {
     camera.up.set(0, 0, 1);
     camera.position.copy(insidePoint(EYE_U, EYE_H));
-    // The view tilted back against the path, 15° from the axis (direct requests:
+    // The view tilted back against the path, 22° (direct requests:
     // "tilt view backwards so cells vanish above in distance", "centre of
     // appearing and disappearing cell should drop slightly", "more upward
     // tilt", "still want more stretch of tunnel upwards, vanishing into
@@ -261,7 +262,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     // centre sits a little below the middle as it passes and the path
     // climbs to a vanishing point well above it.
     const reach = 20 * S;
-    controls.target.copy(insidePoint(EYE_U + 20, EYE_H - reach * Math.tan((15 * Math.PI) / 180)));
+    controls.target.copy(insidePoint(EYE_U + 20, EYE_H - reach * Math.tan((22 * Math.PI) / 180)));
     controls.enabled = false;
     controls.update();
   }
@@ -274,6 +275,10 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   function setInside(on) {
     view.inside = on;
     setFog(true);
+    // Inside, only outward faces (you're never within a cell, but it keeps
+    // a cell's hollow from ever showing through).
+    solidMaterial.side = on ? THREE.FrontSide : THREE.DoubleSide;
+    solidMaterial.needsUpdate = true;
     if (on) aimInside();
     else { camera.up.set(0, 1, 0); controls.enabled = true; resetView(); frameOutside(); }
   }
