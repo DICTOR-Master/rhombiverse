@@ -29,6 +29,8 @@ jobs:
       - run: node scripts/verify-kaleidoscope.mjs
       # 1D Signal: Morse timing, one signal for every view, the embedding.
       - run: node scripts/verify-trajectory.mjs
+      # 1D Construct: cell/instance/direction model, grids, junction rules.
+      - run: node scripts/verify-construction.mjs
 
   catalogue:
     # Every 5D/6D catalogue entry really occurs and lands, at 9 phason and

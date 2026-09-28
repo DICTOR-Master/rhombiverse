@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 import { morseSequence, decode, layout, totalUnits, cellUnits, pulsesAt, embed, tangentAngle } from '../geometry-extensions/trajectory-1d.js';
 import { createGearedSlider } from './geared-slider.js';
+import { bulletGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 
@@ -68,14 +69,11 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   }
 
   // ---- drawing ----
-  const geoCache = new Map();
-  function capsule(units) {
-    if (!geoCache.has(units)) geoCache.set(units, new THREE.CapsuleGeometry(R, Math.max(0.001, units * S - 2 * R - PAD), 6, 12));
-    return geoCache.get(units);
-  }
-  const ghostMaterial = new THREE.MeshStandardMaterial({ color: GHOST_COLOR, transparent: true, opacity: 0.22, depthWrite: false });
-  const firstMaterial = new THREE.MeshStandardMaterial({ color: FIRST_COLOR, transparent: true, opacity: 0.3, depthWrite: false });
-  const gapMaterial = new THREE.MeshStandardMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.1, depthWrite: false });
+  // The shared 1D cell (bullet-cell.js), nose along the trajectory.
+  const cellGeometry = (units) => bulletGeometry(units * S, R, PAD);
+  const ghostMaterial = new THREE.MeshStandardMaterial({ color: GHOST_COLOR, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
+  const firstMaterial = new THREE.MeshStandardMaterial({ color: FIRST_COLOR, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
+  const gapMaterial = new THREE.MeshStandardMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
   const pulseMaterial = new THREE.MeshBasicMaterial({ color: PULSE_COLOR, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide });
   const catchPlane = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
   catchPlane.position.z = -0.02;
@@ -89,7 +87,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   function placeCell(mesh, s0, units) {
     const mid = s0 + units / 2;
     mesh.position.copy(at(mid, R));
-    mesh.rotation.z = tangentAngle(mid) - Math.PI / 2; // the capsule's own axis is y
+    mesh.rotation.z = tangentAngle(mid) - Math.PI / 2; // the cell's own axis is y, nose at +y
   }
   function clearBuilt() {
     for (const child of [...built.children]) {
@@ -120,10 +118,10 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     for (const { cell, s0 } of layout(cells)) {
       const units = cellUnits(cell);
       let mesh;
-      if (cell.type === 'gap') mesh = new THREE.Mesh(capsule(units), gapMaterial);
+      if (cell.type === 'gap') mesh = new THREE.Mesh(cellGeometry(units), gapMaterial);
       else {
         colorFor(cell, tmpColor);
-        mesh = new THREE.Mesh(capsule(units), new THREE.MeshStandardMaterial({ color: tmpColor.clone(), roughness: 0.45, metalness: 0.1 }));
+        mesh = new THREE.Mesh(cellGeometry(units), new THREE.MeshStandardMaterial({ color: tmpColor.clone(), roughness: 0.45, metalness: 0.1, side: THREE.DoubleSide }));
         mesh.userData.ownMaterial = true;
       }
       placeCell(mesh, s0, units);
@@ -134,7 +132,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     let s = L;
     next.forEach((c, i) => {
       const units = cellUnits(c);
-      const mesh = new THREE.Mesh(capsule(units), !cells.length && i === 0 ? firstMaterial : ghostMaterial);
+      const mesh = new THREE.Mesh(cellGeometry(units), !cells.length && i === 0 ? firstMaterial : ghostMaterial);
       placeCell(mesh, s, units);
       built.add(mesh);
       s += units;

@@ -27,6 +27,7 @@ import { createShellsWorld } from './app/world-shells.js';
 import { createGoldenWorld } from './app/world-golden.js';
 import { createKaleidoWorld } from './app/world-kaleidoscope.js';
 import { createSignalWorld } from './app/world-signal.js';
+import { createConstructWorld } from './app/world-construct.js';
 import { makeQuasicrystal, PRISM_HEIGHT } from './geometry-extensions/quasicrystal.js';
 import { loadCatalogue, findBySerial, zonotopeVertices, localPatch, polytopeShape } from './geometry-extensions/quasicrystal-catalogue.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
@@ -147,9 +148,10 @@ let shellsWorld = null;
 let goldenWorld = null;
 let kaleidoWorld = null;
 let signalWorld = null;
+let constructWorld = null;
 let own3D = null;
-const OWN_WORLD_DIMENSION = { shells: '3D', golden: '3D', kaleido: '2D', signal: '1D' };
-const own3DWorld = () => ({ shells: shellsWorld, golden: goldenWorld, kaleido: kaleidoWorld, signal: signalWorld })[own3D] ?? null;
+const OWN_WORLD_DIMENSION = { shells: '3D', golden: '3D', kaleido: '2D', signal: '1D', construct: '1D' };
+const own3DWorld = () => ({ shells: shellsWorld, golden: goldenWorld, kaleido: kaleidoWorld, signal: signalWorld, construct: constructWorld })[own3D] ?? null;
 const own3DActive = () => !!own3DWorld() && activeDimension === OWN_WORLD_DIMENSION[own3D];
 // 4D, 5D, 6D and the own 3D worlds each own their scene, taps, Lattice View and Skeleton.
 const isOwnWorldDimension = () => activeDimension === '4D' || qcWorlds.has(activeDimension) || own3DActive();
@@ -1965,7 +1967,8 @@ async function init() {
   // types) it's hidden. Reached from the colour wheel's middle, and from
   // this bottom-row slot whenever no attach toggle needs it.
   let paintOn = false;
-  const paintAvailable = () => !!activeDimension && !(own3DActive() && (own3D === 'shells' || own3D === 'golden'));
+  // Construct colours cells by their axis (provenance), so no Paint there either.
+  const paintAvailable = () => !!activeDimension && !(own3DActive() && ['shells', 'golden', 'construct'].includes(own3D));
   const attachNeeded = () => (activeDimension === '4D' ? ['cell24', 'cell16', ...A4_CYCLE] : activeDimension !== '2D' && !isOwnWorldDimension() ? ['rhombohedra', 'pyrochlore'] : []).includes(attachPiece());
   const paintInSlot = () => paintAvailable() && !attachNeeded();
   function setPaint(on) {
@@ -2569,6 +2572,7 @@ async function init() {
     reg('worldgolden', '3D', () => goldenWorld.snapshot(), (j) => goldenWorld.restore(j));
     reg('worldkaleido', '2D', () => kaleidoWorld.snapshot(), (j) => kaleidoWorld.restore(j));
     reg('world1dsignal', '1D', () => signalWorld.snapshot(), (j) => signalWorld.restore(j));
+    reg('world1dconstruct', '1D', () => constructWorld.snapshot(), (j) => constructWorld.restore(j));
     updateUndoButton();
   }
 
@@ -2805,6 +2809,7 @@ async function init() {
     goldenWorld?.setActive(own3DActive() && own3D === 'golden');
     kaleidoWorld?.setActive(own3DActive() && own3D === 'kaleido');
     signalWorld?.setActive(own3DActive() && own3D === 'signal');
+    constructWorld?.setActive(own3DActive() && own3D === 'construct');
     document.body.classList.toggle('qc-world-on', qcWorlds.has(activeDimension) || own3DActive());
     // 4D/6D: X-Ray and Spherical don't apply (the slider IS the X-Ray),
     // so their HUD faces go blank and untappable (direct decision).
@@ -3417,12 +3422,13 @@ async function init() {
         // 2026-08-29 -- X-Ray stays reachable via the corner HUD wheel's
         // own #xray-toggle face and the Lab panel, so no wheel face
         // routes to it here any more.)
-        if (action === 'tool:shellsWorld' || action === 'tool:goldenWorld' || action === 'tool:kaleidoWorld' || action === 'tool:signalWorld') {
-          own3D = { 'tool:shellsWorld': 'shells', 'tool:goldenWorld': 'golden', 'tool:kaleidoWorld': 'kaleido', 'tool:signalWorld': 'signal' }[action];
+        const OWN_WORLD_ACTIONS = { 'tool:shellsWorld': 'shells', 'tool:goldenWorld': 'golden', 'tool:kaleidoWorld': 'kaleido', 'tool:signalWorld': 'signal', 'tool:constructWorld': 'construct' };
+        if (OWN_WORLD_ACTIONS[action]) {
+          own3D = OWN_WORLD_ACTIONS[action];
           wheel3D.close();
           applyDimensionVisibility();
           updateQuickSelect();
-          showHudPrompt({ shells: 'Shells', golden: 'Golden Rhombohedra', kaleido: 'Kaleidoscope', signal: 'Signal' }[own3D], 2500);
+          showHudPrompt({ shells: 'Shells', golden: 'Golden Rhombohedra', kaleido: 'Kaleidoscope', signal: 'Signal', construct: 'Construct' }[own3D], 2500);
           return;
         }
         if (own3D && (action?.startsWith('tool:pieceType:') || action === 'tool:cuboctaBuild')) {
@@ -5020,6 +5026,27 @@ async function init() {
     showHudPrompt,
     onChange: () => { if (historyRestorers.has('world1dsignal')) recordHistory('world1dsignal', signalWorld.snapshot()); },
   });
+  constructWorld = createConstructWorld({
+    scene,
+    camera,
+    controls,
+    // A finished primitive opens in its own dimension's lattice: the
+    // square as 2D's Parallelogram tile at the Square angle.
+    onOpenIn: (dim) => {
+      if (dim !== '2D') return;
+      own3D = null;
+      activeDimension = '2D';
+      activeLattice2dPrimitiveId = 'parallelogram';
+      activeLattice2dAngleId = 'square';
+      activeLattice2dArrangementId = 'translation';
+      applyDimensionVisibility();
+      applyDimensionCamera('2D');
+      renderLattice2dPanel();
+      applyLattice2dSelection();
+    },
+    showHudPrompt,
+    onChange: () => { if (historyRestorers.has('world1dconstruct')) recordHistory('world1dconstruct', constructWorld.snapshot()); },
+  });
   kaleidoWorld = createKaleidoWorld({
     scene,
     // One edge length = the 2D hexagon's edge at 60°, so tiles look the same size.
@@ -5622,6 +5649,7 @@ async function init() {
     goldenWorld?.clear();
     kaleidoWorld?.clear();
     signalWorld?.clear();
+    constructWorld?.clear();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

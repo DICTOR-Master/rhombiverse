@@ -189,9 +189,21 @@ function signalEdges() {
   out.coin = true;
   return out;
 }
-// 1D's worlds (Construct follows).
+// Construct: the square's grid of cells, as it emerges.
+function constructEdges() {
+  const out = [];
+  const n = 3, k = 2 / n;
+  for (let a = 0; a <= n; a++) {
+    out.push([[-1, -1 + a * k, 0], [1, -1 + a * k, 0]]);
+    out.push([[-1 + a * k, -1, 0], [-1 + a * k, 1, 0]]);
+  }
+  out.coin = true;
+  return out;
+}
+// 1D's worlds.
 const FAMILIES_1D = [
   { id: 'signal', label: 'Signal', action: 'tool:signalWorld', preview: signalEdges },
+  { id: 'construct', label: 'Construct', action: 'tool:constructWorld', preview: constructEdges },
 ];
 
 function edges6D() {

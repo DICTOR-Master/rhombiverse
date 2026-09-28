@@ -31,6 +31,9 @@ right-click) removes. The **User Guide** (in the app, or at
 - **1D** — **Signal**: a one-dimensional trajectory built cell by cell
   (dots, dashes, gaps), with Morse messages as ghost cells, Outside and
   Inside views, and Play to send it along the line as pulses.
+  **Construct**: the construction microscope — fill 1D cells along X; at
+  the junction Y becomes available (X stays), and a square emerges from
+  its cells, each coloured by the axis it was built along; open it in 2D.
 - **2D** — five tiles (Parallelogram, Triangle, Hexagon, Kite, Kagome) on
   four lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular),
   plus the Rhombille pattern.
