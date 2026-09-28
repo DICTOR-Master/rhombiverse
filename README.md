@@ -28,9 +28,10 @@ piece goes; tap a face to add the neighbour across it; long-press (or
 right-click) removes. The **User Guide** (in the app, or at
 [/guide](https://rhombiverse.vercel.app/guide)) covers every control.
 
-- **1D** — **Signal**: a one-dimensional trajectory built cell by cell
-  (dots, dashes, gaps), with Morse messages as ghost cells, Outside and
-  Inside views, and Play to set the bullets themselves moving along it.
+- **1D** — **Signal**: type a message and it becomes a line of bullet
+  cells in a tube (its Morse code, no need to know it); tap the orange cell
+  or press Send to set it moving. Outside (in perspective) and Inside (the
+  driver's cab of a tube train) views.
   **Construct**: the construction microscope — fill 1D cells along X; at
   the junction Y becomes available (X stays), and a square emerges from
   its cells, each coloured by the axis it was built along; open it in 2D.

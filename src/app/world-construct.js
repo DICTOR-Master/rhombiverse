@@ -48,7 +48,8 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   // ---- drawing ----
   const geo = bulletGeometry(U, R, PAD);
   const filledMat = new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide });
-  const availableMat = new THREE.MeshStandardMaterial({ color: 0xeaf6ff, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
+  // Cells you can fill next glow orange, the 1D worlds' "tap here".
+  const availableMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.35, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide });
   const unavailableMat = new THREE.MeshStandardMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide });
   const catchPlane = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
   catchPlane.position.z = -0.02;
