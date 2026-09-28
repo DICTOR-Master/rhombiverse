@@ -1967,8 +1967,8 @@ async function init() {
   // types) it's hidden. Reached from the colour wheel's middle, and from
   // this bottom-row slot whenever no attach toggle needs it.
   let paintOn = false;
-  // Construct colours cells by their axis (provenance), so no Paint there either.
-  const paintAvailable = () => !!activeDimension && !(own3DActive() && ['shells', 'golden', 'construct'].includes(own3D));
+  // 1D has no colours to paint (Signal is cyan, Construct shows each axis).
+  const paintAvailable = () => !!activeDimension && activeDimension !== '1D' && !(own3DActive() && ['shells', 'golden'].includes(own3D));
   const attachNeeded = () => (activeDimension === '4D' ? ['cell24', 'cell16', ...A4_CYCLE] : activeDimension !== '2D' && !isOwnWorldDimension() ? ['rhombohedra', 'pyrochlore'] : []).includes(attachPiece());
   const paintInSlot = () => paintAvailable() && !attachNeeded();
   function setPaint(on) {
@@ -2843,7 +2843,10 @@ async function init() {
     // for a click to usefully "open."
     // 5D/6D: the tiling decides each piece's shape, so this button opens
     // the catalogue instead (updateQuickSelect draws its icon).
-    document.getElementById('hud-quick-shape').style.display = activeDimension === '2D' ? 'none' : '';
+    // 1D (direct request: "shape and lattice wheel buttons and color hide
+    // in signal mode"): no shapes, lattice views or colours to pick there.
+    document.getElementById('hud-quick-shape').style.display = activeDimension === '2D' || activeDimension === '1D' ? 'none' : '';
+    for (const id of ['hud-quick-color', 'hud-quick-lattice-view']) document.getElementById(id).style.display = activeDimension === '1D' ? 'none' : '';
   }
   // Re-applies the same visibility rule whenever activeDimension itself
   // changes (not just when World View mode changes, which is

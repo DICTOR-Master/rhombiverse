@@ -34,6 +34,19 @@ export function bulletGeometry(unit, radius, pad = 0) {
   }
   const g = new THREE.LatheGeometry(pts, 20);
   g.computeVertexNormals();
+  // A soft shadow in the tail's hollow, darkening toward its centre, so
+  // the concave cup reads as concave, not as a dome (direct request:
+  // "concave appearing convex, so slight shadow darkening towards
+  // centre"). Materials use it through vertexColors.
+  const pos = g.attributes.position;
+  const col = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const rho = Math.hypot(pos.getX(i), pos.getZ(i));
+    const inCup = pos.getY(i) <= cupDeep + 1e-6 && rho < r - 1e-6;
+    const f = inCup ? 0.35 + 0.65 * (rho / r) ** 2 : 1;
+    col[3 * i] = col[3 * i + 1] = col[3 * i + 2] = f;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   cache.set(key, g);
   return g;
 }
