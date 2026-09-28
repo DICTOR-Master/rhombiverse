@@ -246,9 +246,14 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   function aimInside() {
     camera.up.set(0, 0, 1);
     camera.position.copy(insidePoint(EYE_U, EYE_H));
-    // Level, a touch down: the horizon sits above the middle, the path
-    // climbing up the screen toward it.
-    controls.target.copy(insidePoint(EYE_U + 20, EYE_H - 0.35));
+    // The view tilted back against the path, 15° (direct requests:
+    // "tilt view backwards so cells vanish above in distance", "centre of
+    // appearing and disappearing cell should drop slightly", "more upward
+    // tilt"): each cell's
+    // centre sits a little below the middle as it passes and the path
+    // climbs to a vanishing point well above it.
+    const reach = 20 * S;
+    controls.target.copy(insidePoint(EYE_U + 20, EYE_H - reach * Math.tan((15 * Math.PI) / 180)));
     controls.enabled = false;
     controls.update();
   }
