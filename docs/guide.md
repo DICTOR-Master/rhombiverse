@@ -2,7 +2,7 @@
 
 Rhombiverse and its twin, [Polyhedraverse](https://polyhedraverse.vercel.app), are two ways of looking at the same geometry. Rhombiverse is the **landscape**: the lattices themselves, stretching out in every direction. Polyhedraverse is the **portrait gallery**: the shapes that live in those lattices, one at a time, up close.
 
-Here, every piece fills space perfectly on a real crystal lattice, so you can only put a piece where the lattice has room for it. Tap to add a piece, long-press to remove one, and look at what you've built in different views, from 2D up to 6D.
+Here, every piece fills space perfectly on a real crystal lattice, so you can only put a piece where the lattice has room for it. Tap to add a piece, long-press to remove one, and look at what you've built in different views, from 1D up to 6D.
 
 The first part of this guide walks through common tasks. The second part lists every control.
 
@@ -10,7 +10,7 @@ The first part of this guide walks through common tasks. The second part lists e
 
 ### Pick a dimension
 
-After **ENTER**, the dimension picker opens: a slowly turning shape whose faces are **2D**, **3D**, **4D**, **5D** and **6D**, each marked with an icon. Hover over a face (or press and hold it on a touchscreen) to see its name, then tap the one you want. Drag to turn the shape and bring other faces round.
+After **ENTER**, the dimension picker opens: a slowly turning shape whose faces are **1D**, **2D**, **3D**, **4D**, **5D** and **6D**, each marked with an icon. Hover over a face (or press and hold it on a touchscreen) to see its name, then tap the one you want. Drag to turn the shape and bring other faces round.
 
 You can switch later from **Menu → Change Dimension**, or from the **Wizard** (top left), which lists every lattice in each dimension with its pieces as rotating wireframes.
 
@@ -36,6 +36,8 @@ To take back your last change, tap **Undo** (↶, bottom right). Hold it to scru
 ## Choosing what to build
 
 ### The pieces, by lattice
+
+**1D Signal** (Wizard → 1D → Signal): a single trajectory, built one cell at a time: • Dot, — Dash or · Gap. Type a message and its Morse code appears as ghost cells after your chain; each tap places the next one, and the panel reads the chain back as text. **Outside** shows the trajectory drawn across the screen, running on toward infinity both ways; **Inside** puts you on it, looking back down the chain. **▶ Play** sends your chain along the trajectory as pulses, over and over, at the speed on the slider, **Forward** from its start or in **Reverse** from its end. Long-press removes a cell, and the chain closes up behind it: it's one-dimensional.
 
 **2D:** Parallelogram, Triangle, Hexagon, Kite and Kagome tiles, chosen from the panel at the top, each at up to four lattice angles (90°, 70.53°, 63.43° and 60°).
 

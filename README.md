@@ -1,6 +1,6 @@
 # Rhombiverse
 
-Rhombiverse is a free, browser-based geometry builder **from 2D to 6D**.
+Rhombiverse is a free, browser-based geometry builder **from 1D to 6D**.
 Everything is made of shapes that fill space perfectly on real lattices —
 starting from the rhombic dodecahedron, the natural cell of the
 face-centered cubic (FCC) lattice — and every piece traces back to real
@@ -28,6 +28,9 @@ piece goes; tap a face to add the neighbour across it; long-press (or
 right-click) removes. The **User Guide** (in the app, or at
 [/guide](https://rhombiverse.vercel.app/guide)) covers every control.
 
+- **1D** — **Signal**: a one-dimensional trajectory built cell by cell
+  (dots, dashes, gaps), with Morse messages as ghost cells, Outside and
+  Inside views, and Play to send it along the line as pulses.
 - **2D** — five tiles (Parallelogram, Triangle, Hexagon, Kite, Kagome) on
   four lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular),
   plus the Rhombille pattern.

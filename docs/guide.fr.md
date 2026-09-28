@@ -2,7 +2,7 @@
 
 Rhombiverse et son jumeau, [Polyhedraverse](https://polyhedraverse.vercel.app), sont deux façons de regarder la même géométrie. Rhombiverse est le **paysage** : les réseaux eux-mêmes, qui s'étendent dans toutes les directions. Polyhedraverse est la **galerie de portraits** : les formes qui habitent ces réseaux, une à la fois, vues de près.
 
-Ici, chaque pièce remplit parfaitement l'espace sur un vrai réseau cristallin : on ne peut donc poser une pièce que là où le réseau a de la place pour elle. Touchez pour ajouter une pièce, appuyez longuement pour en retirer une, et regardez ce que vous avez construit sous différentes vues, de la 2D à la 6D.
+Ici, chaque pièce remplit parfaitement l'espace sur un vrai réseau cristallin : on ne peut donc poser une pièce que là où le réseau a de la place pour elle. Touchez pour ajouter une pièce, appuyez longuement pour en retirer une, et regardez ce que vous avez construit sous différentes vues, de la 1D à la 6D.
 
 La première partie de ce guide présente les tâches courantes. La seconde liste toutes les commandes.
 
@@ -12,7 +12,7 @@ Les noms des boutons sont écrits tels qu'ils apparaissent dans l'application (c
 
 ### Choisir une dimension
 
-Après **ENTER**, le sélecteur de dimension s'ouvre : une forme qui tourne lentement et dont les faces sont **2D**, **3D**, **4D**, **5D** et **6D**, chacune avec une icône. Survolez une face (ou appuyez longuement dessus sur un écran tactile) pour voir son nom, puis touchez celle que vous voulez. Faites glisser pour tourner la forme et amener d'autres faces devant.
+Après **ENTER**, le sélecteur de dimension s'ouvre : une forme qui tourne lentement et dont les faces sont **1D**, **2D**, **3D**, **4D**, **5D** et **6D**, chacune avec une icône. Survolez une face (ou appuyez longuement dessus sur un écran tactile) pour voir son nom, puis touchez celle que vous voulez. Faites glisser pour tourner la forme et amener d'autres faces devant.
 
 Vous pourrez changer plus tard depuis **Menu → Change Dimension**, ou depuis le **Wizard** (en haut à gauche), qui présente tous les réseaux de chaque dimension avec leurs pièces en fil de fer qui tournent.
 
@@ -38,6 +38,8 @@ Pour annuler votre dernière modification, touchez **Undo** (↶, en bas à droi
 ## Choisir quoi construire
 
 ### Les pièces, par réseau
+
+**Signal 1D** (Wizard → 1D → Signal) : une seule trajectoire, construite cellule par cellule : • Point, — Trait ou · Silence. Tapez un message et son code Morse apparaît en cellules fantômes après votre chaîne ; chaque toucher pose la suivante, et le panneau relit la chaîne en texte. **Dehors** montre la trajectoire tracée à l'écran, filant vers l'infini des deux côtés ; **Dedans** vous place dessus, regardant la chaîne en arrière. **▶ Lecture** envoie votre chaîne le long de la trajectoire en impulsions, en boucle, à la vitesse du curseur, **Avant** depuis son début ou **Arrière** depuis sa fin. Un appui long retire une cellule, et la chaîne se referme derrière : elle est à une dimension.
 
 **2D :** carreaux Parallelogram (parallélogramme), Triangle, Hexagon (hexagone), Kite (cerf-volant) et Kagome, choisis dans le panneau du haut, chacun avec jusqu'à quatre angles de réseau (90°, 70,53°, 63,43° et 60°).
 

@@ -514,15 +514,9 @@ export const WHEEL_RD_FAMILY = {
 // (0,sy,1)/(sx,0,1) has its true antipode at (0,-sy,-1)/(-sx,0,-1) on
 // the bottom ring) that were previously unreachable because their
 // antipodes were fixed universal-ring faces. That's exactly enough for
-// every one of the 5 real dimensions to get a TRUE doubled pair (10
-// slots), with one pair (2 slots) left over -- given to Almanac,
-// doubled too, direct follow-up ("maybe almanac too doubled for all
-// 12") -- so all 12 slots are real, none truly spare. Only 3D is
-// buildable (`kind: "dept"`, real click); 2D/4D/5D/6D stay plain SPARE
-// (dark, non-clickable, label + desc kept) until each tier actually
-// ships -- "simplicity is key" still applies unchanged, just now with
-// every dimension visibly doubled rather than only the ones that
-// happened to have a free antipode under the old universal-ring layout.
+// every dimension, 1D through 6D, to get a TRUE doubled pair: all 12
+// slots are real. (The last pair was Almanac's until 1D arrived,
+// 2026-09-29; the Almanac is on the main wheel's universal ring.)
 export const WHEEL_DIMENSION = {
   id: "dimension",
   noUniversalRing: true,
@@ -552,10 +546,12 @@ export const WHEEL_DIMENSION = {
       desc: "Decagonal quasicrystal -- Penrose rhombus layers sliced from Z5." },
     "bottom|sy1sz-1":   { kind: "dept", label: "5D", action: "tool:selectDimension:5D",
       desc: "Decagonal quasicrystal -- Penrose rhombus layers sliced from Z5." },
-    "top|sx-1sz1":      { kind: "dept", label: "Almanac", action: "openAlmanac",
-      desc: "Math & Geometry reference -- the demonstrations behind everything you build." },
-    "bottom|sx1sz-1":   { kind: "dept", label: "Almanac", action: "openAlmanac",
-      desc: "Math & Geometry reference -- the demonstrations behind everything you build." },
+    // 1D (2026-09-29) takes the pair Almanac had; the Almanac stays on
+    // the main wheel's universal ring.
+    "top|sx-1sz1":      { kind: "dept", label: "1D", action: "tool:selectDimension:1D",
+      desc: "Signal -- a one-dimensional trajectory carrying Morse code." },
+    "bottom|sx1sz-1":   { kind: "dept", label: "1D", action: "tool:selectDimension:1D",
+      desc: "Signal -- a one-dimensional trajectory carrying Morse code." },
     "top|sx1sz1":       { kind: "dept", label: "6D", action: "tool:selectDimension:6D",
       desc: "Icosahedral quasicrystal -- golden rhombohedra sliced from Z6." },
     "bottom|sx-1sz-1":  { kind: "dept", label: "6D", action: "tool:selectDimension:6D",

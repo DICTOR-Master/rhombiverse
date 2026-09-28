@@ -14,6 +14,7 @@
     "verify:catalogue": "node scripts/verify-catalogue.mjs",
     "verify:shells": "node scripts/verify-shells.mjs",
     "verify:kaleidoscope": "node scripts/verify-kaleidoscope.mjs",
+    "verify:trajectory": "node scripts/verify-trajectory.mjs",
     "verify:copy": "node scripts/verify-copy.mjs"
   },
   "devDependencies": {

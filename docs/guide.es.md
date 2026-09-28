@@ -2,7 +2,7 @@
 
 Rhombiverse y su gemelo, [Polyhedraverse](https://polyhedraverse.vercel.app), son dos maneras de mirar la misma geometría. Rhombiverse es el **paisaje**: las propias redes, que se extienden en todas direcciones. Polyhedraverse es la **galería de retratos**: las formas que viven en esas redes, de una en una y de cerca.
 
-Aquí cada pieza llena el espacio a la perfección sobre una red cristalina real, así que solo puedes poner una pieza donde la red tenga sitio para ella. Toca para añadir una pieza, mantén pulsado para quitarla y observa lo que has construido con distintas vistas, de 2D a 6D.
+Aquí cada pieza llena el espacio a la perfección sobre una red cristalina real, así que solo puedes poner una pieza donde la red tenga sitio para ella. Toca para añadir una pieza, mantén pulsado para quitarla y observa lo que has construido con distintas vistas, de 1D a 6D.
 
 La primera parte de esta guía recorre las tareas habituales. La segunda enumera todos los controles.
 
@@ -12,7 +12,7 @@ Los nombres de los botones aparecen tal como se ven en la aplicación (los que l
 
 ### Elige una dimensión
 
-Después de **ENTER** se abre el selector de dimensión: una figura que gira despacio y cuyas caras son **2D**, **3D**, **4D**, **5D** y **6D**, cada una con un icono. Pasa el cursor por una cara (o mantenla pulsada en una pantalla táctil) para ver su nombre y toca la que quieras. Arrastra para girar la figura y traer otras caras al frente.
+Después de **ENTER** se abre el selector de dimensión: una figura que gira despacio y cuyas caras son **1D**, **2D**, **3D**, **4D**, **5D** y **6D**, cada una con un icono. Pasa el cursor por una cara (o mantenla pulsada en una pantalla táctil) para ver su nombre y toca la que quieras. Arrastra para girar la figura y traer otras caras al frente.
 
 Puedes cambiar más tarde desde **Menú → Change Dimension**, o desde el **Wizard** (arriba a la izquierda), que muestra todas las redes de cada dimensión con sus piezas como estructuras de alambre giratorias.
 
@@ -38,6 +38,8 @@ Para deshacer tu último cambio, toca **Undo** (↶, abajo a la derecha). Manten
 ## Qué construir
 
 ### Las piezas, por red
+
+**Señal 1D** (Wizard → 1D → Signal): una sola trayectoria, construida celda a celda: • Punto, — Raya o · Pausa. Escribe un mensaje y su código Morse aparece como celdas fantasma tras tu cadena; cada toque coloca la siguiente, y el panel lee la cadena como texto. **Fuera** muestra la trayectoria dibujada en la pantalla, siguiendo hacia el infinito en ambos sentidos; **Dentro** te pone sobre ella, mirando hacia atrás a lo largo de la cadena. **▶ Reproducir** envía tu cadena por la trayectoria como pulsos, una y otra vez, a la velocidad del deslizador, **Adelante** desde su inicio o **Atrás** desde su final. Mantén pulsada una celda para quitarla, y la cadena se cierra tras ella: es unidimensional.
 
 **2D:** baldosas Parallelogram (paralelogramo), Triangle (triángulo), Hexagon (hexágono), Kite (cometa) y Kagome, que se eligen en el panel superior, cada una con hasta cuatro ángulos de red (90°, 70,53°, 63,43° y 60°).
 

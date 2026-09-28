@@ -59,6 +59,7 @@
     "growth (face-reflection)"
   ],
   "appTerms": [
-    "grow(s|n|ing|th)?"
+    "grow(s|n|ing|th)?",
+    "from 2D to 6D"
   ]
 }

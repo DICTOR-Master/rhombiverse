@@ -37,6 +37,7 @@
 // through i18n.js ('wiz.*' and 'cat.*'); lattice, piece and tile names
 // stay English.
 import { tileOnEdge } from '../geometry-extensions/kaleidoscope.js';
+import { embed } from '../geometry-extensions/trajectory-1d.js';
 import { mountWireframePreview } from './wireframe-preview.js';
 import { cellStructure, rotation4, matVec, project4, A4_FIRST } from '../geometry-extensions/lattice-4d.js';
 import { START_LATTICE_ANGLE, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS } from '../geometry-extensions/lattice-2d.js';
@@ -166,6 +167,7 @@ const DIMENSIONS = [
   // which meant toggling angle silently swapped to an unrelated store
   // instead of reshaping the one you'd actually built. See
   // lattice2dSeedCell's own header in render.js for the full incident.
+  { id: '1D', label: '1D', preview: () => signalEdges() },
   { id: '2D', label: '2D', preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: START_LATTICE_ANGLE.angleDeg }) },
   { id: '3D', label: '3D', previewAction: 'tool:pieceType:rd' },
   { id: '4D', label: '4D', preview: () => edges4D('cell24') },
@@ -175,6 +177,23 @@ const DIMENSIONS = [
 
 // 6D thumbnail: a prolate golden rhombohedron, the same tile world-quasicrystal.js
 // places (growth.js's unit tile). Edges join corners one step apart.
+// 1D: a stretch of the Signal trajectory, • — • as segments along E(s).
+function signalEdges() {
+  const out = [];
+  const pt = (s) => { const [x, y] = embed(s); return [x * 0.3 - 1.05, y * 0.3, 0]; };
+  let s = 0;
+  for (const u of [1, 3, 1]) {
+    for (let k = 0; k < u * 4; k++) out.push([pt(s + k / 4), pt(s + (k + 1) / 4)]);
+    s += u + 1;
+  }
+  out.coin = true;
+  return out;
+}
+// 1D's worlds (Construct follows).
+const FAMILIES_1D = [
+  { id: 'signal', label: 'Signal', action: 'tool:signalWorld', preview: signalEdges },
+];
+
 function edges6D() {
   const v = unitTileVertices(VALID_TRIPLES.find((t) => t.type === 'acute').dirs);
   const c = [0, 1, 2].map((x) => v.reduce((s, p) => s + p[x], 0) / 8);
@@ -370,36 +389,42 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
         const dim = el.dataset.dim;
         if (dim === '3D') showLattice3D();
         else if (dim === '2D') showLattice2D();
+        else if (dim === '1D') showLattice1D();
         else if (dim === '4D') showLattice4D();
         else if (dim === '5D' || dim === '6D') showCatalogue(dim);
       });
     });
   }
 
-  function showLattice2D() {
+  // A dimension's card screen (1D, 2D): one card per world or tile,
+  // descriptions 'wiz.<1d|2d>.<id>'.
+  const showLattice1D = () => showFamilies('1D', FAMILIES_1D);
+  const showLattice2D = () => showFamilies('2D', LATTICE_FAMILIES_2D);
+  function showFamilies(dim, families) {
     resetPreviews();
     const L = getSettings().language;
+    const d = dim.toLowerCase();
     let grid = '';
-    for (const fam of LATTICE_FAMILIES_2D) {
+    for (const fam of families) {
       grid += `
         <button type="button" class="dim-wizard-card-btn" data-action="${fam.action}">
           ${previewSlot(fam.preview)}
           <span class="dim-wizard-row-text">
             <span class="dim-wizard-label">${fam.label}</span>
-            <span class="dim-wizard-desc">${t(`wiz.2d.${fam.id}`, L)}</span>
+            <span class="dim-wizard-desc">${t(`wiz.${d}.${fam.id}`, L)}</span>
           </span>
         </button>`;
     }
     bodyEl.innerHTML = `
       <button type="button" class="dim-wizard-back">${t('wiz.back', L)}</button>
-      <div class="dim-wizard-sub">${t('wiz.2d.sub', L)}</div>
+      <div class="dim-wizard-sub">${t(`wiz.${d}.sub`, L)}</div>
       <div class="dim-wizard-grid">${grid}</div>`;
     mountPreviews();
     bodyEl.querySelector('.dim-wizard-back').addEventListener('click', showDimensions);
     bodyEl.querySelectorAll('.dim-wizard-card-btn[data-action]').forEach((el) => {
       el.addEventListener('click', () => {
         close();
-        onSelectFamily('2D', el.dataset.action);
+        onSelectFamily(dim, el.dataset.action);
       });
     });
   }
@@ -564,7 +589,8 @@ export function createDimensionWizard({ onSelectFamily, pieceEdges }) {
   function openDimension(dim) {
     overlay.classList.add('open');
     titleEl.textContent = t('wiz.title', getSettings().language); // the lattice screens keep the list's title
-    if (dim === '2D') showLattice2D();
+    if (dim === '1D') showLattice1D();
+    else if (dim === '2D') showLattice2D();
     else if (dim === '3D') showLattice3D();
     else if (dim === '4D') showLattice4D();
     else if (dim === '5D' || dim === '6D') showCatalogue(dim);

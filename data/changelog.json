@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-09-29",
+    "title": "1D",
+    "items": [
+      "New dimension: 1D (on the dimension picker, the Wizard and the welcome screen). Its first world is Signal: a single trajectory, built one cell at a time from dots, dashes and gaps. Type a message and its Morse code appears as ghost cells to tap into place; the panel reads your chain back as text. Outside shows the trajectory drawn across the screen, running on toward infinity; Inside puts you on it, looking back down the chain. Play sends your chain along the trajectory as pulses, forward or in reverse, at the speed on the slider. Long-press removes a cell and the chain closes up behind it, because it's one-dimensional. The Almanac is still on the main wheel."
+    ]
+  },
+  {
     "date": "2026-09-26",
     "title": "Colours & Shells",
     "items": [

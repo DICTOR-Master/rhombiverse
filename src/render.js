@@ -26,6 +26,7 @@ import { createQuasicrystalWorld } from './app/world-quasicrystal.js';
 import { createShellsWorld } from './app/world-shells.js';
 import { createGoldenWorld } from './app/world-golden.js';
 import { createKaleidoWorld } from './app/world-kaleidoscope.js';
+import { createSignalWorld } from './app/world-signal.js';
 import { makeQuasicrystal, PRISM_HEIGHT } from './geometry-extensions/quasicrystal.js';
 import { loadCatalogue, findBySerial, zonotopeVertices, localPatch, polytopeShape } from './geometry-extensions/quasicrystal-catalogue.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
@@ -145,9 +146,10 @@ const qcWorlds = new Map();
 let shellsWorld = null;
 let goldenWorld = null;
 let kaleidoWorld = null;
+let signalWorld = null;
 let own3D = null;
-const OWN_WORLD_DIMENSION = { shells: '3D', golden: '3D', kaleido: '2D' };
-const own3DWorld = () => ({ shells: shellsWorld, golden: goldenWorld, kaleido: kaleidoWorld })[own3D] ?? null;
+const OWN_WORLD_DIMENSION = { shells: '3D', golden: '3D', kaleido: '2D', signal: '1D' };
+const own3DWorld = () => ({ shells: shellsWorld, golden: goldenWorld, kaleido: kaleidoWorld, signal: signalWorld })[own3D] ?? null;
 const own3DActive = () => !!own3DWorld() && activeDimension === OWN_WORLD_DIMENSION[own3D];
 // 4D, 5D, 6D and the own 3D worlds each own their scene, taps, Lattice View and Skeleton.
 const isOwnWorldDimension = () => activeDimension === '4D' || qcWorlds.has(activeDimension) || own3DActive();
@@ -357,7 +359,7 @@ function applyDimensionCamera(dimension) {
   // restores ORBIT_LEFT_DEFAULT (rotate) on the way back to 3D. Guarded
   // by `!== null`: Drag Placement mode (pickers' own onDragPlacementChange)
   // sets LEFT to null while active, and this must never clobber that.
-  if (dimension === '2D') {
+  if (dimension === '2D' || dimension === '1D') {
     if (!cameraSavedFor2D) {
       saved3DCameraState.position.copy(camera.position);
       saved3DCameraState.target.copy(controls.target);
@@ -829,6 +831,8 @@ const AUTO_ASSIGN_MATERIAL_BY_PIECE = {
   'kaleido:triangle': 'emerald',
   'kaleido:hexagon': 'amethyst',
   'kaleido:square': 'citrine',
+  'signal:dot': 'gold',
+  'signal:dash': 'water',
 };
 const AUTO_ASSIGN_PIECE_LABELS = {
   rd: 'RD (full block)',
@@ -859,6 +863,8 @@ const AUTO_ASSIGN_PIECE_LABELS = {
   'kaleido:triangle': 'Kaleidoscope: Triangle',
   'kaleido:hexagon': 'Kaleidoscope: Hexagon',
   'kaleido:square': 'Kaleidoscope: Square',
+  'signal:dot': 'Signal: Dot',
+  'signal:dash': 'Signal: Dash',
 };
 
 // Piece colour mode (2026-09-26, parity with Polyhedraverse's Green /
@@ -2562,6 +2568,7 @@ async function init() {
     reg('worldshells', '3D', () => shellsWorld.snapshot(), (j) => shellsWorld.restore(j));
     reg('worldgolden', '3D', () => goldenWorld.snapshot(), (j) => goldenWorld.restore(j));
     reg('worldkaleido', '2D', () => kaleidoWorld.snapshot(), (j) => kaleidoWorld.restore(j));
+    reg('world1dsignal', '1D', () => signalWorld.snapshot(), (j) => signalWorld.restore(j));
     updateUndoButton();
   }
 
@@ -2760,7 +2767,7 @@ async function init() {
   function dimensionAllowsMesh(key) {
     // 4D shows only its own world (world-4d.js's own group); every 3D and
     // 2D mesh hides, same "toggle visibility, delete nothing" rule.
-    if (isOwnWorldDimension()) return false;
+    if (isOwnWorldDimension() || activeDimension === '1D') return false;
     if (key.startsWith('lattice2d:')) {
       return activeDimension === '2D' && key === `lattice2d:${activeLattice2dPrimitiveId}`;
     }
@@ -2797,6 +2804,7 @@ async function init() {
     shellsWorld?.setActive(own3DActive() && own3D === 'shells');
     goldenWorld?.setActive(own3DActive() && own3D === 'golden');
     kaleidoWorld?.setActive(own3DActive() && own3D === 'kaleido');
+    signalWorld?.setActive(own3DActive() && own3D === 'signal');
     document.body.classList.toggle('qc-world-on', qcWorlds.has(activeDimension) || own3DActive());
     // 4D/6D: X-Ray and Spherical don't apply (the slider IS the X-Ray),
     // so their HUD faces go blank and untappable (direct decision).
@@ -3409,12 +3417,12 @@ async function init() {
         // 2026-08-29 -- X-Ray stays reachable via the corner HUD wheel's
         // own #xray-toggle face and the Lab panel, so no wheel face
         // routes to it here any more.)
-        if (action === 'tool:shellsWorld' || action === 'tool:goldenWorld' || action === 'tool:kaleidoWorld') {
-          own3D = { 'tool:shellsWorld': 'shells', 'tool:goldenWorld': 'golden', 'tool:kaleidoWorld': 'kaleido' }[action];
+        if (action === 'tool:shellsWorld' || action === 'tool:goldenWorld' || action === 'tool:kaleidoWorld' || action === 'tool:signalWorld') {
+          own3D = { 'tool:shellsWorld': 'shells', 'tool:goldenWorld': 'golden', 'tool:kaleidoWorld': 'kaleido', 'tool:signalWorld': 'signal' }[action];
           wheel3D.close();
           applyDimensionVisibility();
           updateQuickSelect();
-          showHudPrompt({ shells: 'Shells', golden: 'Golden Rhombohedra', kaleido: 'Kaleidoscope' }[own3D], 2500);
+          showHudPrompt({ shells: 'Shells', golden: 'Golden Rhombohedra', kaleido: 'Kaleidoscope', signal: 'Signal' }[own3D], 2500);
           return;
         }
         if (own3D && (action?.startsWith('tool:pieceType:') || action === 'tool:cuboctaBuild')) {
@@ -3705,6 +3713,14 @@ async function init() {
           enterQuasicrystal(action.slice(-2));
           return;
         }
+        // 1D (2026-09-29): Signal, the one 1D world so far.
+        if (action === 'tool:selectDimension:1D') {
+          activeDimension = '1D';
+          applyDimensionCamera('1D');
+          dimensionWheel3D.close();
+          handleWheelAction('tool:signalWorld', { quiet: true });
+          return;
+        }
         if (action === 'tool:selectDimension:2D') {
           activeDimension = '2D';
           applyDimensionVisibility();
@@ -3713,12 +3729,6 @@ async function init() {
           handleWheelAction(`tool:pieceType:lattice2d:${LATTICE_PRIMITIVES[0].id}`, { quiet: true });
           return;
         }
-        // WHEEL_DIMENSION's own noUniversalRing:true (see that config's
-        // own header) means Cyborg/Settings are no longer reachable
-        // faces on this wheel at all -- only Almanac stays, doubled on
-        // its own antipodal pair ("maybe almanac too doubled for all
-        // 12"), so this is the one universal-ring action still live here.
-        if (action === 'openAlmanac') { dimensionWheel3D.close(); almanac.open(); return; }
       },
     });
     // Dimension wizard: a SECOND, parallel entry point inside a
@@ -5000,6 +5010,16 @@ async function init() {
     showHudPrompt,
     onChange: () => { if (historyRestorers.has('worldgolden')) recordHistory('worldgolden', goldenWorld.snapshot()); },
   });
+  signalWorld = createSignalWorld({
+    scene,
+    camera,
+    controls,
+    resetView: () => applyDimensionCamera('1D'),
+    colorFor: (cell, out) => out.copy(instanceColorFor({ material: cell.material }, `signal:${cell.type}`)),
+    getMaterial: (type) => currentMaterialFor(`signal:${type}`),
+    showHudPrompt,
+    onChange: () => { if (historyRestorers.has('world1dsignal')) recordHistory('world1dsignal', signalWorld.snapshot()); },
+  });
   kaleidoWorld = createKaleidoWorld({
     scene,
     // One edge length = the 2D hexagon's edge at 60°, so tiles look the same size.
@@ -5601,6 +5621,7 @@ async function init() {
     shellsWorld?.clear();
     goldenWorld?.clear();
     kaleidoWorld?.clear();
+    signalWorld?.clear();
   }
   document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);

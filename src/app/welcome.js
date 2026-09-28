@@ -158,11 +158,13 @@ function startLogoSpin(onEnterHit) {
 // spot instead -- the "What's New" changelog panel (src/app/changelog.js)
 // is still the real place for that content, this was always a secondary
 // teaser of it.
-// The overview line with each dimension (2D ... 6D) as a link that opens
-// the Wizard at that dimension. Redrawn here on a language change (not via
-// data-i18n, which would set plain text and drop the links).
+// The overview line, then every dimension (1D ... 6D) as a button that
+// opens the Wizard at that dimension, all on one row of their own
+// (direct request: no '&', the row never splitting across lines).
+// Redrawn here on a language change (data-i18n would drop the buttons).
+const DIMS = ['1D', '2D', '3D', '4D', '5D', '6D'];
 function overviewHtml(lang) {
-  return t('welcome.overview', lang).replace(/\b([2-6]D)\b/g, '<button type="button" class="dim-link" data-dim="$1">$1</button>');
+  return `${t('welcome.overview', lang)}<span class="dim-links">${DIMS.map((d) => `<button type="button" class="dim-link" data-dim="${d}">${d}</button>`).join('')}</span>`;
 }
 
 function overlayHtml() {
