@@ -50,3 +50,19 @@ export function bulletGeometry(unit, radius, pad = 0) {
   cache.set(key, g);
   return g;
 }
+
+// A faint, not-yet-filled or gap cell drawn plain: an open cylinder the
+// cell's length, no nose or hollow tail, so a run of them reads as one
+// smooth line (direct report: "gaps shouldn't show as double when
+// ghosted out": see-through noses and cups overlapped as double rims).
+const plainCache = new Map();
+export function plainCellGeometry(unit, radius) {
+  const key = `${unit.toFixed(4)}|${radius.toFixed(4)}`;
+  if (!plainCache.has(key)) {
+    const g = new THREE.CylinderGeometry(radius, radius, unit, 64, 1, true);
+    const col = new Float32Array(g.attributes.position.count * 3).fill(1);
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); // matches the bullets' vertexColors materials
+    plainCache.set(key, g);
+  }
+  return plainCache.get(key);
+}

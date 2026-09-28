@@ -21,7 +21,7 @@
 // - Controls: one line, the view button, the message, Send.
 import * as THREE from 'three';
 import { morseSequence, decode, layout, totalUnits, cellUnits, embed, tangentAngle } from '../geometry-extensions/trajectory-1d.js';
-import { bulletGeometry } from './bullet-cell.js';
+import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 
@@ -170,7 +170,8 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     const copies = playing ? Math.ceil((L + BEHIND + AHEAD) / period()) + 2 : 1;
     for (const [k, entries] of byKey) {
       const [kind, units] = k.split('|');
-      const mesh = new THREE.InstancedMesh(cellGeometry(Number(units)), kind === 'gap' ? gapMaterial : solidMaterial, entries.length * copies);
+      // Gaps are faint and plain (no nose or cup to show double through them).
+      const mesh = new THREE.InstancedMesh(kind === 'gap' ? plainCellGeometry(Number(units) * S, R) : cellGeometry(Number(units)), kind === 'gap' ? gapMaterial : solidMaterial, entries.length * copies);
       mesh.frustumCulled = false;
       built.add(mesh);
       stream.push({ mesh, entries });
@@ -182,7 +183,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       let s = L;
       pending.forEach((c, i) => {
         const units = cellUnits(c);
-        const mesh = new THREE.Mesh(cellGeometry(units), i === 0 ? nextMaterial : ghostMaterial);
+        const mesh = new THREE.Mesh(i === 0 ? cellGeometry(units) : plainCellGeometry(units * S, R), i === 0 ? nextMaterial : ghostMaterial);
         placeCell(mesh, s, units);
         built.add(mesh);
         s += units;

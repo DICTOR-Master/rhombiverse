@@ -7,12 +7,14 @@
 // and confusing", "I wanted a square, not a grid", "looks like 1960s Open
 // University graphics, nothing like the rest of the app", "supposed to be
 // staged to make it as simple as possible"). Decisions: one cell per tap,
-// cyan like Signal, a fixed square of 4 cells per side.
-// - One line at a time: the side you're on waits as faint empty cells,
-//   sides built are ghosted, sides ahead hidden. The next cell is
-//   orange: tap (anywhere) to fill it. Along X first; at the corner a
-//   junction glows and Y joins (X stays); up Y, back along the top (a
-//   second X line, parallel to the first), down the last side. Closing
+// cyan like Signal, a fixed square of 10 cells per side, slender cells,
+// seen straight on.
+// - One line at a time: only the side you're on shows (its empty cells
+//   faint, plain) until the square closes. The next cell is orange: tap
+//   (anywhere) to fill it. Up the screen along X first; at the corner a
+//   junction glows and Y joins (X stays); clockwise along the top, down
+//   the far side (a second X line, parallel to the first), back along
+//   the bottom. Closing
 //   the loop, the square fills in, and can open in 2D ("same animal,
 //   different zoo").
 // - Long-press takes back the last cell. No other controls.
@@ -20,14 +22,15 @@
 //   round, in Signal's cyan, matte, shaded cups.
 import * as THREE from 'three';
 import { squareLoop, junctions, axisName, SQUARE_N } from '../geometry-extensions/construction.js';
-import { bulletGeometry } from './bullet-cell.js';
+import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 
 const STORAGE_KEY = 'rhombiverse-1d-construct-world';
-const U = 0.7; // world units per cell
-const R = 0.2; // Signal's proportions, doubled
-const PAD = 0.006;
+const U = 0.5; // world units per cell
+// Slender, more like an axis than a fat tube (direct request).
+const R = 0.055;
+const PAD = 0.004;
 const CYAN = 0x22c3e6;
 const NEXT = 0xf59e0b; // the 1D worlds' orange "tap here"
 const lang = () => getSettings().language;
@@ -53,12 +56,19 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
 
   // ---- drawing ----
   const geo = bulletGeometry(U, R, PAD);
+  const plainGeo = plainCellGeometry(U, R);
   const filledMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, roughness: 0.8, metalness: 0.05 });
   const nextMat = new THREE.MeshStandardMaterial({ color: NEXT, emissive: NEXT, emissiveIntensity: 0.35, vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false });
   const emptyMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.08, depthWrite: false });
-  const ghostMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.22, depthWrite: false });
   const faceMat = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
-  const junctionMat = new THREE.MeshBasicMaterial({ color: NEXT, transparent: true, opacity: 0.85 });
+  const junctionMat = new THREE.MeshBasicMaterial({ color: NEXT, transparent: true, opacity: 0.45, depthWrite: false });
+  // Rounded corners (direct request: "corners should become rounded when
+  // reached; the dome should reach the far side of the diameter"): a
+  // joint as wide as the cells at each corner once it's reached, so the
+  // line bends smoothly instead of stopping at the corner's centre line.
+  const cornerMat = new THREE.MeshStandardMaterial({ color: CYAN, roughness: 0.8, metalness: 0.05 });
+  const cornerGeo = new THREE.SphereGeometry(R, 48, 24);
+  const corners = [...turns.map((j) => ({ point: j.point, arrive: j.at - 1, depart: j.at })), { point: loop[0].from, arrive: loop.length - 1, depart: 0 }];
   const catchPlane = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
   catchPlane.position.z = -R - 0.05;
   group.add(catchPlane);
@@ -71,8 +81,8 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   // direction's name, not "horizontal". Y then turns off to the side.
   const world = (p) => new THREE.Vector3(p[1] * U, p[0] * U, 0);
 
-  function cellMesh(c, mat) {
-    const m = new THREE.Mesh(geo, mat);
+  function cellMesh(c, mat, g = geo) {
+    const m = new THREE.Mesh(g, mat);
     const a = world(c.from), b = world(c.to);
     m.position.copy(a).add(b).multiplyScalar(0.5);
     m.quaternion.setFromUnitVectors(up, b.clone().sub(a).normalize());
@@ -81,21 +91,29 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   function draw() {
     for (const child of [...layer.children]) { layer.remove(child); if (child.userData.own) child.geometry.dispose(); }
     if (!active) return;
-    // One line at a time (direct request: "this is 1D, so only one axis
-    // should show at a time; everything else is hidden till you reach
-    // the junction, ghosted out"): the side you're on in full; sides
-    // already built ghosted; sides ahead hidden until their junction.
-    // The closed square shows whole.
+    // One line at a time (direct requests: "this is 1D, so only one axis
+    // should show at a time", "only one axis showing till complete"):
+    // just the side you're on; the closed square shows whole.
     const here = loop[Math.min(filled, loop.length - 1)].instance;
     loop.forEach((c, k) => {
       if (complete()) { layer.add(cellMesh(c, filledMat)); return; }
-      if (c.instance === here) layer.add(cellMesh(c, k < filled ? filledMat : k === filled ? nextMat : emptyMat));
-      else if (k < filled) layer.add(cellMesh(c, ghostMat));
+      if (c.instance !== here) return;
+      if (k < filled) layer.add(cellMesh(c, filledMat));
+      else if (k === filled) layer.add(cellMesh(c, nextMat));
+      else layer.add(cellMesh(c, emptyMat, plainGeo));
     });
-    // The junction ahead: where the next cell turns onto another axis.
+    for (const c of corners) {
+      const reached = filled > c.arrive;
+      if (complete() || (reached && (loop[c.arrive].instance === here || loop[c.depart].instance === here))) {
+        const joint = new THREE.Mesh(cornerGeo, cornerMat);
+        joint.position.copy(world(c.point));
+        layer.add(joint);
+      }
+    }
+    // The junction just reached: a soft orange glow round the corner.
     const j = turns.find((x) => x.at === filled);
     if (j) {
-      const dot = new THREE.Mesh(new THREE.SphereGeometry(R * 0.7, 24, 16), junctionMat);
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(R * 2.2, 32, 16), junctionMat);
       dot.userData.own = true;
       dot.position.copy(world(j.point));
       layer.add(dot);
@@ -108,12 +126,14 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     }
     renderPanel();
   }
-  // Looking at the square from in front and above, in perspective.
+  // Straight on from above (direct request: "this vertical should be
+  // pure, without perspective"): the square's plane faces the screen, so
+  // its lines stay truly vertical and horizontal.
   function frame() {
     const c = new THREE.Vector3((SQUARE_N * U) / 2, (SQUARE_N * U) / 2, 0);
-    camera.up.set(0, 0, 1);
+    camera.up.set(0, 1, 0);
     controls.target.copy(c);
-    camera.position.set(c.x, c.y - 6.4, 7);
+    camera.position.set(c.x, c.y, SQUARE_N * U * 2.3);
     controls.update();
   }
 

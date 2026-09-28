@@ -18,7 +18,7 @@
 
 export const AXES = ['X', 'Y', 'Z', 'W', 'V', 'U'];
 export const axisName = (i) => AXES[i] ?? `A${i + 1}`;
-export const SQUARE_N = 4;
+export const SQUARE_N = 10;
 
 /** The square's cells in building order: { from, to, axis, instance,
  * index }. Edges go +X, +Y, -X, -Y; instance ids are per edge. */
