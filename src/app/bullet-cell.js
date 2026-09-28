@@ -32,7 +32,7 @@ export function bulletGeometry(unit, radius, pad = 0) {
     const a = (i / STEPS) * (Math.PI / 2);
     pts.push(new THREE.Vector2(r * Math.cos(a), tip - r + r * Math.sin(a)));
   }
-  const g = new THREE.LatheGeometry(pts, 20);
+  const g = new THREE.LatheGeometry(pts, 64); // smooth circles, no crenulation
   g.computeVertexNormals();
   // A soft shadow in the tail's hollow, darkening toward its centre, so
   // the concave cup reads as concave, not as a dome (direct request:

@@ -35,7 +35,7 @@ const TYPES = ['dot', 'dash', 'gap'];
 const SPEED = 4; // units per second
 // Inside, each cell fills the view as it passes, so it moves slower there
 // (direct report: "pulsing too erratic inside tunnel").
-const SPEED_INSIDE = 1.5;
+const SPEED_INSIDE = 0.8; // and slower still: "slow down view in tunnel, more calming pulse"
 const lang = () => getSettings().language;
 const at = (s, z = 0) => { const [x, y] = embed(s); return new THREE.Vector3(x * S, y * S, z); };
 
@@ -72,8 +72,20 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // Where a point of the trajectory is drawn. Outside: through E(s).
   // Inside: straight, since from within a 1D world only distance along s
   // exists (E is for looking from outside; the plan's §6.2).
-  const place = (s, z = 0) => (view.inside ? new THREE.Vector3(s * S, 0, z) : at(s, z));
-  const heading = (s) => (view.inside ? 0 : tangentAngle(s));
+  // Inside, the tunnel rises very gently ahead of you (direct request:
+  // "a very slight upward curve of horizon / vanishing point ... so the
+  // signal fades into distance"): a parabola, level where you stand.
+  const EYE_U = 2;
+  const RISE = 0.0025; // world units of rise per (world unit ahead)^2
+  const ahead = (s) => Math.max(0, (s - EYE_U) * S);
+  const insidePoint = (s, z = 0) => new THREE.Vector3(s * S, 0, z + RISE * ahead(s) ** 2);
+  const insideTangent = (s) => new THREE.Vector3(1, 0, 2 * RISE * ahead(s)).normalize();
+  const place = (s, z = 0) => (view.inside ? insidePoint(s, z) : at(s, z));
+  // A cell's orientation (its own axis is y, nose at +y) at s.
+  const yAxis = new THREE.Vector3(0, 1, 0);
+  const orient = (s, out = new THREE.Quaternion()) => (view.inside
+    ? out.setFromUnitVectors(yAxis, insideTangent(s))
+    : out.setFromAxisAngle(new THREE.Vector3(0, 0, 1), tangentAngle(s) - Math.PI / 2));
 
   // ---- drawing ----
   // The bullets are the trajectory, inside its tube; no line. Each
@@ -118,7 +130,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   function placeCell(mesh, s0, units) {
     const mid = uMid(s0, units);
     mesh.position.copy(place(mid));
-    mesh.rotation.z = heading(mid) - Math.PI / 2; // the cell's own axis is y, nose at +y
+    orient(mid, mesh.quaternion);
   }
   function clearBuilt() {
     for (const child of [...built.children]) {
@@ -130,7 +142,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   }
   const chainEnd = () => totalUnits(cells);
   const period = () => chainEnd() + 7;
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), zAxis = new THREE.Vector3(0, 0, 1), one = new THREE.Vector3(1, 1, 1);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
   function draw() {
     clearBuilt();
     if (!active) return;
@@ -171,7 +183,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     // Outside, the faint tube seen from without; Inside, the cab's own
     // tunnel takes its place.
     if (!view.inside) {
-      const tube = new THREE.Mesh(new THREE.TubeGeometry(new TrajectoryCurve(lo, hi), Math.ceil((hi - lo) * 2), TUBE_R, 16, false), tubeMaterial);
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(new TrajectoryCurve(lo, hi), Math.ceil((hi - lo) * 2), TUBE_R, 48, false), tubeMaterial);
       tube.userData.ownGeometry = true;
       built.add(tube);
     }
@@ -194,7 +206,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
         const kMax = repeat ? Math.floor((hi - base) / P) : 0;
         for (let k = kMin; k <= kMax && n < mesh.instanceMatrix.count; k++) {
           const mid = base + k * P;
-          q.setFromAxisAngle(zAxis, heading(mid) - Math.PI / 2);
+          orient(mid, q);
           m4.compose(place(mid), q, one);
           mesh.setMatrixAt(n, m4);
           if (color) mesh.setColorAt(n, color);
@@ -213,23 +225,28 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // through you, not continuous rings; you are not travelling, the signal
   // is"): you stand still on the tube's axis just ahead of the train,
   // looking down the tunnel. Send and the signal comes from behind, passes
-  // through you and travels away. Plain dark walls; straight inside, as
-  // the dimension has no other shape from within.
+  // through you and travels away. Plain dark walls, rising very gently
+  // ahead so the signal climbs away and fades into the distance.
   const cab = new THREE.Group();
   const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x0f1a24, side: THREE.BackSide });
-  const EYE_U = 2;
-  const TUNNEL = [-10, AHEAD];
-  const tunnel = new THREE.Mesh(new THREE.CylinderGeometry(TUBE_R, TUBE_R, (TUNNEL[1] - TUNNEL[0]) * S, 24, 1, true), wallMaterial);
-  tunnel.rotation.z = Math.PI / 2; // the cylinder's own axis is y; the tube runs along x inside
-  tunnel.position.set(((TUNNEL[0] + TUNNEL[1]) / 2) * S, 0, 0);
+  const TUNNEL = [-10, 160];
+  class InsideCurve extends THREE.Curve {
+    getPoint(t, target = new THREE.Vector3()) { return target.copy(insidePoint(TUNNEL[0] + t * (TUNNEL[1] - TUNNEL[0]))); }
+  }
+  // Smooth circles (direct request: "does there have to be rough
+  // crenulation ... is smooth circle not possible?"): plenty of segments.
+  const tunnel = new THREE.Mesh(new THREE.TubeGeometry(new InsideCurve(), (TUNNEL[1] - TUNNEL[0]) * 2, TUBE_R, 96, false), wallMaterial);
   // The dimension's cell walls, faintly, and still ("maybe a slight
   // opacity of cell walls, but that isn't moving").
   const wallRingMaterial = new THREE.MeshBasicMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.1, depthWrite: false });
   const ringCount = Math.floor(TUNNEL[1] - EYE_U);
-  const walls = new THREE.InstancedMesh(new THREE.TorusGeometry(TUBE_R * 0.98, TUBE_R * 0.02, 6, 32), wallRingMaterial, ringCount);
+  const walls = new THREE.InstancedMesh(new THREE.TorusGeometry(TUBE_R * 0.98, TUBE_R * 0.02, 6, 96), wallRingMaterial, ringCount);
   {
-    const ringQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-    for (let i = 0; i < ringCount; i++) walls.setMatrixAt(i, m4.compose(new THREE.Vector3((Math.ceil(EYE_U) + i) * S, 0, 0), ringQ, one));
+    const zAxisRing = new THREE.Vector3(0, 0, 1); // the torus lies across its own z
+    for (let i = 0; i < ringCount; i++) {
+      const k = Math.ceil(EYE_U) + i;
+      walls.setMatrixAt(i, m4.compose(insidePoint(k), new THREE.Quaternion().setFromUnitVectors(zAxisRing, insideTangent(k)), one));
+    }
   }
   walls.frustumCulled = false;
   cab.add(tunnel, walls);
@@ -239,13 +256,19 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   const atYou = new THREE.Plane(new THREE.Vector3(1, 0, 0), -(EYE_U + 0.1) * S); // right at you: each cell emerges as big as the view ("all the way from outside the rings") and shrinks away
   function aimInside() {
     camera.up.set(0, 0, 1);
-    camera.position.set(EYE_U * S, 0, 0);
-    controls.target.set((EYE_U + 10) * S, 0, 0);
+    camera.position.copy(insidePoint(EYE_U));
+    // Along the rising tunnel, so the view tilts up a touch with it.
+    controls.target.copy(insidePoint(EYE_U + 14));
     controls.enabled = false;
     controls.update();
   }
+  // Distance fades into the dark (both views; the scene's fog, only
+  // while Signal is on).
+  const fogs = { inside: new THREE.Fog(0x05050a, 1.2, 9), outside: new THREE.Fog(0x05050a, 3, 16) };
+  function setFog(on) { scene.fog = on ? fogs[view.inside ? 'inside' : 'outside'] : null; }
   function setInside(on) {
     view.inside = on;
+    setFog(true);
     // Inside, only outward faces: a cell around you isn't drawn from
     // within (no flood of colour), you see it again once it's ahead.
     solidMaterial.clippingPlanes = on ? [atYou] : [];
@@ -261,10 +284,12 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // controls are blocking the closer circle").
   function frameOutside() {
     const focus = -chainEnd();
-    const t = place(focus), back = place(focus - 6);
+    // Low and grazing, so the line converges strongly to its vanishing
+    // point ("there should be a perspective sense from outside too").
+    const t = place(focus + 3), back = place(focus - 5);
     camera.up.set(0, 0, 1);
     controls.target.copy(t);
-    camera.position.set(back.x, back.y, 3.4);
+    camera.position.set(back.x, back.y, 1.5);
     controls.update();
   }
 
@@ -414,6 +439,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       if (!on) {
         playing = false;
         view.inside = false;
+        setFog(false);
         solidMaterial.clippingPlanes = [];
         solidMaterial.side = THREE.DoubleSide;
         solidMaterial.needsUpdate = true;
@@ -423,7 +449,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       }
       renderPanel();
       draw();
-      if (on) frameOutside();
+      if (on) { setFog(true); frameOutside(); }
     },
     get isEmpty() { return cells.length === 0; },
     clear() { cells = []; pending = []; input.value = ''; playing = false; commit(); },
