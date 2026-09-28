@@ -45,10 +45,12 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   let filled = 0;
   try {
     const data = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
-    if (data?.version === 2 && Number.isInteger(data.filled)) filled = Math.max(0, Math.min(loop.length, data.filled));
+    if (data?.version === 3 && data.n === SQUARE_N && Number.isInteger(data.filled)) filled = Math.max(0, Math.min(loop.length, data.filled));
   } catch { /* corrupt or blocked storage: start empty */ }
+  // Progress saved for another square size (v2: the 4-per-side square)
+  // is dropped, so the build starts again on the first, vertical side.
   let active = false;
-  const toJSON = () => ({ version: 2, filled });
+  const toJSON = () => ({ version: 3, n: SQUARE_N, filled });
   function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toJSON())); } catch { /* best-effort */ }
   }
@@ -58,14 +60,15 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   const geo = bulletGeometry(U, R, PAD);
   const plainGeo = plainCellGeometry(U, R);
   const filledMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, roughness: 0.8, metalness: 0.05 });
-  const nextMat = new THREE.MeshStandardMaterial({ color: NEXT, emissive: NEXT, emissiveIntensity: 0.35, vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false });
+  const nextMat = new THREE.MeshStandardMaterial({ color: NEXT, emissive: NEXT, emissiveIntensity: 0.35, vertexColors: true }); // opaque: no nested nose showing through
   const emptyMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.08, depthWrite: false });
   const faceMat = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
   const junctionMat = new THREE.MeshBasicMaterial({ color: NEXT, transparent: true, opacity: 0.45, depthWrite: false });
-  // Rounded corners (direct request: "corners should become rounded when
-  // reached; the dome should reach the far side of the diameter"): a
-  // joint as wide as the cells at each corner once it's reached, so the
-  // line bends smoothly instead of stopping at the corner's centre line.
+  // Rounded corners (direct requests: "corners should become rounded when
+  // reached; the dome should reach the far side of the diameter", "all
+  // rounded corners"): a corner's arriving nose domes out over it; while
+  // only the departing line shows, a dome the cells' width stands in for
+  // that hidden nose.
   const cornerMat = new THREE.MeshStandardMaterial({ color: CYAN, roughness: 0.8, metalness: 0.05 });
   const cornerGeo = new THREE.SphereGeometry(R, 48, 24);
   const corners = [...turns.map((j) => ({ point: j.point, arrive: j.at - 1, depart: j.at })), { point: loop[0].from, arrive: loop.length - 1, depart: 0 }];
@@ -104,7 +107,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     });
     for (const c of corners) {
       const reached = filled > c.arrive;
-      if (complete() || (reached && (loop[c.arrive].instance === here || loop[c.depart].instance === here))) {
+      if (!complete() && reached && loop[c.depart].instance === here && loop[c.arrive].instance !== here) {
         const joint = new THREE.Mesh(cornerGeo, cornerMat);
         joint.position.copy(world(c.point));
         layer.add(joint);
@@ -187,7 +190,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     clear() { filled = 0; commit(); },
     snapshot: toJSON,
     restore(json) {
-      if (json?.version === 2 && Number.isInteger(json.filled)) filled = Math.max(0, Math.min(loop.length, json.filled));
+      if (json?.version === 3 && json.n === SQUARE_N && Number.isInteger(json.filled)) filled = Math.max(0, Math.min(loop.length, json.filled));
       save(); draw(); onChange();
     },
     toJSON,

@@ -108,7 +108,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   const ghostMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, color: GHOST_COLOR, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
   // The next cell a tap places, in orange ("tap here"; everything else
   // is cyan).
-  const nextMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, color: NEXT_COLOR, emissive: NEXT_COLOR, emissiveIntensity: 0.35, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide });
+  const nextMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, color: NEXT_COLOR, emissive: NEXT_COLOR, emissiveIntensity: 0.35 }); // opaque: no nested nose showing through
   const gapMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0x9de0ff, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
   const solidMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.05, side: THREE.DoubleSide }); // matte: no bright glint in the tail's hollow
   const catchPlane = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
