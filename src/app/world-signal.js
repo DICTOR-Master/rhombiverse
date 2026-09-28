@@ -33,6 +33,9 @@ const NEXT_COLOR = 0xf59e0b; // the HUD's orange
 const GHOST_COLOR = 0x9de0ff;
 const TYPES = ['dot', 'dash', 'gap'];
 const SPEED = 4; // units per second
+// Inside, each cell fills the view as it passes, so it moves slower there
+// (direct report: "pulsing too erratic inside tunnel").
+const SPEED_INSIDE = 1.5;
 const lang = () => getSettings().language;
 const at = (s, z = 0) => { const [x, y] = embed(s); return new THREE.Vector3(x * S, y * S, z); };
 
@@ -270,7 +273,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   function tick(now) {
     raf = 0;
     if (!active || !playing) return;
-    playT += ((now - last) / 1000) * SPEED;
+    playT += ((now - last) / 1000) * (view.inside ? SPEED_INSIDE : SPEED);
     last = now;
     placeStream();
     raf = requestAnimationFrame(tick);
