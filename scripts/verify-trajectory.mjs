@@ -4,7 +4,7 @@
 // - the moving chain carries m(u) (one signal, every view);
 // - E(s): unit speed, continuous, and a chord on screen is never longer
 //   than the distance along s (the world's only metric).
-import { morseSequence, decode, totalUnits, signal, streamAt, embed, tangentAngle, GAP_UNITS, MORSE } from '../src/geometry-extensions/trajectory-1d.js';
+import { morseSequence, decode, totalUnits, signal, waveAt, embed, tangentAngle, GAP_UNITS, MORSE } from '../src/geometry-extensions/trajectory-1d.js';
 
 let failures = 0;
 function check(label, ok, extra = '') {
@@ -20,21 +20,27 @@ check('every Morse character round-trips', decode(morseSequence(all)) === all);
 check('words round-trip', decode(morseSequence('Hello world 42')) === 'HELLO WORLD 42');
 check('characters with no Morse code are skipped', decode(morseSequence('a~b')) === 'AB');
 
-// One signal: the moving chain read at a fixed point is m(t).
+// One signal: the moving train read at a fixed point is m(t).
 {
   const cells = morseSequence('SOS');
   const L = totalUnits(cells), P = L + GAP_UNITS.word;
   let ok = true;
-  for (let t = 0; t < 120; t += 0.37) if (streamAt(cells, 0, t) !== signal(cells, t)) ok = false;
-  check('a reader at the start of a Forward stream reads m(t), the message in order', ok);
-  let same = true;
-  for (let t = 0; t < 60; t += 0.41) for (const s of [0.5123, 3.2071, 11.7313]) {
-    // The stream is the chain moving rigidly: what s shows at t, s - t showed at 0.
-    if (streamAt(cells, s, t) !== streamAt(cells, s + t, 0)) same = false;
+  for (let t = 0; t < 120; t += 0.37) if (waveAt(cells, 0, t) !== signal(cells, t)) ok = false;
+  check('a reader ahead (at the front, u = 0) reads m(t): the message in order', ok);
+  let rest = true;
+  for (let u = -L + 0.013; u < 0; u += 0.29) {
+    // At t = 0 the train is laid out at u = -s: its first cell in front.
+    if (waveAt(cells, u, 0) !== signal(cells, -u)) rest = false;
   }
-  check('Forward moves the whole chain toward its start at unit speed', same);
+  check('at rest the first cell is in front (u = -s)', rest);
+  let same = true;
+  for (let t = 0; t < 60; t += 0.41) for (const u of [0.5123, 3.2071, 11.7313]) {
+    // Rigid motion forward: what u shows at t, u - t showed at 0.
+    if (waveAt(cells, u, t) !== waveAt(cells, u - t, 0)) same = false;
+  }
+  check('it travels away, forward at unit speed, as a whole', same);
   let period = true;
-  for (let t = 0; t < 30; t += 0.53) if (streamAt(cells, 1.7, t) !== streamAt(cells, 1.7, t + P)) period = false;
+  for (let t = 0; t < 30; t += 0.53) if (waveAt(cells, 1.7, t) !== waveAt(cells, 1.7, t + P)) period = false;
   check(`it repeats every pass (the chain plus a word gap, ${P} units)`, period);
 }
 

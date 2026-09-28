@@ -75,11 +75,14 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // ---- drawing ----
   // The bullets are the trajectory, inside its tube; no line. Each
   // cell is the shared 1D cell (bullet-cell.js), centred on E(s), nose
-  // along the trajectory. Play moves the bullets themselves: the chain
-  // streams along the trajectory, repeating (one pass P = the chain plus
-  // a word gap), toward its start, so a reader there gets the
-  // message in order: at time t the point s shows the chain's s + t
-  // (streamAt in trajectory-1d.js, checked against m(t)).
+  // along the trajectory. The chain is a train (direct report: "signal
+  // seems to be going backwards"): its first cell is the engine, at the
+  // front (u = 0), later cells behind it toward the viewer, all noses
+  // forward. Cell i of the message sits at u = -(its s), so taps add at
+  // the back (u = -L). Play drives it forward, nose first, repeating (one
+  // pass P = the chain plus a word gap), so a reader ahead gets the
+  // message in order: the point u shows m(t - u) (waveAt in
+  // trajectory-1d.js, checked against m(t)).
   const cellGeometry = (units) => bulletGeometry(units * S, R, PAD);
   const ghostMaterial = new THREE.MeshStandardMaterial({ color: GHOST_COLOR, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
   // The next cell a tap places, in orange ("tap here"; everything else
@@ -95,7 +98,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   group.add(built);
   const tmpColor = new THREE.Color();
   let stream = []; // { mesh, entries: [{ s0, units, color }] } per cell shape
-  const WINDOW = [-200, 400]; // how far before the start / past the end the trajectory is drawn
+  const BEHIND = 60, AHEAD = 400; // how far behind the train / ahead of it the trajectory is drawn
   // The tube the bullets form in (direct request, 2026-09-29): the 1D
   // dimension itself, a faint channel just wider than a cell, stretching
   // off both ways toward infinity. From Inside it's the tunnel you look
@@ -107,8 +110,10 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     getPoint(u, target = new THREE.Vector3()) { return target.copy(place(this.lo + u * (this.hi - this.lo))); }
   }
 
+  // A cell spanning [s0, s0 + units] of the message, in world position u.
+  const uMid = (s0, units) => -(s0 + units / 2);
   function placeCell(mesh, s0, units) {
-    const mid = s0 + units / 2;
+    const mid = uMid(s0, units);
     mesh.position.copy(place(mid));
     mesh.rotation.z = heading(mid) - Math.PI / 2; // the cell's own axis is y, nose at +y
   }
@@ -137,7 +142,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       const color = cell.type === 'gap' ? null : colorFor(cell, new THREE.Color()).clone();
       byKey.get(k).push({ s0, units, color });
     }
-    const copies = playing ? Math.ceil((L + WINDOW[1] - WINDOW[0]) / period()) + 2 : 1;
+    const copies = playing ? Math.ceil((L + BEHIND + AHEAD) / period()) + 2 : 1;
     for (const [k, entries] of byKey) {
       const [kind, units] = k.split('|');
       const mesh = new THREE.InstancedMesh(cellGeometry(Number(units)), kind === 'gap' ? gapMaterial : solidMaterial, entries.length * copies);
@@ -159,7 +164,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       });
     }
     if (view.inside) { group.add(cab); } else group.remove(cab);
-    const lo = WINDOW[0], hi = L + WINDOW[1];
+    const lo = -L - BEHIND - 40, hi = AHEAD;
     // Outside, the faint tube seen from without; Inside, the cab's own
     // tunnel takes its place.
     if (!view.inside) {
@@ -175,15 +180,17 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     const L = chainEnd(), P = period();
     // Inside you ride the train itself: one chain, not the repeating
     // stream, carried on without wrapping.
-    const shift = !playing ? 0 : view.inside ? -playT : -(playT % P);
-    const lo = view.inside ? shift - 1 : WINDOW[0], hi = view.inside ? shift + L + 1 : L + WINDOW[1];
+    const shift = !playing ? 0 : view.inside ? playT : playT % P;
+    const lo = -L - BEHIND, hi = AHEAD;
+    const repeat = playing && !view.inside;
     for (const { mesh, entries } of stream) {
       let n = 0;
       for (const { s0, units, color } of entries) {
-        const kMin = playing && !view.inside ? Math.ceil((lo - s0 - shift - units) / P) : 0;
-        const kMax = playing && !view.inside ? Math.floor((hi - s0 - shift) / P) : 0;
+        const base = uMid(s0, units) + shift;
+        const kMin = repeat ? Math.ceil((lo - base) / P) : 0;
+        const kMax = repeat ? Math.floor((hi - base) / P) : 0;
         for (let k = kMin; k <= kMax && n < mesh.instanceMatrix.count; k++) {
-          const mid = s0 + shift + k * P + units / 2;
+          const mid = base + k * P;
           q.setFromAxisAngle(zAxis, heading(mid) - Math.PI / 2);
           m4.compose(place(mid), q, one);
           mesh.setMatrixAt(n, m4);
@@ -201,8 +208,8 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // ---- views ----
   // Inside (direct request: "inside tunnel view, outside not visible,
   // like being driver of tube train"): you sit on the tube's axis at the
-  // front of the chain (its start, the way Play drives it), looking ahead
-  // down the tunnel. The walls close in all round; rings mark each cell
+  // front of the train (its engine, the message's first cell), looking
+  // ahead down the tunnel. The walls close in all round; rings mark each cell
   // of the dimension, so while playing the tunnel streams past. The tube
   // is straight inside, so a length of it simply travels with the cab.
   const cab = new THREE.Group();
@@ -215,19 +222,19 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   rings.frustumCulled = false;
   cab.add(tunnel, rings);
   function aimInside(front = 0) {
-    const eyeS = front - 0.15;
-    // The tunnel ahead (toward -s), from just behind the cab.
-    tunnel.position.set((eyeS - CAB_AHEAD / 2 + 2) * S, 0, 0);
+    const eyeS = front + 0.15;
+    // The tunnel ahead (toward +u), from just behind the cab.
+    tunnel.position.set((eyeS + CAB_AHEAD / 2 - 2) * S, 0, 0);
     const ringQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-    const first = Math.floor(eyeS) + 1;
+    const first = Math.floor(eyeS) - 1;
     for (let i = 0; i < RING_COUNT; i++) {
-      m4.compose(new THREE.Vector3((first - i) * S, 0, 0), ringQ, one);
+      m4.compose(new THREE.Vector3((first + i) * S, 0, 0), ringQ, one);
       rings.setMatrixAt(i, m4);
     }
     rings.instanceMatrix.needsUpdate = true;
     camera.up.set(0, 0, 1);
     camera.position.set(eyeS * S, 0, 0);
-    controls.target.set((eyeS - 10) * S, 0, 0);
+    controls.target.set((eyeS + 10) * S, 0, 0);
     controls.enabled = false;
     controls.update();
   }
@@ -236,14 +243,13 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     if (on) aimInside();
     else { camera.up.set(0, 1, 0); controls.enabled = true; resetView(); frameOutside(); }
   }
-  // Outside: centre the view on the chain.
-  // Outside looks up the trajectory from behind and above, so it runs
-  // up the screen and narrows into the distance (direct request: "closer
-  // is wider"), focused on the chain's end, where taps add.
+  // Outside looks up the trajectory from behind the train and above, so
+  // it runs up the screen and narrows into the distance (direct request:
+  // "closer is wider"), the train heading away. The back of the train,
+  // where taps add, sits mid-screen, clear of the panel below ("the
+  // controls are blocking the closer circle").
   function frameOutside() {
-    // The chain's end at the middle of the screen, clear of the panel
-    // below ("the controls are blocking the closer circle").
-    const focus = chainEnd();
+    const focus = -chainEnd();
     const t = place(focus), back = place(focus - 6);
     camera.up.set(0, 0, 1);
     controls.target.copy(t);
@@ -273,7 +279,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // when it has drifted off, keeping the camera's height.
   function followEnd() {
     if (view.inside) return;
-    const ndc = place(chainEnd()).project(camera);
+    const ndc = place(-chainEnd()).project(camera);
     if (Math.abs(ndc.x) < 0.6 && ndc.y > -0.3 && ndc.y < 0.45) return;
     frameOutside();
   }
@@ -286,7 +292,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     for (const { cell, s0 } of layout(cells)) {
       const u = cellUnits(cell);
       for (let s = s0; s <= s0 + u; s += 0.25) {
-        const d = place(s).distanceTo(point);
+        const d = place(-s).distanceTo(point);
         if (d <= reach && (!best || d < best.d)) best = { cell, d };
       }
     }

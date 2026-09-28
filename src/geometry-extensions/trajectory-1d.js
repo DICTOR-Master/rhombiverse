@@ -82,13 +82,13 @@ export function signal(cells, u) {
   const v = u % P;
   return elements(cells).some(([a, b]) => v >= a && v < b) ? 1 : 0;
 }
-/** Play: the chain streams along the trajectory, repeating every pass
- * P, Forward (dir +1) toward its start, Reverse (dir -1) the other way.
- * The point s shows, at time t, the chain's own point s + dir t (mod P):
- * 1 there if a dot or dash covers it. A reader at the start (s = 0) of a
- * Forward stream therefore reads exactly m(t). */
-export function streamAt(cells, s, t, dir = 1) {
-  return signal(cells, s + dir * t);
+/** Play: the chain is a train heading forward along the trajectory, its
+ * first cell in front. Laid out at u = -s (the message's own s), it moves
+ * toward +u at unit speed, repeating every pass (chain plus a word gap):
+ * the point u shows, at time t, m(t - u), so a reader ahead receives the
+ * message in order, first symbol first. */
+export function waveAt(cells, u, t) {
+  return signal(cells, t - u);
 }
 
 // ---- the screen embedding E(s) ----
