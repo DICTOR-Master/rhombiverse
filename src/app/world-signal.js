@@ -230,7 +230,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // distance. Plain dark walls; the path itself shows the way.
   const cab = new THREE.Group();
   const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x0f1a24, side: THREE.BackSide });
-  const TUNNEL = [-10, 160];
+  const TUNNEL = [-10, AHEAD];
   class InsideCurve extends THREE.Curve {
     getPoint(t, target = new THREE.Vector3()) { return target.copy(insidePoint(TUNNEL[0] + t * (TUNNEL[1] - TUNNEL[0]))); }
   }
@@ -248,14 +248,15 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   function aimInside() {
     camera.up.set(0, 0, 1);
     camera.position.copy(insidePoint(EYE_U, EYE_H));
-    // The view tilted back against the path, 15° (direct requests:
+    // The view tilted back against the path, 22° (direct requests:
     // "tilt view backwards so cells vanish above in distance", "centre of
     // appearing and disappearing cell should drop slightly", "more upward
-    // tilt"): each cell's
+    // tilt", "still want more stretch of tunnel upwards, vanishing into
+    // distance"): each cell's
     // centre sits a little below the middle as it passes and the path
     // climbs to a vanishing point well above it.
     const reach = 20 * S;
-    controls.target.copy(insidePoint(EYE_U + 20, EYE_H - reach * Math.tan((15 * Math.PI) / 180)));
+    controls.target.copy(insidePoint(EYE_U + 20, EYE_H - reach * Math.tan((22 * Math.PI) / 180)));
     controls.enabled = false;
     controls.update();
   }
@@ -263,7 +264,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // while Signal is on).
   // Inside, far enough out that the path narrows to a sharp point first
   // ("make the disappearing triangle sharper to horizon").
-  const fogs = { inside: new THREE.Fog(0x05050a, 4, 40), outside: new THREE.Fog(0x05050a, 3, 16) };
+  const fogs = { inside: new THREE.Fog(0x05050a, 6, 90), outside: new THREE.Fog(0x05050a, 3, 16) };
   function setFog(on) { scene.fog = on ? fogs[view.inside ? 'inside' : 'outside'] : null; }
   function setInside(on) {
     view.inside = on;
