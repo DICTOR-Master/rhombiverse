@@ -177,9 +177,7 @@ document.getElementById('app').appendChild(renderer.domElement);
 // frame (see hud-wheel-3d.js's own header comment for why: a second
 // full WebGLRenderer, always running, would make the exact perf
 // mistake this session already found and fixed for the modal wheel).
-const hudWheel = createHudWheel3D(renderer, {
-  getBackgroundColor: () => scene.background,
-});
+const hudWheel = createHudWheel3D(renderer);
 
 // Touch/drag-only rotation, scoped to the wheel's own small on-screen
 // rect -- no auto-rotate, no idle timer, matching "rotates to touch

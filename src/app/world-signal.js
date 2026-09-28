@@ -118,8 +118,12 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // dimension itself, a faint channel just wider than a cell, stretching
   // off both ways toward infinity. From Inside it's the tunnel you look
   // down.
-  const TUBE_R = R * 1.45;
-  const tubeMaterial = new THREE.MeshStandardMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
+  // Just the cells' own width, and faint: a slight mist along the same
+  // borders, no second outline beside them (direct request: "I don't like
+  // double lines outside of cells on outside view; only slight misting
+  // matching cell borders").
+  const TUBE_R = R * 1.005;
+  const tubeMaterial = new THREE.MeshStandardMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.06, depthWrite: false, side: THREE.FrontSide });
   class TrajectoryCurve extends THREE.Curve {
     constructor(lo, hi) { super(); this.lo = lo; this.hi = hi; }
     getPoint(u, target = new THREE.Vector3()) { return target.copy(place(this.lo + u * (this.hi - this.lo))); }
@@ -240,15 +244,16 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   const TUNNEL_R = R * 3.2;
   const tunnel = new THREE.Mesh(new THREE.TubeGeometry(new InsideCurve(), (TUNNEL[1] - TUNNEL[0]) * 2, TUNNEL_R, 96, false), wallMaterial);
   cab.add(tunnel);
-  // Above the path: a passing cell fills the bottom of the view unbroken
-  // ("if a cell is coming that part of the screen should be full of cyan";
-  // cutting it where you stand left a dark gap under it), and the path
-  // narrows to a sharp point at the horizon.
-  const EYE_H = R * 2.2;
+  // On the path's axis (direct request: "inside view should show full
+  // circle of diameter"): every cell is seen end-on, a full circle; one
+  // passing you fills the screen with cyan ("if a cell is coming that
+  // part of the screen should be full of cyan"); never cut, so no dark
+  // gaps; the path narrows to a sharp point at the horizon.
+  const EYE_H = 0;
   function aimInside() {
     camera.up.set(0, 0, 1);
     camera.position.copy(insidePoint(EYE_U, EYE_H));
-    // The view tilted back against the path, 22° (direct requests:
+    // The view tilted back against the path, 15° from the axis (direct requests:
     // "tilt view backwards so cells vanish above in distance", "centre of
     // appearing and disappearing cell should drop slightly", "more upward
     // tilt", "still want more stretch of tunnel upwards, vanishing into
@@ -256,7 +261,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     // centre sits a little below the middle as it passes and the path
     // climbs to a vanishing point well above it.
     const reach = 20 * S;
-    controls.target.copy(insidePoint(EYE_U + 20, EYE_H - reach * Math.tan((22 * Math.PI) / 180)));
+    controls.target.copy(insidePoint(EYE_U + 20, EYE_H - reach * Math.tan((15 * Math.PI) / 180)));
     controls.enabled = false;
     controls.update();
   }
@@ -269,10 +274,6 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   function setInside(on) {
     view.inside = on;
     setFog(true);
-    // Inside, only outward faces (you're never within a cell now, but it
-    // keeps a cell's hollow from ever showing through).
-    solidMaterial.side = on ? THREE.FrontSide : THREE.DoubleSide;
-    solidMaterial.needsUpdate = true;
     if (on) aimInside();
     else { camera.up.set(0, 1, 0); controls.enabled = true; resetView(); frameOutside(); }
   }
@@ -283,12 +284,14 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // controls are blocking the closer circle").
   function frameOutside() {
     const focus = -chainEnd();
-    // Low and grazing, so the line converges strongly to its vanishing
-    // point ("there should be a perspective sense from outside too").
-    const t = place(focus + 3), back = place(focus - 5);
+    // From behind and well above, so the line converges to its vanishing
+    // point ("there should be a perspective sense from outside too") and
+    // the cells' ends read as ellipses, not full circles ("outside view
+    // should be an ellipse").
+    const t = place(focus + 3), back = place(focus - 4);
     camera.up.set(0, 0, 1);
     controls.target.copy(t);
-    camera.position.set(back.x, back.y, 1.5);
+    camera.position.set(back.x, back.y, 3);
     controls.update();
   }
 
@@ -368,6 +371,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     save();
     onChange();
     setPlaying(true);
+    if (!view.inside) frameOutside(); // the whole message was placed at once
   }
 
   // ---- panel ----
