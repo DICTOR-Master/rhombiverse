@@ -10,8 +10,8 @@
 //   The world's only distance is measured along s; two points' distance
 //   on screen (a chord) is shorter than their distance along s (the arc)
 //   wherever the curve bends.
-// - One time signal m(u) (1 while a dot or dash is sounding) drives the
-//   transmission, so every view shows the same state.
+// - One time signal m(u) (1 while a dot or dash is sounding) is what the
+//   moving chain carries, so every view shows the same state.
 
 export const UNITS = { dot: 1, dash: 3 };
 export const GAP_UNITS = { element: 1, letter: 3, word: 7 };
@@ -82,35 +82,21 @@ export function signal(cells, u) {
   const v = u % P;
   return elements(cells).some(([a, b]) => v >= a && v < b) ? 1 : 0;
 }
-/** The pulses on the trajectory at time t (units), travelling from `from`
- * in direction dir (+1 forward, -1 back): value(s, t) = m(t - dir (s - from)).
- * Returned as [sA, sB] spans with sA < sB, within [lo, hi]. */
-export function pulsesAt(cells, t, { from = 0, dir = 1, lo = -Infinity, hi = Infinity } = {}) {
-  const P = totalUnits(cells) + GAP_UNITS.word;
-  const els = elements(cells);
-  if (!els.length) return [];
-  const out = [];
-  // Passes whose pulses can still be on [lo, hi]: emitted at k P + u.
-  const reach = Math.max(Math.abs(hi - from), Math.abs(lo - from));
-  const kMax = Math.floor(t / P), kMin = Math.max(0, Math.floor((t - reach - P) / P));
-  for (let k = kMin; k <= kMax; k++) {
-    for (const [a, b] of els) {
-      // Emitted during [kP + a, kP + b): now between distances t - (kP+b) and t - (kP+a) from `from`.
-      const d0 = Math.max(0, t - (k * P + b)), d1 = t - (k * P + a);
-      if (d1 <= 0) continue;
-      let sA = from + dir * d0, sB = from + dir * d1;
-      if (sA > sB) [sA, sB] = [sB, sA];
-      sA = Math.max(sA, lo); sB = Math.min(sB, hi);
-      if (sB > sA) out.push([sA, sB]);
-    }
-  }
-  return out;
+/** Play: the chain streams along the trajectory, repeating every pass
+ * P, Forward (dir +1) toward its start, Reverse (dir -1) the other way.
+ * The point s shows, at time t, the chain's own point s + dir t (mod P):
+ * 1 there if a dot or dash covers it. A reader at the start (s = 0) of a
+ * Forward stream therefore reads exactly m(t). */
+export function streamAt(cells, s, t, dir = 1) {
+  return signal(cells, s + dir * t);
 }
 
 // ---- the screen embedding E(s) ----
 // Unit speed, direction theta(s) drifting slowly: two sines of long,
-// incommensurate periods, so it never quite repeats.
-const theta = (s) => 0.32 * Math.sin(s / 9) + 0.18 * Math.sin(s / 23 + 1.3);
+// incommensurate periods, so it never quite repeats. Nearly straight
+// (direct request: "too curved, should be stretching off to infinity"):
+// a few degrees of drift over dozens of cells.
+const theta = (s) => 0.07 * Math.sin(s / 31) + 0.04 * Math.sin(s / 83 + 1.3);
 const STEP = 0.05;
 const table = new Map(); // integer step index -> [x, y]
 table.set(0, [0, 0]);
