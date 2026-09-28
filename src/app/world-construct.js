@@ -1,29 +1,34 @@
 // 1D Construct: a world of its own (Wizard → 1D → Construct), the
 // construction microscope of DICTO's Dimensional Construction Interface
-// (docs/DIMENSIONAL_CONSTRUCTION_INTERFACE.md; model and rules in
+// (docs/DIMENSIONAL_CONSTRUCTION_INTERFACE.md; the model is
 // geometry-extensions/construction.js).
 //
-// Stage B (2026-09-29): the square. Start with one X line of unfilled
-// cells; tap to fill them in order (●—●—○). A full X line reaches a
-// junction at the origin that exposes Y (X stays); Y lines then grow from
-// every reached point, and X lines parallel to the first from every point
-// Y reaches, until the square emerges from its cells. Every cell keeps
-// the colour of the direction it was built along (provenance, not
-// decoration), so Paint is off here. Cells are the shared bullet cell,
-// nose along their axis. A finished square opens in 2D as the Square
-// lattice's own tile ("same animal, different zoo").
+// Redesigned 2026-09-29 (direct feedback on the first version: "horrible
+// and confusing", "I wanted a square, not a grid", "looks like 1960s Open
+// University graphics, nothing like the rest of the app", "supposed to be
+// staged to make it as simple as possible"). Decisions: one cell per tap,
+// cyan like Signal, a fixed square of 4 cells per side.
+// - The square's outline waits as faint empty cells; the next one is
+//   orange: tap (anywhere) to fill it. Along X first; at the corner a
+//   junction glows and Y joins (X stays); up Y, back along the top (a
+//   second X line, parallel to the first), down the last side. Closing
+//   the loop, the square fills in, and can open in 2D ("same animal,
+//   different zoo").
+// - Long-press takes back the last cell. No other controls.
+// - Cells are the shared 1D bullet (bullet-cell.js), nose along the way
+//   round, in Signal's cyan, matte, shaded cups.
 import * as THREE from 'three';
-import { createConstruction, axisName, AXIS_COLORS, N_MIN, N_MAX } from '../geometry-extensions/construction.js';
+import { squareLoop, junctions, axisName, SQUARE_N } from '../geometry-extensions/construction.js';
 import { bulletGeometry } from './bullet-cell.js';
-import { createGearedSlider } from './geared-slider.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 
 const STORAGE_KEY = 'rhombiverse-1d-construct-world';
-const U = 1; // world units per cell
-const R = 0.1;
-const PAD = 0.003; // flush joins along a line, as in Signal
-const PRIMITIVE = { id: 'square', label: 'Square', d: 2 };
+const U = 0.7; // world units per cell
+const R = 0.2; // Signal's proportions, doubled
+const PAD = 0.006;
+const CYAN = 0x22c3e6;
+const NEXT = 0xf59e0b; // the 1D worlds' orange "tap here"
 const lang = () => getSettings().language;
 
 export function createConstructWorld({ scene, camera, controls, onOpenIn = () => {}, onChange = () => {}, showHudPrompt = () => {} }) {
@@ -31,182 +36,103 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   group.visible = false;
   scene.add(group);
 
-  let n = 3;
-  let saved = null;
+  const loop = squareLoop(SQUARE_N);
+  const turns = junctions(loop);
+  let filled = 0;
   try {
     const data = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
-    if (data) { if (Number.isInteger(data.n) && data.n >= N_MIN && data.n <= N_MAX) n = data.n; saved = data; }
+    if (data?.version === 2 && Number.isInteger(data.filled)) filled = Math.max(0, Math.min(loop.length, data.filled));
   } catch { /* corrupt or blocked storage: start empty */ }
-  let con = createConstruction(PRIMITIVE.d, n, saved);
   let active = false;
-  let wasComplete = con.complete();
-  const toJSON = () => ({ primitive: PRIMITIVE.id, n, ...con.toJSON() });
+  const toJSON = () => ({ version: 2, filled });
   function save() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, ...toJSON() })); } catch { /* best-effort */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toJSON())); } catch { /* best-effort */ }
   }
+  const complete = () => filled === loop.length;
 
   // ---- drawing ----
   const geo = bulletGeometry(U, R, PAD);
-  const filledMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide });
-  // Cells you can fill next glow orange, the 1D worlds' "tap here".
-  const availableMat = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.35, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide });
-  const unavailableMat = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0x9de0ff, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide });
+  const filledMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, roughness: 0.8, metalness: 0.05 });
+  const nextMat = new THREE.MeshStandardMaterial({ color: NEXT, emissive: NEXT, emissiveIntensity: 0.35, vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false });
+  const emptyMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.08, depthWrite: false });
+  const faceMat = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
+  const junctionMat = new THREE.MeshBasicMaterial({ color: NEXT, transparent: true, opacity: 0.85 });
   const catchPlane = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
-  catchPlane.position.z = -0.02;
+  catchPlane.position.z = -R - 0.05;
   group.add(catchPlane);
   const pickTargets = [catchPlane];
   const layer = new THREE.Group();
   group.add(layer);
-  let junctionMesh = null, faceMesh = null;
-  const world = (p) => new THREE.Vector3(p[0] * U, (p[1] ?? 0) * U, 0);
-  const mid = (c) => world(c.from).add(world(c.to)).multiplyScalar(0.5);
+  const up = new THREE.Vector3(0, 1, 0);
+  const world = (p) => new THREE.Vector3(p[0] * U, p[1] * U, 0);
 
-  function clearLayer() {
-    for (const child of [...layer.children]) { layer.remove(child); if (child.isInstancedMesh) child.dispose(); }
-    junctionMesh = null;
-    faceMesh = null;
+  function cellMesh(c, mat) {
+    const m = new THREE.Mesh(geo, mat);
+    const a = world(c.from), b = world(c.to);
+    m.position.copy(a).add(b).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(up, b.clone().sub(a).normalize());
+    return m;
   }
   function draw() {
-    clearLayer();
+    for (const child of [...layer.children]) { layer.remove(child); if (child.userData.own) child.geometry.dispose(); }
     if (!active) return;
-    const st = con.states();
-    const lists = { filled: [], available: [], unavailable: [] };
-    con.grid.cells.forEach((c, i) => lists[st[i]].push(c));
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1);
-    const up = new THREE.Vector3(0, 1, 0);
-    const color = new THREE.Color();
-    for (const [kind, mat] of [['filled', filledMat], ['available', availableMat], ['unavailable', unavailableMat]]) {
-      const list = lists[kind];
-      if (!list.length) continue;
-      const mesh = new THREE.InstancedMesh(geo, mat, list.length);
-      list.forEach((c, i) => {
-        const dir = world(c.to).sub(world(c.from)).normalize();
-        q.setFromUnitVectors(up, dir);
-        const p = mid(c);
-        p.z = R;
-        m.compose(p, q, s);
-        mesh.setMatrixAt(i, m);
-        if (kind === 'filled') mesh.setColorAt(i, color.setHex(AXIS_COLORS[axisName(c.dir)]));
-      });
-      mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      layer.add(mesh);
-    }
-    // The junction: a glowing point in the colour of the direction it
-    // would expose.
-    const j = con.junction();
+    loop.forEach((c, k) => layer.add(cellMesh(c, k < filled ? filledMat : k === filled ? nextMat : emptyMat)));
+    // The junction ahead: where the next cell turns onto another axis.
+    const j = turns.find((x) => x.at === filled);
     if (j) {
-      junctionMesh = new THREE.Mesh(new THREE.SphereGeometry(R * 2.2, 20, 14), new THREE.MeshBasicMaterial({ color: AXIS_COLORS[axisName(j.exposes)], transparent: true, opacity: 0.85 }));
-      junctionMesh.position.copy(world(j.at)).setZ(R);
-      layer.add(junctionMesh);
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(R * 0.7, 24, 16), junctionMat);
+      dot.userData.own = true;
+      dot.position.copy(world(j.point));
+      layer.add(dot);
     }
-    // The primitive, once it has emerged: its face, faintly.
-    if (con.complete()) {
-      faceMesh = new THREE.Mesh(new THREE.PlaneGeometry(n * U, n * U), new THREE.MeshBasicMaterial({ color: 0xeaf6ff, transparent: true, opacity: 0.12, depthWrite: false }));
-      faceMesh.position.set((n * U) / 2, (n * U) / 2, -0.005);
-      layer.add(faceMesh);
+    if (complete()) {
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(SQUARE_N * U, SQUARE_N * U), faceMat);
+      face.userData.own = true;
+      face.position.set((SQUARE_N * U) / 2, (SQUARE_N * U) / 2, 0);
+      layer.add(face);
     }
     renderPanel();
   }
+  // Looking at the square from in front and above, in perspective.
   function frame() {
-    const c = new THREE.Vector3((n * U) / 2, (n * U) / 2, 0);
+    const c = new THREE.Vector3((SQUARE_N * U) / 2, (SQUARE_N * U) / 2, 0);
+    camera.up.set(0, 0, 1);
     controls.target.copy(c);
-    camera.position.set(c.x, c.y, Math.max(8, n * 2.6));
+    camera.position.set(c.x, c.y - 6.4, 7);
     controls.update();
   }
 
   // ---- building ----
-  function commit() {
-    save(); draw(); onChange();
-    const done = con.complete();
-    if (done && !wasComplete) showHudPrompt(t('con.prompt.done', lang(), { name: PRIMITIVE.label, n: con.grid.cells.length }), 5000);
-    wasComplete = done;
-  }
-  function nearest(point, kind, reach = 0.7) {
-    const st = con.states();
-    let best = null;
-    con.grid.cells.forEach((c, i) => {
-      if (st[i] !== kind) return;
-      const d = mid(c).distanceTo(point);
-      if (d <= reach && (!best || d < best.d)) best = { id: i, d };
-    });
-    return best?.id ?? null;
-  }
+  function commit() { save(); draw(); onChange(); }
   function handleTap(hit, mode) {
-    if (!hit?.point || mode === 'paint') return false;
-    const p = new THREE.Vector3(hit.point.x, hit.point.y, 0);
+    if (mode === 'paint') return false;
     if (mode === 'chisel') {
-      const id = nearest(p, 'filled');
-      if (id === null) return false;
-      if (!con.unfill(id)) { showHudPrompt(t('con.prompt.locked', lang()), 3000); return true; }
+      if (!filled) return false;
+      filled -= 1;
       commit();
       return true;
     }
-    const j = con.junction();
-    if (j && world(j.at).distanceTo(p) < 0.45) return exposeNext();
-    const id = nearest(p, 'available');
-    if (id === null) return false;
-    con.fill(id);
+    if (complete()) return false;
+    filled += 1;
     commit();
-    if (con.junction() && !j) showHudPrompt(t('con.prompt.junction', lang(), { axis: axisName(con.junction().exposes) }), 4500);
+    const j = turns.find((x) => x.at === filled);
+    if (complete()) showHudPrompt(t('con.prompt.done', lang(), { name: 'Square', n: loop.length }), 5000);
+    else if (j) showHudPrompt(t('con.prompt.junction', lang(), { axis: axisName(j.exposes) }), 4000);
     return true;
-  }
-  function exposeNext() {
-    if (!con.expose()) return false;
-    commit();
-    return true;
-  }
-  function setN(k) {
-    if (k === n) return;
-    n = k;
-    con = createConstruction(PRIMITIVE.d, n);
-    wasComplete = false;
-    commit();
-    frame();
   }
 
-  // ---- panel ----
+  // ---- panel: only the hand-off, once the square is complete ----
   const panel = document.createElement('div');
   panel.id = 'world1dconstruct-panel';
   panel.className = 'qc-panel';
-  panel.innerHTML = `
-    <div class="w4d-row w4d-controls con-axes"></div>
-    <div class="w4d-track" role="slider"><div class="w4d-ticks"></div><div class="w4d-thumb"></div></div>
-    <div class="w4d-row w4d-options con-options"></div>`;
+  panel.innerHTML = '<div class="w4d-row w4d-options"><button type="button" class="sig-send" data-open="2D"></button></div>';
   document.body.appendChild(panel);
-  const axesRow = panel.querySelector('.con-axes');
-  const optionsRow = panel.querySelector('.con-options');
-  const toSlider = (k) => -1 + (2 * (k - N_MIN)) / (N_MAX - N_MIN);
-  const slider = createGearedSlider(panel.querySelector('.w4d-track'), {
-    value: () => toSlider(n),
-    setValue: (v) => { const k = Math.round(N_MIN + ((v + 1) / 2) * (N_MAX - N_MIN)); if (k !== n) { setN(k); slider.render(); } },
-    limit: () => 1,
-    perSweep: () => 2,
-    detents: () => Array.from({ length: N_MAX - N_MIN + 1 }, (_, i) => ({ v: toSlider(N_MIN + i), label: String(N_MIN + i) })),
-    snap: () => 1,
-  });
+  const openBtn = panel.querySelector('[data-open]');
   function renderPanel() {
-    panel.classList.toggle('visible', active);
-    if (!active) return;
-    const L = lang();
-    const j = con.junction();
-    // Axis symbols: exposed (in their colour), ready at a junction
-    // (outlined, tappable), not yet available (faded, inert).
-    axesRow.innerHTML = [...Array(PRIMITIVE.d).keys()].map((a) => {
-      const name = axisName(a);
-      const hex = `#${AXIS_COLORS[name].toString(16).padStart(6, '0')}`;
-      const state = a < con.exposed ? 'on' : j && j.exposes === a ? 'ready' : 'off';
-      return `<button type="button" class="con-axis con-axis-${state}" data-axis="${a}" style="--axis:${hex}"${state === 'off' ? ' disabled' : ''}>${name}</button>`;
-    }).join('') + `<span class="con-progress">${t('con.progress', L, con.progress())}</span>`;
-    optionsRow.innerHTML = `<span class="con-size">${t('con.size', L, { n })}</span>` + (con.complete() ? `<button type="button" data-open="2D">${t('con.open', L, { dim: '2D' })}</button>` : '');
-    slider.render();
+    panel.classList.toggle('visible', active && complete());
+    openBtn.textContent = t('con.open', lang(), { dim: '2D' });
   }
-  panel.addEventListener('click', (ev) => {
-    const b = ev.target.closest('button');
-    if (!b) return;
-    if (b.dataset.axis !== undefined) { const j = con.junction(); if (j && j.exposes === Number(b.dataset.axis)) exposeNext(); }
-    else if (b.dataset.open) onOpenIn(b.dataset.open, PRIMITIVE.id);
-  });
+  openBtn.addEventListener('click', () => onOpenIn('2D', 'square'));
   let shownLang = lang();
   onSettingsChange((st) => { if (st.language !== shownLang) { shownLang = st.language; if (active) renderPanel(); } });
 
@@ -218,17 +144,15 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
       if (on === active) return;
       active = on;
       group.visible = on;
-      if (!on) panel.classList.remove('visible');
+      if (!on) { camera.up.set(0, 1, 0); panel.classList.remove('visible'); }
       draw();
-      if (on) { frame(); if (!con.progress().filled) showHudPrompt(t('con.prompt.start', lang()), 5000); }
+      if (on) { frame(); if (!filled) showHudPrompt(t('con.prompt.start', lang()), 5000); }
     },
-    get isEmpty() { return con.progress().filled === 0; },
-    clear() { con = createConstruction(PRIMITIVE.d, n); wasComplete = false; commit(); },
+    get isEmpty() { return filled === 0; },
+    clear() { filled = 0; commit(); },
     snapshot: toJSON,
     restore(json) {
-      if (Number.isInteger(json?.n) && json.n >= N_MIN && json.n <= N_MAX) n = json.n;
-      con = createConstruction(PRIMITIVE.d, n, json);
-      wasComplete = con.complete();
+      if (json?.version === 2 && Number.isInteger(json.filled)) filled = Math.max(0, Math.min(loop.length, json.filled));
       save(); draw(); onChange();
     },
     toJSON,

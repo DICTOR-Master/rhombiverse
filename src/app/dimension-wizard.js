@@ -189,14 +189,18 @@ function signalEdges() {
   out.coin = true;
   return out;
 }
-// Construct: the square's grid of cells, as it emerges.
+// Construct: the square, its four sides of four cells.
 function constructEdges() {
   const out = [];
-  const n = 3, k = 2 / n;
-  for (let a = 0; a <= n; a++) {
-    out.push([[-1, -1 + a * k, 0], [1, -1 + a * k, 0]]);
-    out.push([[-1 + a * k, -1, 0], [-1 + a * k, 1, 0]]);
-  }
+  const n = 4, k = 2 / n;
+  const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  pts.forEach((p, i) => {
+    const q = pts[(i + 1) % 4];
+    for (let a = 0; a < n; a++) {
+      const f = (t) => [p[0] + ((q[0] - p[0]) * t) / 2, p[1] + ((q[1] - p[1]) * t) / 2, 0];
+      out.push([f(a * k * 0.999 + 0.02), f((a + 1) * k - 0.02)]);
+    }
+  });
   out.coin = true;
   return out;
 }

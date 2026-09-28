@@ -32,9 +32,9 @@ right-click) removes. The **User Guide** (in the app, or at
   cells (its Morse code, no need to know it); tap the orange cell or press
   Send to set it moving away. Outside (in perspective) and Inside (in the
   tunnel, the cells passing beneath you) views.
-  **Construct**: the construction microscope — fill 1D cells along X; at
-  the junction Y becomes available (X stays), and a square emerges from
-  its cells, each coloured by the axis it was built along; open it in 2D.
+  **Construct**: build a square from 1D cells, one tap at a time — along
+  X, Y joining at the corner (X stays), round the four sides until it
+  closes and fills in; then open it in 2D.
 - **2D** — five tiles (Parallelogram, Triangle, Hexagon, Kite, Kagome) on
   four lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular),
   plus the Rhombille pattern.
