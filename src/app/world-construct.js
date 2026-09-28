@@ -8,7 +8,8 @@
 // University graphics, nothing like the rest of the app", "supposed to be
 // staged to make it as simple as possible"). Decisions: one cell per tap,
 // cyan like Signal, a fixed square of 4 cells per side.
-// - The square's outline waits as faint empty cells; the next one is
+// - One line at a time: the side you're on waits as faint empty cells,
+//   sides built are ghosted, sides ahead hidden. The next cell is
 //   orange: tap (anywhere) to fill it. Along X first; at the corner a
 //   junction glows and Y joins (X stays); up Y, back along the top (a
 //   second X line, parallel to the first), down the last side. Closing
@@ -55,6 +56,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   const filledMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, roughness: 0.8, metalness: 0.05 });
   const nextMat = new THREE.MeshStandardMaterial({ color: NEXT, emissive: NEXT, emissiveIntensity: 0.35, vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false });
   const emptyMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.08, depthWrite: false });
+  const ghostMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.22, depthWrite: false });
   const faceMat = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
   const junctionMat = new THREE.MeshBasicMaterial({ color: NEXT, transparent: true, opacity: 0.85 });
   const catchPlane = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
@@ -64,7 +66,10 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   const layer = new THREE.Group();
   group.add(layer);
   const up = new THREE.Vector3(0, 1, 0);
-  const world = (p) => new THREE.Vector3(p[0] * U, p[1] * U, 0);
+  // The first line (X) runs up the screen, like Signal's (direct
+  // request: "can't we start at the vertical axis?"); X is only the first
+  // direction's name, not "horizontal". Y then turns off to the side.
+  const world = (p) => new THREE.Vector3(p[1] * U, p[0] * U, 0);
 
   function cellMesh(c, mat) {
     const m = new THREE.Mesh(geo, mat);
@@ -76,7 +81,17 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   function draw() {
     for (const child of [...layer.children]) { layer.remove(child); if (child.userData.own) child.geometry.dispose(); }
     if (!active) return;
-    loop.forEach((c, k) => layer.add(cellMesh(c, k < filled ? filledMat : k === filled ? nextMat : emptyMat)));
+    // One line at a time (direct request: "this is 1D, so only one axis
+    // should show at a time; everything else is hidden till you reach
+    // the junction, ghosted out"): the side you're on in full; sides
+    // already built ghosted; sides ahead hidden until their junction.
+    // The closed square shows whole.
+    const here = loop[Math.min(filled, loop.length - 1)].instance;
+    loop.forEach((c, k) => {
+      if (complete()) { layer.add(cellMesh(c, filledMat)); return; }
+      if (c.instance === here) layer.add(cellMesh(c, k < filled ? filledMat : k === filled ? nextMat : emptyMat));
+      else if (k < filled) layer.add(cellMesh(c, ghostMat));
+    });
     // The junction ahead: where the next cell turns onto another axis.
     const j = turns.find((x) => x.at === filled);
     if (j) {
