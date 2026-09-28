@@ -236,13 +236,15 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   }
   // Smooth circles (direct request: "does there have to be rough
   // crenulation ... is smooth circle not possible?"): plenty of segments.
-  const tunnel = new THREE.Mesh(new THREE.TubeGeometry(new InsideCurve(), (TUNNEL[1] - TUNNEL[0]) * 2, TUBE_R, 96, false), wallMaterial);
+  // Roomier than the outside tube, so you can stand well above the path.
+  const TUNNEL_R = R * 3.2;
+  const tunnel = new THREE.Mesh(new THREE.TubeGeometry(new InsideCurve(), (TUNNEL[1] - TUNNEL[0]) * 2, TUNNEL_R, 96, false), wallMaterial);
   cab.add(tunnel);
-  // You're in the signal's path: cells are cut where you stand, and only
-  // their outward faces drawn, so each one emerges from beyond the view,
-  // its hollow tail toward you, and shrinks away down the tunnel.
-  const atYou = new THREE.Plane(new THREE.Vector3(1, 0, 0), -(EYE_U + 0.1) * S); // right at you: each cell emerges as big as the view ("all the way from outside the rings") and shrinks away
-  const EYE_H = R * 1.25; // above the path: just over the passing cells, inside the tube
+  // Above the path: a passing cell fills the bottom of the view unbroken
+  // ("if a cell is coming that part of the screen should be full of cyan";
+  // cutting it where you stand left a dark gap under it), and the path
+  // narrows to a sharp point at the horizon.
+  const EYE_H = R * 2.2;
   function aimInside() {
     camera.up.set(0, 0, 1);
     camera.position.copy(insidePoint(EYE_U, EYE_H));
@@ -259,14 +261,15 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   }
   // Distance fades into the dark (both views; the scene's fog, only
   // while Signal is on).
-  const fogs = { inside: new THREE.Fog(0x05050a, 1.2, 9), outside: new THREE.Fog(0x05050a, 3, 16) };
+  // Inside, far enough out that the path narrows to a sharp point first
+  // ("make the disappearing triangle sharper to horizon").
+  const fogs = { inside: new THREE.Fog(0x05050a, 4, 40), outside: new THREE.Fog(0x05050a, 3, 16) };
   function setFog(on) { scene.fog = on ? fogs[view.inside ? 'inside' : 'outside'] : null; }
   function setInside(on) {
     view.inside = on;
     setFog(true);
-    // Inside, only outward faces: a cell around you isn't drawn from
-    // within (no flood of colour), you see it again once it's ahead.
-    solidMaterial.clippingPlanes = on ? [atYou] : [];
+    // Inside, only outward faces (you're never within a cell now, but it
+    // keeps a cell's hollow from ever showing through).
     solidMaterial.side = on ? THREE.FrontSide : THREE.DoubleSide;
     solidMaterial.needsUpdate = true;
     if (on) aimInside();
@@ -435,7 +438,6 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
         playing = false;
         view.inside = false;
         setFog(false);
-        solidMaterial.clippingPlanes = [];
         solidMaterial.side = THREE.DoubleSide;
         solidMaterial.needsUpdate = true;
         camera.up.set(0, 1, 0);
