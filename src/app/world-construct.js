@@ -281,6 +281,9 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
         layer.add(sp);
       }
     }
+    // Tracing Kagome's star: back at a hexagon corner, two of its lines
+    // cross there.
+    if (next >= 0 && !milestoneAt() && plan.crossings?.some((p) => same(p, plan.edges[next].from))) layer.add(junction(plan.edges[next].from));
     const m = milestoneAt();
     if (!m) return;
     m.corners.forEach((p) => layer.add(dome(p)));
@@ -435,7 +438,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
       // A new direction's first line: a junction.
       const e = plan.edges[plan.steps[filled].edge];
       const isNew = !plan.edges.slice(0, e.instance).some((x) => x.axis === e.axis);
-      if (isNew && filled === lineStart(e.line)) showHudPrompt(t('con.prompt.junction', lang(), { axis: axisLabel(e.axis) }), 4000);
+      if (isNew && filled === lineStart(e.line)) showHudPrompt(t(plan.junctionPrompt?.[e.axis] ?? 'con.prompt.junction', lang(), { axis: axisLabel(e.axis) }), 4000);
     }
     return true;
   }

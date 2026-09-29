@@ -210,71 +210,106 @@ export function squarePlan(n = SQUARE_N) {
   };
 }
 
-/** Kagome: its star unit, two triangles of side 3n through a hexagon of
- * side n; six straight lines in Kagome's three directions (direct
- * decisions, 2026-09-29: "star unit, then lattice", "make all
- * builds five a side"). The first triangle is traced round, its first side up the
- * screen, then the second; each direction's first edge by hand, every
- * other edge one tap. The lattice: each direction's lines, √3·n apart. */
+/** Kagome (direct decisions, 2026-09-29: "star unit, then lattice", "build
+ * the hexagon first, five taps a side", third direction named "XY";
+ * "directions are free, dimensions are earned"): the hexagon, its first
+ * side up the screen, traced clockwise by hand, one continuous path; it
+ * takes Kagome's three line directions, X, Y and XY (X and Y together,
+ * still 2D), and closing it is the 2D moment. Then the star: its outline
+ * traced round the hexagon, out to each point and back to the next
+ * corner, one tap per edge (no new direction), each corner a crossing of
+ * two of Kagome's lines. Then the Kagome lattice: each direction's lines,
+ * √3·n apart. Axis ids: 0 X, 1 Y, 4 XY (2 and 3 stay Z and W). */
 export function kagomePlan(n = SQUARE_N) {
   const r3 = Math.sqrt(3);
-  const a = (r3 / 2) * n; // the triangle's side from its centre
-  const A = [[-1.5 * n, -a], [1.5 * n, -a], [0, 2 * a]];
-  const B = A.map(([x, y]) => [-x, -y]);
-  const names = ['X', 'Y', 'V'];
+  const dirs = [[1, 0], [0.5, r3 / 2], [-0.5, r3 / 2]]; // X, Y, XY (x up the screen, y right)
+  const AX = [0, 1, 4];
+  const names = { 0: 'X', 1: 'Y', 4: 'XY', 2: 'Z', 3: 'W' };
+  // The hexagon, clockwise from its bottom-left corner.
+  const P = [[0, 0]];
+  const sideDir = [0, 1, 2, 0, 1, 2].map((k, i) => (i < 3 ? dirs[k] : dirs[k].map((v) => -v)));
+  for (let i = 0; i < 5; i++) P.push([P[i][0] + n * sideDir[i][0], P[i][1] + n * sideDir[i][1]]);
+  const centre = [P.reduce((s, p) => s + p[0], 0) / 6, P.reduce((s, p) => s + p[1], 0) / 6];
+  const axisOf = (d) => {
+    const k = dirs.findIndex((u) => Math.abs(Math.abs(u[0] * d[0] + u[1] * d[1]) - 1) < 1e-9);
+    return AX[k];
+  };
   const edges = [];
   const count = {};
-  [A, B].forEach((T, t) => T.forEach((p, i) => {
-    const q = T[(i + 1) % 3];
-    const axis = i; // A's and B's sides pair up, parallel
-    const line = t * 3 + i;
-    for (let k = 0; k < 3; k++) {
-      const f = (u) => pad4([p[0] + ((q[0] - p[0]) * u) / 3, p[1] + ((q[1] - p[1]) * u) / 3]);
-      count[axis] = (count[axis] ?? 0) + 1;
-      edges.push({ axis, instance: edges.length, line, label: `${names[axis]}${count[axis]}`, from: f(k), to: f(k + 1) });
-    }
-  }));
-  const seen = new Set();
-  const steps = [];
-  edges.forEach((e) => {
-    const cells = edgeCells(e);
-    if (!seen.has(e.axis)) { seen.add(e.axis); cells.forEach((c) => steps.push({ cells: [c], edge: e.instance })); } else steps.push({ cells, edge: e.instance });
-  });
-  // Lattice lines: direction d_k = A's k-th side; offsets a + j·√3n from
-  // the centre; clipped to a disc, minus the star's own stretch.
-  const RC = 4.6 * n;
-  const lattice = [];
-  for (let k = 0; k < 3; k++) {
-    const [p, q] = [A[k], A[(k + 1) % 3]];
-    const d = [(q[0] - p[0]) / (3 * n), (q[1] - p[1]) / (3 * n)];
-    const nu = [-d[1], d[0]];
-    for (let j = -3; j <= 3; j++) {
-      const c = (nu[0] * p[0] + nu[1] * p[1]) + j * r3 * n;
-      if (Math.abs(c) >= RC) continue;
-      const h = Math.sqrt(RC * RC - c * c);
-      const foot = [nu[0] * c, nu[1] * c];
-      const at = (u) => pad4([foot[0] + d[0] * u, foot[1] + d[1] * u]);
-      // The star's own lines (j = 0 through A's side, and B's parallel one)
-      // span |u| ≤ 1.5n; the lattice carries them on beyond.
-      const own = Math.abs(Math.abs(c) - a) < 1e-6;
-      if (own) { lattice.push([at(-h), at(-1.5 * n)]); lattice.push([at(1.5 * n), at(h)]); } else lattice.push([at(-h), at(h)]);
-    }
+  const add = (from, to, along, line) => {
+    const d = [(to[0] - from[0]) / n, (to[1] - from[1]) / n];
+    const axis = axisOf(d);
+    count[axis] = (count[axis] ?? 0) + 1;
+    edges.push({ axis, instance: edges.length, line, along, label: `${names[axis]}${count[axis]}`, from: pad4(from), to: pad4(to) });
+  };
+  for (let i = 0; i < 6; i++) add(P[i], P[(i + 1) % 6], i, i);
+  // The star's outline: a point on each side, reached along the
+  // neighbouring sides' lines carried on past the corners.
+  const tips = [];
+  for (let i = 0; i < 6; i++) {
+    const a = P[i], b = P[(i + 1) % 6];
+    const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const out = [mid[0] - centre[0], mid[1] - centre[1]];
+    const L = Math.hypot(...out);
+    const tip = [mid[0] + (out[0] / L) * (r3 / 2) * n, mid[1] + (out[1] / L) * (r3 / 2) * n];
+    tips.push(tip);
+    add(a, tip, (i + 5) % 6, 6 + 2 * i); // side i-1's line, on past corner i
+    add(tip, b, (i + 1) % 6, 7 + 2 * i); // side i+1's line, back in to corner i+1
   }
-  const tips = [...A, ...B].map(pad4);
-  const P = (u) => pad4(u);
-  // Faces: the hexagon (the triangles' crossings) and the six points.
-  const hex = [];
-  for (let i = 0; i < 6; i++) { const ang = Math.PI / 2 + (i * Math.PI) / 3; hex.push(P([n * Math.cos(ang + Math.PI / 6) * 1, n * Math.sin(ang + Math.PI / 6)])); }
-  const hexByAngle = hex.map((h) => ({ h, ang: Math.atan2(h[1], h[0]) }));
-  const faces = [hex, ...tips.map((tip) => {
-    const ang = Math.atan2(tip[1], tip[0]);
-    const near = hexByAngle.filter(({ ang: b }) => Math.abs(Math.atan2(Math.sin(b - ang), Math.cos(b - ang))) < Math.PI / 3).map(({ h }) => h);
-    return [tip, ...near];
-  })];
+  const steps = [];
+  edges.forEach((e, k) => {
+    const cells = edgeCells(e);
+    if (k < 6) cells.forEach((c) => steps.push({ cells: [c], edge: e.instance }));
+    else steps.push({ cells, edge: e.instance });
+  });
+  // Lattices. The hexagon's: the honeycomb, two rings round it. Kagome's:
+  // each direction's lines through the hexagon's sides, √3·n apart,
+  // clipped to a disc, carrying the star's own lines on past its points.
+  const key = (a, b) => [a, b].map((p) => p.map((v) => v.toFixed(6)).join(',')).sort().join('|');
+  const hexAt = (c) => P.map((p) => [p[0] - centre[0] + c[0], p[1] - centre[1] + c[1]]);
+  const honey = new Map();
+  const seen = new Set([centre.map((v) => v.toFixed(6)).join()]);
+  let ring = [centre];
+  const cells = [centre];
+  for (let r = 0; r < 2; r++) {
+    const next = [];
+    for (const c of ring) for (let i = 0; i < 6; i++) {
+      const h = hexAt(c);
+      const mid = [(h[i][0] + h[(i + 1) % 6][0]) / 2, (h[i][1] + h[(i + 1) % 6][1]) / 2];
+      const nc = [2 * mid[0] - c[0], 2 * mid[1] - c[1]];
+      const k2 = nc.map((v) => v.toFixed(6)).join();
+      if (!seen.has(k2)) { seen.add(k2); next.push(nc); cells.push(nc); }
+    }
+    ring = next;
+  }
+  const own = new Set(P.map((p, i) => key(p, P[(i + 1) % 6])));
+  for (const c of cells) {
+    const h = hexAt(c);
+    h.forEach((p, i) => { const q = h[(i + 1) % 6]; const k2 = key(p, q); if (!own.has(k2)) honey.set(k2, [pad4(p), pad4(q)]); });
+  }
+  const RC = 4.6 * n;
+  const kagome = [];
+  dirs.forEach((d) => {
+    const nu = [-d[1], d[0]];
+    const oc = nu[0] * centre[0] + nu[1] * centre[1];
+    for (let j = -4; j <= 3; j++) {
+      const off = (r3 / 2) * n * (2 * j + 1);
+      if (Math.abs(off) >= RC) continue;
+      const h = Math.sqrt(RC * RC - off * off);
+      const foot = [centre[0] + nu[0] * off, centre[1] + nu[1] * off];
+      const at = (u) => pad4([foot[0] + d[0] * u, foot[1] + d[1] * u]);
+      if (j === 0 || j === -1) { kagome.push([at(-h), at(-1.5 * n)]); kagome.push([at(1.5 * n), at(h)]); } else kagome.push([at(-h), at(h)]);
+    }
+  });
+  const hexFace = P.map(pad4);
+  const tipFaces = tips.map((tp, i) => [pad4(tp), pad4(P[(i + 1) % 6]), pad4(P[i])]);
   return {
-    id: 'kagome', n, edges, steps, flat: steps.length, axisNames: names, startPrompt: 'con.prompt.startKagome',
+    id: 'kagome', n, edges, steps, flat: 6 * n, axisNames: names,
+    startPrompt: 'con.prompt.startKagome', junctionPrompt: { 4: 'con.prompt.junctionXY' },
+    crossings: P.map(pad4),
     milestones: [
-      { at: steps.length, whole: edges.length, dim: 2, name: 'Kagome', prompt: 'con.prompt.kagome', corners: tips, faces, lattice, autoLattice: true, open: { dim: '2D', piece: 'kagome' } },
+      { at: 6 * n, whole: 6, dim: 2, name: 'Hexagon', prompt: 'con.prompt.hexagon', corners: P.map(pad4), faces: [hexFace], lattice: [...honey.values()], autoLattice: false, open: { dim: '2D', piece: 'hexagon' } },
+      { at: steps.length, whole: 18, dim: 2, name: 'Kagome', prompt: 'con.prompt.kagome', corners: tips.map(pad4), faces: [hexFace, ...tipFaces], lattice: kagome, autoLattice: true, open: { dim: '2D', piece: 'kagome' } },
     ],
   };
 }

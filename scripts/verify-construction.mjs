@@ -81,34 +81,30 @@ check('axes only ever join: X from the start, Y at the first corner, and X is ne
     prefix && wHand && T.length === Cs.length + n + 19 && T.flatMap((s) => s.cells).length === 32 * n && same(T[Cs.length].cells[0].from, [0, 0]) && T[Cs.length].cells[0].from.every((v) => v === 0));
 }
 
-// Kagome's star: six straight lines, three directions 120° apart (each
-// with two parallel lines √3·n apart, Kagome's own spacing), every edge n
-// cells, the hexagon's corners where the lines cross; each direction's
-// first edge by hand, the rest one tap each.
+// Kagome: the hexagon by hand, one continuous clockwise path in three
+// directions (X, Y, XY), then the star's outline round it, one tap per
+// edge; the star's six straight lines (each a hexagon side carried on
+// both ways), two per direction √3·n apart; each corner where two cross.
 {
   const n = SQUARE_N;
   const K = kagomePlan(n);
   const len = (e) => Math.hypot(...e.from.map((v, i) => e.to[i] - v));
   const dir = (e) => e.from.map((v, i) => (e.to[i] - v) / len(e));
   const near = (a, b) => Math.abs(a - b) < 1e-9;
-  const lines = [...new Set(K.edges.map((e) => e.line))].map((l) => K.edges.filter((e) => e.line === l));
-  const straight = lines.every((es) => es.length === 3 && es.every((e, i) => !i || (same(e.from.slice(0, 2), es[i - 1].to.slice(0, 2)) || e.from.every((v, d) => near(v, es[i - 1].to[d]))) && dir(e).every((v, d) => near(v, dir(es[0])[d]))));
-  check('Kagome star: 18 edges of n cells, six straight lines of three edges', K.edges.length === 18 && K.edges.every((e) => near(len(e), n)) && straight);
-  const angs = [0, 1, 2].map((a) => { const e = K.edges.find((x) => x.axis === a); const d = dir(e); return Math.atan2(d[1], d[0]); });
-  const sep = (a, b) => { const x = Math.abs(a - b) % Math.PI; return Math.min(x, Math.PI - x); };
-  check('three directions, 60° apart as lines (the triangles\' 120° turns)', near(sep(angs[0], angs[1]), Math.PI / 3) && near(sep(angs[1], angs[2]), Math.PI / 3) && near(sep(angs[0], angs[2]), Math.PI / 3));
-  // Offsets across each direction, measured against its first line's
-  // heading (the second triangle runs its lines the other way).
-  const pairs = [0, 1, 2].map((a) => {
-    const d = dir(K.edges.find((x) => x.axis === a));
-    return lines.filter((es) => es[0].axis === a).map((es) => -d[1] * es[0].from[0] + d[0] * es[0].from[1]);
-  });
-  check('each direction: two parallel lines, √3·n apart', pairs.every((p) => p.length === 2 && near(Math.abs(Math.abs(p[0] - p[1]) - Math.sqrt(3) * n), 0)));
-  const hex = K.milestones[0].faces[0];
-  const crossings = hex.every((h) => K.edges.filter((e) => [e.from, e.to].some((p) => p.every((v, d) => near(v, h[d])))).length === 4);
-  check('the hexagon: six corners, each where two lines cross (four edge ends meet)', hex.length === 6 && crossings);
-  const byHand = K.steps.filter((s) => s.cells.length === 1).length;
-  check(`steps: each direction's first edge by hand (3n = ${3 * n}), the other 15 edges one tap each: ${K.steps.length} taps`, byHand === 3 * n && K.steps.length === 3 * n + 15);
+  const eq = (p, q) => p.every((v, d) => near(v, q[d]));
+  const path = K.edges.every((e, k) => !k || k === 6 || eq(e.from, K.edges[k - 1].to)) && eq(K.edges[5].to, K.edges[0].from) && eq(K.edges[17].to, K.edges[0].from);
+  check('Kagome: 18 edges of n cells; the hexagon, then the star outline, each one continuous closed path', K.edges.length === 18 && K.edges.every((e) => near(len(e), n)) && path);
+  const lines = [0, 1, 2, 3, 4, 5].map((i) => K.edges.filter((e) => e.along === i));
+  const straight = lines.every((es) => es.length === 3 && es.every((e) => { const d = dir(e), d0 = dir(es[0]); return near(Math.abs(d[0] * d0[0] + d[1] * d0[1]), 1) && near(d0[0] * (e.from[1] - es[0].from[1]) - d0[1] * (e.from[0] - es[0].from[0]), 0); }));
+  check('the star: six straight lines, each a hexagon side carried on past both corners', straight);
+  const axes = [...new Set(K.edges.map((e) => e.axis))].sort();
+  check('three directions (X, Y, XY), no new dimension: XY is X and Y together', axes.join() === '0,1,4' && K.axisNames[4] === 'XY' && K.milestones.every((m) => m.dim === 2));
+  // Offsets across each direction, both lines measured against one heading.
+  const across = (i, j) => { const d = dir(lines[i][0]), p = lines[j][0].from; return -d[1] * p[0] + d[0] * p[1]; };
+  check('each direction: two parallel lines, √3·n apart', [0, 1, 2].every((i) => near(Math.abs(across(i, i) - across(i, i + 3)), Math.sqrt(3) * n)));
+  const crossings = K.crossings.every((h) => K.edges.filter((e) => eq(e.from, h) || eq(e.to, h)).length === 4);
+  check('the hexagon\'s six corners are crossings: two lines, four edge ends', K.crossings.length === 6 && crossings);
+  check(`steps: the hexagon by hand (6n = ${6 * n}), the star one tap per edge (12): ${K.steps.length} taps`, K.steps.slice(0, 6 * n).every((s) => s.cells.length === 1) && K.steps.slice(6 * n).every((s) => s.cells.length === n) && K.steps.length === 6 * n + 12);
   const sq = squarePlan(n);
   check('the square plan builds exactly as before (square → cube → tesseract)', sq.steps.length === tesseractSteps(n).length && sq.milestones.map((m) => m.at).join() === `${4 * n},${cubeSteps(n).length},${tesseractSteps(n).length}`);
 }
