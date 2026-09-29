@@ -58,3 +58,48 @@ export function exposedAxes(cells, filled) {
   for (let k = 0; k < Math.min(filled + 1, cells.length); k++) if (!seen.includes(cells[k].axis)) seen.push(cells[k].axis);
   return seen;
 }
+
+/** The cube, built on from the closed square (direct decisions,
+ * 2026-09-29: "first 10 cells by hand, then one tap per edge, with axes
+ * numbered"): Z rises from the square's start corner, its first edge one
+ * cell per tap; then each remaining edge fills in one tap: the other three
+ * Z edges, then the top square (parallel X and Y instances). Returns the
+ * twelve edges in building order: { axis, instance, label, from, to },
+ * points in ℝ³; `label` numbers the instances per direction (X1, X2, …). */
+export function cubeEdges(n = SQUARE_N) {
+  const base = [[0, 0], [n, 0], [n, n], [0, n]];
+  const edges = [];
+  const count = {};
+  const add = (axis, from, to) => {
+    count[axis] = (count[axis] ?? 0) + 1;
+    edges.push({ axis, instance: edges.length, label: `${axisName(axis)}${count[axis]}`, from, to });
+  };
+  base.forEach((p, k) => { const q = base[(k + 1) % 4]; add(k % 2, [...p, 0], [...q, 0]); });
+  base.forEach((p) => add(2, [...p, 0], [...p, n]));
+  base.forEach((p, k) => { const q = base[(k + 1) % 4]; add(k % 2, [...p, n], [...q, n]); });
+  return edges;
+}
+
+/** An edge's n unit cells, from its start: { from, to, axis, instance, index }. */
+export function edgeCells(e) {
+  const len = e.from.reduce((s, v, i) => s + Math.abs(e.to[i] - v), 0);
+  return Array.from({ length: len }, (_, i) => ({
+    from: e.from.map((v, d) => v + ((e.to[d] - v) / len) * i),
+    to: e.from.map((v, d) => v + ((e.to[d] - v) / len) * (i + 1)),
+    axis: e.axis, instance: e.instance, index: i,
+  }));
+}
+
+/** The whole build as taps: the square's 4n cells and the first Z edge's
+ * n cells one per tap, then one tap per remaining edge. Each step:
+ * { cells, edge } (edge = instance id). */
+export function cubeSteps(n = SQUARE_N) {
+  const edges = cubeEdges(n);
+  const steps = [];
+  edges.forEach((e, k) => {
+    const cells = edgeCells(e);
+    if (k <= 4) cells.forEach((c) => steps.push({ cells: [c], edge: e.instance }));
+    else steps.push({ cells, edge: e.instance });
+  });
+  return steps;
+}

@@ -5048,6 +5048,14 @@ async function init() {
     showHudPrompt,
     onChange: () => { if (historyRestorers.has('world1dconstruct')) recordHistory('world1dconstruct', constructWorld.snapshot()); },
   });
+  // The 1D Signal/Construct toggle under Wizard (shown by animate()).
+  document.getElementById('hud-1d-toggle')?.addEventListener('click', (e) => {
+    const w = e.target.closest('[data-world]')?.dataset.world;
+    if (!w || w === own3D) return;
+    own3D = w;
+    applyDimensionVisibility();
+    updateQuickSelect();
+  });
   kaleidoWorld = createKaleidoWorld({
     scene,
     // One edge length = the 2D hexagon's edge at 60°, so tiles look the same size.
@@ -5728,11 +5736,25 @@ let lowFPSSampleStreak = 0;
 let lastDegradeAt = 0;
 
 const hudDimEl = document.getElementById('hud-dim');
+const hud1dToggleEl = document.getElementById('hud-1d-toggle');
 function animate() {
   requestAnimationFrame(animate);
   // The dimension beside Wizard (a cheap per-frame check: several paths
   // change activeDimension; not yet chosen means the default 3D world).
-  if (hudDimEl && hudDimEl.textContent !== (activeDimension ?? '3D')) hudDimEl.textContent = activeDimension ?? '3D';
+  // In Construct it also shows the dimensions built so far (direct
+  // request: "1D/2D/3D should show on the indicator, but only 1D orange").
+  const dimText = own3D === 'construct' && own3DActive() ? ['1D', '2D', '3D'].slice(0, constructWorld.reached()).join('/') : activeDimension ?? '3D';
+  const oneD = (own3D === 'signal' || own3D === 'construct') && own3DActive();
+  if (hud1dToggleEl && hud1dToggleEl.hidden === oneD) hud1dToggleEl.hidden = !oneD;
+  if (oneD && hud1dToggleEl.dataset.on !== own3D) {
+    hud1dToggleEl.dataset.on = own3D;
+    for (const b of hud1dToggleEl.children) b.classList.toggle('active', b.dataset.world === own3D);
+  }
+  if (hudDimEl && hudDimEl.textContent !== dimText) {
+    const [first, ...rest] = dimText.split('/');
+    hudDimEl.textContent = first;
+    if (rest.length) hudDimEl.insertAdjacentHTML('beforeend', `<span class="hud-dim-built">/${rest.join('/')}</span>`);
+  }
   const now = performance.now();
   const dt = Math.min(0.1, (now - lastFrameTime) / 1000); // clamp avoids a huge step after a backgrounded tab regains focus
   lastFrameTime = now;

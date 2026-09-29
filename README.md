@@ -34,7 +34,9 @@ right-click) removes. The **User Guide** (in the app, or at
   tunnel, the cells passing beneath you) views.
   **Construct**: build a square from 1D cells, one tap at a time — along
   X, Y joining at the corner (X stays), round the four sides until it
-  closes and fills in; then open it in 2D.
+  closes and fills in (open it in 2D from there); then Z rises into a
+  cube: its first edge cell by cell, then one tap per numbered edge.
+  ⊘ clears to start again; a Signal | Construct toggle switches worlds.
 - **2D** — five tiles (Parallelogram, Triangle, Hexagon, Kite, Kagome) on
   four lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular),
   plus the Rhombille pattern.

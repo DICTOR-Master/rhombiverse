@@ -108,6 +108,19 @@
       user-select: none; pointer-events: none;
     }
     #hud-dim:empty { display: none; }
+    /* 1D's two worlds, one tap apart (direct request: "a Signal/Construct
+       toggle also"). */
+    #hud-1d-toggle {
+      position: fixed; top: 86px; left: 16px; z-index: 900; display: flex;
+      border: 1px solid rgba(34, 195, 230, 0.55); border-radius: 8px; overflow: hidden;
+    }
+    #hud-1d-toggle[hidden] { display: none; }
+    #hud-1d-toggle button {
+      background: transparent; color: #9fb3c8; border: 0; padding: 6px 12px;
+      font: 600 14px system-ui, sans-serif; cursor: pointer; touch-action: manipulation;
+    }
+    #hud-1d-toggle button.active { background: rgba(34, 195, 230, 0.28); color: #e6fbff; }
+    #hud-dim .hud-dim-built { color: #9fb3c8; }
     /* 2D lattice toggle panel (Phase 4, direct instruction: "a four
        position toggle... to see transformations" -- a persistent, always-
        reachable live control while building in 2D, not a one-shot pick
@@ -207,7 +220,10 @@
     .sig-sym { min-width: 44px; font-size: 18px !important; line-height: 1; }
     .sig-sym svg { display: block; margin: 0 auto; }
     .sig-send { white-space: nowrap; font-weight: 600; color: #f59e0b !important; border-color: #f59e0b !important; }
-    .sig-send.active { color: #fff !important; background: rgba(245, 158, 11, 0.35) !important; }
+.con-clear[hidden], .sig-send[hidden] { display: none !important; }
+.con-clear { font-size: 20px; min-width: 48px; }
+    .con-clear:hover { border-color: #ff6b6b !important; }
+        .sig-send.active { color: #fff !important; background: rgba(245, 158, 11, 0.35) !important; }
     /* Kaleidoscope: more buttons per row, so a little tighter on phones. */
     #worldkaleido-panel .w4d-row button { padding: 6px 8px; }
     .hull-pick { color: #9cd; font: 12px system-ui, sans-serif; display: flex; align-items: center; gap: 6px; }
@@ -826,6 +842,7 @@
     <div id="hud-wizard-cue" data-i18n-title="wiz.cueTitle" title="Browse dimensions, lattices and pieces">Wizard</div>
     <div id="hud-dim"></div>
   </div>
+  <div id="hud-1d-toggle" hidden><button type="button" data-world="signal">Signal</button><button type="button" data-world="construct">Construct</button></div>
   <button id="hud-quick-shape" type="button" title="Shape (tap to change)"></button>
   <button id="hud-quick-color" type="button" title="Color (tap to change)"></button>
   <button id="hud-quick-lattice-view" type="button" title="Lattice View (tap to cycle)"></button>

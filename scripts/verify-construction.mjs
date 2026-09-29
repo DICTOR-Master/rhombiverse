@@ -4,7 +4,7 @@
 // - cell, axis instance and axis direction are separate: the bottom and
 //   top edges are two different, parallel X instances (likewise Y);
 // - junctions sit at the corners and only ever add an axis (X stays).
-import { squareLoop, junctions, exposedAxes, SQUARE_N } from '../src/geometry-extensions/construction.js';
+import { squareLoop, junctions, exposedAxes, cubeEdges, edgeCells, cubeSteps, SQUARE_N } from '../src/geometry-extensions/construction.js';
 
 let failures = 0;
 function check(label, ok, extra = '') {
@@ -37,6 +37,29 @@ for (let k = 0; k <= c.length; k++) {
   prev = e;
 }
 check('axes only ever join: X from the start, Y at the first corner, and X is never replaced', ok && exposedAxes(c, 0).join() === '0' && exposedAxes(c, SQUARE_N).join() === '0,1');
+
+// The cube: its 12 real edges, each n unit cells, built as the square's
+// 4n cells and the first Z edge's n cells by hand, then 7 one-tap edges.
+{
+  const n = SQUARE_N;
+  const E = cubeEdges(n);
+  const key = (a, b) => [String(a), String(b)].sort().join('|');
+  const real = new Set();
+  for (const x of [0, n]) for (const y of [0, n]) for (const z of [0, n]) {
+    if (x === 0) real.add(key([0, y, z], [n, y, z]));
+    if (y === 0) real.add(key([x, 0, z], [x, n, z]));
+    if (z === 0) real.add(key([x, y, 0], [x, y, n]));
+  }
+  check('the cube: 12 distinct edges, exactly the real cube\'s', E.length === 12 && new Set(E.map((e) => key(e.from, e.to))).size === 12 && E.every((e) => real.has(key(e.from, e.to))));
+  const labels = E.map((e) => e.label).join();
+  check('edges numbered per direction (X1–X4, Y1–Y4, Z1–Z4)', labels === 'X1,Y1,X2,Y2,Z1,Z2,Z3,Z4,X3,Y3,X4,Y4');
+  const steps = cubeSteps(n);
+  const cells = steps.flatMap((s) => s.cells);
+  const firstSquare = squareLoop(n).every((c, k) => same(c.from, cells[k].from) && same(c.to, cells[k].to) && cells[k].from[2] === 0);
+  check(`steps: the square first (4n), Z1 by hand (n), then 7 whole edges: ${steps.length} taps, ${cells.length} = 12n cells`,
+    firstSquare && steps.length === 5 * n + 7 && cells.length === 12 * n && steps.slice(5 * n).every((s) => s.cells.length === n) && steps[4 * n].cells[0].axis === 2 && same(steps[4 * n].cells[0].from, [0, 0]));
+  check('every edge cell is a unit step along its own axis', E.every((e) => edgeCells(e).every((c) => c.from.reduce((s, v, d) => s + Math.abs(c.to[d] - v), 0) === 1 && c.to[e.axis] !== c.from[e.axis])));
+}
 
 console.log(`\n${failures} failure${failures === 1 ? '' : 's'}.`);
 process.exit(failures ? 1 : 0);
