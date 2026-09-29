@@ -146,8 +146,10 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   function drawSquareStage() {
     // One line at a time (direct requests: "this is 1D, so only one axis
     // should show at a time", "only one axis showing till complete"):
-    // just the side you're on.
+    // the side you're on, with the sides already built kept as ghosts
+    // ("a ghost of what is already constructed stays").
     const here = steps[filled].edge;
+    for (const e of edges.slice(0, here)) layer.add(cellMesh({ from: e.from, to: e.to }, ghostMat, edgeGhostGeo));
     steps.slice(0, SQUARE_STEPS).forEach(({ cells: [c] }, k) => {
       if (c.instance !== here) return;
       if (k < filled) layer.add(cellMesh(c, filledMat));
