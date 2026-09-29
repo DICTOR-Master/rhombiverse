@@ -18,7 +18,10 @@
 
 export const AXES = ['X', 'Y', 'Z', 'W', 'V', 'U'];
 export const axisName = (i) => AXES[i] ?? `A${i + 1}`;
-export const SQUARE_N = 10;
+// Cells per edge, every family (direct decision, 2026-09-29: "make all
+// builds five a side"; it was 10, and Kagome's star, three edges across,
+// drew its cells as hairlines on a phone).
+export const SQUARE_N = 5;
 
 /** The square's cells in building order: { from, to, axis, instance,
  * index }. Edges go +X, +Y, -X, -Y; instance ids are per edge. */
@@ -209,8 +212,8 @@ export function squarePlan(n = SQUARE_N) {
 
 /** Kagome: its star unit, two triangles of side 3n through a hexagon of
  * side n; six straight lines in Kagome's three directions (direct
- * decisions, 2026-09-29: "star unit, then lattice", "10, like the
- * square"). The first triangle is traced round, its first side up the
+ * decisions, 2026-09-29: "star unit, then lattice", "make all
+ * builds five a side"). The first triangle is traced round, its first side up the
  * screen, then the second; each direction's first edge by hand, every
  * other edge one tap. The lattice: each direction's lines, √3·n apart. */
 export function kagomePlan(n = SQUARE_N) {

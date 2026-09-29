@@ -7,7 +7,7 @@
 // and confusing", "I wanted a square, not a grid", "looks like 1960s Open
 // University graphics, nothing like the rest of the app", "supposed to be
 // staged to make it as simple as possible"). Decisions: one cell per tap,
-// cyan like Signal, a fixed square of 10 cells per side, slender cells,
+// cyan like Signal, a fixed square of 5 cells per side (SQUARE_N), slender cells,
 // seen straight on.
 // - One line at a time: only the side you're on shows (its empty cells
 //   faint, plain) until the square closes. The next cell is orange: tap
@@ -51,8 +51,9 @@ import { getSettings, onSettingsChange } from './settings.js';
 
 const STORAGE_KEY = 'rhombiverse-1d-construct-world';
 const U = 0.5; // world units per cell
-// Slender, more like an axis than a fat tube (direct request).
-const R = 0.055;
+// Slender, more like an axis than a fat tube (direct request); slimmer
+// again at five cells a side, which draws each cell twice the size.
+const R = 0.04;
 const PAD = 0.004;
 const CYAN = 0x22c3e6;
 const NEXT = 0xf59e0b; // the 1D worlds' orange "tap here"
@@ -176,7 +177,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
       labelCache.set(text, tex);
     }
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelCache.get(text), transparent: true, opacity, depthWrite: false }));
-    sp.scale.set(0.9, 0.45, 1);
+    sp.scale.set(0.18 * N * U, 0.09 * N * U, 1); // sized to the shape
     sp.userData.ownMaterial = true;
     return sp;
   }
@@ -275,7 +276,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
         const out = mid.clone().sub(centre);
         if (e.axis < 3) out.setComponent(e.axis === 0 ? 1 : e.axis === 1 ? 0 : 2, 0); // push out square to the edge only
         const sp = labelSprite(e.label, finished(e) && e.instance !== last ? 0.5 : 1);
-        sp.position.copy(mid).add(out.setLength(0.45));
+        sp.position.copy(mid).add(out.setLength(0.09 * N * U));
         layer.add(sp);
       }
     }
