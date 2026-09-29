@@ -5048,6 +5048,13 @@ async function init() {
     showHudPrompt,
     onChange: () => { if (historyRestorers.has('world1dconstruct')) recordHistory('world1dconstruct', constructWorld.snapshot()); },
   });
+  // 1D's Clear beside Undo: the world you're in, whole (Undo brings it
+  // back; shown by animate()).
+  const onedClear = document.getElementById('oned-clear');
+  onedClear?.addEventListener('click', () => own3DWorld()?.clear());
+  const setOnedClearTitle = () => { if (onedClear) { onedClear.title = t('oned.clear', getSettings().language); onedClear.setAttribute('aria-label', onedClear.title); } };
+  setOnedClearTitle();
+  onSettingsChange(setOnedClearTitle);
   // The 1D Signal/Construct toggle under Wizard (shown by animate()).
   document.getElementById('hud-1d-toggle')?.addEventListener('click', (e) => {
     const w = e.target.closest('[data-world]')?.dataset.world;
@@ -5737,6 +5744,7 @@ let lastDegradeAt = 0;
 
 const hudDimEl = document.getElementById('hud-dim');
 const hud1dToggleEl = document.getElementById('hud-1d-toggle');
+const onedClearEl = document.getElementById('oned-clear');
 function animate() {
   requestAnimationFrame(animate);
   // The dimension beside Wizard (a cheap per-frame check: several paths
@@ -5746,6 +5754,11 @@ function animate() {
   const dimText = own3D === 'construct' && own3DActive() ? ['1D', '2D', '3D'].slice(0, constructWorld.reached()).join('/') : activeDimension ?? '3D';
   const oneD = (own3D === 'signal' || own3D === 'construct') && own3DActive();
   if (hud1dToggleEl && hud1dToggleEl.hidden === oneD) hud1dToggleEl.hidden = !oneD;
+  if (onedClearEl) {
+    if (onedClearEl.hidden === oneD) onedClearEl.hidden = !oneD;
+    const empty = !oneD || own3DWorld().isEmpty;
+    if (onedClearEl.disabled !== empty) onedClearEl.disabled = empty;
+  }
   if (oneD && hud1dToggleEl.dataset.on !== own3D) {
     hud1dToggleEl.dataset.on = own3D;
     for (const b of hud1dToggleEl.children) b.classList.toggle('active', b.dataset.world === own3D);

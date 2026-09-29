@@ -33,7 +33,7 @@ right-click) removes. The **User Guide** (in the app, or at
   Send to set it moving away. Outside (in perspective) and Inside (in the
   tunnel, the cells passing beneath you) views.
   Or key it yourself on the pulse key (tap a dot, hold a dash); a Morse
-  glossary opens from the right edge, and the message reads out at the
+  glossary opens beside Send, and the message reads out at the
   top as it arrives.
   **Construct**: build a square from 1D cells, one tap at a time — along
   X, Y joining at the corner (X stays), round the four sides until it
@@ -41,7 +41,7 @@ right-click) removes. The **User Guide** (in the app, or at
   cube: its first edge cell by cell, then one tap per numbered edge,
   and a lattice button shows the closed square or finished
   cube tiling space.
-  ⊘ clears to start again; a Signal | Construct toggle switches worlds.
+  ⊘ beside Undo clears to start again; a Signal | Construct toggle switches worlds.
 - **2D** — five tiles (Parallelogram, Triangle, Hexagon, Kite, Kagome) on
   four lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular),
   plus the Rhombille pattern.

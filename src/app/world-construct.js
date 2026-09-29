@@ -319,35 +319,24 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     return true;
   }
 
-  // ---- panel: Clear, and the hand-off once the square is complete ----
+  // ---- panel: the lattice, and the hand-off once the square is complete ----
   const panel = document.createElement('div');
   panel.id = 'world1dconstruct-panel';
   panel.className = 'qc-panel';
-  // Clear (direct request: "we need a (full) clear button"): the whole
-  // build in one tap; Undo brings it back.
-  panel.innerHTML = '<div class="w4d-row w4d-options"><button type="button" class="con-clear" data-clear>⊘</button><button type="button" class="sig-sym" data-lattice><svg viewBox="-12 -12 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="-10" y="-10" width="20" height="20" rx="1.5"/><path d="M-3.3,-10v20M3.3,-10v20M-10,-3.3h20M-10,3.3h20"/></svg></button><button type="button" class="sig-send" data-open="2D"></button></div>';
+  panel.innerHTML = '<div class="w4d-row w4d-options"><button type="button" class="sig-sym" data-lattice><svg viewBox="-12 -12 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="-10" y="-10" width="20" height="20" rx="1.5"/><path d="M-3.3,-10v20M3.3,-10v20M-10,-3.3h20M-10,3.3h20"/></svg></button><button type="button" class="sig-send" data-open="2D"></button></div>';
   document.body.appendChild(panel);
   const openBtn = panel.querySelector('[data-open]');
-  const clearBtn = panel.querySelector('[data-clear]');
   const latticeBtn = panel.querySelector('[data-lattice]');
   latticeBtn.addEventListener('click', () => { latticeOn = !latticeOn; draw(); frame(true); });
   function renderPanel() {
-    panel.classList.toggle('visible', active && filled > 0);
+    panel.classList.toggle('visible', active && latticeReady());
     openBtn.hidden = filled !== SQUARE_STEPS;
     latticeBtn.hidden = !latticeReady();
     latticeBtn.classList.toggle('active', latticeOn);
     latticeBtn.title = t('con.lattice', lang());
     latticeBtn.setAttribute('aria-label', latticeBtn.title);
     openBtn.textContent = t('con.open', lang(), { dim: '2D' });
-    clearBtn.title = t('con.clear', lang());
-    clearBtn.setAttribute('aria-label', clearBtn.title);
   }
-  clearBtn.addEventListener('click', () => {
-    const before = filled;
-    filled = 0;
-    commit(before);
-    showHudPrompt(t('con.prompt.start', lang()), 5000);
-  });
   openBtn.addEventListener('click', () => onOpenIn('2D', 'square'));
   let shownLang = lang();
   onSettingsChange((st) => { if (st.language !== shownLang) { shownLang = st.language; if (active) renderPanel(); } });
@@ -367,7 +356,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     /** How many dimensions are built so far: 1 (lines), 2 (the square closed), 3 (the cube). */
     reached: () => (complete() ? 3 : squareStage() ? 1 : 2),
     get isEmpty() { return filled === 0; },
-    clear() { const before = filled; filled = 0; commit(before); },
+    clear() { const before = filled; filled = 0; commit(before); if (active) showHudPrompt(t('con.prompt.start', lang()), 5000); },
     snapshot: toJSON,
     restore(json) {
       const before = filled;

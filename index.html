@@ -220,8 +220,7 @@
     .sig-sym { min-width: 44px; font-size: 18px !important; line-height: 1; }
     .sig-sym svg { display: block; margin: 0 auto; }
     .sig-send { white-space: nowrap; font-weight: 600; color: #f59e0b !important; border-color: #f59e0b !important; }
-    .con-clear[hidden], .sig-send[hidden], .sig-sym[hidden] { display: none !important; }
-    .con-clear { font-size: 20px; min-width: 48px; }
+    .sig-send[hidden], .sig-sym[hidden] { display: none !important; }
     /* Signal's pulse key: held down, it lights up. */
     .sig-pulse { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
     .sig-pulse.down { background: rgba(34, 195, 230, 0.4) !important; border-color: #22c3e6 !important; color: #fff !important; }
@@ -233,18 +232,11 @@
       overflow-wrap: anywhere;
     }
     #sig-arrivals.visible { display: block; }
-    /* The Morse glossary: a script button at the right edge, and the code
-       book beside it. */
-    #sig-gloss-btn {
-      position: fixed; right: 12px; top: 50%; transform: translateY(-50%); z-index: 860; display: none;
-      width: 44px; height: 44px; border-radius: 10px; cursor: pointer;
-      background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.25); color: #9cd;
-    }
-    #sig-gloss-btn.visible { display: block; }
-    #sig-gloss-btn.active { background: rgba(34, 195, 230, 0.28); border-color: #22c3e6; color: #fff; }
-    #sig-gloss-btn svg { display: block; margin: 0 auto; }
+    /* The Morse glossary: a script button beside Send, the code book at
+       the right. */
+    #sig-gloss-btn.active { background: rgba(34, 195, 230, 0.28) !important; border-color: #22c3e6 !important; color: #fff !important; }
     #sig-gloss {
-      position: fixed; right: 64px; top: 160px; bottom: 130px; z-index: 860; display: none;
+      position: fixed; right: 16px; top: 160px; bottom: 130px; z-index: 860; display: none;
       width: 168px; overflow-y: auto; padding: 6px; box-sizing: border-box;
       background: rgba(5, 5, 10, 0.88); border: 1px solid rgba(34, 195, 230, 0.4); border-radius: 10px;
       grid-template-columns: 1fr 1fr; gap: 3px;
@@ -260,7 +252,6 @@
     #sig-gloss i { display: block; height: 4px; border-radius: 2px; background: #22c3e6; }
     #sig-gloss i.d { width: 4px; }
     #sig-gloss i.l { width: 8px; }
-    .con-clear:hover { border-color: #ff6b6b !important; }
         .sig-send.active { color: #fff !important; background: rgba(245, 158, 11, 0.35) !important; }
     /* Kaleidoscope: more buttons per row, so a little tighter on phones. */
     #worldkaleido-panel .w4d-row button { padding: 6px 8px; }
@@ -623,6 +614,15 @@
     /* Fixed bottom-right, just left of What's New and About, same size
        and style as the bottom-left quick buttons. */
     #undo-widget { position: fixed; bottom: 8px; right: 88px; z-index: 900; }
+    /* 1D's Clear, beside Undo (direct request: "clear next to undo"). */
+    #oned-clear {
+      position: fixed; bottom: 8px; right: 132px; z-index: 900;
+      width: 36px; height: 36px; padding: 0; font: 20px system-ui, sans-serif; color: #9cd;
+      background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 6px; cursor: pointer;
+    }
+    #oned-clear[hidden] { display: none; }
+    #oned-clear:hover:not(:disabled) { border-color: #ff6b6b; }
+    #oned-clear:disabled { opacity: 0.35; cursor: default; }
     #undo-btn {
       display: flex; align-items: center; justify-content: center;
       width: 36px; height: 36px;
@@ -896,6 +896,7 @@
   <button id="lab-toggle" type="button" title="Settings" data-i18n-title="hud.settings">⚙</button>
   <!-- Undo: on the main screen in every dimension (moved out of Settings
        2026-09-25). Tap undoes one step; hold for the scrub strip. -->
+  <button id="oned-clear" type="button" hidden>⊘</button>
   <div id="undo-widget">
     <button id="undo-btn" type="button" disabled title="Tap: undo one step. Hold: scrub back further." data-i18n-title="shells.undoTitle" aria-label="Undo">↶</button>
     <div id="undo-scrub-strip"></div>

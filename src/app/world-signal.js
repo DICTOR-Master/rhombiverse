@@ -22,7 +22,7 @@
 //   Send. The key (direct request: "a pulse button: a tap for short (dot)
 //   and a touch for dash, etc."): tap for a dot, hold for a dash; a pause
 //   starts a new letter, a longer one a new word, like a telegraph key.
-// - A script-style button at the right edge opens the Morse glossary
+// - A script-style button beside Send opens the Morse glossary
 //   (tap a letter to add it to the message), and while the signal plays
 //   the message reads out at the top, letter by letter, as it arrives
 //   there ("a sent message viewer where the signal arrives at the top").
@@ -491,12 +491,14 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   pulseBtn.addEventListener('pointercancel', keyUp);
 
   // ---- the Morse glossary ----
+  // Beside Send (direct request: "glossary next to send").
   const glossBtn = document.createElement('button');
   glossBtn.type = 'button';
+  glossBtn.className = 'sig-sym';
   glossBtn.id = 'sig-gloss-btn';
   // A little scroll: the code book.
   glossBtn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 4h11a2 2 0 0 1 0 4h-1v10a2 2 0 0 1-2 2H6a2 2 0 0 1 0-4h1z"/><path d="M6 16h9M10 8h4M10 11h1.2M13 11h3M10 14h3"/></svg>';
-  document.body.appendChild(glossBtn);
+  panel.querySelector('.sig-message-row').appendChild(glossBtn);
   const gloss = document.createElement('div');
   gloss.id = 'sig-gloss';
   const sym = (code) => [...code].map((c) => `<i class="${c === '.' ? 'd' : 'l'}"></i>`).join('');
@@ -506,7 +508,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   gloss.innerHTML = glossOrder.map((ch) => [ch, MORSE[ch]]).map(([ch, code]) => `<button type="button" data-ch="${ch === '"' ? '&quot;' : ch}"><b>${ch === '"' ? '&quot;' : ch}</b><span>${sym(code)}</span></button>`).join('');
   document.body.appendChild(gloss);
   let glossOpen = false;
-  glossBtn.addEventListener('click', () => { glossOpen = !glossOpen; renderPanel(); });
+  glossBtn.addEventListener('click', (e) => { e.stopPropagation(); glossOpen = !glossOpen; renderPanel(); });
   // A letter tapped in the glossary joins the message, as if typed.
   gloss.addEventListener('click', (e) => {
     const ch = e.target.closest('[data-ch]')?.dataset.ch;
@@ -522,7 +524,6 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   };
   function renderPanel() {
     panel.classList.toggle('visible', active);
-    glossBtn.classList.toggle('visible', active);
     gloss.classList.toggle('visible', active && glossOpen);
     glossBtn.classList.toggle('active', glossOpen);
     if (!active) return;
