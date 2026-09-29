@@ -167,7 +167,9 @@ const DIMENSIONS = [
   // which meant toggling angle silently swapped to an unrelated store
   // instead of reshaping the one you'd actually built. See
   // lattice2dSeedCell's own header in render.js for the full incident.
-  { id: '1D', label: '1D', preview: () => signalEdges() },
+  // Shown as 1D+ (direct request: "much of the mode is interacting with
+  // other dimensions, and purists might complain"); its id stays 1D.
+  { id: '1D', label: '1D+', preview: () => signalEdges() },
   { id: '2D', label: '2D', preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: START_LATTICE_ANGLE.angleDeg }) },
   { id: '3D', label: '3D', previewAction: 'tool:pieceType:rd' },
   { id: '4D', label: '4D', preview: () => edges4D('cell24') },

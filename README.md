@@ -28,7 +28,7 @@ piece goes; tap a face to add the neighbour across it; long-press (or
 right-click) removes. The **User Guide** (in the app, or at
 [/guide](https://rhombiverse.vercel.app/guide)) covers every control.
 
-- **1D** — **Signal**: type a message and it becomes a line of bullet
+- **1D+** — **Signal**: type a message and it becomes a line of bullet
   cells (its Morse code, no need to know it); tap the orange cell or press
   Send to set it moving away. Outside (in perspective) and Inside (in the
   tunnel, the cells passing beneath you) views.

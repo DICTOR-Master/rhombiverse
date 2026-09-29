@@ -548,9 +548,9 @@ export const WHEEL_DIMENSION = {
       desc: "Decagonal quasicrystal -- Penrose rhombus layers sliced from Z5." },
     // 1D (2026-09-29) takes the pair Almanac had; the Almanac stays on
     // the main wheel's universal ring.
-    "top|sx-1sz1":      { kind: "dept", label: "1D", action: "tool:selectDimension:1D",
+    "top|sx-1sz1":      { kind: "dept", label: "1D+", action: "tool:selectDimension:1D",
       desc: "Signal -- a one-dimensional trajectory carrying Morse code." },
-    "bottom|sx1sz-1":   { kind: "dept", label: "1D", action: "tool:selectDimension:1D",
+    "bottom|sx1sz-1":   { kind: "dept", label: "1D+", action: "tool:selectDimension:1D",
       desc: "Signal -- a one-dimensional trajectory carrying Morse code." },
     "top|sx1sz1":       { kind: "dept", label: "6D", action: "tool:selectDimension:6D",
       desc: "Icosahedral quasicrystal -- golden rhombohedra sliced from Z6." },

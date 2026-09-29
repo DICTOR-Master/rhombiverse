@@ -5751,7 +5751,8 @@ function animate() {
   // change activeDimension; not yet chosen means the default 3D world).
   // In Construct it also shows the dimensions built so far (direct
   // request: "1D/2D/3D should show on the indicator, but only 1D orange").
-  const dimText = own3D === 'construct' && own3DActive() ? ['1D', '2D', '3D'].slice(0, constructWorld.reached()).join('/') : activeDimension ?? '3D';
+  // 1D shows as 1D+ (it interacts with the other dimensions).
+  const dimText = own3D === 'construct' && own3DActive() ? ['1D+', '2D', '3D', '4D'].slice(0, constructWorld.reached()).join('/') : activeDimension === '1D' ? '1D+' : activeDimension ?? '3D';
   const oneD = (own3D === 'signal' || own3D === 'construct') && own3DActive();
   if (hud1dToggleEl && hud1dToggleEl.hidden === oneD) hud1dToggleEl.hidden = !oneD;
   if (onedClearEl) {

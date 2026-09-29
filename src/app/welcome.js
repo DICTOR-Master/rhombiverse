@@ -160,11 +160,12 @@ function startLogoSpin(onEnterHit) {
 // teaser of it.
 // The overview line, then every dimension (1D ... 6D) as a button that
 // opens the Wizard at that dimension, all on one row of their own
-// (direct request: no '&', the row never splitting across lines).
+// (direct request: no '&', the row never splitting across lines). 1D
+// shows as 1D+: it interacts with the other dimensions.
 // Redrawn here on a language change (data-i18n would drop the buttons).
 const DIMS = ['1D', '2D', '3D', '4D', '5D', '6D'];
 function overviewHtml(lang) {
-  return `${t('welcome.overview', lang)}<span class="dim-links">${DIMS.map((d) => `<button type="button" class="dim-link" data-dim="${d}">${d}</button>`).join('')}</span>`;
+  return `${t('welcome.overview', lang)}<span class="dim-links">${DIMS.map((d) => `<button type="button" class="dim-link" data-dim="${d}">${d === '1D' ? '1D+' : d}</button>`).join('')}</span>`;
 }
 
 function overlayHtml() {
