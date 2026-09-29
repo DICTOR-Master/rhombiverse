@@ -31,6 +31,10 @@ jobs:
       - run: node scripts/verify-trajectory.mjs
       # 1D Construct: cell/instance/direction model, grids, junction rules.
       - run: node scripts/verify-construction.mjs
+      # The repo's About text (outside the repo, so it drifts): warns only.
+      - run: node scripts/verify-about.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   catalogue:
     # Every 5D/6D catalogue entry really occurs and lands, at 9 phason and
