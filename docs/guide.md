@@ -197,7 +197,7 @@ In **Settings**:
 | Undo (↶, bottom right) | Tap to undo one step in the current dimension. Hold to scrub back further |
 | Paint (brush) | Recolour placed pieces: turn on, pick a colour, tap a piece. In the attach toggle's place on the bottom row; when that toggle is needed it sits just above it (in 4D, in the 4D panel) |
 | Signal \| Construct (under Wizard, 1D+ only) | Switches between the two 1D+ worlds |
-| ⊘ Clear (beside Undo, 1D+ and Nets) | Clears the 1D+ world you're in to start again; Undo brings it back In Nets, the net you're on. |
+| ⊘ Clear (beside Undo, 1D+ and Nets) | Clears the 1D+ world you're in to start again (in Nets, the net you're on); Undo brings it back |
 | Menu | Opens the menu wheel (keyboard: Tab or Space) |
 
 ## Corner wheel

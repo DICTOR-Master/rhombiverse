@@ -199,7 +199,7 @@ Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel
 | Undo（↶，右下） | 轻点撤销当前维度的一步。按住可继续回退 |
 | Paint（画笔） | 给已放好的块重新上色：打开、选色、轻点一块。在底部一排连接方式切换的位置；需要那个切换时，它就在正上方（4D 中在 4D 面板里） |
 | Signal \| Construct（Wizard 下方，仅 1D+） | 在两个 1D+ 世界之间切换 |
-| ⊘ 清除（Undo 旁，仅 1D+） | 清空当前 1D+ 世界重新开始；Undo 可恢复 |
+| ⊘ 清除（Undo 旁，1D+ 和 Nets） | 清空当前 1D+ 世界重新开始（在 Nets 中为当前展开图）；Undo 可恢复 |
 | 菜单 | 打开菜单轮盘（键盘：Tab 或空格） |
 
 ## 角落轮盘

@@ -199,7 +199,7 @@ Dans **Paramètres** :
 | Undo (↶, en bas à droite) | Touchez pour annuler une étape dans la dimension actuelle. Maintenez pour remonter plus loin |
 | Paint (pinceau) | Recolore les pièces posées : activez-le, choisissez une couleur, touchez une pièce. À la place du choix d'assemblage dans la rangée du bas ; quand ce choix est nécessaire, juste au-dessus (en 4D, dans le panneau 4D) |
 | Signal \| Construct (sous Wizard, 1D+ seulement) | Passe d'un monde 1D+ à l'autre |
-| ⊘ Effacer (à côté d'Undo, 1D+ seulement) | Efface le monde 1D+ où vous êtes pour recommencer ; Undo le rétablit |
+| ⊘ Effacer (à côté d'Undo, 1D+ et Nets) | Efface le monde 1D+ où vous êtes pour recommencer (dans Nets, le patron en cours) ; Undo le rétablit |
 | Menu | Ouvre la roue du menu (clavier : Tab ou Espace) |
 
 ## Roue du coin

@@ -199,7 +199,7 @@ En **Ajustes**:
 | Undo (↶, abajo a la derecha) | Toca para deshacer un paso en la dimensión actual. Mantén pulsado para retroceder más |
 | Paint (pincel) | Cambia el color de piezas ya colocadas: actívalo, elige un color y toca una pieza. Ocupa el lugar del cambio de unión en la fila inferior; cuando ese cambio hace falta, queda justo encima (en 4D, en el panel 4D) |
 | Signal \| Construct (bajo Wizard, solo 1D+) | Cambia entre los dos mundos 1D+ |
-| ⊘ Borrar (junto a Undo, solo 1D+) | Borra el mundo 1D+ en el que estás para empezar de nuevo; Undo lo recupera |
+| ⊘ Borrar (junto a Undo, 1D+ y Nets) | Borra el mundo 1D+ en el que estás para empezar de nuevo (en Nets, el desarrollo en el que estás); Undo lo recupera |
 | Menú | Abre la rueda del menú (teclado: Tab o Espacio) |
 
 ## Rueda de la esquina
