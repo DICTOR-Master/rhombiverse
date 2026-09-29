@@ -4,7 +4,7 @@
 // - cell, axis instance and axis direction are separate: the bottom and
 //   top edges are two different, parallel X instances (likewise Y);
 // - junctions sit at the corners and only ever add an axis (X stays).
-import { squareLoop, junctions, exposedAxes, cubeEdges, edgeCells, cubeSteps, tesseractEdges, tesseractSteps, kagomePlan, squarePlan, SQUARE_N } from '../src/geometry-extensions/construction.js';
+import { squareLoop, junctions, exposedAxes, cubeEdges, edgeCells, cubeSteps, tesseractEdges, tesseractSteps, kagomePlan, squarePlan, rdPlan, SQUARE_N } from '../src/geometry-extensions/construction.js';
 
 let failures = 0;
 function check(label, ok, extra = '') {
@@ -147,6 +147,30 @@ check('axes only ever join: X from the start, Y at the first corner, and X is ne
   check('steps: hexagon by hand, star by edge, Z1 by hand, then an edge a tap', py.at === 6 * n + 12 + n + 17 && K.steps.slice(6 * n + 12, 7 * n + 12).every((s) => s.cells.length === 1));
   const sq = squarePlan(n);
   check('the square plan builds exactly as before (square → cube → tesseract)', sq.steps.length === tesseractSteps(n).length && sq.milestones.map((m) => m.at).join() === `${4 * n},${cubeSteps(n).length},${tesseractSteps(n).length}`);
+}
+
+// The RD from its rhombus: the rhombus (70.53°, by hand), the cube
+// inside (edges 2n/√3, the rhombi's short diagonals), then the six
+// pyramids; together the rhombic dodecahedron: 24 edges of n, 12 rhombi,
+// six corners where four meet and eight where three do.
+{
+  const n = SQUARE_N;
+  const D = rdPlan(n);
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  const len = (e) => Math.hypot(...e.from.map((v, i) => e.to[i] - v));
+  const [e0, e1] = D.edges;
+  const u = e0.from.map((v, i) => e0.to[i] - v), w = D.edges[3].to.map((v, i) => v - D.edges[3].from[i]);
+  const ang = Math.acos(-u.reduce((t, v, i) => t + v * w[i], 0) / (len(e0) * len(D.edges[3]))) * 180 / Math.PI;
+  check('the rhombus: four sides of n, by hand, 70.53° at the start (the RD\'s own face)', D.edges.slice(0, 4).every((e) => near(len(e), n) && e.from[2] === 0 && e.to[2] === 0) && near(ang, Math.acos(1 / 3) * 180 / Math.PI) && D.steps.slice(0, 4 * n).every((s) => s.cells.length === 1) && D.milestones[0].dim === 2 && D.milestones[0].open.angle === 'rd-rhombus', `${ang.toFixed(2)}°`);
+  const cube = D.edges.slice(4, D.milestones[1].whole);
+  check('the body: the cube, 12 edges of 2n/√3', cube.length === 12 && cube.every((e) => near(len(e), (2 * n) / Math.sqrt(3))));
+  const rd = D.edges.filter((e) => e.part === 'limb');
+  const k = (p) => p.map((v) => v.toFixed(5)).join();
+  const deg = new Map();
+  for (const e of rd) for (const p of [e.from, e.to]) deg.set(k(p), (deg.get(k(p)) ?? 0) + 1);
+  const vals = [...deg.values()];
+  check('the limbs make the RD: 24 edges of n, 14 corners (six of four edges, eight of three), 12 rhombi', rd.length === 24 && rd.every((e) => near(len(e), n)) && deg.size === 14 && vals.filter((d) => d === 4).length === 6 && vals.filter((d) => d === 3).length === 8 && D.milestones[2].faces.length === 12);
+  check('its lattice: the twelve RDs round it, every edge n', D.milestones[2].lattice.length > 0 && D.milestones[2].lattice.every(([a, b]) => near(Math.hypot(...a.map((v, i) => v - b[i])), n)), `${D.milestones[2].lattice.length} ghost edges`);
 }
 
 console.log(`\n${failures} failure${failures === 1 ? '' : 's'}.`);

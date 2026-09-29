@@ -3432,7 +3432,7 @@ async function init() {
         // own #xray-toggle face and the Lab panel, so no wheel face
         // routes to it here any more.)
         const OWN_WORLD_ACTIONS = { 'tool:shellsWorld': 'shells', 'tool:goldenWorld': 'golden', 'tool:kaleidoWorld': 'kaleido', 'tool:signalWorld': 'signal', 'tool:constructWorld': 'construct' };
-        // Construct's families: tool:constructWorld:<family> (square, kagome).
+        // Construct's families: tool:constructWorld:<family> (square, kagome, rd).
         if (action?.startsWith('tool:constructWorld:')) {
           constructWorld?.setFamily(action.slice('tool:constructWorld:'.length));
           action = 'tool:constructWorld';
@@ -5048,7 +5048,7 @@ async function init() {
     // A finished primitive opens in its own dimension's lattice: the
     // square as 2D's Parallelogram tile at the Square angle, the cube and
     // the tesseract in 3D and 4D.
-    onOpenIn: (dim, piece) => {
+    onOpenIn: (dim, piece, angle) => {
       // The cube opens as 3D's Cube piece, the pyrochlore cluster as its
       // Pyrochlore piece, the tesseract in 4D's Z4 (hypercubic) world.
       if (dim === '3D' || dim === '4D') {
@@ -5058,12 +5058,12 @@ async function init() {
         applyDimensionCamera(dim);
         runWheelAction(`tool:pieceType:${piece}`, { quiet: true });
         // The cube arrives as a cube (direct report: "opening cube in 3D led
-        // to RD floating in space"; decision: replace the starter): an empty
-        // 3D world gets one at the centre, a real build is left alone, and
-        // Lattice View shows the cube lattice either way.
-        if (piece === 'cube') {
-          if (!world.entries().length) { world.addCell(0, 0, 0, { material: currentMaterialFor('cube'), pyramids: 0 }); onChange(); }
-          latticeQuickViewMode = 'cube';
+        // to RD floating in space"; decision: replace the starter), the RD as
+        // an RD: an empty 3D world gets one at the centre, a real build is
+        // left alone, and Lattice View shows its lattice either way.
+        if (piece === 'cube' || piece === 'rd') {
+          if (!world.entries().length) { world.addCell(0, 0, 0, { material: currentMaterialFor(piece), ...(piece === 'cube' ? { pyramids: 0 } : {}) }); onChange(); }
+          latticeQuickViewMode = piece;
           updateLatticeQuickViewIcon();
           rebuildLatticeQuickView();
         }
@@ -5075,7 +5075,7 @@ async function init() {
       // The square as the Parallelogram at the Square angle; the Kagome
       // star as the Kagome tile (triangular).
       activeLattice2dPrimitiveId = piece;
-      activeLattice2dAngleId = piece === 'parallelogram' ? 'square' : 'triangular';
+      activeLattice2dAngleId = angle ?? (piece === 'parallelogram' ? 'square' : 'triangular');
       activeLattice2dArrangementId = 'translation';
       applyDimensionVisibility();
       applyDimensionCamera('2D');

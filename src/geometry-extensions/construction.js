@@ -445,4 +445,128 @@ export function kagomePlan(n = SQUARE_N) {
   };
 }
 
-export const PLANS = { square: squarePlan, kagome: kagomePlan };
+/** The rhombic dodecahedron, from its own rhombus (direct decisions,
+ * 2026-09-29: "RD reg rhombus", "like the square", "body then limbs"):
+ * the RD's face rhombus (70.53° / 109.47°) by hand, starting at its acute
+ * corner, first side up the screen, clockwise: the 2D moment. Then the
+ * RD's own grammar, cube plus six pyramids: the cube inside (the body;
+ * its edges are the rhombi's short diagonals, 2n/√3 long), Z's first edge
+ * by hand, then one tap per edge; then the six pyramids on its faces (the
+ * limbs), whose edges are the RD's. The RD closes into its lattice, the
+ * twelve RDs round it (FCC). */
+export function rdPlan(n = SQUARE_N) {
+  const s = (2 * n) / Math.sqrt(3); // the cube's side (RD edge n)
+  const hs = s / 2;
+  const sub = (a, b) => a.map((v, i) => v - b[i]);
+  const dot = (a, b) => a.reduce((t, v, i) => t + v * b[i], 0);
+  const norm = (a) => { const l = Math.hypot(...a); return a.map((v) => v / l); };
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  // RD coordinates: the cube's corners (±hs)³, the apexes ±s on each axis.
+  const corners = [];
+  for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) corners.push([x * hs, y * hs, z * hs]);
+  const apexes = [0, 1, 2].flatMap((k) => [1, -1].map((sg) => { const a = [0, 0, 0]; a[k] = sg * s; return a; }));
+  // The first rhombus: A1 (acute) → C1 → A2 (acute) → C2.
+  const A1 = [s, 0, 0], C1 = [hs, hs, hs], A2 = [0, s, 0], C2 = [hs, hs, -hs];
+  const ex = norm(sub(C1, A1));
+  const v = sub(C2, A1);
+  const ey = norm(sub(v, ex.map((t) => t * dot(v, ex))));
+  let ez = cross(ex, ey);
+  if (dot(sub([0, 0, 0], A1), ez) < 0) ez = ez.map((t) => -t); // the RD on the near side
+  const plan = (p) => { const d = sub(p, A1); return pad4([dot(d, ex), dot(d, ey), dot(d, ez)]); };
+  const key3 = (p) => p.map((t) => t.toFixed(6)).join();
+  const edges = [];
+  const count = {};
+  const names = { 0: 'X', 1: 'Y', 4: 'XY', 2: 'Z', 3: 'W' };
+  const uDir = norm(sub(C1, A1)), vDir = norm(sub(C2, A1));
+  const add = (a, b, part) => {
+    const from = plan(a), to = plan(b);
+    const d = norm(sub(b, a));
+    const inPlane = Math.abs(to[2]) < 1e-9 && Math.abs(from[2]) < 1e-9;
+    const axis = !inPlane ? 2 : Math.abs(Math.abs(dot(d, uDir)) - 1) < 1e-9 ? 0 : Math.abs(Math.abs(dot(d, vDir)) - 1) < 1e-9 ? 1 : 4;
+    count[axis] = (count[axis] ?? 0) + 1;
+    edges.push({ axis, instance: edges.length, line: edges.length, along: -1, label: `${names[axis]}${count[axis]}`, from, to, ...(part ? { part } : {}) });
+  };
+  const has = (a, b) => edges.some((e) => (key3(e.from.slice(0, 3)) === key3(plan(a).slice(0, 3)) && key3(e.to.slice(0, 3)) === key3(plan(b).slice(0, 3))) || (key3(e.from.slice(0, 3)) === key3(plan(b).slice(0, 3)) && key3(e.to.slice(0, 3)) === key3(plan(a).slice(0, 3))));
+  // The rhombus (its edges are pyramids' edges: limbs).
+  [[A1, C1], [C1, A2], [A2, C2], [C2, A1]].forEach(([a, b]) => add(a, b, 'limb'));
+  const rhombusDone = edges.length;
+  // The body: the cube, from C1 out of the plane first, then outward
+  // edge by edge, each touching what's built.
+  const cubeEdges3 = [];
+  corners.forEach((a, i) => corners.forEach((b, j) => { if (i < j && sub(a, b).filter((t) => Math.abs(t) > 1e-9).length === 1) cubeEdges3.push([a, b]); }));
+  const first = cubeEdges3.find(([a, b]) => (key3(a) === key3(C1) || key3(b) === key3(C1)) && Math.abs(plan(key3(a) === key3(C1) ? b : a)[2]) > 1e-9);
+  const orient = ([a, b], from) => (key3(a) === key3(from) ? [a, b] : [b, a]);
+  const built = new Set([key3(C1), key3(C2)]);
+  const queue = [orient(first, C1)];
+  const rest = cubeEdges3.filter((e) => e !== first);
+  while (queue.length) {
+    const [a, b] = queue.shift();
+    add(a, b);
+    built.add(key3(a)); built.add(key3(b));
+    const next = rest.findIndex(([p, q]) => built.has(key3(p)) || built.has(key3(q)));
+    if (next >= 0) { const [p, q] = rest.splice(next, 1)[0]; queue.push(built.has(key3(p)) ? [p, q] : [q, p]); }
+  }
+  const cubeDone = edges.length;
+  // The limbs: each pyramid's edges from its apex to its face's corners,
+  // the first rhombus's two apexes first.
+  const order = [A1, A2, ...apexes.filter((a) => key3(a) !== key3(A1) && key3(a) !== key3(A2))];
+  for (const A of order) {
+    corners.filter((c) => Math.abs(Math.hypot(...sub(c, A)) - n) < 1e-9).forEach((c) => { if (!has(A, c)) add(c, A, 'limb'); });
+  }
+  const steps = [];
+  edges.forEach((e, k) => {
+    const cells = edgeCells(e);
+    if (k < rhombusDone || k === rhombusDone) cells.forEach((c) => steps.push({ cells: [c], edge: e.instance }));
+    else steps.push({ cells, edge: e.instance });
+  });
+  const at = (count2) => steps.findIndex((st) => st.edge === count2);
+  // Faces and lattices.
+  const rhombus = [A1, C1, A2, C2].map(plan);
+  const cubeFaces = [0, 1, 2].flatMap((k) => [-1, 1].map((sg) => {
+    const f = corners.filter((c) => Math.abs(c[k] - sg * hs) < 1e-9);
+    const [i, j] = [0, 1, 2].filter((d) => d !== k);
+    const cen = [0, 0, 0]; cen[k] = sg * hs;
+    return f.sort((a, b) => Math.atan2(a[j], a[i]) - Math.atan2(b[j], b[i])).map(plan);
+  }));
+  const rdFaces = [];
+  for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) {
+    const Ai = apexes[i], Aj = apexes[j];
+    if (Math.abs(dot(Ai, Aj)) > 1e-9) continue; // perpendicular apexes share a face
+    const cs = corners.filter((c) => Math.abs(Math.hypot(...sub(c, Ai)) - n) < 1e-9 && Math.abs(Math.hypot(...sub(c, Aj)) - n) < 1e-9);
+    rdFaces.push(Object.assign([Ai, cs[0], Aj, cs[1]].map(plan), { part: 'limb' }));
+  }
+  // The rhombus's lattice: its 3×3 in the plane.
+  const u2 = sub(C1, A1), v2 = sub(C2, A1);
+  const rhombLattice = [];
+  for (const [base, step] of [[u2, v2], [v2, u2]]) for (let a = -1; a <= 2; a++) for (let b = -1; b <= 1; b++) {
+    const p0 = A1.map((t, i) => t + base[i] * b + step[i] * a);
+    const p1 = p0.map((t, i) => t + base[i]);
+    if (a >= 0 && a <= 1 && b === 0) continue; // the rhombus's own sides
+    rhombLattice.push([plan(p0), plan(p1)]);
+  }
+  // The RD's lattice: the twelve RDs round it (FCC neighbours ±s±s0).
+  const rdEdges = (o) => {
+    const out = [];
+    for (const A of apexes) for (const c of corners) if (Math.abs(Math.hypot(...sub(c, A)) - n) < 1e-9) out.push([A.map((t, i) => t + o[i]), c.map((t, i) => t + o[i])]);
+    return out;
+  };
+  const ownRD = new Set(rdEdges([0, 0, 0]).map(([a, b]) => [key3(a), key3(b)].sort().join('|')));
+  const rdLattice = new Map();
+  for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) for (const si of [-1, 1]) for (const sj of [-1, 1]) {
+    const o = [0, 0, 0]; o[i] = si * s; o[j] = sj * s;
+    for (const [a, b] of rdEdges(o)) { const k2 = [key3(a), key3(b)].sort().join('|'); if (!ownRD.has(k2)) rdLattice.set(k2, [plan(a), plan(b)]); }
+  }
+  const centre3 = plan([0, 0, 0]);
+  return {
+    id: 'rd', n, edges, steps, flat: 4 * n, axisNames: names,
+    startPrompt: 'con.prompt.startRd',
+    w: { centre: centre3.slice(0, 3), eye: 2 * s, mid: 0 },
+    milestones: [
+      { at: 4 * n, whole: rhombusDone, dim: 2, name: 'Rhombus', prompt: 'con.prompt.rhombus', corners: rhombus, faces: [Object.assign([...rhombus], { part: 'limb' })], lattice: rhombLattice, autoLattice: false, open: { dim: '2D', piece: 'parallelogram', angle: 'rd-rhombus' } },
+      { at: at(cubeDone), whole: cubeDone, dim: 3, name: 'Cube', prompt: 'con.prompt.rdBody', corners: corners.map(plan), faces: cubeFaces, lattice: [], autoLattice: false, open: null },
+      { at: steps.length, whole: edges.length, dim: 3, name: 'Rhombic dodecahedron', prompt: 'con.prompt.rd', corners: [...corners, ...apexes].map(plan), faces: rdFaces, lattice: [...rdLattice.values()], autoLattice: true, open: { dim: '3D', piece: 'rd' } },
+    ],
+  };
+}
+
+export const PLANS = { square: squarePlan, kagome: kagomePlan, rd: rdPlan };

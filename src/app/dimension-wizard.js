@@ -217,12 +217,23 @@ function kagomeStarEdges() {
   out.coin = true;
   return out;
 }
+// Construct · RD: the RD's own rhombus (70.53°).
+function rdRhombusEdges() {
+  const a = Math.acos(1 / 3), L = 1.25;
+  const u = [0, L, 0], v = [L * Math.sin(a), L * Math.cos(a), 0];
+  const p0 = [-(u[0] + v[0]) / 2, -(u[1] + v[1]) / 2, 0];
+  const pts = [p0, [p0[0] + u[0], p0[1] + u[1], 0], [p0[0] + u[0] + v[0], p0[1] + u[1] + v[1], 0], [p0[0] + v[0], p0[1] + v[1], 0]];
+  const out = pts.map((p, i) => [p, pts[(i + 1) % 4]]);
+  out.coin = true;
+  return out;
+}
 // 1D's worlds: Signal, and Construct's families (direct decision,
 // 2026-09-29: "Wizard cards").
 const FAMILIES_1D = [
   { id: 'signal', label: 'Signal', action: 'tool:signalWorld', preview: signalEdges },
   { id: 'construct', label: 'Construct · Square', action: 'tool:constructWorld:square', preview: constructEdges },
   { id: 'constructKagome', label: 'Construct · Kagome', action: 'tool:constructWorld:kagome', preview: kagomeStarEdges },
+  { id: 'constructRd', label: 'Construct · RD', action: 'tool:constructWorld:rd', preview: rdRhombusEdges },
 ];
 
 function edges6D() {

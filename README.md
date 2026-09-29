@@ -47,6 +47,8 @@ right-click) removes. The **User Guide** (in the app, or at
   round it (three directions of line) and its lattice, then rises
   into 3D pyrochlore (truncated tetrahedron, then its tetrahedra) and
   4D hyper-pyrochlore (truncated 5-cell, then its 5-cells).
+  **Construct · RD** builds the RD's own rhombus, then the rhombic
+  dodecahedron: its cube inside, then its six pyramids, then its lattice.
   ⊘ beside Undo clears to start again; a Signal | Construct toggle switches worlds.
 - **2D** — five tiles (Parallelogram, Triangle, Hexagon, Kite, Kagome) on
   four lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular),

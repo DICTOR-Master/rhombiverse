@@ -481,7 +481,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     latticeBtn.title = t('con.lattice', lang());
     latticeBtn.setAttribute('aria-label', latticeBtn.title);
   }
-  openBtn.addEventListener('click', () => { const open = milestoneAt()?.open; if (open) onOpenIn(open.dim, open.piece); });
+  openBtn.addEventListener('click', () => { const open = milestoneAt()?.open; if (open) onOpenIn(open.dim, open.piece, open.angle); });
   let shownLang = lang();
   onSettingsChange((st) => { if (st.language !== shownLang) { shownLang = st.language; if (active) renderPanel(); } });
 
@@ -499,7 +499,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     group,
     meshes: () => pickTargets,
     handleTap,
-    /** Which family is built: 'square' (→ cube → tesseract) or 'kagome'. */
+    /** Which family is built: 'square' (→ cube → tesseract), 'kagome' or 'rd'. */
     setFamily(id) {
       if (!plans[id] || id === family) return;
       enterFamily(id);
