@@ -2352,6 +2352,11 @@ async function init() {
     if (currentMode === 'cubocta') {
       return cuboctaWorld.entries().length ? null : { geometry: cuboctaGeometry.clone(), place: (material) => { cuboctaWorld.addCell(0, 0, 0, { material }); onCuboctaChange(); } };
     }
+    // A Cube is an RD cell with none of its six pyramids: outlined and
+    // placed as one (it was outlined and placed as a whole RD).
+    if (piece === 'cube') {
+      return world.entries().length ? null : { geometry: new ConvexGeometry(pyramidPieces(SCALE).cube.map(([x, y, z]) => new THREE.Vector3(x, y, z))), place: (material) => { world.addCell(0, 0, 0, { material, pyramids: 0 }); onChange(); } };
+    }
     if (RD_FAMILY_PIECES.includes(piece)) {
       return world.entries().length ? null : { geometry: geometry.clone(), place: (material) => { world.addCell(0, 0, 0, { material }); onChange(); } };
     }
@@ -5047,6 +5052,16 @@ async function init() {
         applyDimensionVisibility();
         applyDimensionCamera(dim);
         runWheelAction(dim === '3D' ? 'tool:pieceType:cube' : 'tool:pieceType:tesseract', { quiet: true });
+        // The cube arrives as a cube (direct report: "opening cube in 3D led
+        // to RD floating in space"; decision: replace the starter): an empty
+        // 3D world gets one at the centre, a real build is left alone, and
+        // Lattice View shows the cube lattice either way.
+        if (dim === '3D') {
+          if (!world.entries().length) { world.addCell(0, 0, 0, { material: currentMaterialFor('cube'), pyramids: 0 }); onChange(); }
+          latticeQuickViewMode = 'cube';
+          updateLatticeQuickViewIcon();
+          rebuildLatticeQuickView();
+        }
         return;
       }
       if (dim !== '2D') return;
