@@ -8,7 +8,7 @@
 // it by hand ("fold slider"). The geometry is geometry-extensions/nets.js.
 import * as THREE from 'three';
 import { netOf, netSteps, SOLIDS, SOLID_GROUPS, apply } from '../geometry-extensions/nets.js';
-import { bulletGeometry } from './bullet-cell.js';
+import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 
@@ -48,7 +48,8 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
   const complete = () => done() === steps().length;
 
   // ---- drawing ----
-  const geo = bulletGeometry(1, R, PAD, 20, 4); // slender cells, by the hundred (see bullet-cell.js)
+  const geo = bulletGeometry(1, R, PAD); // full detail: only the edges being built show their cells
+  const rodGeo = plainCellGeometry(L, R, 20); // a built edge, fused into one
   const filledMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, roughness: 0.8, metalness: 0.05 });
   const nextMat = new THREE.MeshStandardMaterial({ color: NEXT, emissive: NEXT, emissiveIntensity: 0.35, vertexColors: true });
   const faceMat = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
@@ -84,7 +85,16 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
     const builtEdges = new Set();
     steps().slice(0, k).forEach((st) => st.edges.forEach((e) => builtEdges.add(e)));
     steps().forEach((st) => st.edges.forEach((e) => {
-      if (builtEdges.has(e)) edgeCells(e[0], e[1], filledMat, faceGroups[st.face]);
+      // Built edges fuse into one rod each (direct suggestion: "fuse them
+      // as you go through the build to maintain speed"); the next ones
+      // show their cells.
+      if (builtEdges.has(e)) {
+        const A = new THREE.Vector3(...e[0]), B = new THREE.Vector3(...e[1]);
+        const m = new THREE.Mesh(rodGeo, filledMat);
+        m.position.copy(A).add(B).multiplyScalar(0.5);
+        m.quaternion.setFromUnitVectors(up, B.clone().sub(A).normalize());
+        faceGroups[st.face].add(m);
+      }
       else if (next && next.edges.includes(e)) edgeCells(e[0], e[1], nextMat, faceGroups[st.face]);
     }));
     // A face fills in (faintly) once all its sides are there.

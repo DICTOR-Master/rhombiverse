@@ -107,8 +107,8 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   let theta = 0;
 
   // ---- drawing ----
-  const SEG = 20; // round the axis: slender cells, by the hundred (see bullet-cell.js)
-  const geo = bulletGeometry(U, R, PAD, SEG, 4);
+  const SEG = 20; // round the axis, for the fused rods (see bullet-cell.js)
+  const geo = bulletGeometry(U, R, PAD); // full detail: only the edge being built shows its cells
   const plainGeo = plainCellGeometry(U, R, SEG);
   const edgeGhostGeo = plainCellGeometry(N * U, R, SEG); // a finished edge, ghosted: one plain rod
   const filledMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, roughness: 0.8, metalness: 0.05 });
@@ -271,7 +271,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
       if (e.line < current.line) { (rod(e.from, e.to, ghost(e))); continue; }
       if (e.line > current.line) continue;
       const done = doneCells(e);
-      if (e.instance < current.instance) edgeCells(e).forEach((c) => (cellMesh(c, fill(e))));
+      if (e.instance < current.instance) rod(e.from, e.to, fill(e)); // finished: fused into one
       else if (e.instance > current.instance) (rod(e.from, e.to, emptyMat));
       else if (step.cells.length > 1) edgeCells(e).forEach((c) => (cellMesh(c, nextMat)));
       else edgeCells(e).forEach((c, i) => (i < done ? cellMesh(c, fill(e)) : i === done ? cellMesh(c, nextMat) : cellMesh(c, emptyMat, plainGeo)));
@@ -309,7 +309,10 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
       // A closed shape that left an earlier one behind (the RD, under its
       // 24-cell): that one as ghosts.
       if (m0?.ghostBelow !== undefined && e.instance < m0.ghostBelow) (rod(e.from, e.to, ghost(e)));
-      else if (e.instance < whole || (finished(e) && lastSet.has(e.instance))) cells.forEach((c) => (cellMesh(c, fill(e))));
+      // Finished edges fuse into one rod each (direct suggestion: "fuse
+      // them as you go through the build to maintain speed"); only the
+      // edge being built keeps its cells.
+      else if (e.instance < whole || (finished(e) && lastSet.has(e.instance))) rod(e.from, e.to, fill(e));
       else if (finished(e)) (rod(e.from, e.to, ghost(e)));
       else if (nextSet.has(e.instance)) {
         if (plan.steps[filled].cells.length === 1) {

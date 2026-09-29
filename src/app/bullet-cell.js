@@ -15,11 +15,9 @@
 import * as THREE from 'three';
 
 const cache = new Map();
-// `segments`: round the axis. Signal's big close-up bullets need 64
-// ("smooth circles, no crenulation"); Construct's and Nets' slender cells,
-// seen from further off and by the hundred, 20 round and 4 along each
-// curve (a 24-cell's worth at 64 and 10
-// was ~800k vertices, too heavy to turn by touch).
+// `segments`: round the axis, `steps`: along the nose's and hollow's
+// curves. Full detail by default ("smooth circles, no crenulation"); the
+// finished edges Construct and Nets fuse into rods use fewer.
 export function bulletGeometry(unit, radius, pad = 0, segments = 64, steps = 10) {
   const key = `${unit.toFixed(4)}|${radius.toFixed(4)}|${pad.toFixed(4)}|${segments}|${steps}`;
   if (cache.has(key)) return cache.get(key);
