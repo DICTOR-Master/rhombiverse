@@ -18,9 +18,9 @@
 
 export const AXES = ['X', 'Y', 'Z', 'W', 'V', 'U'];
 export const axisName = (i) => AXES[i] ?? `A${i + 1}`;
-// Cells per edge, every family (direct decision, 2026-09-29: "make all
-// builds five a side"; it was 10, and Kagome's star, three edges across,
-// drew its cells as hairlines on a phone).
+// Cells per edge, every family (direct decisions, 2026-09-29: "make all
+// builds five a side", "edges same length as before, just longer
+// cells"; it was 10).
 export const SQUARE_N = 5;
 
 /** The square's cells in building order: { from, to, axis, instance,

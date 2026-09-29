@@ -50,10 +50,11 @@ import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 
 const STORAGE_KEY = 'rhombiverse-1d-construct-world';
-const U = 0.5; // world units per cell
-// Slender, more like an axis than a fat tube (direct request); slimmer
-// again at five cells a side, which draws each cell twice the size.
-const R = 0.04;
+// Five cells a side, each twice as long, so edges keep their length
+// (direct request: "edges same length as before, just longer cells").
+const U = 1; // world units per cell
+// Slender, more like an axis than a fat tube (direct request).
+const R = 0.055;
 const PAD = 0.004;
 const CYAN = 0x22c3e6;
 const NEXT = 0xf59e0b; // the 1D worlds' orange "tap here"
