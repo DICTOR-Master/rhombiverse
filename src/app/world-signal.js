@@ -27,7 +27,7 @@
 //   the message reads out at the top, letter by letter, as it arrives
 //   there ("a sent message viewer where the signal arrives at the top").
 import * as THREE from 'three';
-import { morseSequence, decode, letterEnds, keyedElement, keyedGap, KEY_MS, isCode, toCode, codeSequence, layout, totalUnits, cellUnits, embed, tangentAngle, MORSE } from '../geometry-extensions/trajectory-1d.js';
+import { morseSequence, decode, letterEnds, readKeying, keyingThreshold, KEY_FALLBACK_DASH_MS, isCode, toCode, codeSequence, layout, totalUnits, cellUnits, embed, tangentAngle, MORSE } from '../geometry-extensions/trajectory-1d.js';
 import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
@@ -503,7 +503,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   }
   // Send: the rest of the message joins the chain, and the chain sets off.
   function send() {
-    keying = false;
+    keying = false; presses = [];
     if (pending.length && !draftStarted) cells = [];
     for (const c of pending) cells.push({ ...c, material: getMaterial(c.type) });
     pending = [];
@@ -525,7 +525,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // dot dash space controls", "type message .... send on the same line";
   // nobody is expected to know Morse): the view, the message, Send.
   panel.innerHTML = `
-    <div class="w4d-row sig-message-row"><button type="button" class="sig-sym" data-view></button><input type="text" class="sig-message" maxlength="400" autocomplete="off" spellcheck="false" enterkeyhint="send"><button type="button" class="sig-sym sig-pulse" data-pulse></button><button type="button" class="sig-send" data-opt="send"></button></div>`;
+    <div class="sig-decoded" aria-live="polite"></div><div class="w4d-row sig-message-row"><button type="button" class="sig-sym" data-view></button><input type="text" class="sig-message" maxlength="400" autocomplete="off" spellcheck="false" enterkeyhint="send"><button type="button" class="sig-sym sig-pulse" data-pulse></button><button type="button" class="sig-send" data-opt="send"></button></div>`;
   document.body.appendChild(panel);
   const viewBtn = panel.querySelector('[data-view]');
   const sendBtn = panel.querySelector('[data-opt="send"]');
@@ -540,6 +540,10 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   };
   pulseBtn.innerHTML = PULSE_ICONS.dot;
   let keying = false; // the chain is a keyed message (the next Send ends it)
+  // The presses so far ({ held, pause } ms), re-read as a whole at every
+  // press by the keyer's own rhythm (readKeying); `keyBase`: cells already
+  // there (typed or edited as code) that the keyed ones follow.
+  let presses = [], keyBase = [];
   let downAt = 0, upAt = 0, dashTimer = 0;
   pulseBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -548,7 +552,9 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     downAt = e.timeStamp;
     pulseBtn.classList.add('down');
     clearTimeout(dashTimer);
-    dashTimer = setTimeout(() => { pulseBtn.innerHTML = PULSE_ICONS.dash; }, KEY_MS.dash);
+    // The icon turns to a dash at your own dot/dash boundary.
+    const cutAt = presses.length > 1 ? keyingThreshold(presses.map((q) => q.held)) : KEY_FALLBACK_DASH_MS;
+    dashTimer = setTimeout(() => { pulseBtn.innerHTML = PULSE_ICONS.dash; }, cutAt);
   });
   function keyUp(e) {
     if (!downAt) return;
@@ -565,12 +571,14 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     if (!keying) {
       // A keyed message replaces the chain, as a typed one does.
       cells = []; pending = []; draftStarted = false; message = ''; input.value = '';
-      keying = true;
-    } else if (cells.length) {
-      cells.push(keyedGap(pause));
+      keying = true; presses = []; keyBase = [];
+    } else if (!presses.length) {
+      // Keying on after editing the code: what's there stays, and the new
+      // presses follow it as a new letter.
+      keyBase = cells.length ? [...cells, { type: 'gap', units: 3 }] : [];
     }
-    const { type } = keyedElement(held);
-    cells.push({ type, material: getMaterial(type) });
+    presses.push({ held, pause: presses.length ? pause : 0 });
+    cells = [...keyBase, ...readKeying(presses)].map((c) => (c.type === 'gap' ? c : { ...c, material: c.material ?? getMaterial(c.type) }));
     // Keyed dots and dashes show in the message box, to see and edit
     // (direct request: "if you tap the dots and dashes they appear in the
     // writing box so you can see them and edit").
@@ -635,19 +643,24 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     // An empty field shows what the chain says; otherwise the prompt.
     const said = decode(cells);
     input.placeholder = said ? `“${said}”` : t('sig.message', L);
+    // While keying (or editing the code), the letters it reads as, live.
+    const decodedEl = panel.querySelector('.sig-decoded');
+    const showLetters = (keying || isCode(input.value)) && cells.some((c) => c.type !== 'gap');
+    decodedEl.textContent = showLetters ? said : '';
+    decodedEl.hidden = !showLetters;
   }
   input.addEventListener('input', () => {
     // Dots and dashes (· – or . -, a space between letters, / between
     // words) are the chain itself, edited in place.
     if (isCode(input.value) || (keying && !input.value.trim())) {
-      keying = true;
+      keying = true; presses = [];
       message = input.value;
       cells = codeSequence(message).map((c) => ({ ...c, ...(c.type === 'gap' ? {} : { material: getMaterial(c.type) }) }));
       pending = []; draftStarted = false;
       commit();
       return;
     }
-    keying = false;
+    keying = false; presses = [];
     message = input.value;
     const seq = morseSequence(message);
     if (draftStarted) {
@@ -701,7 +714,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
       if (on) { setFog(true); frameOutside(); }
     },
     get isEmpty() { return cells.length === 0; },
-    clear() { cells = []; pending = []; draftStarted = false; keying = false; input.value = ''; playing = false; commit(); renderArrivals(); },
+    clear() { cells = []; pending = []; draftStarted = false; keying = false; presses = []; input.value = ''; playing = false; commit(); renderArrivals(); },
     snapshot: toJSON,
     restore(json) { setFromJSON(json); save(); draw(); renderPanel(); onChange(); },
     toJSON,

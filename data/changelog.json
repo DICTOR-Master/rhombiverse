@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-09-29",
+    "title": "Signal's key",
+    "items": [
+      "Signal's pulse key now reads your own rhythm, the way an operator does: short presses are dots and long ones dashes relative to each other, and pauses are judged against each other, so careful, slow keying comes out as the letters you meant (it used fixed timings, which split slow letters into E's and T's). The letters it reads show above the message box as you key."
+    ]
+  },
+  {
+    "date": "2026-09-29",
     "title": "Platonic nets",
     "items": [
       "Nets adds the Platonic solids: tetrahedron, octahedron, icosahedron and dodecahedron (with the cube), each net built face by face and folded up. Open in 3D shows for the solids the 3D world has as pieces, and ⊘ beside Undo clears the net you're on."

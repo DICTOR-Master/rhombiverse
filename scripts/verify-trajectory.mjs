@@ -4,7 +4,7 @@
 // - the moving chain carries m(u) (one signal, every view);
 // - E(s): unit speed, continuous, and a chord on screen is never longer
 //   than the distance along s (the world's only metric).
-import { morseSequence, decode, totalUnits, signal, waveAt, embed, tangentAngle, GAP_UNITS, MORSE, letterEnds, keyedElement, keyedGap, KEY_MS, isCode, toCode, codeSequence } from '../src/geometry-extensions/trajectory-1d.js';
+import { morseSequence, decode, totalUnits, signal, waveAt, embed, tangentAngle, GAP_UNITS, MORSE, letterEnds, readKeying, isCode, toCode, codeSequence } from '../src/geometry-extensions/trajectory-1d.js';
 
 let failures = 0;
 function check(label, ok, extra = '') {
@@ -15,12 +15,40 @@ function check(label, ok, extra = '') {
 check('PARIS is 43 units, 50 with its word gap (the standard word)', totalUnits(morseSequence('PARIS')) === 43 && totalUnits(morseSequence('PARIS')) + GAP_UNITS.word === 50);
 check('SOS is 27 units', totalUnits(morseSequence('SOS')) === 27);
 {
-  // The pulse key: S O S keyed with a relaxed hand reads back as SOS, and
-  // a long pause makes a word break.
-  const presses = [[90, 0], [90, 200], [90, 200], [400, 900], [400, 200], [400, 200], [90, 2500], [90, 200], [90, 200]];
-  const keyed = [];
-  presses.forEach(([held, pause], i) => { if (i) keyed.push(keyedGap(pause)); keyed.push(keyedElement(held)); });
-  check('the pulse key: short is a dot, held is a dash; a pause ends a letter, a longer one a word', decode(keyed) === 'SO S' && keyedElement(KEY_MS.dash - 1).type === 'dot' && keyedElement(KEY_MS.dash).type === 'dash', decode(keyed));
+  // The pulse key, read by the keyer's own rhythm: "CALL ME" (the direct
+  // report that came out as "TETE ET ETI ETI TT E") keyed carefully and
+  // slowly, briskly, and unevenly, reads back right each time.
+  const keyAs = (text, { dot, dash, el, letter, word, jitter = 0 }) => {
+    let r = 7;
+    const j = (x) => { r = (r * 9301 + 49297) % 233280; return x * (1 + jitter * (2 * (r / 233280) - 1)); };
+    const presses = [];
+    let gapBefore = 0;
+    for (const c of morseSequence(text)) {
+      if (c.type === 'gap') { gapBefore = c.units === 7 ? word : c.units === 3 ? letter : el; continue; }
+      presses.push({ held: j(c.type === 'dot' ? dot : dash), pause: j(gapBefore) });
+      gapBefore = 0;
+    }
+    return decode(readKeying(presses));
+  };
+  const careful = keyAs('CALL ME', { dot: 260, dash: 750, el: 900, letter: 2200, word: 4500 });
+  const brisk = keyAs('CALL ME', { dot: 90, dash: 270, el: 90, letter: 280, word: 650 });
+  const uneven = keyAs('SOS HELP', { dot: 180, dash: 520, el: 300, letter: 900, word: 2000, jitter: 0.25 });
+  check('the pulse key reads your own rhythm: careful, brisk and uneven keying all come out right', careful === 'CALL ME' && brisk === 'CALL ME' && uneven === 'SOS HELP', `${careful} | ${brisk} | ${uneven}`);
+  const oneLetter = keyAs('C', { dot: 260, dash: 750, el: 900, letter: 2200, word: 4500 });
+  const oneWord = keyAs('HELLO', { dot: 240, dash: 700, el: 800, letter: 2000, word: 4000, jitter: 0.15 });
+  check('and a single careful letter, or one careful word', oneLetter === 'C' && oneWord === 'HELLO', `${oneLetter} | ${oneWord}`);
+  // And a sweep: six messages at careful, normal and fast keying, each
+  // with ±15% wobble in every press and pause, 10 hands each.
+  const speeds = [{ dot: 260, dash: 750, el: 850, letter: 2100, word: 4300 }, { dot: 150, dash: 450, el: 170, letter: 500, word: 1200 }, { dot: 80, dash: 240, el: 80, letter: 240, word: 560 }];
+  let right = 0, all = 0;
+  for (const sp of speeds) for (const m of ['SOS', 'CALL ME', 'HELLO WORLD', 'THE QUICK FOX', 'MEET AT TEN', 'E T I M']) for (let seed = 1; seed <= 10; seed++) {
+    let r = seed * 7919;
+    const jj = (x) => { r = (r * 9301 + 49297) % 233280; return x * (1 + 0.15 * (2 * (r / 233280) - 1)); };
+    const ps = []; let g = 0;
+    for (const c of morseSequence(m)) { if (c.type === 'gap') { g = c.units === 7 ? sp.word : c.units === 3 ? sp.letter : sp.el; continue; } ps.push({ held: jj(c.type === 'dot' ? sp.dot : sp.dash), pause: jj(g) }); g = 0; }
+    all++; if (decode(readKeying(ps)) === m) right++;
+  }
+  check('keyed by many hands (±15% wobble, three speeds): every message reads right', right === all, `${right}/${all}`);
   const msg = morseSequence('SOS HELP');
   check('keyed code written out and read back is the same chain (· –, space, /)', JSON.stringify(codeSequence(toCode(msg))) === JSON.stringify(msg) && toCode(morseSequence('SOS')) === '··· ––– ···' && decode(codeSequence('... --- ... / .... ..')) === 'SOS HI' && isCode('·– /') && !isCode('hi'));
   const ends = letterEnds(morseSequence('HI YO'));

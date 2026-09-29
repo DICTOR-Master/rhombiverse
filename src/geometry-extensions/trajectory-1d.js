@@ -93,12 +93,94 @@ export function decode(cells) {
   return text;
 }
 
-/** A telegraph key's timing (Signal's pulse key): a press held past
- * DASH_MS is a dash; the pause before a press sets the gap before it
- * (standard ratios, at a relaxed hand speed). */
-export const KEY_MS = { dash: 250, letter: 700, word: 1800 };
-export const keyedElement = (heldMs) => ({ type: heldMs < KEY_MS.dash ? 'dot' : 'dash' });
-export const keyedGap = (pauseMs) => ({ type: 'gap', units: pauseMs < KEY_MS.letter ? GAP_UNITS.element : pauseMs < KEY_MS.word ? GAP_UNITS.letter : GAP_UNITS.word });
+/** A telegraph key read the way an operator reads one (direct report,
+ * 2026-09-29: "I carefully constructed a message in Morse and it came
+ * out as completely different letters": fixed times (a dash past 250 ms,
+ * a new letter past 0.7 s) split careful, slower keying into E's and
+ * T's). Each press is judged against the others: the short presses set
+ * the dot, the long ones are dashes (split at the widest jump between
+ * press lengths); pauses are counted in dots, a letter break from 2.5, a
+ * word break from 6 (Morse's own 1 : 3 : 7, read generously). The whole
+ * message is re-read at every press, so it settles as you go.
+ * presses: [{ held, pause }] in ms (pause: the time before this press;
+ * the first one's is ignored). */
+export const KEY_FALLBACK_DASH_MS = 300; // only while every press is alike
+// Natural breaks: the values (in log space, so ratios count, not
+// differences) split into up to kMax groups with the least spread inside
+// them; a split counts only if each group's mean is at least `apart` ×
+// the one below and (when more than one group) no group spans more than
+// `tight` × from its shortest to its longest, and each group's shortest
+// is at least `gap` × the longest below it: groups that nearly touch are
+// one group (else fewer groups).
+// Returns, per value, its group (0 = shortest) and the groups' means.
+function naturalGroups(values, kMax, apart, tight = Infinity, gap = 1) {
+  const sorted = values.map((v, i) => ({ v: Math.max(1, v), i, l: Math.log(Math.max(1, v)) })).sort((a, b) => a.v - b.v);
+  const n = sorted.length;
+  const spread = (lo, hi) => {
+    let m = 0;
+    for (let q = lo; q < hi; q++) m += sorted[q].l;
+    m /= hi - lo;
+    let ss = 0;
+    for (let q = lo; q < hi; q++) ss += (sorted[q].l - m) ** 2;
+    return ss;
+  };
+  const meanOf = (lo, hi) => { let m = 0; for (let q = lo; q < hi; q++) m += sorted[q].v; return m / (hi - lo); };
+  let best = null;
+  for (const k of [3, 2, 1].filter((x) => x <= kMax && x <= n)) {
+    const options = k === 1 ? [[]] : k === 2 ? Array.from({ length: n - 1 }, (_, c) => [c + 1]) : Array.from({ length: n - 1 }, (_, c1) => Array.from({ length: n - c1 - 2 }, (_, j) => [c1 + 1, c1 + 2 + j])).flat();
+    for (const cuts of options) {
+      const edges = [0, ...cuts, n];
+      const means = edges.slice(0, -1).map((lo, g) => meanOf(lo, edges[g + 1]));
+      if (means.some((m, g) => g && m / means[g - 1] < apart)) continue;
+      if (k > 1 && edges.slice(0, -1).some((lo, g) => sorted[edges[g + 1] - 1].v / sorted[lo].v > tight)) continue;
+      if (cuts.some((c) => sorted[c].v / sorted[c - 1].v < gap)) continue;
+      const cost = edges.slice(0, -1).reduce((t, lo, g) => t + spread(lo, edges[g + 1]), 0);
+      if (!best || cost < best.cost - 1e-12) best = { cuts, cost, means };
+    }
+    if (best) break; // the most groups that are clearly apart
+  }
+  const group = new Array(n);
+  const edges = [0, ...(best?.cuts ?? []), n];
+  edges.slice(0, -1).forEach((lo, g) => { for (let q = lo; q < edges[g + 1]; q++) group[sorted[q].i] = g; });
+  return { group, means: best?.means ?? [meanOf(0, n)] };
+}
+/** Where dots end and dashes begin, from the press lengths so far. */
+export function keyingThreshold(held) {
+  if (held.length < 2) return KEY_FALLBACK_DASH_MS;
+  const { group, means } = naturalGroups(held, 2, 1.8);
+  if (means.length < 2) return KEY_FALLBACK_DASH_MS;
+  const top = Math.max(...held.filter((h, i) => group[i] === 0)), low = Math.min(...held.filter((h, i) => group[i] === 1));
+  return Math.sqrt(top * low);
+}
+export function readKeying(presses) {
+  if (!presses.length) return [];
+  const held = presses.map((p) => Math.max(1, p.held));
+  const threshold = keyingThreshold(held);
+  const dots = held.filter((h) => h < threshold), dashes = held.filter((h) => h >= threshold);
+  const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+  const unit = Math.max(60, dots.length && dashes.length ? (mean(dots) + mean(dashes) / 3) / 2 : dots.length ? mean(dots) : mean(dashes) / 3);
+  // Pauses, grouped the same way: with three groups, inside a
+  // letter / between letters / between words; with two, the shorter is
+  // inside a letter unless it's very long; with one, all inside a letter
+  // unless very long (careful keyers leave several dots between the
+  // elements of a letter).
+  const pauses = presses.slice(1).map((p) => p.pause);
+  const { group, means } = naturalGroups(pauses, 3, 1.6, 1.9, 1.35);
+  const labelOf = (gi) => {
+    const kinds = [GAP_UNITS.element, GAP_UNITS.letter, GAP_UNITS.word];
+    if (means.length === 3) return kinds[gi];
+    const firstIsLetter = means[0] / unit >= 5;
+    if (means.length === 1) return firstIsLetter ? (means[0] / unit >= 12 ? GAP_UNITS.word : GAP_UNITS.letter) : GAP_UNITS.element;
+    if (gi === 0) return firstIsLetter ? GAP_UNITS.letter : GAP_UNITS.element;
+    return firstIsLetter || means[1] / means[0] >= 4.5 ? GAP_UNITS.word : GAP_UNITS.letter;
+  };
+  const out = [];
+  presses.forEach((p, i) => {
+    if (i) out.push({ type: 'gap', units: labelOf(group[i - 1]) });
+    out.push({ type: held[i] < threshold ? 'dot' : 'dash' });
+  });
+  return out;
+}
 
 /** The text read back letter by letter, each with where its last
  * element ends along s (a word break is a ' ' at the next letter's end):
