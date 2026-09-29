@@ -273,6 +273,21 @@ Grouped by theme. Skip around; nothing here depends on reading the rest.
   default-deny gate). Explicitly deferred, with the exact conditions
   that would reopen the decision stated plainly, not just abandoned.
 
+- **Fuse finished work as the build goes; keep detail only where the
+  hands are** (DICTO's suggestion, 2026-09-29: "can you not just fuse them
+  as you go through the build to maintain speed"). Construct drew every
+  1D cell of every edge as its own bullet, so a finished 24-cell was 576
+  bullets, about 800k vertices, and ran at 0.8 fps on the Pi: too heavy
+  to turn by touch. Batching them into instanced meshes changed nothing
+  (the cost wasn't draw calls), and cutting their detail only got 3×.
+  Fusing each finished edge into one plain rod, with cells only on the
+  edge being built, gave 7×, faster than the ordinary 3D world, *and* let
+  the live bullets go back to full detail. The general rule: a build's
+  finished parts don't need the resolution of the part being worked on.
+  Measure frame rate before and after each attempt (a 4 s
+  `requestAnimationFrame` count in Playwright is enough); the first guess
+  at the cost (draw calls) was wrong, and only the numbers showed it.
+
 ## UX lessons from real user feedback
 
 - **Modifier-key combinations stacked on one gesture stop being
