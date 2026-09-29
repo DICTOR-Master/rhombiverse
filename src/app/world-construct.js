@@ -68,7 +68,10 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toJSON())); } catch { /* best-effort */ }
   }
   const complete = () => filled === steps.length;
-  let latticeOn = false; // the finished square's or cube's lattice shown around it
+  // The finished square's or cube's lattice shown around it. The cube
+  // closes straight into its lattice (direct request: "cube should
+  // immediately be part of the lattice").
+  let latticeOn = complete();
   const latticeReady = () => complete() || filled === 4 * SQUARE_N;
   const squareLattice = () => latticeOn && filled === 4 * SQUARE_N;
   const squareStage = () => filled < SQUARE_STEPS;
@@ -82,7 +85,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   const emptyMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.08, depthWrite: false });
   const ghostMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.22, depthWrite: false });
   const faceMat = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
-  const latticeMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.13, depthWrite: false });
+  const latticeMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.21, depthWrite: false }); // "one tone brighter" than first shown
   const junctionMat = new THREE.MeshBasicMaterial({ color: NEXT, transparent: true, opacity: 0.45, depthWrite: false });
   // Rounded corners (direct requests: "corners should become rounded when
   // reached; the dome should reach the far side of the diameter", "all
@@ -267,7 +270,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     const c = centre();
     const flat = squareStage() || squareLattice();
     const dir = flat ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0.5, 0.32, 0.8).normalize();
-    const dist = squareStage() ? 2.3 : squareLattice() ? 6.4 : latticeOn && complete() ? 8.5 : 3.6;
+    const dist = squareStage() ? 2.3 : squareLattice() ? 6.4 : latticeOn && complete() ? 10.5 : 3.6;
     return { target: c, position: c.clone().add(dir.multiplyScalar(SIDE * dist)) };
   }
   let tween = 0;
@@ -311,7 +314,9 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     }
     if (complete()) return false;
     filled += 1;
+    if (complete()) latticeOn = true;
     commit(before);
+    if (complete()) frame(true);
     if (complete()) showHudPrompt(t('con.prompt.done', lang(), { name: 'Cube', n: 12 * SQUARE_N }), 5000);
     else if (filled === SQUARE_STEPS) showHudPrompt(t('con.prompt.square', lang(), { n: SQUARE_STEPS }), 6000);
     else if (filled === HAND_STEPS) showHudPrompt(t('con.prompt.edges', lang()), 5000);
