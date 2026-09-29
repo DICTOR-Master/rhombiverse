@@ -62,6 +62,35 @@ export function decode(cells) {
   return text;
 }
 
+/** A telegraph key's timing (Signal's pulse key): a press held past
+ * DASH_MS is a dash; the pause before a press sets the gap before it
+ * (standard ratios, at a relaxed hand speed). */
+export const KEY_MS = { dash: 250, letter: 700, word: 1800 };
+export const keyedElement = (heldMs) => ({ type: heldMs < KEY_MS.dash ? 'dot' : 'dash' });
+export const keyedGap = (pauseMs) => ({ type: 'gap', units: pauseMs < KEY_MS.letter ? GAP_UNITS.element : pauseMs < KEY_MS.word ? GAP_UNITS.letter : GAP_UNITS.word });
+
+/** The text read back letter by letter, each with where its last
+ * element ends along s (a word break is a ' ' at the next letter's end):
+ * the message as it arrives, cell by cell. */
+export function letterEnds(cells) {
+  const out = [];
+  let letter = '', gap = 0, end = 0, s = 0;
+  const flush = () => { if (letter) { out.push({ text: DECODE[letter] ?? '?', end }); letter = ''; } };
+  for (const c of cells) {
+    const u = cellUnits(c);
+    if (c.type === 'gap') { gap += u; s += u; continue; }
+    if (gap >= GAP_UNITS.letter) flush();
+    const space = gap >= GAP_UNITS.word && out.length;
+    gap = 0;
+    letter += c.type === 'dot' ? '.' : '-';
+    s += u;
+    end = s;
+    if (space && letter.length === 1) out.push({ text: ' ', end: s });
+  }
+  flush();
+  return out;
+}
+
 /** Each cell's span [s0, s1) along the trajectory, end to end from 0. */
 export function layout(cells) {
   let s = 0;

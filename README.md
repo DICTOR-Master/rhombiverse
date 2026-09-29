@@ -32,6 +32,9 @@ right-click) removes. The **User Guide** (in the app, or at
   cells (its Morse code, no need to know it); tap the orange cell or press
   Send to set it moving away. Outside (in perspective) and Inside (in the
   tunnel, the cells passing beneath you) views.
+  Or key it yourself on the pulse key (tap a dot, hold a dash); a Morse
+  glossary opens from the right edge, and the message reads out at the
+  top as it arrives.
   **Construct**: build a square from 1D cells, one tap at a time — along
   X, Y joining at the corner (X stays), round the four sides until it
   closes and fills in (open it in 2D from there); then Z rises into a

@@ -18,9 +18,16 @@
 // - Playing moves the bullets themselves: the chain streams along the
 //   trajectory, repeating, toward its start, so a reader there gets the
 //   message in order. Fixed speed; breathing and undulation are later.
-// - Controls: one line, the view button, the message, Send.
+// - Controls: one line, the view button, the message, the pulse key,
+//   Send. The key (direct request: "a pulse button: a tap for short (dot)
+//   and a touch for dash, etc."): tap for a dot, hold for a dash; a pause
+//   starts a new letter, a longer one a new word, like a telegraph key.
+// - A script-style button at the right edge opens the Morse glossary
+//   (tap a letter to add it to the message), and while the signal plays
+//   the message reads out at the top, letter by letter, as it arrives
+//   there ("a sent message viewer where the signal arrives at the top").
 import * as THREE from 'three';
-import { morseSequence, decode, layout, totalUnits, cellUnits, embed, tangentAngle } from '../geometry-extensions/trajectory-1d.js';
+import { morseSequence, decode, letterEnds, keyedElement, keyedGap, KEY_MS, layout, totalUnits, cellUnits, embed, tangentAngle, MORSE } from '../geometry-extensions/trajectory-1d.js';
 import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
@@ -280,6 +287,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   const fogs = { inside: new THREE.Fog(0x05050a, 6, 90), outside: new THREE.Fog(0x05050a, 3, 16) };
   function setFog(on) { scene.fog = on ? fogs[view.inside ? 'inside' : 'outside'] : null; }
   function setInside(on) {
+    queueMicrotask(measureArrival);
     view.inside = on;
     setFog(true);
     // Inside, only outward faces (you're never within a cell, but it keeps
@@ -315,6 +323,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     playT += ((now - last) / 1000) * (view.inside ? SPEED_INSIDE : SPEED);
     last = now;
     placeStream();
+    renderArrivals();
     raf = requestAnimationFrame(tick);
   }
   function setPlaying(on) {
@@ -323,6 +332,38 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     if (on) { playT = 0; last = performance.now(); if (!raf) raf = requestAnimationFrame(tick); }
     draw();
     renderPanel();
+    measureArrival();
+    renderArrivals();
+  }
+
+  // ---- the message as it arrives ----
+  // Where the line fades out of sight (the fog's far reach, up the
+  // screen): a letter has arrived once its last cell has passed there.
+  // The stream repeats, so the read-out starts again with each pass.
+  let uArrive = 0;
+  function measureArrival() {
+    const far = (scene.fog?.far ?? 16) * 0.85;
+    let u = -chainEnd();
+    while (u < AHEAD && place(u).distanceTo(camera.position) < far) u += 0.5;
+    uArrive = u;
+  }
+  const viewer = document.createElement('div');
+  viewer.id = 'sig-arrivals';
+  document.body.appendChild(viewer);
+  let arrivedText = null, heardWhole = false;
+  function renderArrivals() {
+    const on = active && playing;
+    viewer.classList.toggle('visible', on);
+    if (!on) { arrivedText = null; heardWhole = false; return; }
+    const P = period();
+    const y = (((playT % P) - uArrive) % P + P) % P;
+    const letters = letterEnds(cells);
+    let text = letters.filter((l) => l.end <= y).map((l) => l.text).join('');
+    // Between passes, the whole message stays up until the next one's
+    // first letter arrives.
+    if (text.length === letters.length) heardWhole = true;
+    else if (!text && heardWhole) text = letters.map((l) => l.text).join('');
+    if (text !== arrivedText) { arrivedText = text; viewer.textContent = text; }
   }
 
   // Keep the chain's end (where taps add) on screen: glide the view there
@@ -376,6 +417,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   }
   // Send: the rest of the message joins the chain, and the chain sets off.
   function send() {
+    keying = false;
     if (pending.length && !draftStarted) cells = [];
     for (const c of pending) cells.push({ ...c, material: getMaterial(c.type) });
     pending = [];
@@ -397,11 +439,81 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // dot dash space controls", "type message .... send on the same line";
   // nobody is expected to know Morse): the view, the message, Send.
   panel.innerHTML = `
-    <div class="w4d-row sig-message-row"><button type="button" class="sig-sym" data-view></button><input type="text" class="sig-message" maxlength="80" autocomplete="off" spellcheck="false" enterkeyhint="send"><button type="button" class="sig-send" data-opt="send"></button></div>`;
+    <div class="w4d-row sig-message-row"><button type="button" class="sig-sym" data-view></button><input type="text" class="sig-message" maxlength="80" autocomplete="off" spellcheck="false" enterkeyhint="send"><button type="button" class="sig-sym sig-pulse" data-pulse></button><button type="button" class="sig-send" data-opt="send"></button></div>`;
   document.body.appendChild(panel);
   const viewBtn = panel.querySelector('[data-view]');
   const sendBtn = panel.querySelector('[data-opt="send"]');
   const input = panel.querySelector('.sig-message');
+  const pulseBtn = panel.querySelector('[data-pulse]');
+
+  // ---- the pulse key ----
+  // Timing: KEY_MS (trajectory-1d.js).
+  const PULSE_ICONS = {
+    dot: '<svg viewBox="-12 -12 24 24" width="20" height="20"><circle r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle r="3.2" fill="currentColor"/></svg>',
+    dash: '<svg viewBox="-12 -12 24 24" width="20" height="20"><circle r="10" fill="none" stroke="currentColor" stroke-width="2"/><rect x="-6" y="-2.2" width="12" height="4.4" rx="2.2" fill="currentColor"/></svg>',
+  };
+  pulseBtn.innerHTML = PULSE_ICONS.dot;
+  let keying = false; // the chain is a keyed message (the next Send ends it)
+  let downAt = 0, upAt = 0, dashTimer = 0;
+  pulseBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    pulseBtn.setPointerCapture?.(e.pointerId);
+    // Input time, not handler time: a busy frame mustn't stretch a dot.
+    downAt = e.timeStamp;
+    pulseBtn.classList.add('down');
+    clearTimeout(dashTimer);
+    dashTimer = setTimeout(() => { pulseBtn.innerHTML = PULSE_ICONS.dash; }, KEY_MS.dash);
+  });
+  function keyUp(e) {
+    if (!downAt) return;
+    e.preventDefault();
+    const now = e.timeStamp;
+    const held = now - downAt;
+    const pause = downAt - upAt;
+    downAt = 0; upAt = now;
+    clearTimeout(dashTimer);
+    pulseBtn.classList.remove('down');
+    pulseBtn.innerHTML = PULSE_ICONS.dot;
+    if (e.type === 'pointercancel') return;
+    if (playing) setPlaying(false);
+    if (!keying) {
+      // A keyed message replaces the chain, as a typed one does.
+      cells = []; pending = []; draftStarted = false; message = ''; input.value = '';
+      keying = true;
+    } else if (cells.length) {
+      cells.push(keyedGap(pause));
+    }
+    const { type } = keyedElement(held);
+    cells.push({ type, material: getMaterial(type) });
+    commit();
+  }
+  pulseBtn.addEventListener('pointerup', keyUp);
+  pulseBtn.addEventListener('pointercancel', keyUp);
+
+  // ---- the Morse glossary ----
+  const glossBtn = document.createElement('button');
+  glossBtn.type = 'button';
+  glossBtn.id = 'sig-gloss-btn';
+  // A little scroll: the code book.
+  glossBtn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 4h11a2 2 0 0 1 0 4h-1v10a2 2 0 0 1-2 2H6a2 2 0 0 1 0-4h1z"/><path d="M6 16h9M10 8h4M10 11h1.2M13 11h3M10 14h3"/></svg>';
+  document.body.appendChild(glossBtn);
+  const gloss = document.createElement('div');
+  gloss.id = 'sig-gloss';
+  const sym = (code) => [...code].map((c) => `<i class="${c === '.' ? 'd' : 'l'}"></i>`).join('');
+  // Letters, then digits, then punctuation (object order would put the
+  // digits first).
+  const glossOrder = [...Object.keys(MORSE).filter((k) => /[A-Z]/.test(k)), ...Object.keys(MORSE).filter((k) => /[0-9]/.test(k)), ...Object.keys(MORSE).filter((k) => !/[A-Z0-9]/.test(k))];
+  gloss.innerHTML = glossOrder.map((ch) => [ch, MORSE[ch]]).map(([ch, code]) => `<button type="button" data-ch="${ch === '"' ? '&quot;' : ch}"><b>${ch === '"' ? '&quot;' : ch}</b><span>${sym(code)}</span></button>`).join('');
+  document.body.appendChild(gloss);
+  let glossOpen = false;
+  glossBtn.addEventListener('click', () => { glossOpen = !glossOpen; renderPanel(); });
+  // A letter tapped in the glossary joins the message, as if typed.
+  gloss.addEventListener('click', (e) => {
+    const ch = e.target.closest('[data-ch]')?.dataset.ch;
+    if (!ch) return;
+    input.value = (input.value + ch).slice(0, 80);
+    input.dispatchEvent(new Event('input'));
+  });
   // The view button shows the view you're in: an eye looking on from
   // Outside, a tunnel mouth Inside.
   const VIEW_ICONS = {
@@ -410,6 +522,9 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   };
   function renderPanel() {
     panel.classList.toggle('visible', active);
+    glossBtn.classList.toggle('visible', active);
+    gloss.classList.toggle('visible', active && glossOpen);
+    glossBtn.classList.toggle('active', glossOpen);
     if (!active) return;
     const L = lang();
     const nextView = view.inside ? 'outside' : 'inside';
@@ -417,6 +532,10 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     viewBtn.innerHTML = VIEW_ICONS[view.inside ? 'inside' : 'outside'];
     viewBtn.title = t(`sig.${nextView}`, L);
     viewBtn.setAttribute('aria-label', viewBtn.title);
+    pulseBtn.title = t('sig.pulse', L);
+    pulseBtn.setAttribute('aria-label', pulseBtn.title);
+    glossBtn.title = t('sig.glossary', L);
+    glossBtn.setAttribute('aria-label', glossBtn.title);
     sendBtn.textContent = playing ? `■ ${t('sig.stop', L)}` : t('sig.send', L);
     sendBtn.classList.toggle('active', playing);
     // An empty field shows what the chain says; otherwise the prompt.
@@ -424,6 +543,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     input.placeholder = said ? `“${said}”` : t('sig.message', L);
   }
   input.addEventListener('input', () => {
+    keying = false;
     message = input.value;
     const seq = morseSequence(message);
     if (draftStarted) {
@@ -445,6 +565,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     const b = ev.target.closest('button');
     if (!b) return;
     const d = b.dataset;
+    if ('pulse' in d) return;
     if (d.view) setInside(d.view === 'inside');
     else if (d.opt === 'send') { if (playing) setPlaying(false); else send(); return; }
     save(); draw(); renderPanel();
@@ -469,13 +590,14 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
         camera.up.set(0, 1, 0);
         controls.enabled = true;
         panel.classList.remove('visible');
+        renderArrivals();
       }
       renderPanel();
       draw();
       if (on) { setFog(true); frameOutside(); }
     },
     get isEmpty() { return cells.length === 0; },
-    clear() { cells = []; pending = []; draftStarted = false; input.value = ''; playing = false; commit(); },
+    clear() { cells = []; pending = []; draftStarted = false; keying = false; input.value = ''; playing = false; commit(); renderArrivals(); },
     snapshot: toJSON,
     restore(json) { setFromJSON(json); save(); draw(); renderPanel(); onChange(); },
     toJSON,

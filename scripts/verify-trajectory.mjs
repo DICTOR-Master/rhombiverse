@@ -4,7 +4,7 @@
 // - the moving chain carries m(u) (one signal, every view);
 // - E(s): unit speed, continuous, and a chord on screen is never longer
 //   than the distance along s (the world's only metric).
-import { morseSequence, decode, totalUnits, signal, waveAt, embed, tangentAngle, GAP_UNITS, MORSE } from '../src/geometry-extensions/trajectory-1d.js';
+import { morseSequence, decode, totalUnits, signal, waveAt, embed, tangentAngle, GAP_UNITS, MORSE, letterEnds, keyedElement, keyedGap, KEY_MS } from '../src/geometry-extensions/trajectory-1d.js';
 
 let failures = 0;
 function check(label, ok, extra = '') {
@@ -14,6 +14,16 @@ function check(label, ok, extra = '') {
 
 check('PARIS is 43 units, 50 with its word gap (the standard word)', totalUnits(morseSequence('PARIS')) === 43 && totalUnits(morseSequence('PARIS')) + GAP_UNITS.word === 50);
 check('SOS is 27 units', totalUnits(morseSequence('SOS')) === 27);
+{
+  // The pulse key: S O S keyed with a relaxed hand reads back as SOS, and
+  // a long pause makes a word break.
+  const presses = [[90, 0], [90, 200], [90, 200], [400, 900], [400, 200], [400, 200], [90, 2500], [90, 200], [90, 200]];
+  const keyed = [];
+  presses.forEach(([held, pause], i) => { if (i) keyed.push(keyedGap(pause)); keyed.push(keyedElement(held)); });
+  check('the pulse key: short is a dot, held is a dash; a pause ends a letter, a longer one a word', decode(keyed) === 'SO S' && keyedElement(KEY_MS.dash - 1).type === 'dot' && keyedElement(KEY_MS.dash).type === 'dash', decode(keyed));
+  const ends = letterEnds(morseSequence('HI YO'));
+  check('letters arrive in order, each once its last cell has passed', ends.map((l) => l.text).join('') === 'HI YO' && ends.every((l, k) => !k || l.end >= ends[k - 1].end) && ends.at(-1).end === totalUnits(morseSequence('HI YO')));
+}
 check('two words: one 7-unit gap between them', morseSequence('E E').map((c) => c.units ?? c.type).join(',') === 'dot,7,dot');
 const all = Object.keys(MORSE).join('');
 check('every Morse character round-trips', decode(morseSequence(all)) === all);
