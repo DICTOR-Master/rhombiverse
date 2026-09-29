@@ -5245,7 +5245,8 @@ async function init() {
   // 1D's Clear beside Undo: the world you're in, whole (Undo brings it
   // back; shown by animate()).
   const onedClear = document.getElementById('oned-clear');
-  onedClear?.addEventListener('click', () => own3DWorld()?.clear());
+  // Nets clears just the solid you're on.
+  onedClear?.addEventListener('click', () => { const w = own3DWorld(); if (w?.clearCurrent) w.clearCurrent(); else w?.clear(); });
   const setOnedClearTitle = () => { if (onedClear) { onedClear.title = t('oned.clear', getSettings().language); onedClear.setAttribute('aria-label', onedClear.title); } };
   setOnedClearTitle();
   onSettingsChange(setOnedClearTitle);
@@ -5965,8 +5966,11 @@ function animate() {
   const oneD = (own3D === 'signal' || own3D === 'construct') && own3DActive();
   if (hud1dToggleEl && hud1dToggleEl.hidden === oneD) hud1dToggleEl.hidden = !oneD;
   if (onedClearEl) {
-    if (onedClearEl.hidden === oneD) onedClearEl.hidden = !oneD;
-    const empty = !oneD || own3DWorld().isEmpty;
+    // 1D+'s worlds, and Nets.
+    const withClear = oneD || (own3D === 'nets' && own3DActive());
+    if (onedClearEl.hidden === withClear) onedClearEl.hidden = !withClear;
+    const w = withClear ? own3DWorld() : null;
+    const empty = !w || (w.currentEmpty ?? w.isEmpty);
     if (onedClearEl.disabled !== empty) onedClearEl.disabled = empty;
   }
   if (oneD && hud1dToggleEl.dataset.on !== own3D) {

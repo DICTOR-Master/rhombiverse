@@ -90,17 +90,58 @@ function ordered(v, idx) {
   const w = cross(n, u);
   return idx.map((i) => ({ i, a: Math.atan2(dot(sub(v[i], c), w), dot(sub(v[i], c), u)) })).sort((a, b) => a.a - b.a).map((x) => x.i);
 }
+// Any convex solid from its vertices: its faces are the planes through
+// three corners with every other corner on one side; its edge the
+// shortest distance between corners.
+function hullOf(v) {
+  const faces = [];
+  const seen = new Set();
+  for (let i = 0; i < v.length; i++) for (let j = i + 1; j < v.length; j++) for (let k = j + 1; k < v.length; k++) {
+    let n = cross(sub(v[j], v[i]), sub(v[k], v[i]));
+    const len = Math.hypot(...n);
+    if (len < 1e-9) continue;
+    n = n.map((x) => x / len);
+    const d = dot(n, v[i]);
+    const side = v.map((p) => dot(n, p) - d);
+    if (side.every((x) => x <= 1e-9) || side.every((x) => x >= -1e-9)) {
+      const on = v.map((p, q) => q).filter((q) => Math.abs(side[q]) < 1e-9);
+      const key = on.join();
+      if (!seen.has(key)) { seen.add(key); faces.push(ordered(v, on)); }
+    }
+  }
+  let edge = Infinity;
+  for (let i = 0; i < v.length; i++) for (let j = i + 1; j < v.length; j++) edge = Math.min(edge, Math.hypot(...sub(v[i], v[j])));
+  return { v, faces, edge };
+}
+const PHI = (1 + Math.sqrt(5)) / 2;
+const cyclic = (pts) => pts.flatMap(([a, b, c]) => [[a, b, c], [b, c, a], [c, a, b]]);
+const signs = (p) => {
+  let out = [[]];
+  for (const x of p) out = out.flatMap((q) => (x === 0 ? [[...q, 0]] : [[...q, x], [...q, -x]]));
+  return out;
+};
+const tetrahedron = () => hullOf([[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]]);
+const octahedron = () => hullOf([[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]);
+const icosahedron = () => hullOf(cyclic(signs([0, 1, PHI])));
+const dodecahedron = () => hullOf([...signs([1, 1, 1]), ...cyclic(signs([0, 1 / PHI, PHI]))]);
 // Grouped as the panel shows them. The Voronoi cells (direct decision,
 // 2026-09-29: "Voronoi in the name if valid and relevant"): the cube, the
 // RD and the truncated octahedron are exactly the Voronoi cells of the
 // simple, face-centred and body-centred cubic lattices, the region
 // nearer one lattice point than any other, and so each fills space.
+// The Platonic solids (direct decision, 2026-09-29: "all possible
+// regulars"), the cube among them too. `piece`: its 3D piece, where
+// the 3D world has one (Open in 3D).
 export const SOLIDS = {
-  cube: { label: 'Cube', group: 'voronoi', make: cube },
-  rd: { label: 'Rhombic dodecahedron', group: 'voronoi', make: rd },
-  to: { label: 'Truncated octahedron', group: 'voronoi', make: truncatedOctahedron },
+  cube: { label: 'Cube', groups: ['voronoi', 'platonic'], make: cube, piece: 'cube' },
+  rd: { label: 'Rhombic dodecahedron', groups: ['voronoi'], make: rd, piece: 'rd' },
+  to: { label: 'Truncated octahedron', groups: ['voronoi'], make: truncatedOctahedron, piece: 'to' },
+  tetra: { label: 'Tetrahedron', groups: ['platonic'], make: tetrahedron },
+  octa: { label: 'Octahedron', groups: ['platonic'], make: octahedron, piece: 'octahedron' },
+  icosa: { label: 'Icosahedron', groups: ['platonic'], make: icosahedron },
+  dodeca: { label: 'Dodecahedron', groups: ['platonic'], make: dodecahedron },
 };
-export const SOLID_GROUPS = [{ id: 'voronoi', label: 'Voronoi cells' }];
+export const SOLID_GROUPS = [{ id: 'voronoi', label: 'Voronoi cells' }, { id: 'platonic', label: 'Platonic solids' }];
 
 // ---- nets ----
 // Faces as corner coordinates, scaled to edge L, each wound so its normal

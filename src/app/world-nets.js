@@ -140,11 +140,19 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
     // solid's sphere, in whichever field of view is narrower.
     const vHalf = THREE.MathUtils.degToRad(camera.fov) / 2;
     const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
+    // Only the band between the top buttons and the panel is clear: fit to
+    // it, and centre there.
+    const H = window.innerHeight || 1;
+    const top = 150, bottom = H - (panel.offsetHeight || 150) - 60;
+    const band = Math.max(0.3, (bottom - top) / H);
+    const bandNdc = 1 - (top + bottom) / H; // the band's middle, +up
     const dist = flat
-      ? Math.max(s.y / 2 / Math.tan(vHalf), s.x / 2 / Math.tan(hHalf)) * 1.2
-      : (Math.max(...[0, 1].flatMap((i) => [0, 1].flatMap((j) => [0, 1].map((k) => new THREE.Vector3(i ? b.max.x : b.min.x, j ? b.max.y : b.min.y, k ? b.max.z : b.min.z).distanceTo(c))))) / Math.sin(Math.min(vHalf, hHalf))) * 1.05;
+      ? Math.max(s.y / 2 / (Math.tan(vHalf) * band), s.x / 2 / Math.tan(hHalf)) * 1.1
+      : (Math.max(...[0, 1].flatMap((i) => [0, 1].flatMap((j) => [0, 1].map((k) => new THREE.Vector3(i ? b.max.x : b.min.x, j ? b.max.y : b.min.y, k ? b.max.z : b.min.z).distanceTo(c))))) / Math.sin(Math.min(Math.atan(Math.tan(vHalf) * band), hHalf))) * 1.05;
     const dir = flat ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(-0.45, 0.35, 0.82).normalize();
-    return { target: c, position: c.clone().add(dir.multiplyScalar(dist)), dist };
+    // Look a little below the shape, so it sits in the band's middle.
+    const target = c.clone().addScaledVector(camera.up.clone().normalize(), -bandNdc * Math.tan(vHalf) * dist);
+    return { target, position: target.clone().add(dir.multiplyScalar(dist)), dist };
   }
   let tween = 0, tweening = false;
   // While folding: keep the viewing direction (yours, if you've turned
@@ -223,7 +231,7 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
   panel.id = 'worldnets-panel';
   panel.className = 'qc-panel';
   panel.innerHTML = `
-    <div class="w4d-row w4d-options nets-solids"></div>
+    <div class="nets-solids"></div>
     <div class="w4d-row nets-fold-row"><input type="range" class="nets-fold" min="0" max="100" step="1" value="0"><button type="button" class="sig-send" data-open></button></div>`;
   document.body.appendChild(panel);
   const solidsRow = panel.querySelector('.nets-solids');
@@ -240,17 +248,21 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
     save(); draw(); frame(true); onChange();
     if (!done()) showHudPrompt(t('nets.prompt.start', lang()), 5000);
   });
-  openBtn.addEventListener('click', () => onOpenIn('3D', solid));
+  openBtn.addEventListener('click', () => onOpenIn('3D', SOLIDS[solid].piece));
   function renderPanel() {
     panel.classList.toggle('visible', active);
     if (!active) return;
     // Each group named, its solids short (full names on hover).
-    const SHORT = { rd: 'RD', to: 'TO' };
-    solidsRow.innerHTML = SOLID_GROUPS.map((g) => `<span class="nets-group">${t(`nets.group.${g.id}`, lang())}</span>${Object.entries(SOLIDS).filter(([, s]) => s.group === g.id).map(([id, s]) => `<button type="button" data-solid="${id}" class="${id === solid ? 'active' : ''}" title="${s.label}">${SHORT[id] ?? s.label}</button>`).join('')}`).join('');
+    const SHORT = { rd: 'RD', to: 'TO', tetra: 'Tetra', octa: 'Octa', icosa: 'Icosa', dodeca: 'Dodeca' };
+    solidsRow.innerHTML = SOLID_GROUPS.map((g) => `<div class="w4d-row w4d-options"><span class="nets-group">${t(`nets.group.${g.id}`, lang())}</span>${Object.entries(SOLIDS).filter(([, s]) => s.groups.includes(g.id)).map(([id, s]) => `<button type="button" data-solid="${id}" class="${id === solid ? 'active' : ''}" title="${s.label}">${SHORT[id] ?? s.label}</button>`).join('')}</div>`).join('');
     foldRow.hidden = !complete();
+    // The slider always shows this net's own fold (direct report: "the
+    // slider doesn't reset between builds").
+    slider.value = String(Math.round(fold * 100));
     slider.title = t('nets.fold', lang());
     slider.setAttribute('aria-label', slider.title);
-    openBtn.hidden = fold < 1;
+    // Open in 3D where the 3D world has this solid as a piece.
+    openBtn.hidden = fold < 1 || !SOLIDS[solid].piece;
     openBtn.textContent = t('con.open', lang(), { dim: '3D' });
   }
   let shownLang = lang();
@@ -271,6 +283,16 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
     /** Folded any way at all: the net has left 2D. */
     get folded() { return fold > 0; },
     get isEmpty() { return Object.values(progress).every((v) => v === 0); },
+    /** Nothing built on the solid you're on (the ⊘ beside Undo). */
+    get currentEmpty() { return progress[solid] === 0 && fold === 0; },
+    /** ⊘ beside Undo (direct request: "need the delete button on nets"):
+     * the solid you're on, back to its ghost net; Undo brings it back. */
+    clearCurrent() {
+      cancelAnimationFrame(foldRaf);
+      progress[solid] = 0; fold = 0;
+      save(); draw(); if (active) { frame(true); showHudPrompt(t('nets.prompt.start', lang()), 5000); }
+      onChange();
+    },
     clear() { for (const id of Object.keys(progress)) progress[id] = 0; fold = 0; save(); draw(); if (active) frame(true); onChange(); },
     snapshot: toJSON,
     restore(json) { read(json); save(); draw(); if (active) frame(true); },
