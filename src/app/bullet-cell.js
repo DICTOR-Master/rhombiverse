@@ -15,14 +15,19 @@
 import * as THREE from 'three';
 
 const cache = new Map();
-export function bulletGeometry(unit, radius, pad = 0) {
-  const key = `${unit.toFixed(4)}|${radius.toFixed(4)}|${pad.toFixed(4)}`;
+// `segments`: round the axis. Signal's big close-up bullets need 64
+// ("smooth circles, no crenulation"); Construct's and Nets' slender cells,
+// seen from further off and by the hundred, 20 round and 4 along each
+// curve (a 24-cell's worth at 64 and 10
+// was ~800k vertices, too heavy to turn by touch).
+export function bulletGeometry(unit, radius, pad = 0, segments = 64, steps = 10) {
+  const key = `${unit.toFixed(4)}|${radius.toFixed(4)}|${pad.toFixed(4)}|${segments}|${steps}`;
   if (cache.has(key)) return cache.get(key);
   const back = -unit / 2 + pad / 2; // the flat back, and the hollow's centre
   const base = unit / 2 - pad / 2; // the nose's centre
   const r = Math.min(radius, (base - back) / 2);
   const pts = [];
-  const STEPS = 10;
+  const STEPS = steps; // along the nose's and the hollow's curve
   // Tail hollow: a sphere of the nose's radius, from its deepest point on
   // the axis out to the rim.
   for (let i = 0; i <= STEPS; i++) {
@@ -34,7 +39,7 @@ export function bulletGeometry(unit, radius, pad = 0) {
     const a = (i / STEPS) * (Math.PI / 2);
     pts.push(new THREE.Vector2(r * Math.cos(a), base + r * Math.sin(a)));
   }
-  const g = new THREE.LatheGeometry(pts, 64); // smooth circles, no crenulation
+  const g = new THREE.LatheGeometry(pts, segments); // smooth circles, no crenulation
   g.computeVertexNormals();
   // A soft shadow in the tail's hollow, darkening toward its centre, so
   // the concave cup reads as concave, not as a dome (direct request:
@@ -58,10 +63,10 @@ export function bulletGeometry(unit, radius, pad = 0) {
 // smooth line (direct report: "gaps shouldn't show as double when
 // ghosted out": see-through noses and cups overlapped as double rims).
 const plainCache = new Map();
-export function plainCellGeometry(unit, radius) {
-  const key = `${unit.toFixed(4)}|${radius.toFixed(4)}`;
+export function plainCellGeometry(unit, radius, segments = 64) {
+  const key = `${unit.toFixed(4)}|${radius.toFixed(4)}|${segments}`;
   if (!plainCache.has(key)) {
-    const g = new THREE.CylinderGeometry(radius, radius, unit, 64, 1, true);
+    const g = new THREE.CylinderGeometry(radius, radius, unit, segments, 1, true);
     const col = new Float32Array(g.attributes.position.count * 3).fill(1);
     g.setAttribute('color', new THREE.BufferAttribute(col, 3)); // matches the bullets' vertexColors materials
     plainCache.set(key, g);

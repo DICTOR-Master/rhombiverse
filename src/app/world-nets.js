@@ -48,7 +48,7 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
   const complete = () => done() === steps().length;
 
   // ---- drawing ----
-  const geo = bulletGeometry(1, R, PAD);
+  const geo = bulletGeometry(1, R, PAD, 20, 4); // slender cells, by the hundred (see bullet-cell.js)
   const filledMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, roughness: 0.8, metalness: 0.05 });
   const nextMat = new THREE.MeshStandardMaterial({ color: NEXT, emissive: NEXT, emissiveIntensity: 0.35, vertexColors: true });
   const faceMat = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });

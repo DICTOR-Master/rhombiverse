@@ -107,9 +107,10 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   let theta = 0;
 
   // ---- drawing ----
-  const geo = bulletGeometry(U, R, PAD);
-  const plainGeo = plainCellGeometry(U, R);
-  const edgeGhostGeo = plainCellGeometry(N * U, R); // a finished edge, ghosted: one plain rod
+  const SEG = 20; // round the axis: slender cells, by the hundred (see bullet-cell.js)
+  const geo = bulletGeometry(U, R, PAD, SEG, 4);
+  const plainGeo = plainCellGeometry(U, R, SEG);
+  const edgeGhostGeo = plainCellGeometry(N * U, R, SEG); // a finished edge, ghosted: one plain rod
   const filledMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, roughness: 0.8, metalness: 0.05 });
   const nextMat = new THREE.MeshStandardMaterial({ color: NEXT, emissive: NEXT, emissiveIntensity: 0.35, vertexColors: true }); // opaque: no nested nose showing through
   const emptyMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.08, depthWrite: false });
@@ -130,7 +131,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   const limbCornerMat = new THREE.MeshStandardMaterial({ color: GOLD, roughness: 0.8, metalness: 0.05 });
   const fill = (e) => (e?.part === 'limb' ? limbFilledMat : filledMat);
   const ghost = (e) => (e?.part === 'limb' ? limbGhostMat : ghostMat);
-  const cornerGeo = new THREE.SphereGeometry(R, 48, 24);
+  const cornerGeo = new THREE.SphereGeometry(R, 20, 10);
   const catchPlane = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
   catchPlane.position.z = -R - 0.05;
   group.add(catchPlane);
@@ -194,8 +195,35 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   }
 
   // Every drawn piece keeps its ℝ⁴ ends, so the turning tesseract can be
-  // re-placed each frame without rebuilding anything.
-  const placed = [];
+  // re-placed each frame without rebuilding anything. Pieces of one shape
+  // and colour are one instanced mesh (direct report: "the RD 24-cell
+  // isn't moving easily with touch": hundreds of separate meshes ran it
+  // at a sixth of the 3D world's frame rate).
+  const batches = new Map(); // geometry+material → { g, mat, items, mesh }
+  const batchOf = (g, mat) => {
+    const key = `${g.uuid}|${mat.uuid}`;
+    if (!batches.has(key)) batches.set(key, { g, mat, items: [], mesh: null });
+    return batches.get(key);
+  };
+  const tmp = new THREE.Object3D();
+  function placeBatch(b) {
+    b.items.forEach((it, i) => {
+      tmp.quaternion.identity();
+      if (it.at) placePoint(tmp, it.at); else placeSegment(tmp, it.from, it.to, it.length);
+      tmp.updateMatrix();
+      b.mesh.setMatrixAt(i, tmp.matrix);
+    });
+    b.mesh.instanceMatrix.needsUpdate = true;
+  }
+  function flushBatches() {
+    for (const b of batches.values()) {
+      if (!b.items.length) continue;
+      b.mesh = new THREE.InstancedMesh(b.g, b.mat, b.items.length);
+      b.mesh.frustumCulled = false;
+      placeBatch(b);
+      layer.add(b.mesh);
+    }
+  }
   function placeSegment(obj, from, to, length) {
     const a = project(from), b = project(to);
     obj.position.copy(a.v).add(b.v).multiplyScalar(0.5);
@@ -205,19 +233,13 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     obj.scale.set(f, d.length() / length, f); // W's perspective: thinner inside
   }
   function cellMesh(c, mat, g = geo, length = U) {
-    const m = new THREE.Mesh(g, mat);
-    placeSegment(m, c.from, c.to, length);
-    placed.push({ obj: m, from: c.from, to: c.to, length });
-    return m;
+    batchOf(g, mat).items.push({ from: c.from, to: c.to, length });
   }
   const rod = (from, to, mat) => cellMesh({ from, to }, mat, edgeGhostGeo, N * U);
   function placePoint(obj, p) { const { v, f } = project(p); obj.position.copy(v); obj.scale.setScalar(f); }
   function dome(p) {
     const touching = plan.edges.filter((e) => same(e.from, p) || same(e.to, p));
-    const d = new THREE.Mesh(cornerGeo, touching.length && touching.every((e) => e.part === 'limb') ? limbCornerMat : cornerMat);
-    placed.push({ obj: d, at: p });
-    placePoint(d, p);
-    return d;
+    batchOf(cornerGeo, touching.length && touching.every((e) => e.part === 'limb') ? limbCornerMat : cornerMat).items.push({ at: p });
   }
   function face(corners) {
     const g = new THREE.BufferGeometry().setFromPoints(corners.map(world));
@@ -246,19 +268,19 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     const current = plan.edges[step.edge];
     const doneCells = (e) => plan.steps.slice(0, filled).filter((s) => s.edge === e.instance).reduce((n, s) => n + s.cells.length, 0);
     for (const e of plan.edges) {
-      if (e.line < current.line) { layer.add(rod(e.from, e.to, ghost(e))); continue; }
+      if (e.line < current.line) { (rod(e.from, e.to, ghost(e))); continue; }
       if (e.line > current.line) continue;
       const done = doneCells(e);
-      if (e.instance < current.instance) edgeCells(e).forEach((c) => layer.add(cellMesh(c, fill(e))));
-      else if (e.instance > current.instance) layer.add(rod(e.from, e.to, emptyMat));
-      else if (step.cells.length > 1) edgeCells(e).forEach((c) => layer.add(cellMesh(c, nextMat)));
-      else edgeCells(e).forEach((c, i) => layer.add(i < done ? cellMesh(c, fill(e)) : i === done ? cellMesh(c, nextMat) : cellMesh(c, emptyMat, plainGeo)));
+      if (e.instance < current.instance) edgeCells(e).forEach((c) => (cellMesh(c, fill(e))));
+      else if (e.instance > current.instance) (rod(e.from, e.to, emptyMat));
+      else if (step.cells.length > 1) edgeCells(e).forEach((c) => (cellMesh(c, nextMat)));
+      else edgeCells(e).forEach((c, i) => (i < done ? cellMesh(c, fill(e)) : i === done ? cellMesh(c, nextMat) : cellMesh(c, emptyMat, plainGeo)));
     }
     // The corner you've come round: a dome for the hidden nose; the one
     // just reached glows (a junction).
     const first = plan.edges.find((e) => e.line === current.line);
     const prev = plan.edges[first.instance - 1];
-    if (prev && same(prev.to, first.from)) layer.add(dome(first.from));
+    if (prev && same(prev.to, first.from)) (dome(first.from));
     if (current.line > 0 && filled === lineStart(current.line)) layer.add(junction(first.from));
   }
   // After it: finished edges ghost, the one just finished stays solid, the
@@ -286,13 +308,13 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
       let shown = true;
       // A closed shape that left an earlier one behind (the RD, under its
       // 24-cell): that one as ghosts.
-      if (m0?.ghostBelow !== undefined && e.instance < m0.ghostBelow) layer.add(rod(e.from, e.to, ghost(e)));
-      else if (e.instance < whole || (finished(e) && lastSet.has(e.instance))) cells.forEach((c) => layer.add(cellMesh(c, fill(e))));
-      else if (finished(e)) layer.add(rod(e.from, e.to, ghost(e)));
+      if (m0?.ghostBelow !== undefined && e.instance < m0.ghostBelow) (rod(e.from, e.to, ghost(e)));
+      else if (e.instance < whole || (finished(e) && lastSet.has(e.instance))) cells.forEach((c) => (cellMesh(c, fill(e))));
+      else if (finished(e)) (rod(e.from, e.to, ghost(e)));
       else if (nextSet.has(e.instance)) {
         if (plan.steps[filled].cells.length === 1) {
-          cells.forEach((c, i) => layer.add(i < doneCells[e.instance] ? cellMesh(c, fill(e)) : i === doneCells[e.instance] ? cellMesh(c, nextMat) : cellMesh(c, emptyMat, plainGeo)));
-        } else cells.forEach((c) => layer.add(cellMesh(c, nextMat)));
+          cells.forEach((c, i) => (i < doneCells[e.instance] ? cellMesh(c, fill(e)) : i === doneCells[e.instance] ? cellMesh(c, nextMat) : cellMesh(c, emptyMat, plainGeo)));
+        } else cells.forEach((c) => (cellMesh(c, nextMat)));
       } else shown = false;
       if (shown && !whole && !e.chunked) {
         const mid = world(e.from).add(world(e.to)).multiplyScalar(0.5);
@@ -308,7 +330,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     if (next >= 0 && !milestoneAt() && plan.crossings?.some((p) => same(p, plan.edges[next].from))) layer.add(junction(plan.edges[next].from));
     const m = milestoneAt();
     if (!m) return;
-    m.corners.forEach((p) => layer.add(dome(p)));
+    m.corners.forEach((p) => (dome(p)));
     m.faces.forEach((f) => layer.add(face(f)));
     if (latticeOn) drawLattice(m.lattice);
     if (!complete()) layer.add(junction(plan.edges[next].from)); // the next direction joins here
@@ -321,7 +343,6 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     placeLattice();
     layer.add(latticeMesh);
   }
-  const tmp = new THREE.Object3D();
   function placeLattice() {
     if (!latticeMesh) return;
     latticeMesh.userData.segs.forEach(([a, b], i) => {
@@ -338,11 +359,12 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
       if (child.userData.ownMaterial) child.material.dispose();
       if (child.isInstancedMesh) child.dispose();
     }
-    placed.length = 0;
+    batches.clear();
     latticeMesh = null;
     if (!active) return;
     if (flatStage()) drawFlatStage();
     else drawBuildStage();
+    flushBatches();
     renderPanel();
   }
   // The finished tesseract turning through W: re-place everything drawn.
@@ -352,7 +374,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     if (!active || !turning || !milestoneAt()?.turn) return;
     theta = (theta + ((now - turnLast) / 1000) * W_TURN) % (2 * Math.PI);
     turnLast = now;
-    for (const p of placed) p.at ? placePoint(p.obj, p.at) : placeSegment(p.obj, p.from, p.to, p.length);
+    for (const b of batches.values()) if (b.mesh) placeBatch(b);
     placeLattice();
     turnRaf = requestAnimationFrame(turn);
   }
