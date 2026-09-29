@@ -265,9 +265,22 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // circle" cells; the user preferred this: "inside view was perfect
   // before".)
   const EYE_H = R * 2.2;
+  // Touch moves you about inside (direct request: "signal inside view
+  // should be manipulable"; decisions: look around, move along, change
+  // height; ease back when let go): offsets from the tuned pose below.
+  const look = { yaw: 0, pitch: 0, du: 0, dh: 0 };
+  const LOOK_LIMITS = { pitch: 1.2, du: [-8, 40], dh: [-EYE_H, TUNNEL_R * 0.85 - EYE_H] };
+  const clampLook = () => {
+    look.yaw = Math.max(-Math.PI, Math.min(Math.PI, look.yaw));
+    look.pitch = Math.max(-LOOK_LIMITS.pitch, Math.min(LOOK_LIMITS.pitch, look.pitch));
+    look.du = Math.max(LOOK_LIMITS.du[0], Math.min(LOOK_LIMITS.du[1], look.du));
+    look.dh = Math.max(LOOK_LIMITS.dh[0], Math.min(LOOK_LIMITS.dh[1], look.dh));
+  };
+  const zUp = new THREE.Vector3(0, 0, 1);
   function aimInside() {
     camera.up.set(0, 0, 1);
-    camera.position.copy(insidePoint(EYE_U, EYE_H));
+    const eye = insidePoint(EYE_U + look.du, EYE_H + look.dh);
+    camera.position.copy(eye);
     // The view tilted back against the path, 22° (direct requests:
     // "tilt view backwards so cells vanish above in distance", "centre of
     // appearing and disappearing cell should drop slightly", "more upward
@@ -276,10 +289,81 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     // centre sits a little below the middle as it passes and the path
     // climbs to a vanishing point well above it.
     const reach = 20 * S;
-    controls.target.copy(insidePoint(EYE_U + 20, EYE_H - reach * Math.tan((22 * Math.PI) / 180)));
+    const base = insidePoint(EYE_U + 20, EYE_H - reach * Math.tan((22 * Math.PI) / 180));
+    const dir = base.sub(insidePoint(EYE_U, EYE_H));
+    if (look.yaw) dir.applyAxisAngle(zUp, look.yaw);
+    if (look.pitch) dir.applyAxisAngle(new THREE.Vector3().crossVectors(dir, zUp).normalize(), look.pitch);
+    controls.target.copy(eye).add(dir);
     controls.enabled = false;
     controls.update();
   }
+  // Gestures, Inside only: one finger (or the mouse) drags to look
+  // around; a pinch or the scroll wheel moves you along the tunnel; two
+  // fingers dragged up or down (or Shift + scroll) change your height.
+  // A moment after you let go, the view eases back.
+  const touches = new Map();
+  let gesture = null, easeTimer = 0, easeRaf = 0;
+  const insideActive = () => active && view.inside;
+  function moved() { clampLook(); aimInside(); cancelEase(); }
+  function cancelEase() { clearTimeout(easeTimer); cancelAnimationFrame(easeRaf); easeRaf = 0; }
+  function easeBackSoon() {
+    cancelEase();
+    easeTimer = setTimeout(() => {
+      let last = performance.now();
+      const step = (now) => {
+        const k = Math.min(1, ((now - last) / 1000) * 3);
+        last = now;
+        for (const key of Object.keys(look)) look[key] *= 1 - k;
+        const done = Object.values(look).every((v) => Math.abs(v) < 1e-3);
+        if (done) for (const key of Object.keys(look)) look[key] = 0;
+        if (insideActive()) aimInside();
+        easeRaf = done || !insideActive() ? 0 : requestAnimationFrame(step);
+      };
+      easeRaf = requestAnimationFrame(step);
+    }, 1200);
+  }
+  function twoFinger() {
+    const [a, b] = [...touches.values()];
+    return { dist: Math.hypot(a.x - b.x, a.y - b.y), y: (a.y + b.y) / 2 };
+  }
+  const el = controls.domElement;
+  el.addEventListener('pointerdown', (e) => {
+    if (!insideActive()) return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    gesture = touches.size >= 2 ? { two: twoFinger() } : { x: e.clientX, y: e.clientY };
+    cancelEase();
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!insideActive() || !touches.has(e.pointerId)) return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size >= 2 && gesture?.two) {
+      const now = twoFinger();
+      look.du += (now.dist - gesture.two.dist) * 0.03; // spread = forward
+      look.dh += (gesture.two.y - now.y) * 0.0012; // up = higher
+      gesture.two = now;
+      moved();
+    } else if (touches.size === 1 && gesture && !gesture.two) {
+      look.yaw -= (e.clientX - gesture.x) * 0.005;
+      look.pitch -= (e.clientY - gesture.y) * 0.005;
+      gesture.x = e.clientX; gesture.y = e.clientY;
+      moved();
+    }
+  });
+  const lift = (e) => {
+    if (!touches.delete(e.pointerId)) return;
+    if (touches.size === 1) { const [p] = touches.values(); gesture = { x: p.x, y: p.y }; }
+    if (!touches.size) { gesture = null; if (insideActive()) easeBackSoon(); }
+  };
+  el.addEventListener('pointerup', lift);
+  el.addEventListener('pointercancel', lift);
+  el.addEventListener('wheel', (e) => {
+    if (!insideActive()) return;
+    e.preventDefault();
+    if (e.shiftKey) look.dh -= (e.deltaY || e.deltaX) * 0.0006;
+    else look.du -= e.deltaY * 0.01;
+    moved();
+    easeBackSoon();
+  }, { passive: false });
   // Distance fades into the dark (both views; the scene's fog, only
   // while Signal is on).
   // Inside, far enough out that the path narrows to a sharp point first
@@ -294,6 +378,8 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     // a cell's hollow from ever showing through).
     solidMaterial.side = on ? THREE.FrontSide : THREE.DoubleSide;
     solidMaterial.needsUpdate = true;
+    for (const key of Object.keys(look)) look[key] = 0;
+    cancelEase();
     if (on) aimInside();
     else { camera.up.set(0, 1, 0); controls.enabled = true; resetView(); frameOutside(); }
   }
