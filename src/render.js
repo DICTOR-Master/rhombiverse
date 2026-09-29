@@ -3426,6 +3426,7 @@ async function init() {
   const octaVoidMat = new THREE.MeshStandardMaterial({ color: 0xf5c542, emissive: 0xf5c542, emissiveIntensity: 0.25, roughness: 0.4 });
   const tetraVoidMat = new THREE.MeshStandardMaterial({ color: 0xff7aa8, emissive: 0xff7aa8, emissiveIntensity: 0.25, roughness: 0.4 });
   const packWireMat = new THREE.LineBasicMaterial({ color: 0x22c3e6, transparent: true, opacity: 0.35 });
+  const packSlotMat = new THREE.MeshBasicMaterial({ color: 0x22c3e6, transparent: true, opacity: 0.1, depthWrite: false });
   const rdEdgePairs = (() => {
     const v = rdRawVerts(SCALE);
     const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -3440,11 +3441,16 @@ async function init() {
     for (const c of [...packGroup.children]) { packGroup.remove(c); if (c.isInstancedMesh) c.dispose(); else c.geometry?.dispose(); }
     const on = packingMode !== 'off' && packingApplies();
     material.visible = !on; // the RD solids step aside (view only)
+    // Layered with Lattice View (direct decision, 2026-09-29: "layer:
+    // lattice as ghost spheres"): its ghost pieces step aside, and every
+    // open slot one step past the build shows as a faint sphere.
+    const latticeLayer = on && latticeQuickViewMode !== 'off';
+    for (const g of [latticeQuickViewMesh, latticeQuickViewEdges]) if (g) g.visible = !latticeLayer;
     packingPanel.classList.toggle('visible', on);
     if (!on) return;
     const cells = visibleCells(world);
     const planes = document.getElementById('section-enable')?.checked ? [sectionPlane] : [];
-    for (const m of [packMat, packGhostMat, octaVoidMat, tetraVoidMat, packWireMat]) m.clippingPlanes = planes;
+    for (const m of [packMat, packGhostMat, octaVoidMat, tetraVoidMat, packWireMat, packSlotMat]) m.clippingPlanes = planes;
     // The baseline wireframe: every whole RD's edges.
     const wp = [];
     for (const c of cells) for (const [a, b] of rdEdgePairs) wp.push(a[0] + c.x * SCALE, a[1] + c.y * SCALE, a[2] + c.z * SCALE, b[0] + c.x * SCALE, b[1] + c.y * SCALE, b[2] + c.z * SCALE);
@@ -3460,6 +3466,17 @@ async function init() {
       spheres.setColorAt(i, instanceColorFor(c, 'rd'));
     });
     packGroup.add(spheres);
+    if (latticeLayer) {
+      const slots = new Map();
+      for (const c of cells) for (const [dx, dy, dz] of NEIGHBOR_OFFSETS) {
+        const x = c.x + dx, y = c.y + dy, z = c.z + dz;
+        if (!world.has(x, y, z)) slots.set(`${x},${y},${z}`, [x, y, z]);
+      }
+      const ghosts = new THREE.InstancedMesh(packSphereGeo, packSlotMat, Math.max(1, slots.size));
+      [...slots.values()].forEach(([x, y, z], i) => ghosts.setMatrixAt(i, m4.makeScale(r, r, r).setPosition(x * SCALE, y * SCALE, z * SCALE)));
+      ghosts.count = slots.size;
+      packGroup.add(ghosts);
+    }
     if (packingMode !== 'voids') return;
     const p = packing(cells.map((c) => [c.x, c.y, c.z]));
     for (const [kind, pts, mat] of [['octa', p.octa, octaVoidMat], ['tetra', p.tetra, tetraVoidMat]]) {
@@ -4295,7 +4312,13 @@ async function init() {
     document.getElementById('hud-quick-lattice-view')?.classList.toggle('active', isOn);
   }
 
+  // Packed spheres lay the lattice out as ghost spheres instead, so its
+  // own ghosts step aside after every rebuild while they're on.
   async function rebuildLatticeQuickView() {
+    await rebuildLatticeQuickViewPieces();
+    refreshPackingIfOn?.();
+  }
+  async function rebuildLatticeQuickViewPieces() {
     const myGeneration = ++latticeQuickViewGeneration;
     clearLatticeQuickView();
     if (latticeQuickViewMode === 'off') { syncLatticeQuickViewActiveState(false); return; }

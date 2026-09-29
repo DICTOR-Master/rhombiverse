@@ -3,7 +3,7 @@
     "date": "2026-09-29",
     "title": "Packed spheres",
     "items": [
-      "New on the corner wheel, Packed spheres (three circles), for the 3D RD world: tap once and every RD becomes one touching sphere, twelve round each, the way close-packed spheres fill space; tap again for the voids they leave, octahedral (gold) and tetrahedral (rose), shown only where fully enclosed, the spheres ghosted round them. A slider sizes the spheres, from bare wireframe through touching to overlapping. A view only: your cells are untouched, and it keeps to X-Ray's cut. Spherical (◯) stays as it was."
+      "New on the corner wheel, Packed spheres (three circles), for the 3D RD world: tap once and every RD becomes one touching sphere, twelve round each, the way close-packed spheres fill space; tap again for the voids they leave, octahedral (gold) and tetrahedral (rose), shown only where fully enclosed, the spheres ghosted round them. A slider sizes the spheres, from bare wireframe through touching to overlapping. With Lattice View on, every open lattice slot one step past your build shows as a faint sphere, where the packing would grow. A view only: your cells are untouched, and it keeps to X-Ray's cut. Spherical (◯) stays as it was."
     ]
   },
   {

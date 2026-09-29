@@ -98,7 +98,7 @@ Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel
 | Lattice View | 你的作品，以及所选部件向外一步的所有空位 | 轻点 Lattice View 按钮循环切换部件 |
 | X-Ray | 剖切。可以把切面拖过结构，也可以斜着拖 | X-Ray 按钮（⛶） |
 | Spherical | 把每个部件显示成近似球体 | Spherical 按钮（◯） |
-| Packed spheres | 每个 RD 一个相切的球；然后是它们之间的空隙（八面体金色、四面体玫瑰色），只显示完全封闭的；滑块调节球的大小（0 = 线框，相切处有停顿，更大 = 重叠）。仅视图 | 角落轮盘的 Packed spheres 面（三个圆）：关 → 球 → 空隙 |
+| Packed spheres | 每个 RD 一个相切的球；然后是它们之间的空隙（八面体金色、四面体玫瑰色），只显示完全封闭的；滑块调节球的大小（0 = 线框，相切处有停顿，更大 = 重叠）。打开 Lattice View 时，每个空的晶格位置显示为淡淡的球。仅视图 | 角落轮盘的 Packed spheres 面（三个圆）：关 → 球 → 空隙 |
 | Duality | 这种晶体结构投射出的非周期镶嵌 | Duality 按钮（◐） |
 | BCC Lattice | 嵌套在 FCC 晶格中的体心立方晶格 | BCC Lattice 按钮（⬡） |
 | Dualize | 交换 FCC 和 BCC | 设置 → Dualize Preview |

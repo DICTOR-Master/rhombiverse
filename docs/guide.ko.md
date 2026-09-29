@@ -98,7 +98,7 @@ FCC에서 해 보세요. Pyramid 여섯 개를 놓아 Cube를 만듭니다. 그�
 | Lattice View | 작품과, 고른 조각을 한 칸 바깥에 놓을 수 있는 모든 빈자리 | Lattice View 버튼을 탭해 조각을 전환 |
 | X-Ray | 단면. 평면을 구조 속으로 드래그할 수 있습니다(대각선으로도) | X-Ray 버튼(⛶) |
 | Spherical | 각 조각을 구에 가까운 모양으로 표시 | Spherical 버튼(◯) |
-| Packed spheres | RD마다 서로 닿는 구 하나, 그다음 그 사이 빈틈(팔면체 금색, 사면체 장밋빛)을 완전히 둘러싸인 곳만. 슬라이더로 구 크기(0 = 와이어프레임, 닿는 곳에서 멈춤, 그 이상 = 겹침). 보기만 | 코너 휠의 Packed spheres 면(원 셋): 끔 → 구 → 빈틈 |
+| Packed spheres | RD마다 서로 닿는 구 하나, 그다음 그 사이 빈틈(팔면체 금색, 사면체 장밋빛)을 완전히 둘러싸인 곳만. 슬라이더로 구 크기(0 = 와이어프레임, 닿는 곳에서 멈춤, 그 이상 = 겹침). Lattice View를 켜면 빈 격자 자리마다 흐린 구가 보입니다. 보기만 | 코너 휠의 Packed spheres 면(원 셋): 끔 → 구 → 빈틈 |
 | Duality | 이 결정 구조가 드리우는 비주기 타일링 | Duality 버튼(◐) |
 | BCC Lattice | FCC 격자 안에 들어 있는 체심 입방 격자 | BCC Lattice 버튼(⬡) |
 | Dualize | FCC와 BCC를 맞바꿈 | 설정 → Dualize Preview |
