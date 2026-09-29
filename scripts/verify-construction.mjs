@@ -116,7 +116,12 @@ check('axes only ever join: X from the start, Y at the first corner, and X is ne
   const deg = new Map();
   for (const e of ttEdges) for (const p of [e.from, e.to]) deg.set(kk(p), (deg.get(kk(p)) ?? 0) + 1);
   check('the truncated tetrahedron: the hexagon + 12 edges; 12 corners, three edges at each; 4 hexagons + 4 triangles', ttEdges.length === 18 && deg.size === 12 && [...deg.values()].every((d) => d === 3) && tt.faces.filter((f) => f.length === 6).length === 4 && tt.faces.filter((f) => f.length === 3).length === 4 && tt.dim === 3);
-  const big = py.faces.flat().filter((p, i, a) => a.findIndex((q) => kk(q) === kk(p)) === i);
+  // The big tetrahedron's corners: its apex (the highest point) and the
+  // points 3n from it.
+  const pts = K.edges.flatMap((e) => [e.from, e.to]).filter((p, i, a) => a.findIndex((q) => kk(q) === kk(p)) === i);
+  const d3 = (a, b) => near(Math.hypot(...a.slice(0, 3).map((v, d) => v - b[d])), 3 * n);
+  const top = pts.reduce((a, b) => (b[2] > a[2] ? b : a));
+  const big = [top, ...pts.filter((p) => d3(p, top))];
   const bigRegular = big.length === 4 && big.every((a, x) => big.every((b, y) => x === y || near(Math.hypot(...a.slice(0, 3).map((v, d) => v - b[d])), 3 * n)));
   check('then its limbs: one tap per edge, and all together one big regular tetrahedron (edge 3n), every edge n', bigRegular && K.edges.every((e) => near(len(e), n)) && K.steps.slice(tt.at).every((s) => s.cells.length === n) && py.open.piece === 'pyrochlore');
   const pyro = py.lattice;

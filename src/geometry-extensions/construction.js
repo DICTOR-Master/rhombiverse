@@ -289,6 +289,7 @@ export function kagomePlan(n = SQUARE_N) {
   // and the top cap's three edges to the apex.
   [0, 2, 4].forEach((i, k) => addZ(tips[i], S1[k]));
   [0, 1, 2].forEach((k) => addZ(S2[k], BA));
+  edges.forEach((e, k) => { if ((k >= 6 && k < 18) || k >= ttDone) e.part = 'limb'; });
   const steps = [];
   edges.forEach((e, k) => {
     const cells = edgeCells(e);
@@ -374,7 +375,11 @@ export function kagomePlan(n = SQUARE_N) {
     }
   }
   const hexFace = P.map(pad4);
-  const tipFaces = tips.map((tp, i) => [pad4(tp), pad4(P[(i + 1) % 6]), pad4(P[i])]);
+  // Two colours (direct decision, 2026-09-29: "double colours for Kagome",
+  // limbs gold): the body (hexagon, truncated tetrahedron) and the limbs
+  // (the star's points, the mini tetrahedra), edges and faces alike.
+  const limb = (f) => Object.assign(f, { part: 'limb' });
+  const tipFaces = tips.map((tp, i) => limb([pad4(tp), pad4(P[(i + 1) % 6]), pad4(P[i])]));
   const bigCorners = [...T3.map((t) => [t[0], t[1], 0]), BA];
   const hexOfFace = (A, B, C) => [at3(A, B, 1 / 3), at3(A, B, 2 / 3), at3(B, C, 1 / 3), at3(B, C, 2 / 3), at3(C, A, 1 / 3), at3(C, A, 2 / 3)].map(pad4);
   const [c0, c1, c2, c3] = bigCorners;
@@ -382,7 +387,10 @@ export function kagomePlan(n = SQUARE_N) {
     hexOfFace(c0, c1, c2), hexOfFace(c0, c1, c3), hexOfFace(c1, c2, c3), hexOfFace(c2, c0, c3),
     ...bigCorners.map((V) => bigCorners.filter((W) => W !== V).map((W) => pad4(at3(V, W, 1 / 3)))),
   ];
-  const bigFaces = [[c0, c1, c2], [c0, c1, c3], [c1, c2, c3], [c2, c0, c3]].map((f) => f.map(pad4));
+  const capFaces = [
+    ...[0, 2, 4].flatMap((i, k) => [[tips[i], P[i], P[(i + 1) % 6]], [tips[i], P[i], S1[k]], [tips[i], P[(i + 1) % 6], S1[k]]]),
+    ...[0, 1, 2].map((k) => [S2[k], S2[(k + 1) % 3], BA]),
+  ].map((f) => limb(f.map(pad4)));
   const ttCorners = [...P.map((p) => [p[0], p[1], 0]), ...S1, ...S2].map(pad4);
   return {
     id: 'kagome', n, edges, steps, flat: 6 * n, axisNames: names,
@@ -396,7 +404,7 @@ export function kagomePlan(n = SQUARE_N) {
       { at: 6 * n, whole: 6, dim: 2, name: 'Hexagon', prompt: 'con.prompt.hexagon', corners: P.map(pad4), faces: [hexFace], lattice: [...honey.values()], autoLattice: false, open: { dim: '2D', piece: 'hexagon' } },
       { at: 6 * n + 12, whole: 18, dim: 2, name: 'Kagome', prompt: 'con.prompt.kagome', corners: tips.map(pad4), faces: [hexFace, ...tipFaces], lattice: kagome, autoLattice: true, open: { dim: '2D', piece: 'kagome' } },
       { at: steps.findIndex((st) => st.edge === ttDone), whole: ttDone, dim: 3, name: 'Truncated tetrahedron', prompt: 'con.prompt.tt', corners: ttCorners, faces: ttFaces, lattice: [], autoLattice: false, open: null },
-      { at: steps.length, whole: edges.length, dim: 3, name: 'Pyrochlore', prompt: 'con.prompt.pyrochlore', corners: [...ttCorners, ...bigCorners.map(pad4), ...tips.map(pad4)], faces: bigFaces, lattice: [...pyro.values()], autoLattice: true, open: { dim: '3D', piece: 'pyrochlore' } },
+      { at: steps.length, whole: edges.length, dim: 3, name: 'Pyrochlore', prompt: 'con.prompt.pyrochlore', corners: [...ttCorners, ...bigCorners.map(pad4), ...tips.map(pad4)], faces: [...ttFaces, ...capFaces], lattice: [...pyro.values()], autoLattice: true, open: { dim: '3D', piece: 'pyrochlore' } },
     ],
   };
 }

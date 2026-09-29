@@ -58,6 +58,7 @@ const R = 0.055;
 const PAD = 0.004;
 const CYAN = 0x22c3e6;
 const NEXT = 0xf59e0b; // the 1D worlds' orange "tap here"
+const GOLD = 0xd4af37; // a family's second colour (Kagome's limbs): the app's own gold
 const W_TURN = 0.3; // radians per second through W, once the tesseract closes
 const lang = () => getSettings().language;
 
@@ -122,6 +123,13 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   // only the departing line shows, a dome the cells' width stands in for
   // that hidden nose, and a closed shape gets one at every corner.
   const cornerMat = new THREE.MeshStandardMaterial({ color: CYAN, roughness: 0.8, metalness: 0.05 });
+  // The second colour, for a plan's limbs (edge.part / face.part 'limb').
+  const limbFilledMat = new THREE.MeshStandardMaterial({ color: GOLD, vertexColors: true, roughness: 0.8, metalness: 0.05 });
+  const limbGhostMat = new THREE.MeshStandardMaterial({ color: GOLD, vertexColors: true, transparent: true, opacity: 0.22, depthWrite: false });
+  const limbFaceMat = new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
+  const limbCornerMat = new THREE.MeshStandardMaterial({ color: GOLD, roughness: 0.8, metalness: 0.05 });
+  const fill = (e) => (e?.part === 'limb' ? limbFilledMat : filledMat);
+  const ghost = (e) => (e?.part === 'limb' ? limbGhostMat : ghostMat);
   const cornerGeo = new THREE.SphereGeometry(R, 48, 24);
   const catchPlane = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
   catchPlane.position.z = -R - 0.05;
@@ -203,7 +211,8 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   const rod = (from, to, mat) => cellMesh({ from, to }, mat, edgeGhostGeo, N * U);
   function placePoint(obj, p) { const { v, f } = project(p); obj.position.copy(v); obj.scale.setScalar(f); }
   function dome(p) {
-    const d = new THREE.Mesh(cornerGeo, cornerMat);
+    const touching = plan.edges.filter((e) => same(e.from, p) || same(e.to, p));
+    const d = new THREE.Mesh(cornerGeo, touching.length && touching.every((e) => e.part === 'limb') ? limbCornerMat : cornerMat);
     placed.push({ obj: d, at: p });
     placePoint(d, p);
     return d;
@@ -213,7 +222,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     const idx = [];
     for (let i = 1; i + 1 < corners.length; i++) idx.push(0, i, i + 1);
     g.setIndex(idx);
-    const m = new THREE.Mesh(g, faceMat);
+    const m = new THREE.Mesh(g, corners.part === 'limb' ? limbFaceMat : faceMat);
     m.userData.own = true;
     return m;
   }
@@ -235,13 +244,13 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     const current = plan.edges[step.edge];
     const doneCells = (e) => plan.steps.slice(0, filled).filter((s) => s.edge === e.instance).reduce((n, s) => n + s.cells.length, 0);
     for (const e of plan.edges) {
-      if (e.line < current.line) { layer.add(rod(e.from, e.to, ghostMat)); continue; }
+      if (e.line < current.line) { layer.add(rod(e.from, e.to, ghost(e))); continue; }
       if (e.line > current.line) continue;
       const done = doneCells(e);
-      if (e.instance < current.instance) edgeCells(e).forEach((c) => layer.add(cellMesh(c, filledMat)));
+      if (e.instance < current.instance) edgeCells(e).forEach((c) => layer.add(cellMesh(c, fill(e))));
       else if (e.instance > current.instance) layer.add(rod(e.from, e.to, emptyMat));
       else if (step.cells.length > 1) edgeCells(e).forEach((c) => layer.add(cellMesh(c, nextMat)));
-      else edgeCells(e).forEach((c, i) => layer.add(i < done ? cellMesh(c, filledMat) : i === done ? cellMesh(c, nextMat) : cellMesh(c, emptyMat, plainGeo)));
+      else edgeCells(e).forEach((c, i) => layer.add(i < done ? cellMesh(c, fill(e)) : i === done ? cellMesh(c, nextMat) : cellMesh(c, emptyMat, plainGeo)));
     }
     // The corner you've come round: a dome for the hidden nose; the one
     // just reached glows (a junction).
@@ -265,11 +274,11 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     for (const e of plan.edges) {
       const cells = edgeCells(e);
       let shown = true;
-      if (e.instance < whole || (finished(e) && e.instance === last)) cells.forEach((c) => layer.add(cellMesh(c, filledMat)));
-      else if (finished(e)) layer.add(rod(e.from, e.to, ghostMat));
+      if (e.instance < whole || (finished(e) && e.instance === last)) cells.forEach((c) => layer.add(cellMesh(c, fill(e))));
+      else if (finished(e)) layer.add(rod(e.from, e.to, ghost(e)));
       else if (e.instance === next) {
         if (plan.steps[filled].cells.length === 1) {
-          cells.forEach((c, i) => layer.add(i < doneCells[e.instance] ? cellMesh(c, filledMat) : i === doneCells[e.instance] ? cellMesh(c, nextMat) : cellMesh(c, emptyMat, plainGeo)));
+          cells.forEach((c, i) => layer.add(i < doneCells[e.instance] ? cellMesh(c, fill(e)) : i === doneCells[e.instance] ? cellMesh(c, nextMat) : cellMesh(c, emptyMat, plainGeo)));
         } else cells.forEach((c) => layer.add(cellMesh(c, nextMat)));
       } else shown = false;
       if (shown && !whole) {
