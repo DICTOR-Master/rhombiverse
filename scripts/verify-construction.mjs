@@ -124,12 +124,27 @@ check('axes only ever join: X from the start, Y at the first corner, and X is ne
   // (All six star points lie 3n from it; its base is the three with an edge going up.)
   const big = [top, ...pts.filter((p) => d3(p, top) && K.edges.some((e) => kk(e.from) === kk(p) && e.to[2] > 0))];
   const bigRegular = big.length === 4 && big.every((a, x) => big.every((b, y) => x === y || near(Math.hypot(...a.slice(0, 3).map((v, d) => v - b[d])), 3 * n)));
-  check('then its limbs: one tap per edge, and all together one big regular tetrahedron (edge 3n), every edge n', bigRegular && K.edges.every((e) => near(len(e), n)) && K.steps.slice(tt.at).every((s) => s.cells.length === n) && py.open.piece === 'pyrochlore');
+  check('then its limbs: one tap per edge, and all together one big regular tetrahedron (edge 3n), every edge n', bigRegular && K.edges.every((e) => near(len(e), n)) && K.steps.slice(tt.at, py.at).every((s) => s.cells.length === n) && py.open.piece === 'pyrochlore');
+  // Hyper-pyrochlore: the body (the truncated 5-cell, 20 corners, four
+  // edges at each, the truncated tetrahedron one of its cells), then the
+  // limbs; all together one big regular 5-cell (edge 3n), every edge n.
+  const t5 = K.milestones[4], hy = K.milestones[5];
+  const k4 = (p) => p.map((v) => v.toFixed(5)).join();
+  const bodyEdges = [...ttEdges, ...K.edges.slice(py.whole, t5.whole)];
+  const deg4 = new Map();
+  for (const e of bodyEdges) for (const p of [e.from, e.to]) deg4.set(k4(p), (deg4.get(k4(p)) ?? 0) + 1);
+  check('the truncated 5-cell: 40 edges, 20 corners, four edges at each (the truncated tetrahedron one of its cells)', bodyEdges.length === 40 && deg4.size === 20 && [...deg4.values()].every((d) => d === 4) && t5.dim === 4);
+  const all4 = K.edges.flatMap((e) => [e.from, e.to]).filter((p, i, a) => a.findIndex((q) => k4(q) === k4(p)) === i);
+  const apex4 = all4.reduce((a, b) => ((b[3] ?? 0) > (a[3] ?? 0) ? b : a));
+  const d4 = (a, b) => Math.hypot(...a.map((v, d) => v - b[d]));
+  // (The other star points happen to lie 3n from it too; the base is the four with a W edge.)
+  const big5 = [apex4, ...all4.filter((p) => near(d4(p, apex4), 3 * n) && K.edges.some((e) => k4(e.from) === k4(p) && (e.to[3] ?? 0) > 0))];
+  check('then its limbs: one big regular 5-cell (edge 3n), every edge n, turning through W', big5.length === 5 && big5.every((a, x) => big5.every((b, y) => x === y || near(d4(a, b), 3 * n))) && K.edges.every((e) => near(len(e), n)) && hy.turn && hy.dim === 4, `${K.steps.length} taps`);
   const pyro = py.lattice;
   const pdeg = new Map();
-  for (const [a, b] of [...pyro, ...K.edges.map((e) => [e.from, e.to])]) for (const p of [a, b]) pdeg.set(kk(p), (pdeg.get(kk(p)) ?? 0) + 1);
+  for (const [a, b] of [...pyro, ...K.edges.slice(0, py.whole).map((e) => [e.from, e.to])]) for (const p of [a, b]) pdeg.set(kk(p), (pdeg.get(kk(p)) ?? 0) + 1);
   check('its lattice: every edge n; no corner in more than two tetrahedra (at most 6 edges)', pyro.every(([a, b]) => near(Math.hypot(...a.map((v, d) => v - b[d])), n)) && [...pdeg.values()].every((d) => d <= 6), `${pyro.length} ghost edges`);
-  check(`steps: hexagon by hand, star by edge, Z1 by hand, then an edge a tap: ${K.steps.length} taps`, K.steps.length === 6 * n + 12 + n + 17 && K.steps.slice(6 * n + 12, 7 * n + 12).every((s) => s.cells.length === 1));
+  check('steps: hexagon by hand, star by edge, Z1 by hand, then an edge a tap', py.at === 6 * n + 12 + n + 17 && K.steps.slice(6 * n + 12, 7 * n + 12).every((s) => s.cells.length === 1));
   const sq = squarePlan(n);
   check('the square plan builds exactly as before (square → cube → tesseract)', sq.steps.length === tesseractSteps(n).length && sq.milestones.map((m) => m.at).join() === `${4 * n},${cubeSteps(n).length},${tesseractSteps(n).length}`);
 }

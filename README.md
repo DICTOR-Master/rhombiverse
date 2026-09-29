@@ -45,7 +45,8 @@ right-click) removes. The **User Guide** (in the app, or at
   through W; each closed shape opens in its own dimension (2D, 3D, 4D).
   **Construct · Kagome** builds a hexagon by hand, then Kagome's star
   round it (three directions of line) and its lattice, then rises
-  into 3D pyrochlore: truncated tetrahedron first, then its tetrahedra.
+  into 3D pyrochlore (truncated tetrahedron, then its tetrahedra) and
+  4D hyper-pyrochlore (truncated 5-cell, then its 5-cells).
   ⊘ beside Undo clears to start again; a Signal | Construct toggle switches worlds.
 - **2D** — five tiles (Parallelogram, Triangle, Hexagon, Kite, Kagome) on
   four lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular),

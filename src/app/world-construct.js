@@ -146,16 +146,18 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   // from w = -n), so the tesseract's second cube sits inside the first at
   // half size and straight edges stay straight as it turns in the X–W
   // plane by theta.
-  const C = N / 2;
+  // The plan sets W's centre, eye distance and turning middle (the
+  // square's: its cube's centre, n, n/2).
   function project(p) {
+    const { centre: [cx, cy, cz], eye, mid } = plan.w;
     let x = p[0], w = p[3] ?? 0;
     if (theta) {
-      const dx = x - C, dw = w - C, c = Math.cos(theta), s = Math.sin(theta);
-      x = C + dx * c - dw * s;
-      w = C + dx * s + dw * c;
+      const dx = x - cx, dw = w - mid, c = Math.cos(theta), s = Math.sin(theta);
+      x = cx + dx * c - dw * s;
+      w = mid + dx * s + dw * c;
     }
-    const f = N / (N + w);
-    return { v: new THREE.Vector3(((p[1] - C) * f + C) * U, ((x - C) * f + C) * U, (((p[2] ?? 0) - C) * f + C) * U), f };
+    const f = eye / (eye + w);
+    return { v: new THREE.Vector3(((p[1] - cy) * f + cy) * U, ((x - cx) * f + cx) * U, (((p[2] ?? 0) - cz) * f + cz) * U), f };
   }
   const world = (p) => project(p).v;
   // What the view frames: the shape being built (its bounding box), or its

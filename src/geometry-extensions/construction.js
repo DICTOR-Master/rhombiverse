@@ -202,6 +202,7 @@ export function squarePlan(n = SQUARE_N) {
   }));
   return {
     id: 'square', n, edges, steps, flat: 4 * n, startPrompt: 'con.prompt.start',
+    w: { centre: [n / 2, n / 2, n / 2], eye: n, mid: n / 2 },
     milestones: [
       { at: 4 * n, whole: 4, dim: 2, name: 'Square', prompt: 'con.prompt.square', corners: corners(2), faces: [sq], lattice: gridLattice(n, 2), autoLattice: false, open: { dim: '2D', piece: 'parallelogram' } },
       { at: cubeDone, whole: 12, dim: 3, name: 'Cube', prompt: 'con.prompt.cube', corners: corners(3), faces: cubeFaces, lattice: gridLattice(n, 3), autoLattice: true, open: { dim: '3D', piece: 'cube' } },
@@ -289,11 +290,41 @@ export function kagomePlan(n = SQUARE_N) {
   // and the top cap's three edges to the apex.
   [0, 2, 4].forEach((i, k) => addZ(tips[i], S1[k]));
   [0, 1, 2].forEach((k) => addZ(S2[k], BA));
-  edges.forEach((e, k) => { if ((k >= 6 && k < 18) || k >= ttDone) e.part = 'limb'; });
+  const pyroDone = edges.length;
+  // Hyper-pyrochlore (direct request: "no 4D Kagome?"; "same pattern in
+  // W"): the rhythm once more, a dimension up. A big 5-cell (edge 3n)
+  // over the big tetrahedron is the truncated 5-cell (the body, five
+  // truncated tetrahedra and five tetrahedra, yours one of them) plus a
+  // small 5-cell on each of its tetrahedra (the limbs). W's first edge by
+  // hand, then one tap per edge.
+  const h4 = 3 * n * Math.sqrt(5 / 8); // a regular 5-cell's height over its base (edge 3n)
+  const big3 = [...T3.map((t) => [t[0], t[1], 0]), BA];
+  const cen3 = [0, 1, 2].map((d) => big3.reduce((sum, v) => sum + v[d], 0) / 4);
+  const V4 = [...cen3, h4];
+  const at4 = (A, B, f) => [0, 1, 2, 3].map((d) => (A[d] ?? 0) + ((B[d] ?? 0) - (A[d] ?? 0)) * f);
+  const Q1 = big3.map((c) => at4(c, V4, 1 / 3));
+  const Q2 = big3.map((c) => at4(c, V4, 2 / 3));
+  const addW = (from, to) => {
+    const dw = (to[3] ?? 0) - (from[3] ?? 0), dz = (to[2] ?? 0) - (from[2] ?? 0);
+    const axis = Math.abs(dw) > 1e-9 ? 3 : Math.abs(dz) > 1e-9 ? 2 : axisOf([(to[0] - from[0]) / n, (to[1] - from[1]) / n]);
+    count[axis] = (count[axis] ?? 0) + 1;
+    edges.push({ axis, instance: edges.length, line: 20 + edges.length, along: -1, label: `${names[axis]}${count[axis]}`, from: pad4(from), to: pad4(to) });
+  };
+  // Each big corner's cut: its three neighbours at a third, in 3D.
+  const cut3 = big3.map((V) => big3.filter((W) => W !== V).map((W) => at3(V, W, 1 / 3)));
+  // The body: from each corner's cut up into W, then on along the big edge.
+  big3.forEach((V, k) => { cut3[k].forEach((c) => addW(c, Q1[k])); addW(Q1[k], Q2[k]); });
+  // Its top: the tetrahedron where W's edges meet at two thirds.
+  for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) addW(Q2[i], Q2[j]);
+  const bodyDone = edges.length;
+  // The limbs: each corner's small 5-cell closes along its big edge.
+  big3.forEach((V, k) => addW(V, Q1[k]));
+  Q2.forEach((q) => addW(q, V4));
+  edges.forEach((e, k) => { if ((k >= 6 && k < 18) || (k >= ttDone && k < pyroDone) || k >= bodyDone) e.part = 'limb'; });
   const steps = [];
   edges.forEach((e, k) => {
     const cells = edgeCells(e);
-    if (k < 6 || k === 18) cells.forEach((c) => steps.push({ cells: [c], edge: e.instance })); // the hexagon, Z's first edge
+    if (k < 6 || k === 18 || k === pyroDone) cells.forEach((c) => steps.push({ cells: [c], edge: e.instance })); // the hexagon, Z's first edge, W's first edge
     else steps.push({ cells, edge: e.instance });
   });
   // Lattices. The hexagon's: the honeycomb, two rings round it. Kagome's:
@@ -396,7 +427,10 @@ export function kagomePlan(n = SQUARE_N) {
     id: 'kagome', n, edges, steps, flat: 6 * n, axisNames: names,
     startPrompt: 'con.prompt.startKagome', junctionPrompt: { 4: 'con.prompt.junctionXY' },
     crossings: P.map(pad4),
-    centre: [centre[0], centre[1], 0], // W's perspective centres here (the hexagon's middle)
+    // W's perspective: toward the big tetrahedron's centre, where the big
+    // 5-cell's apex stands, seen from 3n off in W; it turns about half
+    // the apex's height.
+    w: { centre: cen3, eye: 3 * n, mid: h4 / 2 },
     // Depth seen with the Kagome plane as a floor: from low in front, Z up
     // the screen (world axes: the plane is the screen's x–y, Z toward you).
     view3: { dir: [-0.35, -0.85, 0.45], up: [0, 0, 1] },
@@ -404,7 +438,9 @@ export function kagomePlan(n = SQUARE_N) {
       { at: 6 * n, whole: 6, dim: 2, name: 'Hexagon', prompt: 'con.prompt.hexagon', corners: P.map(pad4), faces: [hexFace], lattice: [...honey.values()], autoLattice: false, open: { dim: '2D', piece: 'hexagon' } },
       { at: 6 * n + 12, whole: 18, dim: 2, name: 'Kagome', prompt: 'con.prompt.kagome', corners: tips.map(pad4), faces: [hexFace, ...tipFaces], lattice: kagome, autoLattice: true, open: { dim: '2D', piece: 'kagome' } },
       { at: steps.findIndex((st) => st.edge === ttDone), whole: ttDone, dim: 3, name: 'Truncated tetrahedron', prompt: 'con.prompt.tt', corners: ttCorners, faces: ttFaces, lattice: [], autoLattice: false, open: null },
-      { at: steps.length, whole: edges.length, dim: 3, name: 'Pyrochlore', prompt: 'con.prompt.pyrochlore', corners: [...ttCorners, ...bigCorners.map(pad4), ...tips.map(pad4)], faces: [...ttFaces, ...capFaces], lattice: [...pyro.values()], autoLattice: true, open: { dim: '3D', piece: 'pyrochlore' } },
+      { at: steps.findIndex((st) => st.edge === pyroDone), whole: pyroDone, dim: 3, name: 'Pyrochlore', prompt: 'con.prompt.pyrochlore', corners: [...ttCorners, ...bigCorners.map(pad4), ...tips.map(pad4)], faces: [...ttFaces, ...capFaces], lattice: [...pyro.values()], autoLattice: true, open: { dim: '3D', piece: 'pyrochlore' } },
+      { at: steps.findIndex((st) => st.edge === bodyDone), whole: bodyDone, dim: 4, name: 'Truncated 5-cell', prompt: 'con.prompt.t5', corners: [...cut3.flat(), ...Q1, ...Q2].map(pad4), faces: [], lattice: [], autoLattice: false, open: null },
+      { at: steps.length, whole: edges.length, dim: 4, name: 'Hyper-pyrochlore', prompt: 'con.prompt.hyper', corners: [...cut3.flat(), ...Q1, ...Q2, ...big3, V4].map(pad4), faces: [], lattice: [], autoLattice: false, open: { dim: '4D', piece: 'a4trunc' }, turn: true },
     ],
   };
 }
