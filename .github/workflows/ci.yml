@@ -33,6 +33,8 @@ jobs:
       - run: node scripts/verify-construction.mjs
       # Nets: flat without overlaps, folding closed into the solid.
       - run: node scripts/verify-nets.mjs
+      # Packed spheres: tangency, enclosed voids, bulk FCC counts.
+      - run: node scripts/verify-packing.mjs
       # The repo's About text (outside the repo, so it drifts): warns only.
       - run: node scripts/verify-about.mjs
         env:

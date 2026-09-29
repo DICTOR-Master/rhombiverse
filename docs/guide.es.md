@@ -98,6 +98,7 @@ Las piezas se colorean según el ajuste **Colores** (en Ajustes): **Cian** (toda
 | Lattice View | Tu construcción y todos los huecos libres un paso más allá, para la pieza elegida | Toca el botón Lattice View para recorrer las piezas |
 | X-Ray | Un corte. Arrastra el plano a través de la estructura, también en diagonal | Botón X-Ray (⛶) |
 | Spherical | Cada pieza como una casi-esfera | Botón Spherical (◯) |
+| Packed spheres | Una esfera tangente por RD; luego los huecos entre ellas (octaédricos oro, tetraédricos rosa), donde están cerrados; un deslizador ajusta el tamaño (0 = alambre, parada en tangencia, más = solapadas). Solo vista | Cara Packed spheres (tres círculos) de la rueda de esquina: apagado → esferas → huecos |
 | Duality | El teselado aperiódico que proyecta esta estructura cristalina | Botón Duality (◐) |
 | BCC Lattice | La red cúbica centrada en el cuerpo, anidada dentro de la FCC | Botón BCC Lattice (⬡) |
 | Dualize | Intercambia FCC y BCC | Ajustes → Dualize Preview |
@@ -215,6 +216,7 @@ Arrastra la pequeña rueda de la esquina para girarla. Toca una cara para usarla
 | ⊘ | Clear World |
 | ↻ | Reload (úsalo si algo parece atascado) |
 | ◯ | Spherical |
+| ⚬⚬⚬ | Packed spheres (apagado → esferas → huecos) |
 | — | World View, Cuboctahedron Build |
 
 ## Rueda del menú

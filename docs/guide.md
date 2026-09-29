@@ -96,6 +96,7 @@ Pieces are coloured by the **Colours** setting (in Settings): **Cyan** (every pi
 | Lattice View | Your build plus every open slot one step out, for the chosen piece | Tap the Lattice View button to cycle through the pieces |
 | X-Ray | A cutaway. Drag the plane through the structure, including on a diagonal | X-Ray button (⛶) |
 | Spherical | Each piece shown as a near-sphere | Spherical button (◯) |
+| Packed spheres | One touching sphere per RD; then the voids between them (octahedral gold, tetrahedral rose), where fully enclosed; a slider sizes the spheres (0 = wireframe, a click-stop at touching, beyond = overlapping). View only | Packed spheres face (three circles) on the corner wheel: off → spheres → voids |
 | Duality | The aperiodic tiling that this crystal structure casts | Duality button (◐) |
 | BCC Lattice | The body-centred cubic lattice nested inside the FCC one | BCC Lattice button (⬡) |
 | Dualize | Swaps FCC and BCC | Settings → Dualize Preview |
@@ -213,6 +214,7 @@ Drag the small wheel in the corner to turn it. Tap a face to use it.
 | ⊘ | Clear World |
 | ↻ | Reload (use it if something looks stuck) |
 | ◯ | Spherical |
+| ⚬⚬⚬ | Packed spheres (off → spheres → voids) |
 | — | World View, Cuboctahedron Build |
 
 ## Menu wheel
