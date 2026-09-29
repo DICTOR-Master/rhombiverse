@@ -24,6 +24,9 @@
 //   whole edge (the other Z edges, then the top square). Finished edges
 //   ghost; the one just finished stays solid; edges carry their numbered
 //   names (X1, Z3, …) until the cube closes.
+// - The cube lattice (direct request, "c - cube lattice"): once the cube
+//   closes, the lattice button shows it tiling space, the cubes around it
+//   as ghosts, and the view pulls back to take them in.
 // - Long-press takes back the last cell. No other controls.
 // - Cells are the shared 1D bullet (bullet-cell.js), nose along the way
 //   round, in Signal's cyan, matte, shaded cups.
@@ -64,6 +67,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toJSON())); } catch { /* best-effort */ }
   }
   const complete = () => filled === steps.length;
+  let latticeOn = false; // the finished cube's lattice shown around it
   const squareStage = () => filled < SQUARE_STEPS;
 
   // ---- drawing ----
@@ -75,6 +79,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   const emptyMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.08, depthWrite: false });
   const ghostMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.22, depthWrite: false });
   const faceMat = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
+  const latticeMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, transparent: true, opacity: 0.13, depthWrite: false });
   const junctionMat = new THREE.MeshBasicMaterial({ color: NEXT, transparent: true, opacity: 0.45, depthWrite: false });
   // Rounded corners (direct requests: "corners should become rounded when
   // reached; the dome should reach the far side of the diameter", "all
@@ -208,6 +213,25 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     if (complete()) {
       CUBE_CORNERS.forEach((p) => layer.add(dome(p)));
       CUBE_FACES.forEach((f) => layer.add(face(f)));
+      if (latticeOn) drawLattice();
+    }
+  }
+  // The 3×3×3 block of cubes around the finished one: every lattice edge
+  // on the grid lines -N, 0, N, 2N, but the cube's own twelve.
+  function drawLattice() {
+    const G = [-N, 0, N, 2 * N];
+    const own = (a, b) => [...a, ...b].every((v) => v === 0 || v === N);
+    for (let axis = 0; axis < 3; axis++) {
+      for (const u of G) for (const v of G) {
+        for (let k = 0; k < 3; k++) {
+          const from = [0, 0, 0], to = [0, 0, 0];
+          const [p, q] = [0, 1, 2].filter((d) => d !== axis);
+          from[p] = to[p] = u; from[q] = to[q] = v;
+          from[axis] = G[k]; to[axis] = G[k + 1];
+          if (own(from, to)) continue;
+          layer.add(cellMesh({ from, to }, latticeMat, edgeGhostGeo));
+        }
+      }
     }
   }
   function draw() {
@@ -228,7 +252,8 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   function pose() {
     const c = centre();
     const dir = squareStage() ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0.5, 0.32, 0.8).normalize();
-    return { target: c, position: c.clone().add(dir.multiplyScalar(SIDE * (squareStage() ? 2.3 : 3.6))) };
+    const dist = squareStage() ? 2.3 : latticeOn && complete() ? 8.5 : 3.6;
+    return { target: c, position: c.clone().add(dir.multiplyScalar(SIDE * dist)) };
   }
   let tween = 0;
   function frame(animate = false) {
@@ -256,6 +281,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
 
   // ---- building ----
   function commit(before) {
+    if (latticeOn && !complete()) { latticeOn = false; frame(true); }
     save(); draw(); onChange();
     if ((before < SQUARE_STEPS) !== squareStage()) frame(true); // the square closed or reopened: turn
   }
@@ -284,13 +310,19 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   panel.className = 'qc-panel';
   // Clear (direct request: "we need a (full) clear button"): the whole
   // build in one tap; Undo brings it back.
-  panel.innerHTML = '<div class="w4d-row w4d-options"><button type="button" class="con-clear" data-clear>⊘</button><button type="button" class="sig-send" data-open="2D"></button></div>';
+  panel.innerHTML = '<div class="w4d-row w4d-options"><button type="button" class="con-clear" data-clear>⊘</button><button type="button" class="sig-sym" data-lattice><svg viewBox="-12 -12 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="-10" y="-10" width="20" height="20" rx="1.5"/><path d="M-3.3,-10v20M3.3,-10v20M-10,-3.3h20M-10,3.3h20"/></svg></button><button type="button" class="sig-send" data-open="2D"></button></div>';
   document.body.appendChild(panel);
   const openBtn = panel.querySelector('[data-open]');
   const clearBtn = panel.querySelector('[data-clear]');
+  const latticeBtn = panel.querySelector('[data-lattice]');
+  latticeBtn.addEventListener('click', () => { latticeOn = !latticeOn; draw(); frame(true); });
   function renderPanel() {
     panel.classList.toggle('visible', active && filled > 0);
     openBtn.hidden = filled !== SQUARE_STEPS;
+    latticeBtn.hidden = !complete();
+    latticeBtn.classList.toggle('active', latticeOn);
+    latticeBtn.title = t('con.lattice', lang());
+    latticeBtn.setAttribute('aria-label', latticeBtn.title);
     openBtn.textContent = t('con.open', lang(), { dim: '2D' });
     clearBtn.title = t('con.clear', lang());
     clearBtn.setAttribute('aria-label', clearBtn.title);
