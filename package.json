@@ -17,7 +17,8 @@
     "verify:trajectory": "node scripts/verify-trajectory.mjs",
     "verify:construction": "node scripts/verify-construction.mjs",
     "verify:copy": "node scripts/verify-copy.mjs",
-    "verify:about": "node scripts/verify-about.mjs"
+    "verify:about": "node scripts/verify-about.mjs",
+    "verify:nets": "node scripts/verify-nets.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

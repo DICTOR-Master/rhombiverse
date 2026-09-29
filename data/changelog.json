@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-09-29",
+    "title": "Nets",
+    "items": [
+      "New 2D world, Nets (Wizard → 2D → Nets), from 2D to 3D: pick the cube or the rhombic dodecahedron and follow its ghost net, the first face side by side in 1D cells, then a face a tap. When it's complete, a tap folds it up into the solid, a slider folds and unfolds it by hand, and Open in 3D takes the solid there."
+    ]
+  },
+  {
+    "date": "2026-09-29",
     "title": "1D+",
     "items": [
       "Construct · RD reaches 4D: the RD is the 24-cell's shadow, so W splits it open. Each cube corner parts in two to make the tesseract, then the RD's apexes and two more out along W join both sides: the 24-cell, turning through W, the RD left as its ghost; it opens in 4D's D4 world. And fewer taps all round: after each new dimension's first edge by hand, alike parts come in one tap (Kagome's 4D now 8 taps, not 30).",

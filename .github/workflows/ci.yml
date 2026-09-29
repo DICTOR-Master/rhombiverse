@@ -31,6 +31,8 @@ jobs:
       - run: node scripts/verify-trajectory.mjs
       # 1D Construct: cell/instance/direction model, grids, junction rules.
       - run: node scripts/verify-construction.mjs
+      # Nets: flat without overlaps, folding closed into the solid.
+      - run: node scripts/verify-nets.mjs
       # The repo's About text (outside the repo, so it drifts): warns only.
       - run: node scripts/verify-about.mjs
         env:

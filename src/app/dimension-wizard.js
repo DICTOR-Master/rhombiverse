@@ -279,7 +279,20 @@ const LATTICE_FAMILIES_2D = [
   // Kaleidoscope, a 2D world of its own: previewed as the star of five
   // thick rhombi it opens with (5 mirrors reflecting the first one).
   { id: 'kaleido', label: 'Kaleidoscope', action: 'tool:kaleidoWorld', preview: kaleidoStarEdges },
+  // Nets, 2D to 3D: previewed as the cube's cross.
+  { id: 'nets', label: 'Nets', action: 'tool:netsWorld', preview: netsCrossEdges },
 ];
+function netsCrossEdges() {
+  const out = [];
+  const q = 0.42;
+  const squares = [[0, 1.5], [0, 0.5], [0, -0.5], [0, -1.5], [-1, 0.5], [1, 0.5]];
+  for (const [cx, cy] of squares) {
+    const c = [[cx - 0.5, cy - 0.5], [cx + 0.5, cy - 0.5], [cx + 0.5, cy + 0.5], [cx - 0.5, cy + 0.5]].map(([x, y]) => [x * q * 1.6, y * q * 1.6, 0]);
+    c.forEach((p, i) => out.push([p, c[(i + 1) % 4]]));
+  }
+  out.coin = true;
+  return out;
+}
 function kaleidoStarEdges() {
   const edges = [];
   for (let j = 0; j < 5; j++) {

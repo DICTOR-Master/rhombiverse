@@ -26,6 +26,7 @@ import { createQuasicrystalWorld } from './app/world-quasicrystal.js';
 import { createShellsWorld } from './app/world-shells.js';
 import { createGoldenWorld } from './app/world-golden.js';
 import { createKaleidoWorld } from './app/world-kaleidoscope.js';
+import { createNetsWorld } from './app/world-nets.js';
 import { createSignalWorld } from './app/world-signal.js';
 import { createConstructWorld } from './app/world-construct.js';
 import { makeQuasicrystal, PRISM_HEIGHT } from './geometry-extensions/quasicrystal.js';
@@ -147,11 +148,12 @@ const qcWorlds = new Map();
 let shellsWorld = null;
 let goldenWorld = null;
 let kaleidoWorld = null;
+let netsWorld = null;
 let signalWorld = null;
 let constructWorld = null;
 let own3D = null;
-const OWN_WORLD_DIMENSION = { shells: '3D', golden: '3D', kaleido: '2D', signal: '1D', construct: '1D' };
-const own3DWorld = () => ({ shells: shellsWorld, golden: goldenWorld, kaleido: kaleidoWorld, signal: signalWorld, construct: constructWorld })[own3D] ?? null;
+const OWN_WORLD_DIMENSION = { shells: '3D', golden: '3D', kaleido: '2D', nets: '2D', signal: '1D', construct: '1D' };
+const own3DWorld = () => ({ shells: shellsWorld, golden: goldenWorld, kaleido: kaleidoWorld, nets: netsWorld, signal: signalWorld, construct: constructWorld })[own3D] ?? null;
 const own3DActive = () => !!own3DWorld() && activeDimension === OWN_WORLD_DIMENSION[own3D];
 // 4D, 5D, 6D and the own 3D worlds each own their scene, taps, Lattice View and Skeleton.
 const isOwnWorldDimension = () => activeDimension === '4D' || qcWorlds.has(activeDimension) || own3DActive();
@@ -1966,7 +1968,7 @@ async function init() {
   // this bottom-row slot whenever no attach toggle needs it.
   let paintOn = false;
   // 1D has no colours to paint (Signal is cyan, Construct shows each axis).
-  const paintAvailable = () => !!activeDimension && activeDimension !== '1D' && !(own3DActive() && ['shells', 'golden'].includes(own3D));
+  const paintAvailable = () => !!activeDimension && activeDimension !== '1D' && !(own3DActive() && ['shells', 'golden', 'nets'].includes(own3D));
   const attachNeeded = () => (activeDimension === '4D' ? ['cell24', 'cell16', ...A4_CYCLE] : activeDimension !== '2D' && !isOwnWorldDimension() ? ['rhombohedra', 'pyrochlore'] : []).includes(attachPiece());
   const paintInSlot = () => paintAvailable() && !attachNeeded();
   function setPaint(on) {
@@ -2586,6 +2588,7 @@ async function init() {
     reg('worldshells', '3D', () => shellsWorld.snapshot(), (j) => shellsWorld.restore(j));
     reg('worldgolden', '3D', () => goldenWorld.snapshot(), (j) => goldenWorld.restore(j));
     reg('worldkaleido', '2D', () => kaleidoWorld.snapshot(), (j) => kaleidoWorld.restore(j));
+    reg('worldnets', '2D', () => netsWorld.snapshot(), (j) => netsWorld.restore(j));
     reg('world1dsignal', '1D', () => signalWorld.snapshot(), (j) => signalWorld.restore(j));
     reg('world1dconstruct', '1D', () => constructWorld.snapshot(), (j) => constructWorld.restore(j));
     updateUndoButton();
@@ -2823,6 +2826,7 @@ async function init() {
     shellsWorld?.setActive(own3DActive() && own3D === 'shells');
     goldenWorld?.setActive(own3DActive() && own3D === 'golden');
     kaleidoWorld?.setActive(own3DActive() && own3D === 'kaleido');
+    netsWorld?.setActive(own3DActive() && own3D === 'nets');
     signalWorld?.setActive(own3DActive() && own3D === 'signal');
     constructWorld?.setActive(own3DActive() && own3D === 'construct');
     document.body.classList.toggle('qc-world-on', qcWorlds.has(activeDimension) || own3DActive());
@@ -2861,7 +2865,9 @@ async function init() {
     // 1D (direct request: "shape and lattice wheel buttons and color hide
     // in signal mode"): no shapes, lattice views or colours to pick there.
     document.getElementById('hud-quick-shape').style.display = activeDimension === '2D' || activeDimension === '1D' ? 'none' : '';
-    for (const id of ['hud-quick-color', 'hud-quick-lattice-view']) document.getElementById(id).style.display = activeDimension === '1D' ? 'none' : '';
+    // Nets likewise: the solid is picked in its panel, colours are its own.
+    const netsOn = own3DActive() && own3D === 'nets';
+    for (const id of ['hud-quick-color', 'hud-quick-lattice-view']) document.getElementById(id).style.display = activeDimension === '1D' || netsOn ? 'none' : '';
   }
   // Re-applies the same visibility rule whenever activeDimension itself
   // changes (not just when World View mode changes, which is
@@ -3443,7 +3449,7 @@ async function init() {
         // 2026-08-29 -- X-Ray stays reachable via the corner HUD wheel's
         // own #xray-toggle face and the Lab panel, so no wheel face
         // routes to it here any more.)
-        const OWN_WORLD_ACTIONS = { 'tool:shellsWorld': 'shells', 'tool:goldenWorld': 'golden', 'tool:kaleidoWorld': 'kaleido', 'tool:signalWorld': 'signal', 'tool:constructWorld': 'construct' };
+        const OWN_WORLD_ACTIONS = { 'tool:shellsWorld': 'shells', 'tool:goldenWorld': 'golden', 'tool:kaleidoWorld': 'kaleido', 'tool:netsWorld': 'nets', 'tool:signalWorld': 'signal', 'tool:constructWorld': 'construct' };
         // Construct's families: tool:constructWorld:<family> (square, kagome, rd).
         if (action?.startsWith('tool:constructWorld:')) {
           constructWorld?.setFamily(action.slice('tool:constructWorld:'.length));
@@ -3454,7 +3460,7 @@ async function init() {
           wheel3D.close();
           applyDimensionVisibility();
           updateQuickSelect();
-          showHudPrompt({ shells: 'Shells', golden: 'Golden Rhombohedra', kaleido: 'Kaleidoscope', signal: 'Signal', construct: 'Construct' }[own3D], 2500);
+          showHudPrompt({ shells: 'Shells', golden: 'Golden Rhombohedra', kaleido: 'Kaleidoscope', nets: 'Nets', signal: 'Signal', construct: 'Construct' }[own3D], 2500);
           return;
         }
         if (own3D && (action?.startsWith('tool:pieceType:') || action === 'tool:cuboctaBuild')) {
@@ -5060,14 +5066,8 @@ async function init() {
     showHudPrompt,
     onChange: () => { if (historyRestorers.has('world1dsignal')) recordHistory('world1dsignal', signalWorld.snapshot()); },
   });
-  constructWorld = createConstructWorld({
-    scene,
-    camera,
-    controls,
-    // A finished primitive opens in its own dimension's lattice: the
-    // square as 2D's Parallelogram tile at the Square angle, the cube and
-    // the tesseract in 3D and 4D.
-    onOpenIn: (dim, piece, angle) => {
+  // A finished shape opens in its own dimension (Construct's and Nets').
+  const openInDimension = (dim, piece, angle) => {
       // The cube opens as 3D's Cube piece, the pyrochlore cluster as its
       // Pyrochlore piece, the tesseract in 4D's Z4 (hypercubic) world.
       if (dim === '3D' || dim === '4D') {
@@ -5100,7 +5100,15 @@ async function init() {
       applyDimensionCamera('2D');
       renderLattice2dPanel();
       applyLattice2dSelection();
-    },
+    };
+  constructWorld = createConstructWorld({
+    scene,
+    camera,
+    controls,
+    // A finished primitive opens in its own dimension's lattice: the
+    // square as 2D's Parallelogram tile at the Square angle, the cube and
+    // the tesseract in 3D and 4D.
+    onOpenIn: openInDimension,
     showHudPrompt,
     onChange: () => { if (historyRestorers.has('world1dconstruct')) recordHistory('world1dconstruct', constructWorld.snapshot()); },
   });
@@ -5118,6 +5126,14 @@ async function init() {
     own3D = w;
     applyDimensionVisibility();
     updateQuickSelect();
+  });
+  netsWorld = createNetsWorld({
+    scene,
+    camera,
+    controls,
+    onOpenIn: openInDimension,
+    showHudPrompt,
+    onChange: () => { if (historyRestorers.has('worldnets')) recordHistory('worldnets', netsWorld.snapshot()); },
   });
   kaleidoWorld = createKaleidoWorld({
     scene,
@@ -5720,6 +5736,7 @@ async function init() {
     shellsWorld?.clear();
     goldenWorld?.clear();
     kaleidoWorld?.clear();
+    netsWorld?.clear();
     signalWorld?.clear();
     constructWorld?.clear();
   }
@@ -5811,7 +5828,10 @@ function animate() {
   // Signal, which is purely one-dimensional (direct remark: "arguably
   // Signal is purely 1D").
   const dimText = own3D === 'construct' && own3DActive() ? ['1D+', '2D', '3D', '4D'].slice(0, constructWorld.reached()).join('/')
-    : own3D === 'signal' && own3DActive() ? '1D' : activeDimension === '1D' ? '1D+' : activeDimension ?? '3D';
+    : own3D === 'signal' && own3DActive() ? '1D'
+    // Nets: 2D, and 2D/3D once it folds.
+    : own3D === 'nets' && own3DActive() ? (netsWorld.folded ? '2D/3D' : '2D')
+    : activeDimension === '1D' ? '1D+' : activeDimension ?? '3D';
   const oneD = (own3D === 'signal' || own3D === 'construct') && own3DActive();
   if (hud1dToggleEl && hud1dToggleEl.hidden === oneD) hud1dToggleEl.hidden = !oneD;
   if (onedClearEl) {

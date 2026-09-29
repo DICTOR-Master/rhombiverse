@@ -57,6 +57,8 @@ right-click) removes. The **User Guide** (in the app, or at
   mirrors or a triangle of three; Attach or Loose (pieces slide into place
   beside a partner), Turn, Spin, Shake, and a Safe mode that keeps the
   rhombi to Penrose's matching rule.
+  **Nets**, from 2D to 3D: follow a solid's ghost net (cube, rhombic
+  dodecahedron) face by face, then fold it up into the solid with a slider.
 - **Paint** — in every dimension but 1D+, the brush recolours pieces
   you've already placed (except Shells and Golden Rhombohedra, coloured by
   band and type); in 4D it sits in the 4D panel.
