@@ -37,11 +37,14 @@
 //   through W, the inner and outer cubes trading places (the lattice
 //   hides meanwhile: turned, its outer shells swell past the screen), and
 //   another stops it; the lattice button brings the lattice back.
+// - Families (direct decision, 2026-09-29: "Wizard cards"): Square (→
+//   cube → tesseract), Kagome (its star unit → the Kagome lattice), each
+//   a plan in construction.js; each keeps its own progress.
 // - Long-press takes back the last cell.
 // - Cells are the shared 1D bullet (bullet-cell.js), nose along the way
 //   round, in Signal's cyan, matte, shaded cups.
 import * as THREE from 'three';
-import { tesseractEdges, tesseractSteps, edgeCells, SQUARE_N } from '../geometry-extensions/construction.js';
+import { PLANS, edgeCells, SQUARE_N } from '../geometry-extensions/construction.js';
 import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
@@ -53,8 +56,6 @@ const R = 0.055;
 const PAD = 0.004;
 const CYAN = 0x22c3e6;
 const NEXT = 0xf59e0b; // the 1D worlds' orange "tap here"
-// W as true perspective, n·f(w) = n / (n + w)·n: the inner cube half the
-// outer, and straight edges stay straight as the tesseract turns.
 const W_TURN = 0.3; // radians per second through W, once the tesseract closes
 const lang = () => getSettings().language;
 
@@ -64,35 +65,41 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   scene.add(group);
 
   const N = SQUARE_N;
-  const edges = tesseractEdges(N);
-  const steps = tesseractSteps(N);
-  // Where each shape closes (a count of steps): the square, the cube, the
-  // tesseract.
-  const SQUARE_DONE = 4 * N;
-  const CUBE_DONE = steps.findIndex((s) => s.edge === 12);
-  const HAND_DONE = new Set([5 * N, CUBE_DONE + N]); // Z1, W1 finished: every other edge is one tap
-  let filled = 0;
-  try {
-    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
-    if (data?.version === 3 && data.n === N && Number.isInteger(data.filled)) filled = Math.max(0, Math.min(steps.length, data.filled));
-  } catch { /* corrupt or blocked storage: start empty */ }
+  const plans = Object.fromEntries(Object.entries(PLANS).map(([id, make]) => [id, make(N)]));
+  let family = 'square';
+  let plan = plans[family];
+  const progress = Object.fromEntries(Object.keys(plans).map((id) => [id, 0]));
+  const clampSteps = (id, v) => (Number.isInteger(v) ? Math.max(0, Math.min(plans[id].steps.length, v)) : 0);
+  function readProgress(data) {
+    // v3: the square alone; v4: every family.
+    if (data?.version === 3 && data.n === N) progress.square = clampSteps('square', data.filled);
+    if (data?.version === 4 && data.n === N) for (const id of Object.keys(plans)) progress[id] = clampSteps(id, data.filled?.[id]);
+  }
+  try { readProgress(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')); } catch { /* corrupt or blocked storage: start empty */ }
   // Progress saved for another square size (v2: the 4-per-side square)
   // is dropped, so the build starts again on the first, vertical side.
+  let filled = progress[family];
   let active = false;
-  const toJSON = () => ({ version: 3, n: N, filled });
+  const toJSON = () => { progress[family] = filled; return { version: 4, n: N, filled: { ...progress } }; };
   function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toJSON())); } catch { /* best-effort */ }
   }
-  const complete = () => filled === steps.length;
-  const squareStage = () => filled < SQUARE_DONE;
-  // How many edges show whole and solid right now: a shape just closed.
-  const wholeEdges = () => (filled === SQUARE_DONE ? 4 : filled === CUBE_DONE ? 12 : complete() ? edges.length : 0);
-  // The closed shape's lattice shown around it. The cube and tesseract
-  // close straight into theirs (direct request: "cube should immediately
-  // be part of the lattice").
-  let latticeOn = filled === CUBE_DONE || complete();
-  const latticeReady = () => wholeEdges() > 0;
-  const squareLattice = () => latticeOn && filled === SQUARE_DONE;
+  const edges = () => plan.edges;
+  const steps = () => plan.steps;
+  const complete = () => filled === plan.steps.length;
+  const milestoneAt = () => plan.milestones.find((m) => m.at === filled) ?? null;
+  const reachedMilestone = () => [...plan.milestones].reverse().find((m) => m.at <= filled) ?? null;
+  const nextMilestone = () => plan.milestones.find((m) => m.at > filled) ?? null;
+  const flatStage = () => filled < plan.flat;
+  const wholeEdges = () => milestoneAt()?.whole ?? 0;
+  // The closed shape's lattice shown around it. The cube, the tesseract
+  // and the Kagome star close straight into theirs (direct request: "cube
+  // should immediately be part of the lattice").
+  let latticeOn = !!milestoneAt()?.autoLattice;
+  const latticeReady = () => !!milestoneAt();
+  // The dimension being built toward (or just closed, at the end).
+  const stageDim = () => (nextMilestone() ?? reachedMilestone())?.dim ?? 2;
+  const flatView = () => stageDim() === 2 || (latticeOn && milestoneAt()?.dim === 2);
   let turning = false; // the finished tesseract turning through W
   let theta = 0;
 
@@ -125,9 +132,10 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   // request: "can't we start at the vertical axis?"); X is only the first
   // direction's name, not "horizontal". Y then turns off to the side, Z
   // comes out toward you, and W points inward: a point at w is drawn
-  // scaled toward the cube's centre by n / (n + w) (a perspective view
-  // from w = -n), so the second cube sits inside the first at half size.
-  // Once the tesseract closes, it can turn in the X–W plane by theta.
+  // scaled toward the shape's centre by n / (n + w) (a perspective view
+  // from w = -n), so the tesseract's second cube sits inside the first at
+  // half size and straight edges stay straight as it turns in the X–W
+  // plane by theta.
   const C = N / 2;
   function project(p) {
     let x = p[0], w = p[3] ?? 0;
@@ -140,8 +148,17 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     return { v: new THREE.Vector3(((p[1] - C) * f + C) * U, ((x - C) * f + C) * U, (((p[2] ?? 0) - C) * f + C) * U), f };
   }
   const world = (p) => project(p).v;
-  const SIDE = N * U;
-  const centre = () => new THREE.Vector3(SIDE / 2, SIDE / 2, squareStage() || squareLattice() ? 0 : SIDE / 2);
+  // What the view frames: the shape being built (its bounding box), or its
+  // lattice.
+  function bounds(segs) {
+    const box = new THREE.Box3();
+    for (const [a, b] of segs) { box.expandByPoint(world(a)); box.expandByPoint(world(b)); }
+    return box;
+  }
+  const stageEdges = () => {
+    const m = nextMilestone() ?? reachedMilestone();
+    return plan.edges.slice(0, m ? m.whole : plan.edges.length).map((e) => [e.from, e.to]);
+  };
 
   // Numbered edge names: small text sprites, made once each.
   const labelCache = new Map();
@@ -182,16 +199,18 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     return m;
   }
   const rod = (from, to, mat) => cellMesh({ from, to }, mat, edgeGhostGeo, N * U);
+  function placePoint(obj, p) { const { v, f } = project(p); obj.position.copy(v); obj.scale.setScalar(f); }
   function dome(p) {
     const d = new THREE.Mesh(cornerGeo, cornerMat);
     placed.push({ obj: d, at: p });
     placePoint(d, p);
     return d;
   }
-  function placePoint(obj, p) { const { v, f } = project(p); obj.position.copy(v); obj.scale.setScalar(f); }
   function face(corners) {
     const g = new THREE.BufferGeometry().setFromPoints(corners.map(world));
-    g.setIndex([0, 1, 2, 0, 2, 3]);
+    const idx = [];
+    for (let i = 1; i + 1 < corners.length; i++) idx.push(0, i, i + 1);
+    g.setIndex(idx);
     const m = new THREE.Mesh(g, faceMat);
     m.userData.own = true;
     return m;
@@ -202,112 +221,73 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     dot.position.copy(world(p));
     return dot;
   }
-  const SQUARE_FACE = [[0, 0, 0], [N, 0, 0], [N, N, 0], [0, N, 0]];
-  const CUBE_FACES = [
-    SQUARE_FACE, [[0, 0, N], [N, 0, N], [N, N, N], [0, N, N]],
-    [[0, 0, 0], [N, 0, 0], [N, 0, N], [0, 0, N]], [[0, N, 0], [N, N, 0], [N, N, N], [0, N, N]],
-    [[0, 0, 0], [0, N, 0], [0, N, N], [0, 0, N]], [[N, 0, 0], [N, N, 0], [N, N, N], [N, 0, N]],
-  ];
-  const cornersOf = (count) => {
-    const pts = new Map();
-    for (const e of edges.slice(0, count)) for (const p of [e.from, e.to]) pts.set(String(p), p);
-    return [...pts.values()];
-  };
+  const same = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-6);
+  const lineStart = (line) => plan.steps.findIndex((s) => plan.edges[s.edge].line === line);
 
-  function drawSquareStage() {
-    // One line at a time (direct requests: "this is 1D, so only one axis
-    // should show at a time", "only one axis showing till complete"):
-    // the side you're on, with the sides already built kept as ghosts
-    // ("a ghost of what is already constructed stays").
-    const here = steps[filled].edge;
-    for (const e of edges.slice(0, here)) layer.add(rod(e.from, e.to, ghostMat));
-    steps.slice(0, SQUARE_DONE).forEach(({ cells: [c] }, k) => {
-      if (c.instance !== here) return;
-      if (k < filled) layer.add(cellMesh(c, filledMat));
-      else if (k === filled) layer.add(cellMesh(c, nextMat));
-      else layer.add(cellMesh(c, emptyMat, plainGeo));
-    });
+  // The first, flat stage: one line at a time (direct requests: "this is
+  // 1D, so only one axis should show at a time", "only one axis showing
+  // till complete"): the line you're on, the lines already built kept as
+  // ghosts ("a ghost of what is already constructed stays").
+  function drawFlatStage() {
+    const step = plan.steps[filled];
+    const current = plan.edges[step.edge];
+    const doneCells = (e) => plan.steps.slice(0, filled).filter((s) => s.edge === e.instance).reduce((n, s) => n + s.cells.length, 0);
+    for (const e of plan.edges) {
+      if (e.line < current.line) { layer.add(rod(e.from, e.to, ghostMat)); continue; }
+      if (e.line > current.line) continue;
+      const done = doneCells(e);
+      if (e.instance < current.instance) edgeCells(e).forEach((c) => layer.add(cellMesh(c, filledMat)));
+      else if (e.instance > current.instance) layer.add(rod(e.from, e.to, emptyMat));
+      else if (step.cells.length > 1) edgeCells(e).forEach((c) => layer.add(cellMesh(c, nextMat)));
+      else edgeCells(e).forEach((c, i) => layer.add(i < done ? cellMesh(c, filledMat) : i === done ? cellMesh(c, nextMat) : cellMesh(c, emptyMat, plainGeo)));
+    }
     // The corner you've come round: a dome for the hidden nose; the one
-    // just reached glows (a junction: Y joins X there).
-    const side = edges[here];
-    if (here > 0) layer.add(dome(side.from));
-    if (filled === here * N && here > 0) layer.add(junction(side.from));
+    // just reached glows (a junction).
+    const first = plan.edges.find((e) => e.line === current.line);
+    const prev = plan.edges[first.instance - 1];
+    if (prev && same(prev.to, first.from)) layer.add(dome(first.from));
+    if (current.line > 0 && filled === lineStart(current.line)) layer.add(junction(first.from));
   }
-  // The cube and the tesseract: finished edges ghost, the one just
-  // finished stays solid, the next is orange (cell by cell on a new
-  // direction's first edge, whole after that); edges carry their names.
-  // A shape just closed shows whole and solid.
+  // After it: finished edges ghost, the one just finished stays solid, the
+  // next is orange (cell by cell on a new direction's first edge, whole
+  // after that); edges carry their names. A shape just closed shows whole
+  // and solid.
   function drawBuildStage() {
-    const doneCells = new Array(edges.length).fill(0);
-    for (let k = 0; k < filled; k++) doneCells[steps[k].edge] += steps[k].cells.length;
-    const finished = (e) => doneCells[e.instance] === N;
-    const last = steps[filled - 1].edge;
-    const next = complete() ? -1 : steps[filled].edge;
+    const doneCells = new Array(plan.edges.length).fill(0);
+    for (let k = 0; k < filled; k++) doneCells[plan.steps[k].edge] += plan.steps[k].cells.length;
+    const finished = (e) => doneCells[e.instance] === edgeCells(e).length;
+    const last = plan.steps[filled - 1].edge;
+    const next = complete() ? -1 : plan.steps[filled].edge;
     const whole = wholeEdges();
-    for (const e of edges) {
+    const centre = frameTarget();
+    for (const e of plan.edges) {
       const cells = edgeCells(e);
       let shown = true;
       if (e.instance < whole || (finished(e) && e.instance === last)) cells.forEach((c) => layer.add(cellMesh(c, filledMat)));
       else if (finished(e)) layer.add(rod(e.from, e.to, ghostMat));
       else if (e.instance === next) {
-        if (steps[filled].cells.length === 1) {
+        if (plan.steps[filled].cells.length === 1) {
           cells.forEach((c, i) => layer.add(i < doneCells[e.instance] ? cellMesh(c, filledMat) : i === doneCells[e.instance] ? cellMesh(c, nextMat) : cellMesh(c, emptyMat, plainGeo)));
         } else cells.forEach((c) => layer.add(cellMesh(c, nextMat)));
       } else shown = false;
       if (shown && !whole) {
         const mid = world(e.from).add(world(e.to)).multiplyScalar(0.5);
-        const out = mid.clone().sub(centre());
+        const out = mid.clone().sub(centre);
         if (e.axis < 3) out.setComponent(e.axis === 0 ? 1 : e.axis === 1 ? 0 : 2, 0); // push out square to the edge only
         const sp = labelSprite(e.label, finished(e) && e.instance !== last ? 0.5 : 1);
         sp.position.copy(mid).add(out.setLength(0.45));
         layer.add(sp);
       }
     }
-    if (!whole) return;
-    cornersOf(whole).forEach((p) => layer.add(dome(p)));
-    if (whole === 4) layer.add(face(SQUARE_FACE));
-    if (whole === 12) CUBE_FACES.forEach((f) => layer.add(face(f)));
-    if (latticeOn) drawLattice(whole === 4 ? 2 : whole === 12 ? 3 : 4);
-    if (!complete()) layer.add(junction([0, 0, 0])); // the next direction joins at the start corner
+    const m = milestoneAt();
+    if (!m) return;
+    m.corners.forEach((p) => layer.add(dome(p)));
+    m.faces.forEach((f) => layer.add(face(f)));
+    if (latticeOn) drawLattice(m.lattice);
+    if (!complete()) layer.add(junction(plan.edges[next].from)); // the next direction joins here
   }
-  // The closed shape's lattice, its neighbours as ghosts: the square's
-  // 3×3 in the plane, the cube's 3×3×3; the tesseract's is the cube's
-  // 3×3×3 at both W levels joined along W, and its next neighbour along W
-  // (the smaller shell inside; the one outside sits at the eye). One
-  // instanced mesh.
-  const latticeSegments = (() => {
-    const G = [-N, 0, N, 2 * N];
-    const own = (a, b) => [...a, ...b].every((v) => v === 0 || v === N);
-    const out = { 2: [], 3: [], 4: [] };
-    const push = (dims, from, to) => { if (!own(from, to)) out[dims].push([from, to]); };
-    for (let axis = 0; axis < 2; axis++) for (const u of G) for (let k = 0; k < 3; k++) {
-      const from = [0, 0, 0, 0], to = [0, 0, 0, 0];
-      from[1 - axis] = to[1 - axis] = u;
-      from[axis] = G[k]; to[axis] = G[k + 1];
-      push(2, from, to);
-    }
-    const cubeGrid = (w) => {
-      const segs = [];
-      for (let axis = 0; axis < 3; axis++) for (const u of G) for (const v of G) for (let k = 0; k < 3; k++) {
-        const from = [0, 0, 0, w], to = [0, 0, 0, w];
-        const [p, q] = [0, 1, 2].filter((d) => d !== axis);
-        from[p] = to[p] = u; from[q] = to[q] = v;
-        from[axis] = G[k]; to[axis] = G[k + 1];
-        segs.push([from, to]);
-      }
-      return segs;
-    };
-    cubeGrid(0).forEach(([a, b]) => push(3, a, b));
-    [...cubeGrid(0), ...cubeGrid(N)].forEach(([a, b]) => push(4, a, b));
-    for (const x of G) for (const y of G) for (const z of G) push(4, [x, y, z, 0], [x, y, z, N]);
-    const C8 = [0, N].flatMap((x) => [0, N].flatMap((y) => [0, N].map((z) => [x, y, z])));
-    for (const [a, b] of cubeGrid(2 * N)) if ([...a.slice(0, 3), ...b.slice(0, 3)].every((v) => v === 0 || v === N)) push(4, a, b);
-    for (const p of C8) push(4, [...p, N], [...p, 2 * N]);
-    return out;
-  })();
   let latticeMesh = null;
-  function drawLattice(dims) {
-    const segs = latticeSegments[dims];
+  function drawLattice(segs) {
     latticeMesh = new THREE.InstancedMesh(edgeGhostGeo, latticeMat, segs.length);
     latticeMesh.userData.segs = segs;
     latticeMesh.frustumCulled = false;
@@ -334,7 +314,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     placed.length = 0;
     latticeMesh = null;
     if (!active) return;
-    if (squareStage()) drawSquareStage();
+    if (flatStage()) drawFlatStage();
     else drawBuildStage();
     renderPanel();
   }
@@ -342,7 +322,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   let turnRaf = 0, turnLast = 0;
   function turn(now) {
     turnRaf = 0;
-    if (!active || !turning || !complete()) return;
+    if (!active || !turning || !milestoneAt()?.turn) return;
     theta = (theta + ((now - turnLast) / 1000) * W_TURN) % (2 * Math.PI);
     turnLast = now;
     for (const p of placed) p.at ? placePoint(p.obj, p.at) : placeSegment(p.obj, p.from, p.to, p.length);
@@ -351,20 +331,33 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   }
   function setTurning(on) {
     turning = on;
-    if (on && active && complete() && !turnRaf) { turnLast = performance.now(); turnRaf = requestAnimationFrame(turn); }
+    if (on && active && milestoneAt()?.turn && !turnRaf) { turnLast = performance.now(); turnRaf = requestAnimationFrame(turn); }
   }
-  // The square is seen straight on (direct request: "this vertical should
-  // be pure, without perspective"), so its lines stay truly vertical and
-  // horizontal. Once Z joins, the view turns to three-quarters so the
-  // cube's depth shows ("turn, with perspective").
+  // The flat stage is seen straight on (direct request: "this vertical
+  // should be pure, without perspective"), so its lines stay truly
+  // vertical and horizontal. Once a third direction joins, the view turns
+  // to three-quarters so the depth shows ("turn, with perspective"),
+  // from the front left: off the cube's (0,0,0)–centre diagonal, along
+  // which W's first edge runs (seen end-on from the front right). With
+  // the lattice on, it pulls back to take it in.
+  const showingLattice = () => latticeOn && latticeReady();
+  function frameBox() {
+    const theta0 = theta; theta = 0;
+    const box = bounds(showingLattice() ? milestoneAt().lattice : stageEdges());
+    theta = theta0;
+    return box;
+  }
+  function frameTarget() { const c = frameBox().getCenter(new THREE.Vector3()); if (flatView()) c.z = 0; return c; }
   function pose() {
-    const c = centre();
-    const flat = squareStage() || squareLattice();
-    // From the front left: off the cube's (0,0,0)–centre diagonal, along
-    // which W's first edge runs (seen end-on from the front right).
+    const box = frameBox();
+    const size = box.getSize(new THREE.Vector3());
+    const extent = Math.max(size.x, size.y, size.z, U);
+    const c = box.getCenter(new THREE.Vector3());
+    const flat = flatView();
+    if (flat) c.z = 0;
     const dir = flat ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(-0.5, 0.32, 0.8).normalize();
-    const dist = squareStage() ? 2.3 : squareLattice() ? 6.4 : latticeOn && latticeReady() ? 10.5 : 3.6;
-    return { target: c, position: c.clone().add(dir.multiplyScalar(SIDE * dist)) };
+    const k = flat ? (showingLattice() ? 2.15 : 2.3) : (showingLattice() ? 3.5 : 3.6);
+    return { target: c, position: c.clone().add(dir.multiplyScalar(extent * k)) };
   }
   let tween = 0;
   function frame(animate = false) {
@@ -392,12 +385,25 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
 
   // ---- building ----
   function commit(before) {
-    const hadLattice = latticeOn;
+    const hadLattice = latticeOn, wasFlat = before < plan.flat || before === undefined;
     if (latticeOn && !latticeReady()) latticeOn = false;
-    if (!complete()) { theta = 0; setTurning(false); }
+    if (!milestoneAt()?.turn) { theta = 0; setTurning(false); }
     save(); draw(); onChange();
-    if (hadLattice !== latticeOn || (before < SQUARE_DONE) !== squareStage()) frame(true);
+    if (hadLattice !== latticeOn || wasFlat !== flatStage() || (before !== undefined && (plan.milestones.some((m) => m.at === before) || milestoneAt()))) frame(true);
   }
+  // Where the "one tap per edge" prompt shows: the first time in each
+  // stage that by-hand cells give way to whole edges.
+  const edgePromptAt = new Set();
+  function computeEdgePrompts() {
+    edgePromptAt.clear();
+    let stage = -1;
+    plan.steps.forEach((s, k) => {
+      const m = plan.milestones.findIndex((x) => k < x.at);
+      if (k > 0 && s.cells.length > 1 && plan.steps[k - 1].cells.length === 1 && m !== stage) { edgePromptAt.add(k); stage = m; }
+    });
+  }
+  computeEdgePrompts();
+  const axisLabel = (axis) => plan.axisNames?.[axis] ?? ['X', 'Y', 'Z', 'W'][axis];
   function handleTap(hit, mode) {
     if (mode === 'paint') return false;
     const before = filled;
@@ -409,6 +415,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     }
     // The finished tesseract: a tap starts or stops its turning.
     if (complete()) {
+      if (!milestoneAt()?.turn) return false;
       if (turning) setTurning(false);
       else {
         if (latticeOn) { latticeOn = false; draw(); frame(true); }
@@ -417,15 +424,17 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
       return true;
     }
     filled += 1;
-    const closed = filled === CUBE_DONE || complete();
-    if (closed) latticeOn = true;
+    const m = milestoneAt();
+    if (m?.autoLattice) latticeOn = true;
     commit(before);
-    if (closed) frame(true);
-    if (complete()) showHudPrompt(t('con.prompt.tesseract', lang(), { n: edges.length * N }), 6000);
-    else if (filled === CUBE_DONE) showHudPrompt(t('con.prompt.cube', lang(), { n: 12 * N }), 6000);
-    else if (filled === SQUARE_DONE) showHudPrompt(t('con.prompt.square', lang(), { n: SQUARE_DONE }), 6000);
-    else if (HAND_DONE.has(filled)) showHudPrompt(t('con.prompt.edges', lang()), 5000);
-    else if (filled % N === 0 && filled < SQUARE_DONE) showHudPrompt(t('con.prompt.junction', lang(), { axis: 'Y' }), 4000);
+    if (m) showHudPrompt(t(m.prompt, lang(), { n: m.whole * N }), 6000);
+    else if (edgePromptAt.has(filled)) showHudPrompt(t('con.prompt.edges', lang()), 5000);
+    else if (flatStage()) {
+      // A new direction's first line: a junction.
+      const e = plan.edges[plan.steps[filled].edge];
+      const isNew = !plan.edges.slice(0, e.instance).some((x) => x.axis === e.axis);
+      if (isNew && filled === lineStart(e.line)) showHudPrompt(t('con.prompt.junction', lang(), { axis: axisLabel(e.axis) }), 4000);
+    }
     return true;
   }
 
@@ -442,42 +451,60 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     if (latticeOn && theta) { setTurning(false); theta = 0; } // the lattice shows squared up
     draw(); frame(true);
   });
-  // The square opens in 2D, the cube in 3D, the tesseract in 4D.
-  const openDim = () => (filled === SQUARE_DONE ? '2D' : filled === CUBE_DONE ? '3D' : complete() ? '4D' : null);
+  // Each closed shape opens in its own dimension.
   function renderPanel() {
     panel.classList.toggle('visible', active && latticeReady());
-    const dim = openDim();
-    openBtn.hidden = !dim;
-    if (dim) openBtn.textContent = t('con.open', lang(), { dim });
+    const open = milestoneAt()?.open;
+    openBtn.hidden = !open;
+    if (open) openBtn.textContent = t('con.open', lang(), { dim: open.dim });
     latticeBtn.hidden = !latticeReady();
     latticeBtn.classList.toggle('active', latticeOn);
     latticeBtn.title = t('con.lattice', lang());
     latticeBtn.setAttribute('aria-label', latticeBtn.title);
   }
-  openBtn.addEventListener('click', () => { const dim = openDim(); if (dim) onOpenIn(dim); });
+  openBtn.addEventListener('click', () => { const open = milestoneAt()?.open; if (open) onOpenIn(open.dim, open.piece); });
   let shownLang = lang();
   onSettingsChange((st) => { if (st.language !== shownLang) { shownLang = st.language; if (active) renderPanel(); } });
+
+  function enterFamily(id) {
+    progress[family] = filled;
+    family = id;
+    plan = plans[id];
+    filled = progress[id];
+    latticeOn = !!milestoneAt()?.autoLattice;
+    theta = 0; turning = false;
+    computeEdgePrompts();
+  }
 
   return {
     group,
     meshes: () => pickTargets,
     handleTap,
+    /** Which family is built: 'square' (→ cube → tesseract) or 'kagome'. */
+    setFamily(id) {
+      if (!plans[id] || id === family) return;
+      enterFamily(id);
+      save();
+      if (active) { draw(); frame(); if (!filled) showHudPrompt(t(plan.startPrompt, lang()), 5000); }
+    },
+    get family() { return family; },
     setActive(on) {
       if (on === active) return;
       active = on;
       group.visible = on;
       if (!on) { cancelAnimationFrame(tween); camera.up.set(0, 1, 0); panel.classList.remove('visible'); }
       draw();
-      if (on) { frame(); setTurning(turning); if (!filled) showHudPrompt(t('con.prompt.start', lang()), 5000); }
+      if (on) { frame(); setTurning(turning); if (!filled) showHudPrompt(t(plan.startPrompt, lang()), 5000); }
     },
-    /** How many dimensions are built so far: 1 (lines), 2 (the square), 3 (the cube), 4 (the tesseract). */
-    reached: () => (complete() ? 4 : filled >= CUBE_DONE ? 3 : squareStage() ? 1 : 2),
+    /** How many dimensions are built so far: 1 (lines), then each closed shape's. */
+    reached: () => reachedMilestone()?.dim ?? 1,
     get isEmpty() { return filled === 0; },
-    clear() { const before = filled; filled = 0; commit(before); if (active) showHudPrompt(t('con.prompt.start', lang()), 5000); },
+    clear() { const before = filled; filled = 0; commit(before); if (active) showHudPrompt(t(plan.startPrompt, lang()), 5000); },
     snapshot: toJSON,
     restore(json) {
       const before = filled;
-      if (json?.version === 3 && json.n === N && Number.isInteger(json.filled)) filled = Math.max(0, Math.min(steps.length, json.filled));
+      readProgress(json);
+      filled = progress[family];
       commit(before);
     },
     toJSON,

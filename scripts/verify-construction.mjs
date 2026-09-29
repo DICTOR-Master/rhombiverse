@@ -4,7 +4,7 @@
 // - cell, axis instance and axis direction are separate: the bottom and
 //   top edges are two different, parallel X instances (likewise Y);
 // - junctions sit at the corners and only ever add an axis (X stays).
-import { squareLoop, junctions, exposedAxes, cubeEdges, edgeCells, cubeSteps, tesseractEdges, tesseractSteps, SQUARE_N } from '../src/geometry-extensions/construction.js';
+import { squareLoop, junctions, exposedAxes, cubeEdges, edgeCells, cubeSteps, tesseractEdges, tesseractSteps, kagomePlan, squarePlan, SQUARE_N } from '../src/geometry-extensions/construction.js';
 
 let failures = 0;
 function check(label, ok, extra = '') {
@@ -79,6 +79,38 @@ check('axes only ever join: X from the start, Y at the first corner, and X is ne
   const wHand = T.slice(Cs.length, Cs.length + n).every((s) => s.cells.length === 1 && s.cells[0].axis === 3);
   check(`steps: the cube's build (${Cs.length}), W1 by hand (n), then 19 whole edges: ${T.length} taps, ${T.flatMap((s) => s.cells).length} = 32n cells`,
     prefix && wHand && T.length === Cs.length + n + 19 && T.flatMap((s) => s.cells).length === 32 * n && same(T[Cs.length].cells[0].from, [0, 0]) && T[Cs.length].cells[0].from.every((v) => v === 0));
+}
+
+// Kagome's star: six straight lines, three directions 120° apart (each
+// with two parallel lines √3·n apart, Kagome's own spacing), every edge n
+// cells, the hexagon's corners where the lines cross; each direction's
+// first edge by hand, the rest one tap each.
+{
+  const n = SQUARE_N;
+  const K = kagomePlan(n);
+  const len = (e) => Math.hypot(...e.from.map((v, i) => e.to[i] - v));
+  const dir = (e) => e.from.map((v, i) => (e.to[i] - v) / len(e));
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  const lines = [...new Set(K.edges.map((e) => e.line))].map((l) => K.edges.filter((e) => e.line === l));
+  const straight = lines.every((es) => es.length === 3 && es.every((e, i) => !i || (same(e.from.slice(0, 2), es[i - 1].to.slice(0, 2)) || e.from.every((v, d) => near(v, es[i - 1].to[d]))) && dir(e).every((v, d) => near(v, dir(es[0])[d]))));
+  check('Kagome star: 18 edges of n cells, six straight lines of three edges', K.edges.length === 18 && K.edges.every((e) => near(len(e), n)) && straight);
+  const angs = [0, 1, 2].map((a) => { const e = K.edges.find((x) => x.axis === a); const d = dir(e); return Math.atan2(d[1], d[0]); });
+  const sep = (a, b) => { const x = Math.abs(a - b) % Math.PI; return Math.min(x, Math.PI - x); };
+  check('three directions, 60° apart as lines (the triangles\' 120° turns)', near(sep(angs[0], angs[1]), Math.PI / 3) && near(sep(angs[1], angs[2]), Math.PI / 3) && near(sep(angs[0], angs[2]), Math.PI / 3));
+  // Offsets across each direction, measured against its first line's
+  // heading (the second triangle runs its lines the other way).
+  const pairs = [0, 1, 2].map((a) => {
+    const d = dir(K.edges.find((x) => x.axis === a));
+    return lines.filter((es) => es[0].axis === a).map((es) => -d[1] * es[0].from[0] + d[0] * es[0].from[1]);
+  });
+  check('each direction: two parallel lines, √3·n apart', pairs.every((p) => p.length === 2 && near(Math.abs(Math.abs(p[0] - p[1]) - Math.sqrt(3) * n), 0)));
+  const hex = K.milestones[0].faces[0];
+  const crossings = hex.every((h) => K.edges.filter((e) => [e.from, e.to].some((p) => p.every((v, d) => near(v, h[d])))).length === 4);
+  check('the hexagon: six corners, each where two lines cross (four edge ends meet)', hex.length === 6 && crossings);
+  const byHand = K.steps.filter((s) => s.cells.length === 1).length;
+  check(`steps: each direction's first edge by hand (3n = ${3 * n}), the other 15 edges one tap each: ${K.steps.length} taps`, byHand === 3 * n && K.steps.length === 3 * n + 15);
+  const sq = squarePlan(n);
+  check('the square plan builds exactly as before (square → cube → tesseract)', sq.steps.length === tesseractSteps(n).length && sq.milestones.map((m) => m.at).join() === `${4 * n},${cubeSteps(n).length},${tesseractSteps(n).length}`);
 }
 
 console.log(`\n${failures} failure${failures === 1 ? '' : 's'}.`);

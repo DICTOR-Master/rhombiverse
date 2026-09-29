@@ -3432,6 +3432,11 @@ async function init() {
         // own #xray-toggle face and the Lab panel, so no wheel face
         // routes to it here any more.)
         const OWN_WORLD_ACTIONS = { 'tool:shellsWorld': 'shells', 'tool:goldenWorld': 'golden', 'tool:kaleidoWorld': 'kaleido', 'tool:signalWorld': 'signal', 'tool:constructWorld': 'construct' };
+        // Construct's families: tool:constructWorld:<family> (square, kagome).
+        if (action?.startsWith('tool:constructWorld:')) {
+          constructWorld?.setFamily(action.slice('tool:constructWorld:'.length));
+          action = 'tool:constructWorld';
+        }
         if (OWN_WORLD_ACTIONS[action]) {
           own3D = OWN_WORLD_ACTIONS[action];
           wheel3D.close();
@@ -5043,7 +5048,7 @@ async function init() {
     // A finished primitive opens in its own dimension's lattice: the
     // square as 2D's Parallelogram tile at the Square angle, the cube and
     // the tesseract in 3D and 4D.
-    onOpenIn: (dim) => {
+    onOpenIn: (dim, piece) => {
       // The cube opens as 3D's Cube piece, the tesseract in 4D's Z4
       // (hypercubic) world.
       if (dim === '3D' || dim === '4D') {
@@ -5067,8 +5072,10 @@ async function init() {
       if (dim !== '2D') return;
       own3D = null;
       activeDimension = '2D';
-      activeLattice2dPrimitiveId = 'parallelogram';
-      activeLattice2dAngleId = 'square';
+      // The square as the Parallelogram at the Square angle; the Kagome
+      // star as the Kagome tile (triangular).
+      activeLattice2dPrimitiveId = piece;
+      activeLattice2dAngleId = piece === 'parallelogram' ? 'square' : 'triangular';
       activeLattice2dArrangementId = 'translation';
       applyDimensionVisibility();
       applyDimensionCamera('2D');

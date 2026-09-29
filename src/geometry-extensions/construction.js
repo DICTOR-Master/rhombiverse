@@ -80,9 +80,10 @@ export function cubeEdges(n = SQUARE_N) {
   return edges;
 }
 
-/** An edge's n unit cells, from its start: { from, to, axis, instance, index }. */
+/** An edge's unit cells, from its start: { from, to, axis, instance, index }
+ * (as many as its length, in any direction). */
 export function edgeCells(e) {
-  const len = e.from.reduce((s, v, i) => s + Math.abs(e.to[i] - v), 0);
+  const len = Math.round(Math.hypot(...e.from.map((v, i) => e.to[i] - v)));
   return Array.from({ length: len }, (_, i) => ({
     from: e.from.map((v, d) => v + ((e.to[d] - v) / len) * i),
     to: e.from.map((v, d) => v + ((e.to[d] - v) / len) * (i + 1)),
@@ -137,3 +138,142 @@ export function tesseractSteps(n = SQUARE_N) {
   });
   return steps;
 }
+
+
+// ---- construction plans: one per family (Construct's Wizard cards) ----
+// A plan is everything Construct draws, in ℝ⁴ (x up the screen, y to the
+// right, z toward you, w inward):
+// - edges: { axis, instance, line, label, from, to }; `line` groups the
+//   edges of one straight line (the square's sides are one edge each);
+// - steps: the taps, { cells, edge } (see tesseractSteps);
+// - flat: the steps of the first, flat stage, built one line at a time;
+// - milestones: where a shape closes, in order: { at (steps), whole (the
+//   first `whole` edges show solid), dim, name, prompt, corners, faces,
+//   lattice (ghost segments), autoLattice, open ({ dim, piece }), turn }.
+const pad4 = (p) => [...p, ...[0, 0, 0, 0]].slice(0, 4);
+const allIn = (vals, n) => vals.every((v) => v === 0 || v === n);
+
+function gridLattice(n, dims, w = [0]) {
+  const G = [-n, 0, n, 2 * n];
+  const segs = [];
+  const own = (a, b) => allIn([...a, ...b], n);
+  const cubeGrid = (wv, d) => {
+    const out = [];
+    for (let axis = 0; axis < d; axis++) {
+      const others = [0, 1, 2].slice(0, d).filter((k) => k !== axis);
+      const combos = others.length === 1 ? G.map((u) => [u]) : G.flatMap((u) => G.map((v) => [u, v]));
+      for (const c of combos) for (let k = 0; k < 3; k++) {
+        const from = [0, 0, 0, wv], to = [0, 0, 0, wv];
+        others.forEach((o, i) => { from[o] = to[o] = c[i]; });
+        from[axis] = G[k]; to[axis] = G[k + 1];
+        out.push([from, to]);
+      }
+    }
+    return out;
+  };
+  if (dims <= 3) return cubeGrid(0, dims).filter(([a, b]) => !own(a, b));
+  // The tesseract's: the cube's 3×3×3 at both W levels joined along W,
+  // and its next neighbour along W (the smaller shell inside; the one
+  // outside sits at the eye of W's perspective).
+  for (const wv of w) for (const sg of cubeGrid(wv, 3)) if (!own(...sg)) segs.push(sg);
+  for (const x of G) for (const y of G) for (const z of G) if (!allIn([x, y, z], n)) segs.push([[x, y, z, 0], [x, y, z, n]]);
+  for (const [a, b] of cubeGrid(2 * n, 3)) if (allIn([...a.slice(0, 3), ...b.slice(0, 3)], n)) segs.push([a, b]);
+  for (const x of [0, n]) for (const y of [0, n]) for (const z of [0, n]) segs.push([[x, y, z, n], [x, y, z, 2 * n]]);
+  return segs;
+}
+
+/** Square → cube → tesseract. */
+export function squarePlan(n = SQUARE_N) {
+  const edges = tesseractEdges(n).map((e) => ({ ...e, line: e.instance }));
+  const steps = tesseractSteps(n);
+  const cubeDone = steps.findIndex((s) => s.edge === 12);
+  const corners = (d) => {
+    const out = [];
+    for (let m = 0; m < 1 << d; m++) out.push(pad4([0, 1, 2, 3].slice(0, d).map((k) => ((m >> k) & 1) * n)));
+    return out;
+  };
+  const sq = [[0, 0, 0, 0], [n, 0, 0, 0], [n, n, 0, 0], [0, n, 0, 0]];
+  const cubeFaces = [0, 1, 2].flatMap((fix) => [0, n].map((v) => {
+    const [a, b] = [0, 1, 2].filter((k) => k !== fix);
+    return [[0, 0], [n, 0], [n, n], [0, n]].map(([p, q]) => { const pt = [0, 0, 0, 0]; pt[fix] = v; pt[a] = p; pt[b] = q; return pt; });
+  }));
+  return {
+    id: 'square', n, edges, steps, flat: 4 * n, startPrompt: 'con.prompt.start',
+    milestones: [
+      { at: 4 * n, whole: 4, dim: 2, name: 'Square', prompt: 'con.prompt.square', corners: corners(2), faces: [sq], lattice: gridLattice(n, 2), autoLattice: false, open: { dim: '2D', piece: 'parallelogram' } },
+      { at: cubeDone, whole: 12, dim: 3, name: 'Cube', prompt: 'con.prompt.cube', corners: corners(3), faces: cubeFaces, lattice: gridLattice(n, 3), autoLattice: true, open: { dim: '3D', piece: 'cube' } },
+      { at: steps.length, whole: 32, dim: 4, name: 'Tesseract', prompt: 'con.prompt.tesseract', corners: corners(4), faces: [], lattice: gridLattice(n, 4, [0, n]), autoLattice: true, open: { dim: '4D', piece: 'tesseract' }, turn: true },
+    ],
+  };
+}
+
+/** Kagome: its star unit, two triangles of side 3n through a hexagon of
+ * side n; six straight lines in Kagome's three directions (direct
+ * decisions, 2026-09-29: "star unit, then lattice", "10, like the
+ * square"). The first triangle is traced round, its first side up the
+ * screen, then the second; each direction's first edge by hand, every
+ * other edge one tap. The lattice: each direction's lines, √3·n apart. */
+export function kagomePlan(n = SQUARE_N) {
+  const r3 = Math.sqrt(3);
+  const a = (r3 / 2) * n; // the triangle's side from its centre
+  const A = [[-1.5 * n, -a], [1.5 * n, -a], [0, 2 * a]];
+  const B = A.map(([x, y]) => [-x, -y]);
+  const names = ['X', 'Y', 'V'];
+  const edges = [];
+  const count = {};
+  [A, B].forEach((T, t) => T.forEach((p, i) => {
+    const q = T[(i + 1) % 3];
+    const axis = i; // A's and B's sides pair up, parallel
+    const line = t * 3 + i;
+    for (let k = 0; k < 3; k++) {
+      const f = (u) => pad4([p[0] + ((q[0] - p[0]) * u) / 3, p[1] + ((q[1] - p[1]) * u) / 3]);
+      count[axis] = (count[axis] ?? 0) + 1;
+      edges.push({ axis, instance: edges.length, line, label: `${names[axis]}${count[axis]}`, from: f(k), to: f(k + 1) });
+    }
+  }));
+  const seen = new Set();
+  const steps = [];
+  edges.forEach((e) => {
+    const cells = edgeCells(e);
+    if (!seen.has(e.axis)) { seen.add(e.axis); cells.forEach((c) => steps.push({ cells: [c], edge: e.instance })); } else steps.push({ cells, edge: e.instance });
+  });
+  // Lattice lines: direction d_k = A's k-th side; offsets a + j·√3n from
+  // the centre; clipped to a disc, minus the star's own stretch.
+  const RC = 4.6 * n;
+  const lattice = [];
+  for (let k = 0; k < 3; k++) {
+    const [p, q] = [A[k], A[(k + 1) % 3]];
+    const d = [(q[0] - p[0]) / (3 * n), (q[1] - p[1]) / (3 * n)];
+    const nu = [-d[1], d[0]];
+    for (let j = -3; j <= 3; j++) {
+      const c = (nu[0] * p[0] + nu[1] * p[1]) + j * r3 * n;
+      if (Math.abs(c) >= RC) continue;
+      const h = Math.sqrt(RC * RC - c * c);
+      const foot = [nu[0] * c, nu[1] * c];
+      const at = (u) => pad4([foot[0] + d[0] * u, foot[1] + d[1] * u]);
+      // The star's own lines (j = 0 through A's side, and B's parallel one)
+      // span |u| ≤ 1.5n; the lattice carries them on beyond.
+      const own = Math.abs(Math.abs(c) - a) < 1e-6;
+      if (own) { lattice.push([at(-h), at(-1.5 * n)]); lattice.push([at(1.5 * n), at(h)]); } else lattice.push([at(-h), at(h)]);
+    }
+  }
+  const tips = [...A, ...B].map(pad4);
+  const P = (u) => pad4(u);
+  // Faces: the hexagon (the triangles' crossings) and the six points.
+  const hex = [];
+  for (let i = 0; i < 6; i++) { const ang = Math.PI / 2 + (i * Math.PI) / 3; hex.push(P([n * Math.cos(ang + Math.PI / 6) * 1, n * Math.sin(ang + Math.PI / 6)])); }
+  const hexByAngle = hex.map((h) => ({ h, ang: Math.atan2(h[1], h[0]) }));
+  const faces = [hex, ...tips.map((tip) => {
+    const ang = Math.atan2(tip[1], tip[0]);
+    const near = hexByAngle.filter(({ ang: b }) => Math.abs(Math.atan2(Math.sin(b - ang), Math.cos(b - ang))) < Math.PI / 3).map(({ h }) => h);
+    return [tip, ...near];
+  })];
+  return {
+    id: 'kagome', n, edges, steps, flat: steps.length, axisNames: names, startPrompt: 'con.prompt.startKagome',
+    milestones: [
+      { at: steps.length, whole: edges.length, dim: 2, name: 'Kagome', prompt: 'con.prompt.kagome', corners: tips, faces, lattice, autoLattice: true, open: { dim: '2D', piece: 'kagome' } },
+    ],
+  };
+}
+
+export const PLANS = { square: squarePlan, kagome: kagomePlan };

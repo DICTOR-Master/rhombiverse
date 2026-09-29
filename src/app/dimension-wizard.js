@@ -206,10 +206,23 @@ function constructEdges() {
   out.coin = true;
   return out;
 }
-// 1D's worlds.
+// Construct · Kagome: its star, two triangles through a hexagon.
+function kagomeStarEdges() {
+  const out = [];
+  const r = 1.1;
+  for (const rot of [Math.PI / 2, -Math.PI / 2]) {
+    const pts = [0, 1, 2].map((i) => { const a = rot + (i * 2 * Math.PI) / 3; return [r * Math.cos(a), r * Math.sin(a), 0]; });
+    pts.forEach((p, i) => out.push([p, pts[(i + 1) % 3]]));
+  }
+  out.coin = true;
+  return out;
+}
+// 1D's worlds: Signal, and Construct's families (direct decision,
+// 2026-09-29: "Wizard cards").
 const FAMILIES_1D = [
   { id: 'signal', label: 'Signal', action: 'tool:signalWorld', preview: signalEdges },
-  { id: 'construct', label: 'Construct', action: 'tool:constructWorld', preview: constructEdges },
+  { id: 'construct', label: 'Construct · Square', action: 'tool:constructWorld:square', preview: constructEdges },
+  { id: 'constructKagome', label: 'Construct · Kagome', action: 'tool:constructWorld:kagome', preview: kagomeStarEdges },
 ];
 
 function edges6D() {
