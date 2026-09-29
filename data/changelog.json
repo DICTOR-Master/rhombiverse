@@ -3,6 +3,8 @@
     "date": "2026-09-29",
     "title": "Nets",
     "items": [
+      "Nets groups its solids as the Voronoi cells, cube, RD and the new truncated octahedron: the space-filling cells of the three cubic lattices.",
+      "The Kaleidoscope's controls are simpler: where you tap decides (near an edge attaches, empty space drops a piece loose), one mirror button switches Ring and the triangles, Spin and Shake are ↻ and ≈, Safe shows only for Penrose shapes, and Lattice View shows the mirror lines and every open spot as outlines, so nothing looks overlapped.",
       "New 2D world, Nets (Wizard → 2D → Nets), from 2D to 3D: pick the cube or the rhombic dodecahedron and follow its ghost net, the first face side by side in 1D cells, then a face a tap. When it's complete, a tap folds it up into the solid, a slider folds and unfolds it by hand, and Open in 3D takes the solid there."
     ]
   },

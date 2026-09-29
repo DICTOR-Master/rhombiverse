@@ -6,8 +6,10 @@
 // real kaleidoscope. render.js routes taps here while it's on.
 //
 // Decisions this file implements (user, 2026-09-26):
-// - Attach: tap an edge, the chosen piece goes across it (refused if it
-//   would overlap). Loose: tap anywhere to drop the piece there; it
+// - Where you tap decides (direct decision, 2026-09-29: "tap decides
+//   Attach/Loose", simpler controls in line with the app's precedents):
+//   tap near a piece's edge and the chosen piece goes across it (refused
+//   if it would overlap); tap empty space to drop it loose there; it
 //   shuffles across the build until it lines up edge to edge, settling
 //   in the free spot nearest where it fell (the spot whose Voronoi cell
 //   it's in), preferring a spot beside a complementary partner (thick
@@ -20,8 +22,12 @@
 //   of three (60-60-60, 45-45-90, 30-60-90) repeating across the plane;
 //   the slider sets the mirror count or the triangle's size.
 // - A tap on any mirror image means the same spot on the build (it's
-//   folded back into the domain). Guides shows the mirror lines and the
-//   uncut outlines of the build; off, it's the plain kaleidoscope.
+//   folded back into the domain). Lattice View (the bottom-row button)
+//   shows every spot the piece fits, the mirror lines and the uncut
+//   outlines of the build; off, it's the plain kaleidoscope.
+// - The panel, one row of symbols: the mirror button (○ ring, △
+//   triangles; a tap switches), Mirrors/Turn for the slider, ↻ Spin,
+//   ≈ Shake, and Safe for the Penrose shapes only.
 // - Paint (the 2D brush) recolours the tapped piece; long-press removes.
 import * as THREE from 'three';
 import {
@@ -55,7 +61,7 @@ export function createKaleidoWorld({ scene, edge = 1, colorFor, getMaterial, isP
 
   // ---- state ----
   let tiles = []; // { shape, verts, material, idx }, in placing order (idx: Penrose corner indices, see kaleidoscope.js)
-  const view = { group: 'penrose', shape: 'thick', place: 'attach', mirror: 'ring', k: 5, size: 3, turn: 0, slider: 'mirrors', guides: true, safe: true };
+  const view = { group: 'penrose', shape: 'thick', mirror: 'ring', k: 5, size: 3, turn: 0, slider: 'mirrors', safe: true };
   let latticeView = false;
   let ghosts = [];
   let active = false;
@@ -79,12 +85,10 @@ export function createKaleidoWorld({ scene, edge = 1, colorFor, getMaterial, isP
       const v = data.view ?? {};
       if (KALEIDO_GROUPS.some((g) => g.id === v.group)) view.group = v.group;
       if (shapeOk(v.shape)) view.shape = v.shape;
-      if (['attach', 'loose'].includes(v.place)) view.place = v.place;
       if (MIRROR_MODES.includes(v.mirror)) view.mirror = v.mirror;
       if (Number.isInteger(v.k) && v.k >= RING_MIN && v.k <= RING_MAX) view.k = v.k;
       if (Number.isInteger(v.size) && v.size >= SIZE_MIN && v.size <= SIZE_MAX) view.size = v.size;
       if (Number.isFinite(v.turn)) view.turn = v.turn;
-      if (v.guides === false) view.guides = false;
       if (v.safe === false) view.safe = false;
     }
   } catch { /* corrupt or blocked storage: start empty */ }
@@ -220,15 +224,14 @@ export function createKaleidoWorld({ scene, edge = 1, colorFor, getMaterial, isP
   catchPlane.position.z = -0.01;
   group.add(catchPlane);
   const pickTargets = [catchPlane];
-  let pieces = null, guides = null, first = null, ghostMesh = null, ghostLines = null;
-  const ghostMaterial = new THREE.MeshBasicMaterial({ color: GHOST_COLOR, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
-  const ghostLineMaterial = new THREE.LineBasicMaterial({ color: GHOST_COLOR, transparent: true, opacity: 0.8 });
+  let pieces = null, guides = null, first = null, ghostLines = null;
+  const ghostLineMaterial = new THREE.LineBasicMaterial({ color: GHOST_COLOR, transparent: true, opacity: 0.55 });
   const dispose = (o) => { if (o) { group.remove(o); o.geometry.dispose(); } };
   const tmpColor = new THREE.Color();
 
   function draw(now = performance.now()) {
-    dispose(pieces); dispose(guides); dispose(first); dispose(ghostMesh); dispose(ghostLines);
-    pieces = guides = first = ghostMesh = ghostLines = null;
+    dispose(pieces); dispose(guides); dispose(first); dispose(ghostLines);
+    pieces = guides = first = ghostLines = null;
     if (!active) return;
     const Dv = D();
     const u = flights.length ? Math.min(1, (now - flightStart) / SETTLE_MS) : 1;
@@ -275,8 +278,10 @@ export function createKaleidoWorld({ scene, edge = 1, colorFor, getMaterial, isP
       group.add(pieces);
     }
 
-    // Guides: the mirror lines, and the whole (uncut) build outlined.
-    if (view.guides) {
+    // With Lattice View: the mirror lines. (Not the build's uncut outlines
+    // any more: drawn across the mirrors they read as overlapping pieces;
+    // direct report, 2026-09-29: "why do pieces overlap?")
+    if (latticeView) {
       const lp = [];
       const R = 60;
       if (view.mirror === 'ring') {
@@ -288,28 +293,24 @@ export function createKaleidoWorld({ scene, edge = 1, colorFor, getMaterial, isP
         const maps = mapsFor(24);
         for (const mp of maps) Dv.forEach((p, i) => { const a = applyMap(mp, p), b = applyMap(mp, Dv[(i + 1) % 3]); lp.push(a[0], a[1], 0.003, b[0], b[1], 0.003); });
       }
-      for (const { verts } of shown) verts.forEach((p, i) => { const q = verts[(i + 1) % verts.length]; lp.push(p[0], p[1], 0.003, q[0], q[1], 0.003); });
       const lg = new THREE.BufferGeometry();
       lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
       guides = new THREE.LineSegments(lg, guideMaterial);
       group.add(guides);
     }
 
-    // Lattice View ghosts, whole (uncut) where they'd really go.
+    // Lattice View's open spots: outlines only (filled, neighbouring
+    // candidates stacked up and looked like overlapping pieces).
     if (ghosts.length) {
-      const gp = [], lp = [];
+      const lp = [];
       for (const { verts } of ghosts) {
         const v = verts.map(toView);
-        for (let i = 1; i < v.length - 1; i++) gp.push(...v[0], 0.002, ...v[i], 0.002, ...v[i + 1], 0.002);
         v.forEach((p, i) => { const q = v[(i + 1) % v.length]; lp.push(p[0], p[1], 0.0025, q[0], q[1], 0.0025); });
       }
-      const gg = new THREE.BufferGeometry();
-      gg.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3));
       const lg = new THREE.BufferGeometry();
       lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
-      ghostMesh = new THREE.Mesh(gg, ghostMaterial);
       ghostLines = new THREE.LineSegments(lg, ghostLineMaterial);
-      group.add(ghostMesh, ghostLines);
+      group.add(ghostLines);
     }
 
     // Empty: the cyan outline of the first piece, at the centre.
@@ -380,16 +381,17 @@ export function createKaleidoWorld({ scene, edge = 1, colorFor, getMaterial, isP
       return true;
     }
     const material = getMaterial(view.shape);
-    if (view.place === 'loose' || !tiles.length) {
+    // Near a piece's edge: attach across it. Anywhere else (or the very
+    // first piece): drop it loose, to settle into place.
+    const near = tiles.length ? nearestEdge(tiles, b) : null;
+    if (!near) {
       const tile = { shape: view.shape, verts: [], material };
       tiles.push(tile);
-      const fell = view.place === 'loose' ? looseTile(view.shape, b, Math.atan2(b[1], b[0])) : firstTile(view.shape);
+      const fell = tiles.length > 1 ? looseTile(view.shape, b, Math.atan2(b[1], b[0])) : firstTile(view.shape);
       launch([{ tile, fromVerts: fell }]);
       if (!tiles.includes(tile)) { showHudPrompt(t('kal.prompt.noFit', lang(), { piece: KALEIDO_SHAPE_LABELS[view.shape] }), 3000); return false; }
       return true;
     }
-    const near = nearestEdge(tiles, b);
-    if (!near) return false;
     const spot = spotsAcross(view.shape, near.tile, near.i, near.t, tiles)[0];
     if (spot) { tiles.push({ shape: view.shape, verts: spot.verts, idx: spot.idx, material }); commit(); return true; }
     showHudPrompt(t('kal.prompt.noFit', lang(), { piece: KALEIDO_SHAPE_LABELS[view.shape] }), 3000);
@@ -412,7 +414,7 @@ export function createKaleidoWorld({ scene, edge = 1, colorFor, getMaterial, isP
   const track = panel.querySelector('.w4d-track');
   // Short, so the panel fits a phone: a triangle by its angle at the
   // centre (the full name is its tooltip).
-  const MIRROR_LABELS = { ring: null, tri60: '△60°', tri45: '△45°', tri30: '△30°' };
+  const MIRROR_LABELS = { ring: '○', tri60: '△60°', tri45: '△45°', tri30: '△30°' };
   const MIRROR_TITLES = { tri60: '60-60-60', tri45: '45-45-90', tri30: '30-60-90' };
   const SHORT = { thick: 'Thick', thin: 'Thin' };
   // The slider runs -1 … +1: Mirrors maps it onto the count (Ring) or
@@ -452,18 +454,17 @@ export function createKaleidoWorld({ scene, edge = 1, colorFor, getMaterial, isP
       `<select class="hull-select" data-select="group">${KALEIDO_GROUPS.map((g) => `<option value="${g.id}"${g.id === view.group ? ' selected' : ''}>${g.label}</option>`).join('')}</select>`,
       ...grp.shapes.map((s) => btn('shape', s, SHORT[s] ?? KALEIDO_SHAPE_LABELS[s], s === view.shape, KALEIDO_SHAPE_LABELS[s])),
     ].join('');
+    // One mirror button: the current mirrors as a symbol; a tap switches.
     mirrorsRow.innerHTML = [
-      ...MIRROR_MODES.map((m) => btn('mirror', m, MIRROR_LABELS[m] ?? t('kal.ring', L), m === view.mirror, MIRROR_TITLES[m])),
+      btn('mirror', 'next', MIRROR_LABELS[view.mirror], false, view.mirror === 'ring' ? t('kal.ring', L) : MIRROR_TITLES[view.mirror]),
       btn('slider', 'mirrors', view.mirror === 'ring' ? t('kal.mirrors', L, { n: view.k }) : t('kal.size', L, { n: view.size }), view.slider === 'mirrors'),
       btn('slider', 'turn', t('kal.turn', L), view.slider === 'turn'),
     ].join('');
     optionsRow.innerHTML = [
-      btn('place', 'attach', t('kal.attach', L), view.place === 'attach'),
-      btn('place', 'loose', t('kal.loose', L), view.place === 'loose'),
-      btn('opt', 'shake', t('kal.shake', L), false),
-      btn('opt', 'spin', t('kal.spin', L), spinning),
-      btn('opt', 'guides', t('kal.guides', L), view.guides),
-      btn('opt', 'safe', t('kal.safe', L), view.safe),
+      btn('opt', 'spin', '↻', spinning, t('kal.spin', L)),
+      btn('opt', 'shake', '≈', false, t('kal.shake', L)),
+      // Safe (Penrose's matching rule) means something only for Penrose.
+      view.group === 'penrose' ? btn('opt', 'safe', t('kal.safe', L), view.safe) : '',
     ].join('');
     renderSlider();
   }
@@ -479,14 +480,12 @@ export function createKaleidoWorld({ scene, edge = 1, colorFor, getMaterial, isP
     if (!b) return;
     const d = b.dataset;
     if (d.shape && shapeOk(d.shape)) view.shape = d.shape;
-    else if (d.mirror && MIRROR_MODES.includes(d.mirror)) view.mirror = d.mirror;
-    else if (d.slider) view.slider = d.slider;
-    else if (d.place) {
-      view.place = d.place;
-      showHudPrompt(t(d.place === 'loose' ? 'kal.prompt.loose' : 'kal.prompt.attach', lang()), 4000);
-    } else if (d.opt === 'shake') shake();
+    else if (d.mirror === 'next') {
+      view.mirror = MIRROR_MODES[(MIRROR_MODES.indexOf(view.mirror) + 1) % MIRROR_MODES.length];
+      showHudPrompt(view.mirror === 'ring' ? t('kal.ring', lang()) : `△ ${MIRROR_TITLES[view.mirror]}`, 1800);
+    } else if (d.slider) view.slider = d.slider;
+    else if (d.opt === 'shake') shake();
     else if (d.opt === 'spin') { spinning = !spinning; if (spinning) tick(); }
-    else if (d.opt === 'guides') view.guides = !view.guides;
     else if (d.opt === 'safe') { view.safe = !view.safe; if (view.safe) showHudPrompt(t('kal.prompt.safe', lang()), 4500); }
     save(); computeGhosts(); renderPanel(); draw();
   });

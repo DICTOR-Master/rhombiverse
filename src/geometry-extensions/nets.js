@@ -66,10 +66,41 @@ function rd() {
   }
   return { v, faces, edge: Math.sqrt(3) };
 }
+// The truncated octahedron: the permutations of (0, ±1, ±2); six square
+// faces (a coordinate ±2) and eight hexagons (x·s = 3 for each sign
+// triple s), their corners put in order round each face.
+function truncatedOctahedron() {
+  const v = [];
+  const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+  for (const [i, j, k] of perms) for (const a of [-1, 1]) for (const b of [-1, 1]) {
+    const p = [0, 0, 0]; p[i] = 0; p[j] = a; p[k] = 2 * b;
+    if (!v.some((q) => q.every((x, d) => x === p[d]))) v.push(p);
+  }
+  const faces = [];
+  for (let k = 0; k < 3; k++) for (const sg of [-1, 1]) faces.push(ordered(v, v.map((p, i) => i).filter((i) => v[i][k] === 2 * sg)));
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) faces.push(ordered(v, v.map((p, i) => i).filter((i) => v[i][0] * sx + v[i][1] * sy + v[i][2] * sz === 3)));
+  return { v, faces, edge: Math.SQRT2 };
+}
+// A face's corners (indices) in order round its centre.
+function ordered(v, idx) {
+  const pts = idx.map((i) => v[i]);
+  const c = pts.reduce((s, p) => s.map((x, d) => x + p[d] / pts.length), [0, 0, 0]);
+  const n = norm(c);
+  const u = norm(sub(pts[0], c));
+  const w = cross(n, u);
+  return idx.map((i) => ({ i, a: Math.atan2(dot(sub(v[i], c), w), dot(sub(v[i], c), u)) })).sort((a, b) => a.a - b.a).map((x) => x.i);
+}
+// Grouped as the panel shows them. The Voronoi cells (direct decision,
+// 2026-09-29: "Voronoi in the name if valid and relevant"): the cube, the
+// RD and the truncated octahedron are exactly the Voronoi cells of the
+// simple, face-centred and body-centred cubic lattices, the region
+// nearer one lattice point than any other, and so each fills space.
 export const SOLIDS = {
-  cube: { label: 'Cube', make: cube },
-  rd: { label: 'Rhombic dodecahedron', make: rd },
+  cube: { label: 'Cube', group: 'voronoi', make: cube },
+  rd: { label: 'Rhombic dodecahedron', group: 'voronoi', make: rd },
+  to: { label: 'Truncated octahedron', group: 'voronoi', make: truncatedOctahedron },
 };
+export const SOLID_GROUPS = [{ id: 'voronoi', label: 'Voronoi cells' }];
 
 // ---- nets ----
 // Faces as corner coordinates, scaled to edge L, each wound so its normal

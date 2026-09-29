@@ -54,11 +54,12 @@ right-click) removes. The **User Guide** (in the app, or at
   plus the Rhombille pattern.
   **Kaleidoscope**, a 2D world of its own: Penrose thick and thin rhombi,
   pentagons, triangles, hexagons and squares reflected by a ring of 1–12
-  mirrors or a triangle of three; Attach or Loose (pieces slide into place
-  beside a partner), Turn, Spin, Shake, and a Safe mode that keeps the
+  mirrors or a triangle of three; tap an edge to attach or empty space to
+  drop a piece loose (it slides into place beside a partner), Turn, Spin, Shake, and a Safe mode that keeps the
   rhombi to Penrose's matching rule.
-  **Nets**, from 2D to 3D: follow a solid's ghost net (cube, rhombic
-  dodecahedron) face by face, then fold it up into the solid with a slider.
+  **Nets**, from 2D to 3D: follow a solid's ghost net face by face, then
+  fold it up into the solid with a slider; the Voronoi cells of the cubic
+  lattices (cube, rhombic dodecahedron, truncated octahedron).
 - **Paint** — in every dimension but 1D+, the brush recolours pieces
   you've already placed (except Shells and Golden Rhombohedra, coloured by
   band and type); in 4D it sits in the 4D panel.

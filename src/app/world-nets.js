@@ -7,7 +7,7 @@
 // ("tap it and it folds into the solid"), and a slider folds and unfolds
 // it by hand ("fold slider"). The geometry is geometry-extensions/nets.js.
 import * as THREE from 'three';
-import { netOf, netSteps, SOLIDS, apply } from '../geometry-extensions/nets.js';
+import { netOf, netSteps, SOLIDS, SOLID_GROUPS, apply } from '../geometry-extensions/nets.js';
 import { bulletGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
@@ -244,7 +244,9 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
   function renderPanel() {
     panel.classList.toggle('visible', active);
     if (!active) return;
-    solidsRow.innerHTML = Object.entries(SOLIDS).map(([id, s]) => `<button type="button" data-solid="${id}" class="${id === solid ? 'active' : ''}">${s.label}</button>`).join('');
+    // Each group named, its solids short (full names on hover).
+    const SHORT = { rd: 'RD', to: 'TO' };
+    solidsRow.innerHTML = SOLID_GROUPS.map((g) => `<span class="nets-group">${t(`nets.group.${g.id}`, lang())}</span>${Object.entries(SOLIDS).filter(([, s]) => s.group === g.id).map(([id, s]) => `<button type="button" data-solid="${id}" class="${id === solid ? 'active' : ''}" title="${s.label}">${SHORT[id] ?? s.label}</button>`).join('')}`).join('');
     foldRow.hidden = !complete();
     slider.title = t('nets.fold', lang());
     slider.setAttribute('aria-label', slider.title);

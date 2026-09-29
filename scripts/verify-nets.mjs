@@ -34,7 +34,7 @@ for (const id of Object.keys(SOLIDS)) {
   const steps = netSteps(net);
   const edges = steps.flatMap((s) => s.edges);
   const sides = net.faces.reduce((s, f) => s + f.pts.length, 0);
-  check(`${net.label}: the build follows the net, first face by sides then a face a tap (${steps.length} taps), every edge n`, steps.length === net.faces[0].pts.length + F - 1 && edges.length === sides - (F - 1) && edges.every(([a, b]) => near(dist(a, b), 5)));
+  check(`${net.label}: the build follows the net, first face by sides then a face a tap (${steps.length} taps), every edge n`, steps.length === net.faces[net.tree.order[0]].pts.length + F - 1 && edges.length === sides - (F - 1) && edges.every(([a, b]) => near(dist(a, b), 5)));
 }
 console.log(`\n${failures} failure${failures === 1 ? '' : 's'}.`);
 process.exit(failures ? 1 : 0);
