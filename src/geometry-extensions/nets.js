@@ -153,7 +153,12 @@ function solidFaces(id, L) {
     const pts = f.map((i) => v[i].map((x) => x * k));
     const c = pts.reduce((s, p) => s.map((x, d) => x + p[d] / pts.length), [0, 0, 0]);
     const n = cross(sub(pts[1], pts[0]), sub(pts[2], pts[0]));
-    return { pts: dot(n, c) < 0 ? [...pts].reverse() : pts, keys: f.map((i) => i) };
+    // Wound outward: corners and their ids reversed together (they were
+    // out of step, so a face's hinge was taken as the wrong side and that
+    // side never drawn; direct report: "the RD net doesn't fully enclose
+    // all sides").
+    const flip = dot(n, c) < 0;
+    return { pts: flip ? [...pts].reverse() : pts, keys: flip ? [...f].reverse() : [...f] };
   });
 }
 const edgeKey = (a, b) => (a < b ? `${a}-${b}` : `${b}-${a}`);

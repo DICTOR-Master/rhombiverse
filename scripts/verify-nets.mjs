@@ -31,6 +31,15 @@ for (const id of Object.keys(SOLIDS)) {
     return [0, 0.3, 0.7, 1].every((t) => { const T = net.at(t); return [node.a, node.a.map((v, d) => v + node.d[d] * 5)].every((q) => dist(apply(T[i], q), apply(T[P], q)) < 1e-6); });
   });
   check(`${net.label}: half folded, faces keep their shape and stay hinged`, rigid && hinged);
+  // Every face's outline is complete once built: each of its sides is an
+  // edge it owns or its hinge to its parent (the parent's).
+  const has = (list, a, b) => list.some(([p, q]) => (dist(p, a) < 1e-9 && dist(q, b) < 1e-9) || (dist(p, b) < 1e-9 && dist(q, a) < 1e-9));
+  const closedOutlines = net.faces.every((f, i) => f.pts.every((a, j) => {
+    const b = f.pts[(j + 1) % f.pts.length];
+    const parent = net.tree.nodes[i].parent;
+    return has(net.owned[i], a, b) || (parent >= 0 && has(net.owned[parent], a, b));
+  }));
+  check(`${net.label}: every face's outline is complete once built`, closedOutlines);
   const steps = netSteps(net);
   const edges = steps.flatMap((s) => s.edges);
   const sides = net.faces.reduce((s, f) => s + f.pts.length, 0);
