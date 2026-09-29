@@ -26,7 +26,8 @@
 //   names (X1, Z3, …) until the cube closes.
 // - The cube lattice (direct request, "c - cube lattice"): once the cube
 //   closes, the lattice button shows it tiling space, the cubes around it
-//   as ghosts, and the view pulls back to take them in.
+//   as ghosts, and the view pulls back to take them in. The closed square
+//   has its lattice too ("we need square lattice too"), seen straight on.
 // - Long-press takes back the last cell. No other controls.
 // - Cells are the shared 1D bullet (bullet-cell.js), nose along the way
 //   round, in Signal's cyan, matte, shaded cups.
@@ -67,7 +68,9 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toJSON())); } catch { /* best-effort */ }
   }
   const complete = () => filled === steps.length;
-  let latticeOn = false; // the finished cube's lattice shown around it
+  let latticeOn = false; // the finished square's or cube's lattice shown around it
+  const latticeReady = () => complete() || filled === 4 * SQUARE_N;
+  const squareLattice = () => latticeOn && filled === 4 * SQUARE_N;
   const squareStage = () => filled < SQUARE_STEPS;
 
   // ---- drawing ----
@@ -101,7 +104,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   // Z comes out toward you.
   const world = (p) => new THREE.Vector3(p[1] * U, p[0] * U, (p[2] ?? 0) * U);
   const SIDE = SQUARE_N * U;
-  const centre = () => new THREE.Vector3(SIDE / 2, SIDE / 2, squareStage() ? 0 : SIDE / 2);
+  const centre = () => new THREE.Vector3(SIDE / 2, SIDE / 2, squareStage() || squareLattice() ? 0 : SIDE / 2);
 
   // Numbered edge names: small text sprites, made once each.
   const labelCache = new Map();
@@ -204,6 +207,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     if (lastWhole) {
       SQUARE_FACE.forEach((p) => layer.add(dome(p)));
       layer.add(face(SQUARE_FACE));
+      if (latticeOn) drawLattice(2);
       // Z joins at the start corner.
       const dot = new THREE.Mesh(new THREE.SphereGeometry(R * 2.2, 32, 16), junctionMat);
       dot.userData.own = true;
@@ -218,10 +222,20 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   }
   // The 3×3×3 block of cubes around the finished one: every lattice edge
   // on the grid lines -N, 0, N, 2N, but the cube's own twelve.
-  function drawLattice() {
+  // The square's is its 3×3 in the plane (Z stays 0).
+  function drawLattice(dims = 3) {
     const G = [-N, 0, N, 2 * N];
     const own = (a, b) => [...a, ...b].every((v) => v === 0 || v === N);
-    for (let axis = 0; axis < 3; axis++) {
+    for (let axis = 0; axis < dims; axis++) {
+      if (dims === 2) {
+        for (const u of G) for (let k = 0; k < 3; k++) {
+          const from = [0, 0, 0], to = [0, 0, 0];
+          from[1 - axis] = to[1 - axis] = u;
+          from[axis] = G[k]; to[axis] = G[k + 1];
+          if (!own(from, to)) layer.add(cellMesh({ from, to }, latticeMat, edgeGhostGeo));
+        }
+        continue;
+      }
       for (const u of G) for (const v of G) {
         for (let k = 0; k < 3; k++) {
           const from = [0, 0, 0], to = [0, 0, 0];
@@ -251,8 +265,9 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   // cube's depth shows ("turn, with perspective").
   function pose() {
     const c = centre();
-    const dir = squareStage() ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0.5, 0.32, 0.8).normalize();
-    const dist = squareStage() ? 2.3 : latticeOn && complete() ? 8.5 : 3.6;
+    const flat = squareStage() || squareLattice();
+    const dir = flat ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0.5, 0.32, 0.8).normalize();
+    const dist = squareStage() ? 2.3 : squareLattice() ? 6.4 : latticeOn && complete() ? 8.5 : 3.6;
     return { target: c, position: c.clone().add(dir.multiplyScalar(SIDE * dist)) };
   }
   let tween = 0;
@@ -281,7 +296,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
 
   // ---- building ----
   function commit(before) {
-    if (latticeOn && !complete()) { latticeOn = false; frame(true); }
+    if (latticeOn && !latticeReady()) { latticeOn = false; frame(true); }
     save(); draw(); onChange();
     if ((before < SQUARE_STEPS) !== squareStage()) frame(true); // the square closed or reopened: turn
   }
@@ -319,7 +334,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   function renderPanel() {
     panel.classList.toggle('visible', active && filled > 0);
     openBtn.hidden = filled !== SQUARE_STEPS;
-    latticeBtn.hidden = !complete();
+    latticeBtn.hidden = !latticeReady();
     latticeBtn.classList.toggle('active', latticeOn);
     latticeBtn.title = t('con.lattice', lang());
     latticeBtn.setAttribute('aria-label', latticeBtn.title);
