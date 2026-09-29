@@ -28,28 +28,25 @@ piece goes; tap a face to add the neighbour across it; long-press (or
 right-click) removes. The **User Guide** (in the app, or at
 [/guide](https://rhombiverse.vercel.app/guide)) covers every control.
 
-- **1D+** — **Signal**: type a message and it becomes a line of bullet
-  cells (its Morse code, no need to know it); tap the orange cell or press
-  Send to set it moving away. Outside (in perspective) and Inside (in the
-  tunnel, the cells passing beneath you) views.
-  Or key it yourself on the pulse key (tap a dot, hold a dash); a Morse
-  glossary opens beside Send, and the message reads out at the
-  top as it arrives.
-  **Construct**: build a square from 1D cells, one tap at a time — along
-  X, Y joining at the corner (X stays), round the four sides until it
-  closes and fills in (open it in 2D from there); then Z rises into a
-  cube: its first edge cell by cell, then one tap per numbered edge,
-  and the finished cube goes straight into its lattice (a
-  lattice button shows the closed square's too).
-  Then W rises into a tesseract (cube within a cube), which turns
-  through W; each closed shape opens in its own dimension (2D, 3D, 4D).
-  **Construct · Kagome** builds a hexagon by hand, then Kagome's star
-  round it (three directions of line) and its lattice, then rises
-  into 3D pyrochlore (truncated tetrahedron, then its tetrahedra) and
-  4D hyper-pyrochlore (truncated 5-cell, then its 5-cells).
-  **Construct · RD** builds the RD's own rhombus, then the rhombic
-  dodecahedron: its cube inside, then its six pyramids, then its lattice.
-  ⊘ beside Undo clears to start again; a Signal | Construct toggle switches worlds.
+- **1D+** — 1D, and 1D reaching into the other dimensions.
+  **Signal**: type a message (or key it on the pulse key: tap a dot, hold
+  a dash) and it becomes a line of bullet cells, its Morse code, shown and
+  editable as dots and dashes; a Morse glossary opens beside Send. Send
+  sets it moving away, and it reads out at the top as it arrives. Outside
+  (in perspective) and Inside (in the tunnel, movable by touch) views.
+  **Construct**: build shapes from 1D cells, one tap at a time — the first
+  closed shape by hand, then one tap per edge, each new dimension's first
+  edge by hand again ("directions are free, dimensions are earned"):
+  - **Square** → cube → tesseract (cube within a cube, turning through W);
+  - **Kagome**: hexagon → star → the Kagome lattice → 3D pyrochlore
+    (truncated tetrahedron, then its tetrahedra) → 4D hyper-pyrochlore
+    (truncated 5-cell, then its 5-cells); body cyan, limbs gold;
+  - **RD**, the flagship: the RD's own rhombus → the rhombic dodecahedron,
+    its cube inside first, then its six pyramids → its lattice.
+  Each closed shape shows its lattice and opens in its own dimension (2D,
+  3D, 4D); the indicator beside Wizard reads 1D+/2D/3D/4D as you go.
+  ⊘ beside Undo clears to start again; a Signal | Construct toggle
+  switches worlds.
 - **2D** — five tiles (Parallelogram, Triangle, Hexagon, Kite, Kagome) on
   four lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular),
   plus the Rhombille pattern.
@@ -58,9 +55,9 @@ right-click) removes. The **User Guide** (in the app, or at
   mirrors or a triangle of three; Attach or Loose (pieces slide into place
   beside a partner), Turn, Spin, Shake, and a Safe mode that keeps the
   rhombi to Penrose's matching rule.
-- **Paint** — in every dimension, the brush recolours pieces you've
-  already placed (except Shells and Golden Rhombohedra, coloured by band
-  and type).
+- **Paint** — in every dimension but 1D+, the brush recolours pieces
+  you've already placed (except Shells and Golden Rhombohedra, coloured by
+  band and type); in 4D it sits in the 4D panel.
 - **3D** — every piece listed under the lattice it lives on:
   - **FCC**: rhombic dodecahedron (RD), Hemi RD, Hourglass, RD Quarter,
     Cube, Pyramid

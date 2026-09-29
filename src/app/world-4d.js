@@ -64,7 +64,7 @@ const keyInts = (k, c) => (KINDS_4D[k].key ? KINDS_4D[k].key(c) : toDoubled(c));
 const fromKeyInts = (k, d) => (KINDS_4D[k].fromKey ? KINDS_4D[k].fromKey(d) : fromDoubled(d));
 const keyOf = (k, c) => cellKey4(k, keyInts(k, c));
 
-export function createWorld4D({ scene, materialColor, getMaterial, onChange = () => {}, showHudPrompt = () => {} }) {
+export function createWorld4D({ scene, materialColor, getMaterial, onChange = () => {}, showHudPrompt = () => {}, paint = null }) {
   const group = new THREE.Group();
   group.visible = false;
   scene.add(group);
@@ -481,6 +481,9 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
       view.mode === 'projection' ? `<button type="button" data-opt="perspective">${t(view.perspective ? '4d.perspective' : '4d.parallel', lang)}</button>` : '',
       `<button type="button" data-opt="reset">${t('hyper.reset', lang, { dim: '4D' })}</button>`,
       `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">${t('hyper.info', lang)}</button>`,
+      // Paint, when the bottom row's shared slot is the attach toggle
+      // (direct request: "add paint button to 4D").
+      paint?.shown() ? `<button type="button" data-opt="paint" class="w4d-paint ${paint.isOn() ? 'active' : ''}" title="${paint.title()}" aria-label="${paint.title()}">${paint.icon}</button>` : '',
     ].join('');
     slider.render();
   }
@@ -493,6 +496,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
   optionsRow.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-opt]');
     if (!b) return;
+    if (b.dataset.opt === 'paint') { paint?.toggle(); renderPanel(); return; }
     if (b.dataset.opt === 'info') {
       infoOpen = !infoOpen;
       renderPanel();
@@ -530,6 +534,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     group,
     meshes,
     handleTap,
+    refreshPanel: () => { if (active) renderPanel(); },
     get kind() { return kind; },
     setKind(k) {
       if (!KINDS_4D[k]) return;

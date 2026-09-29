@@ -1971,6 +1971,8 @@ async function init() {
   const paintInSlot = () => paintAvailable() && !attachNeeded();
   function setPaint(on) {
     paintOn = on;
+    document.getElementById('hud-quick-paint')?.classList.toggle('active', on && paintAvailable() && attachNeeded());
+    world4d?.refreshPanel?.();
     rhomboAttachBtn?.classList.toggle('active', on && paintInSlot());
     document.getElementById('hud-quick-color')?.classList.toggle('painting', on);
     renderRhomboAttachButton();
@@ -2033,10 +2035,20 @@ async function init() {
     showHudPrompt(rhomboAttachMode === 'mirror' ? 'Attach: Mirror -- taps place the mirror image across the tapped face.' : 'Attach: Copy -- taps place a same-orientation copy across the tapped face.', 3000);
   });
   renderRhomboAttachButton();
+  // Paint's own button, when the attach toggle holds the shared slot.
+  const quickPaintBtn = document.getElementById('hud-quick-paint');
+  if (quickPaintBtn) quickPaintBtn.innerHTML = PAINT_ICON;
+  quickPaintBtn?.addEventListener('click', () => { togglePaint(); updateRhomboAttachPanel(); });
   function updateRhomboAttachPanel() {
     if (paintOn && !paintAvailable()) setPaint(false);
     rhomboAttachBtn?.classList.toggle('hidden', !paintInSlot() && !attachNeeded());
     rhomboAttachBtn?.classList.toggle('active', paintOn && paintInSlot());
+    // (4D has it in its own panel instead: the stack above would sit under it.)
+    const ownPaint = paintAvailable() && attachNeeded() && activeDimension !== '4D';
+    world4d?.refreshPanel?.();
+    quickPaintBtn?.classList.toggle('hidden', !ownPaint);
+    quickPaintBtn?.classList.toggle('active', ownPaint && paintOn);
+    if (quickPaintBtn) quickPaintBtn.title = `Paint: ${paintOn ? 'on' : 'off'} (tap to switch)`;
     renderRhomboAttachButton();
   }
 
@@ -4956,6 +4968,13 @@ async function init() {
   }
 
   world4d = createWorld4D({
+    paint: {
+      shown: () => paintAvailable() && attachNeeded(),
+      isOn: () => paintOn,
+      toggle: () => { togglePaint(); updateRhomboAttachPanel(); },
+      title: () => `Paint: ${paintOn ? 'on' : 'off'} (tap to switch)`,
+      icon: PAINT_ICON,
+    },
     scene,
     materialColor: viewMaterialColor,
     getMaterial: () => currentMaterialFor(document.getElementById('piece-type-select').value),
