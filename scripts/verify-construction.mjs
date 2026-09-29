@@ -121,7 +121,8 @@ check('axes only ever join: X from the start, Y at the first corner, and X is ne
   const pts = K.edges.flatMap((e) => [e.from, e.to]).filter((p, i, a) => a.findIndex((q) => kk(q) === kk(p)) === i);
   const d3 = (a, b) => near(Math.hypot(...a.slice(0, 3).map((v, d) => v - b[d])), 3 * n);
   const top = pts.reduce((a, b) => (b[2] > a[2] ? b : a));
-  const big = [top, ...pts.filter((p) => d3(p, top))];
+  // (All six star points lie 3n from it; its base is the three with an edge going up.)
+  const big = [top, ...pts.filter((p) => d3(p, top) && K.edges.some((e) => kk(e.from) === kk(p) && e.to[2] > 0))];
   const bigRegular = big.length === 4 && big.every((a, x) => big.every((b, y) => x === y || near(Math.hypot(...a.slice(0, 3).map((v, d) => v - b[d])), 3 * n)));
   check('then its limbs: one tap per edge, and all together one big regular tetrahedron (edge 3n), every edge n', bigRegular && K.edges.every((e) => near(len(e), n)) && K.steps.slice(tt.at).every((s) => s.cells.length === n) && py.open.piece === 'pyrochlore');
   const pyro = py.lattice;
