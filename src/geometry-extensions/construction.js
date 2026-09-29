@@ -321,12 +321,20 @@ export function kagomePlan(n = SQUARE_N) {
   big3.forEach((V, k) => addW(V, Q1[k]));
   Q2.forEach((q) => addW(q, V4));
   edges.forEach((e, k) => { if ((k >= 6 && k < 18) || (k >= ttDone && k < pyroDone) || k >= bodyDone) e.part = 'limb'; });
+  // Taps (direct request: "minimise taps... identical limb parts happen at
+  // once"): the hexagon by hand; the star an edge a tap (2D, no new
+  // direction); then each new dimension's first edge by hand, the rest of
+  // its body in a tap per kind of part, and its limbs, all alike, in one.
   const steps = [];
-  edges.forEach((e, k) => {
-    const cells = edgeCells(e);
-    if (k < 6 || k === 18 || k === pyroDone) cells.forEach((c) => steps.push({ cells: [c], edge: e.instance })); // the hexagon, Z's first edge, W's first edge
-    else steps.push({ cells, edge: e.instance });
-  });
+  const hand = (i) => edgeCells(edges[i]).forEach((c) => steps.push({ cells: [c], edge: i }));
+  const range = (a, b) => Array.from({ length: b - a }, (_, k) => a + k);
+  const chunk = (ids) => { ids.forEach((i) => { edges[i].chunked = true; }); steps.push({ cells: ids.flatMap((i) => edgeCells(edges[i])), edge: ids[0], edges: ids }); };
+  range(0, 6).forEach(hand);
+  range(6, 18).forEach((i) => steps.push({ cells: edgeCells(edges[i]), edge: i }));
+  hand(18); chunk(range(19, ttDone - 3)); chunk(range(ttDone - 3, ttDone)); // the truncated tetrahedron: its three corners' rest, its top
+  chunk(range(ttDone, pyroDone)); // the four tetrahedra
+  hand(pyroDone); chunk(range(pyroDone + 1, bodyDone - 6)); chunk(range(bodyDone - 6, bodyDone)); // the truncated 5-cell: its four corners' rest, its top
+  chunk(range(bodyDone, edges.length)); // the five small 5-cells
   // Lattices. The hexagon's: the honeycomb, two rings round it. Kagome's:
   // each direction's lines through the hexagon's sides, √3·n apart,
   // clipped to a disc, carrying the star's own lines on past its points.
@@ -513,12 +521,51 @@ export function rdPlan(n = SQUARE_N) {
   for (const A of order) {
     corners.filter((c) => Math.abs(Math.hypot(...sub(c, A)) - n) < 1e-9).forEach((c) => { if (!has(A, c)) add(c, A, 'limb'); });
   }
+  const rdDone = edges.length;
+  // Taps (direct request: "minimise taps... identical limb parts happen at
+  // once"): the rhombus by hand; Z's first cube edge by hand, the rest of
+  // the cube in one tap, the six pyramids (all alike) in one.
   const steps = [];
-  edges.forEach((e, k) => {
-    const cells = edgeCells(e);
-    if (k < rhombusDone || k === rhombusDone) cells.forEach((c) => steps.push({ cells: [c], edge: e.instance }));
-    else steps.push({ cells, edge: e.instance });
+  const chunk = (ids) => { ids.forEach((i) => { edges[i].chunked = true; }); steps.push({ cells: ids.flatMap((i) => edgeCells(edges[i])), edge: ids[0], edges: ids }); };
+  const range = (a, b) => Array.from({ length: b - a }, (_, k) => a + k);
+  for (let i = 0; i <= rhombusDone; i++) edgeCells(edges[i]).forEach((c) => steps.push({ cells: [c], edge: i }));
+  chunk(range(rhombusDone + 1, cubeDone));
+  chunk(range(cubeDone, rdDone));
+  // 4D (direct decisions, 2026-09-29: "24-cell", "split corners apart",
+  // "leave behind as ghosts"): the RD is the 24-cell's shadow along W.
+  // Split it open: each cube corner parts into two, ±hs in W, so the two
+  // copies of the cube make the tesseract (the body; the first corner's
+  // W edge by hand, then a tap per corner, each bringing its W edge and
+  // the cube edges it now shares with corners already split). Then the
+  // limbs: each of the RD's six apexes joins the corners on both sides,
+  // and two new apexes out along W join their cubes: a tap each. All
+  // together the 24-cell, 96 edges of s; the RD stays as its ghost.
+  const W4 = (p, w) => [...plan(p).slice(0, 3), w];
+  const add4 = (a, b, part) => {
+    const dw = b[3] - a[3];
+    const axis = Math.abs(dw) > 1e-9 ? 3 : 2;
+    count[axis] = (count[axis] ?? 0) + 1;
+    edges.push({ axis, instance: edges.length, line: edges.length, along: -1, label: `${names[axis]}${count[axis]}`, from: a, to: b, ...(part ? { part } : {}) });
+    return edges.length - 1;
+  };
+  const split = [];
+  const cornerOrder = [C1, ...corners.filter((c) => key3(c) !== key3(C1)).sort((a, b) => Math.hypot(...sub(a, C1)) - Math.hypot(...sub(b, C1)))];
+  // W's first edge by hand (the first corner parting), then the other
+  // corners all at once; then the RD's six apexes join both sides at
+  // once, and the two new W apexes at once.
+  const firstW = add4(W4(cornerOrder[0], -hs), W4(cornerOrder[0], hs));
+  edgeCells(edges[firstW]).forEach((cell) => steps.push({ cells: [cell], edge: firstW }));
+  split.push(cornerOrder[0]);
+  const others = [];
+  cornerOrder.slice(1).forEach((c) => {
+    others.push(add4(W4(c, -hs), W4(c, hs)));
+    for (const d of split) if (sub(c, d).filter((t) => Math.abs(t) > 1e-9).length === 1) for (const w of [-hs, hs]) others.push(add4(W4(d, w), W4(c, w)));
+    split.push(c);
   });
+  chunk(others);
+  const tessDone = edges.length;
+  chunk(order.flatMap((A) => corners.filter((c) => Math.abs(Math.hypot(...sub(c, A)) - n) < 1e-9).flatMap((c) => [add4(W4(A, 0), W4(c, -hs), 'limb'), add4(W4(A, 0), W4(c, hs), 'limb')])));
+  chunk([-s, s].flatMap((w) => corners.map((c) => add4(W4([0, 0, 0], w), W4(c, Math.sign(w) * hs), 'limb'))));
   const at = (count2) => steps.findIndex((st) => st.edge === count2);
   // Faces and lattices.
   const rhombus = [A1, C1, A2, C2].map(plan);
@@ -560,11 +607,13 @@ export function rdPlan(n = SQUARE_N) {
   return {
     id: 'rd', n, edges, steps, flat: 4 * n, axisNames: names,
     startPrompt: 'con.prompt.startRd',
-    w: { centre: centre3.slice(0, 3), eye: 2 * s, mid: 0 },
+    w: { centre: centre3.slice(0, 3), eye: 3 * s, mid: 0 },
     milestones: [
       { at: 4 * n, whole: rhombusDone, dim: 2, name: 'Rhombus', prompt: 'con.prompt.rhombus', corners: rhombus, faces: [Object.assign([...rhombus], { part: 'limb' })], lattice: rhombLattice, autoLattice: false, open: { dim: '2D', piece: 'parallelogram', angle: 'rd-rhombus' } },
       { at: at(cubeDone), whole: cubeDone, dim: 3, name: 'Cube', prompt: 'con.prompt.rdBody', corners: corners.map(plan), faces: cubeFaces, lattice: [], autoLattice: false, open: null },
-      { at: steps.length, whole: edges.length, dim: 3, name: 'Rhombic dodecahedron', prompt: 'con.prompt.rd', corners: [...corners, ...apexes].map(plan), faces: rdFaces, lattice: [...rdLattice.values()], autoLattice: true, open: { dim: '3D', piece: 'rd' } },
+      { at: at(rdDone), whole: rdDone, dim: 3, name: 'Rhombic dodecahedron', prompt: 'con.prompt.rd', corners: [...corners, ...apexes].map(plan), faces: rdFaces, lattice: [...rdLattice.values()], autoLattice: true, open: { dim: '3D', piece: 'rd' } },
+      { at: at(tessDone), whole: tessDone, ghostBelow: rdDone, dim: 4, name: 'Tesseract', prompt: 'con.prompt.rdTesseract', corners: corners.flatMap((c) => [W4(c, -hs), W4(c, hs)]), faces: [], lattice: [], autoLattice: false, open: null },
+      { at: steps.length, whole: edges.length, ghostBelow: rdDone, dim: 4, name: '24-cell', prompt: 'con.prompt.cell24', corners: [...corners.flatMap((c) => [W4(c, -hs), W4(c, hs)]), ...apexes.map((a) => W4(a, 0)), W4([0, 0, 0], -s), W4([0, 0, 0], s)], faces: [], lattice: [], autoLattice: false, open: { dim: '4D', piece: 'cell24' }, turn: true },
     ],
   };
 }

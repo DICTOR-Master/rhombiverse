@@ -36,13 +36,15 @@ right-click) removes. The **User Guide** (in the app, or at
   (in perspective) and Inside (in the tunnel, movable by touch) views.
   **Construct**: build shapes from 1D cells, one tap at a time — the first
   closed shape by hand, then one tap per edge, each new dimension's first
-  edge by hand again ("directions are free, dimensions are earned"):
+  edge by hand again, alike parts in one tap ("directions are free,
+  dimensions are earned"):
   - **Square** → cube → tesseract (cube within a cube, turning through W);
   - **Kagome**: hexagon → star → the Kagome lattice → 3D pyrochlore
     (truncated tetrahedron, then its tetrahedra) → 4D hyper-pyrochlore
     (truncated 5-cell, then its 5-cells); body cyan, limbs gold;
   - **RD**, the flagship: the RD's own rhombus → the rhombic dodecahedron,
-    its cube inside first, then its six pyramids → its lattice.
+    its cube inside first, then its six pyramids → its lattice → 4D, the
+    24-cell (the RD is its shadow: its corners split apart in W).
   Each closed shape shows its lattice and opens in its own dimension (2D,
   3D, 4D); the indicator beside Wizard reads 1D+/2D/3D/4D as you go.
   ⊘ beside Undo clears to start again; a Signal | Construct toggle

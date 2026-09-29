@@ -266,28 +266,39 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   // after that); edges carry their names. A shape just closed shows whole
   // and solid.
   function drawBuildStage() {
+    // A step brings one edge (or cells of one), or several whole edges.
+    const stepEdges = (st) => st.edges ?? [st.edge];
     const doneCells = new Array(plan.edges.length).fill(0);
-    for (let k = 0; k < filled; k++) doneCells[plan.steps[k].edge] += plan.steps[k].cells.length;
+    for (let k = 0; k < filled; k++) {
+      const st = plan.steps[k];
+      if (st.edges) st.edges.forEach((i) => { doneCells[i] = edgeCells(plan.edges[i]).length; });
+      else doneCells[st.edge] += st.cells.length;
+    }
     const finished = (e) => doneCells[e.instance] === edgeCells(e).length;
-    const last = plan.steps[filled - 1].edge;
+    const lastSet = new Set(stepEdges(plan.steps[filled - 1]));
+    const nextSet = new Set(complete() ? [] : stepEdges(plan.steps[filled]));
     const next = complete() ? -1 : plan.steps[filled].edge;
     const whole = wholeEdges();
+    const m0 = milestoneAt();
     const centre = frameTarget();
     for (const e of plan.edges) {
       const cells = edgeCells(e);
       let shown = true;
-      if (e.instance < whole || (finished(e) && e.instance === last)) cells.forEach((c) => layer.add(cellMesh(c, fill(e))));
+      // A closed shape that left an earlier one behind (the RD, under its
+      // 24-cell): that one as ghosts.
+      if (m0?.ghostBelow !== undefined && e.instance < m0.ghostBelow) layer.add(rod(e.from, e.to, ghost(e)));
+      else if (e.instance < whole || (finished(e) && lastSet.has(e.instance))) cells.forEach((c) => layer.add(cellMesh(c, fill(e))));
       else if (finished(e)) layer.add(rod(e.from, e.to, ghost(e)));
-      else if (e.instance === next) {
+      else if (nextSet.has(e.instance)) {
         if (plan.steps[filled].cells.length === 1) {
           cells.forEach((c, i) => layer.add(i < doneCells[e.instance] ? cellMesh(c, fill(e)) : i === doneCells[e.instance] ? cellMesh(c, nextMat) : cellMesh(c, emptyMat, plainGeo)));
         } else cells.forEach((c) => layer.add(cellMesh(c, nextMat)));
       } else shown = false;
-      if (shown && !whole) {
+      if (shown && !whole && !e.chunked) {
         const mid = world(e.from).add(world(e.to)).multiplyScalar(0.5);
         const out = mid.clone().sub(centre);
         if (e.axis < 3) out.setComponent(e.axis === 0 ? 1 : e.axis === 1 ? 0 : 2, 0); // push out square to the edge only
-        const sp = labelSprite(e.label, finished(e) && e.instance !== last ? 0.5 : 1);
+        const sp = labelSprite(e.label, finished(e) && !lastSet.has(e.instance) ? 0.5 : 1);
         sp.position.copy(mid).add(out.setLength(0.09 * N * U));
         layer.add(sp);
       }
@@ -447,7 +458,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     if (m?.autoLattice) latticeOn = true;
     commit(before);
     if (m) showHudPrompt(t(m.prompt, lang(), { n: m.whole * N }), 6000);
-    else if (edgePromptAt.has(filled)) showHudPrompt(t('con.prompt.edges', lang()), 5000);
+    else if (edgePromptAt.has(filled)) showHudPrompt(t(plan.steps[filled].edges ? 'con.prompt.parts' : 'con.prompt.edges', lang()), 5000);
     else if (flatStage()) {
       // A new direction's first line: a junction.
       const e = plan.edges[plan.steps[filled].edge];

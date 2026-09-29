@@ -124,7 +124,7 @@ check('axes only ever join: X from the start, Y at the first corner, and X is ne
   // (All six star points lie 3n from it; its base is the three with an edge going up.)
   const big = [top, ...pts.filter((p) => d3(p, top) && K.edges.some((e) => kk(e.from) === kk(p) && e.to[2] > 0))];
   const bigRegular = big.length === 4 && big.every((a, x) => big.every((b, y) => x === y || near(Math.hypot(...a.slice(0, 3).map((v, d) => v - b[d])), 3 * n)));
-  check('then its limbs: one tap per edge, and all together one big regular tetrahedron (edge 3n), every edge n', bigRegular && K.edges.every((e) => near(len(e), n)) && K.steps.slice(tt.at, py.at).every((s) => s.cells.length === n) && py.open.piece === 'pyrochlore');
+  check('then its limbs, all four in one tap: together one big regular tetrahedron (edge 3n), every edge n', bigRegular && K.edges.every((e) => near(len(e), n)) && py.at === tt.at + 1 && K.steps[tt.at].edges.length === 6 && py.open.piece === 'pyrochlore');
   // Hyper-pyrochlore: the body (the truncated 5-cell, 20 corners, four
   // edges at each, the truncated tetrahedron one of its cells), then the
   // limbs; all together one big regular 5-cell (edge 3n), every edge n.
@@ -144,7 +144,10 @@ check('axes only ever join: X from the start, Y at the first corner, and X is ne
   const pdeg = new Map();
   for (const [a, b] of [...pyro, ...K.edges.slice(0, py.whole).map((e) => [e.from, e.to])]) for (const p of [a, b]) pdeg.set(kk(p), (pdeg.get(kk(p)) ?? 0) + 1);
   check('its lattice: every edge n; no corner in more than two tetrahedra (at most 6 edges)', pyro.every(([a, b]) => near(Math.hypot(...a.map((v, d) => v - b[d])), n)) && [...pdeg.values()].every((d) => d <= 6), `${pyro.length} ghost edges`);
-  check('steps: hexagon by hand, star by edge, Z1 by hand, then an edge a tap', py.at === 6 * n + 12 + n + 17 && K.steps.slice(6 * n + 12, 7 * n + 12).every((s) => s.cells.length === 1));
+  // Taps ("minimise taps"): each new dimension's first edge by hand, the
+  // rest of its body a tap per kind of part, its identical limbs one tap.
+  const hy0 = K.milestones[5];
+  check(`taps: hexagon by hand, star by edge; Z1 and W1 by hand, bodies in two taps, limbs in one: ${K.steps.length} in all`, K.steps.slice(6 * n + 12, 7 * n + 12).every((s) => s.cells.length === 1) && tt.at === 7 * n + 12 + 2 && hy0.at === K.steps.length && K.steps.length === 8 * n + 12 + 6);
   const sq = squarePlan(n);
   check('the square plan builds exactly as before (square → cube → tesseract)', sq.steps.length === tesseractSteps(n).length && sq.milestones.map((m) => m.at).join() === `${4 * n},${cubeSteps(n).length},${tesseractSteps(n).length}`);
 }
@@ -164,13 +167,28 @@ check('axes only ever join: X from the start, Y at the first corner, and X is ne
   check('the rhombus: four sides of n, by hand, 70.53° at the start (the RD\'s own face)', D.edges.slice(0, 4).every((e) => near(len(e), n) && e.from[2] === 0 && e.to[2] === 0) && near(ang, Math.acos(1 / 3) * 180 / Math.PI) && D.steps.slice(0, 4 * n).every((s) => s.cells.length === 1) && D.milestones[0].dim === 2 && D.milestones[0].open.angle === 'rd-rhombus', `${ang.toFixed(2)}°`);
   const cube = D.edges.slice(4, D.milestones[1].whole);
   check('the body: the cube, 12 edges of 2n/√3', cube.length === 12 && cube.every((e) => near(len(e), (2 * n) / Math.sqrt(3))));
-  const rd = D.edges.filter((e) => e.part === 'limb');
+  const rd = D.edges.slice(0, D.milestones[2].whole).filter((e) => e.part === 'limb');
   const k = (p) => p.map((v) => v.toFixed(5)).join();
   const deg = new Map();
   for (const e of rd) for (const p of [e.from, e.to]) deg.set(k(p), (deg.get(k(p)) ?? 0) + 1);
   const vals = [...deg.values()];
   check('the limbs make the RD: 24 edges of n, 14 corners (six of four edges, eight of three), 12 rhombi', rd.length === 24 && rd.every((e) => near(len(e), n)) && deg.size === 14 && vals.filter((d) => d === 4).length === 6 && vals.filter((d) => d === 3).length === 8 && D.milestones[2].faces.length === 12);
   check('its lattice: the twelve RDs round it, every edge n', D.milestones[2].lattice.length > 0 && D.milestones[2].lattice.every(([a, b]) => near(Math.hypot(...a.map((v, i) => v - b[i])), n)), `${D.milestones[2].lattice.length} ghost edges`);
+  // 4D: the RD's corners split apart in W make the tesseract (32 edges),
+  // then its apexes and two more in W join both sides: the 24-cell, 24
+  // corners, 96 edges of 2n/√3, eight at each corner; and its shadow
+  // along W (drop w) is the RD again.
+  const s4 = (2 * n) / Math.sqrt(3);
+  const tess = D.edges.slice(D.milestones[2].whole, D.milestones[3].whole);
+  const c24 = D.edges.slice(D.milestones[2].whole);
+  const k4 = (p) => p.map((v) => v.toFixed(5)).join();
+  const deg24 = new Map();
+  for (const e of c24) for (const p of [e.from, e.to]) deg24.set(k4(p), (deg24.get(k4(p)) ?? 0) + 1);
+  check('the tesseract: the cube\'s corners split apart in W, 32 edges', tess.length === 32 && tess.every((e) => near(len(e), s4)) && D.milestones[3].dim === 4);
+  const shadow = new Set(c24.flatMap((e) => [e.from, e.to]).map((p) => p.slice(0, 3).map((v) => v.toFixed(5)).join()));
+  const rdPts = new Set(rd.flatMap((e) => [e.from, e.to]).map((p) => p.slice(0, 3).map((v) => v.toFixed(5)).join()));
+  check('the 24-cell: 24 corners, 96 edges of 2n/√3, eight at each; its shadow along W is the RD (plus its centre)', c24.length === 96 && c24.every((e) => near(len(e), s4)) && deg24.size === 24 && [...deg24.values()].every((d) => d === 8) && [...rdPts].every((p) => shadow.has(p)) && shadow.size === rdPts.size + 1 && D.milestones[4].open.piece === 'cell24' && D.milestones[4].turn);
+  check(`taps: rhombus by hand, Z1 and W1 by hand, the rest in a tap per kind of part: ${D.steps.length} in all`, D.steps.length === 4 * n + 6 + 2 + 6 + 3);
 }
 
 console.log(`\n${failures} failure${failures === 1 ? '' : 's'}.`);
