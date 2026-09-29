@@ -46,6 +46,37 @@ export function morseSequence(text) {
   return out;
 }
 
+/** Morse written out, as the message box shows keyed cells (direct
+ * request: "if you tap the dots and dashes they appear in the writing
+ * box so you can see them and edit"): · and – (. and - typed), a space
+ * between letters, " / " between words. */
+export const isCode = (str) => /[.\-·–]/.test(str) && /^[\s.\-·–—/]*$/.test(str);
+export function toCode(cells) {
+  let out = '';
+  for (const c of cells) {
+    if (c.type === 'dot') out += '·';
+    else if (c.type === 'dash') out += '–';
+    else if ((c.units ?? 1) >= GAP_UNITS.word) out += ' / ';
+    else if ((c.units ?? 1) >= GAP_UNITS.letter) out += ' ';
+  }
+  return out;
+}
+export function codeSequence(str) {
+  const out = [];
+  const words = String(str).split(/\s*\/\s*|\s{2,}/).map((w) => w.trim().split(/\s+/).filter(Boolean)).filter((w) => w.length);
+  words.forEach((word, wi) => {
+    if (wi) out.push({ type: 'gap', units: GAP_UNITS.word });
+    word.forEach((letter, li) => {
+      if (li) out.push({ type: 'gap', units: GAP_UNITS.letter });
+      [...letter].filter((ch) => '.-·–—'.includes(ch)).forEach((ch, k) => {
+        if (k) out.push({ type: 'gap', units: GAP_UNITS.element });
+        out.push({ type: ch === '.' || ch === '·' ? 'dot' : 'dash' });
+      });
+    });
+  });
+  return out;
+}
+
 /** Cells read back as text: a gap of 3 or more ends a letter, 7 or more
  * a word; an unknown pattern shows as '?'. */
 export function decode(cells) {

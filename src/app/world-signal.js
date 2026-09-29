@@ -27,7 +27,7 @@
 //   the message reads out at the top, letter by letter, as it arrives
 //   there ("a sent message viewer where the signal arrives at the top").
 import * as THREE from 'three';
-import { morseSequence, decode, letterEnds, keyedElement, keyedGap, KEY_MS, layout, totalUnits, cellUnits, embed, tangentAngle, MORSE } from '../geometry-extensions/trajectory-1d.js';
+import { morseSequence, decode, letterEnds, keyedElement, keyedGap, KEY_MS, isCode, toCode, codeSequence, layout, totalUnits, cellUnits, embed, tangentAngle, MORSE } from '../geometry-extensions/trajectory-1d.js';
 import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
@@ -525,7 +525,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // dot dash space controls", "type message .... send on the same line";
   // nobody is expected to know Morse): the view, the message, Send.
   panel.innerHTML = `
-    <div class="w4d-row sig-message-row"><button type="button" class="sig-sym" data-view></button><input type="text" class="sig-message" maxlength="80" autocomplete="off" spellcheck="false" enterkeyhint="send"><button type="button" class="sig-sym sig-pulse" data-pulse></button><button type="button" class="sig-send" data-opt="send"></button></div>`;
+    <div class="w4d-row sig-message-row"><button type="button" class="sig-sym" data-view></button><input type="text" class="sig-message" maxlength="400" autocomplete="off" spellcheck="false" enterkeyhint="send"><button type="button" class="sig-sym sig-pulse" data-pulse></button><button type="button" class="sig-send" data-opt="send"></button></div>`;
   document.body.appendChild(panel);
   const viewBtn = panel.querySelector('[data-view]');
   const sendBtn = panel.querySelector('[data-opt="send"]');
@@ -571,6 +571,10 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     }
     const { type } = keyedElement(held);
     cells.push({ type, material: getMaterial(type) });
+    // Keyed dots and dashes show in the message box, to see and edit
+    // (direct request: "if you tap the dots and dashes they appear in the
+    // writing box so you can see them and edit").
+    input.value = message = toCode(cells);
     commit();
   }
   pulseBtn.addEventListener('pointerup', keyUp);
@@ -595,11 +599,14 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   document.body.appendChild(gloss);
   let glossOpen = false;
   glossBtn.addEventListener('click', (e) => { e.stopPropagation(); glossOpen = !glossOpen; renderPanel(); });
-  // A letter tapped in the glossary joins the message, as if typed.
+  // A letter tapped in the glossary joins the message, as if typed; into
+  // a keyed message, as its dots and dashes.
   gloss.addEventListener('click', (e) => {
     const ch = e.target.closest('[data-ch]')?.dataset.ch;
     if (!ch) return;
-    input.value = (input.value + ch).slice(0, 80);
+    const v = input.value;
+    const code = MORSE[ch].replace(/\./g, '·').replace(/-/g, '–');
+    input.value = (keying || isCode(v) ? (v.trim() ? `${v.trimEnd()} ${code}` : code) : v + ch).slice(0, input.maxLength);
     input.dispatchEvent(new Event('input'));
   });
   // The view button shows the view you're in: an eye looking on from
@@ -630,6 +637,16 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     input.placeholder = said ? `“${said}”` : t('sig.message', L);
   }
   input.addEventListener('input', () => {
+    // Dots and dashes (· – or . -, a space between letters, / between
+    // words) are the chain itself, edited in place.
+    if (isCode(input.value) || (keying && !input.value.trim())) {
+      keying = true;
+      message = input.value;
+      cells = codeSequence(message).map((c) => ({ ...c, ...(c.type === 'gap' ? {} : { material: getMaterial(c.type) }) }));
+      pending = []; draftStarted = false;
+      commit();
+      return;
+    }
     keying = false;
     message = input.value;
     const seq = morseSequence(message);

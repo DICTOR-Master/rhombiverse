@@ -4,7 +4,7 @@
 // - the moving chain carries m(u) (one signal, every view);
 // - E(s): unit speed, continuous, and a chord on screen is never longer
 //   than the distance along s (the world's only metric).
-import { morseSequence, decode, totalUnits, signal, waveAt, embed, tangentAngle, GAP_UNITS, MORSE, letterEnds, keyedElement, keyedGap, KEY_MS } from '../src/geometry-extensions/trajectory-1d.js';
+import { morseSequence, decode, totalUnits, signal, waveAt, embed, tangentAngle, GAP_UNITS, MORSE, letterEnds, keyedElement, keyedGap, KEY_MS, isCode, toCode, codeSequence } from '../src/geometry-extensions/trajectory-1d.js';
 
 let failures = 0;
 function check(label, ok, extra = '') {
@@ -21,6 +21,8 @@ check('SOS is 27 units', totalUnits(morseSequence('SOS')) === 27);
   const keyed = [];
   presses.forEach(([held, pause], i) => { if (i) keyed.push(keyedGap(pause)); keyed.push(keyedElement(held)); });
   check('the pulse key: short is a dot, held is a dash; a pause ends a letter, a longer one a word', decode(keyed) === 'SO S' && keyedElement(KEY_MS.dash - 1).type === 'dot' && keyedElement(KEY_MS.dash).type === 'dash', decode(keyed));
+  const msg = morseSequence('SOS HELP');
+  check('keyed code written out and read back is the same chain (· –, space, /)', JSON.stringify(codeSequence(toCode(msg))) === JSON.stringify(msg) && toCode(morseSequence('SOS')) === '··· ––– ···' && decode(codeSequence('... --- ... / .... ..')) === 'SOS HI' && isCode('·– /') && !isCode('hi'));
   const ends = letterEnds(morseSequence('HI YO'));
   check('letters arrive in order, each once its last cell has passed', ends.map((l) => l.text).join('') === 'HI YO' && ends.every((l, k) => !k || l.end >= ends[k - 1].end) && ends.at(-1).end === totalUnits(morseSequence('HI YO')));
 }
