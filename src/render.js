@@ -5049,19 +5049,19 @@ async function init() {
     // square as 2D's Parallelogram tile at the Square angle, the cube and
     // the tesseract in 3D and 4D.
     onOpenIn: (dim, piece) => {
-      // The cube opens as 3D's Cube piece, the tesseract in 4D's Z4
-      // (hypercubic) world.
+      // The cube opens as 3D's Cube piece, the pyrochlore cluster as its
+      // Pyrochlore piece, the tesseract in 4D's Z4 (hypercubic) world.
       if (dim === '3D' || dim === '4D') {
         own3D = null;
         activeDimension = dim;
         applyDimensionVisibility();
         applyDimensionCamera(dim);
-        runWheelAction(dim === '3D' ? 'tool:pieceType:cube' : 'tool:pieceType:tesseract', { quiet: true });
+        runWheelAction(`tool:pieceType:${piece}`, { quiet: true });
         // The cube arrives as a cube (direct report: "opening cube in 3D led
         // to RD floating in space"; decision: replace the starter): an empty
         // 3D world gets one at the centre, a real build is left alone, and
         // Lattice View shows the cube lattice either way.
-        if (dim === '3D') {
+        if (piece === 'cube') {
           if (!world.entries().length) { world.addCell(0, 0, 0, { material: currentMaterialFor('cube'), pyramids: 0 }); onChange(); }
           latticeQuickViewMode = 'cube';
           updateLatticeQuickViewIcon();

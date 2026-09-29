@@ -88,23 +88,42 @@ check('axes only ever join: X from the start, Y at the first corner, and X is ne
 {
   const n = SQUARE_N;
   const K = kagomePlan(n);
+  const E2 = K.edges.slice(0, 18); // the 2D part: hexagon and star
   const len = (e) => Math.hypot(...e.from.map((v, i) => e.to[i] - v));
   const dir = (e) => e.from.map((v, i) => (e.to[i] - v) / len(e));
   const near = (a, b) => Math.abs(a - b) < 1e-9;
   const eq = (p, q) => p.every((v, d) => near(v, q[d]));
-  const path = K.edges.every((e, k) => !k || k === 6 || eq(e.from, K.edges[k - 1].to)) && eq(K.edges[5].to, K.edges[0].from) && eq(K.edges[17].to, K.edges[0].from);
-  check('Kagome: 18 edges of n cells; the hexagon, then the star outline, each one continuous closed path', K.edges.length === 18 && K.edges.every((e) => near(len(e), n)) && path);
+  const path = E2.every((e, k) => !k || k === 6 || eq(e.from, E2[k - 1].to)) && eq(E2[5].to, E2[0].from) && eq(E2[17].to, E2[0].from);
+  check('Kagome: 18 edges of n cells, flat; the hexagon, then the star outline, each one continuous closed path', E2.every((e) => near(len(e), n) && e.from[2] === 0 && e.to[2] === 0) && path);
   const lines = [0, 1, 2, 3, 4, 5].map((i) => K.edges.filter((e) => e.along === i));
   const straight = lines.every((es) => es.length === 3 && es.every((e) => { const d = dir(e), d0 = dir(es[0]); return near(Math.abs(d[0] * d0[0] + d[1] * d0[1]), 1) && near(d0[0] * (e.from[1] - es[0].from[1]) - d0[1] * (e.from[0] - es[0].from[0]), 0); }));
   check('the star: six straight lines, each a hexagon side carried on past both corners', straight);
-  const axes = [...new Set(K.edges.map((e) => e.axis))].sort();
-  check('three directions (X, Y, XY), no new dimension: XY is X and Y together', axes.join() === '0,1,4' && K.axisNames[4] === 'XY' && K.milestones.every((m) => m.dim === 2));
+  const axes = [...new Set(E2.map((e) => e.axis))].sort();
+  check('three directions (X, Y, XY), no new dimension: XY is X and Y together', axes.join() === '0,1,4' && K.axisNames[4] === 'XY' && K.milestones.slice(0, 2).every((m) => m.dim === 2));
   // Offsets across each direction, both lines measured against one heading.
   const across = (i, j) => { const d = dir(lines[i][0]), p = lines[j][0].from; return -d[1] * p[0] + d[0] * p[1]; };
   check('each direction: two parallel lines, √3·n apart', [0, 1, 2].every((i) => near(Math.abs(across(i, i) - across(i, i + 3)), Math.sqrt(3) * n)));
-  const crossings = K.crossings.every((h) => K.edges.filter((e) => eq(e.from, h) || eq(e.to, h)).length === 4);
+  const crossings = K.crossings.every((h) => E2.filter((e) => eq(e.from, h) || eq(e.to, h)).length === 4);
   check('the hexagon\'s six corners are crossings: two lines, four edge ends', K.crossings.length === 6 && crossings);
-  check(`steps: the hexagon by hand (6n = ${6 * n}), the star one tap per edge (12): ${K.steps.length} taps`, K.steps.slice(0, 6 * n).every((s) => s.cells.length === 1) && K.steps.slice(6 * n).every((s) => s.cells.length === n) && K.steps.length === 6 * n + 12);
+  check(`steps: the hexagon by hand (6n = ${6 * n}), the star one tap per edge (12)`, K.steps.slice(0, 6 * n).every((s) => s.cells.length === 1) && K.steps.slice(6 * n, 6 * n + 12).every((s) => s.cells.length === n) && K.milestones[1].at === 6 * n + 12);
+  // Pyrochlore: the body, then the limbs. The truncated tetrahedron on
+  // the hexagon (12 corners, each on 3 of its 18 edges; four hexagons and
+  // four triangles), then a tetrahedron on each triangle; together one big
+  // regular tetrahedron of edge 3n, every edge n.
+  const kk = (p) => p.slice(0, 3).map((v) => v.toFixed(5)).join();
+  const tt = K.milestones[2], py = K.milestones[3];
+  const ttEdges = [...K.edges.slice(0, 6), ...K.edges.slice(18, tt.whole)];
+  const deg = new Map();
+  for (const e of ttEdges) for (const p of [e.from, e.to]) deg.set(kk(p), (deg.get(kk(p)) ?? 0) + 1);
+  check('the truncated tetrahedron: the hexagon + 12 edges; 12 corners, three edges at each; 4 hexagons + 4 triangles', ttEdges.length === 18 && deg.size === 12 && [...deg.values()].every((d) => d === 3) && tt.faces.filter((f) => f.length === 6).length === 4 && tt.faces.filter((f) => f.length === 3).length === 4 && tt.dim === 3);
+  const big = py.faces.flat().filter((p, i, a) => a.findIndex((q) => kk(q) === kk(p)) === i);
+  const bigRegular = big.length === 4 && big.every((a, x) => big.every((b, y) => x === y || near(Math.hypot(...a.slice(0, 3).map((v, d) => v - b[d])), 3 * n)));
+  check('then its limbs: one tap per edge, and all together one big regular tetrahedron (edge 3n), every edge n', bigRegular && K.edges.every((e) => near(len(e), n)) && K.steps.slice(tt.at).every((s) => s.cells.length === n) && py.open.piece === 'pyrochlore');
+  const pyro = py.lattice;
+  const pdeg = new Map();
+  for (const [a, b] of [...pyro, ...K.edges.map((e) => [e.from, e.to])]) for (const p of [a, b]) pdeg.set(kk(p), (pdeg.get(kk(p)) ?? 0) + 1);
+  check('its lattice: every edge n; no corner in more than two tetrahedra (at most 6 edges)', pyro.every(([a, b]) => near(Math.hypot(...a.map((v, d) => v - b[d])), n)) && [...pdeg.values()].every((d) => d <= 6), `${pyro.length} ghost edges`);
+  check(`steps: hexagon by hand, star by edge, Z1 by hand, then an edge a tap: ${K.steps.length} taps`, K.steps.length === 6 * n + 12 + n + 17 && K.steps.slice(6 * n + 12, 7 * n + 12).every((s) => s.cells.length === 1));
   const sq = squarePlan(n);
   check('the square plan builds exactly as before (square → cube → tesseract)', sq.steps.length === tesseractSteps(n).length && sq.milestones.map((m) => m.at).join() === `${4 * n},${cubeSteps(n).length},${tesseractSteps(n).length}`);
 }

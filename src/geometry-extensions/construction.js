@@ -256,10 +256,43 @@ export function kagomePlan(n = SQUARE_N) {
     add(a, tip, (i + 5) % 6, 6 + 2 * i); // side i-1's line, on past corner i
     add(tip, b, (i + 1) % 6, 7 + 2 * i); // side i+1's line, back in to corner i+1
   }
+  // Pyrochlore (direct decisions, 2026-09-29: "go on to pyrochlore",
+  // "3D hexagon after star points in 2D"): Kagome in 3D, the same rhythm
+  // again. First the 3D hexagon, the truncated tetrahedron (four hexagons,
+  // four triangles) standing on the built hexagon, Z's first edge by hand,
+  // then one tap per edge; closing it is the 3D moment. Then its points:
+  // a tetrahedron capping each triangle, one tap per edge, three on the
+  // star's points and one on top; with them it is one big tetrahedron
+  // (edge 3n), 3D's own Pyrochlore piece. Every edge reaching out of the
+  // plane is a Z edge; the top triangle's run level, in Kagome's
+  // directions.
+  const h = Math.sqrt(2 / 3) * n; // a regular tetrahedron's height (edge n)
+  const T3 = [0, 2, 4].map((i) => tips[i]); // the big tetrahedron's base: the star's alternate points
+  const BA = [centre[0], centre[1], 3 * h]; // and its apex
+  const at3 = (A, B, f) => [0, 1, 2].map((d) => (A[d] ?? 0) + ((B[d] ?? 0) - (A[d] ?? 0)) * f);
+  const S1 = T3.map((T) => at3(T, BA, 1 / 3)); // where Z's edges from the hexagon meet
+  const S2 = T3.map((T) => at3(T, BA, 2 / 3)); // the top triangle
+  const addZ = (from, to) => {
+    const d = [(to[0] - from[0]) / n, (to[1] - from[1]) / n];
+    const level = Math.abs((to[2] ?? 0) - (from[2] ?? 0)) < 1e-9;
+    const axis = level ? axisOf(d) : 2;
+    count[axis] = (count[axis] ?? 0) + 1;
+    edges.push({ axis, instance: edges.length, line: 20 + edges.length, along: -1, label: `${names[axis]}${count[axis]}`, from: pad4(from), to: pad4(to) });
+  };
+  // The truncated tetrahedron: over each alternate point's corner, up to
+  // S1 from the hexagon's two corners there and on up the big edge to S2;
+  // then the top triangle.
+  [0, 2, 4].forEach((i, k) => { addZ(P[i], S1[k]); addZ(P[(i + 1) % 6], S1[k]); addZ(S1[k], S2[k]); });
+  [0, 1, 2].forEach((k) => addZ(S2[k], S2[(k + 1) % 3]));
+  const ttDone = edges.length;
+  // Its points: the three caps' outer edges (up from the star's points)
+  // and the top cap's three edges to the apex.
+  [0, 2, 4].forEach((i, k) => addZ(tips[i], S1[k]));
+  [0, 1, 2].forEach((k) => addZ(S2[k], BA));
   const steps = [];
   edges.forEach((e, k) => {
     const cells = edgeCells(e);
-    if (k < 6) cells.forEach((c) => steps.push({ cells: [c], edge: e.instance }));
+    if (k < 6 || k === 18) cells.forEach((c) => steps.push({ cells: [c], edge: e.instance })); // the hexagon, Z's first edge
     else steps.push({ cells, edge: e.instance });
   });
   // Lattices. The hexagon's: the honeycomb, two rings round it. Kagome's:
@@ -301,15 +334,69 @@ export function kagomePlan(n = SQUARE_N) {
       if (j === 0 || j === -1) { kagome.push([at(-h), at(-1.5 * n)]); kagome.push([at(1.5 * n), at(h)]); } else kagome.push([at(-h), at(h)]);
     }
   });
+  // Pyrochlore's: three Kagome layers with their tetrahedra, this one and
+  // the layers 2h above and below. Along [111], pyrochlore alternates
+  // Kagome and triangular layers, h apart; each neighbouring Kagome layer
+  // is this one reflected through a triangle's centre, so its tetrahedra
+  // share the corners of this layer's (above: the up ones; below: the
+  // down ones). Kept to the tetrahedra whose triangles lie near.
+  const tri = (i) => [P[i], tips[i], P[(i + 1) % 6]];
+  const a1 = dirs[0].map((v) => 2 * n * v), a2 = dirs[1].map((v) => 2 * n * v); // Kagome's own translations
+  const upT = tri(0), downT = tri(1);
+  const cen = (t) => [0, 1].map((d) => (t[0][d] + t[1][d] + t[2][d]) / 3);
+  const RL = 2.7 * n;
+  const layerTris = [];
+  for (let u = -4; u <= 4; u++) for (let v = -4; v <= 4; v++) {
+    const T = [u * a1[0] + v * a2[0], u * a1[1] + v * a2[1]];
+    for (const [t, up] of [[upT, true], [downT, false]]) {
+      const moved = t.map((p) => [p[0] + T[0], p[1] + T[1]]);
+      const c = cen(moved);
+      if (Math.hypot(c[0] - centre[0], c[1] - centre[1]) <= RL) layerTris.push({ t: moved, up });
+    }
+  }
+  const pyro = new Map();
+  const ownPyro = new Set(edges.map((e) => key(e.from.slice(0, 3), e.to.slice(0, 3))));
+  const addTet = (t, apex) => {
+    const vs = [...t.map((p) => [p[0], p[1], p[2] ?? 0]), apex];
+    for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) {
+      const k2 = key(vs[i], vs[j]);
+      if (!ownPyro.has(k2)) pyro.set(k2, [pad4(vs[i]), pad4(vs[j])]);
+    }
+  };
+  const cUp = cen(upT), cDown = cen(downT);
+  for (const [z, mirror, flip] of [[0, null, false], [2 * h, cUp, true], [-2 * h, cDown, true]]) {
+    for (const { t, up } of layerTris) {
+      const tt = mirror ? t.map((p) => [2 * mirror[0] - p[0], 2 * mirror[1] - p[1], z]) : t.map((p) => [p[0], p[1], 0]);
+      const c = cen(tt);
+      // Reflected, an up triangle's image is a down one there.
+      const pointsUp = flip ? !up : up;
+      addTet(tt, [c[0], c[1], z + (pointsUp ? h : -h)]);
+    }
+  }
   const hexFace = P.map(pad4);
   const tipFaces = tips.map((tp, i) => [pad4(tp), pad4(P[(i + 1) % 6]), pad4(P[i])]);
+  const bigCorners = [...T3.map((t) => [t[0], t[1], 0]), BA];
+  const hexOfFace = (A, B, C) => [at3(A, B, 1 / 3), at3(A, B, 2 / 3), at3(B, C, 1 / 3), at3(B, C, 2 / 3), at3(C, A, 1 / 3), at3(C, A, 2 / 3)].map(pad4);
+  const [c0, c1, c2, c3] = bigCorners;
+  const ttFaces = [
+    hexOfFace(c0, c1, c2), hexOfFace(c0, c1, c3), hexOfFace(c1, c2, c3), hexOfFace(c2, c0, c3),
+    ...bigCorners.map((V) => bigCorners.filter((W) => W !== V).map((W) => pad4(at3(V, W, 1 / 3)))),
+  ];
+  const bigFaces = [[c0, c1, c2], [c0, c1, c3], [c1, c2, c3], [c2, c0, c3]].map((f) => f.map(pad4));
+  const ttCorners = [...P.map((p) => [p[0], p[1], 0]), ...S1, ...S2].map(pad4);
   return {
     id: 'kagome', n, edges, steps, flat: 6 * n, axisNames: names,
     startPrompt: 'con.prompt.startKagome', junctionPrompt: { 4: 'con.prompt.junctionXY' },
     crossings: P.map(pad4),
+    centre: [centre[0], centre[1], 0], // W's perspective centres here (the hexagon's middle)
+    // Depth seen with the Kagome plane as a floor: from low in front, Z up
+    // the screen (world axes: the plane is the screen's x–y, Z toward you).
+    view3: { dir: [-0.35, -0.85, 0.45], up: [0, 0, 1] },
     milestones: [
       { at: 6 * n, whole: 6, dim: 2, name: 'Hexagon', prompt: 'con.prompt.hexagon', corners: P.map(pad4), faces: [hexFace], lattice: [...honey.values()], autoLattice: false, open: { dim: '2D', piece: 'hexagon' } },
-      { at: steps.length, whole: 18, dim: 2, name: 'Kagome', prompt: 'con.prompt.kagome', corners: tips.map(pad4), faces: [hexFace, ...tipFaces], lattice: kagome, autoLattice: true, open: { dim: '2D', piece: 'kagome' } },
+      { at: 6 * n + 12, whole: 18, dim: 2, name: 'Kagome', prompt: 'con.prompt.kagome', corners: tips.map(pad4), faces: [hexFace, ...tipFaces], lattice: kagome, autoLattice: true, open: { dim: '2D', piece: 'kagome' } },
+      { at: steps.findIndex((st) => st.edge === ttDone), whole: ttDone, dim: 3, name: 'Truncated tetrahedron', prompt: 'con.prompt.tt', corners: ttCorners, faces: ttFaces, lattice: [], autoLattice: false, open: null },
+      { at: steps.length, whole: edges.length, dim: 3, name: 'Pyrochlore', prompt: 'con.prompt.pyrochlore', corners: [...ttCorners, ...bigCorners.map(pad4), ...tips.map(pad4)], faces: bigFaces, lattice: [...pyro.values()], autoLattice: true, open: { dim: '3D', piece: 'pyrochlore' } },
     ],
   };
 }

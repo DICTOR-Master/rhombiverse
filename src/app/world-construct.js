@@ -98,7 +98,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   // and the Kagome star close straight into theirs (direct request: "cube
   // should immediately be part of the lattice").
   let latticeOn = !!milestoneAt()?.autoLattice;
-  const latticeReady = () => !!milestoneAt();
+  const latticeReady = () => !!milestoneAt()?.lattice.length;
   // The dimension being built toward (or just closed, at the end).
   const stageDim = () => (nextMilestone() ?? reachedMilestone())?.dim ?? 2;
   const flatView = () => stageDim() === 2 || (latticeOn && milestoneAt()?.dim === 2);
@@ -360,15 +360,18 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     const c = box.getCenter(new THREE.Vector3());
     const flat = flatView();
     if (flat) c.z = 0;
-    const dir = flat ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(-0.5, 0.32, 0.8).normalize();
+    // A plan can view its depth its own way (Kagome's: the plane as a
+    // floor, pyrochlore standing up out of it, Z up the screen).
+    const v3 = plan.view3;
+    const dir = flat ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(...(v3?.dir ?? [-0.5, 0.32, 0.8])).normalize();
     const k = flat ? (showingLattice() ? 2.15 : 2.3) : (showingLattice() ? 3.5 : 3.6);
-    return { target: c, position: c.clone().add(dir.multiplyScalar(extent * k)) };
+    return { target: c, position: c.clone().add(dir.multiplyScalar(extent * k)), up: new THREE.Vector3(...(flat ? [0, 1, 0] : v3?.up ?? [0, 1, 0])) };
   }
   let tween = 0;
   function frame(animate = false) {
     cancelAnimationFrame(tween);
     const to = pose();
-    camera.up.set(0, 1, 0);
+    camera.up.copy(to.up);
     if (!animate) {
       controls.target.copy(to.target);
       camera.position.copy(to.position);
@@ -458,7 +461,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   });
   // Each closed shape opens in its own dimension.
   function renderPanel() {
-    panel.classList.toggle('visible', active && latticeReady());
+    panel.classList.toggle('visible', active && (latticeReady() || !!milestoneAt()?.open));
     const open = milestoneAt()?.open;
     openBtn.hidden = !open;
     if (open) openBtn.textContent = t('con.open', lang(), { dim: open.dim });
