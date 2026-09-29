@@ -93,7 +93,7 @@ function zonogonSvg(n) {
   return `<svg viewBox="-30 -30 60 60" width="1em" height="1em" role="img" aria-label="${n}-vector zonogon shadow">${polys}</svg>`;
 }
 
-const DIMENSION_N = { '1D': 1, '2D': 2, '3D': 3, '4D': 4, '5D': 5, '6D': 6 };
+const DIMENSION_N = { '1D': 1, '1D+': 1, '2D': 2, '3D': 3, '4D': 4, '5D': 5, '6D': 6 };
 // One vector's zonotope is a segment, so 1D's shadow is a line with its
 // two end points, drawn at the same size as the others.
 function segmentSvg() {

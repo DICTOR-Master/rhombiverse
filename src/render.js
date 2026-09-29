@@ -3397,6 +3397,9 @@ async function init() {
   // its open/closed state internally (open()/close()/toggle()), this
   // scope just needs a stable reference to call into from onAction.
   const almanac = createAlmanac();
+  // The wheel's action path, for callers outside the block below
+  // (Construct's "Open in 4D").
+  let runWheelAction = () => {};
   {
     // handleWheelAction: extracted to a named function (2026-09-22,
     // dimension-select wheel) so the dedicated dimensionWheel3D instance
@@ -3644,6 +3647,7 @@ async function init() {
 
         if (action?.startsWith('tool:')) { showHudPrompt(`${action.slice(5)} is not built yet.`, 3000); return; }
     };
+    runWheelAction = handleWheelAction;
     selectPieceAction = handleWheelAction;
     const wheel3D = createRhombicWheel3D({
       onAction: handleWheelAction,
@@ -5032,8 +5036,19 @@ async function init() {
     camera,
     controls,
     // A finished primitive opens in its own dimension's lattice: the
-    // square as 2D's Parallelogram tile at the Square angle.
+    // square as 2D's Parallelogram tile at the Square angle, the cube and
+    // the tesseract in 3D and 4D.
     onOpenIn: (dim) => {
+      // The cube opens as 3D's Cube piece, the tesseract in 4D's Z4
+      // (hypercubic) world.
+      if (dim === '3D' || dim === '4D') {
+        own3D = null;
+        activeDimension = dim;
+        applyDimensionVisibility();
+        applyDimensionCamera(dim);
+        runWheelAction(dim === '3D' ? 'tool:pieceType:cube' : 'tool:pieceType:tesseract', { quiet: true });
+        return;
+      }
       if (dim !== '2D') return;
       own3D = null;
       activeDimension = '2D';
@@ -5751,8 +5766,11 @@ function animate() {
   // change activeDimension; not yet chosen means the default 3D world).
   // In Construct it also shows the dimensions built so far (direct
   // request: "1D/2D/3D should show on the indicator, but only 1D orange").
-  // 1D shows as 1D+ (it interacts with the other dimensions).
-  const dimText = own3D === 'construct' && own3DActive() ? ['1D+', '2D', '3D', '4D'].slice(0, constructWorld.reached()).join('/') : activeDimension === '1D' ? '1D+' : activeDimension ?? '3D';
+  // 1D shows as 1D+ (it interacts with the other dimensions), except in
+  // Signal, which is purely one-dimensional (direct remark: "arguably
+  // Signal is purely 1D").
+  const dimText = own3D === 'construct' && own3DActive() ? ['1D+', '2D', '3D', '4D'].slice(0, constructWorld.reached()).join('/')
+    : own3D === 'signal' && own3DActive() ? '1D' : activeDimension === '1D' ? '1D+' : activeDimension ?? '3D';
   const oneD = (own3D === 'signal' || own3D === 'construct') && own3DActive();
   if (hud1dToggleEl && hud1dToggleEl.hidden === oneD) hud1dToggleEl.hidden = !oneD;
   if (onedClearEl) {

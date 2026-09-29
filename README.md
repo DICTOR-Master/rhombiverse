@@ -41,6 +41,8 @@ right-click) removes. The **User Guide** (in the app, or at
   cube: its first edge cell by cell, then one tap per numbered edge,
   and the finished cube goes straight into its lattice (a
   lattice button shows the closed square's too).
+  Then W rises into a tesseract (cube within a cube), which turns
+  through W; each closed shape opens in its own dimension (2D, 3D, 4D).
   ⊘ beside Undo clears to start again; a Signal | Construct toggle switches worlds.
 - **2D** — five tiles (Parallelogram, Triangle, Hexagon, Kite, Kagome) on
   four lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular),

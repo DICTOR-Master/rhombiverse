@@ -4,7 +4,7 @@
 // - cell, axis instance and axis direction are separate: the bottom and
 //   top edges are two different, parallel X instances (likewise Y);
 // - junctions sit at the corners and only ever add an axis (X stays).
-import { squareLoop, junctions, exposedAxes, cubeEdges, edgeCells, cubeSteps, SQUARE_N } from '../src/geometry-extensions/construction.js';
+import { squareLoop, junctions, exposedAxes, cubeEdges, edgeCells, cubeSteps, tesseractEdges, tesseractSteps, SQUARE_N } from '../src/geometry-extensions/construction.js';
 
 let failures = 0;
 function check(label, ok, extra = '') {
@@ -59,6 +59,26 @@ check('axes only ever join: X from the start, Y at the first corner, and X is ne
   check(`steps: the square first (4n), Z1 by hand (n), then 7 whole edges: ${steps.length} taps, ${cells.length} = 12n cells`,
     firstSquare && steps.length === 5 * n + 7 && cells.length === 12 * n && steps.slice(5 * n).every((s) => s.cells.length === n) && steps[4 * n].cells[0].axis === 2 && same(steps[4 * n].cells[0].from, [0, 0]));
   check('every edge cell is a unit step along its own axis', E.every((e) => edgeCells(e).every((c) => c.from.reduce((s, v, d) => s + Math.abs(c.to[d] - v), 0) === 1 && c.to[e.axis] !== c.from[e.axis])));
+}
+
+// The tesseract: its 32 real edges (every pair of its 16 corners differing
+// in one coordinate), the cube's build first, W1 by hand, then 19 taps.
+{
+  const n = SQUARE_N;
+  const E = tesseractEdges(n);
+  const key = (a, b) => [String(a), String(b)].sort().join('|');
+  const corners = [];
+  for (let m = 0; m < 16; m++) corners.push([0, 1, 2, 3].map((d) => ((m >> d) & 1) * n));
+  const real = new Set();
+  corners.forEach((a) => corners.forEach((b) => { if (a.filter((v, d) => v !== b[d]).length === 1) real.add(key(a, b)); }));
+  check('the tesseract: 32 distinct edges, exactly the real tesseract\'s', real.size === 32 && E.length === 32 && new Set(E.map((e) => key(e.from, e.to))).size === 32 && E.every((e) => real.has(key(e.from, e.to))));
+  const per = [0, 1, 2, 3].map((a) => E.filter((e) => e.axis === a).map((e) => e.label).join());
+  check('eight edges per direction, numbered 1–8 (X, Y, Z, W)', per.every((l, a) => l === Array.from({ length: 8 }, (_, i) => `${'XYZW'[a]}${i + 1}`).sort((p, q) => parseInt(p.slice(1)) - parseInt(q.slice(1))).join()), per.join(' | '));
+  const T = tesseractSteps(n), Cs = cubeSteps(n);
+  const prefix = Cs.every((s, k) => s.cells.length === T[k].cells.length && s.cells.every((c, i) => String(c.from) === String(T[k].cells[i].from.slice(0, 3)) && T[k].cells[i].from[3] === 0));
+  const wHand = T.slice(Cs.length, Cs.length + n).every((s) => s.cells.length === 1 && s.cells[0].axis === 3);
+  check(`steps: the cube's build (${Cs.length}), W1 by hand (n), then 19 whole edges: ${T.length} taps, ${T.flatMap((s) => s.cells).length} = 32n cells`,
+    prefix && wHand && T.length === Cs.length + n + 19 && T.flatMap((s) => s.cells).length === 32 * n && same(T[Cs.length].cells[0].from, [0, 0]) && T[Cs.length].cells[0].from.every((v) => v === 0));
 }
 
 console.log(`\n${failures} failure${failures === 1 ? '' : 's'}.`);

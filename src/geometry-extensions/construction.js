@@ -103,3 +103,37 @@ export function cubeSteps(n = SQUARE_N) {
   });
   return steps;
 }
+
+/** The tesseract, built on from the closed cube (direct decisions,
+ * 2026-09-29: "same as the cube"): W rises from the start corner, its
+ * first edge one cell per tap; then one tap per remaining edge: the other
+ * seven W edges, then the second cube's twelve. Points in ℝ⁴; the cube's
+ * edges keep their names, the second cube's continue them (X5 …). */
+export function tesseractEdges(n = SQUARE_N) {
+  const cube = cubeEdges(n);
+  const edges = cube.map((e) => ({ ...e, from: [...e.from, 0], to: [...e.to, 0] }));
+  const count = { 0: 4, 1: 4, 2: 4 };
+  const add = (axis, from, to) => {
+    count[axis] = (count[axis] ?? 0) + 1;
+    edges.push({ axis, instance: edges.length, label: `${axisName(axis)}${count[axis]}`, from, to });
+  };
+  const corners = [[0, 0, 0], [n, 0, 0], [n, n, 0], [0, n, 0], [0, 0, n], [n, 0, n], [n, n, n], [0, n, n]];
+  corners.forEach((p) => add(3, [...p, 0], [...p, n]));
+  cube.forEach((e) => add(e.axis, [...e.from, n], [...e.to, n]));
+  return edges;
+}
+
+/** The whole build as taps, square → cube → tesseract: each new
+ * direction's first edge one cell per tap, every other edge one tap.
+ * Each step: { cells, edge }. */
+export function tesseractSteps(n = SQUARE_N) {
+  const edges = tesseractEdges(n);
+  const byHand = new Set([0, 1, 2, 3, 4, 12]); // the square's four sides, Z1, W1
+  const steps = [];
+  edges.forEach((e) => {
+    const cells = edgeCells(e);
+    if (byHand.has(e.instance)) cells.forEach((c) => steps.push({ cells: [c], edge: e.instance }));
+    else steps.push({ cells, edge: e.instance });
+  });
+  return steps;
+}
