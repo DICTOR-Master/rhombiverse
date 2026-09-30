@@ -35,6 +35,17 @@ jobs:
       - run: node scripts/verify-nets.mjs
       # Packed spheres: tangency, enclosed voids, bulk FCC counts.
       - run: node scripts/verify-packing.mjs
+      # 2D lattices: edge lengths, angles, tile placement rules.
+      - run: node scripts/verify-lattice-2d.mjs
+      # Pyrochlore (3D Kagome): the quarter-cubic geometry.
+      - run: node scripts/verify-pyrochlore.mjs
+      # Rhombohedra: copy/mirror attach on the rhombohedral lattice.
+      - run: node scripts/verify-rhombohedra.mjs
+      # 4D worlds: Z4, D4 and hyper-pyrochlore cells, slices and steps.
+      - run: node scripts/verify-4d.mjs
+      # Translations: every key in all 7 languages, main app and RHOMBIS.
+      - run: node scripts/verify-i18n.mjs
+      - run: node scripts/verify-rhombis-i18n.mjs
       # The repo's About text (outside the repo, so it drifts): warns only.
       - run: node scripts/verify-about.mjs
         env:
