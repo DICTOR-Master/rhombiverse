@@ -51,13 +51,13 @@ Then the tesseract: when the cube closes (**Open in 3D** takes it to 3D's Cube p
 
 **1D+ Construct · RD** (Wizard → 1D+ → Construct · RD): the flagship. First the RD's own rhombus, by hand like the square, starting at its 70.53° corner, first side up the screen, clockwise: the 2D moment (its lattice button shows the rhombic lattice, and **Open in 2D** takes it to the Parallelogram at the RD Rhombus angle). Then **Z** into the rhombic dodecahedron, in the RD's own grammar: the body first, the cube inside it (cyan; its edges are the rhombi's short diagonals; Z's first edge by hand, then the rest in one tap), then the limbs, a pyramid on each of its six faces (gold, all six in one tap), whose edges are the RD's. It closes straight into its lattice, the twelve RDs round it, and **Open in 3D** places an RD there. Then **W**: the RD is the 24-cell's shadow, so splitting it open makes the 24-cell. Each corner of its cube parts in two, one on each side in W, and the two copies make the tesseract (the body: W's first edge by hand, the other corners at once). Then the limbs: the six apexes join both sides in one tap, and two new apexes out along W in another. That's the 24-cell, 96 edges, turning through W, with the RD left as its ghost; **Open in 4D** takes it to the D4 world.
 
-**2D:** Parallelogram, Triangle, Hexagon, Kite and Kagome tiles, chosen from the panel at the top, each at up to four lattice angles (90°, 70.53°, 63.43° and 60°).
+**2D:** Parallelogram, Triangle, Hexagon, Kite and Kagome tiles, chosen from the 2D panel (at the top; at the bottom on a phone), each at up to four lattice angles (90°, 70.53°, 63.43° and 60°).
 
 **2D Kaleidoscope** (Wizard → 2D → Kaleidoscope): a world of its own. Build with thick and thin Penrose rhombi, pentagons, triangles, hexagons and squares (all the same edge length, so any two fit edge to edge). Where you tap decides: near a piece's edge, the chosen piece goes across it; in empty space, it drops loose and slides along until it lines up beside a partner. Pieces never overlap. Mirrors reflect your build into a kaleidoscope: the mirror button switches between a Ring (○, 1 to 12 mirrors) and a triangle of three (△60°, △45°, △30°) repeating across the screen, set with the slider; **Turn** rotates your build against the mirrors, **↻** keeps it turning, **≈** shakes every piece loose to settle into a new pattern. **Safe** (Penrose shapes only) keeps the rhombi to Penrose's matching rule, so they always form a true Penrose tiling. **Lattice View** shows the mirror lines and, outlined, every spot the piece fits.
 
 **2D Nets** (Wizard → 2D → Nets): from 2D to 3D. Pick a solid in the panel: the **Voronoi cells**, Cube, RD and TO (truncated octahedron), the space-filling cells of the simple, face-centred and body-centred cubic lattices; its net shows as a faint ghost. Follow it: tap to build the first face side by side, in 1D cells, then each tap builds the next face. When the net is complete, tap and it folds up into the solid (the indicator reads **2D/3D**); the **fold slider** folds and unfolds it by hand, and **Open in 3D** takes the finished solid there. Long-press takes back a face (or unfolds). Each solid keeps its own progress. The **Platonic solids** are a second group: tetrahedron, octahedron, icosahedron, dodecahedron and the cube. **Open in 3D** appears for the solids the 3D world has as pieces (cube, RD, TO, octahedron). **⊘** beside Undo clears the net you're on.
 
-**Paint** (every dimension but 1D+): the brush on the bottom row, or the Paint switch in the middle of the colour wheel, recolours pieces you've already placed. Turn it on, pick a colour, tap a piece; turn it off to build again. It switches colours to Pick, so each piece shows its own colour. (Shells and Golden Rhombohedra colour their pieces by band and type, so Paint isn't offered there.) When the bottom row's slot is taken by an attach toggle (3D's Rhombohedra and Pyrochlore), the brush sits just above it; in 4D it's in the 4D panel.
+**Paint** (every dimension but 1D+): the brush on the bottom row, or the Paint switch in the middle of the colour wheel, recolours pieces you've already placed. Turn it on, pick a colour, tap a piece; turn it off to build again. It switches colours to Pick, so each piece shows its own colour. (Shells and Golden Rhombohedra colour their pieces by band and type, so Paint isn't offered there, nor in Nets.) When the bottom row's slot is taken by an attach toggle (3D's Rhombohedra and Pyrochlore), the brush sits just above it; in 4D it's in the 4D panel.
 
 **3D:**
 
@@ -164,6 +164,10 @@ A 3D world for building **hulls**: shells of rhombic dodecahedra (RDs), each she
 
 A 3D world for the two pieces of the 3D Penrose tiling. Choose it in the Wizard's 3D screen. Tap the cyan outline, then tap a face to add the **Prolate** or **Oblate** piece chosen in the Piece menu. **Penrose check** colours pieces green where they belong to the true aperiodic tiling and red where your build has drifted; Lattice View shows the true tiling around you, and tapping a ghost places it.
 
+## RHOMBIS
+
+RHOMBIS is a 3D puzzle made from the same pieces: fill the target shape with the pieces in the tray. Open it from the welcome screen (**Try RHOMBIS**). Tap a piece in the tray, then tap a glowing void to place it; some pieces flip when tapped again. **Stages** lists every puzzle in sections and ticks the ones you've solved. **← Rhombiverse** brings you back here.
+
 ## Saving your work
 
 Your World saves automatically in this browser, every dimension, after each change. It comes back when you reopen the site on the same device and browser.
@@ -223,7 +227,8 @@ The menu is a rhombic dodecahedron. Each face is a section: tap a face to open i
 | Home | Piece, Colour, Change Dimension |
 | Piece | RD family, Cube, Pyramid, TO, Flattened Octahedron, Disphenoid, CO, Octahedron |
 | RD family | RD, Hemi RD, Hourglass, RD Quarter, ED, Hex Prism, Rhombohedra, Pyrochlore |
-| Change Dimension | 2D, 3D, 4D, 5D, 6D |
+| Change Dimension | 1D+, 2D, 3D, 4D, 5D, 6D |
+| Piece (in 4D) | Tesseract, 24-cell, 16-cell, 5-cell, Truncated 5-cell, Bitruncated 5-cell |
 
 ## Settings
 

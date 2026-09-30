@@ -53,13 +53,13 @@ Después, el teseracto: al cerrarse el cubo (**Abrir en 3D** lo lleva a la pieza
 
 **1D+ Construct · RD** (Wizard → 1D+ → Construct · RD): la familia insignia. Primero el rombo propio del RD, a mano como el cuadrado, empezando en su esquina de 70,53°, el primer lado hacia arriba, en el sentido de las agujas del reloj: el momento 2D (su botón de red muestra la red rómbica y **Abrir en 2D** lo lleva al Paralelogramo con el ángulo del rombo del RD). Luego **Z** hacia el dodecaedro rómbico, con la gramática propia del RD: primero el cuerpo, el cubo interior (cian; sus aristas son las diagonales cortas de los rombos; la primera arista de Z a mano, el resto de un toque), después las extremidades, una pirámide sobre cada una de sus seis caras (oro, las seis de un toque), cuyas aristas son las del RD. Se cierra directamente en su red, los doce RD a su alrededor, y **Abrir en 3D** coloca allí un RD. Luego **W**: el RD es la sombra de la 24-celda, así que abrirlo da la 24-celda. Cada esquina de su cubo se separa en dos, una a cada lado en W, y las dos copias forman el teseracto (el cuerpo: la primera arista de W a mano, las demás esquinas de una vez). Después las extremidades: los seis vértices se unen a ambos lados de un toque, y dos vértices nuevos a lo largo de W en otro. Es la 24-celda, 96 aristas, que gira a través de W, con el RD como su sombra; **Abrir en 4D** la lleva al mundo D4.
 
-**2D:** baldosas Parallelogram (paralelogramo), Triangle (triángulo), Hexagon (hexágono), Kite (cometa) y Kagome, que se eligen en el panel superior, cada una con hasta cuatro ángulos de red (90°, 70,53°, 63,43° y 60°).
+**2D:** baldosas Parallelogram (paralelogramo), Triangle (triángulo), Hexagon (hexágono), Kite (cometa) y Kagome, que se eligen en el panel 2D (arriba; abajo en un móvil), cada una con hasta cuatro ángulos de red (90°, 70,53°, 63,43° y 60°).
 
 **Caleidoscopio 2D** (Wizard → 2D → Kaleidoscope): un mundo propio. Construye con rombos de Penrose gruesos y delgados, pentágonos, triángulos, hexágonos y cuadrados (todos con la misma longitud de arista, así que cualquier par encaja arista con arista). Decide dónde tocas: cerca de la arista de una pieza, la pieza elegida se coloca al otro lado; en un espacio vacío, cae suelta y se desliza hasta alinearse junto a una compañera. Las piezas nunca se solapan. Los espejos reflejan tu construcción como un caleidoscopio: el botón de espejo cambia entre un Anillo (○, 1 a 12 espejos) y un triángulo de tres (△60°, △45°, △30°) que se repite por la pantalla, ajustado con el deslizador; **Girar** rota tu construcción frente a los espejos, **↻** la mantiene girando, **≈** suelta todas las piezas para que formen un nuevo patrón. **Safe** (solo formas de Penrose) mantiene los rombos en la regla de Penrose, así que siempre forman un verdadero teselado de Penrose. **Lattice View** muestra las líneas de los espejos y, en contorno, cada lugar donde cabe la pieza.
 
 **Desarrollos 2D** (Wizard → 2D → Nets): de 2D a 3D. Elige un sólido en el panel: las **celdas de Voronoi**, cubo, RD y TO (octaedro truncado), las celdas que llenan el espacio de las redes cúbicas simple, centrada en las caras y centrada en el cuerpo; su desarrollo aparece como un fantasma tenue. Síguelo: toca para construir la primera cara lado a lado, en celdas 1D, y después cada toque construye la cara siguiente. Cuando el desarrollo está completo, toca y se pliega en el sólido (el indicador muestra **2D/3D**); el **deslizador de plegado** lo pliega y despliega a mano, y **Abrir en 3D** lleva allí el sólido terminado. Mantén pulsado para deshacer una cara (o desplegar). Cada sólido guarda su propio progreso. Los **sólidos platónicos** son un segundo grupo: tetraedro, octaedro, icosaedro, dodecaedro y el cubo. **Abrir en 3D** aparece para los sólidos que el mundo 3D tiene como piezas (cubo, RD, TO, octaedro). **⊘** junto a Undo borra el desarrollo en el que estás.
 
-**Paint** (todas las dimensiones salvo 1D+): el pincel de la fila inferior, o el interruptor Paint en el centro de la rueda de colores, cambia el color de las piezas ya colocadas. Actívalo, elige un color y toca una pieza; desactívalo para volver a construir. Pasa los colores a Pick, así cada pieza muestra su propio color. (Shells y Golden Rhombohedra colorean sus piezas por banda y tipo, así que ahí no hay Paint.) Cuando el hueco de la fila inferior lo ocupa un cambio de unión (Rhombohedra y Pyrochlore en 3D), el pincel queda justo encima; en 4D está en el panel 4D.
+**Paint** (todas las dimensiones salvo 1D+): el pincel de la fila inferior, o el interruptor Paint en el centro de la rueda de colores, cambia el color de las piezas ya colocadas. Actívalo, elige un color y toca una pieza; desactívalo para volver a construir. Pasa los colores a Pick, así cada pieza muestra su propio color. (Shells y Golden Rhombohedra colorean sus piezas por banda y tipo, así que ahí no hay Paint; tampoco en Nets.) Cuando el hueco de la fila inferior lo ocupa un cambio de unión (Rhombohedra y Pyrochlore en 3D), el pincel queda justo encima; en 4D está en el panel 4D.
 
 **3D:**
 
@@ -166,6 +166,10 @@ Un mundo 3D para construir **envolventes**: capas de dodecaedros rómbicos (RD),
 
 Un mundo 3D con las dos piezas del teselado de Penrose en 3D. Elígelo en la pantalla 3D del Wizard. Toca el contorno cian y luego una cara para añadir la pieza **Alargada** o **Achatada** elegida en el menú Pieza. El **Control Penrose** pinta de verde las piezas que pertenecen al verdadero teselado aperiódico y de rojo las que se han desviado; Lattice View muestra el teselado verdadero alrededor, y tocar un fantasma lo coloca.
 
+## RHOMBIS
+
+RHOMBIS es un rompecabezas 3D hecho con las mismas piezas: llena la forma objetivo con las piezas de la bandeja. Ábrelo desde la pantalla de bienvenida (**Prueba RHOMBIS**). Toca una pieza de la bandeja y luego un hueco iluminado para colocarla; algunas piezas se voltean si las tocas otra vez. **Etapas** muestra todos los rompecabezas por secciones y marca los que has resuelto. **← Rhombiverse** te trae de vuelta aquí.
+
 ## Guarda tu trabajo
 
 Tu mundo se guarda automáticamente en este navegador, en todas las dimensiones, después de cada cambio. Vuelve a aparecer cuando abres el sitio en el mismo dispositivo y navegador.
@@ -225,7 +229,8 @@ El menú es un dodecaedro rómbico. Cada cara es una sección: toca una cara par
 | Home | Piece, Color, Change Dimension |
 | Piece | RD family, Cube, Pyramid, TO, Flattened Octahedron, Disphenoid, CO, Octahedron |
 | RD family | RD, Hemi RD, Hourglass, RD Quarter, ED, Hex Prism, Rhombohedra, Pyrochlore |
-| Change Dimension | 2D, 3D, 4D, 5D, 6D |
+| Change Dimension | 1D+, 2D, 3D, 4D, 5D, 6D |
+| Piece (en 4D) | Tesseract, 24-cell, 16-cell, 5-cell, Truncated 5-cell, Bitruncated 5-cell |
 
 ## Ajustes
 
