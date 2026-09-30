@@ -10,8 +10,15 @@ export function createGearedSlider(track, { value, setValue, limit, perSweep, de
 
   function render() {
     const L = limit();
-    ticks.innerHTML = detents().map(({ v, label, below }) => `<span class="w4d-tick${below ? ' w4d-tick-below' : ''}" style="left:${((v + L) / (2 * L)) * 100}%">${label}</span>`).join('');
-    thumb.style.left = `calc(17px + (100% - 34px) * ${(value() + L) / (2 * L)})`;
+    const ds = detents();
+    // Labels read rightward from their ticks, so a labelled last tick needs
+    // room past it (about 6.5px a character plus the indent) or its label
+    // hangs off the end of the track; ticks and thumb share that margin.
+    const last = ds.find(({ v, below }) => !below && (v + L) / (2 * L) > 0.95);
+    const right = last?.label ? Math.max(17, Math.ceil(22 + 6.5 * String(last.label).length)) : 17;
+    ticks.style.right = `${right}px`;
+    ticks.innerHTML = ds.map(({ v, label, below }) => `<span class="w4d-tick${below ? ' w4d-tick-below' : ''}" style="left:${((v + L) / (2 * L)) * 100}%">${label}</span>`).join('');
+    thumb.style.left = `calc(17px + (100% - ${17 + right}px) * ${(value() + L) / (2 * L)})`;
   }
 
   let drag = null;
