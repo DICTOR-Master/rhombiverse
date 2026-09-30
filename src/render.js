@@ -3699,7 +3699,7 @@ async function init() {
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
           const PIECE_LABELS = {
-            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', rhombohedra: 'Rhombohedra', pyrochlore: 'Pyrochlore (3D Kagome)', tesseract: 'Tesseract', cell24: '24-cell', cell16: '16-cell', a4trunc: 'Truncated 5-cell', a4bitrunc: 'Bitruncated 5-cell', a4cell5: '5-cell',
+            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', dictofcc: 'DICTO FCC (skewed RD)', rhombohedra: 'Rhombohedra', pyrochlore: 'Pyrochlore (3D Kagome)', tesseract: 'Tesseract', cell24: '24-cell', cell16: '16-cell', a4trunc: 'Truncated 5-cell', a4bitrunc: 'Bitruncated 5-cell', a4cell5: '5-cell',
             // 2D lattice tier: one label per LATTICE_PRIMITIVES entry
             // (Phase 6: primitive alone, angle is a live toggle not a
             // piece-type value -- see lattice2dSeedCell's own header),

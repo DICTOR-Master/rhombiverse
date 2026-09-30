@@ -603,6 +603,7 @@ export const ACTION_TO_MARK = {
   // specific gap read as "blank," not "wrong," but still a real gap).
   'tool:pieceType:elongdodeca': 'pieceElongDodeca',
   'tool:pieceType:hexprism': 'pieceHexPrism',
+  'tool:pieceType:dictofcc': 'pieceDictoFcc',
   'tool:pieceType:rdquarter': 'pieceRDQuarter',
   'tool:pieceType:rhombohedra': 'pieceRhombohedron',
   'tool:pieceType:pyrochlore': 'piecePyrochlore',
