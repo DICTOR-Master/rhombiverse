@@ -9,6 +9,7 @@
     "verify:lattice-2d": "node scripts/verify-lattice-2d.mjs",
     "verify:pyrochlore": "node scripts/verify-pyrochlore.mjs",
     "verify:rhombohedra": "node scripts/verify-rhombohedra.mjs",
+    "verify:dicto-fcc": "node scripts/verify-dicto-fcc.mjs",
     "verify:4d": "node scripts/verify-4d.mjs",
     "verify:quasicrystal": "node scripts/verify-quasicrystal.mjs",
     "verify:catalogue": "node scripts/verify-catalogue.mjs",
