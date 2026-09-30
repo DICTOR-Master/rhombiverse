@@ -66,7 +66,7 @@ Después, el teseracto: al cerrarse el cubo (**Abrir en 3D** lo lleva a la pieza
 | Red | Piezas |
 |---|---|
 | FCC | Rhombic Dodecahedron (RD, dodecaedro rómbico), Hemi RD, Hourglass, RD Quarter, Cube, Pyramid |
-| DICTO FCC | DICTO RD: el dodecaedro rómbico sesgado de DICTO con varillas azules de Zometool (seis rombos de 60° y seis de 72°, volumen φ² con arista 1), en un FCC cizallado |
+| DICTO FCC | DICTO RD: el dodecaedro rómbico sesgado de DICTO con varillas azules de Zometool (seis rombos de 60° y seis de 72°, volumen φ² con arista 1), en un FCC cizallado; DICTO Blocks: sus cuatro bloques, dos bloques de rombos y dos romboedros aplanados, cara con cara |
 | RD Dual | Cuboctahedron (CO, cuboctaedro), Octahedron (octaedro) |
 | BCC | Truncated Octahedron (TO, octaedro truncado) |
 | BCC Interstitial | Flattened Octahedron, Disphenoid |

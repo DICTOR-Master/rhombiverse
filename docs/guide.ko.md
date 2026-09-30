@@ -66,7 +66,7 @@ Rhombiverse와 그 쌍둥이인 [Polyhedraverse](https://polyhedraverse.vercel.a
 | 격자 | 조각 |
 |---|---|
 | FCC | Rhombic Dodecahedron(RD, 마름모 십이면체), Hemi RD, Hourglass, RD Quarter, Cube, Pyramid |
-| DICTO FCC | DICTO RD: DICTO가 Zometool 파란 스트럿으로 만든 비스듬한 마름모십이면체(60°와 72° 마름모 6개씩, 모서리 1일 때 부피 φ²)를 비튼 FCC로 쌓은 것 |
+| DICTO FCC | DICTO RD: DICTO가 Zometool 파란 스트럿으로 만든 비스듬한 마름모십이면체(60°와 72° 마름모 6개씩, 모서리 1일 때 부피 φ²)를 비튼 FCC로 쌓은 것; DICTO Blocks: 그 네 블록(모두 마름모인 블록 2개와 납작한 능면체 2개)을 면끼리 붙여 놓기 |
 | RD Dual | Cuboctahedron(CO, 육팔면체), Octahedron(팔면체) |
 | BCC | Truncated Octahedron(TO, 깎은 팔면체) |
 | BCC Interstitial | Flattened Octahedron, Disphenoid |

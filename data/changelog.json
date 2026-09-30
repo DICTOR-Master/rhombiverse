@@ -3,7 +3,8 @@
     "date": "2026-10-01",
     "title": "DICTO FCC",
     "items": [
-      "New 3D lattice, DICTO FCC (Wizard → 3D): DICTO's skewed rhombic dodecahedron, found in Zometool from medium blue struts. It has six 60° and six 72° rhombi and volume exactly φ² at edge 1, and it packs as a sheared version of the FCC rhombic dodecahedron packing: every cell touches 12 neighbours in the same pattern. Tap a face to grow the next cell, as in the RD world. In the Type colour mode it shows in Zome blue, which is also a new colour to pick."
+      "New 3D lattice, DICTO FCC (Wizard → 3D): DICTO's skewed rhombic dodecahedron, found in Zometool from medium blue struts. It has six 60° and six 72° rhombi and volume exactly φ² at edge 1, and it packs as a sheared version of the FCC rhombic dodecahedron packing: every cell touches 12 neighbours in the same pattern. Tap a face to grow the next cell, as in the RD world. In the Type colour mode it shows in Zome blue, which is also a new colour to pick.",
+      "DICTO Blocks (Wizard → 3D → DICTO FCC): the skewed rhombic dodecahedron's four blocks as pieces of their own, two all-rhombus blocks (Zome blue) and two flattened rhombohedra (pale blue). Tap a block's face to add the block across it; four fill a cell exactly, and they carry on across the whole sheared lattice."
     ]
   },
   {

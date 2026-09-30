@@ -66,7 +66,7 @@ Rhombiverse とその双子の [Polyhedraverse](https://polyhedraverse.vercel.ap
 | 格子 | ピース |
 |---|---|
 | FCC | Rhombic Dodecahedron（RD、菱形十二面体）、Hemi RD、Hourglass、RD Quarter、Cube、Pyramid |
-| DICTO FCC | DICTO RD：DICTO が Zometool の青いストラットで作った歪んだ菱形十二面体（60°と72°のひし形が6枚ずつ、辺1で体積φ²）を、ずらした FCC に詰めたもの |
+| DICTO FCC | DICTO RD：DICTO が Zometool の青いストラットで作った歪んだ菱形十二面体（60°と72°のひし形が6枚ずつ、辺1で体積φ²）を、ずらした FCC に詰めたもの。DICTO Blocks：その4つのブロック（すべてひし形のブロック2つと平たい菱面体2つ）を面どうしで置けます |
 | RD Dual | Cuboctahedron（CO、立方八面体）、Octahedron（八面体） |
 | BCC | Truncated Octahedron（TO、切頂八面体） |
 | BCC Interstitial | Flattened Octahedron、Disphenoid |

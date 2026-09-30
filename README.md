@@ -76,7 +76,8 @@ right-click) removes. The **User Guide** (in the app, or at
   - **Elongated Dodecahedron**, **Hexagonal Prism** and **Rhombohedra**,
     each on its own lattice
   - **DICTO FCC**: DICTO's skewed rhombic dodecahedron of blue Zometool
-    struts (volume φ²), packed as a sheared FCC
+    struts (volume φ²), packed as a sheared FCC, and **DICTO Blocks**, its
+    four blocks as separate pieces
   - **Pyrochlore (3D Kagome)**: truncated tetrahedra with their
     corner-sharing tetrahedra
 - **Shells** (a 3D world of its own) — build **hulls** from shells of

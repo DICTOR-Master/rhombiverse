@@ -604,6 +604,7 @@ export const ACTION_TO_MARK = {
   'tool:pieceType:elongdodeca': 'pieceElongDodeca',
   'tool:pieceType:hexprism': 'pieceHexPrism',
   'tool:pieceType:dictofcc': 'pieceDictoFcc',
+  'tool:pieceType:dictoblock': 'pieceRhombohedron',
   'tool:pieceType:rdquarter': 'pieceRDQuarter',
   'tool:pieceType:rhombohedra': 'pieceRhombohedron',
   'tool:pieceType:pyrochlore': 'piecePyrochlore',

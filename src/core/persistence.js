@@ -43,6 +43,7 @@ export const ELONGDODECA_STORAGE_KEY = 'rhombiverse-elongdodeca-world';
 // hex-prism.js), genuinely separate from FCC's own grid.
 export const HEXPRISM_STORAGE_KEY = 'rhombiverse-hexprism-world';
 export const DICTOFCC_STORAGE_KEY = 'rhombiverse-dicto-fcc-world';
+export const DICTOBLOCK_STORAGE_KEY = 'rhombiverse-dicto-block-world';
 
 // 2D tier (Phase 3): one store PER (angle, primitive) combination from
 // lattice-2d.js's own LATTICE_2D_COMBINATIONS, each flat layer pinned

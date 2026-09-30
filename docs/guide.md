@@ -64,7 +64,7 @@ Then the tesseract: when the cube closes (**Open in 3D** takes it to 3D's Cube p
 | Lattice | Pieces |
 |---|---|
 | FCC | Rhombic Dodecahedron (RD), Hemi RD, Hourglass, RD Quarter, Cube, Pyramid |
-| DICTO FCC | DICTO RD: DICTO's skewed rhombic dodecahedron of blue Zometool struts (six 60° and six 72° rhombi, volume φ² at edge 1), packed as a sheared FCC |
+| DICTO FCC | DICTO RD: DICTO's skewed rhombic dodecahedron of blue Zometool struts (six 60° and six 72° rhombi, volume φ² at edge 1), packed as a sheared FCC; DICTO Blocks: its four blocks, two all-rhombus blocks and two flattened rhombohedra, placed face to face |
 | RD Dual | Cuboctahedron (CO), Octahedron |
 | BCC | Truncated Octahedron (TO) |
 | BCC Interstitial | Flattened Octahedron, Disphenoid |

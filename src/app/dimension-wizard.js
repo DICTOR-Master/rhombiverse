@@ -328,6 +328,7 @@ export const LATTICES_3D = [
   // on its sheared FCC lattice, right after the FCC it shears.
   { key: 'dictofcc', label: 'DICTO FCC', pieces: [
     { label: 'DICTO RD', action: 'tool:pieceType:dictofcc' },
+    { label: 'DICTO Blocks', action: 'tool:pieceType:dictoblock' },
   ] },
   { key: 'rdDual', label: 'RD Dual', pieces: [
     { label: 'CO', action: 'tool:cuboctaBuild' },

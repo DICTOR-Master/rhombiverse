@@ -190,3 +190,104 @@ export function matchDictoNeighborOffset(faceNormal, s = 1) {
 }
 
 export const DICTO_ZOME_BLUE = 0x1f5fa8; // Zometool's blue strut colour, roughly
+
+// ---- The four blocks (stage 2, direct request 2026-10-01) ----------------
+// Each cell splits into four parallelepipeds, one per choice of three of
+// its four edge directions: two "all-rhombus" blocks (volume phi/2 at edge
+// 1) and two flattened rhombohedra (1/2). Together the blocks of every
+// cell fill space, so a block's face is shared with exactly one other
+// block, in the same cell or a neighbouring one.
+
+const TRIPLES = [[0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]];
+
+/** Does a point lie strictly inside a parallelepiped (origin o, edges a, b, c)? */
+function insideBox(p, o, a, b, c) {
+  const D = det3(a, b, c);
+  const r = sub(p, o);
+  const t = [det3(r, b, c) / D, det3(a, r, c) / D, det3(a, b, r) / D];
+  return t.every((x) => x > 1e-9 && x < 1 - 1e-9);
+}
+
+/**
+ * Where each block sits: the cell is the sweep of its four edges from its
+ * lowest corner, and each block is that corner plus either nothing or the
+ * one edge it doesn't use. Of the 16 ways to choose, the one whose four
+ * blocks don't overlap (tested at points spread through each block).
+ */
+function blockOffsets(g) {
+  const cornerPts = (o, a, b, c) => {
+    const pts = [];
+    for (const i of [0.2, 0.5, 0.8]) for (const j of [0.2, 0.5, 0.8]) for (const k of [0.2, 0.5, 0.8]) pts.push(add(add(add(o, scale(a, i)), scale(b, j)), scale(c, k)));
+    return pts;
+  };
+  for (let m = 0; m < 16; m++) {
+    const boxes = TRIPLES.map((t, q) => {
+      const missing = [0, 1, 2, 3].find((i) => !t.includes(i));
+      return { o: (m >> q) & 1 ? g[missing] : [0, 0, 0], e: t.map((i) => g[i]) };
+    });
+    const clash = boxes.some((b1, i) => boxes.some((b2, j) => j > i && cornerPts(b1.o, ...b1.e).some((p) => insideBox(p, b2.o, ...b2.e))));
+    if (!clash) return boxes;
+  }
+  throw new Error('dicto-fcc: no non-overlapping block arrangement');
+}
+
+const blocksCache = new Map();
+
+/**
+ * The cell's four blocks at scale s, relative to the cell centre:
+ * corners, kind, and for each of its six faces the outward normal, the
+ * face centre and the neighbouring block across it ({ offset, q }, offset
+ * in FCC cell coordinates, [0, 0, 0] for a block of the same cell).
+ */
+export function dictoBlocks(s = 1) {
+  if (blocksCache.has(s)) return blocksCache.get(s);
+  const e = RD_EDGE * s;
+  const g = DICTO_DIRECTIONS.map((d) => scale(d, e));
+  const centre = scale(g.reduce(add, [0, 0, 0]), 0.5);
+  const boxes = blockOffsets(g).map((b) => ({ o: sub(b.o, centre), e: b.e }));
+  const blocks = boxes.map(({ o, e: [a, b, c] }, q) => {
+    const corners = [];
+    for (const i of [0, 1]) for (const j of [0, 1]) for (const k of [0, 1]) corners.push(add(add(add(o, scale(a, i)), scale(b, j)), scale(c, k)));
+    const mid = add(o, scale(add(add(a, b), c), 0.5));
+    const faces = [];
+    for (const [p1, p2, other] of [[a, b, c], [a, c, b], [b, c, a]]) {
+      const n = unit(cross(p1, p2));
+      for (const side of [0, 1]) {
+        const fc = add(add(o, scale(add(p1, p2), 0.5)), scale(other, side));
+        const nn = dot(n, sub(fc, mid)) > 0 ? n : scale(n, -1);
+        faces.push({ normal: nn, centre: fc });
+      }
+    }
+    const volume = Math.abs(det3(a, b, c)) / e ** 3;
+    return { q, corners, faces, kind: Math.abs(volume - 0.5) < 1e-9 ? 'flattened' : 'allRhombus' };
+  });
+  // Neighbours: the block (in this cell or one of its 12 neighbours) with a face at the same centre, facing back.
+  const M = matrixFor(s);
+  const at = (o) => add(add(scale(M[0], o[0]), scale(M[1], o[1])), scale(M[2], o[2]));
+  for (const b of blocks) {
+    b.neighbours = b.faces.map((f) => {
+      for (const offset of [[0, 0, 0], ...NEIGHBOR_OFFSETS]) {
+        const shift = at(offset);
+        for (const b2 of blocks) {
+          if (offset.every((x) => x === 0) && b2.q === b.q) continue;
+          if (b2.faces.some((f2) => norm(sub(add(f2.centre, shift), f.centre)) < 1e-9 && dot(f2.normal, f.normal) < -1 + 1e-9)) return { offset, q: b2.q };
+        }
+      }
+      return null;
+    });
+  }
+  blocksCache.set(s, blocks);
+  return blocks;
+}
+
+/** The neighbour across the face of block q whose outward normal is closest to faceNormal. */
+export function matchDictoBlockNeighbour(q, faceNormal, s = 1) {
+  const b = dictoBlocks(s)[q];
+  let best = 0;
+  b.faces.forEach((f, i) => { if (dot(f.normal, [faceNormal.x, faceNormal.y, faceNormal.z]) > dot(b.faces[best].normal, [faceNormal.x, faceNormal.y, faceNormal.z])) best = i; });
+  return b.neighbours[best];
+}
+
+// Blocks live in their own store keyed by (4x + q, y, z): cell (x, y, z) and block q in 0..3.
+export const dictoBlockKey = (x, y, z, q) => [4 * x + q, y, z];
+export const dictoBlockFromKey = (kx, y, z) => ({ x: Math.floor(kx / 4), y, z, q: ((kx % 4) + 4) % 4 });

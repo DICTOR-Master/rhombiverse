@@ -15,7 +15,7 @@
 //     one cell, and the cell's volume equals the volume per lattice cell;
 //   - a click on any face finds the neighbour across it.
 import { NEIGHBOR_OFFSETS, isValidCell } from '../src/core/lattice.js';
-import { blueLines, DICTO_DIRECTIONS, dictoCellVerts, dictoMatrix, dictoCellToWorld, matchDictoNeighborOffset } from '../src/geometry-extensions/dicto-fcc.js';
+import { blueLines, DICTO_DIRECTIONS, dictoCellVerts, dictoMatrix, dictoCellToWorld, matchDictoNeighborOffset, dictoBlocks, matchDictoBlockNeighbour, dictoBlockKey, dictoBlockFromKey } from '../src/geometry-extensions/dicto-fcc.js';
 
 let failures = 0;
 function check(label, condition) {
@@ -134,6 +134,39 @@ check(`cell volume = volume per lattice cell, 2 |det M| (${cellVolume.toFixed(9)
     }
   }
   check(`each of the 12 faces leads to the neighbour across it (${ok}/12)`, ok === 12);
+}
+
+// 7. The four blocks (the same pieces as Polyhedraverse's DICTO
+// all-rhombus block and DICTO flattened rhombohedron).
+{
+  const B = dictoBlocks(1);
+  const vol = (b) => { const [o, a, c, d] = [b.corners[0], sub(b.corners[4], b.corners[0]), sub(b.corners[2], b.corners[0]), sub(b.corners[1], b.corners[0])]; return Math.abs(det3(a, c, d)) / EDGE ** 3; };
+  check('four blocks: two flattened rhombohedra (volume 1/2) and two all-rhombus blocks (phi/2), as in Polyhedraverse', B.filter((b) => b.kind === 'flattened' && Math.abs(vol(b) - 0.5) < 1e-9).length === 2 && B.filter((b) => b.kind === 'allRhombus' && Math.abs(vol(b) - PHI / 2) < 1e-9).length === 2);
+  const faceAngles = (b) => { const o = b.corners[0]; const ed = [sub(b.corners[4], o), sub(b.corners[2], o), sub(b.corners[1], o)]; return [[0, 1], [0, 2], [1, 2]].map(([i, j]) => lineAngle(ed[i], ed[j])).sort((x, y) => x - y).join(); };
+  check('flattened rhombohedron faces: 60, 60, 72 degrees; all-rhombus block: 60, 72, 72', B.every((b) => faceAngles(b) === (b.kind === 'flattened' ? '60,60,72' : '60,72,72')));
+  // The blocks fill the cell: random points in the cell lie in exactly one block.
+  const inBlock = (p, b) => { const o = b.corners[0]; const [a, c, d] = [sub(b.corners[4], o), sub(b.corners[2], o), sub(b.corners[1], o)]; const D = det3(a, c, d); const r = sub(p, o); const t = [det3(r, c, d) / D, det3(a, r, d) / D, det3(a, c, r) / D]; return t.every((x) => x > 1e-9 && x < 1 - 1e-9); };
+  let seed = 5; const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  let bad = 0, inCell = 0;
+  const planes = [];
+  for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) { const n = cross(e[i], e[j]); const u = scale(n, 1 / norm(n)); for (const sgn of [1, -1]) { const nn = scale(u, sgn); planes.push([nn, dot(nn, e.reduce((acc, gk, k) => (k === i || k === j ? acc : add(acc, scale(gk, Math.sign(dot(nn, gk)) / 2))), [0, 0, 0]))]); } }
+  for (let k = 0; k < 4000; k++) {
+    const p = [rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1];
+    const inside = planes.every(([n, d]) => dot(n, p) < d - 1e-6);
+    const n = B.filter((b) => inBlock(p, b)).length;
+    if (inside) { inCell++; if (n !== 1) bad++; } else if (planes.every(([nn, d]) => dot(nn, p) > d + 1e-6 || true) && n > 0 && planes.some(([nn, d]) => dot(nn, p) > d + 1e-6)) bad++;
+  }
+  check(`the four blocks fill the cell exactly (${inCell} points inside, ${bad} exceptions)`, bad === 0 && inCell > 200);
+  // Every block face has a neighbour whose face coincides with it, facing back.
+  const M = dictoMatrix(1);
+  const at = (o) => add(add(scale(M[0], o[0]), scale(M[1], o[1])), scale(M[2], o[2]));
+  let pairs = 0;
+  B.forEach((b) => b.faces.forEach((f, i) => { const nb = b.neighbours[i]; if (nb && B[nb.q].faces.some((f2) => norm(sub(add(f2.centre, at(nb.offset)), f.centre)) < 1e-9 && dot(f2.normal, f.normal) < -1 + 1e-9)) pairs++; }));
+  check(`all 24 block faces have a neighbour block across them (${pairs}/24)`, pairs === 24);
+  let clicks = 0;
+  B.forEach((b) => b.faces.forEach((f, i) => { const nb = matchDictoBlockNeighbour(b.q, { x: f.normal[0], y: f.normal[1], z: f.normal[2] }, 1); if (nb && nb.q === b.neighbours[i].q && nb.offset.join() === b.neighbours[i].offset.join()) clicks++; }));
+  check(`a click on each block face finds the block across it (${clicks}/24)`, clicks === 24);
+  check('block keys round-trip', [[0, 0, 0, 0], [-3, 2, 1, 3], [5, -1, -4, 2]].every(([x, y, z, q]) => { const k = dictoBlockKey(x, y, z, q); const r = dictoBlockFromKey(...k); return r.x === x && r.y === y && r.z === z && r.q === q; }));
 }
 
 console.log(failures === 0 ? '\nAll checks passed (0 failures).' : `\n${failures} check(s) FAILED.`);
