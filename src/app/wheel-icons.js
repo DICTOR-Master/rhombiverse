@@ -183,6 +183,8 @@ export const MARKS = {
   // reading as "hexagon extruded into a prism" -- distinct from both
   // pieceRD's filled hexagon and Elongated Dodecahedron's stretched one.
   pieceHexPrism: `<polygon points="${hexPts(20)}" ${THIN}/><path d="M-17,-10 V10 M17,-10 V10" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>`,
+  // DICTO FCC: pieceRD's hexagon, sheared -- the skewed rhombic dodecahedron.
+  pieceDictoFcc: `<polygon points="${hexPts(20).split(' ').map((p) => { const [x, y] = p.split(',').map(Number); return `${(x + y * 0.3).toFixed(2)},${(y * 0.9).toFixed(2)}`; }).join(' ')}" ${THIN}/>`,
   // Rhombohedra: a real skewed parallelogram (not the symmetric kite
   // rhombusPts() draws elsewhere), matching a rhombohedron's own
   // non-orthogonal silhouette.

@@ -324,6 +324,11 @@ export const LATTICES_3D = [
     { label: 'Cube', action: 'tool:pieceType:cube' },
     { label: 'Pyramid', action: 'tool:pieceType:pyramid' },
   ] },
+  // DICTO FCC (direct request 2026-09-30): DICTO's blue-strut skewed RD
+  // on its sheared FCC lattice, right after the FCC it shears.
+  { key: 'dictofcc', label: 'DICTO FCC', pieces: [
+    { label: 'DICTO RD', action: 'tool:pieceType:dictofcc' },
+  ] },
   { key: 'rdDual', label: 'RD Dual', pieces: [
     { label: 'CO', action: 'tool:cuboctaBuild' },
     { label: 'Octahedron', action: 'tool:pieceType:octahedron' },

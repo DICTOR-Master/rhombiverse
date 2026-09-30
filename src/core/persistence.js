@@ -42,6 +42,7 @@ export const ELONGDODECA_STORAGE_KEY = 'rhombiverse-elongdodeca-world';
 // member" store -- own axial-hex coordinate frame (geometry-extensions/
 // hex-prism.js), genuinely separate from FCC's own grid.
 export const HEXPRISM_STORAGE_KEY = 'rhombiverse-hexprism-world';
+export const DICTOFCC_STORAGE_KEY = 'rhombiverse-dicto-fcc-world';
 
 // 2D tier (Phase 3): one store PER (angle, primitive) combination from
 // lattice-2d.js's own LATTICE_2D_COMBINATIONS, each flat layer pinned

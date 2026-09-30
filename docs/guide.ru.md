@@ -66,6 +66,7 @@ Rhombiverse и его близнец, [Polyhedraverse](https://polyhedraverse.ve
 | Решётка | Детали |
 |---|---|
 | FCC | Rhombic Dodecahedron (RD, ромбододекаэдр), Hemi RD, Hourglass, RD Quarter, Cube, Pyramid |
+| DICTO FCC | DICTO RD: скошенный ромбододекаэдр DICTO из синих стержней Zometool (шесть ромбов 60° и шесть 72°, объём φ² при ребре 1), уложенный в скошенную ГЦК |
 | RD Dual | Cuboctahedron (CO, кубооктаэдр), Octahedron (октаэдр) |
 | BCC | Truncated Octahedron (TO, усечённый октаэдр) |
 | BCC Interstitial | Flattened Octahedron, Disphenoid |
