@@ -66,6 +66,7 @@ Puis le tesseract : quand le cube se ferme (**Ouvrir en 3D** l'emmène vers la p
 | Réseau | Pièces |
 |---|---|
 | FCC | Rhombic Dodecahedron (RD, dodécaèdre rhombique), Hemi RD, Hourglass, RD Quarter, Cube, Pyramid |
+| DICTO FCC | DICTO RD : le dodécaèdre rhombique oblique de DICTO en tiges bleues Zometool (six losanges de 60° et six de 72°, volume φ² pour une arête de 1), empilé en FCC cisaillé |
 | RD Dual | Cuboctahedron (CO, cuboctaèdre), Octahedron (octaèdre) |
 | BCC | Truncated Octahedron (TO, octaèdre tronqué) |
 | BCC Interstitial | Flattened Octahedron, Disphenoid |
