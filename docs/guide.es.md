@@ -95,11 +95,10 @@ Las piezas se colorean según el ajuste **Colores** (en Ajustes): **Cian** (toda
 | Vista | Qué muestra | Cómo activarla |
 |---|---|---|
 | World View | Color, Translúcido o Esqueleto | Toca el botón World View para alternar |
-| Lattice View | Tu construcción y todos los huecos libres un paso más allá, para la pieza elegida | Toca el botón Lattice View para recorrer las piezas |
+| Lattice View | Tu construcción y todos los huecos libres un paso más allá, para la pieza elegida | Toca el botón Lattice View (o ⬡ en la rueda de la esquina) para recorrer las piezas |
 | X-Ray | Un corte. Arrastra el plano a través de la estructura, también en diagonal | Botón X-Ray (⛶) |
 | Spherical | Toca para cambiar: cada pieza como una esfera (los RD enteros tocan a sus doce vecinos), luego los huecos entre RD enteros (octaédricos en oro, tetraédricos en rosa, solo donde están cerrados) con todas las esferas tenues. Un control deslizante da tamaño a todas las esferas (se detiene en el tamaño propio de cada forma; menos = separadas, más = solapadas). Con Lattice View activo, cada hueco libre de la red se ve como una esfera tenue. Solo una vista | Botón Spherical (◯): apagado → esferas → huecos |
 | Duality | El teselado aperiódico que proyecta esta estructura cristalina | Botón Duality (◐) |
-| BCC Lattice | La red cúbica centrada en el cuerpo, anidada dentro de la FCC | Botón BCC Lattice (⬡) |
 | Dualize | Intercambia FCC y BCC | Ajustes → Dualize Preview |
 
 Ajustes también tiene una **Vista de sección**: elige un eje, arrastra el deslizador para mover el corte y marca **Invertir** para ver el otro lado.
@@ -175,7 +174,7 @@ En **Ajustes**:
 
 - **Exportar Mundo** guarda todo (cada red 3D, tus baldosas 2D y tus construcciones 4D, 5D y 6D) en un solo archivo. Úsalo como copia de seguridad o para llevar tu mundo a otro dispositivo.
 - **Importar Mundo** abre un archivo exportado. **Undo** deshace una importación.
-- **Mundo Nuevo** empieza de nuevo con un mundo vacío. **Clear World** (⊘) hace lo mismo desde la rueda de la esquina. Undo puede recuperarlo.
+- **Clear World** (⊘ en la rueda de la esquina) empieza de nuevo con un mundo vacío. Undo puede recuperarlo.
 
 ## Aprende las matemáticas
 
@@ -210,16 +209,16 @@ Arrastra la pequeña rueda de la esquina para girarla. Toca una cara para usarla
 | ⚙ | Ajustes |
 | ⛶ | X-Ray |
 | ◐ | Duality |
-| ⬡ | BCC Lattice |
+| ⬡ | Lattice View |
 | ◇ | Menú |
 | ⊘ | Clear World |
 | ↻ | Reload (úsalo si algo parece atascado) |
 | ◯ | Spherical (apagado → esferas → huecos) |
-| — | World View, Cuboctahedron Build |
+| — | World View |
 
 ## Rueda del menú
 
-El menú es un dodecaedro rómbico. Cada cara es una sección: toca una cara para abrirla y usa **Home** para volver. **Settings** y **Almanac** están siempre en las caras superiores.
+El menú es un dodecaedro rómbico. Cada cara es una sección: toca una cara para abrirla y usa **Home** para volver. **Almanac** está siempre en una cara superior.
 
 | Sección | Contenido |
 |---|---|
@@ -241,8 +240,8 @@ El menú es un dodecaedro rómbico. Cada cara es una sección: toca una cara par
 | Idioma | English, 日本語, Español, Français, 한국어, 中文, Русский (también con el selector 🌐 de la parte superior de la pantalla de bienvenida y de esta guía) |
 | Colores | Cian, Tipo o Elegir: cómo se colorean las piezas |
 | Vista de sección, eje, posición, Invertir | Corte a lo largo de un eje |
-| Build Cuboctahedron, Dualize Preview | Modos de construcción especiales |
-| Mundo Nuevo, Exportar Mundo, Importar Mundo | Empezar de nuevo, hacer copia y restaurar (todas las dimensiones) |
+| Dualize Preview | Modo de construcción especial |
+| Exportar Mundo, Importar Mundo | Hacer copia y restaurar (todas las dimensiones) |
 
 ## Teclado y ratón
 

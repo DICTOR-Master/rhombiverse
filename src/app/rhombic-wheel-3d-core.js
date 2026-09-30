@@ -129,10 +129,7 @@ export const LABEL_STYLE = {
 // No wheel config below re-declares these keys -- that's the whole
 // point: it's structurally impossible for a wheel to drift from this.
 //
-// Action mapping to real, already-shipped UI (see Phase 0/1 report):
-// openCyborg -> #cyborg-toggle, openLab -> #lab-toggle already exist
-// and do the described thing. openAlmanac has no existing counterpart
-// and is a stub.
+// Settings isn't here: the corner HUD wheel's ⚙ is its one doorway.
 //
 // 2026-08-29: "Lenses" (openLenses / X-Ray) was dropped from this ring
 // on direct instruction ("lenses are amply catered for now so can come
@@ -144,12 +141,7 @@ export const LABEL_STYLE = {
 export const UNIVERSAL_RING = {
   // Was Cyborg (guided walkthrough + AI suggestions), shelved 2026-09-25.
   "top|sy-1sz1": { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
-  // Direct instruction 2026-09-02: "get rid of lab everywhere" -- label
-  // only, dropped from "Lab / Settings" to plain "Settings"; internal
-  // id/action ("openLab", #lab-toggle, #lab-panel) unchanged, same
-  // label-only-rename pattern already used for Rhombitect/Rhombivate.
-  "top|sx1sz1":  { kind: "universal", label: "Settings", action: "openLab",
-                   desc: "Camera, graphics, sound, language, colours, and saving/loading your World." },
+  "top|sx1sz1":  { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." },
   "top|sx-1sz1": { kind: "universal", label: "Almanac",        action: "openAlmanac",
                    desc: "Math & Geometry reference — the demonstrations behind everything you build." }
 };
@@ -667,8 +659,7 @@ export const ACTION_TO_MARK = {
   // got its own real mark (a 6-arrow recycling symbol) 2026-09-02 --
   // direct request, see wheel-icons.js's MARKS.alter for the full
   // design-review history.
-  // Universal ring (every wheel): Lab/Settings and Home.
-  openLab: 'lab',
+  // Universal ring (every wheel): Home.
   navigateHome: 'home',
   // Cuboctahedron Build (Piece, 2026-08-29): reuses the same pinwheel
   // mark Lattice Quick-View already uses for this shape.

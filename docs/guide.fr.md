@@ -95,11 +95,10 @@ Les pièces sont colorées selon le réglage **Couleurs** (dans Réglages) : **C
 | Vue | Ce qu'elle montre | Comment l'activer |
 |---|---|---|
 | World View | Couleur, Translucide ou Squelette | Touchez le bouton World View pour alterner |
-| Lattice View | Votre construction et chaque emplacement libre un cran plus loin, pour la pièce choisie | Touchez le bouton Lattice View pour parcourir les pièces |
+| Lattice View | Votre construction et chaque emplacement libre un cran plus loin, pour la pièce choisie | Touchez le bouton Lattice View (ou ⬡ sur la roue du coin) pour parcourir les pièces |
 | X-Ray | Une coupe. Faites glisser le plan à travers la structure, y compris en diagonale | Bouton X-Ray (⛶) |
 | Spherical | Touchez pour alterner : chaque pièce en sphère (les RD entiers touchent leurs douze voisins), puis les vides entre RD entiers (octaédriques en or, tétraédriques en rose, seulement là où ils sont fermés), toutes les sphères rendues pâles. Un curseur règle la taille de toutes les sphères (cran à la taille propre de chaque forme ; en dessous = écartées, au-delà = qui se chevauchent). Avec Lattice View activé, chaque place libre du réseau apparaît comme une sphère pâle. Une vue seulement | Bouton Spherical (◯) : éteint → sphères → vides |
 | Duality | Le pavage apériodique que projette cette structure cristalline | Bouton Duality (◐) |
-| BCC Lattice | Le réseau cubique centré imbriqué dans le réseau FCC | Bouton BCC Lattice (⬡) |
 | Dualize | Échange FCC et BCC | Paramètres → Dualize Preview |
 
 Paramètres propose aussi une **Vue en coupe** : choisissez un axe, faites glisser le curseur pour déplacer la coupe, et cochez **Retourner** pour voir l'autre côté.
@@ -175,7 +174,7 @@ Dans **Paramètres** :
 
 - **Exporter le Monde** enregistre tout (chaque réseau 3D, vos carreaux 2D et vos constructions 4D, 5D et 6D) dans un seul fichier. Utilisez-le pour faire une sauvegarde ou transférer votre monde sur un autre appareil.
 - **Importer un Monde** ouvre un fichier exporté. **Undo** annule une importation.
-- **Nouveau Monde** recommence avec un monde vide. **Clear World** (⊘) fait la même chose depuis la roue du coin. Undo peut le rétablir.
+- **Clear World** (⊘ sur la roue du coin) recommence avec un monde vide. Undo peut le rétablir.
 
 ## Découvrir les mathématiques
 
@@ -210,16 +209,16 @@ Faites glisser la petite roue du coin pour la tourner. Touchez une face pour l'u
 | ⚙ | Paramètres |
 | ⛶ | X-Ray |
 | ◐ | Duality |
-| ⬡ | BCC Lattice |
+| ⬡ | Lattice View |
 | ◇ | Menu |
 | ⊘ | Clear World |
 | ↻ | Reload (à utiliser si quelque chose semble bloqué) |
 | ◯ | Spherical (éteint → sphères → vides) |
-| — | World View, Cuboctahedron Build |
+| — | World View |
 
 ## Roue du menu
 
-Le menu est un dodécaèdre rhombique. Chaque face est une section : touchez une face pour l'ouvrir, et utilisez **Home** pour revenir. **Settings** et **Almanac** sont toujours sur les faces du haut.
+Le menu est un dodécaèdre rhombique. Chaque face est une section : touchez une face pour l'ouvrir, et utilisez **Home** pour revenir. **Almanac** est toujours sur une face du haut.
 
 | Section | Contenu |
 |---|---|
@@ -241,8 +240,8 @@ Le menu est un dodécaèdre rhombique. Chaque face est une section : touchez une
 | Langue | English, 日本語, Español, Français, 한국어, 中文, Русский (aussi avec le sélecteur 🌐 en haut de l'écran d'accueil et de ce guide) |
 | Couleurs | Cyan, Type ou Choisir : la coloration des pièces |
 | Vue en coupe, axe, position, Retourner | Coupe le long d'un axe |
-| Build Cuboctahedron, Dualize Preview | Modes de construction spéciaux |
-| Nouveau Monde, Exporter le Monde, Importer un Monde | Recommencer, sauvegarder et restaurer (toutes les dimensions) |
+| Dualize Preview | Mode de construction spécial |
+| Exporter le Monde, Importer un Monde | Sauvegarder et restaurer (toutes les dimensions) |
 
 ## Clavier et souris
 

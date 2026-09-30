@@ -3549,8 +3549,7 @@ async function init() {
     // (2026-09-25: it was popping up over the empty world on every entry
     // into 2D/3D/4D, reading as a cluster of floating squares).
     const handleWheelAction = (action, { quiet = false } = {}) => {
-        // openCyborg/openLab reuse the real, already-shipped toggles.
-        // openAlmanac now opens the real Almanac overlay (Stage 1 --
+        // openAlmanac opens the real Almanac overlay (Stage 1 --
         // previously just a "not built yet" toast).
         // (openLenses/X-Ray was dropped from the universal ring
         // 2026-08-29 -- X-Ray stays reachable via the corner HUD wheel's
@@ -3574,7 +3573,6 @@ async function init() {
           own3D = null;
           applyDimensionVisibility();
         }
-        if (action === 'openLab') { wheel3D.close(); labToggleEl?.click(); return; }
         if (action === 'openAlmanac') { wheel3D.close(); almanac.open(); return; }
         // Real tool wiring below -- reuses existing, already-working
         // primitives (mode-btn clicks, panel-open functions) rather
@@ -3708,9 +3706,7 @@ async function init() {
         // --- Piece: Cuboctahedron Build (core/cubocta-build.js), the RD
         // lattice's own dual shape -- 2026-08-29, freed onto Piece's
         // top|sy1sz1 slot by dropping Lenses from the universal ring.
-        // Same Rhombeometry-only defense-in-depth check the retired
-        // standalone BCC Build face used to have (even though
-        // #cubocta-build-toggle is already hidden by CSS in Full World).
+        // #cubocta-build-toggle is a hidden mode button (index.html).
         //
         // 2026-08-29 SAME-DAY FIX, real bug caught live: this used to
         // close the wheel immediately (BCC Build's own pattern), unlike
@@ -3812,7 +3808,7 @@ async function init() {
     // an old dimension-wizard.js, since deleted).
     //
     // Its own onAction, NOT handleWheelAction directly: the universal-
-    // ring actions (openCyborg/openLab/openAlmanac) need to close THIS
+    // ring action (openAlmanac) needs to close THIS
     // wheel instance, not wheel3D (handleWheelAction's own `wheel3D.
     // close()` calls would close the wrong, already-closed instance and
     // leave this one sitting open on top of Settings/Cyborg/Almanac).
@@ -4058,16 +4054,10 @@ async function init() {
   const bccToggleBtn = document.getElementById('bcc-toggle');
   if (bccToggleBtn) bccToggleBtn.style.display = FEATURES.bccLattice ? '' : 'none';
   // Bottom-left Lattice View quick-select icon -- same Rhombeometry-only
-  // gating as the corner HUD wheel's own "BCC Lattice" face, since it
+  // gating as the corner HUD wheel's own Lattice View face, since it
   // drives the exact same underlying cycle (see cycleLatticeQuickView).
   const hudQuickLatticeViewEl = document.getElementById('hud-quick-lattice-view');
   if (hudQuickLatticeViewEl) hudQuickLatticeViewEl.style.display = FEATURES.bccLattice ? '' : 'none';
-  // Real Cuboctahedron cell placement -- same Rhombeometry-only gating.
-  // Lab-panel entry point kept alongside the real wheel face (Piece:CO)
-  // as a second doorway to the same mode -- not code duplication, both
-  // just call clickMode('cubocta').
-  const cuboctaBuildRow = document.getElementById('cubocta-build-row');
-  if (cuboctaBuildRow) cuboctaBuildRow.style.display = FEATURES.bccLattice ? '' : 'none';
   // Dualize preview (reframe Stage 3): same Rhombeometry-only gating as
   // the rest of the BCC/TO family -- Lab-panel entry point rather than a
   // wheel face; a wheel face can follow later once a commit path exists
@@ -4577,7 +4567,7 @@ async function init() {
     s.add(latticeQuickViewEdges);
     syncLatticeQuickViewActiveState(true);
   }
-  // Corner HUD wheel's own "BCC Lattice" face (hud-wheel-3d.js) --
+  // Corner HUD wheel's own Lattice View face (hud-wheel-3d.js) --
   // found once and cached, same reuse as the bottom-left icon's own
   // markKey lookup below, since faceEntries never changes after
   // createHudWheel3D() builds it once at startup.
@@ -5761,11 +5751,7 @@ async function init() {
   updateHudIndicator();
 
 
-  // Shared by both the Lab panel's own "New World" button and the always-
-  // visible HUD clear-world-toggle added alongside it (2026-08-25) -- same
-  // action, a second, easier-to-find entry point for it since the Lab
-  // panel lives behind the gear icon and isn't the first thing a returning
-  // player necessarily opens.
+  // Clear World (⊘ on the corner HUD wheel): erase every dimension.
   async function clearWorldToNew() {
     if (!confirm('Start a new world? This clears your current build.')) return;
     // Real report, 2026-08-29: "still have zero cells" after Clear World
@@ -5848,7 +5834,6 @@ async function init() {
     signalWorld?.clear();
     constructWorld?.clear();
   }
-  document.getElementById('new-world').addEventListener('click', clearWorldToNew);
   document.getElementById('clear-world-toggle')?.addEventListener('click', clearWorldToNew);
   document.getElementById('reload-toggle')?.addEventListener('click', () => {
     location.reload();

@@ -172,7 +172,7 @@ function injectCssOnce() {
 }
 
 export function createRhombicWheel3D({
-  onAction, // (actionString) => void -- caller resolves navigateHome/navigateTo:x/tool:x/openLab/etc.
+  onAction, // (actionString) => void -- caller resolves navigateHome/navigateTo:x/tool:x/openAlmanac/etc.
   // Dimension-select wheel (2026-09-22): a SECOND, independent instance
   // of this factory now exists (render.js's own dimensionWheel3D) --
   // every DOM id below used to be a bare hardcoded literal, which was

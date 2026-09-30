@@ -1,9 +1,10 @@
 [
   {
     "date": "2026-09-30",
-    "title": "One Spherical button",
+    "title": "One button per job",
     "items": [
-      "Spherical (◯) and Packed spheres were the same view twice: at its first step, Packed spheres drew exactly the sphere ◯ already drew for each RD. They are now one button that cycles off → spheres → voids. Spheres shows every piece as a sphere, with whole RDs touching; voids fades every sphere and shows the gaps between whole RDs. The size slider now resizes every piece's sphere, not only the RDs'. The Packed spheres face on the corner wheel is gone."
+      "Spherical (◯) and Packed spheres were the same view twice: at its first step, Packed spheres drew exactly the sphere ◯ already drew for each RD. They are now one button that cycles off → spheres → voids. Spheres shows every piece as a sphere, with whole RDs touching; voids fades every sphere and shows the gaps between whole RDs. The size slider now resizes every piece's sphere, not only the RDs'. The Packed spheres face on the corner wheel is gone.",
+      "Other controls that did the same thing twice now have one home each. Cuboctahedron is picked from Menu → Piece → CO, like every other piece (its corner-wheel face and Settings button are gone). Clear World (⊘) is the one way to start again (Settings' New World is gone). Settings opens from ⚙ on the corner wheel (the Menu's Settings face is gone). The corner-wheel ⬡ keeps cycling Lattice View alongside the bottom button, now labelled as that."
     ]
   },
   {

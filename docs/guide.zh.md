@@ -95,11 +95,10 @@ Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel
 | 视图 | 显示内容 | 如何打开 |
 |---|---|---|
 | World View | 彩色、半透明或骨架 | 轻点 World View 按钮循环切换 |
-| Lattice View | 你的作品，以及所选部件向外一步的所有空位 | 轻点 Lattice View 按钮循环切换部件 |
+| Lattice View | 你的作品，以及所选部件向外一步的所有空位 | 轻点 Lattice View 按钮（或角落轮盘上的 ⬡）循环切换部件 |
 | X-Ray | 剖切。可以把切面拖过结构，也可以斜着拖 | X-Ray 按钮（⛶） |
 | Spherical | 点按切换：每个部件显示为球（完整的 RD 与周围十二个相切），然后显示完整 RD 之间的空隙（八面体空隙金色，四面体空隙玫瑰色，只在完全封闭处），所有球变淡。滑块调节所有球的大小（在每种形状本来的大小处停住，更小则分开，更大则重叠）。打开 Lattice View 时，每个空着的格点显示为淡淡的球。仅为视图 | Spherical 按钮（◯）：关 → 球 → 空隙 |
 | Duality | 这种晶体结构投射出的非周期镶嵌 | Duality 按钮（◐） |
-| BCC Lattice | 嵌套在 FCC 晶格中的体心立方晶格 | BCC Lattice 按钮（⬡） |
 | Dualize | 交换 FCC 和 BCC | 设置 → Dualize Preview |
 
 设置中还有 **剖面视图**：选择一个轴，拖动滑块移动切面，勾选 **翻转** 可以看到另一侧。
@@ -175,7 +174,7 @@ Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel
 
 - **导出世界** 把所有内容（每个 3D 晶格、你的 2D 瓷砖以及 4D、5D、6D 作品）保存到一个文件中。可以用来备份，或把世界转移到另一台设备。
 - **导入世界** 打开导出的文件。**Undo** 可以撤销导入。
-- **新建世界** 用空世界重新开始。角落轮盘上的 **Clear World**（⊘）作用相同。Undo 可以恢复。
+- 角落轮盘上的 **Clear World**（⊘）用空世界重新开始。Undo 可以恢复。
 
 ## 学习数学
 
@@ -210,16 +209,16 @@ Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel
 | ⚙ | 设置 |
 | ⛶ | X-Ray |
 | ◐ | Duality |
-| ⬡ | BCC Lattice |
+| ⬡ | Lattice View |
 | ◇ | 菜单 |
 | ⊘ | Clear World |
 | ↻ | Reload（看起来卡住时使用） |
 | ◯ | Spherical（关 → 球 → 空隙） |
-| — | World View、Cuboctahedron Build |
+| — | World View |
 
 ## 菜单轮盘
 
-菜单是一个菱形十二面体。每个面是一个分区：轻点一个面打开它，用 **Home** 返回。**Settings** 和 **Almanac** 总在顶部的面上。
+菜单是一个菱形十二面体。每个面是一个分区：轻点一个面打开它，用 **Home** 返回。**Almanac** 总在顶部的一个面上。
 
 | 分区 | 内容 |
 |---|---|
@@ -241,8 +240,8 @@ Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel
 | 语言 | English、日本語、Español、Français、한국어、中文、Русский（也可以用欢迎界面和本指南顶部的 🌐 选择器） |
 | 配色 | 青色、类型或自选：部件的着色方式 |
 | 剖面视图、轴、位置、翻转 | 沿一个轴剖切 |
-| Build Cuboctahedron、Dualize Preview | 特殊搭建模式 |
-| 新建世界、导出世界、导入世界 | 重新开始、备份和恢复（所有维度） |
+| Dualize Preview | 特殊搭建模式 |
+| 导出世界、导入世界 | 备份和恢复（所有维度） |
 
 ## 键盘和鼠标
 

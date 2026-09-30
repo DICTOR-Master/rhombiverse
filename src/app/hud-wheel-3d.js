@@ -130,11 +130,8 @@ const HUD_FACES = {
   // SYMBOL_SCALE bump above wasn't the actual gap; the font just
   // renders ⬡ with much thinner strokes than sibling glyphs like ◇,
   // and -webkit-text-stroke didn't compensate enough for that specific
-  // codepoint. Same fix already used for Cuboctahedron Build below (a
-  // real SVG gives direct stroke-width control instead of depending on
-  // font glyph rendering) -- a plain hexagon outline, matching that
-  // face's own coordinate scale and stroke weight for visual
-  // consistency.
+  // codepoint. A real SVG gives direct stroke-width control instead of
+  // depending on font glyph rendering -- a plain hexagon outline.
   //
   // IMPORTANT: this static value is a real fallback, but it is NOT what
   // the user actually sees in practice -- render.js's
@@ -149,50 +146,18 @@ const HUD_FACES = {
   // with MARKS.latticeOff's own visual weight if either ever changes.
   'top|sy-1sz1':      {
     svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><polygon points="0,-2.3 1.99,-1.15 1.99,1.15 0,2.3 -1.99,1.15 -1.99,-1.15" fill="none" stroke="currentColor" stroke-width="0.32" stroke-linejoin="round"/></svg>',
-    elId: 'bcc-toggle', title: 'BCC Lattice',
+    elId: 'bcc-toggle', title: 'Lattice View',
   },
   'top|sx1sz1':       { symbol: '◇', elId: 'rhombic-wheel-3d-toggle', title: 'Menu' },
   'top|sx-1sz1':      { symbol: '⊘', elId: 'clear-world-toggle',      title: 'Clear World' },
   'bottom|sy1sz-1':   { symbol: '↻', elId: 'reload-toggle',           title: 'Reload' },
   // This face was a temporary duplicate of Duality at its true
-  // geometric antipode (see the policy note below on the one remaining
-  // duplicate). Replaced with real new content, Spherical Toggle, the
-  // same "duplicate slot -> real function" swap Cuboctahedron Build
-  // (bottom|sx1sz-1 below) later also did with the (by-then-retired)
-  // BCC Build's own slot -- Spherical is the closer sibling to Duality
+  // geometric antipode. Replaced with real new content, Spherical
+  // Toggle -- Spherical is the closer sibling to Duality
   // anyway (both are client-side view toggles that reinterpret the
   // same cells, not new world-state), so it fits its old spot
   // semantically too.
   'bottom|sy-1sz-1':  { symbol: '◯', elId: 'spherical-toggle',        title: 'Spherical' },
-  // BCC Build retired 2026-09-02 (direct report): a genuinely separate,
-  // duplicate implementation of the exact bootstrap/extend mechanic
-  // Piece:TO's own handleToClick already provided (see core/build.js,
-  // core/bcc-build.md) -- not a second real doorway, an actual
-  // reimplementation. This slot is filled with real new content
-  // instead of a duplicate ("no blank spaces but no adjacent
-  // duplications either," direct instruction) -- Cuboctahedron Build
-  // had no seat anywhere on this medallion at all (only on the Piece
-  // wheel and the Lab panel), so it's a genuinely new capability here,
-  // not filler. Verified non-adjacent to every real Cuboctahedron
-  // Build doorway (there isn't another one on this wheel to be
-  // adjacent to). Deliberately NOT the same hexagon-with-3-alternating-
-  // wedges mark wheel-icons.js's MARKS.cuboctahedron uses -- direct
-  // follow-up report caught a real collision that mark would have
-  // caused: render.js's updateLatticeQuickViewIcon() overwrites the
-  // 'BCC Lattice' face above (top|sy-1sz1) with that exact same mark
-  // whenever Lattice View is cycled to its own 'cubocta' preview mode
-  // -- confirmed live, both faces showed the identical icon
-  // simultaneously. Same "real placement vs. live preview need visibly
-  // different icons, even for the same shape family" precedent the
-  // retired BCC Build face already established against BCC Lattice's
-  // own plain hexagon. Solid filled hexagon with a "+" cut out (evenodd)
-  // instead -- the same Add-tool "+" language used elsewhere in this
-  // app, on a solid (not wedge-shaded) hexagon, so it reads as "commit/
-  // place" rather than "preview."
-  'bottom|sx1sz-1':   {
-    svg: '<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em"><path d="M0,-1.5 L1.3,-0.75 L1.3,0.75 L0,1.5 L-1.3,0.75 L-1.3,-0.75 Z M0.18,0.18 L0.18,1.0 L-0.18,1.0 L-0.18,0.18 L-1.0,0.18 L-1.0,-0.18 L-0.18,-0.18 L-0.18,-1.0 L0.18,-1.0 L0.18,-0.18 L1.0,-0.18 L1.0,0.18 Z" fill="currentColor" fill-rule="evenodd"/></svg>',
-    elId: 'cubocta-build-toggle', title: 'Cuboctahedron Build',
-  },
   // Was a temporary duplicate Menu face (its true geometric antipode had
   // no non-duplicate content to swap in when the wheel-audit pass filled
   // every other slot -- see the policy note above). Filled 2026-09-02

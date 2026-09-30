@@ -297,21 +297,6 @@ export const MARKS = {
     <polygon points="${hexPts(16, 19.05, 11)}" fill="#bfe3f0" stroke="currentColor" stroke-width="1" stroke-opacity="0.4"/>
     <polygon points="${hexPts(16, -19.05, 11)}" fill="#5a5a5a" stroke="currentColor" stroke-width="1" stroke-opacity="0.4"/>`,
   // --- Universal-ring gaps (appear on every wheel, not spec-resolved) ---
-  // Settings (mark key "lab", unchanged internally): real SVG gear, not
-  // the bare ⚙ Unicode glyph. Direct report chain, 2026-09-02: first
-  // "too small" (font-size 40, fixed to 64), then "off center"
-  // (measured live -- the glyph's own rendered bbox center sat at
-  // cy=-5.6, not 0, a real font-metrics quirk, not eyeballing error),
-  // then "still a bit small" even at font-size 64/h=71 (same root cause
-  // as BCC Lattice's hexagon, c731054: a Unicode glyph can stay
-  // visually thin no matter the font-size) -- fixed with a first-pass
-  // hand-built SVG (rOuter=40, 8 sharp-pointed teeth), then a direct
-  // follow-up: "too big and too simplistic." Redrawn with more care --
-  // rOuter 40->30 (smaller), and real trapezoidal teeth (flat tips,
-  // flat valleys, computed from real trig, not pointed sawtooth) for an
-  // actual cog profile instead of a spiky one. Solid fill, evenodd
-  // center hole (r=10), perfectly centered on (0,0) by construction.
-  lab: `<path d="M20.33,-8.42 L29.54,-5.21 L29.54,5.21 L20.33,8.42 L24.57,17.21 L17.21,24.57 L8.42,20.33 L5.21,29.54 L-5.21,29.54 L-8.42,20.33 L-17.21,24.57 L-24.57,17.21 L-20.33,8.42 L-29.54,5.21 L-29.54,-5.21 L-20.33,-8.42 L-24.57,-17.21 L-17.21,-24.57 L-8.42,-20.33 L-5.21,-29.54 L5.21,-29.54 L8.42,-20.33 L17.21,-24.57 L24.57,-17.21 Z M10,0 A10,10 0 1,0 -10,0 A10,10 0 1,0 10,0 Z" fill="currentColor" fill-rule="evenodd"/>`,
   // Home: a literal "H" (two uprights + a crossbar, see
   // HOME_H_HALF_W/HOME_H_HALF_H above) centered in iconFrame's own
   // hexagon -- "H" for Home. Was a plain solid hexagon before; direct

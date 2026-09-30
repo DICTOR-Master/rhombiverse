@@ -93,11 +93,10 @@ Pieces are coloured by the **Colours** setting (in Settings): **Cyan** (every pi
 | View | What it shows | How to turn it on |
 |---|---|---|
 | World View | Colour, Translucent or Skeleton | Tap the World View button to cycle |
-| Lattice View | Your build plus every open slot one step out, for the chosen piece | Tap the Lattice View button to cycle through the pieces |
+| Lattice View | Your build plus every open slot one step out, for the chosen piece | Tap the Lattice View button (or ⬡ on the corner wheel) to cycle through the pieces |
 | X-Ray | A cutaway. Drag the plane through the structure, including on a diagonal | X-Ray button (⛶) |
 | Spherical | Tap to cycle: each piece as a sphere (whole RDs touch their twelve neighbours), then the voids between whole RDs (octahedral gold, tetrahedral rose, where fully enclosed) with every sphere made faint. A slider sizes every sphere (a click-stop at each shape's own size; below = apart, beyond = overlapping). With Lattice View on, every open lattice slot shows as a faint sphere. View only | Spherical button (◯): off → spheres → voids |
 | Duality | The aperiodic tiling that this crystal structure casts | Duality button (◐) |
-| BCC Lattice | The body-centred cubic lattice nested inside the FCC one | BCC Lattice button (⬡) |
 | Dualize | Swaps FCC and BCC | Settings → Dualize Preview |
 
 Settings also has a **Section view**: pick an axis, drag the slider to move the cut, and tick **Flip** to see the other side.
@@ -173,7 +172,7 @@ In **Settings**:
 
 - **Export World** saves everything, every 3D lattice, your 2D tiles and your 4D, 5D and 6D builds, to one file. Use it to keep a backup or move your World to another device.
 - **Import World** opens an exported file. **Undo** takes an import back.
-- **New World** starts again with an empty world. **Clear World** (⊘) does the same from the corner wheel. Undo can bring it back.
+- **Clear World** (⊘ on the corner wheel) starts again with an empty world. Undo can bring it back.
 
 ## Learning the maths
 
@@ -208,16 +207,16 @@ Drag the small wheel in the corner to turn it. Tap a face to use it.
 | ⚙ | Settings |
 | ⛶ | X-Ray |
 | ◐ | Duality |
-| ⬡ | BCC Lattice |
+| ⬡ | Lattice View |
 | ◇ | Menu |
 | ⊘ | Clear World |
 | ↻ | Reload (use it if something looks stuck) |
 | ◯ | Spherical (off → spheres → voids) |
-| — | World View, Cuboctahedron Build |
+| — | World View |
 
 ## Menu wheel
 
-The menu is a rhombic dodecahedron. Each face is a section: tap a face to open it, and use **Home** to go back. **Settings** and **Almanac** are always on the top faces.
+The menu is a rhombic dodecahedron. Each face is a section: tap a face to open it, and use **Home** to go back. **Almanac** is always on a top face.
 
 | Section | Contents |
 |---|---|
@@ -239,8 +238,8 @@ The menu is a rhombic dodecahedron. Each face is a section: tap a face to open i
 | Language | English, 日本語, Español, Français, 한국어, 中文, Русский (also the 🌐 picker at the top of the welcome screen and this guide) |
 | Colours | Cyan, Type or Pick: how pieces are coloured |
 | Section view, axis, position, Flip | Cutaway along one axis |
-| Build Cuboctahedron, Dualize Preview | Special build modes |
-| New World, Export World, Import World | Start again, back up, and restore (every dimension) |
+| Dualize Preview | Special build mode |
+| Export World, Import World | Back up and restore (every dimension) |
 
 ## Keyboard and mouse
 
