@@ -1809,14 +1809,29 @@ async function init() {
   // outward this covers) raised 3 -> 10, direct follow-up ("still far
   // too few dots to cover reasonable portion of screen when zooming
   // out") -- 3 was sized only for the default un-zoomed camera
-  // distance. (21*DOT_SUBDIVISIONS+1)^2 total instances at radius 10 is
-  // still comfortably within InstancedMesh's own practical range for
-  // this simple an unlit sphere, but if a future iPad performance
-  // report ever comes in, THIS is the number to trade off first.
+  // distance. That's (2*100+1)^2 = 40,401 dots. They were instanced
+  // 8x6 spheres, ~3.9 million triangles a frame, which held every 2D
+  // world to ~1 fps in the performance audit (2026-09-30; the other
+  // worlds ~37). Now they're round point sprites, one vertex each,
+  // sized to the sphere's on-screen diameter at any zoom.
   const DOT_SUBDIVISIONS = 10;
   const DOT_MATRIX_CELL_RADIUS = 10;
   const DOT_MATRIX_RADIUS = DOT_SUBDIVISIONS * DOT_MATRIX_CELL_RADIUS;
-  const dotMatrixGeometry = new THREE.SphereGeometry(0.06 * LATTICE2D_S / DOT_SUBDIVISIONS, 8, 6);
+  const DOT_DIAMETER = 0.12 * LATTICE2D_S / DOT_SUBDIVISIONS;
+  const dotMatrixGeometry = new THREE.BufferGeometry();
+  const dotSprite = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    // A soft round edge, so a dot a few pixels across still reads round.
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.6, 'rgba(255,255,255,1)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
   // Signature blue (#9de0ff), same accent color as everything else in
   // this app's own HUD chrome -- fully opaque (not the original 0.85)
   // for max contrast against the scene's own dark starfield background,
@@ -1830,9 +1845,13 @@ async function init() {
   // face (see updateDotMatrix's own z below) lets the opaque tile
   // correctly occlude the dots underneath it, while dots elsewhere
   // (nothing in front of them) still render normally.
-  const dotMatrixMaterial = new THREE.MeshBasicMaterial({ color: 0x9de0ff });
-  const dotMatrixCount = (2 * DOT_MATRIX_RADIUS + 1) ** 2;
-  const dotMatrixMesh = new THREE.InstancedMesh(dotMatrixGeometry, dotMatrixMaterial, dotMatrixCount);
+  const dotMatrixMaterial = new THREE.PointsMaterial({ color: 0x9de0ff, map: dotSprite, transparent: true, alphaTest: 0.02, depthWrite: false, sizeAttenuation: true });
+  const dotMatrixMesh = new THREE.Points(dotMatrixGeometry, dotMatrixMaterial);
+  // THREE sizes an attenuated point as size * (canvas height / 2) / depth;
+  // a sphere of diameter d shows as d * (height / 2) / (depth * tan(fov/2)),
+  // so size = d / tan(fov/2) matches it, following the Field of view setting
+  // (x1.3 for the sprite's soft edge, matched by eye against the spheres).
+  dotMatrixMesh.onBeforeRender = () => { dotMatrixMaterial.size = 1.3 * DOT_DIAMETER / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2); };
   // renderOrder no longer needed for draw-order purposes now that real
   // depth testing (not depthTest:false) handles tile-occludes-dots
   // correctly on its own -- left at the default.
@@ -1841,8 +1860,7 @@ async function init() {
 
   function updateDotMatrix(angleDeg) {
     const [v0, v1] = latticeBasis(angleDeg, LATTICE2D_S / DOT_SUBDIVISIONS);
-    const m = new THREE.Matrix4();
-    let idx = 0;
+    const pos = [];
     for (let i = -DOT_MATRIX_RADIUS; i <= DOT_MATRIX_RADIUS; i++) {
       for (let j = -DOT_MATRIX_RADIUS; j <= DOT_MATRIX_RADIUS; j++) {
         const x = i * v0[0] + j * v1[0];
@@ -1852,13 +1870,11 @@ async function init() {
         // at 0.12 like before -- see dotMatrixMaterial's own comment
         // above for why this, paired with real depth testing, is what
         // actually lets the tile occlude the dots under it now.
-        m.makeTranslation(x, y, -0.05);
-        dotMatrixMesh.setMatrixAt(idx++, m);
+        pos.push(x, y, -0.05);
       }
     }
-    dotMatrixMesh.count = idx;
-    dotMatrixMesh.instanceMatrix.needsUpdate = true;
-    dotMatrixMesh.computeBoundingSphere();
+    dotMatrixGeometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    dotMatrixGeometry.computeBoundingSphere();
   }
   updateDotMatrix(START_LATTICE_ANGLE.angleDeg);
 
