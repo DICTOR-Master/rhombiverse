@@ -37,7 +37,6 @@ import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-
 import { NAMED_LATTICE_ANGLES, START_LATTICE_ANGLE, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
 import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWorld, rhombohedraMigrateLegacyCell, rhombohedraAttachOptions, rhombohedraOverlap } from './geometry-extensions/rhombohedra-lattice.js';
 import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats, pyrochloreNeighborOffsets, pyrochloreCapTetsOf, pyrochloreVisibleTets, pyrochloreTetCornerPartner } from './geometry-extensions/pyrochlore-lattice.js';
-import { FEATURES } from './app/features.js';
 import { loadWorld, createWorldStore } from './core/worldstate-core.js';
 import { createBuildController } from './core/build.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR, QUALITY_LEVELS_ASCENDING } from './app/settings.js';
@@ -3774,11 +3773,6 @@ async function init() {
         // reachable through a picker that isn't hidden behind the wheel
         // anymore.
         if (action === 'tool:cuboctaBuild') {
-          if (!FEATURES.bccLattice) {
-            wheel3D.close();
-            showHudPrompt('Cuboctahedron Build is Rhombeometry-only -- switch modes in the Settings panel first.', 4000);
-            return;
-          }
           clickMode('cubocta');
           showHudPrompt('Piece: CO', 3000);
           wheel3D.close();
@@ -4068,36 +4062,6 @@ async function init() {
   }
 
   const bccToggleBtn = document.getElementById('bcc-toggle');
-  if (bccToggleBtn) bccToggleBtn.style.display = FEATURES.bccLattice ? '' : 'none';
-  // Bottom-left Lattice View quick-select icon -- same Rhombeometry-only
-  // gating as the corner HUD wheel's own Lattice View face, since it
-  // drives the exact same underlying cycle (see cycleLatticeQuickView).
-  const hudQuickLatticeViewEl = document.getElementById('hud-quick-lattice-view');
-  if (hudQuickLatticeViewEl) hudQuickLatticeViewEl.style.display = FEATURES.bccLattice ? '' : 'none';
-  // Dualize preview (reframe Stage 3): same Rhombeometry-only gating as
-  // the rest of the BCC/TO family -- Lab-panel entry point rather than a
-  // wheel face; a wheel face can follow later once a commit path exists
-  // to make it a more central tool.
-  const dualizeRow = document.getElementById('dualize-row');
-  if (dualizeRow) dualizeRow.style.display = FEATURES.bccLattice ? '' : 'none';
-  // Piece picker's TO option (core/build.js's handleToClick) -- same
-  // Rhombeometry-only gating as the rest of BCC's own UI. A disabled
-  // option can't be selected via the <select> itself; getPieceType()
-  // reading 'to' at all already implies this feature is on.
-  const pieceTypeToOption = document.getElementById('piece-type-to-option');
-  if (pieceTypeToOption) {
-    pieceTypeToOption.disabled = !FEATURES.bccLattice;
-    pieceTypeToOption.hidden = !FEATURES.bccLattice;
-  }
-  // Same gating for the interstitial-lattice piece tiers, plus the
-  // Cuboctahedron gap-fill Octahedron (same Rhombeometry-only reasoning).
-  for (const id of ['piece-type-ioct-option', 'piece-type-octahedron-option', 'piece-type-idis-option']) {
-    const opt = document.getElementById(id);
-    if (opt) {
-      opt.disabled = !FEATURES.bccLattice;
-      opt.hidden = !FEATURES.bccLattice;
-    }
-  }
   // Lattice Quick-View (generalizes the old "Lens Parity" system,
   // 2-lattices/5-modes, into one cycle across ALL SIX Piece-picker
   // types -- direct request 2026-08-29: "the lattice view button on
@@ -5470,10 +5434,7 @@ async function init() {
     // owns the bootstrap-vs-extend logic directly, using
     // geometry-extensions/dual-lattice.js's matchBCCNeighborOffset) --
     // not a pretense that a truncated octahedron is a piece of the same RD
-    // decomposition RD/Cube/Pyramid are. bccWorld/bccMesh always exist
-    // regardless of FEATURES.bccLattice (see their own construction
-    // above); the Piece picker's own 'to' option is what's actually
-    // feature-gated (below), so no separate guard is needed here.
+    // decomposition RD/Cube/Pyramid are.
     bccWorld,
     bccMesh,
     bccCellAt: (instanceId) => bccCellOrder[instanceId],
@@ -5711,7 +5672,7 @@ async function init() {
     cuboctaWorld,
     onChange: onCuboctaChange,
     getMaterial: () => currentMaterialFor('cubocta'),
-    isActive: () => currentMode === 'cubocta' && FEATURES.bccLattice,
+    isActive: () => currentMode === 'cubocta',
   });
 
   // Cuboctahedron gap-octahedron Build: own change handler -- genuinely
@@ -5741,7 +5702,6 @@ async function init() {
     getMaterial: () => currentMaterialFor('octahedron'),
     isActive: () =>
       (currentMode === 'build' || currentMode === 'chisel') &&
-      FEATURES.bccLattice &&
       document.getElementById('piece-type-select')?.value === 'octahedron',
   });
 

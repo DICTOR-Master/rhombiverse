@@ -321,9 +321,7 @@
        2026-08-29 ("a third square at the bottom left going through all
        options including off") -- cycles the SAME underlying state as
        the corner HUD wheel's own Lattice View face (render.js's
-       cycleLatticeQuickView), just a second, more-visible access point.
-       Rhombeometry-only, matching every other BCC/interstitial-lattice
-       control (see FEATURES.bccLattice gating in render.js). */
+       cycleLatticeQuickView), just a second, more-visible access point. */
     #hud-quick-lattice-view { left: calc(var(--quick-x, 64px) + 84px); }
     #hud-quick-lattice-view.active { border-color: #39ff88; background: rgba(57, 255, 136, 0.18); }
     /* Rhombohedra Copy | Mirror attach toggle: 4th bottom-left icon,
@@ -954,7 +952,7 @@
       <div class="row"><label for="setting-language" data-i18n="setting.language">Language</label>
         <select id="setting-language"></select>
       </div>
-      <div class="row" id="dualize-row" style="display:none;">
+      <div class="row" id="dualize-row">
         <button id="dualize-toggle" class="mode-btn" data-mode="dualize" type="button">Dualize Preview</button>
       </div>
     </div>

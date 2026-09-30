@@ -188,31 +188,6 @@ export function resolveWheelFaces(wheelConfig) {
 }
 
 
-// BCC Lattice feature gate (added 2026-08-28, WHEEL_PIECE): the 3 BCC/
-// interstitial piece tiers only mean anything when FEATURES.bccLattice
-// is on (Rhombeometry mode) -- Full World has no BCC/interstitial
-// worlds to place them into at all. Deliberately a SEPARATE gate from
-// applyWorkspaceModeGate above -- that one is model-vs-world workspace
-// (an orthogonal axis, gates tool:bccBuild for a different reason), not
-// Rhombeometry-vs-Full-World. Takes a plain boolean, not FEATURES
-// itself, so this module stays free of any global-state import (same
-// reasoning applyWorkspaceModeGate already follows for workspaceMode).
-const BCC_LATTICE_ONLY_FACE_ACTIONS = new Set([
-  "tool:pieceType:to",
-  "tool:pieceType:ioct",
-  "tool:pieceType:idis",
-]);
-export function applyBCCLatticeGate(resolvedFaces, bccLatticeEnabled) {
-  if (bccLatticeEnabled) return resolvedFaces;
-  const gated = { ...resolvedFaces };
-  for (const [key, data] of Object.entries(resolvedFaces)) {
-    if (data.action && BCC_LATTICE_ONLY_FACE_ACTIONS.has(data.action)) {
-      gated[key] = { kind: "spare", label: data.label, action: null,
-        desc: `${data.label} needs the BCC Lattice feature (Rhombeometry mode) — switch there to use it.` };
-    }
-  }
-  return gated;
-}
 
 const SPARE = { kind: "spare", label: "Spare", action: null, desc: "Reserved — not yet needed." };
 

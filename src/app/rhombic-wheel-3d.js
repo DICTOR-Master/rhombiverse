@@ -2,7 +2,7 @@
 // on the real RD mesh (see rhombic-wheel-shared-renderer.md, Phase 0-3).
 // Deliberately does NOT touch wheel.js's existing 2D radial menu --
 // that stays the shipped B1 control surface. This is new, flag-gated
-// off by default (FEATURES.rhombicWheel3D in features.js).
+// (now the app's only menu wheel).
 //
 // Self-contained: its own THREE.Scene/Camera/WebGLRenderer/Raycaster in
 // a modal overlay canvas, not the main world scene -- this is a
@@ -12,12 +12,11 @@ import * as THREE from 'three';
 import {
   buildRDFaces, faceKey, ensureOutwardWinding,
   SKELETON_COLOR, FACE_STYLE, computeLabelVisibility, LABEL_STYLE,
-  resolveWheelFaces, ALL_WHEELS, applyBCCLatticeGate,
+  resolveWheelFaces, ALL_WHEELS,
   ACTION_TO_MARK,
 } from './rhombic-wheel-3d-core.js';
 import { iconFrame, MARKS } from './wheel-icons.js';
 import { dimensionShadowIcon, almanacIcon } from './dimension-shadow-icons.js';
-import { FEATURES } from './features.js';
 
 // Reveal timing (spec section 3): explicitly left tunable by the spec
 // itself ("needs real testing on touch devices"), not a fixed value --
@@ -245,10 +244,7 @@ export function createRhombicWheel3D({
     if (!wheelConfig) throw new Error(`Unknown Rhombic Wheel 3D id "${wheelId}"`);
     clearFaces();
     currentWheelId = wheelId;
-    const resolved = applyBCCLatticeGate(
-      resolveWheelFaces(wheelConfig),
-      FEATURES.bccLattice
-    );
+    const resolved = resolveWheelFaces(wheelConfig);
     for (const face of buildRDFaces()) {
       const key = faceKey(face);
       const data = resolved[key];
