@@ -135,7 +135,11 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   // borders, no second outline beside them (direct request: "I don't like
   // double lines outside of cells on outside view; only slight misting
   // matching cell borders").
-  const TUBE_R = R * 1.005;
+  // 16 sides, circumscribed: the flat sides still clear the cells. One
+  // ring per unit: the trajectory bends so gently that the chords stay
+  // within 1e-4 of it (the tube was 96k triangles, half Signal's frame).
+  const TUBE_SIDES = 16;
+  const TUBE_R = (R * 1.005) / Math.cos(Math.PI / TUBE_SIDES);
   const tubeMaterial = new THREE.MeshStandardMaterial({ color: 0x9de0ff, transparent: true, opacity: 0.06, depthWrite: false, side: THREE.FrontSide });
   class TrajectoryCurve extends THREE.Curve {
     constructor(lo, hi) { super(); this.lo = lo; this.hi = hi; }
@@ -201,7 +205,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
     // Outside, the faint tube seen from without; Inside, the cab's own
     // tunnel takes its place.
     if (!view.inside) {
-      const tube = new THREE.Mesh(new THREE.TubeGeometry(new TrajectoryCurve(lo, hi), Math.ceil((hi - lo) * 2), TUBE_R, 48, false), tubeMaterial);
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(new TrajectoryCurve(lo, hi), Math.ceil(hi - lo), TUBE_R, TUBE_SIDES, false), tubeMaterial);
       tube.userData.ownGeometry = true;
       built.add(tube);
     }
