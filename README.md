@@ -61,8 +61,8 @@ right-click) removes. The **User Guide** (in the app, or at
   fold it up into the solid with a slider; the Voronoi cells of the cubic
   lattices (cube, rhombic dodecahedron, truncated octahedron) and the
   Platonic solids.
-- **Packed spheres** — a corner-wheel view for the 3D RD world: each RD
-  as one touching sphere (FCC close packing), then the octahedral and
+- **Spherical (◯)** — a view that cycles through every piece as a sphere
+  (whole RDs touching, FCC close packing), then the octahedral and
   tetrahedral voids between them, with a size slider; view only.
 - **Paint** — in every dimension but 1D+, the brush recolours pieces
   you've already placed (except Shells and Golden Rhombohedra, coloured by

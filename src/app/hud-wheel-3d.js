@@ -104,15 +104,14 @@ const SYMBOL_SCALE = {
 // glyph (◇ vs Cyborg's ◈) since two identical symbols on one
 // symbol-only wheel would be genuinely ambiguous with no text to
 // disambiguate, unlike the old button row where position/tooltip did.
-// The Spherical View Cycle face's symbol in each state: three packed
-// spheres (dim when off, white when on), and for voids the three as
-// rings round a white sphere in their gap.
+// ◯ Spherical's symbol while it's on (render.js swaps it in; off is ◯):
+// three packed white spheres, and for voids the three as rings round a
+// white sphere in their gap.
 export const PACKING_ICONS = (() => {
   const C = [[-0.62, 0.36], [0.62, 0.36], [0, -0.72]];
   const ring = (fill, op) => C.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="0.7" fill="${fill}" stroke="currentColor" stroke-width="0.16" opacity="${op}"/>`).join('');
   const wrap = (inner) => `<svg viewBox="-2.6 -2.6 5.2 5.2" width="1em" height="1em">${inner}</svg>`;
   return {
-    off: wrap(ring('none', 0.55)),
     spheres: wrap(ring('#ffffff', 1)),
     voids: wrap(`${ring('none', 1)}<circle cx="0" cy="0" r="0.28" fill="#ffffff"/>`),
   };
@@ -123,11 +122,6 @@ const HUD_FACES = {
   // elId (#lab-toggle) unchanged.
   'equator|sx1sy1':   { symbol: '⚙', elId: 'lab-toggle',              title: 'Settings' },
   'equator|sx1sy-1':  { symbol: '⛶', elId: 'xray-toggle',             title: 'X-Ray' },
-  // Spherical View Cycle (docs/RHOMBIVERSE_SPEC_SPHERICAL_VIEW_CYCLE.md;
-  // direct decisions, 2026-09-29: "a separate face, there are plenty
-  // spare", "keep ◯", "a group of packed spheres", white): off → packed
-  // spheres → voids. render.js redraws this symbol for each state.
-  'equator|sx-1sy1':  { svg: PACKING_ICONS.off, elId: 'packing-toggle', title: 'Packed spheres' },
   'top|sy1sz1':       { symbol: '◐', elId: 'duality-toggle',          title: 'Duality' },
   // Real SVG hexagon, not the bare ⬡ Unicode glyph: direct report
   // 2026-09-02 ("some single line lattice wheel symbols on HUD are

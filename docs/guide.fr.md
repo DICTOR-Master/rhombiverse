@@ -97,8 +97,7 @@ Les pièces sont colorées selon le réglage **Couleurs** (dans Réglages) : **C
 | World View | Couleur, Translucide ou Squelette | Touchez le bouton World View pour alterner |
 | Lattice View | Votre construction et chaque emplacement libre un cran plus loin, pour la pièce choisie | Touchez le bouton Lattice View pour parcourir les pièces |
 | X-Ray | Une coupe. Faites glisser le plan à travers la structure, y compris en diagonale | Bouton X-Ray (⛶) |
-| Spherical | Chaque pièce affichée comme une quasi-sphère | Bouton Spherical (◯) |
-| Packed spheres | Une sphère tangente par RD ; puis les vides entre elles (octaédriques or, tétraédriques rose), là où ils sont fermés ; un curseur règle la taille (0 = fil de fer, cran au contact, au-delà = chevauchement) ; avec Lattice View, chaque place libre du réseau apparaît en sphère pâle. Vue seulement | Face Packed spheres (trois cercles) de la roue d'angle : éteint → sphères → vides |
+| Spherical | Touchez pour alterner : chaque pièce en sphère (les RD entiers touchent leurs douze voisins), puis les vides entre RD entiers (octaédriques en or, tétraédriques en rose, seulement là où ils sont fermés), toutes les sphères rendues pâles. Un curseur règle la taille de toutes les sphères (cran à la taille propre de chaque forme ; en dessous = écartées, au-delà = qui se chevauchent). Avec Lattice View activé, chaque place libre du réseau apparaît comme une sphère pâle. Une vue seulement | Bouton Spherical (◯) : éteint → sphères → vides |
 | Duality | Le pavage apériodique que projette cette structure cristalline | Bouton Duality (◐) |
 | BCC Lattice | Le réseau cubique centré imbriqué dans le réseau FCC | Bouton BCC Lattice (⬡) |
 | Dualize | Échange FCC et BCC | Paramètres → Dualize Preview |
@@ -215,8 +214,7 @@ Faites glisser la petite roue du coin pour la tourner. Touchez une face pour l'u
 | ◇ | Menu |
 | ⊘ | Clear World |
 | ↻ | Reload (à utiliser si quelque chose semble bloqué) |
-| ◯ | Spherical |
-| ⚬⚬⚬ | Packed spheres (éteint → sphères → vides) |
+| ◯ | Spherical (éteint → sphères → vides) |
 | — | World View, Cuboctahedron Build |
 
 ## Roue du menu

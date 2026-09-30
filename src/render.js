@@ -1505,9 +1505,13 @@ async function init() {
   // Lattice View state, declared first: dimension switches (which can
   // run early in startup) rebuild it.
   let latticeQuickViewMode = 'off';
-  // Set once the Spherical View Cycle is built (below): redraws its spheres
-  // after any change while it's on, or tidies up once it's off.
-  let refreshPackingIfOn = null;
+  // ◯ Spherical cycles off → spheres → voids (declared early: World View's
+  // materials read it, and they're applied during startup).
+  let sphericalState = 'off';
+  const SPHERE_GHOST_OPACITY = 0.16; // every sphere in the voids state
+  // Set once ◯ is built (below): redraws its overlay (voids, open-slot
+  // spheres) after any change while it's on, or tidies up once it's off.
+  let refreshSphereOverlayIfOn = null;
   let latticeQuickViewMesh = null;
   let latticeQuickViewEdges = null;
   // Real bug the old system already hit and fixed live (2026-08-28),
@@ -1518,7 +1522,6 @@ async function init() {
   // stale result instead of touching the scene.
   let latticeQuickViewGeneration = 0;
   wireFirstUseHint('duality-toggle', 'Duality: shows this structure\'s aperiodic shadow -- the tiling it casts, not the block shape itself.');
-  wireFirstUseHint('spherical-toggle', 'Spherical: renders shapes in a simplified near-spherical form -- a client-side view only, your cells are untouched.');
   wireFirstUseHint('bcc-toggle', 'Lattice View: click to cycle a preview lens through every Piece type -- RD, Cube, Pyramid (shown on your real World), then Cuboctahedron and Octahedron, then BCC/TO, Flattened Octahedron, and Disphenoid (a hypothetical patch near you), then Off.');
   wireFirstUseHint('clear-world-toggle', 'Clear World: erase everything in every dimension and start fresh (Undo can bring it back).');
   wireFirstUseHint('reload-toggle', 'Reload: hard-refresh the app if anything looks stuck or stale.');
@@ -2651,7 +2654,7 @@ async function init() {
   // instead of only whenever the user next happens to re-toggle X-Ray.
   function updateSectionEnabled() {
     updateFirstPlacementTarget(); // every lattice's own change handler runs through here -- see firstPlacementSpec
-    refreshPackingIfOn?.();
+    refreshSphereOverlayIfOn?.();
     const enabled = document.getElementById('section-enable').checked;
     const planes = enabled ? [sectionPlane] : [];
     material.clippingPlanes = planes;
@@ -2724,10 +2727,12 @@ async function init() {
     return mats;
   }
   function applyWorldViewMaterials() {
-    const translucent = worldViewMode === 'translucent';
+    // ◯'s voids state ghosts every sphere, so only the voids stand out.
+    const ghost = sphericalState === 'voids';
+    const translucent = ghost || worldViewMode === 'translucent';
     for (const mat of worldViewMaterials()) {
       mat.transparent = translucent;
-      mat.opacity = translucent ? TRANSLUCENT_OPACITY : 1;
+      mat.opacity = ghost ? SPHERE_GHOST_OPACITY : translucent ? TRANSLUCENT_OPACITY : 1;
       mat.depthWrite = !translucent;
       mat.needsUpdate = true;
     }
@@ -2817,9 +2822,7 @@ async function init() {
     // so their HUD faces go blank and untappable (direct decision).
     hudWheel?.setFaceHidden?.('xray-toggle', isOwnWorldDimension());
     hudWheel?.setFaceHidden?.('spherical-toggle', isOwnWorldDimension());
-    // Packed spheres: the 3D RD world only.
-    hudWheel?.setFaceHidden?.('packing-toggle', activeDimension !== '3D' || own3DActive());
-    refreshPackingIfOn?.();
+    refreshSphereOverlayIfOn?.();
     lattice2dPanel.classList.toggle('visible', activeDimension === '2D' && !own3DActive());
     updateRhomboAttachPanel();
     updateFirstPlacementTarget();
@@ -3195,18 +3198,19 @@ async function init() {
   // changes that one InstancedMesh's own property, not the underlying
   // object other meshes still reference.
   let sphericalModeActive = false;
+  // The ◯ slider: every sphere's radius × this (1 = each shape's own
+  // sphere above; for RD that's exactly touching, √2/2).
+  let sphereScale = 1;
+  const sphereR = (R) => Math.max(1e-3, R * sphereScale);
   const sphericalShapes = sphericalClassificationFor(SCALE);
-  const sphericalGeometries = {
-    rd: buildSphericalGeometry(sphericalShapes.rd),
-    octahedron: buildSphericalGeometry(sphericalShapes.octahedron),
-    cuboctahedron: buildSphericalGeometry(sphericalShapes.cuboctahedron),
-    truncatedOctahedron: buildSphericalGeometry(sphericalShapes.truncatedOctahedron),
-    truncatedTetrahedron: buildSphericalGeometry(sphericalShapes.truncatedTetrahedron),
-    tetrahedron: buildSphericalGeometry(sphericalShapes.tetrahedron),
-    elongDodeca: buildSphericalGeometry(sphericalShapes.elongDodeca),
-    hexPrism: buildSphericalGeometry(sphericalShapes.hexPrism),
-    rhombohedron: buildSphericalGeometry(sphericalShapes.rhombohedron),
-  };
+  const sphericalGeometries = {};
+  function buildSphericalGeometries() {
+    for (const [name, shape] of Object.entries(sphericalShapes)) {
+      sphericalGeometries[name]?.dispose();
+      sphericalGeometries[name] = buildSphericalGeometry({ ...shape, R: sphereR(shape.R) });
+    }
+  }
+  buildSphericalGeometries();
   const originalGeometries = {
     rd: geometry,
     octahedron: octGapGeometry,
@@ -3252,7 +3256,7 @@ async function init() {
   // deliberately deferred, not silently dropped -- see
   // project_rhombiverse_spherical_toggle.md.
   const disphenoidFreeR = volumeMatchedRadius((2 / 3) * SCALE ** 3);
-  const disphenoidSphereTemplate = buildSphericalGeometry({ mode: 'sphere', R: disphenoidFreeR });
+  let disphenoidSphereTemplate = buildSphericalGeometry({ mode: 'sphere', R: sphereR(disphenoidFreeR) });
   const disphenoidOriginalGeometries = new Map(); // key -> original Mesh geometry
   function disphenoidCentroid(verts) {
     const world = disphenoidVertsToWorld(verts, SCALE);
@@ -3267,6 +3271,7 @@ async function init() {
         const [cx, cy, cz] = disphenoidCentroid(cell.verts);
         const sphereGeom = disphenoidSphereTemplate.clone();
         sphereGeom.translate(cx, cy, cz);
+        if (m.geometry !== disphenoidOriginalGeometries.get(key)) m.geometry.dispose();
         m.geometry = sphereGeom;
       } else {
         const original = disphenoidOriginalGeometries.get(key);
@@ -3316,7 +3321,7 @@ async function init() {
     const key = volume.toFixed(9);
     if (!partialSphereGeometryCache.has(key)) {
       const R = Math.min(volumeMatchedRadius(volume), PARTIAL_CEILING);
-      partialSphereGeometryCache.set(key, buildSphericalGeometry({ mode: 'sphere', R }));
+      partialSphereGeometryCache.set(key, buildSphericalGeometry({ mode: 'sphere', R: sphereR(R) }));
     }
     return partialSphereGeometryCache.get(key);
   }
@@ -3333,7 +3338,9 @@ async function init() {
           if (original) entry.mesh.geometry = original;
         }
       } else if (active) {
-        if (!partialAddedSphereMeshes.has(key)) {
+        if (partialAddedSphereMeshes.has(key)) {
+          partialAddedSphereMeshes.get(key).geometry = partialSphereGeometryFor(entry.cell);
+        } else {
           const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.15, roughness: 0.55, flatShading: true });
           mat.color.copy(instanceColorFor(entry.cell, 'rd'));
           const sphereMesh = new THREE.Mesh(partialSphereGeometryFor(entry.cell), mat);
@@ -3353,9 +3360,8 @@ async function init() {
     }
   }
 
-  document.getElementById('spherical-toggle')?.addEventListener('click', () => {
-    sphericalModeActive = !sphericalModeActive;
-    document.getElementById('spherical-toggle').classList.toggle('active', sphericalModeActive);
+  // Swaps every shape to its sphere (or back), at the slider's size.
+  function applySphericalGeometries() {
     const active = sphericalModeActive ? sphericalGeometries : originalGeometries;
     mesh.geometry = active.rd;
     octGapMesh.geometry = active.octahedron;
@@ -3377,30 +3383,24 @@ async function init() {
     // the next unrelated World View change. See skeletonCellPieces's
     // own header.
     if (worldViewMode === 'skeleton') rebuildWorldViewSkeleton();
-    showHudPrompt(sphericalModeActive
-      ? 'Spherical: every real placeable shape shown as a true sphere -- a client-side view only, your cells are untouched.'
-      : 'Spherical: off.', 5000);
-  });
+  }
 
-  // Spherical View Cycle, States 2-3 (docs/RHOMBIVERSE_SPEC_SPHERICAL_
-  // VIEW_CYCLE.md; the maths is geometry-extensions/sphere-packing.js).
-  // Its own corner-wheel face (◯ stays the Equivalent Sphere) cycles off
-  // → packed spheres → voids. View only, like X-Ray: your cells are
-  // untouched. Packed: one touching sphere per whole RD, in its colour,
-  // over a faint RD wireframe (the RD solids hidden). Voids: the gaps
-  // only where fully enclosed, a sphere fitted in each (octahedral gold,
-  // tetrahedral rose), the packed spheres ghosted round them. A slider
-  // sets the spheres' size: 0 is the bare wireframe, the detent is
-  // touching, beyond it they overlap, molecule-style; the voids follow.
-  // It keeps to X-Ray's cutting plane.
-  let packingMode = 'off';
-  let packingRadius = 1; // × TANGENT_R
-  const PACKING_MODES = ['off', 'spheres', 'voids'];
+  // ◯ Spherical (docs/RHOMBIVERSE_SPEC_SPHERICAL_VIEW_CYCLE.md; the
+  // packing maths is geometry-extensions/sphere-packing.js) cycles
+  // off → spheres → voids. View only, like X-Ray: your cells are
+  // untouched. Spheres: every piece as its sphere; whole RDs touch their
+  // twelve neighbours. Voids: every sphere ghosted, over a faint RD
+  // wireframe, with a sphere fitted in each fully enclosed gap between
+  // whole RDs (octahedral gold, tetrahedral rose). A slider sizes every
+  // sphere: its detent is each shape's own size (RDs touching), below
+  // they part, above they overlap, molecule-style; the voids follow.
+  // With Lattice View on, its ghost pieces step aside and every open slot
+  // one step past the build shows as a faint sphere. The overlay keeps
+  // to X-Ray's cutting plane.
+  const SPHERICAL_STATES = ['off', 'spheres', 'voids'];
   const packGroup = new THREE.Group();
   scene.add(packGroup);
   const packSphereGeo = new THREE.SphereGeometry(1, 40, 20);
-  const packMat = new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.05 });
-  const packGhostMat = new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.05, transparent: true, opacity: 0.16, depthWrite: false });
   const octaVoidMat = new THREE.MeshStandardMaterial({ color: 0xf5c542, emissive: 0xf5c542, emissiveIntensity: 0.25, roughness: 0.4 });
   const tetraVoidMat = new THREE.MeshStandardMaterial({ color: 0xff7aa8, emissive: 0xff7aa8, emissiveIntensity: 0.25, roughness: 0.4 });
   const packWireMat = new THREE.LineBasicMaterial({ color: 0x22c3e6, transparent: true, opacity: 0.35 });
@@ -3414,37 +3414,24 @@ async function init() {
     for (let i = 0; i < v.length; i++) for (let j = i + 1; j < v.length; j++) if (Math.abs(d(v[i], v[j]) - min) < 1e-6) out.push([v[i], v[j]]);
     return out;
   })();
-  const packingApplies = () => activeDimension === '3D' && !own3DActive();
-  function refreshPacking() {
+  // Voids and open-slot spheres: the 3D RD world only (null = not yet
+  // chosen, which shows the 3D world).
+  const sphereOverlayApplies = () => (activeDimension === '3D' || activeDimension === null) && !own3DActive();
+  let sphereOverlayShown = false;
+  function refreshSphereOverlay() {
     for (const c of [...packGroup.children]) { packGroup.remove(c); if (c.isInstancedMesh) c.dispose(); else c.geometry?.dispose(); }
-    const on = packingMode !== 'off' && packingApplies();
-    material.visible = !on; // the RD solids step aside (view only)
-    // Layered with Lattice View (direct decision, 2026-09-29: "layer:
-    // lattice as ghost spheres"): its ghost pieces step aside, and every
-    // open slot one step past the build shows as a faint sphere.
+    spherePanel.classList.toggle('visible', sphericalState !== 'off' && !isOwnWorldDimension());
+    const on = sphericalState !== 'off' && sphereOverlayApplies();
     const latticeLayer = on && latticeQuickViewMode !== 'off';
     for (const g of [latticeQuickViewMesh, latticeQuickViewEdges]) if (g) g.visible = !latticeLayer;
-    packingPanel.classList.toggle('visible', on);
+    sphereOverlayShown = on;
     if (!on) return;
     const cells = visibleCells(world);
     const planes = document.getElementById('section-enable')?.checked ? [sectionPlane] : [];
-    for (const m of [packMat, packGhostMat, octaVoidMat, tetraVoidMat, packWireMat, packSlotMat]) m.clippingPlanes = planes;
-    // The baseline wireframe: every whole RD's edges.
-    const wp = [];
-    for (const c of cells) for (const [a, b] of rdEdgePairs) wp.push(a[0] + c.x * SCALE, a[1] + c.y * SCALE, a[2] + c.z * SCALE, b[0] + c.x * SCALE, b[1] + c.y * SCALE, b[2] + c.z * SCALE);
-    const wg = new THREE.BufferGeometry();
-    wg.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3));
-    packGroup.add(new THREE.LineSegments(wg, packWireMat));
-    const r = TANGENT_R * packingRadius * SCALE;
-    if (!cells.length || r <= 0) return;
+    for (const m of [octaVoidMat, tetraVoidMat, packWireMat, packSlotMat]) m.clippingPlanes = planes;
+    const r = TANGENT_R * sphereScale * SCALE;
     const m4 = new THREE.Matrix4();
-    const spheres = new THREE.InstancedMesh(packSphereGeo, packingMode === 'voids' ? packGhostMat : packMat, cells.length);
-    cells.forEach((c, i) => {
-      spheres.setMatrixAt(i, m4.makeScale(r, r, r).setPosition(c.x * SCALE, c.y * SCALE, c.z * SCALE));
-      spheres.setColorAt(i, instanceColorFor(c, 'rd'));
-    });
-    packGroup.add(spheres);
-    if (latticeLayer) {
+    if (latticeLayer && r > 0) {
       const slots = new Map();
       for (const c of cells) for (const [dx, dy, dz] of NEIGHBOR_OFFSETS) {
         const x = c.x + dx, y = c.y + dy, z = c.z + dz;
@@ -3455,7 +3442,13 @@ async function init() {
       ghosts.count = slots.size;
       packGroup.add(ghosts);
     }
-    if (packingMode !== 'voids') return;
+    if (sphericalState !== 'voids') return;
+    // The wireframe: every whole RD's edges.
+    const wp = [];
+    for (const c of cells) for (const [a, b] of rdEdgePairs) wp.push(a[0] + c.x * SCALE, a[1] + c.y * SCALE, a[2] + c.z * SCALE, b[0] + c.x * SCALE, b[1] + c.y * SCALE, b[2] + c.z * SCALE);
+    const wg = new THREE.BufferGeometry();
+    wg.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3));
+    packGroup.add(new THREE.LineSegments(wg, packWireMat));
     const p = packing(cells.map((c) => [c.x, c.y, c.z]));
     for (const [kind, pts, mat] of [['octa', p.octa, octaVoidMat], ['tetra', p.tetra, tetraVoidMat]]) {
       const vr = voidSphereRadius(kind, r / SCALE) * SCALE;
@@ -3465,38 +3458,50 @@ async function init() {
       packGroup.add(vm);
     }
   }
-  // The radius slider, with a detent at touching.
-  const packingPanel = document.createElement('div');
-  packingPanel.id = 'packing-panel';
-  packingPanel.className = 'qc-panel';
-  packingPanel.innerHTML = `<div class="pack-row"><label></label><input type="range" min="0" max="${Math.round(RADIUS_MAX * 100)}" step="1" value="100"></div>`;
-  document.body.appendChild(packingPanel);
-  const packingSlider = packingPanel.querySelector('input');
-  packingSlider.addEventListener('input', () => {
-    let v = Number(packingSlider.value);
-    if (Math.abs(v - 100) <= 4) { v = 100; packingSlider.value = '100'; } // the detent: touching
-    packingRadius = v / 100;
-    refreshPacking();
+  // The size slider, with a detent at each shape's own size.
+  const spherePanel = document.createElement('div');
+  spherePanel.id = 'packing-panel';
+  spherePanel.className = 'qc-panel';
+  spherePanel.innerHTML = `<div class="pack-row"><label></label><input type="range" min="0" max="${Math.round(RADIUS_MAX * 100)}" step="1" value="100"></div>`;
+  document.body.appendChild(spherePanel);
+  const sphereSlider = spherePanel.querySelector('input');
+  sphereSlider.addEventListener('input', () => {
+    let v = Number(sphereSlider.value);
+    if (Math.abs(v - 100) <= 4) { v = 100; sphereSlider.value = '100'; } // the detent
+    sphereScale = v / 100;
+    buildSphericalGeometries();
+    disphenoidSphereTemplate.dispose();
+    disphenoidSphereTemplate = buildSphericalGeometry({ mode: 'sphere', R: sphereR(disphenoidFreeR) });
+    for (const g of partialSphereGeometryCache.values()) g.dispose();
+    partialSphereGeometryCache.clear();
+    applySphericalGeometries();
+    refreshSphereOverlay();
   });
-  const packingFace = hudWheel.faceEntries.find((e) => e.data?.elId === 'packing-toggle');
-  function renderPackingControl() {
-    if (packingFace?.labelEl) packingFace.labelEl.innerHTML = PACKING_ICONS[packingMode];
+  const sphericalFace = hudWheel.faceEntries.find((e) => e.data?.elId === 'spherical-toggle');
+  function renderSphericalControl() {
+    if (sphericalFace?.labelEl) {
+      if (sphericalState === 'off') sphericalFace.labelEl.textContent = '◯';
+      else sphericalFace.labelEl.innerHTML = PACKING_ICONS[sphericalState];
+    }
     const L = getSettings().language;
-    packingPanel.querySelector('label').textContent = t('pack.radius', L);
-    packingSlider.title = t('pack.radius', L);
+    spherePanel.querySelector('label').textContent = t('pack.radius', L);
+    sphereSlider.title = t('pack.radius', L);
   }
-  document.getElementById('packing-toggle')?.addEventListener('click', () => {
-    packingMode = PACKING_MODES[(PACKING_MODES.indexOf(packingMode) + 1) % PACKING_MODES.length];
-    document.getElementById('packing-toggle').classList.toggle('active', packingMode !== 'off');
-    renderPackingControl();
-    refreshPacking();
+  document.getElementById('spherical-toggle')?.addEventListener('click', () => {
+    sphericalState = SPHERICAL_STATES[(SPHERICAL_STATES.indexOf(sphericalState) + 1) % SPHERICAL_STATES.length];
+    sphericalModeActive = sphericalState !== 'off';
+    document.getElementById('spherical-toggle').classList.toggle('active', sphericalModeActive);
+    applySphericalGeometries();
+    applyWorldViewMaterials();
+    renderSphericalControl();
+    refreshSphereOverlay();
     const L = getSettings().language;
-    if (packingMode !== 'off' && !visibleCells(world).length) showHudPrompt(t('pack.none', L), 4000);
-    else showHudPrompt(t(`pack.${packingMode}`, L), 5500);
+    if (sphericalState === 'voids' && sphereOverlayApplies() && !visibleCells(world).length) showHudPrompt(t('pack.none', L), 4000);
+    else showHudPrompt(t(`pack.${sphericalState}`, L), 5500);
   });
-  renderPackingControl();
-  onSettingsChange(() => renderPackingControl());
-  refreshPackingIfOn = () => { if (packingMode !== 'off' || !material.visible) refreshPacking(); };
+  renderSphericalControl();
+  onSettingsChange(() => renderSphericalControl());
+  refreshSphereOverlayIfOn = () => { if (sphericalState !== 'off' || sphereOverlayShown) refreshSphereOverlay(); };
 
   // BCC dual-lattice Phase 2 (third revision, 2026-08-25) -- Rhombeometry-
   // only. A real, connected, globally-consistent BCC lattice sharing the
@@ -4290,11 +4295,11 @@ async function init() {
     document.getElementById('hud-quick-lattice-view')?.classList.toggle('active', isOn);
   }
 
-  // Packed spheres lay the lattice out as ghost spheres instead, so its
-  // own ghosts step aside after every rebuild while they're on.
+  // ◯ Spherical lays the lattice out as ghost spheres instead, so its
+  // own ghosts step aside after every rebuild while it's on.
   async function rebuildLatticeQuickView() {
     await rebuildLatticeQuickViewPieces();
-    refreshPackingIfOn?.();
+    refreshSphereOverlayIfOn?.();
   }
   async function rebuildLatticeQuickViewPieces() {
     const myGeneration = ++latticeQuickViewGeneration;
