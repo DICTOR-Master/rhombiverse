@@ -278,11 +278,25 @@ const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 2.5;
 
 function applyCameraFraming() {
-  const aspect = window.innerWidth / window.innerHeight;
-  camera.aspect = aspect;
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  camera.aspect = W / H;
+  // With the tray as a strip (portrait phones), the target is framed in
+  // the free band below it: fitted to that band's height, and its centre
+  // shifted down to the band's centre (a view offset, so raycasting,
+  // which reads the projection matrix, stays exact).
+  const band = targetBand();
+  let fitCam = camera;
+  if (band) {
+    camera.setViewOffset(W, H, 0, H / 2 - (band.top + band.height / 2), W, H);
+    const vFov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * band.height / H);
+    fitCam = { fov: THREE.MathUtils.radToDeg(vFov), aspect: W / band.height };
+  } else {
+    camera.clearViewOffset();
+  }
   camera.updateProjectionMatrix();
   if (!current) return;
-  const distance = cameraRelativeDistance(current.targetBox.cornerOffsets, camera) * FRAME_MARGIN * zoomFactor;
+  const distance = cameraRelativeDistance(current.targetBox.cornerOffsets, fitCam) * FRAME_MARGIN * zoomFactor;
   camera.position.copy(current.targetBox.center).add(CAMERA_DIRECTION.clone().multiplyScalar(distance));
   camera.lookAt(current.targetBox.center);
 }
@@ -297,12 +311,38 @@ function applyTrayFraming() {
   trayCamera.lookAt(current.trayBox.center);
 }
 
-// Tray viewport: a fixed corner overlay, top-right (direct instruction
-// "picker pieces should be top right"), rendered as a second scissored
-// pass over the target's own full-screen render. Kept well clear of
-// the topbar (RHOMBIS wordmark/Stages button) and safe-area insets.
+// Tray viewport, rendered as a second scissored pass over the target's
+// own full-screen render: a top-right corner (direct instruction
+// "picker pieces should be top right"), except on a portrait phone,
+// where a big target ran under that corner (direct report 2026-09-30):
+// there it's a strip across the top, under the top bar, and the target
+// is framed in the band below it (targetBand).
 const TRAY_MARGIN = 16;
+const trayAsStrip = () => window.innerWidth <= 600 && window.innerHeight > window.innerWidth;
+// The top bar's bottom edge, re-measured on resize and stage load (the
+// stage name can wrap), not every frame.
+let topbarBottom = 64;
+function measureTopbar() {
+  const bar = document.getElementById('rhombis-topbar');
+  if (bar) topbarBottom = Math.ceil(bar.getBoundingClientRect().bottom);
+}
+// Room kept clear at the bottom for Undo and the hint line.
+const BOTTOM_CLEAR = 84;
+function targetBand() {
+  if (!trayAsStrip()) return null;
+  const tray = trayViewportRect();
+  const top = tray.top + tray.height + 8;
+  return { top, height: Math.max(80, window.innerHeight - BOTTOM_CLEAR - top) };
+}
 function trayViewportRect() {
+  if (trayAsStrip()) {
+    return {
+      left: TRAY_MARGIN,
+      top: topbarBottom + 4,
+      width: window.innerWidth - 2 * TRAY_MARGIN,
+      height: Math.round(window.innerHeight * 0.22),
+    };
+  }
   const topInset = 64; // clears the topbar in the common case without reading its live layout every frame
   const width = Math.min(300, window.innerWidth * 0.42);
   const height = Math.min(380, window.innerHeight * 0.48);
@@ -326,6 +366,7 @@ function syncTrayPanel() {
 
 function handleViewportChange() {
   renderer.setSize(window.innerWidth, window.innerHeight);
+  measureTopbar();
   applyCameraFraming();
   applyTrayFraming();
   syncTrayPanel();
@@ -495,10 +536,12 @@ function loadStage(index) {
   const targetBox = boundingBoxCenterAndCorners([built.skeletonGroup]);
   const trayBox = boundingBoxCenterAndCorners(built.pieces.map((p) => p.mesh));
   current = { ...built, groups: built.groups ?? [], state, targetBox, trayBox, history: [], advanceTimer: null };
-  applyCameraFraming();
-  applyTrayFraming();
   solvedBanner.hidden = true;
   stageLabel.textContent = t('stage.label', getSettings().language, { id: stageDef.id, name: stageDef.name });
+  measureTopbar(); // the stage name sets the top bar's height, and so the tray's top
+  syncTrayPanel();
+  applyCameraFraming();
+  applyTrayFraming();
   // A fresh piece mesh defaults to visible (THREE.Object3D's own
   // default) -- fine for a fixed-group fused piece (always meant to be
   // shown), but WRONG for the interchangeable singles, which now share
@@ -525,52 +568,69 @@ function updateUndoButton() {
 // exactly one destination; this covers all of them, live, without a
 // page reload. Populated directly from STAGES, so a stage added later
 // needs no picker-specific update.
-// `derivedFrom` (2026-09-05, direct instruction: "add for transparency
-// original order ID numbers showing what came first in conception /
-// creation and what has been generated derived later") -- `id` itself
-// is a difficulty-ramp/menu-order number, already resequenced more than
-// once (see STAGES' own header comment), not a creation-order record.
-// Rather than retroactively guessing a "true" conception order for all
-// 85 pre-existing stages, this tags only the genuinely DERIVED stages
-// (the 2026-09-05 crossover tiers, each explicitly built by combining
-// two earlier tiers' own machinery) with the real `id` of one
-// representative stage from each source TIER plus that tier's own name
-// -- NOT that representative stage's own specific puzzle content name.
-// Real bug caught live: labelling by the representative stage's own
-// name (e.g. "#66 (Molecule Split: Triangle + Wide Bend)") falsely
-// implied a crossover stage reused that EXACT molecule pairing, when
-// most of these deliberately draw a different pairing from the same
-// tier so they read as fresh content rather than a re-skin (see
-// BURR_MOLECULE_SPLIT_STAGE_DEFS' own comment in stages.js).
+// Sections, by the name's prefix (direct decision 2026-09-30: grouped,
+// solved stages ticked, no "derived from" lines). Numbers stay as they
+// are; each section lists its stages in number order.
+const STAGE_SECTIONS = [
+  ['first', ['1 Cell', '2 Cells', 'Hourglass', 'Hourglass Chain', 'Color Match', '3 Cells', '4 Cells']],
+  ['shapes', ['One Piece', 'BCC', 'Octahedron', 'Cube', 'Conjoined Pieces', 'Rhombic Dodecahedron', 'Multi-Cell']],
+  ['hulls', ['Hull', 'Big Hull']],
+  ['molecules', ['Molecule', 'Mirrored Molecule', 'Molecule Split', 'Branching Molecule']],
+  ['crystals', ['BCC Crystal', 'Crystal', 'Salt', 'Calcite', 'Alloy']],
+  ['burr', ['Burr Puzzle']],
+];
+function stageSection(stageDef) {
+  const prefix = stageDef.name.split(':')[0].replace(/\s*\(.*$/, '').replace(/\s+\d+$/, '').trim();
+  return STAGE_SECTIONS.find(([, prefixes]) => prefixes.includes(prefix))?.[0] ?? 'shapes';
+}
+// Solved stages, remembered on this device.
+const SOLVED_KEY = 'rhombis-solved';
+function loadSolved() {
+  try { return new Set(JSON.parse(localStorage.getItem(SOLVED_KEY) ?? '[]')); } catch { return new Set(); }
+}
+function markSolved(id) {
+  const solved = loadSolved();
+  solved.add(id);
+  try { localStorage.setItem(SOLVED_KEY, JSON.stringify([...solved])); } catch { /* storage full or blocked: the tick just won't persist */ }
+}
 function populateStagePicker() {
   stageList.innerHTML = '';
-  STAGES.forEach((stageDef, index) => {
-    const option = document.createElement('button');
-    option.type = 'button';
-    option.className = 'rhombis-stage-option';
-    option.dataset.stageIndex = String(index);
-    const lineage = stageDef.derivedFrom
-      ? `<span class="stage-lineage">${t('stage.derivedFrom', getSettings().language, { list: stageDef.derivedFrom.map(({ id, tier }) => `#${id} (${tier})`).join(' + ') })}</span>`
-      : '';
-    option.innerHTML = `<span class="stage-num">${stageDef.id}</span><span class="stage-name-wrap"><span class="stage-name">${stageDef.name}</span>${lineage}</span>`;
-    option.addEventListener('click', () => {
-      stageIndex = index;
-      loadStage(stageIndex);
-      closeStagePicker();
-    });
-    stageList.appendChild(option);
-  });
+  const lang = getSettings().language;
+  const solved = loadSolved();
+  for (const [section] of STAGE_SECTIONS) {
+    const members = STAGES.map((stageDef, index) => ({ stageDef, index })).filter(({ stageDef }) => stageSection(stageDef) === section);
+    if (!members.length) continue;
+    const heading = document.createElement('div');
+    heading.className = 'rhombis-stage-section';
+    heading.textContent = t(`picker.section.${section}`, lang);
+    stageList.appendChild(heading);
+    for (const { stageDef, index } of members) {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'rhombis-stage-option';
+      option.dataset.stageIndex = String(index);
+      option.innerHTML = `<span class="stage-num">${stageDef.id}</span><span class="stage-name-wrap"><span class="stage-name">${stageDef.name}</span></span>${solved.has(stageDef.id) ? '<span class="stage-tick">✓</span>' : ''}`;
+      option.addEventListener('click', () => {
+        stageIndex = index;
+        loadStage(stageIndex);
+        closeStagePicker();
+      });
+      stageList.appendChild(option);
+    }
+  }
 }
 
 function refreshStagePickerCurrent() {
-  for (const option of stageList.children) {
+  for (const option of stageList.querySelectorAll('.rhombis-stage-option')) {
     option.classList.toggle('current', Number(option.dataset.stageIndex) === stageIndex);
   }
 }
 
 function openStagePicker() {
+  populateStagePicker(); // fresh ticks
   refreshStagePickerCurrent();
   stagePicker.hidden = false;
+  stageList.querySelector('.rhombis-stage-option.current')?.scrollIntoView({ block: 'center' });
 }
 
 function closeStagePicker() {
@@ -919,6 +979,7 @@ function advanceOrFinish() {
   const next = STAGES[stageIndex + 1];
   const lang = getSettings().language;
   hud.textContent = t('solved.hud', lang);
+  markSolved(STAGES[stageIndex].id);
   solvedBanner.hidden = false;
   solvedBanner.textContent = next ? t('solved.bannerFinal', lang) : t('solved.bannerMore', lang);
   if (next) {

@@ -55,6 +55,23 @@
     #rhombis-subtitle { font-size: 0.7rem; opacity: 0.55; margin-left: 0.5rem; font-weight: 400; letter-spacing: 0.02em; }
     @media (max-width: 600px) { #rhombis-subtitle { display: none; } }
     #rhombis-stage { font-size: 0.85rem; opacity: 0.75; margin-left: 0.75rem; }
+    #rhombis-topbar > span:last-child { white-space: nowrap; flex-shrink: 0; }
+    /* Phones: two rows (direct decision 2026-09-30) -- the logo and title
+       with EN, Stages and the back link on one line, the stage number and
+       name full width below. The title span's children join the grid
+       directly (display: contents). */
+    @media (max-width: 600px) {
+      #rhombis-topbar {
+        display: grid; grid-template-columns: auto 1fr auto; align-items: center; row-gap: 0.15rem;
+        padding-top: calc(0.4rem + env(safe-area-inset-top)); padding-bottom: 0.3rem;
+      }
+      #rhombis-topbar > span:first-child { display: contents; }
+      #rhombis-title-mark { grid-column: 1; grid-row: 1; }
+      #rhombis-title { grid-column: 2; grid-row: 1; }
+      #rhombis-topbar > span:last-child { grid-column: 3; grid-row: 1; }
+      #rhombis-stage { grid-column: 1 / -1; grid-row: 2; margin-left: 0; }
+      #rhombis-topbar a, #rhombis-lang-toggle, #rhombis-stage-picker-toggle { display: inline-block; min-height: 36px; line-height: 36px; padding-top: 0; padding-bottom: 0; }
+    }
     /* Visual frame ONLY -- pointer-events stays none, real interaction
        is the canvas's own WebGL raycasting underneath (main.js's
        trayViewportRect(), kept in sync via JS so this never drifts from
@@ -185,8 +202,19 @@
     .rhombis-stage-option .stage-name-wrap {
       display: flex; flex-direction: column; gap: 0.1rem;
     }
-    .rhombis-stage-option .stage-lineage {
-      color: #6f8ba3; font-size: 0.75rem; font-weight: 400;
+    /* Section headings (direct decision 2026-09-30: grouped, solved
+       stages ticked, full screen on phones). */
+    .rhombis-stage-section {
+      margin: 0.6rem 0 0.1rem; color: #6ad0ff; font-size: 0.8rem; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .rhombis-stage-section:first-child { margin-top: 0; }
+    .rhombis-stage-option .stage-name-wrap { flex: 1; }
+    .rhombis-stage-option .stage-tick { color: #6ad0ff; font-weight: 700; }
+    #rhombis-stage-picker-close { min-width: 44px; min-height: 44px; }
+    @media (max-width: 600px) {
+      #rhombis-stage-picker { align-items: stretch; }
+      #rhombis-stage-picker-panel { width: 100%; max-height: none; border-radius: 0; border: 0; padding: 1rem; }
     }
   </style>
   <script type="importmap">

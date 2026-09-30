@@ -878,7 +878,6 @@ function buildHourglassStage(scale) {
 const HOURGLASS_STAGE = {
   id: 3,
   name: 'Hourglass: Half RDs',
-  derivedFrom: [{ id: 2, tier: '2 Cells' }],
   build: buildHourglassStage,
 };
 
@@ -996,7 +995,6 @@ function buildHourglassChainStage(scale) {
 const HOURGLASS_CHAIN_STAGE = {
   id: 4,
   name: 'Hourglass Chain: 3 in a Row',
-  derivedFrom: [{ id: 3, tier: 'Hourglass' }, { id: 12, tier: '3 Cells' }],
   build: buildHourglassChainStage,
 };
 
@@ -1845,7 +1843,6 @@ const COLOR_MATCH_STAGES = THREE_CELL_STAGE_DEFS.map((def, i) => {
   return {
     id: 5 + i,
     name: `Color Match: ${def.name}`,
-    derivedFrom: [{ id: 9 + i, tier: def.name }],
     build: (scale) => buildColorMatchStage(scale, def.cells, { cells: decoyDef.cells, asCubes: i % 2 === 0 }, decoyColor),
   };
 });
@@ -3010,7 +3007,6 @@ const BURR_MOLECULE_SPLIT_STAGES = BURR_MOLECULE_SPLIT_STAGE_DEFS.map(({ lobeA, 
   return {
     id: 107 + i,
     name: `Burr Puzzle: Molecule Split (${lobeA.name} + ${lobeB.name})`,
-    derivedFrom: [{ id: 74, tier: 'Molecule Split' }, { id: 92, tier: 'Burr Puzzle' }],
     build: (scale) => buildBigHullStage(scale, cells, 3, 3, [0]),
   };
 });
@@ -3025,7 +3021,6 @@ const BURR_MIRRORED_MOLECULE_STAGES = BURR_MIRRORED_MOLECULE_INDEXES.map((shapeI
   return {
     id: 110 + i,
     name: `Burr Puzzle: Mirrored Molecule ${shapeIndex + 1}`,
-    derivedFrom: [{ id: 66, tier: 'Mirrored Molecule' }, { id: 92, tier: 'Burr Puzzle' }],
     build: (scale) => buildBigHullStage(scale, cells, 3, 3, [0]),
   };
 });
@@ -3040,7 +3035,6 @@ const BURR_BRANCHING_MOLECULE_STAGES = BURR_BRANCHING_MOLECULE_INDEXES.map((defI
   return {
     id: 113 + i,
     name: `Branching Molecule: ${hub.name} hub + ${branch1.name} + ${branch2.name} (II)`,
-    derivedFrom: [{ id: 82, tier: 'Branching Molecule' }, { id: 92, tier: 'Burr Puzzle' }],
     build: (scale) => buildBranchingMoleculeStage(scale, hub, branch1, branch2, pickBranchMoleculeDecoys(hub, branch1, branch2, defIndex * 2), true),
   };
 });
@@ -3058,13 +3052,11 @@ const DISPHENOID_KEY_HULL_STAGES = [
   {
     id: 116,
     name: 'Big Hull: Cuboctahedron (Disphenoid)',
-    derivedFrom: [{ id: 89, tier: 'Big Hull' }, { id: 88, tier: 'Disphenoid RD' }, { id: 92, tier: 'Burr Puzzle' }],
     build: (scale) => buildDisphenoidKeyHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3, 1),
   },
   {
     id: 117,
     name: 'Big Hull: Tetrahedral Stack (Disphenoid)',
-    derivedFrom: [{ id: 91, tier: 'Big Hull' }, { id: 88, tier: 'Disphenoid RD' }, { id: 92, tier: 'Burr Puzzle' }],
     build: (scale) => buildDisphenoidKeyHullStage(scale, TETRAHEDRAL_STACK_CELLS, 3, 4, 1),
   },
 ];
@@ -3131,7 +3123,6 @@ const CRYSTAL_STAGES = [{
   id: 90,
   name: `Crystal: ${FCC_ELEMENTS[0].name} (${FCC_ELEMENTS[0].symbol})`,
   attributions: FCC_ELEMENTS.map((el) => `${el.name} (${el.symbol})`),
-  derivedFrom: [{ id: 89, tier: 'Big Hull' }],
   build: (scale) => buildBigHullStage(scale, CUBOCTAHEDRON_CELLS, 3, 3, [], FCC_ELEMENTS[0].color, FCC_ELEMENTS[0].color),
 }];
 
@@ -3225,7 +3216,6 @@ const BCC_CRYSTAL_STAGES = [{
   id: 20,
   name: `BCC Crystal: ${BCC_ELEMENTS[0].name} (${BCC_ELEMENTS[0].symbol})`,
   attributions: BCC_ELEMENTS.map((el) => `${el.name} (${el.symbol})`),
-  derivedFrom: [{ id: 18, tier: 'BCC' }],
   build: (scale) => buildBCCCellsStage(scale, BCC_TWO_CELL_OFFSETS, BCC_ELEMENTS[0].color, BCC_ELEMENTS[0].color),
 }];
 
@@ -3327,7 +3317,6 @@ const BCC_ALLOY_DEFS = [
 const BCC_ALLOY_STAGES = BCC_ALLOY_DEFS.map((def, i) => ({
   id: 101 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 18, tier: 'BCC' }],
   build: (scale) => buildBCCAlloyStage(scale, BCC_ALLOY_CELLS, def.colorEven, def.colorOdd),
 }));
 
@@ -3411,7 +3400,6 @@ const DILUTE_ALLOY_DEFS = [
 const DILUTE_ALLOY_STAGES = DILUTE_ALLOY_DEFS.map((def, i) => ({
   id: 104 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 18, tier: 'BCC' }],
   build: (scale) => buildBCCDiluteAlloyStage(scale, BCC_ALLOY_CELLS, BCC_ELEMENTS[0].color, def.dopantColor, def.dopantCount),
 }));
 
@@ -3507,7 +3495,6 @@ const CARBON_COLOR = 0x2b2b2b;
 const CARBON_STEEL_STAGE = {
   id: 106,
   name: 'Alloy: Carbon Steel (Fe + C, interstitial)',
-  derivedFrom: [{ id: 18, tier: 'BCC' }],
   build: (scale) => buildCarbonSteelStage(scale, BCC_ALLOY_CELLS, BCC_ELEMENTS[0].color, CARBON_COLOR),
 };
 
@@ -3603,7 +3590,6 @@ const FCC_ALLOY_DEFS = [
 const FCC_ALLOY_STAGES = FCC_ALLOY_DEFS.map((def, i) => ({
   id: 97 + i,
   name: `Alloy: ${def.name} (${def.formula})`,
-  derivedFrom: [{ id: 89, tier: 'Big Hull' }],
   build: (scale) => buildFCCDiluteAlloyStage(scale, CUBOCTAHEDRON_CELLS, def.baseColor, def.dopantColor, def.dopantCount),
 }));
 
@@ -3680,7 +3666,6 @@ function buildRockSaltStage(scale, cellOffsets, cationColor, anionColor) {
 const SALT_STAGE = {
   id: 95,
   name: 'Salt: Sodium Chloride (NaCl)',
-  derivedFrom: [{ id: 89, tier: 'Big Hull' }],
   build: (scale) => buildRockSaltStage(scale, ROCK_SALT_CELLS, 0xd8d8d0, 0xc9d67a),
 };
 
@@ -3805,7 +3790,6 @@ function buildCalciteStage(scale, cellOffsets, cationColor, anionColor) {
 const CALCITE_STAGE = {
   id: 96,
   name: 'Calcite: Calcium Carbonate (CaCO3)',
-  derivedFrom: [{ id: 95, tier: 'Salt' }],
   build: (scale) => buildCalciteStage(scale, ROCK_SALT_CELLS, 0xf2f0e6, 0x7a8b99),
 };
 
