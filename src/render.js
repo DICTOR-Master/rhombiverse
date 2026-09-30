@@ -66,10 +66,6 @@ import {
   PYROCHLORE_STORAGE_KEY,
 } from './core/persistence.js';
 import { VALID_TRIPLES, unitTileVertices } from './geometry-extensions/growth.js';
-// World-building/game systems (mining, trade, claims, achievements,
-// animals, hazards, hydrosphere, gravity/planetoids, growth/evolution/
-// cultivation, walking/exploring, Shared World sync) were retired and
-// their code archived to an archive, since deleted (2026-09-24) -- see docs/HISTORY-retired-systems.md.
 
 const SCALE = 1;
 // Hex Prism: no special proportion is required for a plain hex-prism
@@ -209,8 +205,7 @@ const hudWheel = createHudWheel3D(renderer);
   // the underlying cause -- two independent listeners on one event -- is
   // not touch-specific, same "yield the mouse" pattern already used for
   // the X-Ray TransformControls drag below). Saving/restoring the PRIOR
-  // enabled state (not hardcoding true) avoids fighting whatever set it,
-  // e.g. Walk Mode's own controls.enabled = false while walking.
+  // enabled state (not hardcoding true) avoids fighting whatever set it.
   window.addEventListener('pointerdown', (ev) => {
     if (!withinHudRect(ev.clientX, ev.clientY)) return;
     hudDragging = true;
@@ -400,9 +395,9 @@ function applyDimensionCamera(dimension) {
 // UI-chrome translations (src/app/i18n.js), Phase 1 scope only -- see
 // that file's own header for exactly what's covered/deferred. Applies
 // every element tagged data-i18n/-title/-placeholder/-html; the
-// handful of JS-only dynamic strings this file sets directly (walk-
-// toggle, shared-world toggle/hint, recolor button, gallery/share
-// hints) call t() at their own assignment site instead, since their
+// handful of JS-only dynamic strings this file sets directly (recolor
+// button, gallery/share hints) call t() at their own assignment site
+// instead, since their
 // text depends on live STATE, not just the current language. Called
 // once at module load and again whenever the language setting changes.
 function applyTranslations() {
@@ -497,7 +492,6 @@ function wireFirstUseHint(elementId, text) {
   el.addEventListener('mouseenter', reveal);
   el.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') reveal(); });
 }
-const LOCAL_PLAYER_ID = 'local-player'; // fallback ownerId for solo play (no multiplayer identity exists), see notes
 
 const labToggleEl = document.getElementById('lab-toggle');
 const labPanelEl = document.getElementById('lab-panel');
@@ -517,13 +511,6 @@ labToggleEl.addEventListener('click', () => {
 document.getElementById('lab-close')?.addEventListener('click', () => {
   labPanelEl.classList.remove('open');
 });
-
-
-// B6 onboarding sequence removed 2026-09-22 -- narrated Full World/game
-// content (an "already-built World," "growing life", other players) that
-// no longer exists; its own enable() call was already permanently
-// unreachable (gated on !pureGeometry, which settings.js forces true
-// unconditionally). The old onboarding.json (retired game content) was deleted 2026-09-24.
 
 
 // Settings inputs (Lab panel only, per B1) -- initialized from whatever
@@ -553,10 +540,6 @@ document.getElementById('lab-close')?.addEventListener('click', () => {
   const fpsMeterInput = document.getElementById('setting-fps-meter');
   fpsMeterInput.checked = s.showFPSMeter;
   fpsMeterInput.addEventListener('change', () => updateSettings({ showFPSMeter: fpsMeterInput.checked }));
-
-  // Rhombeometry mode's Settings checkbox is gone -- World Systems are
-  // retired (see features.js/settings.js), there's no longer a real
-  // choice to expose here.
 
 
 })();
@@ -756,11 +739,7 @@ function sphericalClassificationFor(scale) {
   };
 }
 
-// emerald/gold added 2026-08-29, direct request -- buildable colors
-// only (deliberately NOT wired into asteroids.js's YIELD_WEIGHTS,
-// trade.js's FREE_THRESHOLDS, TRADE_MATERIALS, or planetoidgen.js's
-// body recipes -- those are real tunable economy-balance constants,
-// not something to invent numbers for without being asked). gold
+// emerald/gold added 2026-08-29, direct request. gold
 // reuses hud-wheel-3d.js's own GOLD constant (0xd4af37) verbatim for
 // visual consistency with the one other "gold" already in this app.
 // amethyst/rose-quartz/citrine/turquoise added 2026-09-02, direct
@@ -917,7 +896,7 @@ function instanceColorFor(cell, type) {
 let cellOrder = []; // instanceId -> {x, y, z, ...cellData}
 
 function visibleCells(world) {
-  const base = world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
+  const base = world.entries();
   // Pyramid Sub-Cell: a partial cell can't be an instance of the shared
   // InstancedMesh -- InstancedMesh requires every instance to share the
   // exact same BufferGeometry, and a partial cell's real shape (cube +
@@ -1037,7 +1016,7 @@ function buildPartialCellObject3D(cell, key) {
 }
 
 function rebuildPartialCellMeshes(world) {
-  const source = world.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed');
+  const source = world.entries();
   const wanted = new Map();
   for (const cell of source) {
     if (isPartialCell(cell)) wanted.set(cellKey(cell.x, cell.y, cell.z), cell);
@@ -1053,7 +1032,7 @@ function rebuildPartialCellMeshes(world) {
     const existing = partialCellMeshes.get(key);
     if (existing && existing.cell.pyramids === cell.pyramids && existing.cell.cube === cell.cube
         && existing.cell.material === cell.material
-        && existing.cell.status === cell.status && existing.cell.shell === cell.shell) {
+        && existing.cell.shell === cell.shell) {
       existing.cell = cell; // cheap fields (e.g. shellCenter) may still have changed
       continue;
     }
@@ -1563,18 +1542,17 @@ async function init() {
   let currentMode = 'build';
 
   // BCC dual-lattice build: a second, independent world store, own
-  // localStorage key (BCC_STORAGE_KEY), no relation to Shared World/
-  // shared-link loading or the Showcase World fallback above -- always
-  // starts empty on a true first visit. Rhombeometry-only (gated by the
-  // 'bcc' mode-btn's own display toggle below), so it never needs the
-  // World Systems hooks (regrowth/seeds/etc) the main world's store has.
+  // localStorage key (BCC_STORAGE_KEY), no relation to shared-link
+  // loading or the Showcase World fallback above -- always starts empty
+  // on a true first visit (gated by the 'bcc' mode-btn's own display
+  // toggle below).
   // See core/bcc-build.md.
   const bccSavedJSON = loadFromLocalStorage(BCC_STORAGE_KEY);
   const bccWorld = createWorldStore(bccSavedJSON ?? { worldName: 'BCC Lattice', version: 1, cells: {}, meta: {} });
 
   // Cuboctahedron Build: a fourth, independent store (own localStorage
   // key, CUBOCTA_STORAGE_KEY), same reasoning as bccWorld/interstitial
-  // above -- Rhombeometry-only, no World Systems hooks needed.
+  // above.
   const cuboctaSavedJSON = loadFromLocalStorage(CUBOCTA_STORAGE_KEY);
   const cuboctaWorld = createWorldStore(cuboctaSavedJSON ?? { worldName: 'Cuboctahedron Lattice', version: 1, cells: {}, meta: {} });
 
@@ -2949,7 +2927,7 @@ async function init() {
     clearWorldViewSkeleton();
     if (isOwnWorldDimension()) return; // 4D/6D draw their own Skeleton
     const { world: w, scene: s } = activeWorldTriple();
-    const cells = w ? w.entries().filter((c) => c.status !== 'flagged' && c.status !== 'removed') : [];
+    const cells = w ? w.entries() : [];
     const pieces = cells.flatMap(skeletonCellPieces);
     // BCC/Cuboctahedron/octahedron-gap/interstitial are real-World-only
     // (Sculpture Mode's own scratch world has no equivalents) -- direct
@@ -5041,8 +5019,6 @@ async function init() {
   // -- see cycleLatticeQuickView/rebuildLatticeQuickView above. Direct
   // confirmation to retire rather than keep both.
 
-  const canPlaceMaterial = () => true;
-
   const ghostMaterial = new THREE.MeshBasicMaterial({
     color: 0x9de0ff,
     transparent: true,
@@ -5601,15 +5577,11 @@ async function init() {
     hemisphereStore,
     hemisphereGroup,
     onHemisphereChange,
-    canPlaceMaterial,
-    getOwnerId: () => LOCAL_PLAYER_ID,
   });
 
   // BCC dual-lattice build: own change handler, deliberately NOT the main
-  // world's onChange() -- that pipeline is entirely World Systems
-  // machinery (asteroid regen, hydrosphere, achievements, undo stack...)
-  // that's off in Rhombeometry mode anyway, the only mode this build ever
-  // runs in. Mirrors how Sculpture Mode's own sculptTarget.apply is a
+  // world's onChange(), which rebuilds far more than this store needs.
+  // Mirrors how Sculpture Mode's own sculptTarget.apply is a
   // small dedicated rebuild, not a reuse of onChange(). Still shared by
   // core/build.js's own Piece:TO handleToClick (the standalone BCC Build
   // mode/controller this used to also serve was cut 2026-09-02 as
@@ -5689,7 +5661,7 @@ async function init() {
   }
 
   // Interstitial-lattice build: own change handler, same reasoning as
-  // onBCCChange above (Rhombeometry-only, no World Systems pipeline).
+  // onBCCChange above.
   function onInterstitialChange() {
     // Same invariant again -- bootstrapDisphenoid([0,0,0]) is the exact
     // same canonical anchor disphenoid every fresh interstitial build

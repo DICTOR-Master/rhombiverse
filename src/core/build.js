@@ -252,10 +252,6 @@ export function createBuildController({
   // `dimensionAllowsMesh('mesh')` specifically (NOT `mesh.visible`,
   // which also folds in Skeleton view's own separate hiding).
   getMeshPickable = () => true,
-  canPlaceMaterial = () => true,
-  getOwnerId = () => null,
-  mineRemote = null,
-  mineAsteroidCell = () => {},
   onHover = null, // (cells: [{x,y,z}], valid: boolean) -- one entry normally, two while "held"
   onHoverEnd = null,
   onPlaced = null,
@@ -1491,7 +1487,7 @@ export function createBuildController({
     if (!hit) return;
 
     const mode = getMode();
-    if (!mode) return; // e.g. Walk mode active -- editing is disabled while walking
+    if (!mode) return; // no editing mode active
     // 2D tiles paint in their own handler (and the Kaleidoscope's taps
     // there), everything else here.
     if (mode === 'build' && paint?.isOn() && !getPieceType().startsWith('lattice2d:')) {
@@ -1683,12 +1679,10 @@ export function createBuildController({
           const [mx, my, mz] = resolved.host;
           if (!world.has(mx, my, mz)) {
             const material = getMaterial();
-            if (canPlaceMaterial(material, mx, my, mz)) {
-              bootstrapPyramidCell(world, mx, my, mz, resolved.axisKey, material);
-              onChange();
-              if (onPlaced) onPlaced({ x: mx, y: my, z: mz, material });
-              return;
-            }
+            bootstrapPyramidCell(world, mx, my, mz, resolved.axisKey, material);
+            onChange();
+            if (onPlaced) onPlaced({ x: mx, y: my, z: mz, material });
+            return;
           }
           if (onPieceNoOp) onPieceNoOp('add');
           return;
@@ -1759,12 +1753,10 @@ export function createBuildController({
           });
           if (newAxisKey) {
             const material = getMaterial();
-            if (canPlaceMaterial(material, bnx, bny, bnz)) {
-              bootstrapPyramidCell(world, bnx, bny, bnz, newAxisKey, material);
-              onChange();
-              if (onPlaced) onPlaced({ x: bnx, y: bny, z: bnz, material });
-              return;
-            }
+            bootstrapPyramidCell(world, bnx, bny, bnz, newAxisKey, material);
+            onChange();
+            if (onPlaced) onPlaced({ x: bnx, y: bny, z: bnz, material });
+            return;
           }
         }
         if (onPieceNoOp) onPieceNoOp('add');
@@ -1791,15 +1783,14 @@ export function createBuildController({
     const nz = cell.z + dz;
     const material = getMaterial();
     // isValidCell's own even-parity check is dropped here (not touched
-    // globally -- every other system that calls it, claims/asteroids/
-    // growth/shell-counting included, is untouched): it was never an
+    // globally -- every other system that calls it, shell-counting
+    // included, is untouched): it was never an
     // intrinsic geometric requirement, just where the original seed
     // happened to sit -- FCC packing is translation-symmetric, so a
     // structure built from an odd-parity seed (reached via
     // resolveGrowthOffset's own pure-axis growth) tiles exactly as
     // safely as the original. Only real occupancy is checked now.
     if (world.has(nx, ny, nz)) return;
-    if (!canPlaceMaterial(material, nx, ny, nz)) return;
     const data = getPieceType() === 'cube' ? { material, pyramids: 0 } : { material };
     world.addCell(nx, ny, nz, data);
     onChange();
@@ -1820,8 +1811,7 @@ export function createBuildController({
 
     // TO piece tier: same reasoning as onClick's own handleToClick gate
     // above -- routed BEFORE the generic cellAt() resolution, which
-    // doesn't know bccMesh's own instance-id space, and before the
-    // mining check below (a TO is never an asteroid node).
+    // doesn't know bccMesh's own instance-id space.
     if (mode === 'build' && getPieceType() === 'to' && bccWorld && bccMesh) {
       if (hit.object !== bccMesh || hit.instanceId === undefined) return;
       const bccCell = bccCellAt(hit.instanceId);
@@ -1887,46 +1877,32 @@ export function createBuildController({
 
     const cell = cellAt(hit);
     if (!cell) return;
-    // Mining is checked BEFORE the getMode() gate, deliberately -- harvesting
-    // an asteroid cell is allowed regardless of mode, walking included; only
-    // editing a NON-asteroid cell still needs a real mode.
-    if (cell.asteroidNodeId && mineRemote) {
-      // Shared World: NOT optimistic here, unlike every other removal in this
-      // function -- the cell only disappears once the server confirms via
-      // realtime (render.js's applyRemoteDelete).
-      mineRemote(cell.x, cell.y, cell.z);
-      return;
-    }
-    if (cell.asteroidNodeId) {
-      mineAsteroidCell(world, cell, getOwnerId());
+    // No mode (falsy) -- general editing stays disabled.
+    // 'bcc' -- BCC mode's own right-click removal lives in core/bcc-build.js.
+    // 'cubocta' -- same, lives in core/cubocta-build.js.
+    // 'dualize' -- view-only (reframe Stage 3): right-click must not
+    // delete the clicked cell, same reasoning as every other read-only mode.
+    if (!mode || mode === 'bcc' || mode === 'cubocta' || mode === 'dualize') return;
+    // Add's own quick Remove gesture (direct instruction 2026-08-26,
+    // for touch: tap to Add, long-press to Remove -- long-press is
+    // already wired to synthesize this exact event, see onTouchStart
+    // below): while actively in Add mode with the Pyramid piece tier
+    // selected, right-click/long-press removes just that one pyramid,
+    // matching what the dedicated Remove button would do for the same
+    // piece tier, instead of always deleting the whole cell. Every
+    // other mode/piece-tier combination keeps this function's own
+    // long-standing universal contract unchanged -- "always removes
+    // the clicked cell, in every mode" (this file's own header) --
+    // deliberately not generalized further than the Add/Remove pair
+    // itself, so e.g. long-pressing in Fill mode still behaves exactly
+    // as it always has regardless of whatever piece tier is selected.
+    if (mode === 'build' && getPieceType() === 'pyramid') {
+      const axisKey = resolveClickedPyramidAxis(hit, cell);
+      if (!axisKey) { if (onPieceNoOp) onPieceNoOp('remove'); return; }
+      const result = applyPyramidEdit(world, 'remove', cell.x, cell.y, cell.z, axisKey);
+      if (!result) { if (onPieceNoOp) onPieceNoOp('remove'); return; } // no-op: that pyramid's already gone
     } else {
-      // e.g. Walk mode active (falsy) -- general editing stays disabled.
-      // 'bcc' -- BCC mode's own right-click removal lives in core/bcc-build.js.
-      // 'cubocta' -- same, lives in core/cubocta-build.js.
-      // 'dualize' -- view-only (reframe Stage 3): right-click must not
-      // delete the clicked cell, same reasoning as every other read-only mode.
-      if (!mode || mode === 'bcc' || mode === 'cubocta' || mode === 'dualize') return;
-      // Add's own quick Remove gesture (direct instruction 2026-08-26,
-      // for touch: tap to Add, long-press to Remove -- long-press is
-      // already wired to synthesize this exact event, see onTouchStart
-      // below): while actively in Add mode with the Pyramid piece tier
-      // selected, right-click/long-press removes just that one pyramid,
-      // matching what the dedicated Remove button would do for the same
-      // piece tier, instead of always deleting the whole cell. Every
-      // other mode/piece-tier combination keeps this function's own
-      // long-standing universal contract unchanged -- "always removes
-      // the clicked cell, in every mode" (this file's own header) --
-      // deliberately not generalized further than the Add/Remove pair
-      // itself, so e.g. long-pressing in Fill mode still behaves exactly
-      // as it always has regardless of whatever piece tier is selected.
-      if (mode === 'build' && getPieceType() === 'pyramid') {
-        const axisKey = resolveClickedPyramidAxis(hit, cell);
-        if (!axisKey) { if (onPieceNoOp) onPieceNoOp('remove'); return; }
-        const result = applyPyramidEdit(world, 'remove', cell.x, cell.y, cell.z, axisKey);
-        if (!result) { if (onPieceNoOp) onPieceNoOp('remove'); return; } // no-op: that pyramid's already gone
-      } else {
-        world.removeCell(cell.x, cell.y, cell.z);
-      }
+      world.removeCell(cell.x, cell.y, cell.z);
     }
     onChange();
     if (onRemoved) onRemoved(cell);

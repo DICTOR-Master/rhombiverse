@@ -31,56 +31,6 @@ function readSelectOptions(selectEl) {
 }
 
 const CSS = `
-#wheel-picker-strip {
-  position: fixed; left: 0; right: 0; bottom: 18px;
-  z-index: 985;
-  display: none;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
-  padding: 0 12px;
-}
-#wheel-picker-strip.open { display: flex; }
-/* Direct instruction 2026-08-26: read as part of the wheel's own
-   faceted/wireframe visual language, not a flat, disconnected 2D popup
-   -- same SKELETON_COLOR (#4DD0E1, rhombic-wheel-3d-core.js) wireframe
-   treatment and a real diagonal light gradient across the rotated
-   square, suggesting a lit rhombic facet instead of a solid-fill tile. */
-.wheel-picker-item {
-  min-width: 56px; height: 56px; padding: 0 6px;
-  background: linear-gradient(135deg, rgba(77, 208, 225, 0.22), rgba(10, 12, 20, 0.92) 60%);
-  border: 1.5px solid rgba(77, 208, 225, 0.55);
-  box-shadow: 0 0 10px rgba(77, 208, 225, 0.15), inset 0 0 14px rgba(77, 208, 225, 0.08);
-  transform: rotate(45deg);
-  cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
-}
-.wheel-picker-item:hover {
-  background: linear-gradient(135deg, rgba(77, 208, 225, 0.4), rgba(30, 45, 60, 0.92) 60%);
-  border-color: #9de0ff;
-  box-shadow: 0 0 16px rgba(157, 224, 255, 0.35), inset 0 0 14px rgba(77, 208, 225, 0.15);
-}
-.wheel-picker-item.current { border-color: #9de0ff; box-shadow: 0 0 16px rgba(157, 224, 255, 0.45), inset 0 0 14px rgba(77, 208, 225, 0.2); }
-.wheel-picker-item span {
-  transform: rotate(-45deg);
-  color: #eaf6ff; font: 600 10px/1.15 system-ui, sans-serif; text-align: center;
-  max-width: 64px;
-}
-/* Piece picker's own real shape icons (RD/Cube/Pyramid/TO, wheel-icons.js
-   pieceRD/pieceCube/piecePyramid/pieceTO) -- same iconFrame() hexagon-
-   wireframe treatment the real wheel faces use, sized down to share the
-   tile with its label instead of replacing it. */
-.wheel-picker-item.has-icon { gap: 0; }
-.wheel-picker-icon { transform: rotate(-45deg); width: 30px; height: 30px; color: #9de0ff; }
-.wheel-picker-icon svg { display: block; width: 100%; height: 100%; }
-.wheel-picker-item.has-icon span { font-size: 8px; max-width: 52px; }
-.wheel-picker-group-label {
-  width: 100%; text-align: center;
-  color: #9cd; font: 11px system-ui, sans-serif; opacity: 0.75;
-  margin: 2px 0;
-}
-
 #color-wheel-overlay {
   position: fixed; inset: 0; z-index: 986;
   display: none;
@@ -152,10 +102,6 @@ export function createWheelPickers({
 } = {}) {
   injectCssOnce();
 
-  const pickerStrip = document.createElement('div');
-  pickerStrip.id = 'wheel-picker-strip';
-  document.body.appendChild(pickerStrip);
-
   const materialWheelOverlay = document.createElement('div');
   materialWheelOverlay.id = 'color-wheel-overlay';
   const materialWheelRoot = document.createElement('div');
@@ -218,63 +164,11 @@ export function createWheelPickers({
     if (e.target === materialWheelOverlay) closeMaterialWheel();
   });
 
-  // Piece picker: was a real mini 3D render here (app/piece-cluster-3d.js,
-  // itself a replacement for an even earlier flat SVG version). Retired
-  // 2026-08-28 -- with 6 real piece tiers now, direct feedback was to
-  // use "the same main real wheel" instead of a bespoke second scene:
-  // Piece is a real WHEEL_PIECE layer on the actual Rhombic Wheel now
-  // (rhombic-wheel-3d-core.js), navigated to and picked from exactly
-  // like every other department, no picker function needed here at all.
-
-  function closePicker() {
-    pickerStrip.classList.remove('open');
-    pickerStrip.innerHTML = '';
-  }
-
-  function openPickerStrip(options, onPick, currentValue) {
-    pickerStrip.innerHTML = '';
-    let lastGroup = undefined;
-    for (const opt of options) {
-      if (opt.group !== lastGroup) {
-        lastGroup = opt.group;
-        if (opt.group) {
-          const groupLabel = document.createElement('div');
-          groupLabel.className = 'wheel-picker-group-label';
-          groupLabel.textContent = opt.group;
-          pickerStrip.appendChild(groupLabel);
-        }
-      }
-      const item = document.createElement('div');
-      item.className = 'wheel-picker-item';
-      item.tabIndex = 0;
-      if (opt.value === currentValue) item.classList.add('current');
-      if (opt.icon) {
-        item.classList.add('has-icon');
-        const iconEl = document.createElement('span');
-        iconEl.className = 'wheel-picker-icon';
-        iconEl.innerHTML = opt.icon;
-        item.appendChild(iconEl);
-      }
-      const span = document.createElement('span');
-      span.textContent = opt.label;
-      item.appendChild(span);
-      item.addEventListener('click', () => {
-        onMenuSound();
-        onPick(opt.value, opt.label);
-        closePicker();
-        onSelectionChange();
-      });
-      pickerStrip.appendChild(item);
-    }
-    pickerStrip.classList.add('open');
-  }
-
   // Own Escape handling for these overlays -- independent of whatever
   // else (the 3D wheel, a panel) might also listen for Escape.
   window.addEventListener('keydown', (e) => {
     if (e.code !== 'Escape') return;
     if (materialWheelOverlay.classList.contains('open')) closeMaterialWheel();
-    else if (pickerStrip.classList.contains('open')) closePicker();
   });
 
   // Renamed from openMaterialPicker (2026-09-23, direct instruction: "it
@@ -299,20 +193,12 @@ export function createWheelPickers({
     // (direct report 2026-09-25).
     openMaterialWheel(options, (value, label) => { select.value = value; select.dispatchEvent(new Event('change')); onPick?.(value, label); }, select.value, paint);
   }
-  // openSpeciesPicker/openGeneratorPicker (both used openPickerStrip, below)
-  // removed 2026-09-22 (second world-building removal pass) -- their only
-  // callers (Cultivate's Plant, Rhombitect's Generate a Body) were
-  // archived along with growth/evolution/cultivation and planetoidgen.
-  // openPickerStrip/pickerStrip themselves stay: isAnyPickerOpen/
-  // closeAnyPicker (below) still check/close the strip generically for
-  // the color-picker-close-on-navigate interplay render.js relies on.
-
   return {
     openColorPicker,
     // For a caller (the 3D wheel's Tab/Space/HUD-cue handling) that
     // wants to close whichever of these is open before doing anything
     // else, same UX the old 2D wheel had for its own Tab/Space handler.
-    isAnyPickerOpen: () => materialWheelOverlay.classList.contains('open') || pickerStrip.classList.contains('open'),
-    closeAnyPicker: () => { closeMaterialWheel(); closePicker(); },
+    isAnyPickerOpen: () => materialWheelOverlay.classList.contains('open'),
+    closeAnyPicker: () => closeMaterialWheel(),
   };
 }

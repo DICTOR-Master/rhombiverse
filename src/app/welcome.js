@@ -1,9 +1,6 @@
 // First-run welcome/entry overlay: rotating RD logo with a static
 // integrated "ENTER" label, legal-doc links. Purely a DOM/localStorage
-// concern, independent of render.js/world state. Used to also offer
-// a Pure Rhombeometry / Full World mode choice here -- removed along with
-// World Systems retirement (see features.js/settings.js); there's only
-// one mode now.
+// concern, independent of render.js/world state.
 import { buildRDFaces } from './rhombic-wheel-3d-core.js';
 import { getSettings, onSettingsChange } from './settings.js';
 import { t } from './i18n.js';
@@ -212,11 +209,6 @@ function init() {
   onSettingsChange((s) => { const p = overlay.querySelector('.overview'); if (p) p.innerHTML = overviewHtml(s.language); });
 
   let stopLogoSpin = () => {};
-
-  // Mode choice (Pure Rhombeometry vs. Full World) removed along with
-  // World Systems retirement -- there's only one real mode now, so
-  // there's nothing left to choose. settings.js's getSettings() forces
-  // pureGeometry true unconditionally regardless of this file.
 
   const aboutBtn = document.createElement('button');
   aboutBtn.id = 'about-btn';

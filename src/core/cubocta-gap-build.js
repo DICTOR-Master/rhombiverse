@@ -60,7 +60,7 @@ export function createCuboctaGapBuildController({
   octGapWorld,
   onChange,
   getMaterial,
-  isActive, // () => boolean -- Gap Octahedron sub-piece currently selected within Cuboctahedron Build mode (and not walking)
+  isActive, // () => boolean -- Gap Octahedron sub-piece currently selected within Cuboctahedron Build mode
 }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();

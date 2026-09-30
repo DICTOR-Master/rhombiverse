@@ -1,10 +1,5 @@
-// Ammann-rhombohedra tiling geometry -- the deterministic, live half of
-// growth.js kept after the 2026-09-22 split (second world-building
-// removal pass). Extracted from growth.test.mjs, which tested the
-// growth-over-time engine half (now archived, see
-// tests/unit/growth-archived.test.mjs... actually kept as
-// growth.test.mjs itself, which tested the retired engine and was deleted 2026-09-24)
-// alongside this geometry. Zero npm dependencies, same as lattice.js.
+// Ammann-rhombohedra tiling geometry (geometry-extensions/growth.js).
+// Zero npm dependencies, same as lattice.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

@@ -5,17 +5,12 @@
 // this app is plain ES modules rather than TypeScript/React). Same
 // scoping discipline as that file: covers ONLY this app's own
 // interface strings (buttons, panel headers, hints, tooltips) -- never
-// material/species/piece-type/world-preset names, "the same way a
-// karaoke machine never translates a song title."
+// color/piece-type/world-preset names, "the same way a karaoke machine
+// never translates a song title."
 //
 // Phase 1 (this file, 2026-09-17): the always-visible chrome (HUD,
-// Settings panel basics, walk mode, World import/export/sharing,
-// Shells, Gallery, Welcome overlay). Deliberately NOT yet covered, a
-// follow-up phase: the Sculpt panel, the Cultivate panel, the "Your Own
-// AI" BYOK section, the gravity-info/evolution-info simulation-status
-// hints (heavily interpolated, multi-clause -- need their own
-// decomposition design, not a straight swap), and the hidden/superseded
-// "Advanced Building" mode-button row.
+// Settings panel basics, World import/export/sharing, Shells, Gallery,
+// Welcome overlay).
 //
 // Phase 2 (2026-09-25, 5D/6D stage 8): the 4D/5D/6D panels, their Info
 // boxes and prompts, and the whole Wizard (every screen, including the

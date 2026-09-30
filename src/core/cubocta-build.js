@@ -65,7 +65,7 @@ export function createCuboctaBuildController({
   cuboctaWorld,
   onChange,
   getMaterial,
-  isActive, // () => boolean -- Cuboctahedron mode currently selected (and not walking)
+  isActive, // () => boolean -- Cuboctahedron mode currently selected
 }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();

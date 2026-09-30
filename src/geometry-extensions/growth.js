@@ -1,13 +1,5 @@
-// Ammann-rhombohedra tiling geometry -- deterministic, on-demand math only.
-// Trimmed 2026-09-22 (second world-building removal pass) from the original
-// growth.js, which also carried a real growth-over-time engine (species
-// templates, tick-rate-limited growSeed/applyGrowth/plantSeed/pruneTile).
-// That engine is archived in full at
-// the old growth engine (deleted 2026-09-24 with the rest of the
-// retired systems -- see docs/HISTORY-retired-systems.md).
-//
-// What's kept here is genuinely reusable, non-simulated geometry: the 12
-// star directions, the valid acute/oblate rhombohedron triples they form,
+// Ammann-rhombohedra tiling geometry -- deterministic, on-demand math
+// only: the 12 star directions, the valid acute/oblate rhombohedron triples they form,
 // a single tile's vertices, and a real 3D SAT overlap test between two
 // tiles. render.js's live Duality Mode feature (VALID_TRIPLES,
 // unitTileVertices) depends on this directly.

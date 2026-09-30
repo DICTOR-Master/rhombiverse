@@ -60,7 +60,7 @@ function build() {
 
   overlay.querySelector('#guide-close').addEventListener('click', closeGuide);
   // In-page #anchor links scroll inside the overlay instead of touching
-  // location.hash, which the app itself uses for shared-world links.
+  // location.hash, which the app itself uses for share links.
   overlay.querySelector('#guide-body').addEventListener('click', (e) => {
     const a = e.target.closest('a[href^="#"]');
     if (!a) return;

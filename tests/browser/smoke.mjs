@@ -70,12 +70,9 @@ async function main() {
 
   // Nothing is saved to localStorage until the first onChange() fires
   // (documented, pre-existing behavior -- render.js only persists on a
-  // real mutation, not right after initial seeding), and the starting
-  // cell count isn't just the seed cell either -- seedAsteroidBelts()
-  // runs unconditionally in init(), even in local-only mode (the two
-  // belts are real, minable content locally too, not just in Shared
-  // World). So this checks the DELTA from one build action, not an
-  // absolute count -- the only thing actually worth asserting here.
+  // real mutation, not right after initial seeding). So this checks the
+  // DELTA from one build action, not an absolute count -- the only thing
+  // actually worth asserting here.
   const cellCount = async () => {
     const raw = await page.evaluate(() => localStorage.getItem('rhombiverse-world'));
     return raw ? Object.keys(JSON.parse(raw).cells).length : 0;

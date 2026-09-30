@@ -196,13 +196,6 @@ export function resolveWheelFaces(wheelConfig) {
 }
 
 
-// World Systems retirement: the "Trade" face this gate used to mask
-// (Offer/Accept/Inventory, the resource/decay economy) is now a plain
-// Spare face directly in WHEEL_HOME's own definition above -- a genuine
-// blank rather than a real department masked at render time. Mining/
-// achievements/animals/hydrosphere never had dedicated wheel faces at
-// all, so no other gate was ever needed here.
-
 // BCC Lattice feature gate (added 2026-08-28, WHEEL_PIECE): the 3 BCC/
 // interstitial piece tiers only mean anything when FEATURES.bccLattice
 // is on (Rhombeometry mode) -- Full World has no BCC/interstitial
@@ -264,8 +257,8 @@ export const DUPLICATE_HOME_FACE = {
 // (Symmetry, Generate a Body, Plant a Seed/Plant) is cut down to the
 // single copy on its real mechanism wheel -- "one tool, one doorway."
 // "Rhombitect" and "Rhombivate" (both invented portmanteaus, sitting
-// next to plain-English "Trade"/"Explore"/"Build"/"Alter" on the same
-// Home wheel) are relabeled to "Blueprint" and "Cultivate" -- label
+// next to plain-English "Build"/"Alter" on the same Home wheel) are
+// relabeled to "Blueprint" and "Cultivate" -- label
 // only, the internal id/action ("rhombitect", "navigateTo:cultivate")
 // is untouched, so no other file needs to change. See LESSONS.md /
 // session notes for the full before/after audit.
@@ -378,15 +371,6 @@ export const WHEEL_PIECE = {
   }
 };
 
-
-// WHEEL_CULTIVATE (Plant/Prune/Growth Parameters) removed 2026-09-22
-// along with the rest of the second world-building removal pass (growth/
-// evolution/cultivation) -- see README.md. Its own "Cultivate" doorway on
-// WHEEL_HOME is now a plain Spare face (see that wheel's own comment).
-
-// WHEEL_TRADE (Offer/Accept/Inventory) removed 2026-09-17 along with the
-// rest of World Systems -- see README.md. Its own "Trade" doorway on
-// WHEEL_HOME is now a plain Spare face (see that wheel's own comment).
 
 // Rhombisis (unified "genesis" doorway for Symmetry/Generate a Body/
 // Plant a Seed/BCC Build) retired 2026-09-02 -- see WHEEL_HOME's own
@@ -596,8 +580,7 @@ export const ALL_WHEELS = {
 // text label exactly as today. Deliberately NOT a guess-to-fill-every-
 // face table: the spec explicitly says not to guess silently, and
 // several real actions (tool:material, tool:repeat, tool:generateBody,
-// tool:offer/accept/inventory, tool:plant/growthParams/prune, and the
-// department-nav faces themselves) have no resolved row.
+// and the department-nav faces themselves) have no resolved row.
 //
 // Lives here (rhombic-wheel-3d-core.js), not rhombic-wheel-3d.js, even
 // though it's only ever consumed there for real icon rendering -- moved
