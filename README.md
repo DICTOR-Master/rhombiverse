@@ -39,17 +39,17 @@ right-click) removes. The **User Guide** (in the app, or at
   edge by hand again, alike parts in one tap ("directions are free,
   dimensions are earned"):
   - **Square** → cube → tesseract (cube within a cube, turning through W);
-  - **Kagome**: hexagon → star → the Kagome lattice → 3D pyrochlore
+  - **Kagome**: hexagon → star → the Kagome lattice → 3D+ pyrochlore
     (truncated tetrahedron, then its tetrahedra) → 4D hyper-pyrochlore
     (truncated 5-cell, then its 5-cells); body cyan, limbs gold;
   - **RD**, the flagship: the RD's own rhombus → the rhombic dodecahedron,
     its cube inside first, then its six pyramids → its lattice → 4D, the
     24-cell (the RD is its shadow: its corners split apart in W).
-  Each closed shape shows its lattice and opens in its own dimension (2D,
-  3D, 4D); the indicator beside Wizard reads 1D+/2D/3D/4D as you go.
+  Each closed shape shows its lattice and opens in its own dimension (2D+,
+  3D+, 4D); the indicator beside Wizard reads 1D+/2D+/3D+/4D as you go.
   ⊘ beside Undo clears to start again; a Signal | Construct toggle
   switches worlds.
-- **2D** — five tiles (Parallelogram, Triangle, Hexagon, Kite, Kagome) on
+- **2D+** — five tiles (Parallelogram, Triangle, Hexagon, Kite, Kagome) on
   four lattice angles (Square, RD Rhombus, Golden Rhombus, Triangular),
   plus the Rhombille pattern.
   **Kaleidoscope**, a 2D world of its own: Penrose thick and thin rhombi,
@@ -67,7 +67,7 @@ right-click) removes. The **User Guide** (in the app, or at
 - **Paint** — in every dimension but 1D+, the brush recolours pieces
   you've already placed (except Shells and Golden Rhombohedra, coloured by
   band and type); in 4D it sits in the 4D panel.
-- **3D** — every piece listed under the lattice it lives on:
+- **3D+** — every piece listed under the lattice it lives on:
   - **FCC**: rhombic dodecahedron (RD), Hemi RD, Hourglass, RD Quarter,
     Cube, Pyramid
   - **RD Dual**: Cuboctahedron, Octahedron

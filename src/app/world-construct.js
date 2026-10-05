@@ -47,6 +47,7 @@ import * as THREE from 'three';
 import { PLANS, edgeCells, SQUARE_N } from '../geometry-extensions/construction.js';
 import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
+import { dimensionLabel } from './dimension-label.js';
 import { getSettings, onSettingsChange } from './settings.js';
 
 const STORAGE_KEY = 'rhombiverse-1d-construct-world';
@@ -511,7 +512,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
     panel.classList.toggle('visible', active && (latticeReady() || !!milestoneAt()?.open));
     const open = milestoneAt()?.open;
     openBtn.hidden = !open;
-    if (open) openBtn.textContent = t('con.open', lang(), { dim: open.dim });
+    if (open) openBtn.textContent = t('con.open', lang(), { dim: dimensionLabel(open.dim) });
     latticeBtn.hidden = !latticeReady();
     latticeBtn.classList.toggle('active', latticeOn);
     latticeBtn.title = t('con.lattice', lang());

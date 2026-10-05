@@ -22,6 +22,7 @@ import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extens
 import { packing, voidSphereRadius, TANGENT_R, RADIUS_MAX } from './geometry-extensions/sphere-packing.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
+import { dimensionLabel } from './app/dimension-label.js';
 import { createWorld4D } from './app/world-4d.js';
 import { createQuasicrystalWorld } from './app/world-quasicrystal.js';
 import { createShellsWorld } from './app/world-shells.js';
@@ -6047,14 +6048,14 @@ function animate() {
   // change activeDimension; not yet chosen means the default 3D world).
   // In Construct it also shows the dimensions built so far (direct
   // request: "1D/2D/3D should show on the indicator, but only 1D orange").
-  // 1D shows as 1D+ (it interacts with the other dimensions), except in
-  // Signal, which is purely one-dimensional (direct remark: "arguably
-  // Signal is purely 1D").
-  const dimText = own3D === 'construct' && own3DActive() ? ['1D+', '2D', '3D', '4D'].slice(0, constructWorld.reached()).join('/')
+  // 1D, 2D and 3D show as 1D+, 2D+ and 3D+ (they interact with the other
+  // dimensions; 4D-6D keep their names), except Signal, which is purely
+  // one-dimensional (direct remark: "arguably Signal is purely 1D").
+  const dimText = own3D === 'construct' && own3DActive() ? ['1D+', '2D+', '3D+', '4D'].slice(0, constructWorld.reached()).join('/')
     : own3D === 'signal' && own3DActive() ? '1D'
     // Nets: 2D, and 2D/3D once it folds.
-    : own3D === 'nets' && own3DActive() ? (netsWorld.folded ? '2D/3D' : '2D')
-    : activeDimension === '1D' ? '1D+' : activeDimension ?? '3D';
+    : own3D === 'nets' && own3DActive() ? (netsWorld.folded ? '2D+/3D+' : '2D+')
+    : dimensionLabel(activeDimension ?? '3D');
   const oneD = (own3D === 'signal' || own3D === 'construct') && own3DActive();
   if (hud1dToggleEl && hud1dToggleEl.hidden === oneD) hud1dToggleEl.hidden = !oneD;
   if (onedClearEl) {

@@ -472,9 +472,9 @@ export const WHEEL_DIMENSION = {
   id: "dimension",
   noUniversalRing: true,
   faces: {
-    "equator|sx1sy1":   { kind: "dept", label: "3D", action: "tool:selectDimension:3D",
+    "equator|sx1sy1":   { kind: "dept", label: "3D+", action: "tool:selectDimension:3D",
       desc: "FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app's existing lattice core." },
-    "equator|sx-1sy-1": { kind: "dept", label: "3D", action: "tool:selectDimension:3D",
+    "equator|sx-1sy-1": { kind: "dept", label: "3D+", action: "tool:selectDimension:3D",
       desc: "FCC (Rhombic Dodecahedron) and BCC (Truncated Octahedron) -- this app's existing lattice core." },
     "equator|sx1sy-1":  { kind: "dept", label: "4D", action: "tool:selectDimension:4D",
       desc: "Tesseract, D4 (24-cell, 16-cell) and Hyper-pyrochlore (4D Kagome)." },
@@ -489,9 +489,9 @@ export const WHEEL_DIMENSION = {
     // square rhombus when its familiar name is square") -- a real,
     // separate Rhombus family is still planned, after Triangular.
     // Hexagon shipped next. Triangular still planned.
-    "top|sy1sz1":       { kind: "dept", label: "2D", action: "tool:selectDimension:2D",
+    "top|sy1sz1":       { kind: "dept", label: "2D+", action: "tool:selectDimension:2D",
       desc: "Square, Hexagon, and Triangle (shipped) -- a real (non-square) Rhombi family still planned." },
-    "bottom|sy-1sz-1":  { kind: "dept", label: "2D", action: "tool:selectDimension:2D",
+    "bottom|sy-1sz-1":  { kind: "dept", label: "2D+", action: "tool:selectDimension:2D",
       desc: "Square, Hexagon, and Triangle (shipped) -- a real (non-square) Rhombi family still planned." },
     "top|sy-1sz1":      { kind: "dept", label: "5D", action: "tool:selectDimension:5D",
       desc: "Decagonal quasicrystal -- Penrose rhombus layers sliced from Z5." },

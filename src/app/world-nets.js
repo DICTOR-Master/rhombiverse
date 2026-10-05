@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { netOf, netSteps, SOLIDS, SOLID_GROUPS, apply } from '../geometry-extensions/nets.js';
 import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
+import { dimensionLabel } from './dimension-label.js';
 import { getSettings, onSettingsChange } from './settings.js';
 
 const STORAGE_KEY = 'rhombiverse-nets-world';
@@ -273,7 +274,7 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
     slider.setAttribute('aria-label', slider.title);
     // Open in 3D where the 3D world has this solid as a piece.
     openBtn.hidden = fold < 1 || !SOLIDS[solid].piece;
-    openBtn.textContent = t('con.open', lang(), { dim: '3D' });
+    openBtn.textContent = t('con.open', lang(), { dim: dimensionLabel('3D') });
   }
   let shownLang = lang();
   onSettingsChange((st) => { if (st.language !== shownLang) { shownLang = st.language; if (active) renderPanel(); } });

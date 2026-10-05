@@ -45,6 +45,7 @@ import { VALID_TRIPLES, unitTileVertices } from '../geometry-extensions/growth.j
 import { PRISM_HEIGHT } from '../geometry-extensions/quasicrystal.js';
 import { loadCatalogue, findBySerial, pieceCount } from '../geometry-extensions/quasicrystal-catalogue.js';
 import { t, tn } from './i18n.js';
+import { dimensionLabel } from './dimension-label.js';
 import { getSettings } from './settings.js';
 
 const CSS = `
@@ -167,11 +168,12 @@ const DIMENSIONS = [
   // which meant toggling angle silently swapped to an unrelated store
   // instead of reshaping the one you'd actually built. See
   // lattice2dSeedCell's own header in render.js for the full incident.
-  // Shown as 1D+ (direct request: "much of the mode is interacting with
-  // other dimensions, and purists might complain"); its id stays 1D.
-  { id: '1D', label: '1D+', preview: () => signalEdges() },
-  { id: '2D', label: '2D', preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: START_LATTICE_ANGLE.angleDeg }) },
-  { id: '3D', label: '3D', previewAction: 'tool:pieceType:rd' },
+  // 1D, 2D and 3D show as 1D+, 2D+ and 3D+ (dimension-label.js; direct
+  // request: "much of the mode is interacting with other dimensions");
+  // their ids stay 1D, 2D, 3D.
+  { id: '1D', label: dimensionLabel('1D'), preview: () => signalEdges() },
+  { id: '2D', label: dimensionLabel('2D'), preview: () => lattice2dEdges({ primitiveId: LATTICE_PRIMITIVES[0].id, angleDeg: START_LATTICE_ANGLE.angleDeg }) },
+  { id: '3D', label: dimensionLabel('3D'), previewAction: 'tool:pieceType:rd' },
   { id: '4D', label: '4D', preview: () => edges4D('cell24') },
   { id: '5D', label: '5D', preview: () => edges5D() },
   { id: '6D', label: '6D', preview: () => edges6D() },
