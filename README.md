@@ -98,7 +98,8 @@ right-click) removes. The **User Guide** (in the app, or at
   where it belongs to the true aperiodic tiling and red where the build has
   drifted; Lattice View shows the true tiling around your build.
 - **Icosahedral/Dodecahedral Transitions (IDT)** (a 3D world of its own) —
-  DICTO's Euclid–Kepler cell: Euclid's roofs on a cube make a regular
+  DICTO's Euclid–Kepler cell (archived:
+  [doi:10.5281/zenodo.23173809](https://doi.org/10.5281/zenodo.23173809)): Euclid's roofs on a cube make a regular
   dodecahedron, and folding the roofs back through the cube's faces makes a
   regular icosahedron, edges φ² : φ : 1. Build with cubes, dodecahedra,
   icosahedra and great stellated dodecahedra (Kepler's star) on its cubic
