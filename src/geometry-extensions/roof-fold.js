@@ -1,4 +1,4 @@
-// Roof-fold cell: a cube of edge 2 centred at the origin, the regular
+// Euclid–Kepler cell: a cube of edge 2 centred at the origin, the regular
 // dodecahedron made by putting Euclid's roofs on it, and the regular
 // icosahedron made by reflecting the 12 roof vertices back through the cube
 // faces. Copies at every translation by 2 along x, y, z form the structure;

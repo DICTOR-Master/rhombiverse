@@ -1,4 +1,4 @@
-// Verifies DICTO's roof-fold cell (geometry-extensions/roof-fold.js;
+// Verifies DICTO's Euclid–Kepler cell (geometry-extensions/roof-fold.js;
 // Kaleidohedra DISCOVERIES.md #8), the Icosahedral/Dodecahedral Transitions world's geometry:
 //
 //   - cube, dodecahedron and icosahedron are regular, with edges
@@ -9,7 +9,9 @@
 //   - each icosahedron face has one node at 2/phi from its three corners,
 //     the 20 tips are the dodecahedron's vertices, apex 36 degrees;
 //   - the node set's symmetry is the 24 operations of m-3 about the origin,
-//     with only lattice translations: Pm-3, nodes on 1b and 12j (0, y, z).
+//     with only lattice translations: Pm-3, nodes on 1b and 12j (0, y, z);
+//     these are exactly the cube's symmetries of the icosahedron, axes aligned:
+//     31 icosahedral axes parallel in every cell, 7 of them crystal-wide;
 //   - the four placeable solids (cube, dodecahedron, icosahedron, and the
 //     star, which is the great stellated dodecahedron) are closed and outward
 //     with exact volumes, and nest;
@@ -125,6 +127,50 @@ check('each works with a lattice translation only (symmorphic, origin on the ico
 const stab = (v) => ops.filter((op) => key(op.f(v)) === key(v)).length;
 check(`corner node is fixed by all 24 (Wyckoff 1b); each icosahedron vertex by 2, a mirror (12j, (0, y, z), y = ${(1 / (2 * PHI)).toFixed(4)}, z = ${(1 / (2 * PHI ** 2)).toFixed(4)} in cell units)`,
   ops.filter((op) => op.even).every((op) => key(op.f([1, 1, 1])) === key([1, 1, 1])) && C.ico.every((v) => ops.filter((op) => op.even && key(op.f(v)) === key(v)).length === 2) && C.ico.every((v) => v.some((c) => Math.abs(c) < EPS)) && stab([1, 1, 1]) === 48);
+
+const S_FACES_FOR_ALIGN = roofFoldSolids().ico.faces;
+// 5b. Alignment: the cubic symmetries that keep the structure are exactly the cube's symmetries
+// that are also symmetries of the icosahedron (m-3 = m-3m intersected with the icosahedral group),
+// the most of the icosahedron's symmetry a periodic crystal can keep. Its axes line up with the
+// cube's: the 3 cube axes are icosahedral 2-fold axes, the 4 body diagonals icosahedral 3-fold axes
+// (normals of 8 of its faces), and every cell's solids share one orientation.
+{
+  const icoSet = new Set(C.ico.map((v) => v.map((c) => c.toFixed(7)).join()));
+  const keepsIco = ops.filter((op) => C.ico.every((v) => icoSet.has(op.f(v).map((c) => (c + 0).toFixed(7)).join())));
+  const sameOps = keepsIco.length === 24 && keepsIco.every((op) => op.even) && ops.filter((op) => op.even).every((op) => keepsIco.includes(op));
+  const icoFaceNormals = S_FACES_FOR_ALIGN.map((t) => { const n = cross(sub(t[1], t[0]), sub(t[2], t[0])); return n.map((c) => c / norm(n)); });
+  const diagonals = [[1, 1, 1], [1, 1, -1], [1, -1, 1], [-1, 1, 1]].map((d) => d.map((c) => c / Math.sqrt(3)));
+  const diagOk = diagonals.every((d) => icoFaceNormals.some((n) => Math.abs(Math.abs(dot(n, d)) - 1) < EPS));
+  const axesOk = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].every((a) => AXES.some((b) => norm(cross(a, b)) < EPS));
+  check('aligned: the 24 operations kept are exactly the cube symmetries of the icosahedron (m-3); cube axes are icosahedral 2-fold axes, body diagonals icosahedral 3-fold axes', sameOps && diagOk && axesOk);
+}
+
+// 5c. Every cell's solids carry the icosahedron's 31 rotation axes (6 five-fold through vertex pairs,
+// 10 three-fold through face pairs, 15 two-fold through edge pairs), all parallel from cell to cell
+// since every cell is a translate. Of these, exactly 7 are symmetries of the whole crystal: the 3
+// cube axes (two-fold) and the 4 body diagonals (three-fold); the other 24 are local, aligned.
+{
+  const dirKey = (v) => { let u = v.map((c) => c / norm(v)); const i = u.findIndex((c) => Math.abs(c) > 1e-9); if (u[i] < 0) u = u.map((c) => -c); return u.map((c) => (c + 0).toFixed(6)).join(); };
+  const five = new Set(C.ico.map(dirKey));
+  const three = new Set(S_FACES_FOR_ALIGN.map((t) => dirKey(t.reduce(add))));
+  const two = new Set(C.icoEdges.map(([i, j]) => dirKey(add(C.ico[i], C.ico[j]))));
+  // A rotation axis is kept by the crystal when the kept operations include a rotation about it.
+  const keptRotAxes = new Set();
+  for (const op of ops.filter((o) => o.even)) {
+    const M = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map((e) => op.f(e)); // columns
+    const det = dot(M[0], cross(M[1], M[2]));
+    if (det < 0) continue; // rotations only
+    const trace = M[0][0] + M[1][1] + M[2][2];
+    if (Math.abs(trace - 3) < 1e-9) continue; // identity
+    const axis = [M[1][2] - M[2][1], M[2][0] - M[0][2], M[0][1] - M[1][0]];
+    const ax = norm(axis) > 1e-9 ? axis : [0, 1, 2].map((k) => M[k][k] > 0 ? 1 : 0); // half-turns: axis = the fixed coordinate
+    keptRotAxes.add(dirKey(norm(axis) > 1e-9 ? axis : ax));
+  }
+  const allIco = new Set([...five, ...three, ...two]);
+  const keptAreIco = [...keptRotAxes].every((k) => allIco.has(k));
+  check(`each cell's solids carry ${five.size} + ${three.size} + ${two.size} = ${allIco.size} icosahedral axes, all parallel across cells; ${keptRotAxes.size} of them are symmetries of the whole crystal`,
+    five.size === 6 && three.size === 10 && two.size === 15 && allIco.size === 31 && keptRotAxes.size === 7 && keptAreIco);
+}
 
 // 6. The four placeable solids: closed, outward, with their exact volumes.
 const S = roofFoldSolids();

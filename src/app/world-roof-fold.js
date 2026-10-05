@@ -1,5 +1,5 @@
 // Icosahedral/Dodecahedral Transitions (IDT): a 3D world of its own on DICTO's
-// roof-fold cell (Kaleidohedra DISCOVERIES.md #8; geometry in
+// Euclid–Kepler cell (Kaleidohedra DISCOVERIES.md #8; geometry in
 // geometry-extensions/roof-fold.js). Sites are a simple cubic lattice of
 // period phi^2 (icosahedron edge 1). Four solids, one at a time, several per
 // site: cube, dodecahedron, icosahedron, great stellated dodecahedron (the star). Tap a solid to add the
