@@ -58,7 +58,8 @@
     "Sculpt, Sculpture Mode and Cyborg are gone",
     "growth.js",
     "as the project grows",
-    "growth (face-reflection)"
+    "growth (face-reflection)",
+    "golden-rhombohedron armature system for sculpture"
   ],
   "appTerms": [
     "grow(s|n|ing|th)?",
