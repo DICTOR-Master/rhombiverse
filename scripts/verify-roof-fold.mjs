@@ -10,8 +10,9 @@
 //     the 20 tips are the dodecahedron's vertices, apex 36 degrees;
 //   - the node set's symmetry is the 24 operations of m-3 about the origin,
 //     with only lattice translations: Pm-3, nodes on 1b and 12j (0, y, z).
-//   - the four placeable solids (cube, dodecahedron, icosahedron, 20-point
-//     star) are closed and outward with exact volumes, and nest;
+//   - the four placeable solids (cube, dodecahedron, icosahedron, and the
+//     star, which is the great stellated dodecahedron) are closed and outward
+//     with exact volumes, and nest;
 //   - face neighbours' dodecahedra overlap, edge neighbours only touch;
 //   - the merged-dodecahedra surface encloses exactly the union, edges without seams;
 //   - colouring sites by parity leaves only even translations: Fm-3; columns,
@@ -142,6 +143,26 @@ for (const k of ROOF_FOLD_KINDS) {
   check(`${k}: ${f.length} faces, closed, outward, volume ${volumeOf(f).toFixed(6)} = ${V[k].toFixed(6)}`, closed(f) && Math.abs(volumeOf(f) - V[k]) < 1e-9);
 }
 check('star: 60 triangles and 90 edges, spike height 2/sqrt3', S.star.faces.length === 60 && S.star.edges.length === 90 && Math.abs(norm(sub(S.star.faces[0][2], S.ico.faces[0].reduce(add).map((c) => c / 3))) - 2 / Math.sqrt(3)) < 1e-9);
+// The star is Kepler's great stellated dodecahedron {5/2, 3}: its 60 visible triangles lie in 12
+// planes, 5 to a plane, each plane's 5 tips a regular pentagram whose edge is phi^3 x the core edge.
+{
+  const byPlane = new Map();
+  for (const t of S.star.faces) {
+    let n = cross(sub(t[1], t[0]), sub(t[2], t[0])); n = n.map((c) => c / norm(n));
+    const k = [...n, dot(t[0], n)].map((c) => (Math.round(c * 1e6) / 1e6 + 0).toFixed(6)).join();
+    if (!byPlane.has(k)) byPlane.set(k, []);
+    byPlane.get(k).push(t[2]);
+  }
+  const base = 2 / PHI ** 2;
+  const pentagrams = [...byPlane.values()].every((tips) => {
+    if (tips.length !== 5) return false;
+    const d = []; for (let i = 0; i < 5; i++) for (let j = i + 1; j < 5; j++) d.push(norm(sub(tips[i], tips[j])));
+    d.sort((a, b) => a - b);
+    // a regular pentagon's 5 sides and 5 diagonals; the pentagram's edge is its diagonal
+    return d.slice(0, 5).every((x) => Math.abs(x - d[0]) < EPS) && d.slice(5).every((x) => Math.abs(x - d[5]) < EPS) && Math.abs(d[5] - PHI ** 3 * base) < EPS;
+  });
+  check('the star is the great stellated dodecahedron: 12 planes of 5 triangles, each a regular pentagram of edge phi^3 x the core edge', byPlane.size === 12 && pentagrams);
+}
 check('icosahedron, star and dodecahedron nest: star inside dodecahedron, icosahedron inside star',
   S.star.faces.flat().every(inside) && Math.abs(V.dodeca - V.star) > 0.1);
 

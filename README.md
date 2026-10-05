@@ -101,7 +101,8 @@ right-click) removes. The **User Guide** (in the app, or at
   DICTO's roof-fold cell: Euclid's roofs on a cube make a regular
   dodecahedron, and folding the roofs back through the cube's faces makes a
   regular icosahedron, edges φ² : φ : 1. Build with cubes, dodecahedra,
-  icosahedra and 20-point stars on its cubic lattice, and view the same build
+  icosahedra and great stellated dodecahedra (Kepler's star) on its cubic
+  lattice, and view the same build
   as alternating patterns (each with its own space group, checked in
   `verify:roof-fold`), a checkerboard, X-ray, or the merged surface of all
   the dodecahedra.
