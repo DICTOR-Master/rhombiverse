@@ -15,7 +15,10 @@
 //   - face neighbours' dodecahedra overlap, edge neighbours only touch;
 //   - the merged-dodecahedra surface encloses exactly the union, edges without seams;
 //   - colouring sites by parity leaves only even translations: Fm-3; columns,
-//     layers and octants give Cmmm, Pmmm and a doubled Pmmm.
+//     layers and octants give Cmmm, Pmmm and a doubled Pmmm;
+//   - two extractions that don't overlap: even-cell dodecahedra (the optimal
+//     lattice packing, (5+sqrt5)/8) and even-cell stars with odd-cell
+//     icosahedra, sharing only corners.
 import { PHI, ROOF_FOLD_PERIOD as P, ROOF_FOLD_KINDS, roofFoldCell, roofFoldSolids, mergedDodecaSurface, mergedDodecaEdges, siteParity, ROOF_FOLD_PATTERNS } from '../src/geometry-extensions/roof-fold.js';
 
 let failures = 0;
@@ -240,6 +243,44 @@ for (const [name, pat] of Object.entries(ROOF_FOLD_PATTERNS)) {
   check(`pattern ${name}: ${opsKept} point operations kept, translations ${e.keep.map((t) => `(${t})`).join(' ')} keep it, ${e.lose.map((t) => `(${t})`).join(' ')} don't -> ${pat.group}`,
     opsKept === e.ops && e.keep.every((t) => keepsP((v) => v, t)) && e.lose.every((t) => !keepsP((v) => v, t)));
 }
+
+// 11. Extractions from the same vertices that don't overlap.
+// (a) Dodecahedra on the even cells alone (an FCC lattice): the 12 nearest touch (checked above,
+// union exactly 2V), the next are 4 apart, beyond two circumradii (2 sqrt3), so none overlap; one
+// dodecahedron per 16 of volume gives density (10 + 2 sqrt5)/16 = (5 + sqrt5)/8, the optimal lattice
+// packing density of the regular dodecahedron (Betke & Henk), each touching 12 others.
+const circum = Math.max(...C.dodeca.map(norm));
+const DIRECTIONS_ODD = [];
+for (const x of [-1, 0, 1]) for (const y of [-1, 0, 1]) for (const z of [-1, 0, 1]) if (siteParity(x, y, z) === 1) DIRECTIONS_ODD.push([2 * x, 2 * y, 2 * z]);
+check(`even-cell dodecahedra: next neighbours 4 apart > 2 circumradii ${(2 * circum).toFixed(4)}; density ${(V.dodeca / 16).toFixed(6)} = (5+sqrt5)/8`,
+  4 > 2 * circum + 1e-9 && Math.abs(V.dodeca / 16 - (5 + Math.sqrt(5)) / 8) < 1e-12);
+// (b) Stars on even cells, icosahedra on odd cells: exact separating-axis test between every
+// convex piece of a star (its icosahedron and 20 spike tetrahedra) and every nearby odd-cell
+// icosahedron; they may touch but never overlap, and each star's 12 roof tips are icosahedron vertices.
+const polyOf = (faces) => ({ verts: faces.flat(), normals: faces.map((f) => cross(sub(f[1], f[0]), sub(f[2], f[0]))), edges: faces.flatMap((f) => f.map((p, i) => sub(f[(i + 1) % f.length], p))) });
+const shift = (P, o) => ({ ...P, verts: P.verts.map((v) => add(v, o)) });
+const spikeFaces = S.star.faces.reduce((acc, f, i) => { (acc[Math.floor(i / 3)] ??= []).push(f); return acc; }, []).map((three) => [...three, [three[0][0], three[2][0], three[1][0]]]);
+const starPieces = [polyOf(S.ico.faces), ...spikeFaces.map(polyOf)];
+const icoPoly = polyOf(S.ico.faces);
+const overlapDepth = (A, B) => {
+  const axes = [...A.normals, ...B.normals];
+  for (const ea of A.edges) for (const eb of B.edges) { const a = cross(ea, eb); if (norm(a) > 1e-9) axes.push(a); }
+  let least = Infinity;
+  for (const ax of axes) {
+    const u = ax.map((c) => c / norm(ax));
+    const pa = A.verts.map((v) => dot(v, u)), pb = B.verts.map((v) => dot(v, u));
+    least = Math.min(least, Math.min(Math.max(...pa), Math.max(...pb)) - Math.max(Math.min(...pa), Math.min(...pb)));
+  }
+  return least; // <= 0 (within rounding) means the interiors are disjoint
+};
+let worst = -Infinity, pairs = 0;
+for (const dx of [-1, 0, 1]) for (const dy of [-1, 0, 1]) for (const dz of [-1, 0, 1]) {
+  if (siteParity(dx, dy, dz) !== 1) continue;
+  const ico = shift(icoPoly, [2 * dx, 2 * dy, 2 * dz]);
+  for (const piece of starPieces) { worst = Math.max(worst, overlapDepth(piece, ico)); pairs++; }
+}
+const tipsOnIco = C.dodeca.slice(8).every((t) => DIRECTIONS_ODD.some((o) => C.ico.some((v) => norm(sub(add(v, o), t)) < EPS)));
+check(`stars on even cells and icosahedra on odd cells share only corners: ${pairs} piece pairs, deepest overlap ${worst.toExponential(1)}; all 12 roof tips are icosahedron vertices`, worst < 1e-9 && tipsOnIco);
 
 console.log(failures === 0 ? '\nAll checks passed (0 failures).' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);
