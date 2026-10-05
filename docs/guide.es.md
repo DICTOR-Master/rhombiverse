@@ -167,9 +167,13 @@ Un mundo 3D para construir **envolventes**: capas de dodecaedros rómbicos (RD),
 
 Un mundo 3D con las dos piezas del teselado de Penrose en 3D. Elígelo en la pantalla 3D+ del Wizard. Toca el contorno cian y luego una cara para añadir la pieza **Alargada** o **Achatada** elegida en el menú Pieza. El **Control Penrose** pinta de verde las piezas que pertenecen al verdadero teselado aperiódico y de rojo las que se han desviado; Lattice View muestra el teselado verdadero alrededor, y tocar un fantasma lo coloca.
 
+Los mismos dos bloques son las piezas de **RHOMBITURE** de DICTO, un sistema de armazón extraíble para tallar y modelar: [doi:10.5281/zenodo.23173896](https://doi.org/10.5281/zenodo.23173896).
+
 ## Transiciones icosaédricas/dodecaédricas (IDT)
 
 Un mundo 3D sobre una única celda exacta. Pon los tejados de Euclides sobre un cubo y obtienes un dodecaedro regular; dobla los tejados hacia dentro por las caras del cubo y forman un icosaedro regular. Las aristas del cubo, el dodecaedro y el icosaedro están en razón φ² : φ : 1. Elígelo en la pantalla 3D+ del Asistente. Toca el contorno cian, elige una **Pieza** (cubo, dodecaedro, icosaedro o gran dodecaedro estrellado) y toca un sólido: la pieza va a esa celda si aún no está, si no a la celda siguiente al otro lado de la cara tocada. Los sólidos pequeños quedan dentro de los grandes, así que usa **Rayos X** o la vista translúcida para verlos. **Vista** redibuja la misma construcción: dos sólidos alternando según un **Patrón**, un damero o la superficie exterior fusionada de todos los dodecaedros. **Vértices** marca las esquinas del cubo o todos los vértices, e **Info** muestra el grupo espacial (Pm-3 para la celda; cada patrón tiene el suyo). Al crecer dodecaedros por sus caras solo se alcanzan celdas del mismo color en el patrón diagonal; crece por una cara de cubo para llegar a las demás.
+
+La celda de este mundo es la **celda Euclid–Kepler**, y los grandes dodecaedros estrellados e icosaedros que solo se tocan por los vértices forman la **red Euclid–Kepler**, ambas de DICTO. Cítalas como [doi:10.5281/zenodo.23173809](https://doi.org/10.5281/zenodo.23173809).
 
 ## RHOMBIS
 

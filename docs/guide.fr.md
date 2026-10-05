@@ -167,9 +167,13 @@ Un monde 3D pour construire des **enveloppes** : des couches de dodécaèdres rh
 
 Un monde 3D avec les deux pièces du pavage de Penrose en 3D. Choisissez-le dans l'écran 3D+ du Wizard. Touchez le contour cyan, puis une face pour ajouter la pièce **Allongée** ou **Aplatie** choisie dans le menu Pièce. Le **Contrôle Penrose** colore en vert les pièces qui appartiennent au vrai pavage apériodique et en rouge celles qui s'en écartent ; Lattice View montre le vrai pavage autour, et toucher un fantôme le pose.
 
+Ces deux blocs sont aussi les pièces de **RHOMBITURE** de DICTO, un système d'armature extractible pour la taille et le modelage : [doi:10.5281/zenodo.23173896](https://doi.org/10.5281/zenodo.23173896).
+
 ## Transitions icosaédriques/dodécaédriques (IDT)
 
 Un monde 3D sur une seule cellule exacte. Posez les toits d'Euclide sur un cube et vous obtenez un dodécaèdre régulier ; repliez les toits vers l'intérieur à travers les faces du cube et ils forment un icosaèdre régulier. Les arêtes du cube, du dodécaèdre et de l'icosaèdre sont dans le rapport φ² : φ : 1. Choisissez-le dans l'écran 3D+ de l'Assistant. Touchez le contour cyan, choisissez une **Pièce** (cube, dodécaèdre, icosaèdre ou grand dodécaèdre étoilé) et touchez un solide : la pièce va dans cette cellule si elle n'y est pas encore, sinon dans la cellule suivante de l'autre côté de la face touchée. Les petits solides se logent dans les grands : utilisez **Rayons X** ou la vue translucide pour les voir. **Vue** redessine la même construction : deux solides en alternance selon un **Motif**, un damier, ou la surface extérieure fusionnée de tous les dodécaèdres. **Sommets** marque les coins du cube ou tous les sommets, et **Infos** donne le groupe d'espace (Pm-3 pour la cellule ; chaque motif a le sien). En faisant croître des dodécaèdres par leurs faces, on n'atteint que les cellules de même couleur dans le motif diagonal ; passez par une face du cube pour atteindre les autres.
+
+La cellule de ce monde est la **cellule Euclid–Kepler**, et les grands dodécaèdres étoilés et icosaèdres qui ne se touchent que par les sommets forment le **réseau Euclid–Kepler**, tous deux de DICTO. À citer comme [doi:10.5281/zenodo.23173809](https://doi.org/10.5281/zenodo.23173809).
 
 ## RHOMBIS
 
