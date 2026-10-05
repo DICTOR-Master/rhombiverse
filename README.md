@@ -97,6 +97,14 @@ right-click) removes. The **User Guide** (in the app, or at
   (Ammann–Kramer) tiling. The **Penrose check** colours each piece green
   where it belongs to the true aperiodic tiling and red where the build has
   drifted; Lattice View shows the true tiling around your build.
+- **Icosahedral/Dodecahedral Transitions (IDT)** (a 3D world of its own) —
+  DICTO's roof-fold cell: Euclid's roofs on a cube make a regular
+  dodecahedron, and folding the roofs back through the cube's faces makes a
+  regular icosahedron, edges φ² : φ : 1. Build with cubes, dodecahedra,
+  icosahedra and 20-point stars on its cubic lattice, and view the same build
+  as alternating patterns (each with its own space group, checked in
+  `verify:roof-fold`), a checkerboard, X-ray, or the merged surface of all
+  the dodecahedra.
 - **4D** — three worlds sharing one frame with the RD world:
   **Tesseract** (Z4), **D4** (the 24-cell, the 4D RD, whose slice at
   w = 0 is exactly the RD world, and the 16-cell) and **Hyper-pyrochlore

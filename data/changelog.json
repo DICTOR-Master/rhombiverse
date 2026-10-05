@@ -1,5 +1,13 @@
 [
   {
+    "date": "2026-10-06",
+    "title": "Icosahedral/Dodecahedral Transitions (IDT)",
+    "items": [
+      "New 3D world, Icosahedral/Dodecahedral Transitions, IDT for short (Wizard → 3D): a cube with Euclid's roofs makes a regular dodecahedron, and folding the roofs back through the cube's faces makes a regular icosahedron, with edges in the ratio φ² : φ : 1 (DICTO's construction). Build one piece at a time with cubes, dodecahedra, icosahedra and 20-point stars on its cubic lattice; several can share a cell.",
+      "Views of the same build: two solids alternating by a pattern (diagonal, columns or layers), a checkerboard (also in 8 colours), and the exact merged outer surface of all the dodecahedra. X-ray shows the inner solids through the outer ones, Vertices marks the cube corners or every vertex, and Info gives the space group of the cell and of each pattern."
+    ]
+  },
+  {
     "date": "2026-10-01",
     "title": "DICTO FCC",
     "items": [

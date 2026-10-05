@@ -189,6 +189,8 @@ export const MARKS = {
   // rhombusPts() draws elsewhere), matching a rhombohedron's own
   // non-orthogonal silhouette.
   pieceRhombohedron: `<polygon points="-22,10 -6,-22 22,-10 6,22" ${THIN}/>`,
+  // Dodecahedron down a five-fold axis: a decagon outline around a pentagon.
+  pieceDodeca: `<polygon points="0.00,-23.00 13.52,-18.61 21.87,-7.11 21.87,7.11 13.52,18.61 0.00,23.00 -13.52,18.61 -21.87,7.11 -21.87,-7.11 -13.52,-18.61" ${THIN}/><polygon points="0.00,-12.00 11.41,-3.71 7.05,9.71 -7.05,9.71 -11.41,-3.71" ${THIN}/>`,
   // RD Quarter: shared pieceRhombohedron's mark until 2026-09-24, direct
   // request for its own -- a hexagon outline with a "Mercedes" Y whose
   // 3 spokes run to 3 alternate corners.

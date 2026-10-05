@@ -165,6 +165,10 @@ A 3D world for building **hulls**: shells of rhombic dodecahedra (RDs), each she
 
 A 3D world for the two pieces of the 3D Penrose tiling. Choose it in the Wizard's 3D screen. Tap the cyan outline, then tap a face to add the **Prolate** or **Oblate** piece chosen in the Piece menu. **Penrose check** colours pieces green where they belong to the true aperiodic tiling and red where your build has drifted; Lattice View shows the true tiling around you, and tapping a ghost places it.
 
+## Icosahedral/Dodecahedral Transitions (IDT)
+
+A 3D world on one exact cell. Put Euclid's roofs on a cube and you get a regular dodecahedron; fold the roofs back in through the cube's faces and they make a regular icosahedron. The cube, dodecahedron and icosahedron edges are in the ratio φ² : φ : 1. Choose it in the Wizard's 3D screen. Tap the cyan outline, then pick a **Piece** (cube, dodecahedron, icosahedron or 20-point star) and tap a solid: the piece goes into that cell if it isn't there yet, otherwise into the next cell across the tapped face. Smaller solids sit inside larger ones, so use **X-ray** or the translucent view to see them. **View** redraws the same build: two solids alternating by a **Pattern**, a checkerboard, or the merged outer surface of all the dodecahedra. **Vertices** marks the cube corners or every vertex, and **Info** shows the space group (Pm-3 for the cell itself; each pattern has its own). Adding dodecahedra across their faces only ever reaches cells of the same colour in the diagonal pattern; add across a cube face to reach the others.
+
 ## RHOMBIS
 
 RHOMBIS is a 3D puzzle made from the same pieces: fill the target shape with the pieces in the tray. Open it from the welcome screen (**Try RHOMBIS**). Tap a piece in the tray, then tap a glowing void to place it; some pieces flip when tapped again. **Stages** lists every puzzle in sections and ticks the ones you've solved. **← Rhombiverse** brings you back here.
