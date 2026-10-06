@@ -1,6 +1,6 @@
 # Rhombiverse User Guide
 
-Rhombiverse and its twin, [Polyhedraverse](https://polyhedraverse.vercel.app), are two ways of looking at the same geometry. Rhombiverse is the **landscape**: the lattices themselves, stretching out in every direction. Polyhedraverse is the **portrait gallery**: the shapes that live in those lattices, one at a time, up close.
+Rhombiverse and its twin, [Polyhedraverse](https://polyhedraverse.vercel.app), are two ways of looking at the same geometry. Rhombiverse is the **landscape**: the lattices themselves, stretching out in every direction. Polyhedraverse is the **portrait gallery**: the shapes that live in those lattices, one at a time, up close. A third sibling, [Kaleidohedra](https://kaleidohedra.vercel.app), **moves the landscape**: lattices you can shear and slide, with every piece moving with them.
 
 Here, every piece fills space perfectly on a real crystal lattice, so you can only put a piece where the lattice has room for it. Tap to add a piece, long-press to remove one, and look at what you've built in different views, from 1D up to 6D.
 

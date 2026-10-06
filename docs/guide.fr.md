@@ -1,6 +1,6 @@
 # Guide de l'utilisateur de Rhombiverse
 
-Rhombiverse et son jumeau, [Polyhedraverse](https://polyhedraverse.vercel.app), sont deux façons de regarder la même géométrie. Rhombiverse est le **paysage** : les réseaux eux-mêmes, qui s'étendent dans toutes les directions. Polyhedraverse est la **galerie de portraits** : les formes qui habitent ces réseaux, une à la fois, vues de près.
+Rhombiverse et son jumeau, [Polyhedraverse](https://polyhedraverse.vercel.app), sont deux façons de regarder la même géométrie. Rhombiverse est le **paysage** : les réseaux eux-mêmes, qui s'étendent dans toutes les directions. Polyhedraverse est la **galerie de portraits** : les formes qui habitent ces réseaux, une à la fois, vues de près. Un troisième frère, [Kaleidohedra](https://kaleidohedra.vercel.app), **fait bouger le paysage** : des réseaux que l'on peut cisailler et faire glisser, chaque pièce bougeant avec eux.
 
 Ici, chaque pièce remplit parfaitement l'espace sur un vrai réseau cristallin : on ne peut donc poser une pièce que là où le réseau a de la place pour elle. Touchez pour ajouter une pièce, appuyez longuement pour en retirer une, et regardez ce que vous avez construit sous différentes vues, de la 1D à la 6D.
 

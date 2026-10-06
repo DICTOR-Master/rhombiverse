@@ -1,6 +1,6 @@
 # Rhombiverse 用户指南
 
-Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel.app) 是观察同一种几何的两种方式。Rhombiverse 是**风景**：向四面八方延伸的晶格本身。Polyhedraverse 是**肖像画廊**：住在这些晶格里的形状，一次一个，近距离展示。
+Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel.app) 是观察同一种几何的两种方式。Rhombiverse 是**风景**：向四面八方延伸的晶格本身。Polyhedraverse 是**肖像画廊**：住在这些晶格里的形状，一次一个，近距离展示。第三个姊妹站点 [Kaleidohedra](https://kaleidohedra.vercel.app) **让风景动起来**：可以剪切、滑动晶格，每一块都随之移动。
 
 在这里，每个部件都在真实的晶体晶格上无缝地填满空间，所以只能把部件放在晶格有空位的地方。轻点添加部件，长按移除部件，再用不同的视图从 1D 到 6D 查看你的作品。
 

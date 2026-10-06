@@ -183,6 +183,10 @@ function overlayHtml() {
         <img src="./assets/polyhedraverse-favicon-64.png" alt="" width="28" height="28" />
         <a href="https://polyhedraverse.vercel.app" target="_blank" rel="noopener" data-i18n-html="welcome.polyhedraverseLink">${t('welcome.polyhedraverseLink', lang)}</a>
       </div>
+      <div class="polyhedraverse-link kaleidohedra-link">
+        <img src="./assets/kaleidohedra-favicon-64.png" alt="" width="28" height="28" />
+        <a href="https://kaleidohedra.vercel.app" target="_blank" rel="noopener" data-i18n-html="welcome.kaleidohedraLink">${t('welcome.kaleidohedraLink', lang)}</a>
+      </div>
       <div class="legal-links">
         <a href="./legal.html?doc=terms" target="_blank" rel="noopener">Terms</a>
         · <a href="./legal.html?doc=privacy" target="_blank" rel="noopener">Privacy</a>

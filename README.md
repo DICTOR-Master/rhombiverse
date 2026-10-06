@@ -18,6 +18,9 @@ here the lattice makes shapes possible — placement is constrained by what
 the lattice allows. There, shapes make the space possible — polyhedra
 joined face to face with no lattice at all. Same geometry, opposite
 direction.
+A third sibling, **[Kaleidohedra](https://kaleidohedra.vercel.app)**, moves
+the landscape: lattices you can shear and slide, with every piece moving
+with them.
 
 ## What you can do
 
