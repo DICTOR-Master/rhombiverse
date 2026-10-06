@@ -148,6 +148,9 @@ const oblate = () => zonohedron([FIVEFOLD[0], FIVEFOLD[1], FIVEFOLD[2]]);
 const bilinski = () => zonohedron(FIVEFOLD.slice(0, 4));
 const rhombicIcosahedron = () => zonohedron(FIVEFOLD.slice(0, 5));
 const triacontahedron = () => zonohedron(FIVEFOLD);
+// The truncated tetrahedron: (+-3, +-1, +-1) with an even number of minus signs, all
+// orders; 4 regular hexagons and 4 triangles (3D's Pyrochlore piece).
+const truncatedTetrahedron = () => hullOf([[3, 1, 1], [1, 3, 1], [1, 1, 3]].flatMap((p) => [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]].map((s) => p.map((c, i) => c * s[i]))));
 // Grouped as the panel shows them. The Voronoi cells (direct decision,
 // 2026-09-29: "Voronoi in the name if valid and relevant"): the cube, the
 // RD and the truncated octahedron are exactly the Voronoi cells of the
@@ -159,11 +162,12 @@ const triacontahedron = () => zonohedron(FIVEFOLD);
 export const SOLIDS = {
   cube: { label: 'Cube', groups: ['voronoi', 'platonic'], make: cube, piece: 'cube' },
   rd: { label: 'Rhombic dodecahedron', groups: ['voronoi'], make: rd, piece: 'rd' },
-  to: { label: 'Truncated octahedron', groups: ['voronoi'], make: truncatedOctahedron, piece: 'to' },
+  to: { label: 'Truncated octahedron', groups: ['voronoi', 'archimedean'], make: truncatedOctahedron, piece: 'to' },
   tetra: { label: 'Tetrahedron', groups: ['platonic'], make: tetrahedron },
   octa: { label: 'Octahedron', groups: ['platonic'], make: octahedron, piece: 'octahedron' },
   icosa: { label: 'Icosahedron', groups: ['platonic'], make: icosahedron },
   dodeca: { label: 'Dodecahedron', groups: ['platonic'], make: dodecahedron },
+  tt: { label: 'Truncated tetrahedron', groups: ['archimedean'], make: truncatedTetrahedron, piece: 'pyrochlore' },
   // The golden zonohedra, coloured as in the Golden Rhombohedra world; the two
   // rhombohedra open there (`golden`).
   prolate: { label: 'Prolate golden rhombohedron', groups: ['golden'], make: prolate, golden: 'prolate', color: 0xffc857 },
@@ -172,7 +176,7 @@ export const SOLIDS = {
   ricosa: { label: 'Rhombic icosahedron', groups: ['golden'], make: rhombicIcosahedron, color: 0xffc857 },
   rtriac: { label: 'Rhombic triacontahedron', groups: ['golden'], make: triacontahedron, color: 0xffc857 },
 };
-export const SOLID_GROUPS = [{ id: 'voronoi', label: 'Voronoi cells' }, { id: 'platonic', label: 'Platonic solids' }, { id: 'golden', label: 'Golden zonohedra' }];
+export const SOLID_GROUPS = [{ id: 'voronoi', label: 'Voronoi cells' }, { id: 'platonic', label: 'Platonic solids' }, { id: 'archimedean', label: 'Archimedean solids' }, { id: 'golden', label: 'Golden zonohedra' }];
 
 // ---- nets ----
 // Faces as corner coordinates, scaled to edge L, each wound so its normal

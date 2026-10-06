@@ -45,6 +45,14 @@ for (const id of Object.keys(SOLIDS)) {
   const sides = net.faces.reduce((s, f) => s + f.pts.length, 0);
   check(`${net.label}: the build follows the net, first face by sides then a face a tap (${steps.length} taps), every edge n`, steps.length === net.faces[net.tree.order[0]].pts.length + F - 1 && edges.length === sides - (F - 1) && edges.every(([a, b]) => near(dist(a, b), 5)));
 }
+// The truncated tetrahedron: 4 regular hexagons and 4 equilateral triangles, every edge equal.
+{
+  const sol = SOLIDS.tt.make();
+  const L = (a, b) => Math.hypot(...a.map((c, i) => c - b[i]));
+  const regular = sol.faces.every((f) => f.every((q, i) => Math.abs(L(sol.v[q], sol.v[f[(i + 1) % f.length]]) - sol.edge) < 1e-9));
+  const counts = [3, 6].map((n) => sol.faces.filter((f) => f.length === n).length);
+  check(`truncated tetrahedron: ${counts[1]} hexagons and ${counts[0]} triangles, all edges ${sol.edge.toFixed(4)}, ${sol.v.length} corners`, regular && counts[0] === 4 && counts[1] === 4 && sol.v.length === 12);
+}
 // The golden zonohedra: every face a golden rhombus (diagonals phi : 1) of one edge, and volumes
 // in prolates and oblates: 1 + 0, 0 + 1, 2 + 2 (Bilinski), 5 + 5 (rhombic icosahedron), 10 + 10
 // (rhombic triacontahedron); prolate 0.7608, oblate 0.4702 times edge^3.

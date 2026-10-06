@@ -268,7 +268,7 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
     panel.classList.toggle('visible', active);
     if (!active) return;
     // Each group named, its solids short (full names on hover).
-    const SHORT = { rd: 'RD', to: 'TO', tetra: 'Tetra', octa: 'Octa', icosa: 'Icosa', dodeca: 'Dodeca', prolate: 'Prolate', oblate: 'Oblate', bilinski: 'Bilinski', ricosa: 'Rh. icosa', rtriac: 'Triaconta' };
+    const SHORT = { rd: 'RD', to: 'TO', tetra: 'Tetra', octa: 'Octa', icosa: 'Icosa', dodeca: 'Dodeca', tt: 'Trunc. tetra', prolate: 'Prolate', oblate: 'Oblate', bilinski: 'Bilinski', ricosa: 'Rh. icosa', rtriac: 'Triaconta' };
     solidsRow.innerHTML = SOLID_GROUPS.map((g) => `<div class="w4d-row w4d-options"><span class="nets-group">${t(`nets.group.${g.id}`, lang())}</span>${Object.entries(SOLIDS).filter(([, s]) => s.groups.includes(g.id)).map(([id, s]) => `<button type="button" data-solid="${id}" class="${id === solid ? 'active' : ''}" title="${s.label}">${SHORT[id] ?? s.label}</button>`).join('')}</div>`).join('');
     foldRow.hidden = !complete();
     // The slider always shows this net's own fold (direct report: "the
