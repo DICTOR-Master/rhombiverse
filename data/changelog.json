@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-10-06",
+    "title": "Nets: golden zonohedra",
+    "items": [
+      "A third group in Nets (Wizard → 2D+ → Nets), the golden zonohedra: the prolate and oblate golden rhombohedra, the Bilinski dodecahedron, the rhombic icosahedron and the rhombic triacontahedron, every face the same golden rhombus. Build each net, fold it up in gold or blue, and open the two rhombohedra in the Golden Rhombohedra world."
+    ]
+  },
+  {
+    "date": "2026-10-06",
     "title": "1D+, 2D+, 3D+",
     "items": [
       "The first three dimensions are now called 1D+, 2D+ and 3D+ everywhere (welcome links, Wizard, dimension wheel, the indicator beside Wizard, Open in buttons and the guide), because each of them works with the dimensions around it. 4D, 5D and 6D keep their names, and saved worlds are unchanged."

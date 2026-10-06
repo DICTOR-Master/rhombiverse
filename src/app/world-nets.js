@@ -75,6 +75,10 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
     }
   }
   function draw() {
+    // Each solid's own colour where it has one (the golden zonohedra), cyan otherwise.
+    const tint = SOLIDS[solid].color ?? CYAN;
+    filledMat.color.setHex(tint);
+    faceMat.color.setHex(tint);
     for (const c of [...layer.children]) { layer.remove(c); c.traverse((o) => { if (o.userData.own) o.geometry.dispose(); }); }
     faceGroups = [];
     if (!active) return;
@@ -259,12 +263,12 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
     save(); draw(); frame(true); onChange();
     if (!done()) showHudPrompt(t('nets.prompt.start', lang()), 5000);
   });
-  openBtn.addEventListener('click', () => onOpenIn('3D', SOLIDS[solid].piece));
+  openBtn.addEventListener('click', () => (SOLIDS[solid].golden ? onOpenIn('golden', SOLIDS[solid].golden) : onOpenIn('3D', SOLIDS[solid].piece)));
   function renderPanel() {
     panel.classList.toggle('visible', active);
     if (!active) return;
     // Each group named, its solids short (full names on hover).
-    const SHORT = { rd: 'RD', to: 'TO', tetra: 'Tetra', octa: 'Octa', icosa: 'Icosa', dodeca: 'Dodeca' };
+    const SHORT = { rd: 'RD', to: 'TO', tetra: 'Tetra', octa: 'Octa', icosa: 'Icosa', dodeca: 'Dodeca', prolate: 'Prolate', oblate: 'Oblate', bilinski: 'Bilinski', ricosa: 'Rh. icosa', rtriac: 'Triaconta' };
     solidsRow.innerHTML = SOLID_GROUPS.map((g) => `<div class="w4d-row w4d-options"><span class="nets-group">${t(`nets.group.${g.id}`, lang())}</span>${Object.entries(SOLIDS).filter(([, s]) => s.groups.includes(g.id)).map(([id, s]) => `<button type="button" data-solid="${id}" class="${id === solid ? 'active' : ''}" title="${s.label}">${SHORT[id] ?? s.label}</button>`).join('')}</div>`).join('');
     foldRow.hidden = !complete();
     // The slider always shows this net's own fold (direct report: "the
@@ -273,7 +277,7 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
     slider.title = t('nets.fold', lang());
     slider.setAttribute('aria-label', slider.title);
     // Open in 3D where the 3D world has this solid as a piece.
-    openBtn.hidden = fold < 1 || !SOLIDS[solid].piece;
+    openBtn.hidden = fold < 1 || !(SOLIDS[solid].piece || SOLIDS[solid].golden);
     openBtn.textContent = t('con.open', lang(), { dim: dimensionLabel('3D') });
   }
   let shownLang = lang();

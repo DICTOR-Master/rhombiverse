@@ -124,6 +124,30 @@ const tetrahedron = () => hullOf([[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 
 const octahedron = () => hullOf([[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]);
 const icosahedron = () => hullOf(cyclic(signs([0, 1, PHI])));
 const dodecahedron = () => hullOf([...signs([1, 1, 1]), ...cyclic(signs([0, 1 / PHI, PHI]))]);
+// The golden zonohedra: every face the same golden rhombus (diagonals phi : 1).
+// Each is the zonohedron of some of the icosahedron's six five-fold axes:
+// three give a golden rhombohedron (prolate or oblate, depending on which
+// three), four the Bilinski dodecahedron, five the rhombic icosahedron, all
+// six the rhombic triacontahedron.
+const FIVEFOLD = [[0, 1, PHI], [0, -1, PHI], [1, PHI, 0], [-1, PHI, 0], [PHI, 0, 1], [PHI, 0, -1]];
+const zonohedron = (dirs) => {
+  const pts = [];
+  for (let m = 0; m < 1 << dirs.length; m++) pts.push(dirs.reduce((acc, d, i) => acc.map((c, k) => c + (m >> i & 1 ? 0.5 : -0.5) * d[k]), [0, 0, 0]));
+  const { faces } = hullOf(pts);
+  // Every edge is one of the axes. (The nearest two corners aren't always an
+  // edge: the oblate's two flat-side poles are closer.)
+  const edge = Math.hypot(...dirs[0]);
+  // Keep only the corners: interior sums belong to no face.
+  const used = [...new Set(faces.flat())].sort((a, b) => a - b);
+  const at = new Map(used.map((i, j) => [i, j]));
+  return { v: used.map((i) => pts[i]), faces: faces.map((f) => f.map((i) => at.get(i))), edge };
+};
+// Pairwise dots of three axes all positive: the prolate; a negative product: the oblate.
+const prolate = () => zonohedron([FIVEFOLD[0], FIVEFOLD[2], FIVEFOLD[4]]);
+const oblate = () => zonohedron([FIVEFOLD[0], FIVEFOLD[1], FIVEFOLD[2]]);
+const bilinski = () => zonohedron(FIVEFOLD.slice(0, 4));
+const rhombicIcosahedron = () => zonohedron(FIVEFOLD.slice(0, 5));
+const triacontahedron = () => zonohedron(FIVEFOLD);
 // Grouped as the panel shows them. The Voronoi cells (direct decision,
 // 2026-09-29: "Voronoi in the name if valid and relevant"): the cube, the
 // RD and the truncated octahedron are exactly the Voronoi cells of the
@@ -140,8 +164,15 @@ export const SOLIDS = {
   octa: { label: 'Octahedron', groups: ['platonic'], make: octahedron, piece: 'octahedron' },
   icosa: { label: 'Icosahedron', groups: ['platonic'], make: icosahedron },
   dodeca: { label: 'Dodecahedron', groups: ['platonic'], make: dodecahedron },
+  // The golden zonohedra, coloured as in the Golden Rhombohedra world; the two
+  // rhombohedra open there (`golden`).
+  prolate: { label: 'Prolate golden rhombohedron', groups: ['golden'], make: prolate, golden: 'prolate', color: 0xffc857 },
+  oblate: { label: 'Oblate golden rhombohedron', groups: ['golden'], make: oblate, golden: 'oblate', color: 0x7cc4ff },
+  bilinski: { label: 'Bilinski dodecahedron', groups: ['golden'], make: bilinski, color: 0xffc857 },
+  ricosa: { label: 'Rhombic icosahedron', groups: ['golden'], make: rhombicIcosahedron, color: 0xffc857 },
+  rtriac: { label: 'Rhombic triacontahedron', groups: ['golden'], make: triacontahedron, color: 0xffc857 },
 };
-export const SOLID_GROUPS = [{ id: 'voronoi', label: 'Voronoi cells' }, { id: 'platonic', label: 'Platonic solids' }];
+export const SOLID_GROUPS = [{ id: 'voronoi', label: 'Voronoi cells' }, { id: 'platonic', label: 'Platonic solids' }, { id: 'golden', label: 'Golden zonohedra' }];
 
 // ---- nets ----
 // Faces as corner coordinates, scaled to edge L, each wound so its normal

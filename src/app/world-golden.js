@@ -302,6 +302,23 @@ export function createGoldenWorld({ scene, onChange = () => {}, showHudPrompt = 
     setSkeleton(on) { skeleton = on; if (active) rebuild(); },
     setTranslucent(o) { if (o !== opacity) { opacity = o; if (active) rebuild(); } },
     setLatticeView(on) { latticeView = on; if (active) rebuild(); },
+    // Nets' Open in 3D+: choose the piece and, in an empty world, start with the true
+    // tiling's own tile of that type nearest the seed.
+    startWith(type) {
+      if (!['prolate', 'oblate'].includes(type)) return;
+      view.piece = type;
+      if (!tiles.size) {
+        const seen = new Set(), queue = [e.seedTile(offset)];
+        while (queue.length) {
+          const x = queue.shift();
+          if (seen.has(keyOf(x)) || seen.size > 60) continue;
+          seen.add(keyOf(x));
+          if (e.tileType(x.I) === type) { tiles.set(keyOf(x), { n: [...x.n], I: [...x.I] }); break; }
+          for (const f of e.tileFaces(x.n, x.I)) { const u = e.neighbourAcross(x.n, x.I, f, offset); if (u) queue.push(u); }
+        }
+      }
+      commit();
+    },
     get isEmpty() { return tiles.size === 0; },
     clear() { tiles.clear(); commit(); },
     snapshot: toJSON,

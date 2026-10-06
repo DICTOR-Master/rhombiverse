@@ -5262,6 +5262,16 @@ async function init() {
   });
   // A finished shape opens in its own dimension (Construct's and Nets').
   const openInDimension = (dim, piece, angle) => {
+      // Nets' golden rhombohedra open in the Golden Rhombohedra world.
+      if (dim === 'golden') {
+        own3D = 'golden';
+        activeDimension = '3D';
+        applyDimensionVisibility();
+        applyDimensionCamera('3D');
+        updateQuickSelect();
+        goldenWorld?.startWith(piece);
+        return;
+      }
       // The cube opens as 3D's Cube piece, the pyrochlore cluster as its
       // Pyrochlore piece, the tesseract in 4D's Z4 (hypercubic) world.
       if (dim === '3D' || dim === '4D') {

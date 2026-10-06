@@ -45,5 +45,21 @@ for (const id of Object.keys(SOLIDS)) {
   const sides = net.faces.reduce((s, f) => s + f.pts.length, 0);
   check(`${net.label}: the build follows the net, first face by sides then a face a tap (${steps.length} taps), every edge n`, steps.length === net.faces[net.tree.order[0]].pts.length + F - 1 && edges.length === sides - (F - 1) && edges.every(([a, b]) => near(dist(a, b), 5)));
 }
+// The golden zonohedra: every face a golden rhombus (diagonals phi : 1) of one edge, and volumes
+// in prolates and oblates: 1 + 0, 0 + 1, 2 + 2 (Bilinski), 5 + 5 (rhombic icosahedron), 10 + 10
+// (rhombic triacontahedron); prolate 0.7608, oblate 0.4702 times edge^3.
+{
+  const PHI = (1 + Math.sqrt(5)) / 2;
+  const sub = (a, b) => a.map((c, i) => c - b[i]), len = (a) => Math.hypot(...a);
+  const vol = ({ v, faces }) => Math.abs(faces.reduce((t, f) => { for (let i = 1; i + 1 < f.length; i++) { const a = v[f[0]], b = v[f[i]], c = v[f[i + 1]]; t += (a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6; } return t; }, 0));
+  const P = vol(SOLIDS.prolate.make()) / SOLIDS.prolate.make().edge ** 3, O = vol(SOLIDS.oblate.make()) / SOLIDS.oblate.make().edge ** 3;
+  for (const [id, np, no] of [['prolate', 1, 0], ['oblate', 0, 1], ['bilinski', 2, 2], ['ricosa', 5, 5], ['rtriac', 10, 10]]) {
+    const sol = SOLIDS[id].make();
+    const rhombi = sol.faces.every((f) => f.length === 4 && f.every((q, i) => Math.abs(len(sub(sol.v[f[(i + 1) % 4]], sol.v[q])) - sol.edge) < 1e-9)
+      && Math.abs(Math.max(len(sub(sol.v[f[2]], sol.v[f[0]])), len(sub(sol.v[f[3]], sol.v[f[1]]))) / Math.min(len(sub(sol.v[f[2]], sol.v[f[0]])), len(sub(sol.v[f[3]], sol.v[f[1]]))) - PHI) < 1e-9);
+    check(`${SOLIDS[id].label}: ${sol.faces.length} golden rhombi of one edge, volume = ${np} prolate + ${no} oblate`, rhombi && Math.abs(vol(sol) / sol.edge ** 3 - (np * P + no * O)) < 1e-9);
+  }
+  check(`prolate ${P.toFixed(4)} and oblate ${O.toFixed(4)} x edge^3`, Math.abs(P - 0.7608) < 1e-4 && Math.abs(O - 0.4702) < 1e-4);
+}
 console.log(`\n${failures} failure${failures === 1 ? '' : 's'}.`);
 process.exit(failures ? 1 : 0);
