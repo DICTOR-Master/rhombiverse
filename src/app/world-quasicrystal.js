@@ -52,6 +52,7 @@ import { createGearedSlider } from './geared-slider.js';
 import { t, tn } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 import { findOccurrence, polytopeShape, isShadowEntry } from '../geometry-extensions/quasicrystal-catalogue.js';
+import { addPanelMinimiser } from './panel-minimiser.js';
 
 const PHASON_LIMIT = 1; // window widths
 const PHASON_SNAP = 0.04;
@@ -652,6 +653,7 @@ export function createQuasicrystalWorld({ tier, scene, materialColor, getMateria
     <div class="w4d-track" role="slider"><div class="w4d-ticks"></div><div class="w4d-thumb"></div></div>
     <div class="w4d-row w4d-options"></div>`;
   document.body.appendChild(panel);
+  addPanelMinimiser(panel, 'quasicrystal');
   const controlsRow = panel.querySelector('.w4d-controls');
   const optionsRow = panel.querySelector('.w4d-options');
   const isApprox = () => view.control === 'approx';

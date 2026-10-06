@@ -45,6 +45,7 @@ without an explicit decision from the user:
 verify:copy` (in CI) fails if any of it reaches user-visible text.
 
 UI rule: hide controls that don't apply; don't grey them out.
+Every bottom control panel (any `.qc-panel` or `#world4d-panel`, and any new one) gets a minimise chevron: call `addPanelMinimiser(panel, key)` from `src/app/panel-minimiser.js` right after appending it. A panel with a row of controls must not cover the scene with no way to fold it away.
 
 ## Layout
 

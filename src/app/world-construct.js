@@ -49,6 +49,7 @@ import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { dimensionLabel } from './dimension-label.js';
 import { getSettings, onSettingsChange } from './settings.js';
+import { addPanelMinimiser } from './panel-minimiser.js';
 
 const STORAGE_KEY = 'rhombiverse-1d-construct-world';
 // Five cells a side, each twice as long, so edges keep their length
@@ -500,6 +501,7 @@ export function createConstructWorld({ scene, camera, controls, onOpenIn = () =>
   panel.className = 'qc-panel';
   panel.innerHTML = '<div class="w4d-row w4d-options"><button type="button" class="sig-sym" data-lattice><svg viewBox="-12 -12 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="-10" y="-10" width="20" height="20" rx="1.5"/><path d="M-3.3,-10v20M3.3,-10v20M-10,-3.3h20M-10,3.3h20"/></svg></button><button type="button" class="sig-send" data-open></button></div>';
   document.body.appendChild(panel);
+  addPanelMinimiser(panel, 'construct');
   const openBtn = panel.querySelector('[data-open]');
   const latticeBtn = panel.querySelector('[data-lattice]');
   latticeBtn.addEventListener('click', () => {

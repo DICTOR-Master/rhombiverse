@@ -12,6 +12,7 @@ import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { dimensionLabel } from './dimension-label.js';
 import { getSettings, onSettingsChange } from './settings.js';
+import { addPanelMinimiser } from './panel-minimiser.js';
 
 const STORAGE_KEY = 'rhombiverse-nets-world';
 const L = 5; // edge length; five cells an edge, as in Construct
@@ -249,6 +250,7 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
     <div class="nets-solids"></div>
     <div class="w4d-row nets-fold-row"><input type="range" class="nets-fold" min="0" max="100" step="1" value="0"><button type="button" class="sig-send" data-open></button></div>`;
   document.body.appendChild(panel);
+  addPanelMinimiser(panel, 'nets', () => frame(true));
   const solidsRow = panel.querySelector('.nets-solids');
   const foldRow = panel.querySelector('.nets-fold-row');
   const slider = panel.querySelector('.nets-fold');

@@ -18,6 +18,7 @@ import { makeQuasicrystal, BASE_OFFSET, tileKey } from '../geometry-extensions/q
 import { solidFromPlanes } from '../geometry-extensions/rd-pieces.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
+import { addPanelMinimiser } from './panel-minimiser.js';
 
 const STORAGE_KEY = 'rhombiverse-golden-world';
 const FIRST_COLOR = 0x00e5ff;
@@ -260,6 +261,7 @@ export function createGoldenWorld({ scene, onChange = () => {}, showHudPrompt = 
     <div class="w4d-row"><label class="hull-pick"><span class="golden-piece-label"></span> <select class="hull-select" data-select="piece"></select></label></div>
     <div class="w4d-row w4d-options"></div>`;
   document.body.appendChild(panel);
+  addPanelMinimiser(panel, 'golden');
   const pieceSelect = panel.querySelector('[data-select="piece"]');
   const optionsRow = panel.querySelector('.w4d-options');
   function renderPanel() {

@@ -28,6 +28,7 @@ import {
 import { createGearedSlider } from './geared-slider.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
+import { addPanelMinimiser } from './panel-minimiser.js';
 
 // One store for every 4D kind (the worlds share one frame and coexist,
 // like 3D's); the key name predates the tesseract joining it.
@@ -448,6 +449,7 @@ export function createWorld4D({ scene, materialColor, getMaterial, onChange = ()
     <div class="w4d-track" role="slider"><div class="w4d-ticks"></div><div class="w4d-thumb"></div></div>
     <div class="w4d-row w4d-options"></div>`;
   document.body.appendChild(panel);
+  addPanelMinimiser(panel, '4d');
   const controlsRow = panel.querySelector('.w4d-controls');
   const optionsRow = panel.querySelector('.w4d-options');
   const track = panel.querySelector('.w4d-track');

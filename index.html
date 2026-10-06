@@ -173,6 +173,14 @@
       flex-direction: column; align-items: stretch; gap: 6px;
     }
     #world4d-panel.visible, .qc-panel.visible { display: flex; }
+    /* Minimise chevron (src/app/panel-minimiser.js): folded, the panel is
+       just the handle, so the scene behind it is clear. */
+    .panel-min {
+      align-self: center; min-width: 44px; min-height: 26px; padding: 2px 10px;
+      background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 6px; color: #9cd; cursor: pointer; display: flex; justify-content: center;
+    }
+    #world4d-panel.minimised > :not(.panel-min), .qc-panel.minimised > :not(.panel-min) { display: none; }
     /* 4D Info (Info button in the 4D panel): top-left under the title,
        read-only, so taps pass straight through to the scene. */
     #world4d-info, .qc-info {

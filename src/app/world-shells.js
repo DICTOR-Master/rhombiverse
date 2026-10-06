@@ -22,6 +22,7 @@ import { rdRawVerts, facePieces, NEIGHBOR_OFFSETS } from '../core/lattice.js';
 import { HULL_IDS, hullShell, hullShellOf, SPLITS, SPLIT_BY_ID, pieceSolid, splitOrientations, pieceAt, piecesOverlap, TRIMMABLE, hullPlanes, trimGauge, trimPiece, scaleDecomposition, nearestFcc, canonicalG } from '../geometry-extensions/rd-pieces.js';
 import { t, tn } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
+import { addPanelMinimiser } from './panel-minimiser.js';
 
 const STORAGE_KEY = 'rhombiverse-shells-world';
 const FIRST_COLOR = 0x00e5ff;
@@ -723,6 +724,7 @@ export function createShellsWorld({ scene, onChange = () => {}, showHudPrompt = 
     </div>
     <div class="w4d-row w4d-options"></div>`;
   document.body.appendChild(panel);
+  addPanelMinimiser(panel, 'shells');
   const hullSelect = panel.querySelector('[data-select="hull"]');
   const pieceSelect = panel.querySelector('[data-select="piece"]');
   const piecePick = panel.querySelector('.hull-piece-pick');

@@ -31,6 +31,7 @@ import { morseSequence, decode, letterEnds, readKeying, keyingThreshold, KEY_FAL
 import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
+import { addPanelMinimiser } from './panel-minimiser.js';
 
 const STORAGE_KEY = 'rhombiverse-1d-signal-world';
 const S = 0.35; // world units per unit of s
@@ -531,6 +532,7 @@ export function createSignalWorld({ scene, camera, controls, resetView = () => {
   panel.innerHTML = `
     <div class="sig-decoded" aria-live="polite"></div><div class="w4d-row sig-message-row"><button type="button" class="sig-sym" data-view></button><input type="text" class="sig-message" maxlength="400" autocomplete="off" spellcheck="false" enterkeyhint="send"><button type="button" class="sig-sym sig-pulse" data-pulse></button><button type="button" class="sig-send" data-opt="send"></button></div>`;
   document.body.appendChild(panel);
+  addPanelMinimiser(panel, 'signal');
   const viewBtn = panel.querySelector('[data-view]');
   const sendBtn = panel.querySelector('[data-opt="send"]');
   const input = panel.querySelector('.sig-message');
