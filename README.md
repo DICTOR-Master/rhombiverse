@@ -195,6 +195,8 @@ rhombiverse/
 
 ## Citable work by DICTO
 
+[![RHOMBITURE DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23173896.svg)](https://doi.org/10.5281/zenodo.23173896) [![Kaleidohedra DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23173809.svg)](https://doi.org/10.5281/zenodo.23173809)
+
 Ideas that grew out of playing in these apps, archived on Zenodo with permanent DOIs. Please cite them by DOI and credit DICTO.
 
 | Work | What it is | Here | DOI |
