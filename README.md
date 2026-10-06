@@ -98,7 +98,7 @@ right-click) removes. The **User Guide** (in the app, or at
   where it belongs to the true aperiodic tiling and red where the build has
   drifted; Lattice View shows the true tiling around your build.
 - **Icosahedral/Dodecahedral Transitions (IDT)** (a 3D world of its own) —
-  DICTO's Euclid–Kepler cell (archived:
+  DICTO's Euclid–Kepler–Pacioli cell (archived:
   [doi:10.5281/zenodo.23173809](https://doi.org/10.5281/zenodo.23173809)): Euclid's roofs on a cube make a regular
   dodecahedron, and folding the roofs back through the cube's faces makes a
   regular icosahedron, edges φ² : φ : 1. Build with cubes, dodecahedra,
@@ -193,7 +193,7 @@ Ideas that grew out of playing in these apps, archived on Zenodo with permanent 
 | Work | What it is | Here | DOI |
 |---|---|---|---|
 | **RHOMBITURE** | An extractable golden-rhombohedron armature system for sculpture, with a keyed-dowel finding on the 3D Penrose tiling. First published 2026-09-26, open prior art. | the **Golden Rhombohedra** world builds with its two blocks | [10.5281/zenodo.23173896](https://doi.org/10.5281/zenodo.23173896) |
-| **Euclid–Kepler cell** and **Euclid–Kepler network** | A cube, Euclid's roofed dodecahedron and the folded icosahedron nested in one cell of a simple cubic lattice (Pm-3), containing Kepler's great stellated dodecahedron; the network shares corners between stars and icosahedra. First recorded 2026-10-06. | the **Icosahedral/Dodecahedral Transitions (IDT)** world | [10.5281/zenodo.23173809](https://doi.org/10.5281/zenodo.23173809) |
+| **Euclid–Kepler–Pacioli cell** and **Euclid–Kepler–Pacioli network** | A cube, Euclid's roofed dodecahedron and the folded icosahedron nested in one cell of a simple cubic lattice (Pm-3), containing Kepler's great stellated dodecahedron; the network shares corners between stars and icosahedra. First recorded 2026-10-06. | the **Icosahedral/Dodecahedral Transitions (IDT)** world | [10.5281/zenodo.23173809](https://doi.org/10.5281/zenodo.23173809) |
 
 ## Contributing
 

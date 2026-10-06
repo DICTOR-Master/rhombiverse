@@ -1,4 +1,4 @@
-// Verifies DICTO's Euclid–Kepler cell (geometry-extensions/roof-fold.js;
+// Verifies DICTO's Euclid–Kepler–Pacioli cell (geometry-extensions/roof-fold.js;
 // Kaleidohedra DISCOVERIES.md #8), the Icosahedral/Dodecahedral Transitions world's geometry:
 //
 //   - cube, dodecahedron and icosahedron are regular, with edges
@@ -19,10 +19,13 @@
 //   - the merged-dodecahedra surface encloses exactly the union, edges without seams;
 //   - colouring sites by parity leaves only even translations: Fm-3; columns,
 //     layers and octants give Cmmm, Pmmm and a doubled Pmmm;
+//   - Pacioli's golden rectangles are the neighbours' roof ridges; Kepler's
+//     chain icosahedron < octahedron < tetrahedra < cube < dodecahedron nests
+//     exactly in one cell;
 //   - two extractions that don't overlap: even-cell dodecahedra (the optimal
 //     lattice packing, (5+sqrt5)/8) and even-cell stars with odd-cell
 //     icosahedra, sharing only corners.
-import { PHI, ROOF_FOLD_PERIOD as P, ROOF_FOLD_KINDS, roofFoldCell, roofFoldSolids, mergedDodecaSurface, mergedDodecaEdges, siteParity, ROOF_FOLD_PATTERNS } from '../src/geometry-extensions/roof-fold.js';
+import { PHI, ROOF_FOLD_PERIOD as P, ROOF_FOLD_KINDS, roofFoldCell, roofFoldSolids, mergedDodecaSurface, mergedDodecaEdges, siteParity, ROOF_FOLD_PATTERNS, goldenRectangles } from '../src/geometry-extensions/roof-fold.js';
 
 let failures = 0;
 function check(label, condition) {
@@ -184,7 +187,11 @@ const closed = (polys) => {
 const V = { cube: 8, dodeca: 10 + 2 * Math.sqrt(5), ico: (5 / 12) * (3 + Math.sqrt(5)) * (2 / PHI ** 2) ** 3 };
 const spike = (Math.sqrt(3) / 4) * (2 / PHI ** 2) ** 2 * (2 / Math.sqrt(3)) / 3; // base area x height / 3, height 2/sqrt3
 V.star = V.ico + 20 * spike;
+V.oct = 4 / 3; // edge sqrt2: (sqrt2/3) a^3
+V.stella = 2 * (8 / 3); // two tetrahedra of edge 2 sqrt2, counted separately
 for (const k of ROOF_FOLD_KINDS) {
+  if (k === 'rects') continue; // three flat plates, not a solid
+  if (k === 'stella') { const f = S.stella.faces; check(`stella: two closed tetrahedra (${f.length} faces), volumes ${volumeOf(f.slice(0, 4)).toFixed(6)} + ${volumeOf(f.slice(4)).toFixed(6)} = 2 x 8/3`, closed(f.slice(0, 4)) && closed(f.slice(4)) && Math.abs(volumeOf(f) - V.stella) < 1e-9); continue; }
   const f = S[k].faces;
   check(`${k}: ${f.length} faces, closed, outward, volume ${volumeOf(f).toFixed(6)} = ${V[k].toFixed(6)}`, closed(f) && Math.abs(volumeOf(f) - V[k]) < 1e-9);
 }
@@ -348,6 +355,91 @@ for (const dx of [-1, 0, 1]) for (const dy of [-1, 0, 1]) for (const dz of [-1, 
 }
 const tipsOnIco = C.dodeca.slice(8).every((t) => DIRECTIONS_ODD.some((o) => C.ico.some((v) => norm(sub(add(v, o), t)) < EPS)));
 check(`stars on even cells and icosahedra on odd cells share only corners: ${pairs} piece pairs, deepest overlap ${worst.toExponential(1)}; all 12 roof tips are icosahedron vertices`, worst < 1e-9 && tipsOnIco);
+
+// 12. Kepler's chain and Pacioli's rectangles (DICTO, 2026-10-06).
+// (a) The six neighbours' roof ridges meet inside each cube as the long sides of the three
+// mutually perpendicular golden rectangles, whose 12 corners are the icosahedron's vertices, and
+// the rectangles interlock in the Borromean way (each passes through the next, cyclically).
+{
+  const R = goldenRectangles();
+  const corners = new Set(R.flat().map(rawKey));
+  const icoKeys = new Set(C.ico.map(rawKey));
+  const golden = R.every((r) => { const L = norm(sub(r[0], r[1])), Sh = norm(sub(r[1], r[2])); return Math.abs(L - 2 / PHI) < EPS && Math.abs(Sh - 2 / PHI ** 2) < EPS && Math.abs(L / Sh - PHI) < EPS && Math.abs(dot(sub(r[1], r[0]), sub(r[2], r[1]))) < EPS; });
+  // Every roof ridge (the edge joining a cube face's two roof vertices), moved into the neighbour
+  // across that face, is a long side of a rectangle.
+  const longSides = new Set(R.flatMap((r) => [[r[0], r[1]], [r[2], r[3]]]).map(([a, b]) => [rawKey(a), rawKey(b)].sort().join('|')));
+  const roof = C.dodeca.slice(8);
+  let ridges = 0, onSides = 0;
+  for (let i = 0; i < 12; i++) for (let j = i + 1; j < 12; j++) {
+    if (Math.abs(norm(sub(roof[i], roof[j])) - 2 / PHI) > EPS) continue;
+    const axis = [0, 1, 2].find((k) => Math.abs(roof[i][k]) > 1 + EPS && Math.abs(roof[j][k] - roof[i][k]) < EPS);
+    if (axis === undefined) continue;
+    ridges++;
+    const t = [0, 0, 0]; t[axis] = -2 * Math.sign(roof[i][axis]);
+    if (longSides.has([rawKey(add(roof[i], t)), rawKey(add(roof[j], t))].sort().join('|'))) onSides++;
+  }
+  // Borromean: along each pair's shared axis, one rectangle's extent lies strictly inside the other's.
+  const ext = (r, k) => Math.max(...r.map((p) => Math.abs(p[k])));
+  const inside = [[0, 1, 2], [1, 2, 0], [2, 0, 1]].every(([a, b, k]) => ext(R[a], k) < ext(R[b], k) - EPS);
+  check(`golden rectangles: 3 of sides 2/phi x 2/phi^2 (ratio phi), corners = the 12 icosahedron vertices; ${onSides} of ${ridges} roof ridges are their long sides in the neighbour; interlocked cyclically (Borromean)`,
+    golden && corners.size === 12 && [...corners].every((k) => icoKeys.has(k)) && ridges === 6 && onSides === 6 && inside);
+}
+// (b) The octahedron on the cube-face centres: each of the icosahedron's 12 vertices lies on a
+// different one of its 12 edges, dividing it in the golden ratio.
+{
+  const O = S.oct;
+  let hits = 0; const used = new Set();
+  for (const v of C.ico) {
+    O.edges.forEach(([a, b], e) => {
+      const ab = sub(b, a), t = dot(sub(v, a), ab) / dot(ab, ab);
+      if (t > EPS && t < 1 - EPS && norm(sub(add(a, ab.map((c) => c * t)), v)) < EPS) {
+        const r = Math.max(t, 1 - t) / Math.min(t, 1 - t);
+        if (Math.abs(r - PHI) < EPS) { hits++; used.add(e); }
+      }
+    });
+  }
+  // And 8 of the icosahedron's 20 faces lie in the octahedron's 8 face planes (inradius = 1/sqrt3).
+  const pk = (P) => { const n = cross(sub(P[1], P[0]), sub(P[2], P[0])).map((c, _, a) => c / Math.hypot(...a)); return [...n, dot(P[0], n)].map((c) => (Math.round(c * 1e6) / 1e6 + 0).toFixed(6)).join(); };
+  const octPl = new Set(O.faces.map(pk));
+  const shared = S.ico.faces.filter((f) => octPl.has(pk(f))).length;
+  check(`8 of the icosahedron's faces lie in the octahedron's 8 face planes (${shared})`, shared === 8);
+  check(`octahedron on the 6 cube-face centres (edge sqrt2, volume 4/3): every icosahedron vertex on its own octahedron edge, at the golden section (${hits} of 12, ${used.size} edges)`,
+    O.edges.length === 12 && hits === 12 && used.size === 12 && closed(O.faces) && Math.abs(volumeOf(O.faces) - 4 / 3) < 1e-9);
+}
+// (c) The two tetrahedra (alternate cube corners) are regular, their 8 face planes are exactly the
+// octahedron's, so they overlap in it; each tetrahedron's 6 edge midpoints are its vertices.
+{
+  const planeKey = (P) => { const n = cross(sub(P[1], P[0]), sub(P[2], P[0])).map((c, _, a) => c / Math.hypot(...a)); return [...n, dot(P[0], n)].map((c) => (Math.round(c * 1e6) / 1e6 + 0).toFixed(6)).join(); };
+  const tetPlanes = new Set(S.stella.faces.map(planeKey));
+  const octPlanes = new Set(S.oct.faces.map(planeKey));
+  const samePlanes = tetPlanes.size === 8 && [...tetPlanes].every((k) => octPlanes.has(k));
+  const octKeys = new Set(S.oct.faces.flat().map(rawKey));
+  const mids = S.stella.edges.map(([a, b]) => rawKey(a.map((c, i) => (c + b[i]) / 2)));
+  const regular = S.stella.edges.every(([a, b]) => Math.abs(norm(sub(a, b)) - 2 * Math.SQRT2) < EPS);
+  check('stella octangula: two regular tetrahedra (edge 2 sqrt2) on alternate cube corners whose 8 face planes are the octahedron\'s; their edge midpoints are its vertices',
+    regular && samePlanes && new Set(mids).size === 6 && mids.every((k) => octKeys.has(k)));
+}
+// (d) Kepler's chain, all in one cell: icosahedron in octahedron in each tetrahedron in cube in
+// dodecahedron (each inside the next, closed), plus Kepler's star around the icosahedron.
+{
+  const planesOf = (faces) => faces.map((f) => { const n = cross(sub(f[1], f[0]), sub(f[2], f[0])); const u = n.map((c) => c / norm(n)); return { n: u, d: dot(f[0], u) }; });
+  const within = (pts, faces) => { const H = planesOf(faces); return pts.every((p) => H.every(({ n, d }) => dot(p, n) <= d + 1e-9)); };
+  const T1 = S.stella.faces.slice(0, 4), T2 = S.stella.faces.slice(4);
+  const chain = within(C.ico, S.oct.faces) && within(S.oct.faces.flat(), T1) && within(S.oct.faces.flat(), T2)
+    && within(T1.flat(), S.cube.faces) && within(T2.flat(), S.cube.faces) && within(C.cube, S.dodeca.faces) && within(S.star.faces.flat(), S.dodeca.faces);
+  check('Kepler\'s chain nests exactly in one cell: icosahedron in octahedron in both tetrahedra in cube in dodecahedron', chain);
+}
+// (e) Symmetry: the stella octangula keeps all 24 operations of m-3; one tetrahedron alone keeps 12
+// (the rotation group 23); the octahedron keeps all 24. Their edges lie along cube face diagonals,
+// not icosahedral two-fold axes (a second, sqrt2 rod family).
+{
+  const setOf = (pts) => new Set(pts.map(rawKey));
+  const keeps = (pts) => { const S0 = setOf(pts); return ops.filter((op) => op.even && pts.every((p) => S0.has(rawKey(op.f(p).map((c) => c + 0))))).length; };
+  const T1v = S.stella.faces.slice(0, 4).flat(), all = S.stella.faces.flat();
+  const offAxes = [...S.oct.edges, ...S.stella.edges].every(([a, b]) => !onAxis(sub(a, b)));
+  check(`symmetry: stella octangula keeps ${keeps(all)} of the 24, one tetrahedron ${keeps(T1v)}, the octahedron ${keeps(S.oct.faces.flat())}; their edges are off the icosahedral axes`,
+    keeps(all) === 24 && keeps(T1v) === 12 && keeps(S.oct.faces.flat()) === 24 && offAxes);
+}
 
 console.log(failures === 0 ? '\nAll checks passed (0 failures).' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

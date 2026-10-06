@@ -1,8 +1,9 @@
 // Icosahedral/Dodecahedral Transitions (IDT): a 3D world of its own on DICTO's
-// Euclid–Kepler cell (Kaleidohedra DISCOVERIES.md #8; geometry in
+// Euclid–Kepler–Pacioli cell (Kaleidohedra DISCOVERIES.md #8; geometry in
 // geometry-extensions/roof-fold.js). Sites are a simple cubic lattice of
-// period phi^2 (icosahedron edge 1). Four solids, one at a time, several per
-// site: cube, dodecahedron, icosahedron, great stellated dodecahedron (the star). Tap a solid to add the
+// period phi^2 (icosahedron edge 1). Seven pieces, one at a time, several per
+// site: cube, dodecahedron, icosahedron, great stellated dodecahedron (the star),
+// octahedron, stella octangula and Pacioli's golden rectangles. Tap a solid to add the
 // chosen one at that site, or across the face when it's already there;
 // long-press removes. The View picker redraws the same build as alternating
 // patterns (site colourings, each with its own space group), in X-ray (inner
@@ -14,14 +15,17 @@ import { getSettings, onSettingsChange } from './settings.js';
 
 const STORAGE_KEY = 'rhombiverse-roof-fold-world';
 const VIEWS = ['built', 'starIco', 'dodecaStar', 'checker', 'merged'];
-const KIND_COLOR = { cube: 0x9fb4c8, dodeca: 0xffc857, ico: 0x5fd38a, star: 0xff7a59 };
+const KIND_COLOR = { cube: 0x9fb4c8, dodeca: 0xffc857, ico: 0x5fd38a, star: 0xff7a59, oct: 0x4dd0e1, stella: 0xc792ea, rects: 0xffe082 };
 const PARITY_COLOR = [0xffc857, 0x7cc4ff];
 const OCTANT_COLOR = [0xffc857, 0x7cc4ff, 0xff7a59, 0x5fd38a, 0xc792ea, 0x4dd0e1, 0xf06292, 0xe8eef7];
 const PATTERNS = Object.keys(ROOF_FOLD_PATTERNS);
 const VERTICES = ['off', 'cube', 'all'];
 const ALTERNATING = ['starIco', 'dodecaStar', 'checker'];
-// X-ray: the innermost solid stays solid, the ones around it fade outward (cube is inscribed in the dodecahedron).
-const XRAY = { ico: { opacity: 1, order: 0 }, star: { opacity: 0.42, order: 1 }, cube: { opacity: 0.3, order: 2 }, dodeca: { opacity: 0.16, order: 3 } };
+// X-ray: inside to outside (the rectangles' corners are the icosahedron's, which sits on the
+// octahedron's edges, inside the tetrahedra, inside the cube, inside the dodecahedron). The
+// innermost kind in the build stays solid; each one further out fades more.
+const NESTING = ['rects', 'ico', 'oct', 'star', 'stella', 'cube', 'dodeca'];
+const xrayOpacity = (rank) => (rank === 0 ? 1 : Math.max(0.14, 0.5 - 0.08 * (rank - 1)));
 const FIRST_COLOR = 0x00e5ff;
 const GHOST_COLOR = 0x9de0ff;
 const EDGE_COLOR = 0x0b1220;
@@ -132,12 +136,28 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
     return [mesh, new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: edgeColor }))];
   }
   const centreOf = (site) => site.map((c) => c * 2 * WS);
-  function solidPolys(items, colourFn) {
+  // Faces of one kind lying in a face plane of another (same outward side): 8 icosahedron faces lie
+  // in the octahedron's planes, and the octahedron's in the tetrahedra's. In the opaque view such an
+  // inner face is hidden by the outer piece in the same cell, so it isn't drawn (it would flicker).
+  const planeKey = (f) => {
+    const n = [0, 1, 2].map((k) => { const a = f[0], b = f[1], c = f[2]; const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]; return [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]][k]; });
+    const l = Math.hypot(...n);
+    return [...n.map((x) => x / l), (n[0] * f[0][0] + n[1] * f[0][1] + n[2] * f[0][2]) / l].map((x) => (Math.round(x * 1e6) / 1e6 + 0).toFixed(6)).join();
+  };
+  const PLANES = Object.fromEntries(ROOF_FOLD_KINDS.map((k) => [k, SOLIDS[k].faces.map(planeKey)]));
+  const PLANE_SETS = Object.fromEntries(ROOF_FOLD_KINDS.map((k) => [k, new Set(PLANES[k])]));
+  function solidPolys(items, colourFn, cullCoplanar = false) {
     const polys = [], edges = [];
+    const kindsAt = new Map();
+    if (cullCoplanar) for (const s of solids.values()) { const k = siteKey(s.site); if (!kindsAt.has(k)) kindsAt.set(k, []); kindsAt.get(k).push(s.kind); }
     for (const item of items) {
       const offset = centreOf(item.site);
       const colour = colourFn(item);
-      for (const polygon of SOLIDS[item.kind].faces) polys.push({ polygon, offset, colour, record: item });
+      const outer = cullCoplanar ? (kindsAt.get(siteKey(item.site)) ?? []).filter((k) => NESTING.indexOf(k) > NESTING.indexOf(item.kind)) : [];
+      SOLIDS[item.kind].faces.forEach((polygon, i) => {
+        if (outer.some((k) => PLANE_SETS[k].has(PLANES[item.kind][i]))) return;
+        polys.push({ polygon, offset, colour, record: item });
+      });
       for (const [a, b] of SOLIDS[item.kind].edges) edges.push({ a, b, offset });
     }
     return { polys, edges };
@@ -189,15 +209,21 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
       const items = view.mode === 'merged' ? sites().map((site) => ({ site, kind: 'dodeca' })) : drawList();
       // X-ray: one mesh per solid kind, each with its own see-through level.
       const layers = view.mode === 'merged' ? [{ ...mergedPolys(), material: pieceMaterial }]
-        : view.xray ? ROOF_FOLD_KINDS.map((kind) => {
+        : view.xray ? NESTING.filter((kind) => items.some((it) => it.kind === kind)).map((kind, rank) => {
           const own = items.filter((it) => it.kind === kind);
-          if (!own.length) return null;
-          const o = XRAY[kind].opacity * opacity;
+          const o = xrayOpacity(rank) * opacity;
           const material = pieceMaterial.clone();
           Object.assign(material, { transparent: o < 1, opacity: o, depthWrite: o >= 1 });
-          return { ...solidPolys(own, colourOf), material, order: XRAY[kind].order };
-        }).filter(Boolean)
-        : [{ ...solidPolys(items, colourOf), material: pieceMaterial }];
+          material.polygonOffsetUnits = 1 + 16 * (NESTING.length - 1 - NESTING.indexOf(kind));
+          return { ...solidPolys(own, colourOf), material, order: rank };
+        })
+        // One mesh per kind, inner kinds pushed back in depth: some share faces exactly (8 icosahedron
+        // faces lie in the octahedron's planes), and the outer one should win there.
+        : NESTING.filter((kind) => items.some((it) => it.kind === kind)).map((kind) => {
+          const material = pieceMaterial.clone();
+          material.polygonOffsetUnits = 1 + 16 * (NESTING.length - 1 - NESTING.indexOf(kind));
+          return { ...solidPolys(items.filter((it) => it.kind === kind), colourOf, opacity >= 1 && (view.mode === 'built' || view.mode === 'checker')), material };
+        });
       for (const { polys, edges, material, order = 0 } of layers) {
         const [mesh, lines] = meshOf(polys, edges, material, EDGE_COLOR, 'piece');
         if (material !== pieceMaterial) mesh.userData.ownMaterial = true;
@@ -297,7 +323,7 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
     const alternating = ALTERNATING.includes(view.mode);
     const row = (k, v) => `<div><span class="w4d-info-k">${k}</span> ${v}</div>`;
     info.innerHTML = [
-      row(t('roofFold.info.solids', L), all.length ? t('roofFold.info.counts', L, { cube: count('cube'), dodeca: count('dodeca'), ico: count('ico'), star: count('star') }) : t('hull.info.none', L)),
+      row(t('roofFold.info.solids', L), all.length ? ROOF_FOLD_KINDS.filter((k) => count(k)).map((k) => `${t(`roofFold.${k}`, L)} ${count(k)}`).join(', ') : t('hull.info.none', L)),
       all.length ? row(t('roofFold.info.sites', L), t('roofFold.info.siteCounts', L, { n: S.length, even, odd: S.length - even })) : '',
       row(t('roofFold.info.group', L), alternating ? ROOF_FOLD_PATTERNS[patternName()].group : 'Pm-3 (No. 200)'),
     ].join('');

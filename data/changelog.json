@@ -4,7 +4,8 @@
     "title": "Icosahedral/Dodecahedral Transitions (IDT)",
     "items": [
       "New 3D world, Icosahedral/Dodecahedral Transitions, IDT for short (Wizard → 3D): a cube with Euclid's roofs makes a regular dodecahedron, and folding the roofs back through the cube's faces makes a regular icosahedron, with edges in the ratio φ² : φ : 1 (DICTO's construction). Build one piece at a time with cubes, dodecahedra, icosahedra and great stellated dodecahedra (Kepler's star) on its cubic lattice; several can share a cell.",
-      "Views of the same build: two solids alternating by a pattern (diagonal, columns or layers), a checkerboard (also in 8 colours), and the exact merged outer surface of all the dodecahedra. X-ray shows the inner solids through the outer ones, Vertices marks the cube corners or every vertex, and Info gives the space group of the cell and of each pattern."
+      "Views of the same build: two solids alternating by a pattern (diagonal, columns or layers), a checkerboard (also in 8 colours), and the exact merged outer surface of all the dodecahedra. X-ray shows the inner solids through the outer ones, Vertices marks the cube corners or every vertex, and Info gives the space group of the cell and of each pattern.",
+      "Three new pieces as a homage to Kepler: the octahedron on the cube's face centres (the icosahedron's corners lie on its edges at the golden section), the stella octangula (two regular tetrahedra overlapping in that octahedron) and Pacioli's three interlocking golden rectangles, which are where the neighbouring cells' roof ridges meet. All five Platonic solids now nest in one cell; X-ray shows them inside each other."
     ]
   },
   {

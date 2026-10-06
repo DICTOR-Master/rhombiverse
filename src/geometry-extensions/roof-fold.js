@@ -1,4 +1,4 @@
-// Euclid–Kepler cell: a cube of edge 2 centred at the origin, the regular
+// Euclid–Kepler–Pacioli cell: a cube of edge 2 centred at the origin, the regular
 // dodecahedron made by putting Euclid's roofs on it, and the regular
 // icosahedron made by reflecting the 12 roof vertices back through the cube
 // faces. Copies at every translation by 2 along x, y, z form the structure;
@@ -30,7 +30,7 @@ export function roofFoldCell() {
   };
 }
 
-export const ROOF_FOLD_KINDS = ['cube', 'dodeca', 'ico', 'star'];
+export const ROOF_FOLD_KINDS = ['cube', 'dodeca', 'ico', 'star', 'oct', 'stella', 'rects'];
 // World units: icosahedron edge 1, dodecahedron phi, cube phi^2.
 export const ROOF_FOLD_WORLD_SCALE = PHI ** 2 / 2;
 export const siteParity = (x, y, z) => (((x + y + z) % 2) + 2) % 2;
@@ -67,6 +67,26 @@ function convexFaces(verts, normals) {
 const outward = (tri, inside) => (dot(cross(sub(tri[1], tri[0]), sub(tri[2], tri[0])), sub(centroid(tri), inside)) < 0 ? [tri[0], tri[2], tri[1]] : tri);
 
 // Face polygons (outward, counter-clockwise) and edges of each solid, centred on the origin, cube edge 2.
+// Face centres of the cube (the octahedron), the two tetrahedra on alternate corners, and
+// each tetrahedron's outward face normals (the corner it doesn't use, negated, per face).
+const OCT = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+const TETS = [
+  [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]],
+  [[-1, -1, -1], [-1, 1, 1], [1, -1, 1], [1, 1, -1]],
+];
+const TET_NORMALS = TETS.map((T) => T.map((v) => unit(v.map((c) => -c))));
+
+// The three mutually perpendicular golden rectangles (sides 2/phi and 2/phi^2) in the
+// coordinate planes, counter-clockwise about +x, +y, +z.
+export function goldenRectangles() {
+  const a = 1 / PHI, b = 1 / PHI ** 2;
+  return [
+    [[0, a, b], [0, -a, b], [0, -a, -b], [0, a, -b]],
+    [[b, 0, a], [b, 0, -a], [-b, 0, -a], [-b, 0, a]],
+    [[a, b, 0], [-a, b, 0], [-a, -b, 0], [a, -b, 0]],
+  ];
+}
+
 export function roofFoldSolids() {
   const C = roofFoldCell();
   const icoTris = [];
@@ -89,6 +109,12 @@ export function roofFoldSolids() {
     dodeca: { faces: convexFaces(C.dodeca, C.ico.map(unit)), edges: pairs(C.dodeca, C.dodecaEdges) },
     ico: { faces: icoTris, edges: pairs(C.ico, C.icoEdges) },
     star: { faces: starTris, edges: starEdges },
+    // The octahedron on the six cube-face centres; the icosahedron's vertices lie on its edges.
+    oct: { faces: convexFaces(OCT, TET_NORMALS.flat()), edges: pairs(OCT, edgesOfLength(OCT, Math.SQRT2)) },
+    // The stella octangula: the two regular tetrahedra on alternate cube corners, overlapping in the octahedron.
+    stella: { faces: TETS.flatMap((T) => convexFaces(T, TET_NORMALS[TETS.indexOf(T)])), edges: TETS.flatMap((T) => pairs(T, edgesOfLength(T, 2 * Math.SQRT2))) },
+    // Pacioli's three golden rectangles: the folded roof ridges, corners on the icosahedron.
+    rects: { faces: goldenRectangles(), edges: goldenRectangles().flatMap((R) => R.map((p, i) => [p, R[(i + 1) % 4]])) },
   };
 }
 
