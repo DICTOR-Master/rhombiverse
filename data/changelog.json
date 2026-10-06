@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-10-06",
+    "title": "1D+, 2D+, 3D+",
+    "items": [
+      "The first three dimensions are now called 1D+, 2D+ and 3D+ everywhere (welcome links, Wizard, dimension wheel, the indicator beside Wizard, Open in buttons and the guide), because each of them works with the dimensions around it. 4D, 5D and 6D keep their names, and saved worlds are unchanged."
+    ]
+  },
+  {
+    "date": "2026-10-06",
     "title": "Icosahedral/Dodecahedral Transitions (IDT)",
     "items": [
       "New 3D world, Icosahedral/Dodecahedral Transitions, IDT for short (Wizard → 3D): a cube with Euclid's roofs makes a regular dodecahedron, and folding the roofs back through the cube's faces makes a regular icosahedron, with edges in the ratio φ² : φ : 1 (DICTO's construction). Build one piece at a time with cubes, dodecahedra, icosahedra and great stellated dodecahedra (Kepler's star) on its cubic lattice; several can share a cell.",
