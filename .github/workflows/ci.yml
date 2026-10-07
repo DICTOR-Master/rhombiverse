@@ -91,7 +91,8 @@ jobs:
         working-directory: tests/browser
         run: |
           npm install
-          npx playwright install --with-deps chromium
+          # GitHub runners sometimes hang in this download: give each try 4 minutes, up to 3 tries.
+          for i in 1 2 3; do timeout 240 npx playwright install --with-deps chromium && break; [ "$i" = 3 ] && exit 1; echo "Playwright install hung or failed (try $i), retrying"; done
       - name: Serve app
         run: python3 -m http.server 8000 &
       - name: Wait for server
@@ -133,7 +134,8 @@ jobs:
         working-directory: tests/browser
         run: |
           npm install
-          npx playwright install --with-deps chromium
+          # GitHub runners sometimes hang in this download: give each try 4 minutes, up to 3 tries.
+          for i in 1 2 3; do timeout 240 npx playwright install --with-deps chromium && break; [ "$i" = 3 ] && exit 1; echo "Playwright install hung or failed (try $i), retrying"; done
       - name: Serve dist/
         run: cd dist && python3 -m http.server 8000 &
       - name: Wait for server
