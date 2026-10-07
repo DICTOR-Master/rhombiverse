@@ -9,7 +9,7 @@
 // patterns (site colourings, each with its own space group), in X-ray (inner
 // solids through outer ones) or as the exact merged surface of the dodecahedra.
 import * as THREE from 'three';
-import { ROOF_FOLD_KINDS, ROOF_FOLD_WORLD_SCALE as WS, roofFoldSolids, mergedDodecaSurface, mergedDodecaEdges, ROOF_FOLD_PATTERNS } from '../geometry-extensions/roof-fold.js';
+import { ROOF_FOLD_KINDS, ROOF_FOLD_WORLD_SCALE as WS, roofFoldSolids, mergedDodecaSurface, mergedDodecaEdges, ROOF_FOLD_PATTERNS , siteParity, turnPoint } from '../geometry-extensions/roof-fold.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 import { addPanelMinimiser } from './panel-minimiser.js';
@@ -46,7 +46,7 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
 
   // ---- state ----
   const solids = new Map(); // solidKey -> { site: [x, y, z], kind }
-  const view = { piece: 'dodeca', mode: 'built', parity: false, vertices: 'off', pattern: 'xyz', xray: false };
+  const view = { piece: 'dodeca', mode: 'built', parity: false, vertices: 'off', pattern: 'xyz', xray: false, turnOdd: false };
   let active = false;
   let skeleton = false;
   let opacity = 1;
@@ -71,6 +71,7 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
       if (VERTICES.includes(data.view?.vertices)) view.vertices = data.view.vertices;
       if (PATTERNS.includes(data.view?.pattern)) view.pattern = data.view.pattern;
       view.xray = data.view?.xray === true;
+      view.turnOdd = data.view?.turnOdd === true;
     }
   } catch { /* corrupt or blocked storage: start empty */ }
   function save() {
@@ -137,6 +138,9 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
     return [mesh, new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: edgeColor }))];
   }
   const centreOf = (site) => site.map((c) => c * 2 * WS);
+  // Odd sites are turned a quarter about z when the view asks for it. The merged surface is built from
+  // unturned dodecahedra, so the turn doesn't apply there (its control is hidden).
+  const turnFor = (site) => (view.turnOdd && view.mode !== 'merged' && siteParity(...site) === 1 ? turnPoint : (p) => p);
   // Faces of one kind lying in a face plane of another (same outward side): 8 icosahedron faces lie
   // in the octahedron's planes, and the octahedron's in the tetrahedra's. In the opaque view such an
   // inner face is hidden by the outer piece in the same cell, so it isn't drawn (it would flicker).
@@ -154,12 +158,13 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
     for (const item of items) {
       const offset = centreOf(item.site);
       const colour = colourFn(item);
+      const turn = turnFor(item.site);
       const outer = cullCoplanar ? (kindsAt.get(siteKey(item.site)) ?? []).filter((k) => NESTING.indexOf(k) > NESTING.indexOf(item.kind)) : [];
       SOLIDS[item.kind].faces.forEach((polygon, i) => {
         if (outer.some((k) => PLANE_SETS[k].has(PLANES[item.kind][i]))) return;
-        polys.push({ polygon, offset, colour, record: item });
+        polys.push({ polygon: polygon.map(turn), offset, colour, record: item });
       });
-      for (const [a, b] of SOLIDS[item.kind].edges) edges.push({ a, b, offset });
+      for (const [a, b] of SOLIDS[item.kind].edges) edges.push({ a: turn(a), b: turn(b), offset });
     }
     return { polys, edges };
   }
@@ -181,7 +186,7 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
     if (view.vertices === 'cube') {
       for (const s of sites()) for (const dx of [-1, 1]) for (const dy of [-1, 1]) for (const dz of [-1, 1]) put([(2 * s[0] + dx) * WS, (2 * s[1] + dy) * WS, (2 * s[2] + dz) * WS]);
     } else {
-      for (const { site, kind } of items) for (const f of SOLIDS[kind].faces) for (const v of f) put(v.map((c, a) => c * WS + centreOf(site)[a]));
+      for (const { site, kind } of items) { const turn = turnFor(site); for (const f of SOLIDS[kind].faces) for (const v of f) put(turn(v).map((c, a) => c * WS + centreOf(site)[a])); }
     }
     const mesh = new THREE.InstancedMesh(nodeGeometry, nodeMaterial, Math.max(1, corners.size));
     const m = new THREE.Matrix4();
@@ -362,6 +367,7 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
     optionsRow.innerHTML = [
       view.mode === 'checker' ? '' : `<button type="button" data-opt="parity" class="${view.parity ? 'active' : ''}">${t('roofFold.parity', L)}</button>`,
       view.mode === 'merged' ? '' : `<button type="button" data-opt="xray" class="${view.xray ? 'active' : ''}">${t('roofFold.xray', L)}</button>`,
+      view.mode === 'merged' ? '' : `<button type="button" data-opt="turnOdd" class="${view.turnOdd ? 'active' : ''}">${t('roofFold.turnOdd', L)}</button>`,
       `<button type="button" data-opt="vertices" class="${view.vertices !== 'off' ? 'active' : ''}">${t('roofFold.vertices', L)}: ${t(`roofFold.vertices.${view.vertices}`, L)}</button>`,
       `<button type="button" data-opt="info" class="${infoOpen ? 'active' : ''}">${t('hyper.info', L)}</button>`,
     ].join('');
@@ -391,6 +397,7 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
     if (!b) return;
     if (b.dataset.opt === 'parity') { view.parity = !view.parity; save(); }
     else if (b.dataset.opt === 'xray') { view.xray = !view.xray; save(); }
+    else if (b.dataset.opt === 'turnOdd') { view.turnOdd = !view.turnOdd; save(); }
     else if (b.dataset.opt === 'vertices') { view.vertices = VERTICES[(VERTICES.indexOf(view.vertices) + 1) % VERTICES.length]; save(); }
     else if (b.dataset.opt === 'info') infoOpen = !infoOpen;
     rebuild();

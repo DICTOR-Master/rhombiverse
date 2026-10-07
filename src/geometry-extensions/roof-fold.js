@@ -34,6 +34,8 @@ export const ROOF_FOLD_KINDS = ['cube', 'dodeca', 'ico', 'star', 'oct', 'stella'
 // World units: icosahedron edge 1, dodecahedron phi, cube phi^2.
 export const ROOF_FOLD_WORLD_SCALE = PHI ** 2 / 2;
 export const siteParity = (x, y, z) => (((x + y + z) % 2) + 2) % 2;
+// A quarter turn about z, for the turned view of odd sites (points in cell units).
+export const turnPoint = (p) => [-p[1], p[0], p[2]];
 const mod2 = (n) => ((n % 2) + 2) % 2;
 // Site colourings for the alternating and checkerboard views, and the space
 // group each leaves (checked in scripts/verify-roof-fold.mjs).
