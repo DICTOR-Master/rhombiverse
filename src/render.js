@@ -3682,7 +3682,7 @@ async function init() {
           wheel3D.close();
           applyDimensionVisibility();
           updateQuickSelect();
-          showHudPrompt({ shells: 'Shells', golden: 'Golden Rhombohedra', roofFold: 'IDT', kaleido: 'Kaleidoscope', nets: 'Nets', signal: 'Signal', construct: 'Construct' }[own3D], 2500);
+          showHudPrompt({ shells: 'Shells', golden: 'Golden Rhombohedra', roofFold: 'EKP', kaleido: 'Kaleidoscope', nets: 'Nets', signal: 'Signal', construct: 'Construct' }[own3D], 2500);
           return;
         }
         if (own3D && (action?.startsWith('tool:pieceType:') || action === 'tool:cuboctaBuild')) {
@@ -4852,7 +4852,7 @@ async function init() {
       if (qcWorlds.has(activeDimension)) {
         quickShapeEl.innerHTML = iconFrame(MARKS.pieceRhombohedron, { title: t('cat.button', getSettings().language) });
       } else if (own3DActive()) {
-        quickShapeEl.innerHTML = iconFrame(({ shells: MARKS.pieceRD, roofFold: MARKS.pieceDodeca })[own3D] ?? MARKS.pieceRhombohedron, { title: ({ shells: 'Shells', roofFold: 'IDT' })[own3D] ?? 'Golden Rhombohedra' });
+        quickShapeEl.innerHTML = iconFrame(({ shells: MARKS.pieceRD, roofFold: MARKS.pieceDodeca })[own3D] ?? MARKS.pieceRhombohedron, { title: ({ shells: 'Shells', roofFold: 'EKP' })[own3D] ?? 'Golden Rhombohedra' });
       } else if (currentMode === 'cubocta') {
         quickShapeEl.innerHTML = iconFrame(MARKS.cuboctahedron, { title: 'Shape' });
       } else {

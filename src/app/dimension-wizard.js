@@ -318,6 +318,9 @@ function kaleidoStarEdges() {
 // Interstitial" reuse the code's own existing descriptions of those
 // lattices; they are placeholders pending the user's own naming.
 export const LATTICES_3D = [
+  { key: 'roofFold', label: 'Euclid–Kepler–Pacioli Cell Network', pieces: [
+    { label: 'Euclid–Kepler–Pacioli Cell Network', action: 'tool:roofFoldWorld' },
+  ] },
   { key: 'fcc', label: 'FCC', pieces: [
     { label: 'RD', action: 'tool:pieceType:rd' },
     { label: 'Hemi RD', action: 'tool:pieceType:halfrd' },
@@ -360,9 +363,6 @@ export const LATTICES_3D = [
   ] },
   { key: 'golden', label: 'Golden Rhombohedra', pieces: [
     { label: 'Golden Rhombohedra', action: 'tool:goldenWorld' },
-  ] },
-  { key: 'roofFold', label: 'Icosahedral/Dodecahedral Transitions', pieces: [
-    { label: 'Icosahedral/Dodecahedral Transitions', action: 'tool:roofFoldWorld' },
   ] },
 ];
 

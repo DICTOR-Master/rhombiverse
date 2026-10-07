@@ -100,7 +100,7 @@ right-click) removes. The **User Guide** (in the app, or at
   (Ammann–Kramer) tiling. The **Penrose check** colours each piece green
   where it belongs to the true aperiodic tiling and red where the build has
   drifted; Lattice View shows the true tiling around your build.
-- **Icosahedral/Dodecahedral Transitions (IDT)** (a 3D world of its own) —
+- **Euclid–Kepler–Pacioli Cell Network (EKP)** (a 3D world of its own) —
   DICTO's **Euclid–Kepler–Pacioli (EKP) cell** (archived:
   [doi:10.5281/zenodo.23173809](https://doi.org/10.5281/zenodo.23173809)):
   all five Platonic solids nested in one cell of a cubic lattice. Euclid's
@@ -202,7 +202,7 @@ Ideas that grew out of playing in these apps, archived on Zenodo with permanent 
 | Work | What it is | Here | DOI |
 |---|---|---|---|
 | **RHOMBITURE** | An extractable golden-rhombohedron armature system for sculpture, with a keyed-dowel finding on the 3D Penrose tiling. First published 2026-09-26, open prior art. | the **Golden Rhombohedra** world builds with its two blocks | [10.5281/zenodo.23173896](https://doi.org/10.5281/zenodo.23173896) |
-| **Euclid–Kepler–Pacioli (EKP) cell** and **network** | All five Platonic solids nested in one cell of a simple cubic lattice (Pm-3): Euclid's roofed dodecahedron, Pacioli's golden rectangles (the neighbouring roofs) cornered on the icosahedron, which sits on the octahedron at the golden section, inside Kepler's stella octangula and great stellated dodecahedron; the network shares corners between stars and icosahedra. First recorded 2026-10-06. | the **Icosahedral/Dodecahedral Transitions (IDT)** world | [10.5281/zenodo.23173809](https://doi.org/10.5281/zenodo.23173809) |
+| **Euclid–Kepler–Pacioli (EKP) cell** and **network** | All five Platonic solids nested in one cell of a simple cubic lattice (Pm-3): Euclid's roofed dodecahedron, Pacioli's golden rectangles (the neighbouring roofs) cornered on the icosahedron, which sits on the octahedron at the golden section, inside Kepler's stella octangula and great stellated dodecahedron; the network shares corners between stars and icosahedra. First recorded 2026-10-06. | the **Euclid–Kepler–Pacioli Cell Network (EKP)** world | [10.5281/zenodo.23173809](https://doi.org/10.5281/zenodo.23173809) |
 
 ## Contributing
 

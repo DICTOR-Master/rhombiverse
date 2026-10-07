@@ -1,4 +1,4 @@
-// Icosahedral/Dodecahedral Transitions (IDT): a 3D world of its own on DICTO's
+// Euclid–Kepler–Pacioli Cell Network (EKP): a 3D world of its own on DICTO's
 // Euclid–Kepler–Pacioli cell (Kaleidohedra DISCOVERIES.md #8; geometry in
 // geometry-extensions/roof-fold.js). Sites are a simple cubic lattice of
 // period phi^2 (icosahedron edge 1). Seven pieces, one at a time, several per
