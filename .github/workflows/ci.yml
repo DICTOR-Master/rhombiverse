@@ -92,8 +92,8 @@ jobs:
         working-directory: tests/browser
         run: |
           npm install
-          # GitHub runners sometimes hang in this download: give each try 4 minutes, up to 3 tries.
-          for i in 1 2 3; do timeout 240 npx playwright install --with-deps chromium && break; [ "$i" = 3 ] && exit 1; echo "Playwright install hung or failed (try $i), retrying"; done
+          # GitHub runners sometimes hang in this download: give each try 5 minutes, up to 3 tries; a killed try leaves apt locked, so clear that first.
+          for i in 1 2 3; do timeout 300 npx playwright install --with-deps chromium && break; [ "$i" = 3 ] && exit 1; echo "Playwright install hung or failed (try $i), clearing apt and retrying"; sudo pkill -9 -f "apt-get|dpkg" || true; sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock; sudo dpkg --configure -a || true; sleep 5; done
       - name: Serve app
         run: python3 -m http.server 8000 &
       - name: Wait for server
@@ -135,8 +135,8 @@ jobs:
         working-directory: tests/browser
         run: |
           npm install
-          # GitHub runners sometimes hang in this download: give each try 4 minutes, up to 3 tries.
-          for i in 1 2 3; do timeout 240 npx playwright install --with-deps chromium && break; [ "$i" = 3 ] && exit 1; echo "Playwright install hung or failed (try $i), retrying"; done
+          # GitHub runners sometimes hang in this download: give each try 5 minutes, up to 3 tries; a killed try leaves apt locked, so clear that first.
+          for i in 1 2 3; do timeout 300 npx playwright install --with-deps chromium && break; [ "$i" = 3 ] && exit 1; echo "Playwright install hung or failed (try $i), clearing apt and retrying"; sudo pkill -9 -f "apt-get|dpkg" || true; sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock; sudo dpkg --configure -a || true; sleep 5; done
       - name: Serve dist/
         run: cd dist && python3 -m http.server 8000 &
       - name: Wait for server
