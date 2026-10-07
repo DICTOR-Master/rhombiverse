@@ -30,7 +30,12 @@ export function roofFoldCell() {
   };
 }
 
-export const ROOF_FOLD_KINDS = ['cube', 'dodeca', 'ico', 'star', 'oct', 'stella', 'rects'];
+// Inside out, each wrapping the one before: rects ⊂ ico ⊂ oct ⊂ stella ⊂ cube ⊂ dodeca.
+// The star holds the icosahedron and sits in the dodecahedron (its hull) but crosses the
+// octahedron, stella and cube, so it goes last before the dodecahedron (verify-roof-fold.mjs).
+export const ROOF_FOLD_KINDS = ['rects', 'ico', 'oct', 'stella', 'cube', 'star', 'dodeca'];
+// One colour per piece, shared by every world that shows the cell.
+export const ROOF_FOLD_COLOURS = { cube: 0x9fb4c8, dodeca: 0xffc857, ico: 0x5fd38a, star: 0xff7a59, oct: 0x4dd0e1, stella: 0xc792ea, rects: 0xffe082 };
 // World units: icosahedron edge 1, dodecahedron phi, cube phi^2.
 export const ROOF_FOLD_WORLD_SCALE = PHI ** 2 / 2;
 export const siteParity = (x, y, z) => (((x + y + z) % 2) + 2) % 2;

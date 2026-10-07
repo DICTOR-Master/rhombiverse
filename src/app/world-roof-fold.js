@@ -9,23 +9,22 @@
 // patterns (site colourings, each with its own space group), in X-ray (inner
 // solids through outer ones) or as the exact merged surface of the dodecahedra.
 import * as THREE from 'three';
-import { ROOF_FOLD_KINDS, ROOF_FOLD_WORLD_SCALE as WS, roofFoldSolids, mergedDodecaSurface, mergedDodecaEdges, ROOF_FOLD_PATTERNS , siteParity, turnPoint } from '../geometry-extensions/roof-fold.js';
+import { ROOF_FOLD_KINDS, ROOF_FOLD_COLOURS, ROOF_FOLD_WORLD_SCALE as WS, roofFoldSolids, mergedDodecaSurface, mergedDodecaEdges, ROOF_FOLD_PATTERNS , siteParity, turnPoint } from '../geometry-extensions/roof-fold.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 import { addPanelMinimiser } from './panel-minimiser.js';
 
 const STORAGE_KEY = 'rhombiverse-roof-fold-world';
 const VIEWS = ['built', 'starIco', 'dodecaStar', 'checker', 'merged'];
-const KIND_COLOR = { cube: 0x9fb4c8, dodeca: 0xffc857, ico: 0x5fd38a, star: 0xff7a59, oct: 0x4dd0e1, stella: 0xc792ea, rects: 0xffe082 };
+const KIND_COLOR = ROOF_FOLD_COLOURS;
 const PARITY_COLOR = [0xffc857, 0x7cc4ff];
 const OCTANT_COLOR = [0xffc857, 0x7cc4ff, 0xff7a59, 0x5fd38a, 0xc792ea, 0x4dd0e1, 0xf06292, 0xe8eef7];
 const PATTERNS = Object.keys(ROOF_FOLD_PATTERNS);
 const VERTICES = ['off', 'cube', 'all'];
 const ALTERNATING = ['starIco', 'dodecaStar', 'checker'];
-// X-ray: inside to outside (the rectangles' corners are the icosahedron's, which sits on the
-// octahedron's edges, inside the tetrahedra, inside the cube, inside the dodecahedron). The
-// innermost kind in the build stays solid; each one further out fades more.
-const NESTING = ['rects', 'ico', 'oct', 'star', 'stella', 'cube', 'dodeca'];
+// X-ray: inside to outside, the same wrap order as the Piece list. The innermost kind in the
+// build stays solid; each one further out fades more.
+const NESTING = ROOF_FOLD_KINDS;
 const xrayOpacity = (rank) => (rank === 0 ? 1 : Math.max(0.14, 0.5 - 0.08 * (rank - 1)));
 const FIRST_COLOR = 0x00e5ff;
 const GHOST_COLOR = 0x9de0ff;

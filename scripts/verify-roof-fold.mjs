@@ -441,5 +441,34 @@ check(`stars on even cells and icosahedra on odd cells share only corners: ${pai
     keeps(all) === 24 && keeps(T1v) === 12 && keeps(S.oct.faces.flat()) === 24 && offAxes);
 }
 
+// (f) The wrap order (ROOF_FOLD_KINDS: the Piece list, X-ray and Nets order): each piece lies inside
+// the next along rects ⊂ ico ⊂ oct ⊂ stella ⊂ cube ⊂ dodeca; the star holds the icosahedron and
+// sits in the dodecahedron but crosses the octahedron, stella and cube (each has a point outside
+// the other), so it goes just before the dodecahedron.
+{
+  const inConvex = (faces, p) => faces.every((f) => dot(cross(sub(f[1], f[0]), sub(f[2], f[0])), sub(p, f[0])) <= 1e-9);
+  const inTet = (T, p) => [[0, 1, 2, 3], [0, 2, 3, 1], [0, 3, 1, 2], [1, 3, 2, 0]].every(([a, b, c, d]) => {
+    const n = cross(sub(T[b], T[a]), sub(T[c], T[a]));
+    return dot(n, sub(p, T[a])) * dot(n, sub(T[d], T[a])) >= -1e-9;
+  });
+  const spikes = S.ico.faces.map((f, i) => [...f, S.star.faces[3 * i][2]]);
+  const stellaTets = [0, 4].map((i) => S.stella.faces.slice(i, i + 4));
+  const isIn = {
+    ico: (p) => inConvex(S.ico.faces, p), oct: (p) => inConvex(S.oct.faces, p), cube: (p) => inConvex(S.cube.faces, p), dodeca: (p) => inConvex(S.dodeca.faces, p),
+    stella: (p) => stellaTets.some((T) => inConvex(T, p)),
+    star: (p) => inConvex(S.ico.faces, p) || spikes.some((T) => inTet(T, p)),
+  };
+  const mid = (P) => P.reduce(add).map((c) => c / P.length);
+  // Corners, edge midpoints and face centres, each pulled a hair toward its face's centre and the cell's.
+  const samples = (k) => S[k].faces.flatMap((f) => { const c = mid(f); return [...f, ...f.map((p, i) => mid([p, f[(i + 1) % f.length]])), c].map((p) => p.map((x, j) => (x + (c[j] - x) * 1e-6) * (1 - 1e-6))); });
+  const within = (a, b) => samples(a).every((p) => isIn[b](p));
+  const chain = ROOF_FOLD_KINDS.filter((k) => k !== 'star');
+  const chained = chain.every((k, i) => i === 0 || within(chain[i - 1], k));
+  const crosses = (k) => samples('star').some((p) => !isIn[k](p)) && samples(k).some((p) => !isIn.star(p));
+  check(`wrap order ${ROOF_FOLD_KINDS.join(' → ')}: ${chain.join(' ⊂ ')}; ico ⊂ star ⊂ dodeca; the star crosses oct, stella and cube`,
+    chained && within('ico', 'star') && within('star', 'dodeca') && ['oct', 'stella', 'cube'].every(crosses)
+    && ROOF_FOLD_KINDS.indexOf('star') === ROOF_FOLD_KINDS.indexOf('dodeca') - 1);
+}
+
 console.log(failures === 0 ? '\nAll checks passed (0 failures).' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);
