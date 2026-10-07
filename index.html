@@ -231,11 +231,14 @@
     .sig-send { white-space: nowrap; font-weight: 600; color: #f59e0b !important; border-color: #f59e0b !important; }
     .sig-send[hidden], .sig-sym[hidden] { display: none !important; }
     /* Nets: its solids row, and the fold slider once a net is complete. */
-    .nets-fold-row[hidden] { display: none !important; }
+    .nets-fold-row[hidden], .nets-cell-row[hidden], .nets-next-row[hidden] { display: none !important; }
+    .nets-cell-row, .nets-next-row { justify-content: center; }
     .nets-fold-row { align-items: center; gap: 10px; }
     .nets-fold { flex: 1; min-width: 0; max-width: 320px; accent-color: #22c3e6; height: 32px; touch-action: none; }
     .nets-solids .w4d-row { align-items: center; margin-bottom: 4px; flex-wrap: nowrap; }
     .nets-solids .w4d-row button { padding: 7px 8px; }
+    .nets-solids .w4d-row.nets-long { flex-wrap: wrap; justify-content: center; row-gap: 4px; }
+    .nets-long .nets-group { flex-basis: 100%; max-width: none; text-align: center; margin: 2px 0 0; }
     .nets-group { text-align: right; font-size: 11px !important; line-height: 1.1; max-width: 70px; }
     .nets-group { color: #9fb3c8; font: 600 12px system-ui, sans-serif; margin-right: 4px; }
     .nets-solids button.active { background: rgba(34, 195, 230, 0.28) !important; border-color: #22c3e6 !important; color: #fff !important; }

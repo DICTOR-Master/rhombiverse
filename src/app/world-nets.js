@@ -7,7 +7,8 @@
 // ("tap it and it folds into the solid"), and a slider folds and unfolds
 // it by hand ("fold slider"). The geometry is geometry-extensions/nets.js.
 import * as THREE from 'three';
-import { netOf, netSteps, SOLIDS, SOLID_GROUPS, apply } from '../geometry-extensions/nets.js';
+import { netOf, netSteps, SOLIDS, SOLID_GROUPS, EKP_PIECES, EKP_ORDER, IDENTITY, apply, mul, rigidAlign } from '../geometry-extensions/nets.js';
+import { roofFoldSolids, ROOF_FOLD_COLOURS, PHI } from '../geometry-extensions/roof-fold.js';
 import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { dimensionLabel } from './dimension-label.js';
@@ -32,16 +33,54 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
   const stepsOf = Object.fromEntries(Object.entries(nets).map(([id, net]) => [id, netSteps(net)]));
   let solid = 'cube';
   const progress = Object.fromEntries(Object.keys(SOLIDS).map((id) => [id, 0]));
-  let fold = 0; // 0 flat … 1 closed
+  let fold = 0; // 0 flat … 1 closed, for the solid you're on
+  let cellView = false; // the whole EKP cell instead of one net
+  let wrap = 0; // whole cell: shells shown inside out, 0 … pieces folded; a fraction is the next one folding
+  // Folded all the way, kept once reached: an assembly piece (direct
+  // decision, 2026-10-07: "stella octangula ... jump together") needs
+  // this to show its already-done siblings while you build the next one.
+  const foldDone = Object.fromEntries(Object.keys(SOLIDS).map((id) => [id, false]));
+  // Other solids that join this one into one assembled whole: the same
+  // `assembly` tag, or named either way in `assemblyWith`.
+  function siblingsOf(id) {
+    const a = SOLIDS[id].assembly;
+    return Object.keys(SOLIDS).filter((o) => o !== id
+      && ((a && SOLIDS[o].assembly === a) || (SOLIDS[id].assemblyWith ?? []).includes(o) || (SOLIDS[o].assemblyWith ?? []).includes(id)));
+  }
+  // A net folds about its own root face, flat on the screen; `net.align`
+  // takes the closed solid onto its true vertices, the frame its assembly
+  // siblings share. Folded siblings stand in that frame.
+  const trueT = (id, T) => (siblingsOf(id).length ? T.map((Ti) => mul(nets[id].align, Ti)) : T);
+  // The piece being built: flat and facing you while you build it, then
+  // carried into its true place among its folded siblings as it folds
+  // (a Pacioli rectangle in the x = 0 plane was being built edge-on).
+  function carry(M, s) {
+    const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+    new THREE.Matrix4().fromArray(M).decompose(p, q, sc);
+    return new THREE.Matrix4().compose(p.multiplyScalar(s), new THREE.Quaternion().slerp(q, s), new THREE.Vector3(1, 1, 1)).toArray();
+  }
+  const placedT = (id, t) => {
+    const T = nets[id].at(t);
+    if (!siblingsOf(id).length) return T;
+    const B = t >= 1 ? nets[id].align : carry(nets[id].align, t);
+    return T.map((Ti) => mul(B, Ti));
+  };
+  // Folded siblings show only once the piece you're on leaves the flat.
+  const shownSiblings = () => (fold > 0 ? siblingsOf(solid).filter((s) => foldDone[s]) : []);
   const clampP = (id, v) => (Number.isInteger(v) ? Math.max(0, Math.min(stepsOf[id].length, v)) : 0);
   function read(data) {
     if (data?.version !== 1) return;
     for (const id of Object.keys(SOLIDS)) progress[id] = clampP(id, data.progress?.[id]);
+    for (const id of Object.keys(SOLIDS)) foldDone[id] = data.foldDone?.[id] === true && progress[id] === stepsOf[id].length;
     if (SOLIDS[data.solid]) solid = data.solid;
-    fold = data.fold === 1 && progress[solid] === stepsOf[solid].length ? 1 : 0;
+    // Saves from before foldDone kept only the current solid's fold.
+    if (data.fold === 1 && progress[solid] === stepsOf[solid].length) foldDone[solid] = true;
+    fold = foldDone[solid] ? 1 : 0;
+    cellView = data.cell === true;
+    wrap = Infinity; // fully wrapped; drawCell clamps it
   }
   try { read(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')); } catch { /* start empty */ }
-  const toJSON = () => ({ version: 1, solid, progress: { ...progress }, fold: fold === 1 ? 1 : 0 });
+  const toJSON = () => ({ version: 1, solid, progress: { ...progress }, foldDone: { ...foldDone }, cell: cellView });
   function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toJSON())); } catch { /* best-effort */ } }
   let active = false;
   const net = () => nets[solid];
@@ -55,6 +94,22 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
   const filledMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, roughness: 0.8, metalness: 0.05 });
   const nextMat = new THREE.MeshStandardMaterial({ color: NEXT, emissive: NEXT, emissiveIntensity: 0.35, vertexColors: true });
   const faceMat = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
+  // Every EKP piece in full colour, the EKP world's own (roof-fold.js), so
+  // a colour means the same piece in both worlds; stella's two tetrahedra
+  // take a vivid magenta and cyan so the pair reads as two.
+  const PIECE_COLOR = {
+    ...Object.fromEntries(Object.entries(EKP_PIECES).map(([id, p]) => [id, ROOF_FOLD_COLOURS[p.kind]])),
+    stella1: 0xff3b9e, stella2: 0x27d0e0,
+  };
+  const tintedMats = new Map();
+  function matFor(id, base) {
+    if (PIECE_COLOR[id] === undefined) return base;
+    const key = id + '\u0000' + base.uuid;
+    if (!tintedMats.has(key)) { const m = base.clone(); m.color.set(PIECE_COLOR[id]); tintedMats.set(key, m); }
+    return tintedMats.get(key);
+  }
+  // Both sides: a Pacioli rectangle is one face, seen from either side.
+  const siblingMat = new THREE.MeshStandardMaterial({ color: CYAN, vertexColors: true, roughness: 0.8, metalness: 0.05, side: THREE.DoubleSide });
   const ghostMat = new THREE.LineBasicMaterial({ color: CYAN, transparent: true, opacity: 0.28 });
   const catchPlane = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
   catchPlane.position.z = -0.5;
@@ -68,10 +123,16 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
   function edgeCells(a, b, mat, into) {
     const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b);
     const dir = B.clone().sub(A).normalize();
+    // 1 for every solid whose edges are all the same length; the EKP
+    // assembly pieces (the spike, Pacioli's rectangle) are not, so their
+    // longer edges stretch the same cell rather than leaving it short of
+    // the edge (direct finding, 2026-10-07).
+    const segLen = A.distanceTo(B) / L;
     for (let i = 0; i < L; i++) {
       const m = new THREE.Mesh(geo, mat);
       m.position.copy(A).lerp(B, (i + 0.5) / L);
       m.quaternion.setFromUnitVectors(up, dir);
+      m.scale.y = segLen;
       into.add(m);
     }
   }
@@ -82,7 +143,9 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
     faceMat.color.setHex(tint);
     for (const c of [...layer.children]) { layer.remove(c); c.traverse((o) => { if (o.userData.own) o.geometry.dispose(); }); }
     faceGroups = [];
+    folding = null;
     if (!active) return;
+    if (cellView) { drawCell(); renderPanel(); return; }
     const n = net();
     const k = done();
     const next = complete() ? null : steps()[k];
@@ -96,9 +159,10 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
       // show their cells.
       if (builtEdges.has(e)) {
         const A = new THREE.Vector3(...e[0]), B = new THREE.Vector3(...e[1]);
-        const m = new THREE.Mesh(rodGeo, filledMat);
+        const m = new THREE.Mesh(rodGeo, matFor(solid, filledMat));
         m.position.copy(A).add(B).multiplyScalar(0.5);
         m.quaternion.setFromUnitVectors(up, B.clone().sub(A).normalize());
+        m.scale.y = A.distanceTo(B) / L;
         faceGroups[st.face].add(m);
       }
       else if (next && next.edges.includes(e)) edgeCells(e[0], e[1], nextMat, faceGroups[st.face]);
@@ -114,7 +178,7 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
       const idx = [];
       for (let j = 1; j + 1 < f.pts.length; j++) idx.push(0, j, j + 1);
       g.setIndex(idx);
-      const m = new THREE.Mesh(g, faceMat);
+      const m = new THREE.Mesh(g, matFor(solid, faceMat));
       m.userData.own = true;
       faceGroups[i].add(m);
     });
@@ -126,24 +190,195 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
       ghost.userData.own = true;
       layer.add(ghost);
     }
+    // Assembly siblings already folded, in their shared true frame. The
+    // star's icosahedron shows through (X-ray) while you're on its spike.
+    for (const sib of shownSiblings()) {
+      const sn = nets[sib];
+      const T = trueT(sib, sn.at(1));
+      const mat = solid === 'starSpike' && sib === 'icosa' ? matFor(sib, faceMat) : matFor(sib, siblingMat);
+      sn.faces.forEach((f, i) => {
+        const g = new THREE.BufferGeometry().setFromPoints(f.pts.map((p) => new THREE.Vector3(...apply(T[i], p))));
+        const idx = []; for (let j = 1; j + 1 < f.pts.length; j++) idx.push(0, j, j + 1);
+        g.setIndex(idx);
+        g.computeVertexNormals();
+        // filledMat multiplies by vertex colours: white, so the tint shows.
+        g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 3).fill(1), 3));
+        const m = new THREE.Mesh(g, mat);
+        m.userData.own = true;
+        layer.add(m);
+      });
+    }
     place();
     renderPanel();
   }
   const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-6);
+
+  // ---- the whole EKP cell: the pieces you've folded, inside out ----
+  // Each piece in the cell's own frame (roof-fold.js), one scale for all:
+  // the icosahedron family at the size you built it. The wrap runs the
+  // shells in EKP_ORDER, each folding from its net around the ones inside
+  // it; X-ray fades each kind further out, as in the EKP world.
+  const EKP = roofFoldSolids();
+  const U = (L * PHI ** 2) / 2; // world units per cell unit
+  const cellRod = plainCellGeometry(1, 0.07, 12);
+  let folding = null;
+  let drawnShell = '';
+  const built = () => EKP_ORDER.filter((id) => foldDone[id]);
+  const nextPiece = () => EKP_ORDER.find((id) => !foldDone[id]);
+  const cellFaces = (id) => {
+    const { kind, index } = EKP_PIECES[id];
+    if (kind === 'stella') return EKP.stella.faces.slice(4 * index, 4 * index + 4);
+    if (kind === 'rects') return [EKP.rects.faces[index]];
+    return EKP[kind].faces;
+  };
+  const cellEdges = (id) => {
+    const { kind, index } = EKP_PIECES[id];
+    if (kind === 'stella') return EKP.stella.edges.slice(6 * index, 6 * index + 6);
+    if (kind === 'rects') return EKP.rects.edges.slice(4 * index, 4 * index + 4);
+    return EKP[kind].edges;
+  };
+  // One spike stands for all 20: the turn taking spike 0 onto spike j.
+  const spikeTurns = EKP.ico.faces.map((f, j) => rigidAlign([EKP.ico.faces[0][0], EKP.ico.faces[0][1], EKP.star.faces[0][2]], [f[0], f[1], EKP.star.faces[3 * j][2]]));
+  const xray = (rank) => (rank === 0 ? 1 : Math.max(0.14, 0.5 - 0.08 * (rank - 1)));
+  const cellMats = new Map();
+  function cellMat(id, opacity) {
+    const key = `${id}|${opacity}`;
+    if (!cellMats.has(key)) cellMats.set(key, new THREE.MeshStandardMaterial({ color: PIECE_COLOR[id], transparent: opacity < 1, opacity, depthWrite: opacity >= 1, side: THREE.DoubleSide, flatShading: true, roughness: 0.7, metalness: 0.05 }));
+    return cellMats.get(key);
+  }
+  const rodMat = (id) => matFor(id, filledMat);
+  function polyMesh(polys, mat, order) {
+    const pos = [];
+    for (const P of polys) for (let j = 1; j + 1 < P.length; j++) pos.push(...P[0], ...P[j], ...P[j + 1]);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, mat);
+    m.renderOrder = order;
+    m.userData.own = true;
+    return m;
+  }
+  // A rod from a to b in `into`'s units, k world units each: every rod the same thickness.
+  function cellRodMesh(a, b, mat, into, k) {
+    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b);
+    const m = new THREE.Mesh(cellRod, mat);
+    m.position.copy(A).add(B).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(up, B.clone().sub(A).normalize());
+    m.scale.set(1 / k, A.distanceTo(B), 1 / k);
+    into.add(m);
+  }
+  function drawCell() {
+    const shown = built();
+    wrap = Math.max(0, Math.min(wrap, shown.length));
+    const whole = Math.floor(wrap), frac = wrap - whole;
+    const visible = shown.slice(0, whole + (frac > 0 ? 1 : 0));
+    drawnShell = `${whole}|${frac > 0}`;
+    const kinds = [...new Set(visible.map((id) => EKP_PIECES[id].kind))];
+    visible.forEach((id, i) => {
+      const rank = kinds.indexOf(EKP_PIECES[id].kind);
+      const faceMat = cellMat(id, xray(rank)), rm = rodMat(id);
+      if (i < whole) {
+        const g = new THREE.Group();
+        g.scale.setScalar(U);
+        g.add(polyMesh(cellFaces(id), faceMat, rank));
+        for (const [a, b] of cellEdges(id)) cellRodMesh(a, b, rm, g, U);
+        layer.add(g);
+        return;
+      }
+      // The shell wrapping now: its net folding up around the ones inside.
+      const n = nets[id], s = (U * EKP_PIECES[id].cell) / n.scale;
+      folding = { id, faces: [] };
+      for (const R of id === 'starSpike' ? spikeTurns : [IDENTITY]) n.faces.forEach((f, fi) => {
+        const g = new THREE.Group();
+        g.matrixAutoUpdate = false;
+        g.add(polyMesh([f.pts], faceMat, rank));
+        f.pts.forEach((p, j) => cellRodMesh(p, f.pts[(j + 1) % f.pts.length], rm, g, s));
+        layer.add(g);
+        folding.faces.push({ g, R, fi, s });
+      });
+    });
+    // Fully wrapped: the next shell to build, as a ghost.
+    const next = nextPiece();
+    if (whole === shown.length && next) {
+      const pts = cellEdges(next).flatMap(([a, b]) => [new THREE.Vector3(...a).multiplyScalar(U), new THREE.Vector3(...b).multiplyScalar(U)]);
+      const ghost = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: PIECE_COLOR[next], transparent: true, opacity: 0.45 }));
+      ghost.userData.own = true;
+      ghost.userData.ownMaterial = true;
+      layer.add(ghost);
+    }
+    placeCell();
+  }
+  function placeCell() {
+    if (!folding) return;
+    const T = nets[folding.id].at(wrap - Math.floor(wrap));
+    const align = nets[folding.id].align;
+    for (const { g, R, fi, s } of folding.faces) {
+      const S = [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1];
+      g.matrix.fromArray(mul(R, mul(S, mul(align, T[fi]))));
+      g.matrixWorldNeedsUpdate = true;
+    }
+  }
+  let wrapRaf = 0;
+  function setWrap(v) {
+    wrap = Math.max(0, Math.min(built().length, v));
+    const shell = `${Math.floor(wrap)}|${wrap % 1 > 0}`;
+    if (shell !== drawnShell) draw(); else placeCell();
+    cellSlider.value = String(Math.round((wrap / Math.max(1, built().length)) * 1000));
+  }
+  const WRAP_SECONDS = 1.2; // per shell
+  function playWrap() {
+    cancelAnimationFrame(wrapRaf);
+    const n = built().length;
+    const from = wrap >= n ? 0 : wrap, t0 = performance.now();
+    const step = (now) => {
+      const x = Math.min(n, from + (now - t0) / (WRAP_SECONDS * 1000));
+      const i = Math.floor(x), f = x - i;
+      setWrap(x >= n ? n : i + f * f * (3 - 2 * f));
+      if (x < n && active && cellView) wrapRaf = requestAnimationFrame(step);
+    };
+    wrapRaf = requestAnimationFrame(step);
+  }
+  function openCell() {
+    cancelAnimationFrame(foldRaf);
+    cellView = true;
+    wrap = built().length;
+    save(); draw(); frame(true); onChange();
+    const n = built().length;
+    showHudPrompt(n ? t('nets.prompt.cell', lang(), { n, total: EKP_ORDER.length }) : t('nets.prompt.cellEmpty', lang()), 6000);
+  }
+  function choose(id) {
+    cancelAnimationFrame(foldRaf); cancelAnimationFrame(wrapRaf);
+    cellView = false;
+    solid = id; fold = foldDone[id] ? 1 : 0;
+    save(); draw(); frame(true); onChange();
+    if (!done()) showHudPrompt(t('nets.prompt.start', lang()), 5000);
+  }
   function place() {
-    const T = net().at(fold);
+    if (cellView) { placeCell(); return; }
+    const T = placedT(solid, fold);
     faceGroups.forEach((g, i) => { g.matrix.fromArray(T[i]); g.matrixWorldNeedsUpdate = true; });
   }
 
   // ---- the view: straight on while flat; turning to three-quarters as it folds ----
   function box(t) {
-    const T = net().at(t);
     const b = new THREE.Box3();
+    if (cellView) {
+      // What's built, and the ghost of the next shell.
+      const ids = [...built(), nextPiece()].filter(Boolean);
+      const r = U * Math.max(0.5, ...ids.flatMap((id) => cellEdges(id).flat().map((p) => Math.hypot(...p))));
+      return b.set(new THREE.Vector3(-r, -r, -r), new THREE.Vector3(r, r, r));
+    }
+    const T = placedT(solid, t);
     net().faces.forEach((f, i) => f.pts.forEach((p) => b.expandByPoint(new THREE.Vector3(...apply(T[i], p)))));
+    // Folding, frame the folded siblings too.
+    for (const sib of t > 0 ? shownSiblings() : []) {
+      const sn = nets[sib], ST = trueT(sib, sn.at(1));
+      sn.faces.forEach((f, i) => f.pts.forEach((p) => b.expandByPoint(new THREE.Vector3(...apply(ST[i], p)))));
+    }
     return b;
   }
   function pose() {
-    const flat = fold === 0;
+    const flat = fold === 0 && !cellView;
     // Folding, frame the shape as it is now together with the closed
     // solid (half open it spreads wider), so the slider never carries it
     // off the screen; the view follows as it folds (see follow()).
@@ -202,10 +437,13 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
   // ---- folding ----
   let foldRaf = 0;
   function setFold(v, { record = true } = {}) {
-    const wasFlat = fold === 0;
+    const wasFlat = fold === 0, wasDone = fold === 1;
     fold = Math.max(0, Math.min(1, v));
+    foldDone[solid] = fold === 1;
     place();
-    if (wasFlat !== (fold === 0)) { draw(); frame(true); } else follow();
+    // Redraw crossing either edge: flat/folding as before, and done/not
+    // done, since an assembly sibling only appears once this is done.
+    if (wasFlat !== (fold === 0) || wasDone !== (fold === 1)) { draw(); frame(true); } else follow();
     slider.value = String(Math.round(fold * 100));
     renderPanel();
     if (record) { save(); onChange(); }
@@ -226,6 +464,12 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
   function commit() { save(); draw(); onChange(); }
   function handleTap(hit, mode) {
     if (mode === 'paint') return false;
+    if (cellView) {
+      if (mode === 'chisel') return false;
+      if (!built().length) { showHudPrompt(t('nets.prompt.cellEmpty', lang()), 5000); return true; }
+      playWrap();
+      return true;
+    }
     if (mode === 'chisel') {
       if (fold > 0) { animateFold(0); return true; }
       if (!done()) return false;
@@ -248,30 +492,49 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
   panel.className = 'qc-panel';
   panel.innerHTML = `
     <div class="nets-solids"></div>
-    <div class="w4d-row nets-fold-row"><input type="range" class="nets-fold" min="0" max="100" step="1" value="0"><button type="button" class="sig-send" data-open></button></div>`;
+    <div class="w4d-row nets-fold-row"><input type="range" class="nets-fold" min="0" max="100" step="1" value="0"><button type="button" class="sig-send" data-open></button></div>
+    <div class="w4d-row nets-cell-row"><input type="range" class="nets-wrap" min="0" max="1000" step="1" value="1000"></div>
+    <div class="w4d-row nets-next-row"><button type="button" class="sig-send" data-next></button></div>`;
   document.body.appendChild(panel);
   addPanelMinimiser(panel, 'nets', () => frame(true));
   const solidsRow = panel.querySelector('.nets-solids');
   const foldRow = panel.querySelector('.nets-fold-row');
   const slider = panel.querySelector('.nets-fold');
   const openBtn = panel.querySelector('[data-open]');
+  const cellRow = panel.querySelector('.nets-cell-row');
+  const cellSlider = panel.querySelector('.nets-wrap');
+  const nextRow = panel.querySelector('.nets-next-row');
+  const nextBtn = panel.querySelector('[data-next]');
+  cellSlider.addEventListener('input', () => { cancelAnimationFrame(wrapRaf); setWrap((Number(cellSlider.value) / 1000) * built().length); });
+  nextBtn.addEventListener('click', () => { const id = nextPiece(); if (id) choose(id); else openCell(); });
   slider.addEventListener('input', () => { cancelAnimationFrame(foldRaf); setFold(Number(slider.value) / 100, { record: false }); });
   slider.addEventListener('change', () => { save(); onChange(); });
   solidsRow.addEventListener('click', (e) => {
+    if (e.target.closest('[data-cell]')) { if (!cellView) openCell(); return; }
     const id = e.target.closest('[data-solid]')?.dataset.solid;
-    if (!id || id === solid) return;
-    cancelAnimationFrame(foldRaf);
-    solid = id; fold = 0;
-    save(); draw(); frame(true); onChange();
-    if (!done()) showHudPrompt(t('nets.prompt.start', lang()), 5000);
+    if (!id || (id === solid && !cellView)) return;
+    choose(id);
   });
   openBtn.addEventListener('click', () => (SOLIDS[solid].golden ? onOpenIn('golden', SOLIDS[solid].golden) : onOpenIn('3D', SOLIDS[solid].piece)));
   function renderPanel() {
     panel.classList.toggle('visible', active);
     if (!active) return;
-    // Each group named, its solids short (full names on hover).
-    const SHORT = { rd: 'RD', to: 'TO', tetra: 'Tetra', octa: 'Octa', icosa: 'Icosa', dodeca: 'Dodeca', tt: 'Trunc. tetra', prolate: 'Prolate', oblate: 'Oblate', bilinski: 'Bilinski', ricosa: 'Rh. icosa', rtriac: 'Triaconta' };
-    solidsRow.innerHTML = SOLID_GROUPS.map((g) => `<div class="w4d-row w4d-options"><span class="nets-group">${t(`nets.group.${g.id}`, lang())}</span>${Object.entries(SOLIDS).filter(([, s]) => s.groups.includes(g.id)).map(([id, s]) => `<button type="button" data-solid="${id}" class="${id === solid ? 'active' : ''}" title="${s.label}">${SHORT[id] ?? s.label}</button>`).join('')}</div>`).join('');
+    // Each group named, its solids short (full names on hover); the EKP
+    // cell's in its wrap order, inside out, then the whole cell.
+    const SHORT = { rd: 'RD', to: 'TO', tetra: 'Tetra', octa: 'Octa', icosa: 'Icosa', dodeca: 'Dodeca', stella1: 'Stella A', stella2: 'Stella B', starSpike: 'Star spike', pacioli1: 'Pacioli A', pacioli2: 'Pacioli B', pacioli3: 'Pacioli C', tt: 'Trunc. tetra', prolate: 'Prolate', oblate: 'Oblate', bilinski: 'Bilinski', ricosa: 'Rh. icosa', rtriac: 'Triaconta' };
+    const orderOf = (g, id) => (g === 'ekp' ? EKP_ORDER.indexOf(id) : 0);
+    const button = (id, s) => `<button type="button" data-solid="${id}" class="${id === solid && !cellView ? 'active' : ''}" title="${s.label}">${SHORT[id] ?? s.label}</button>`;
+    // A long group (the EKP cell's ten pieces and Whole cell) takes its own lines: its name above, its buttons wrapping, so none is cut off on a phone.
+    const LONG = 7;
+    solidsRow.innerHTML = SOLID_GROUPS.map((g) => `<div class="w4d-row w4d-options${Object.values(SOLIDS).filter((s) => s.groups.includes(g.id)).length >= LONG ? ' nets-long' : ''}"><span class="nets-group">${t(`nets.group.${g.id}`, lang())}</span>${Object.entries(SOLIDS).filter(([, s]) => s.groups.includes(g.id)).sort(([a], [b]) => orderOf(g.id, a) - orderOf(g.id, b)).map(([id, s]) => button(id, s)).join('')}${g.id === 'ekp' ? `<button type="button" data-cell class="${cellView ? 'active' : ''}">${t('nets.cell', lang())}</button>` : ''}</div>`).join('');
+    // Next, inside out: from a folded EKP piece, or from the whole cell.
+    const next = nextPiece();
+    nextRow.hidden = !(cellView ? next : EKP_PIECES[solid] && fold === 1);
+    nextBtn.textContent = next ? t('nets.next', lang(), { name: SOLIDS[next].label }) : t('nets.cell', lang());
+    cellRow.hidden = !cellView || !built().length;
+    cellSlider.title = t('nets.wrap', lang());
+    cellSlider.setAttribute('aria-label', cellSlider.title);
+    if (cellView) { foldRow.hidden = true; return; }
     foldRow.hidden = !complete();
     // The slider always shows this net's own fold (direct report: "the
     // slider doesn't reset between builds").
@@ -293,24 +556,24 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
       if (on === active) return;
       active = on;
       group.visible = on;
-      if (!on) { cancelAnimationFrame(tween); cancelAnimationFrame(foldRaf); panel.classList.remove('visible'); }
+      if (!on) { cancelAnimationFrame(tween); cancelAnimationFrame(foldRaf); cancelAnimationFrame(wrapRaf); panel.classList.remove('visible'); }
       draw();
-      if (on) { frame(); if (!done()) showHudPrompt(t('nets.prompt.start', lang()), 5000); }
+      if (on) { frame(); if (!cellView && !done()) showHudPrompt(t('nets.prompt.start', lang()), 5000); }
     },
     /** Folded any way at all: the net has left 2D. */
-    get folded() { return fold > 0; },
+    get folded() { return cellView || fold > 0; },
     get isEmpty() { return Object.values(progress).every((v) => v === 0); },
     /** Nothing built on the solid you're on (the ⊘ beside Undo). */
-    get currentEmpty() { return progress[solid] === 0 && fold === 0; },
+    get currentEmpty() { return cellView || (progress[solid] === 0 && fold === 0); },
     /** ⊘ beside Undo (direct request: "need the delete button on nets"):
      * the solid you're on, back to its ghost net; Undo brings it back. */
     clearCurrent() {
       cancelAnimationFrame(foldRaf);
-      progress[solid] = 0; fold = 0;
+      progress[solid] = 0; fold = 0; foldDone[solid] = false;
       save(); draw(); if (active) { frame(true); showHudPrompt(t('nets.prompt.start', lang()), 5000); }
       onChange();
     },
-    clear() { for (const id of Object.keys(progress)) progress[id] = 0; fold = 0; save(); draw(); if (active) frame(true); onChange(); },
+    clear() { for (const id of Object.keys(progress)) { progress[id] = 0; foldDone[id] = false; } fold = 0; cellView = false; save(); draw(); if (active) frame(true); onChange(); },
     snapshot: toJSON,
     restore(json) { read(json); save(); draw(); if (active) frame(true); },
     toJSON,
