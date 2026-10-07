@@ -81,6 +81,9 @@ right-click) removes. The **User Guide** (in the app, or at
   - **DICTO FCC**: DICTO's skewed rhombic dodecahedron of blue Zometool
     struts (volume φ²), packed as a sheared FCC, and **DICTO Blocks**, its
     four blocks as separate pieces
+  - **DICTO Hex Prism**: DICTO's regular-hexagon prism leaning 20.9° (two
+    squares and four 72° rhombi round its sides, volume 3φ/2), each layer of
+    its hexagonal lattice slid along the lean
   - **Pyrochlore (3D Kagome)**: truncated tetrahedra with their
     corner-sharing tetrahedra
 - **Shells** (a 3D world of its own) — build **hulls** from shells of

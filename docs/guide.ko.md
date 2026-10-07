@@ -71,7 +71,7 @@ Rhombiverse와 그 쌍둥이인 [Polyhedraverse](https://polyhedraverse.vercel.a
 | BCC | Truncated Octahedron(TO, 깎은 팔면체) |
 | BCC Interstitial | Flattened Octahedron, Disphenoid |
 | Elongated Dodecahedron | Elongated Dodecahedron(ED, 늘인 십이면체) |
-| Hexagonal | Hex Prism(육각기둥) |
+| Hexagonal | Hex Prism(육각기둥); DICTO Hex Prism: DICTO의 20.9° 기운 정육각기둥(옆면은 정사각형 2개와 72° 마름모 4개, 모서리 1일 때 부피 3φ/2). 층마다 기운 방향으로 밀어 쌓습니다 |
 | Rhombohedral | Rhombohedra(능면체) |
 | Pyrochlore(3D 카고메) | Truncated Tetrahedron(깎은 사면체. 사이의 사면체는 자동으로 추가됩니다) |
 

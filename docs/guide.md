@@ -69,7 +69,7 @@ Then the tesseract: when the cube closes (**Open in 3D+** takes it to 3D+'s Cube
 | BCC | Truncated Octahedron (TO) |
 | BCC Interstitial | Flattened Octahedron, Disphenoid |
 | Elongated Dodecahedron | Elongated Dodecahedron (ED) |
-| Hexagonal | Hex Prism |
+| Hexagonal | Hex Prism; DICTO Hex Prism: DICTO's regular-hexagon prism leaning 20.9° (two squares and four 72° rhombi round its sides, volume 3φ/2 at edge 1), each layer slid along its lean |
 | Rhombohedral | Rhombohedra |
 | Pyrochlore (3D Kagome) | Truncated Tetrahedron (the tetrahedra between them are added for you) |
 

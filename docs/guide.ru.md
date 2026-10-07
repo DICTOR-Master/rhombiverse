@@ -71,7 +71,7 @@ Rhombiverse и его близнец, [Polyhedraverse](https://polyhedraverse.ve
 | BCC | Truncated Octahedron (TO, усечённый октаэдр) |
 | BCC Interstitial | Flattened Octahedron, Disphenoid |
 | Elongated Dodecahedron | Elongated Dodecahedron (ED, удлинённый додекаэдр) |
-| Hexagonal | Hex Prism (шестиугольная призма) |
+| Hexagonal | Hex Prism (шестиугольная призма); DICTO Hex Prism: призма DICTO с правильными шестиугольниками, наклонённая на 20,9° (по бокам два квадрата и четыре ромба 72°, объём 3φ/2 при ребре 1), каждый слой сдвинут вдоль наклона |
 | Rhombohedral | Rhombohedra (ромбоэдры) |
 | Pyrochlore (3D кагоме) | Truncated Tetrahedron (усечённый тетраэдр; тетраэдры между ними добавляются сами) |
 

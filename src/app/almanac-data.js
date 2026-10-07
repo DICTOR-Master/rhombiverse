@@ -21,6 +21,7 @@ import { rdQuarterPieces } from '../core/lattice.js';
 import { elongatedDodecahedronVerts } from '../geometry-extensions/elongated-dodecahedron.js';
 import { dictoCellVerts } from '../geometry-extensions/dicto-fcc.js';
 import { hexPrismVerts } from '../geometry-extensions/hex-prism.js';
+import { dictoHexCellVerts } from '../geometry-extensions/dicto-hex.js';
 import { rhombohedraTileVerts } from '../geometry-extensions/rhombohedra-lattice.js';
 import { truncatedTetrahedronVerts } from '../geometry-extensions/pyrochlore-lattice.js';
 
@@ -72,6 +73,7 @@ function convexPieceVerts(action) {
     case 'tool:pieceType:elongdodeca': return elongatedDodecahedronVerts(1);
     case 'tool:pieceType:hexprism': return hexPrismVerts(1);
     case 'tool:pieceType:dictofcc': return dictoCellVerts(1);
+    case 'tool:pieceType:dictohex': return dictoHexCellVerts(1);
     case 'tool:pieceType:pyrochlore': return truncatedTetrahedronVerts(1);
     default: return null; // not a single-cell convex piece -- see compositionForAction below
   }

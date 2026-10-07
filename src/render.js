@@ -38,6 +38,7 @@ import { loadCatalogue, findBySerial, zonotopeVertices, localPatch, polytopeShap
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
 import { dictoCellVerts, dictoCellToWorld, DICTO_NEIGHBOR_OFFSETS, dictoBlocks, dictoBlockFromKey, dictoBlockKey } from './geometry-extensions/dicto-fcc.js';
+import { dictoHexCellVerts, dictoHexCellToWorld, DICTO_HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/dicto-hex.js';
 import { NAMED_LATTICE_ANGLES, START_LATTICE_ANGLE, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
 import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWorld, rhombohedraMigrateLegacyCell, rhombohedraAttachOptions, rhombohedraOverlap } from './geometry-extensions/rhombohedra-lattice.js';
 import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats, pyrochloreNeighborOffsets, pyrochloreCapTetsOf, pyrochloreVisibleTets, pyrochloreTetCornerPartner } from './geometry-extensions/pyrochlore-lattice.js';
@@ -65,6 +66,7 @@ import {
   ELONGDODECA_STORAGE_KEY,
   HEXPRISM_STORAGE_KEY,
   DICTOFCC_STORAGE_KEY,
+  DICTOHEX_STORAGE_KEY,
   DICTOBLOCK_STORAGE_KEY,
   lattice2dStorageKey,
   RHOMBOHEDRA_STORAGE_KEY,
@@ -744,6 +746,7 @@ function sphericalClassificationFor(scale) {
     elongDodeca: capStats(convexVolumeAndCeiling(elongatedDodecahedronVerts(scale))),
     hexPrism: capStats(convexVolumeAndCeiling(hexPrismVerts(HEX_PRISM_R, HEX_PRISM_H))),
     dictoFcc: capStats(convexVolumeAndCeiling(dictoCellVerts(DICTO_S))),
+    dictoHex: capStats(convexVolumeAndCeiling(dictoHexCellVerts(HEX_PRISM_R))),
     rhombohedron: capStats(convexVolumeAndCeiling(rhombohedraTileVerts(RHOMBOHEDRA_S))),
   };
 }
@@ -812,6 +815,7 @@ const AUTO_ASSIGN_MATERIAL_BY_PIECE = {
   elongdodeca: 'rose-quartz',
   hexprism: 'water',
   dictofcc: 'zome-blue',
+  dictohex: 'zome-blue',
   // DICTO Blocks: all-rhombus blocks Zome blue, flattened rhombohedra pale blue.
   dictoblock: 'zome-blue',
   dictoflat: 'ice99',
@@ -848,6 +852,7 @@ const AUTO_ASSIGN_PIECE_LABELS = {
   elongdodeca: 'Elongated Dodecahedron',
   hexprism: 'Hexagonal Prism',
   dictofcc: 'DICTO FCC',
+  dictohex: 'DICTO Hex Prism',
   dictoblock: 'DICTO all-rhombus block',
   dictoflat: 'DICTO flattened rhombohedron',
   rhombohedra: 'Rhombohedra',
@@ -1075,6 +1080,7 @@ let cuboctaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let elongDodecaCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let hexPrismCellOrder = []; // instanceId -> {x, y, z, ...cellData}
 let dictoFccCellOrder = []; // instanceId -> {x, y, z, ...cellData} (FCC cell coordinates)
+let dictoHexCellOrder = []; // instanceId -> {x, y, z, ...cellData} (hex axial q, r and layer z)
 let dictoBlockCellOrders = [[], [], [], []]; // per block q: instanceId -> raw store entry (x = 4 * cellX + q)
 // 2D lattice tier: one instanceId->cell array PER PRIMITIVE, keyed by
 // the primitive's own `id` -- same "separate array per family, never
@@ -1282,6 +1288,21 @@ function rebuildDictoFccInstances(dictoFccMesh, dictoFccWorld) {
   dictoFccMesh.instanceMatrix.needsUpdate = true;
   if (dictoFccMesh.instanceColor) dictoFccMesh.instanceColor.needsUpdate = true;
   dictoFccMesh.computeBoundingSphere();
+}
+
+// DICTO Hex Prism: hex-prism.js's own axial coordinates, each layer slid along the lean (dictoHexCellToWorld).
+function rebuildDictoHexInstances(dictoHexMesh, dictoHexWorld) {
+  dictoHexCellOrder = dictoHexWorld.entries();
+  const m = new THREE.Matrix4();
+  dictoHexCellOrder.forEach((cell, i) => {
+    m.makeTranslation(...dictoHexCellToWorld(cell.x, cell.y, cell.z, HEX_PRISM_R));
+    dictoHexMesh.setMatrixAt(i, m);
+    dictoHexMesh.setColorAt(i, instanceColorFor(cell, 'dictohex'));
+  });
+  dictoHexMesh.count = dictoHexCellOrder.length;
+  dictoHexMesh.instanceMatrix.needsUpdate = true;
+  if (dictoHexMesh.instanceColor) dictoHexMesh.instanceColor.needsUpdate = true;
+  dictoHexMesh.computeBoundingSphere();
 }
 
 // DICTO Blocks: one InstancedMesh per block position q (its own shape and
@@ -1647,6 +1668,7 @@ async function init() {
   // DICTO Blocks: own store, keyed (4x + q, y, z) -- cell (x, y, z), block q.
   const dictoBlockWorld = createWorldStore(loadFromLocalStorage(DICTOBLOCK_STORAGE_KEY) ?? { worldName: 'DICTO Blocks', version: 1, cells: {}, meta: {} });
   const dictoFccWorld = createWorldStore(loadFromLocalStorage(DICTOFCC_STORAGE_KEY) ?? { worldName: 'DICTO FCC Lattice', version: 1, cells: {}, meta: {} });
+  const dictoHexWorld = createWorldStore(loadFromLocalStorage(DICTOHEX_STORAGE_KEY) ?? { worldName: 'DICTO Hex Prism Lattice', version: 1, cells: {}, meta: {} });
   // Seeded here, not just inside onHexPrismChange -- that handler only
   // ever runs in response to a real click, so a truly fresh load (no
   // saved JSON) would otherwise leave hexPrismMesh with zero instances
@@ -1779,6 +1801,12 @@ async function init() {
   dictoFccMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(dictoFccMesh);
   rebuildDictoFccInstances(dictoFccMesh, dictoFccWorld);
+  const dictoHexGeometry = new ConvexGeometry(dictoHexCellVerts(HEX_PRISM_R).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  dictoHexGeometry.computeVertexNormals();
+  const dictoHexMesh = new THREE.InstancedMesh(dictoHexGeometry, material.clone(), MAX_CELLS);
+  dictoHexMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(dictoHexMesh);
+  rebuildDictoHexInstances(dictoHexMesh, dictoHexWorld);
 
   // DICTO Blocks: four InstancedMeshes, one per block of the cell.
   const dictoBlockGeometries = dictoBlocks(DICTO_S).map((b) => { const g = new ConvexGeometry(b.corners.map(([x, y, z]) => new THREE.Vector3(x, y, z))); g.computeVertexNormals(); return g; });
@@ -2399,6 +2427,7 @@ async function init() {
     rebuildCuboctaInstances(cuboctaMesh, cuboctaWorld);
     rebuildHexPrismInstances(hexPrismMesh, hexPrismWorld);
     rebuildDictoFccInstances(dictoFccMesh, dictoFccWorld);
+    rebuildDictoHexInstances(dictoHexMesh, dictoHexWorld);
     rebuildDictoBlockInstances(dictoBlockMeshes, dictoBlockWorld);
     rebuildRhombohedraInstances(rhombohedraMesh, rhombohedraWorld);
     rebuildPyrochloreInstances(pyrochloreTTMeshes, pyrochloreTetMeshes, pyrochloreWorld);
@@ -2469,6 +2498,9 @@ async function init() {
     }
     if (piece === 'dictofcc') {
       return dictoFccWorld.entries().length ? null : { geometry: dictoFccGeometry.clone(), place: (material) => { dictoFccWorld.addCell(0, 0, 0, { material }); onDictoFccChange(); } };
+    }
+    if (piece === 'dictohex') {
+      return dictoHexWorld.entries().length ? null : { geometry: dictoHexGeometry.clone(), place: (material) => { dictoHexWorld.addCell(0, 0, 0, { material }); onDictoHexChange(); } };
     }
     if (piece === 'rhombohedra') {
       const cell = { x: RHOMBOHEDRA_FIRST[0], y: RHOMBOHEDRA_FIRST[1], z: RHOMBOHEDRA_FIRST[2], o: 0 };
@@ -2658,6 +2690,7 @@ async function init() {
     reg(HEXPRISM_STORAGE_KEY, '3D', () => hexPrismWorld.toJSON(), (j) => { hexPrismWorld.replaceAll(j); onHexPrismChange(); });
     reg(DICTOBLOCK_STORAGE_KEY, '3D', () => dictoBlockWorld.toJSON(), (j) => { dictoBlockWorld.replaceAll(j); onDictoBlockChange(); });
     reg(DICTOFCC_STORAGE_KEY, '3D', () => dictoFccWorld.toJSON(), (j) => { dictoFccWorld.replaceAll(j); onDictoFccChange(); });
+    reg(DICTOHEX_STORAGE_KEY, '3D', () => dictoHexWorld.toJSON(), (j) => { dictoHexWorld.replaceAll(j); onDictoHexChange(); });
     reg(PYROCHLORE_STORAGE_KEY, '3D', () => pyrochloreWorld.toJSON(), (j) => { pyrochloreWorld.replaceAll(j); onPyrochloreChange(); });
     reg(RHOMBOHEDRA_STORAGE_KEY, '3D', () => rhombohedraWorld.toJSON(), (j) => { rhombohedraWorld.replaceAll(j); onRhombohedraChange(); });
     reg(INTERSTITIAL_STORAGE_KEY, '3D', () => interstitialStore.toJSON(), (j) => { interstitialStore.replaceAll(j); onInterstitialChange(); });
@@ -2763,6 +2796,7 @@ async function init() {
     elongDodecaMesh.material.clippingPlanes = planes;
     hexPrismMesh.material.clippingPlanes = planes;
     dictoFccMesh.material.clippingPlanes = planes;
+    dictoHexMesh.material.clippingPlanes = planes;
     dictoBlockMeshes.forEach((m) => { m.material.clippingPlanes = planes; });
     lattice2dMeshes.forEach((m) => { m.material.clippingPlanes = planes; });
     lattice2dCompanionMeshes.forEach((meshes) => meshes.forEach((m) => { m.material.clippingPlanes = planes; }));
@@ -2820,7 +2854,7 @@ async function init() {
   let skeletonGeneration = 0;
   const TRANSLUCENT_OPACITY = 0.55; // matches Lattice Quick-View/Dualize preview's own established "see-through structure" opacity
   function worldViewMaterials() {
-    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, dictoFccMesh.material, ...dictoBlockMeshes.map((m) => m.material), ...[...lattice2dMeshes.values()].map((m) => m.material), ...[...lattice2dCompanionMeshes.values()].flat().map((m) => m.material), ...[...lattice2dClassMeshes.values()].flat().map((m) => m.material), rhombohedraMesh.material, ...pyrochloreAllMeshes.map((m) => m.material), cuboctaMesh.material, octGapMesh.material];
+    const mats = [material, bccMesh.material, elongDodecaMesh.material, hexPrismMesh.material, dictoFccMesh.material, dictoHexMesh.material, ...dictoBlockMeshes.map((m) => m.material), ...[...lattice2dMeshes.values()].map((m) => m.material), ...[...lattice2dCompanionMeshes.values()].flat().map((m) => m.material), ...[...lattice2dClassMeshes.values()].flat().map((m) => m.material), rhombohedraMesh.material, ...pyrochloreAllMeshes.map((m) => m.material), cuboctaMesh.material, octGapMesh.material];
     for (const { mesh: m } of partialCellMeshes.values()) {
       if (m.isGroup) { for (const child of m.children) mats.push(child.material); }
       else mats.push(m.material);
@@ -2895,6 +2929,7 @@ async function init() {
     elongDodecaMesh.visible = visible && dimensionAllowsMesh('elongdodeca');
     hexPrismMesh.visible = visible && dimensionAllowsMesh('hexprism');
     dictoFccMesh.visible = visible && dimensionAllowsMesh('dictofcc');
+    dictoHexMesh.visible = visible && dimensionAllowsMesh('dictohex');
     dictoBlockMeshes.forEach((m) => { m.visible = visible && dimensionAllowsMesh('dictoblock'); });
     lattice2dMeshes.forEach((m, primitiveId) => { m.visible = visible && dimensionAllowsMesh(`lattice2d:${primitiveId}`); });
     lattice2dCompanionMeshes.forEach((meshes, primitiveId) => { const v = visible && dimensionAllowsMesh(`lattice2d:${primitiveId}`); meshes.forEach((m) => { m.visible = v; }); });
@@ -3081,6 +3116,9 @@ async function init() {
     }
     for (const cell of dictoFccWorld.entries()) {
       pieces.push((sphericalModeActive ? sphericalGeometries.dictoFcc : dictoFccGeometry).clone().translate(...dictoCellToWorld(cell.x, cell.y, cell.z, DICTO_S)));
+    }
+    for (const cell of dictoHexWorld.entries()) {
+      pieces.push((sphericalModeActive ? sphericalGeometries.dictoHex : dictoHexGeometry).clone().translate(...dictoHexCellToWorld(cell.x, cell.y, cell.z, HEX_PRISM_R)));
     }
     // Pyrochlore (3D Kagome): TTs + their derived cap tets, same
     // geometry/position recipe as rebuildPyrochloreInstances.
@@ -3490,6 +3528,7 @@ async function init() {
     elongDodecaMesh.geometry = sphericalModeActive ? sphericalGeometries.elongDodeca : elongDodecaGeometry;
     hexPrismMesh.geometry = sphericalModeActive ? sphericalGeometries.hexPrism : hexPrismGeometry;
     dictoFccMesh.geometry = sphericalModeActive ? sphericalGeometries.dictoFcc : dictoFccGeometry;
+    dictoHexMesh.geometry = sphericalModeActive ? sphericalGeometries.dictoHex : dictoHexGeometry;
     rhombohedraMesh.geometry = sphericalModeActive ? sphericalGeometries.rhombohedron : rhombohedraGeometry;
     applySphericalToDisphenoids(sphericalModeActive);
     applySphericalToPartials(sphericalModeActive);
@@ -3753,7 +3792,7 @@ async function init() {
         if (action.startsWith('tool:pieceType:')) {
           const value = action.slice('tool:pieceType:'.length);
           const PIECE_LABELS = {
-            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', dictofcc: 'DICTO FCC (skewed RD)', dictoblock: 'DICTO Blocks', rhombohedra: 'Rhombohedra', pyrochlore: 'Pyrochlore (3D Kagome)', tesseract: 'Tesseract', cell24: '24-cell', cell16: '16-cell', a4trunc: 'Truncated 5-cell', a4bitrunc: 'Bitruncated 5-cell', a4cell5: '5-cell',
+            rd: 'RD', cube: 'Cube', pyramid: 'Pyramid', to: 'Truncated Octahedron', ioct: 'Flattened Octahedron', octahedron: 'Octahedron', idis: 'Disphenoid', halfrd: 'Hemi RD', hourglass: 'Hourglass', hemi3: 'Corner Cluster', hemi4: 'Band Cluster', hemiTri: 'Triangle Cluster', elongdodeca: 'Elongated Dodecahedron', rdquarter: 'RD Quarter (rhombohedron)', hexprism: 'Hexagonal Prism', dictofcc: 'DICTO FCC (skewed RD)', dictohex: 'DICTO Hex Prism', dictoblock: 'DICTO Blocks', rhombohedra: 'Rhombohedra', pyrochlore: 'Pyrochlore (3D Kagome)', tesseract: 'Tesseract', cell24: '24-cell', cell16: '16-cell', a4trunc: 'Truncated 5-cell', a4bitrunc: 'Bitruncated 5-cell', a4cell5: '5-cell',
             // 2D lattice tier: one label per LATTICE_PRIMITIVES entry
             // (Phase 6: primitive alone, angle is a live toggle not a
             // piece-type value -- see lattice2dSeedCell's own header),
@@ -4034,6 +4073,7 @@ async function init() {
         case 'elongdodeca': return elongDodecaGeometry;
         case 'hexprism': return hexPrismGeometry;
         case 'dictofcc': return dictoFccGeometry;
+        case 'dictohex': return dictoHexGeometry;
         case 'rhombohedra': return rhombohedraGeometry;
         case 'pyrochlore': return convex(truncatedTetrahedronVerts(1, PYROCHLORE_S));
         default: return null;
@@ -4204,7 +4244,7 @@ async function init() {
   // interstitial-lattice.js). Labels/icons are keyed by mode name below
   // (LATTICE_QUICK_VIEW_LABELS/_MARK_KEY), not by array position, so
   // reordering this list alone is safe.
-  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'rdquarter', 'cubocta', 'octahedron', 'bcc', 'octa', 'disphenoid', 'elongdodeca', 'hexprism', 'dictofcc', 'rhombohedra', 'pyrochlore'];
+  const LATTICE_QUICK_VIEW_MODES = ['off', 'rd', 'cube', 'pyramid', 'rdquarter', 'cubocta', 'octahedron', 'bcc', 'octa', 'disphenoid', 'elongdodeca', 'hexprism', 'dictofcc', 'dictohex', 'rhombohedra', 'pyrochlore'];
   const LATTICE_QUICK_VIEW_LABELS = {
     off: 'Off.',
     rd: 'RD -- every built cell shown as a complete block.',
@@ -4219,6 +4259,7 @@ async function init() {
     elongdodeca: 'Elongated Dodecahedron -- your ED build plus every open ED slot one step beyond it.',
     hexprism: 'Hex Prism -- your Hex Prism build plus every open slot one step beyond it on its own hexagonal grid.',
     dictofcc: 'DICTO FCC -- your DICTO FCC build plus every open slot one step beyond it on its sheared FCC grid.',
+    dictohex: 'DICTO Hex Prism -- your DICTO Hex Prism build plus every open slot one step beyond it on its slid hexagonal grid.',
     rhombohedra: 'Rhombohedra -- your Rhombohedra build plus every open slot one step beyond it (following the current Copy / Mirror setting).',
     pyrochlore: 'Pyrochlore (3D Kagome) -- your truncated tetrahedra plus every open slot one step beyond them, with all their corner-sharing tetrahedra.',
   };
@@ -4468,7 +4509,7 @@ async function init() {
         const verts = octGapVertices(SCALE).map(([x, y, z]) => new THREE.Vector3(x + wx, y + wy, z + wz));
         put(new ConvexGeometry(verts), band);
       }
-    } else if (['elongdodeca', 'hexprism', 'dictofcc', 'rhombohedra', 'pyrochlore'].includes(latticeQuickViewMode)) {
+    } else if (['elongdodeca', 'hexprism', 'dictofcc', 'dictohex', 'rhombohedra', 'pyrochlore'].includes(latticeQuickViewMode)) {
       // Own-lattice pieces (2026-09-24, direct instruction: "follow rules
       // of previous ones where a lattice always extends past where you
       // have built so far"): drawn from that piece's OWN build, not the
@@ -4476,11 +4517,12 @@ async function init() {
       // beyond it, so the grid visibly extends past the build and grows
       // with it.
       const at = (verts, [cx, cy, cz]) => new ConvexGeometry(verts.map(([x, y, z]) => new THREE.Vector3(x + cx, y + cy, z + cz)));
-      if (latticeQuickViewMode === 'elongdodeca' || latticeQuickViewMode === 'hexprism' || latticeQuickViewMode === 'dictofcc') {
+      if (latticeQuickViewMode === 'elongdodeca' || latticeQuickViewMode === 'hexprism' || latticeQuickViewMode === 'dictofcc' || latticeQuickViewMode === 'dictohex') {
         const isED = latticeQuickViewMode === 'elongdodeca';
         const isDicto = latticeQuickViewMode === 'dictofcc';
-        const own = isED ? elongDodecaWorld.entries() : isDicto ? dictoFccWorld.entries() : hexPrismWorld.entries();
-        const offsets = isED ? NEIGHBOR_OFFSETS : isDicto ? DICTO_NEIGHBOR_OFFSETS : HEX_NEIGHBOR_OFFSETS;
+        const isDictoHex = latticeQuickViewMode === 'dictohex';
+        const own = isED ? elongDodecaWorld.entries() : isDicto ? dictoFccWorld.entries() : isDictoHex ? dictoHexWorld.entries() : hexPrismWorld.entries();
+        const offsets = isED ? NEIGHBOR_OFFSETS : isDicto ? DICTO_NEIGHBOR_OFFSETS : isDictoHex ? DICTO_HEX_NEIGHBOR_OFFSETS : HEX_NEIGHBOR_OFFSETS;
         const depth = buildDepths(own.map((c) => [c.x, c.y, c.z]), () => offsets);
         const slots = new Map(); // key -> { p, band }
         for (const c of own) {
@@ -4495,8 +4537,8 @@ async function init() {
             if (!slots.has(k) && !depth.has(k)) slots.set(k, { p: [c.x + dx, c.y + dy, c.z + dz], band: 0 });
           }
         }
-        const verts = isED ? elongatedDodecahedronVerts(SCALE) : isDicto ? dictoCellVerts(DICTO_S) : hexPrismVerts(HEX_PRISM_R, HEX_PRISM_H);
-        const toWorld = (x, y, z) => (isED ? elongDodecaCellToWorld(x, y, z, SCALE) : isDicto ? dictoCellToWorld(x, y, z, DICTO_S) : hexCellToWorld(x, y, z, HEX_PRISM_R, HEX_PRISM_H));
+        const verts = isED ? elongatedDodecahedronVerts(SCALE) : isDicto ? dictoCellVerts(DICTO_S) : isDictoHex ? dictoHexCellVerts(HEX_PRISM_R) : hexPrismVerts(HEX_PRISM_R, HEX_PRISM_H);
+        const toWorld = (x, y, z) => (isED ? elongDodecaCellToWorld(x, y, z, SCALE) : isDicto ? dictoCellToWorld(x, y, z, DICTO_S) : isDictoHex ? dictoHexCellToWorld(x, y, z, HEX_PRISM_R) : hexCellToWorld(x, y, z, HEX_PRISM_R, HEX_PRISM_H));
         for (const { p: [x, y, z], band } of slots.values()) put(at(verts, toWorld(x, y, z)), band);
       } else if (latticeQuickViewMode === 'rhombohedra') {
         const own = rhombohedraWorld.entries();
@@ -4798,7 +4840,7 @@ async function init() {
     // own `?? MARKS.pieceRD` fallback below) regardless of which was
     // actually selected -- the real placement itself was always
     // correct, only this indicator was silently wrong.
-    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', dictofcc: 'pieceDictoFcc', rdquarter: 'pieceRDQuarter', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore', tesseract: 'pieceTesseract', cell24: 'piece24Cell', cell16: 'piece16Cell', a4trunc: 'pieceTrunc5Cell', a4bitrunc: 'pieceBitrunc5Cell', a4cell5: 'piece5Cell',
+    elongdodeca: 'pieceElongDodeca', hexprism: 'pieceHexPrism', dictofcc: 'pieceDictoFcc', dictohex: 'pieceDictoHex', rdquarter: 'pieceRDQuarter', rhombohedra: 'pieceRhombohedron', pyrochlore: 'piecePyrochlore', tesseract: 'pieceTesseract', cell24: 'piece24Cell', cell16: 'piece16Cell', a4trunc: 'pieceTrunc5Cell', a4bitrunc: 'pieceBitrunc5Cell', a4cell5: 'piece5Cell',
     // 2D lattice tier: one entry per LATTICE_PRIMITIVES, reusing
     // wheel-icons.js's own 3 primitive-keyed icons (Phase 6: the piece
     // type IS just the primitive now, angle is a separate live toggle
@@ -5374,6 +5416,7 @@ async function init() {
       [elongDodecaMesh, elongDodecaWorld, elongDodecaCellOrder, onElongDodecaChange],
       [hexPrismMesh, hexPrismWorld, hexPrismCellOrder, onHexPrismChange],
       [dictoFccMesh, dictoFccWorld, dictoFccCellOrder, onDictoFccChange],
+      [dictoHexMesh, dictoHexWorld, dictoHexCellOrder, onDictoHexChange],
       ...dictoBlockMeshes.map((m, q) => [m, dictoBlockWorld, dictoBlockCellOrders[q], onDictoBlockChange]),
       [rhombohedraMesh, rhombohedraWorld, rhombohedraCellOrder, onRhombohedraChange],
       [cuboctaMesh, cuboctaWorld, cuboctaCellOrder, onCuboctaChange],
@@ -5511,6 +5554,10 @@ async function init() {
           add: 'A DICTO FCC cell is already there.',
           remove: "No DICTO FCC cell there to remove -- tap directly on one you've placed.",
         },
+        dictohex: {
+          add: 'A DICTO Hex Prism is already there.',
+          remove: "No DICTO Hex Prism there to remove -- tap directly on one you've placed.",
+        },
         hexprism: {
           add: 'A Hex Prism is already there.',
           remove: "No Hex Prism there to remove -- Remove+Hex Prism only clears an actual one, not the RD world around it. Tap directly on one you've placed.",
@@ -5588,6 +5635,10 @@ async function init() {
     dictoFccMesh,
     dictoFccCellAt: (instanceId) => dictoFccCellOrder[instanceId],
     onDictoFccChange,
+    dictoHexWorld,
+    dictoHexMesh,
+    dictoHexCellAt: (instanceId) => dictoHexCellOrder[instanceId],
+    onDictoHexChange,
     // 2D lattice tier: one `lattice2d` param replaces the old
     // square2dWorld/square2dMesh/square2dCellAt(+Hexagon/+Triangle)
     // trio-of-trios -- see core/build.js's own `lattice2d` param
@@ -5752,6 +5803,15 @@ async function init() {
     updateSectionEnabled();
     applyWorldViewMaterials();
     persist(dictoFccWorld.toJSON(), DICTOFCC_STORAGE_KEY);
+  }
+
+  // DICTO Hex Prism build: own change handler, same pattern as DICTO FCC's.
+  function onDictoHexChange() {
+    if (latticeQuickViewMode === 'dictohex') rebuildLatticeQuickView();
+    rebuildDictoHexInstances(dictoHexMesh, dictoHexWorld);
+    updateSectionEnabled();
+    applyWorldViewMaterials();
+    persist(dictoHexWorld.toJSON(), DICTOHEX_STORAGE_KEY);
   }
 
   // 2D lattice tier: ONE generic change handler for every primitive,
@@ -5950,6 +6010,9 @@ async function init() {
     clearLocalStorage(DICTOFCC_STORAGE_KEY);
     dictoFccWorld.replaceAll({ worldName: 'DICTO FCC Lattice', version: 1, cells: {}, meta: {} });
     onDictoFccChange();
+    clearLocalStorage(DICTOHEX_STORAGE_KEY);
+    dictoHexWorld.replaceAll({ worldName: 'DICTO Hex Prism Lattice', version: 1, cells: {}, meta: {} });
+    onDictoHexChange();
     // 2D lattice tier: one loop over every primitive, replacing the old
     // Square/Hexagon/Triangle hand-written trio -- same "fresh start
     // clears it too" reasoning as every store above.

@@ -43,6 +43,7 @@ jobs:
       - run: node scripts/verify-rhombohedra.mjs
       # DICTO FCC: DICTO's blue-strut skewed RD tiles as a sheared FCC.
       - run: node scripts/verify-dicto-fcc.mjs
+      - run: node scripts/verify-dicto-hex.mjs
       # Icosahedral/Dodecahedral Transitions: DICTO's Euclid–Kepler–Pacioli cell, its solids, patterns and merged surface.
       - run: node scripts/verify-roof-fold.mjs
       # 4D worlds: Z4, D4 and hyper-pyrochlore cells, slices and steps.

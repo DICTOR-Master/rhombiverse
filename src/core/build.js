@@ -31,6 +31,7 @@ import {
 import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
 import { matchHexNeighborOffset } from '../geometry-extensions/hex-prism.js';
 import { matchDictoNeighborOffset, matchDictoBlockNeighbour, dictoBlockFromKey, dictoBlockKey } from '../geometry-extensions/dicto-fcc.js';
+import { matchDictoHexNeighborOffset } from '../geometry-extensions/dicto-hex.js';
 import { rhombohedraAttachOptions, rhombohedraOverlap } from '../geometry-extensions/rhombohedra-lattice.js';
 import { pyrochloreSiteOrientation, pyrochloreNeighborForTTFace, pyrochloreNeighborForTetFace, pyrochloreCapForTTFace, pyrochloreTetCornerPartner, pyrochloreCapTetsOf, pyrochloreCellToWorld } from '../geometry-extensions/pyrochlore-lattice.js';
 import { elongDodecaCellToWorld } from '../geometry-extensions/elongated-dodecahedron.js';
@@ -197,6 +198,12 @@ export function createBuildController({
   dictoFccMesh = null,
   dictoFccCellAt = () => null,
   onDictoFccChange = () => {},
+  // DICTO Hex Prism ('dictohex'): the leaning hexagonal prism on its slid
+  // hexagonal lattice (geometry-extensions/dicto-hex.js), hex axial coordinates.
+  dictoHexWorld = null,
+  dictoHexMesh = null,
+  dictoHexCellAt = () => null,
+  onDictoHexChange = () => {},
   // 2D lattice tier (replaces the old separate Square/Hexagon/Triangle
   // params): one generic "adopted family member" store PER PRIMITIVE
   // from lattice-2d.js's own LATTICE_PRIMITIVES, all sharing this
@@ -321,6 +328,7 @@ export function createBuildController({
     const elongDodecaTargets = elongDodecaMesh && (getPieceType() === 'elongdodeca' || getPieceType() === 'rd' || getPieceType() === 'cube') ? [elongDodecaMesh] : [];
     const hexPrismTargets = hexPrismMesh && getPieceType() === 'hexprism' ? [hexPrismMesh] : [];
     const dictoFccTargets = dictoFccMesh && getPieceType() === 'dictofcc' ? [dictoFccMesh] : [];
+    const dictoHexTargets = dictoHexMesh && getPieceType() === 'dictohex' ? [dictoHexMesh] : [];
     const dictoBlockTargets = getPieceType() === 'dictoblock' ? dictoBlockMeshes : [];
     // Same reasoning as every other "adopted family member" above, for
     // whichever single (angle, primitive) combination is currently
@@ -381,7 +389,7 @@ export function createBuildController({
       return own.length > 0 ? own[0] : null;
     }
     const meshTargets = getMeshPickable() ? [mesh] : [];
-    const hits = raycaster.intersectObjects([...meshTargets, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...dictoFccTargets, ...dictoBlockTargets, ...lattice2dTargets, ...rhombohedraTargets, ...pyrochloreTargets, ...firstPlacementTargets, ...interstitialTargets, ...hemisphereTargets], true);
+    const hits = raycaster.intersectObjects([...meshTargets, ...extraPickTargets, ...bccTargets, ...elongDodecaTargets, ...hexPrismTargets, ...dictoFccTargets, ...dictoHexTargets, ...dictoBlockTargets, ...lattice2dTargets, ...rhombohedraTargets, ...pyrochloreTargets, ...firstPlacementTargets, ...interstitialTargets, ...hemisphereTargets], true);
     return hits.length > 0 ? hits[0] : null;
   }
 
@@ -612,6 +620,29 @@ export function createBuildController({
     }
     dictoFccWorld.removeCell(cell.x, cell.y, cell.z);
     onDictoFccChange();
+    if (onRemoved) onRemoved(cell);
+  }
+
+  // DICTO Hex Prism piece tier: the same pattern again; the clicked face's
+  // normal picks one of the prism's 8 face neighbours.
+  function handleDictoHexClick(hit, mode) {
+    const action = mode === 'build' ? 'add' : 'remove';
+    if (hit.object !== dictoHexMesh || hit.instanceId === undefined) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    const cell = dictoHexCellAt(hit.instanceId);
+    if (!cell) { if (onPieceNoOp) onPieceNoOp(action); return; }
+    if (mode === 'build') {
+      const offset = matchDictoHexNeighborOffset(hit.face.normal);
+      if (!offset) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const nx = cell.x + offset[0], ny = cell.y + offset[1], nz = cell.z + offset[2];
+      if (dictoHexWorld.has(nx, ny, nz)) { if (onPieceNoOp) onPieceNoOp(action); return; }
+      const material = getMaterial();
+      dictoHexWorld.addCell(nx, ny, nz, { material });
+      onDictoHexChange();
+      if (onPlaced) onPlaced({ x: nx, y: ny, z: nz, material });
+      return;
+    }
+    dictoHexWorld.removeCell(cell.x, cell.y, cell.z);
+    onDictoHexChange();
     if (onRemoved) onRemoved(cell);
   }
 
@@ -1605,6 +1636,10 @@ export function createBuildController({
       handleDictoFccClick(hit, mode);
       return;
     }
+    if ((mode === 'build' || mode === 'chisel') && getPieceType() === 'dictohex' && dictoHexWorld && dictoHexMesh) {
+      handleDictoHexClick(hit, mode);
+      return;
+    }
     if ((mode === 'build' || mode === 'chisel') && getPieceType().startsWith('lattice2d:') && lattice2d) {
       handleLattice2dClick(hit, mode, getPieceType());
       return;
@@ -1932,6 +1967,10 @@ export function createBuildController({
     }
     if (mode === 'build' && pieceTypeForInterstitialRemove === 'dictofcc' && dictoFccWorld && dictoFccMesh) {
       handleDictoFccClick(hit, 'chisel');
+      return;
+    }
+    if (mode === 'build' && pieceTypeForInterstitialRemove === 'dictohex' && dictoHexWorld && dictoHexMesh) {
+      handleDictoHexClick(hit, 'chisel');
       return;
     }
     if (mode === 'build' && pieceTypeForInterstitialRemove.startsWith('lattice2d:') && lattice2d) {

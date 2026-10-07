@@ -71,7 +71,7 @@ Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel
 | BCC | Truncated Octahedron（TO，截角八面体） |
 | BCC Interstitial | Flattened Octahedron、Disphenoid |
 | Elongated Dodecahedron | Elongated Dodecahedron（ED，伸长十二面体） |
-| Hexagonal | Hex Prism（六棱柱） |
+| Hexagonal | Hex Prism（六棱柱）；DICTO Hex Prism：DICTO 的倾斜 20.9° 的正六棱柱（侧面为两个正方形和四个 72° 菱形，棱长 1 时体积 3φ/2），每一层沿倾斜方向错开堆叠 |
 | Rhombohedral | Rhombohedra（菱面体） |
 | Pyrochlore（3D 笼目） | Truncated Tetrahedron（截角四面体；它们之间的四面体会自动添加） |
 

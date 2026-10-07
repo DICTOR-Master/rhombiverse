@@ -18,6 +18,6 @@ test('every wheel piece appears in the wizard exactly once', () => {
   }
   assert.equal(new Set(wizardActions).size, wizardActions.length, 'no duplicates');
   // Shells, Golden Rhombohedra, Euclid–Kepler–Pacioli Cell Network and DICTO FCC are Wizard-only (the wheels have no free face).
-  const WIZARD_ONLY = ['tool:shellsWorld', 'tool:goldenWorld', 'tool:roofFoldWorld', 'tool:pieceType:dictofcc', 'tool:pieceType:dictoblock'];
+  const WIZARD_ONLY = ['tool:shellsWorld', 'tool:goldenWorld', 'tool:roofFoldWorld', 'tool:pieceType:dictofcc', 'tool:pieceType:dictoblock', 'tool:pieceType:dictohex'];
   for (const a of wizardActions.filter((w) => !WIZARD_ONLY.includes(w))) assert.ok(wheelActions.includes(a), `${a} is a real wheel action`);
 });

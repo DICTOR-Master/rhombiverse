@@ -71,7 +71,7 @@ Después, el teseracto: al cerrarse el cubo (**Abrir en 3D+** lo lleva a la piez
 | BCC | Truncated Octahedron (TO, octaedro truncado) |
 | BCC Interstitial | Flattened Octahedron, Disphenoid |
 | Elongated Dodecahedron | Elongated Dodecahedron (ED, dodecaedro alargado) |
-| Hexagonal | Hex Prism (prisma hexagonal) |
+| Hexagonal | Hex Prism (prisma hexagonal); DICTO Hex Prism: el prisma de hexágonos regulares de DICTO, inclinado 20,9° (dos cuadrados y cuatro rombos de 72° en sus lados, volumen 3φ/2 con arista 1), con cada capa desplazada a lo largo de su inclinación |
 | Rhombohedral | Rhombohedra (romboedros) |
 | Pyrochlore (Kagome 3D) | Truncated Tetrahedron (tetraedro truncado; los tetraedros entre ellos se añaden solos) |
 

@@ -71,7 +71,7 @@ Rhombiverse とその双子の [Polyhedraverse](https://polyhedraverse.vercel.ap
 | BCC | Truncated Octahedron（TO、切頂八面体） |
 | BCC Interstitial | Flattened Octahedron、Disphenoid |
 | Elongated Dodecahedron | Elongated Dodecahedron（ED、長菱形十二面体） |
-| Hexagonal | Hex Prism（六角柱） |
+| Hexagonal | Hex Prism（六角柱）；DICTO Hex Prism：DICTO の 20.9° 傾いた正六角柱（側面は正方形2枚と72°のひし形4枚、辺1で体積 3φ/2）。層ごとに傾きの方向へずらして積みます |
 | Rhombohedral | Rhombohedra（菱面体） |
 | Pyrochlore（3D かごめ） | Truncated Tetrahedron（切頂四面体。あいだの四面体は自動で追加されます） |
 

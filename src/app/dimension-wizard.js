@@ -351,6 +351,8 @@ export const LATTICES_3D = [
   ] },
   { key: 'hex', label: 'Hexagonal', pieces: [
     { label: 'Hex Prism', action: 'tool:pieceType:hexprism' },
+    // DICTO Hex Prism (queued 2026-10-01): DICTO's leaning prism, each layer slid along its lean.
+    { label: 'DICTO Hex Prism', action: 'tool:pieceType:dictohex' },
   ] },
   { key: 'rhombohedral', label: 'Rhombohedral', pieces: [
     { label: 'Rhombohedra', action: 'tool:pieceType:rhombohedra' },
