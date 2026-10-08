@@ -39,7 +39,7 @@ export function createSunstarWorld(opts) {
     // dodecahedron too (Dogstar inside stella inside cube inside dodecahedron), so Dogstars fill
     // every cell, eight tips meeting at each cube corner.
     nestedFaces: dogstarSolid().map((f) => [f, C.star]),
-    // The nested Sunstar chain (direct request, 2026-10-08), each step touching: inside the
+    // The Star Chain Reaction (DICTO's name, 2026-10-08: "like solar radiation"), each step touching: inside the
     // dodecahedron its great star (the great stellated dodecahedron of the Dogstar's 1/phi^3 core),
     // inside that a whole Sunstar 1/phi^3 the size, inside its dodecahedron the next great star, and
     // the next Sunstar at 1/phi^6.
