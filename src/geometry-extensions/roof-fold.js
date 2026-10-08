@@ -277,6 +277,9 @@ export function edgesOfLength(verts, length, tol = 1e-9) {
 }
 
 // ---- The Sunstar Lattice (DICTO, 2026-10-08; ported from Kaleidohedra) ----
+// The Dogstar is known: George W. Hart's stellation 8 of the dodecahedron ("Tetrahedral Stellations of
+// the Dodecahedron", 1996), which he noted fills space alternated with regular dodecahedra; Polyhedra-World
+// also shows it ("a curious equifacial dodecahedron"). DICTO's names: Dogstar, Sunstar.
 // Regular dodecahedra on the even cells of the EKP cubic lattice are the dodecahedron's densest
 // lattice packing; each hole they leave on the odd cells is a Dogstar. A dodecahedron with the
 // Dogstars round it is a Sunstar, the sun with its sun dogs (DICTO's names).
