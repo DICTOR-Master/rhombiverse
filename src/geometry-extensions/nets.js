@@ -11,7 +11,7 @@
 // angle, on top of its parent's own turn; the first face lies flat on
 // the screen throughout.
 
-import { roofFoldSolids, goldenRectangles, ROOF_FOLD_KINDS } from './roof-fold.js';
+import { roofFoldSolids, goldenRectangles, ROOF_FOLD_KINDS, dogstarSolid } from './roof-fold.js';
 
 // ---- a little linear algebra (4×4, column-major like THREE.Matrix4) ----
 const sub = (a, b) => a.map((v, i) => v - b[i]);
@@ -112,6 +112,15 @@ function ordered(v, idx) {
 // Any convex solid from its vertices: its faces are the planes through
 // three corners with every other corner on one side; its edge the
 // shortest distance between corners.
+// The Dogstar as corners and faces (not a hull: it is not convex).
+function dogstarMesh() {
+  const v = [], at = new Map();
+  const id = (p) => { const k = p.map((c) => (Math.round(c * 1e7) / 1e7 + 0).toFixed(7)).join(); if (!at.has(k)) { at.set(k, v.length); v.push(p); } return at.get(k); };
+  const faces = dogstarSolid().map((f) => f.map(id));
+  let edge = Infinity;
+  for (const f of faces) f.forEach((a, j) => { edge = Math.min(edge, Math.hypot(...sub(v[a], v[f[(j + 1) % f.length]]))); });
+  return { v, faces, edge };
+}
 function hullOf(v) {
   const faces = [];
   const seen = new Set();
@@ -207,6 +216,10 @@ export const SOLIDS = {
   stella1: { label: 'Stella octangula · A', groups: ['ekp'], assembly: 'stella', make: () => hullOf(STELLA_A) },
   stella2: { label: 'Stella octangula · B', groups: ['ekp'], assembly: 'stella', make: () => hullOf(STELLA_B) },
   starSpike: { label: 'Great star · one spike', groups: ['ekp'], assembly: 'star', assemblyWith: ['icosa'], make: () => hullOf(starSpike()) },
+  // The Dogstar (DICTO, 2026-10-08: "in the 2D as well"): its 60 triangles, sharing corners.
+  // Its first plain tree overlaps itself; `net` is a tree found free of overlap (a random
+  // search: root face 8, depth first, seed 308), so it unfolds at once.
+  dogstar: { label: 'Dogstar', groups: ['ekp'], make: dogstarMesh, net: [8, 0, true, 308] },
   pacioli1: { label: "Pacioli's rectangle · A", groups: ['ekp'], assembly: 'pacioli', make: () => hullOf(goldenRectangles()[0]) },
   pacioli2: { label: "Pacioli's rectangle · B", groups: ['ekp'], assembly: 'pacioli', make: () => hullOf(goldenRectangles()[1]) },
   pacioli3: { label: "Pacioli's rectangle · C", groups: ['ekp'], assembly: 'pacioli', make: () => hullOf(goldenRectangles()[2]) },
@@ -214,11 +227,11 @@ export const SOLIDS = {
 // Each EKP piece: its kind in roof-fold.js and its maker's size in cell
 // units (the icosahedron's maker is φ² times the cell's; the rest are the
 // cell's own). EKP_ORDER is the wrap sequence, inside out, straight from
-// ROOF_FOLD_KINDS: Pacioli, icosahedron, octahedron, stella, cube, star,
+// ROOF_FOLD_KINDS: Pacioli, icosahedron, octahedron, Dogstar, stella, cube, star,
 // dodecahedron.
 export const EKP_PIECES = {
   pacioli1: { kind: 'rects', index: 0, cell: 1 }, pacioli2: { kind: 'rects', index: 1, cell: 1 }, pacioli3: { kind: 'rects', index: 2, cell: 1 },
-  icosa: { kind: 'ico', cell: 1 / PHI ** 2 }, octa: { kind: 'oct', cell: 1 },
+  icosa: { kind: 'ico', cell: 1 / PHI ** 2 }, octa: { kind: 'oct', cell: 1 }, dogstar: { kind: 'dogstar', cell: 1 },
   stella1: { kind: 'stella', index: 0, cell: 1 }, stella2: { kind: 'stella', index: 1, cell: 1 },
   cube: { kind: 'cube', cell: 1 }, starSpike: { kind: 'star', cell: 1 }, dodeca: { kind: 'dodeca', cell: 1 },
 };
@@ -343,6 +356,7 @@ export function netOf(id, L = 5) {
   const tries = [];
   for (let root = 0; root < faces.length; root++) for (let shift = 0; shift < 4; shift++) for (const depthFirst of [false, true]) tries.push([root, shift, depthFirst, 0]);
   for (let seed = 1; seed <= 400; seed++) tries.push([seed % faces.length, 0, seed % 2 === 0, seed]);
+  if (solidOf(id).net) tries.splice(0, tries.length, solidOf(id).net);
   for (const [root, shift, depthFirst, seed] of tries) {
     if (best && seed) break; // a plain tree found: no need to search further
     const tree = makeTree(faces, root, shift, depthFirst, seed);

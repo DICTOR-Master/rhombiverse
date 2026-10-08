@@ -189,8 +189,12 @@ const spike = (Math.sqrt(3) / 4) * (2 / PHI ** 2) ** 2 * (2 / Math.sqrt(3)) / 3;
 V.star = V.ico + 20 * spike;
 V.oct = 4 / 3; // edge sqrt2: (sqrt2/3) a^3
 V.stella = 2 * (8 / 3); // two tetrahedra of edge 2 sqrt2, counted separately
+V.dogstar = 16 - V.dodeca; // the hole one dodecahedron leaves per cell (verified in 13(h))
 for (const k of ROOF_FOLD_KINDS) {
   if (k === 'rects') continue; // three flat plates, not a solid
+  // The Dogstar's faces meet seam points part-way along neighbouring edges, so its closure is checked
+  // by 13(h) (vertex-merged); here, its volume.
+  if (k === 'dogstar') { check(`dogstar: ${S.dogstar.faces.length} faces, volume ${volumeOf(S.dogstar.faces).toFixed(6)} = 16 - dodecahedron`, Math.abs(volumeOf(S.dogstar.faces) - V.dogstar) < 1e-9); continue; }
   if (k === 'stella') { const f = S.stella.faces; check(`stella: two closed tetrahedra (${f.length} faces), volumes ${volumeOf(f.slice(0, 4)).toFixed(6)} + ${volumeOf(f.slice(4)).toFixed(6)} = 2 x 8/3`, closed(f.slice(0, 4)) && closed(f.slice(4)) && Math.abs(volumeOf(f) - V.stella) < 1e-9); continue; }
   const f = S[k].faces;
   check(`${k}: ${f.length} faces, closed, outward, volume ${volumeOf(f).toFixed(6)} = ${V[k].toFixed(6)}`, closed(f) && Math.abs(volumeOf(f) - V[k]) < 1e-9);
@@ -457,17 +461,25 @@ check(`stars on even cells and icosahedra on odd cells share only corners: ${pai
     ico: (p) => inConvex(S.ico.faces, p), oct: (p) => inConvex(S.oct.faces, p), cube: (p) => inConvex(S.cube.faces, p), dodeca: (p) => inConvex(S.dodeca.faces, p),
     stella: (p) => stellaTets.some((T) => inConvex(T, p)),
     star: (p) => inConvex(S.ico.faces, p) || spikes.some((T) => inTet(T, p)),
+    dogstar: (p) => insideDogstar(p),
   };
   const mid = (P) => P.reduce(add).map((c) => c / P.length);
   // Corners, edge midpoints and face centres, each pulled a hair toward its face's centre and the cell's.
   const samples = (k) => S[k].faces.flatMap((f) => { const c = mid(f); return [...f, ...f.map((p, i) => mid([p, f[(i + 1) % f.length]])), c].map((p) => p.map((x, j) => (x + (c[j] - x) * 1e-6) * (1 - 1e-6))); });
   const within = (a, b) => samples(a).every((p) => isIn[b](p));
-  const chain = ROOF_FOLD_KINDS.filter((k) => k !== 'star');
+  // The Dogstar (2026-10-08) and the star both cross shells, so they sit off the main chain.
+  const chain = ROOF_FOLD_KINDS.filter((k) => k !== 'star' && k !== 'dogstar');
   const chained = chain.every((k, i) => i === 0 || within(chain[i - 1], k));
   const crosses = (k) => samples('star').some((p) => !isIn[k](p)) && samples(k).some((p) => !isIn.star(p));
   check(`wrap order ${ROOF_FOLD_KINDS.join(' → ')}: ${chain.join(' ⊂ ')}; ico ⊂ star ⊂ dodeca; the star crosses oct, stella and cube`,
     chained && within('ico', 'star') && within('star', 'dodeca') && ['oct', 'stella', 'cube'].every(crosses)
     && ROOF_FOLD_KINDS.indexOf('star') === ROOF_FOLD_KINDS.indexOf('dodeca') - 1);
+  // The Dogstar: inside the stella (so inside the cube and dodecahedron) and inside the star, but
+  // crossing the octahedron and the icosahedron, so it goes just before the stella.
+  const crossesDog = (k) => samples('dogstar').some((p) => !isIn[k](p)) && samples(k).some((p) => !isIn.dogstar(p));
+  check(`wrap order: the Dogstar ⊂ stella ⊂ cube ⊂ dodecahedron and ⊂ star, and crosses the octahedron and icosahedron, so it goes just before the stella`,
+    ['stella', 'cube', 'dodeca', 'star'].every((k) => within('dogstar', k)) && ['oct', 'ico'].every(crossesDog)
+    && ROOF_FOLD_KINDS.indexOf('dogstar') === ROOF_FOLD_KINDS.indexOf('stella') - 1);
 }
 
 // Stella–Jewel Lattice (ported from Kaleidohedra, 2026-10-08).

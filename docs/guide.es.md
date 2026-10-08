@@ -177,6 +177,8 @@ Un mundo 3D sobre una única celda exacta. Pon los tejados de Euclides sobre un 
 
 Tres de esas piezas completan un homenaje a Kepler: el **octaedro** sobre los centros de las caras del cubo, con los vértices del icosaedro en sus aristas en la sección áurea; la **stella octangula**, dos tetraedros regulares en vértices alternos del cubo que se solapan en ese octaedro; y los tres **rectángulos áureos** entrelazados de Pacioli, que son justo donde se encuentran las cumbreras de los tejados de las celdas vecinas. Juntos, los cinco sólidos platónicos se anidan en una celda: icosaedro, octaedro, tetraedros, cubo, dodecaedro.
 
+El **Dogstar** también es una pieza, entre el octaedro y la stella octangula en el orden de envoltura: el hueco que dejan los dodecaedros regulares en su empaquetamiento más denso (la estelación 8 del dodecaedro de George W. Hart, 1996), dentro de la stella y conteniendo el dodecaedro de la celda siguiente, 1/φ³ de su tamaño. En 2D+ → Redes se despliega en una sola red de 60 triángulos.
+
 La celda de este mundo es la **celda Euclid–Kepler–Pacioli**, y los grandes dodecaedros estrellados e icosaedros que solo se tocan por los vértices forman la **red Euclid–Kepler–Pacioli**, ambas de DICTO. Cítalas como [doi:10.5281/zenodo.23173809](https://doi.org/10.5281/zenodo.23173809).
 
 ## RHOMBIS

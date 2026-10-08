@@ -33,9 +33,9 @@ export function roofFoldCell() {
 // Inside out, each wrapping the one before: rects ⊂ ico ⊂ oct ⊂ stella ⊂ cube ⊂ dodeca.
 // The star holds the icosahedron and sits in the dodecahedron (its hull) but crosses the
 // octahedron, stella and cube, so it goes last before the dodecahedron (verify-roof-fold.mjs).
-export const ROOF_FOLD_KINDS = ['rects', 'ico', 'oct', 'stella', 'cube', 'star', 'dodeca'];
+export const ROOF_FOLD_KINDS = ['rects', 'ico', 'oct', 'dogstar', 'stella', 'cube', 'star', 'dodeca'];
 // One colour per piece, shared by every world that shows the cell.
-export const ROOF_FOLD_COLOURS = { cube: 0x9fb4c8, dodeca: 0xffc857, ico: 0x5fd38a, star: 0xff7a59, oct: 0x4dd0e1, stella: 0xc792ea, rects: 0xffe082 };
+export const ROOF_FOLD_COLOURS = { cube: 0x9fb4c8, dodeca: 0xffc857, ico: 0x5fd38a, star: 0xff7a59, oct: 0x4dd0e1, stella: 0xc792ea, rects: 0xffe082, dogstar: 0xf0609e };
 // World units: icosahedron edge 1, dodecahedron phi, cube phi^2.
 export const ROOF_FOLD_WORLD_SCALE = PHI ** 2 / 2;
 export const siteParity = (x, y, z) => (((x + y + z) % 2) + 2) % 2;
@@ -122,7 +122,29 @@ export function roofFoldSolids() {
     stella: { faces: TETS.flatMap((T) => convexFaces(T, TET_NORMALS[TETS.indexOf(T)])), edges: TETS.flatMap((T) => pairs(T, edgesOfLength(T, 2 * Math.SQRT2))) },
     // Pacioli's three golden rectangles: the folded roof ridges, corners on the icosahedron.
     rects: { faces: goldenRectangles(), edges: goldenRectangles().flatMap((R) => R.map((p, i) => [p, R[(i + 1) % 4]])) },
+    // The Dogstar (DICTO, 2026-10-08: "add the Dogstar to the EKP cell network"): the great star
+    // trimmed to the cube, inside the stella, holding the next cell's dodecahedron (1/phi^3). Built
+    // lazily, since it is built from these solids (dogstarSolid below).
+    get dogstar() { return dogstarPiece(); },
   };
+}
+let dogstarCache = null;
+function dogstarPiece() {
+  if (dogstarCache) return dogstarCache;
+  const faces = dogstarSolid();
+  // Its edges: the creases between faces in different planes, not the seams inside one face.
+  const key = (p) => p.map((c) => (Math.round(c * 1e7) / 1e7 + 0).toFixed(7)).join();
+  const nrm = (f) => unit(cross(sub(f[1], f[0]), sub(f[2], f[0])));
+  const byEdge = new Map();
+  faces.forEach((f, i) => f.forEach((p, j) => {
+    const q = f[(j + 1) % f.length];
+    const k = [key(p), key(q)].sort().join('|');
+    if (!byEdge.has(k)) byEdge.set(k, { a: p, b: q, faces: [] });
+    byEdge.get(k).faces.push(i);
+  }));
+  const edges = [...byEdge.values()].filter(({ faces: fs }) => fs.length === 2 && Math.abs(dot(nrm(faces[fs[0]]), nrm(faces[fs[1]])) - 1) > 1e-9).map(({ a, b }) => [a, b]);
+  dogstarCache = { faces, edges };
+  return dogstarCache;
 }
 
 // Split a convex polygon by the plane n.p = d into the parts above and below.

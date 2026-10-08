@@ -521,7 +521,7 @@ export function createNetsWorld({ scene, camera, controls, onOpenIn = () => {}, 
     if (!active) return;
     // Each group named, its solids short (full names on hover); the EKP
     // cell's in its wrap order, inside out, then the whole cell.
-    const SHORT = { rd: 'RD', to: 'TO', tetra: 'Tetra', octa: 'Octa', icosa: 'Icosa', dodeca: 'Dodeca', stella1: 'Stella A', stella2: 'Stella B', starSpike: 'Star spike', pacioli1: 'Pacioli A', pacioli2: 'Pacioli B', pacioli3: 'Pacioli C', tt: 'Trunc. tetra', prolate: 'Prolate', oblate: 'Oblate', bilinski: 'Bilinski', ricosa: 'Rh. icosa', rtriac: 'Triaconta' };
+    const SHORT = { rd: 'RD', to: 'TO', tetra: 'Tetra', octa: 'Octa', icosa: 'Icosa', dodeca: 'Dodeca', dogstar: 'Dogstar', stella1: 'Stella A', stella2: 'Stella B', starSpike: 'Star spike', pacioli1: 'Pacioli A', pacioli2: 'Pacioli B', pacioli3: 'Pacioli C', tt: 'Trunc. tetra', prolate: 'Prolate', oblate: 'Oblate', bilinski: 'Bilinski', ricosa: 'Rh. icosa', rtriac: 'Triaconta' };
     const orderOf = (g, id) => (g === 'ekp' ? EKP_ORDER.indexOf(id) : 0);
     const button = (id, s) => `<button type="button" data-solid="${id}" class="${id === solid && !cellView ? 'active' : ''}" title="${s.label}">${SHORT[id] ?? s.label}</button>`;
     // A long group (the EKP cell's ten pieces and Whole cell) takes its own lines: its name above, its buttons wrapping, so none is cut off on a phone.
