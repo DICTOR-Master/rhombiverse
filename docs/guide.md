@@ -72,6 +72,7 @@ Then the tesseract: when the cube closes (**Open in 3D+** takes it to 3D+'s Cube
 | Hexagonal | Hex Prism; DICTO Hex Prism: DICTO's regular-hexagon prism leaning 20.9° (two squares and four 72° rhombi round its sides, volume 3φ/2 at edge 1), each layer slid along its lean |
 | Rhombohedral | Rhombohedra |
 | Pyrochlore (3D Kagome) | Truncated Tetrahedron (the tetrahedra between them are added for you) |
+| Sunstar Lattice | A world of its own: regular dodecahedra in their densest lattice packing and, in each hole, a Dogstar (an 8-pointed star with only golden edges); a dodecahedron with its Dogstars round it is a Sunstar (DICTO's names). Tap a face to add the piece across it; **View** shows both, the Dogstars alone (corner-sharing, four at each cube corner, like Pyrochlore) or the dodecahedra alone; **Five-fold axes** overlays the dodecahedra's axes |
 
 **4D:**
 

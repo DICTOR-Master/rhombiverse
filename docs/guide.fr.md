@@ -74,6 +74,7 @@ Puis le tesseract : quand le cube se ferme (**Ouvrir en 3D+** l'emmène vers la 
 | Hexagonal | Hex Prism (prisme hexagonal) ; DICTO Hex Prism : le prisme à hexagones réguliers de DICTO, incliné de 20,9° (deux carrés et quatre losanges de 72° sur ses côtés, volume 3φ/2 pour une arête 1), chaque couche glissée le long de son inclinaison |
 | Rhombohedral | Rhombohedra (rhomboèdres) |
 | Pyrochlore (Kagome 3D) | Truncated Tetrahedron (tétraèdre tronqué ; les tétraèdres entre eux sont ajoutés pour vous) |
+| Sunstar Lattice | Un monde à part : des dodécaèdres réguliers dans leur empilement en réseau le plus dense et, dans chaque trou, un Dogstar (étoile à 8 pointes aux arêtes toutes dorées) ; un dodécaèdre entouré de ses Dogstars est un Sunstar (noms de DICTO). Touchez une face pour ajouter la pièce de l'autre côté ; **Vue** montre les deux, les Dogstars seuls (sommets partagés, quatre à chaque coin du cube, comme Pyrochlore) ou les dodécaèdres seuls ; **Axes d'ordre cinq** superpose les axes des dodécaèdres |
 
 **4D :**
 

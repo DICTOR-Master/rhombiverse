@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-10-08",
+    "title": "The Sunstar Lattice",
+    "items": [
+      "New in 3D+ (Wizard, beside Pyrochlore): the Sunstar Lattice, from Kaleidohedra. Regular dodecahedra in their densest lattice packing, and in every hole a Dogstar, an 8-pointed star with only golden edges; a dodecahedron with its Dogstars round it is a Sunstar. View both, the Dogstars alone (corner-sharing, four at each cube corner, like Pyrochlore) or the dodecahedra alone, with the five-fold axes on show."
+    ]
+  },
+  {
+    "date": "2026-10-08",
     "title": "DICTO Hex Prism",
     "items": [
       "New in 3D+ (Wizard → Hexagonal): DICTO Hex Prism, DICTO's regular-hexagon prism leaning 20.9°, with two squares and four 72° rhombi round its sides. It fills space like the plain hexagonal prism, each layer slid along its lean. Tap a face to grow it; Lattice View shows its open slots."

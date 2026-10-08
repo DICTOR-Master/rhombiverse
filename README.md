@@ -86,6 +86,9 @@ right-click) removes. The **User Guide** (in the app, or at
     its hexagonal lattice slid along the lean
   - **Pyrochlore (3D Kagome)**: truncated tetrahedra with their
     corner-sharing tetrahedra
+  - **Sunstar Lattice** (from Kaleidohedra): regular dodecahedra in their
+    densest lattice packing and the Dogstars filling their holes, which
+    share corners like Pyrochlore's tetrahedra
 - **Shells** (a 3D world of its own) — build **hulls** from shells of
   rhombic dodecahedra, each shell its own colour band, counted out from
   your first piece as a **cuboctahedron** (the magic numbers 13, 55, 147 …),

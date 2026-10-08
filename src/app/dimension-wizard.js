@@ -360,6 +360,11 @@ export const LATTICES_3D = [
   { key: 'pyrochlore', label: 'Pyrochlore (3D Kagome)', pieces: [
     { label: 'Truncated Tetrahedron', action: 'tool:pieceType:pyrochlore' },
   ] },
+  // Sunstar Lattice (direct request, 2026-10-08), beside Pyrochlore, the other corner-sharing
+  // lattice: dodecahedra and the Dogstars in their holes (ported from Kaleidohedra).
+  { key: 'sunstar', label: 'Sunstar Lattice', pieces: [
+    { label: 'Sunstar Lattice', action: 'tool:sunstarWorld' },
+  ] },
   { key: 'shells', label: 'Shells', pieces: [
     { label: 'Shells', action: 'tool:shellsWorld' },
   ] },

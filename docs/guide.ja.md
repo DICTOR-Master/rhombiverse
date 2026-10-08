@@ -74,6 +74,7 @@ Rhombiverse とその双子の [Polyhedraverse](https://polyhedraverse.vercel.ap
 | Hexagonal | Hex Prism（六角柱）；DICTO Hex Prism：DICTO の 20.9° 傾いた正六角柱（側面は正方形2枚と72°のひし形4枚、辺1で体積 3φ/2）。層ごとに傾きの方向へずらして積みます |
 | Rhombohedral | Rhombohedra（菱面体） |
 | Pyrochlore（3D かごめ） | Truncated Tetrahedron（切頂四面体。あいだの四面体は自動で追加されます） |
+| Sunstar Lattice | 独立した世界：最密な格子充填の正十二面体と、その穴ごとのドッグスター（辺がすべて黄金比の 8 本とげの星）。ドッグスターに囲まれた正十二面体がサンスターです（DICTO の命名）。面をタップするとその向こうに立体が増えます。**表示**は両方、ドッグスターだけ（Pyrochlore のように立方体の角ごとに 4 つが頂点を共有）、正十二面体だけ。**5 回軸**で十二面体の軸を重ねて表示 |
 
 **4D：**
 

@@ -275,3 +275,80 @@ export function edgesOfLength(verts, length, tol = 1e-9) {
   }
   return out;
 }
+
+// ---- The Sunstar Lattice (DICTO, 2026-10-08; ported from Kaleidohedra) ----
+// Regular dodecahedra on the even cells of the EKP cubic lattice are the dodecahedron's densest
+// lattice packing; each hole they leave on the odd cells is a Dogstar. A dodecahedron with the
+// Dogstars round it is a Sunstar, the sun with its sun dogs (DICTO's names).
+const clipBelow = (P, n, d) => splitPolygon(P, n, d).below;
+const halfSpacesOf = (faces) => faces.map((f) => { const n = unit(cross(sub(f[1], f[0]), sub(f[2], f[0]))); return [n, dot(n, f[0])]; });
+const insideAll = (H, p, eps = 1e-9) => H.every(([n, d]) => dot(n, p) <= d + eps);
+let dodecaH = null;
+/** Is p (cell units, centred on the cell) inside the cell's regular dodecahedron? */
+export function insideDodecahedron(p) {
+  dodecaH ??= halfSpacesOf(roofFoldSolids().dodeca.faces);
+  return insideAll(dodecaH, p);
+}
+const DOGSTAR_NEIGHBOURS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+  [1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1], [-1, 1, 1], [-1, 1, -1], [-1, -1, 1], [-1, -1, -1]];
+/** Is p inside the cell's Dogstar: in its cube, and in none of the neighbouring dodecahedra? */
+export function insideDogstar(p) {
+  if (p.some((c) => Math.abs(c) > 1 + 1e-9)) return false;
+  return !DOGSTAR_NEIGHBOURS.some((d) => insideDodecahedron(p.map((c, i) => c - 2 * d[i])));
+}
+/** The cell offsets two pieces can touch at: the 6 face neighbours and the 12 FCC neighbours. */
+export const PAIR_LATTICE_NEIGHBOURS = [
+  [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+  [1, 1, 0], [1, -1, 0], [-1, 1, 0], [-1, -1, 0], [1, 0, 1], [1, 0, -1], [-1, 0, 1], [-1, 0, -1], [0, 1, 1], [0, 1, -1], [0, -1, 1], [0, -1, -1],
+];
+/** The dodecahedron's six five-fold axes, unit vectors (its face normals, one per opposite pair). */
+export function fiveFoldAxes() {
+  const out = [];
+  for (const f of roofFoldSolids().dodeca.faces) {
+    const c = unit(f.reduce((s, p) => add(s, p), [0, 0, 0]));
+    if (!out.some((a) => Math.abs(dot(a, c)) > 1 - 1e-9)) out.push(c);
+  }
+  return out;
+}
+// Regular dodecahedra on the even cells (the densest lattice packing of the dodecahedron) leave one
+// hole in each odd cell. The hole is exactly a partial stellation of a regular dodecahedron 1/phi^3
+// the size of the cell's, sharing its orientation: its core, all 12 first-layer pyramids, 24 of the
+// 30 second-layer wedges and the 8 great-stellated spikes that point at the cube corners (whose tips
+// are the cube corners). So dodecahedra and Dogstars fill space. A dodecahedron with the Dogstars
+// round it is a Sunstar, the sun with its sun dogs; together they make the Sunstar Lattice. Dogstars
+// alone share corners, four at each cube corner. Built as the boundary of the hole:
+// on each of the 12 planes bounding it, the cells of the plane (cut by the other 11) that have the
+// hole on one side and a dodecahedron on the other. Returns its faces (cube edge 2, centred).
+export function dogstarSolid() {
+  const { dodeca } = roofFoldSolids();
+  const D = dodeca.faces.map((f) => { const n = unit(cross(sub(f[1], f[0]), sub(f[2], f[0]))); return { n, d: dot(n, f[0]) }; });
+  const centres = [];
+  for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) if ((x + y + z) % 2 !== 0) centres.push([2 * x, 2 * y, 2 * z]);
+  const inDodeca = (p) => centres.some((c) => D.every(({ n, d }) => dot(n, sub(p, c)) < d + 1e-12));
+  const inHole = (p) => p.every((c) => Math.abs(c) <= 1 + 1e-9) && !inDodeca(p);
+  // The 12 planes: the dodecahedron's face planes pulled in to 1/phi^3 of its inradius.
+  const r = D[0].d / PHI ** 3;
+  const planes = D.map(({ n }) => ({ n, d: r }));
+  const faces = [];
+  for (const pl of planes) {
+    const u = unit(cross(pl.n, Math.abs(pl.n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0])), v = cross(pl.n, u);
+    const o = pl.n.map((c) => c * pl.d);
+    let Q = [[-9, -9], [9, -9], [9, 9], [-9, 9]].map(([a, b]) => o.map((c, i) => c + a * u[i] + b * v[i]));
+    for (let a = 0; a < 3 && Q; a++) for (const s of [1, -1]) { const n = [0, 0, 0]; n[a] = s; Q = Q && clipBelow(Q, n, 1); }
+    if (!Q) continue;
+    let cells = [Q];
+    for (const sp of planes) {
+      if (sp === pl) continue;
+      cells = cells.flatMap((C) => { const { above, below } = splitPolygon(C, sp.n, sp.d); return [above, below].filter(Boolean); });
+    }
+    for (const C of cells) {
+      if (polygonArea(C) < 1e-9) continue;
+      const c = centroid(C);
+      const back = inHole(add(c, pl.n.map((x) => -x * 1e-6))), front = inHole(add(c, pl.n.map((x) => x * 1e-6)));
+      if (back === front) continue;
+      const out = back ? pl.n : pl.n.map((x) => -x);
+      faces.push(dot(cross(sub(C[1], C[0]), sub(C[2], C[0])), out) < 0 ? [...C].reverse() : C);
+    }
+  }
+  return faces;
+}
