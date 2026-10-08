@@ -7,17 +7,14 @@
     "verify:i18n": "node scripts/verify-i18n.mjs",
     "verify:rhombis-i18n": "node scripts/verify-rhombis-i18n.mjs",
     "verify:lattice-2d": "node scripts/verify-lattice-2d.mjs",
-    "verify:dicto-fcc": "node scripts/verify-dicto-fcc.mjs",
     "verify:dicto-hex": "node scripts/verify-dicto-hex.mjs",
-    "verify:roof-fold": "node scripts/verify-roof-fold.mjs",
     "verify:4d": "node scripts/verify-4d.mjs",
     "verify:catalogue": "node scripts/verify-catalogue.mjs",
     "verify:kaleidoscope": "node scripts/verify-kaleidoscope.mjs",
     "verify:trajectory": "node scripts/verify-trajectory.mjs",
     "verify:construction": "node scripts/verify-construction.mjs",
     "verify:copy": "node scripts/verify-copy.mjs",
-    "verify:about": "node scripts/verify-about.mjs",
-    "verify:nets": "node scripts/verify-nets.mjs"
+    "verify:about": "node scripts/verify-about.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

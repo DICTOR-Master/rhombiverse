@@ -19,7 +19,7 @@ import { bootstrapDisphenoid, octahedronVerts } from '../krp-core/src/geometry-e
 import { CORNER_GROUPS, BAND_GROUPS, TRIANGLE_GROUPS, triangleRingCells, canonicalHourglassCells } from '../core/hemisphere-build.js';
 import { rdQuarterPieces } from '../krp-core/src/core/lattice.js';
 import { elongatedDodecahedronVerts } from '../krp-core/src/geometry-extensions/elongated-dodecahedron.js';
-import { dictoCellVerts } from '../geometry-extensions/dicto-fcc.js';
+import { dictoCellVerts } from '../krp-core/src/geometry-extensions/dicto-fcc.js';
 import { hexPrismVerts } from '../krp-core/src/geometry-extensions/hex-prism.js';
 import { dictoHexCellVerts } from '../geometry-extensions/dicto-hex.js';
 import { rhombohedraTileVerts } from '../krp-core/src/geometry-extensions/rhombohedra-lattice.js';

@@ -30,7 +30,7 @@ import {
 } from '../krp-core/src/core/pyramid.js';
 import { nearestBCCCell, matchBCCNeighborOffset } from '../krp-core/src/geometry-extensions/dual-lattice.js';
 import { matchHexNeighborOffset } from '../krp-core/src/geometry-extensions/hex-prism.js';
-import { matchDictoNeighborOffset, matchDictoBlockNeighbour, dictoBlockFromKey, dictoBlockKey } from '../geometry-extensions/dicto-fcc.js';
+import { matchDictoNeighborOffset, matchDictoBlockNeighbour, dictoBlockFromKey, dictoBlockKey } from '../krp-core/src/geometry-extensions/dicto-fcc.js';
 import { matchDictoHexNeighborOffset } from '../geometry-extensions/dicto-hex.js';
 import { rhombohedraAttachOptions, rhombohedraOverlap } from '../krp-core/src/geometry-extensions/rhombohedra-lattice.js';
 import { pyrochloreSiteOrientation, pyrochloreNeighborForTTFace, pyrochloreNeighborForTetFace, pyrochloreCapForTTFace, pyrochloreTetCornerPartner, pyrochloreCapTetsOf, pyrochloreCellToWorld } from '../krp-core/src/geometry-extensions/pyrochlore-lattice.js';
@@ -187,7 +187,7 @@ export function createBuildController({
   hexPrismCellAt = () => null,
   onHexPrismChange = () => {},
   // DICTO FCC ('dictofcc' piece tier): DICTO's skewed RD on its sheared
-  // FCC lattice (geometry-extensions/dicto-fcc.js), FCC cell coordinates.
+  // FCC lattice (krp-core/src/geometry-extensions/dicto-fcc.js), FCC cell coordinates.
   // Starts empty; the first cell comes from the first-placement target.
   // DICTO Blocks ('dictoblock'): the cell's four blocks, one mesh each.
   dictoBlockWorld = null,

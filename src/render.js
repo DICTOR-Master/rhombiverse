@@ -30,7 +30,7 @@ import { createGoldenWorld } from './app/world-golden.js';
 import { createRoofFoldWorld } from './app/world-roof-fold.js';
 import { createSunstarWorld } from './app/world-sunstar.js';
 import { createStellaJewelWorld } from './app/world-stella-jewel.js';
-import { roofFoldSolids } from './geometry-extensions/roof-fold.js';
+import { roofFoldSolids } from './krp-core/src/geometry-extensions/roof-fold.js';
 import { createKaleidoWorld } from './app/world-kaleidoscope.js';
 import { createNetsWorld } from './app/world-nets.js';
 import { createSignalWorld } from './app/world-signal.js';
@@ -39,7 +39,7 @@ import { makeQuasicrystal, PRISM_HEIGHT } from './krp-core/src/geometry-extensio
 import { loadCatalogue, findBySerial, zonotopeVertices, localPatch, polytopeShape } from './geometry-extensions/quasicrystal-catalogue.js';
 import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './krp-core/src/geometry-extensions/elongated-dodecahedron.js';
 import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './krp-core/src/geometry-extensions/hex-prism.js';
-import { dictoCellVerts, dictoCellToWorld, DICTO_NEIGHBOR_OFFSETS, dictoBlocks, dictoBlockFromKey, dictoBlockKey } from './geometry-extensions/dicto-fcc.js';
+import { dictoCellVerts, dictoCellToWorld, DICTO_NEIGHBOR_OFFSETS, dictoBlocks, dictoBlockFromKey, dictoBlockKey } from './krp-core/src/geometry-extensions/dicto-fcc.js';
 import { dictoHexCellVerts, dictoHexCellToWorld, DICTO_HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/dicto-hex.js';
 import { NAMED_LATTICE_ANGLES, START_LATTICE_ANGLE, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
 import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWorld, rhombohedraMigrateLegacyCell, rhombohedraAttachOptions, rhombohedraOverlap } from './krp-core/src/geometry-extensions/rhombohedra-lattice.js';

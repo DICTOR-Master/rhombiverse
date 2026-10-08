@@ -5,10 +5,10 @@
 // centres and keeps every piece exact (copies), or bends the whole packing (solid; Kaleidohedra only). The five-fold
 // toggle overlays each even piece's five-fold axes (and, where given, more lines per piece).
 // Each world is a config: here the Sunstar Lattice (world-sunstar.js), ported from Kaleidohedra
-// (2026-10-08). Rhombiverse has no lattice shear, so there is no Shear button. Geometry in geometry-extensions/roof-fold.js, checked in
+// (2026-10-08). Rhombiverse has no lattice shear, so there is no Shear button. Geometry in krp-core/src/geometry-extensions/roof-fold.js, checked in
 // scripts/verify-roof-fold.mjs.
 import * as THREE from 'three';
-import { ROOF_FOLD_WORLD_SCALE as WS, PAIR_LATTICE_NEIGHBOURS as DJ_NEIGHBOURS, fiveFoldAxes } from '../geometry-extensions/roof-fold.js';
+import { ROOF_FOLD_WORLD_SCALE as WS, DJ_NEIGHBOURS, fiveFoldAxes } from '../krp-core/src/geometry-extensions/roof-fold.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 import { addPanelMinimiser } from './panel-minimiser.js';

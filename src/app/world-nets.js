@@ -5,10 +5,10 @@
 // side by side (a tap per side), then a face a tap, in 1D cells like
 // Construct's; when it's complete, a tap folds it up into the solid
 // ("tap it and it folds into the solid"), and a slider folds and unfolds
-// it by hand ("fold slider"). The geometry is geometry-extensions/nets.js.
+// it by hand ("fold slider"). The geometry is krp-core/src/geometry-extensions/nets.js.
 import * as THREE from 'three';
-import { netOf, netSteps, SOLIDS, SOLID_GROUPS, EKP_PIECES, EKP_ORDER, IDENTITY, apply, mul, rigidAlign } from '../geometry-extensions/nets.js';
-import { roofFoldSolids, ROOF_FOLD_COLOURS, PHI } from '../geometry-extensions/roof-fold.js';
+import { netOf, netSteps, SOLIDS, SOLID_GROUPS, EKP_PIECES, EKP_ORDER, IDENTITY, apply, mul, rigidAlign } from '../krp-core/src/geometry-extensions/nets.js';
+import { roofFoldSolids, ROOF_FOLD_COLOURS, PHI } from '../krp-core/src/geometry-extensions/roof-fold.js';
 import { bulletGeometry, plainCellGeometry } from './bullet-cell.js';
 import { t } from './i18n.js';
 import { dimensionLabel } from './dimension-label.js';

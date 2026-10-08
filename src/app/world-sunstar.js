@@ -5,7 +5,7 @@
 // share corners, four at each cube corner: a Kagome-style 3D lattice), or the dodecahedra alone. The
 // world itself is world-pair-lattice.js. Ported from Kaleidohedra; here it sits beside Pyrochlore,
 // the other corner-sharing lattice (direct request, 2026-10-08).
-import { roofFoldSolids, ROOF_FOLD_COLOURS as C, dogstarSolid, insideDodecahedron, insideDogstar, PHI } from '../geometry-extensions/roof-fold.js';
+import { roofFoldSolids, ROOF_FOLD_COLOURS as C, dogstarSolid, insideDodecahedron, insideDogstar, PHI } from '../krp-core/src/geometry-extensions/roof-fold.js';
 import { createPairLatticeWorld } from './world-pair-lattice.js';
 
 const GREAT_STAR = 0x7cc4ff;
