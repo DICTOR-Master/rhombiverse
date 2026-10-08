@@ -606,5 +606,27 @@ check(`stars on even cells and icosahedra on odd cells share only corners: ${pai
   check(`Dogstars in every cell: a Dogstar lies inside its cell's dodecahedron (${dog} points, ${out} outside), and Dogstars in neighbouring cells never overlap (${overlap} doubled)`, dog > 0 && out === 0 && overlap === 0);
 }
 
+// (k) The nested Sunstar chain (DICTO, 2026-10-08): the EKP great star is exactly the great stellated
+// dodecahedron of the Dogstar's 1/phi^3 core (all its faces on the core's planes), and a whole Sunstar
+// 1/phi^3 the size (that core with the 6 Dogstars on its faces) fits inside it with no room to grow:
+// the largest scale that fits is exactly 1/phi^3. So dodecahedron > great star > Sunstar(1/phi^3), whose
+// dodecahedron is the next link, each step touching.
+{
+  const S = roofFoldSolids(), k = 1 / PHI ** 3;
+  const nrm = (f) => { const n = cross(sub(f[1], f[0]), sub(f[2], f[0])); return n.map((c) => c / norm(n)); };
+  const D = S.dodeca.faces.map((f) => { const n = nrm(f); return dot(n, f[0]) < 0 ? n.map((c) => -c) : n; });
+  const r = Math.abs(dot(D[0], S.dodeca.faces[0][0])) * k;
+  const starOnCore = S.star.faces.every((f) => { const n = nrm(f); return D.some((m) => Math.abs(Math.abs(dot(m, n)) - 1) < 1e-9) && Math.abs(Math.abs(dot(n, f[0])) - r) < 1e-9; });
+  const inStar = (p) => D.filter((n) => dot(n, p) > r + 1e-12).length <= 3 && norm(p) <= Math.sqrt(3) + 1e-9;
+  const G = dogstarSolid(), axes = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  const pts = [];
+  const sample = (faces, off) => { for (const f of faces) for (let m = 1; m + 1 < f.length; m++) for (let a = 0; a <= 5; a++) for (let b = 0; a + b <= 5; b++) pts.push(f[0].map((c, i) => (c + (f[m][i] - f[0][i]) * a / 5 + (f[m + 1][i] - f[0][i]) * b / 5 + off[i]) * k)); };
+  sample(S.dodeca.faces, [0, 0, 0]);
+  for (const d of axes) sample(G, d.map((c) => 2 * c));
+  let lo = 0.5, hi = 2;
+  for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2; if (pts.every((p) => inStar(p.map((c) => c * m * (1 - 1e-12))))) lo = m; else hi = m; }
+  check(`nested Sunstar chain: the great star's ${S.star.faces.length} faces all lie on the 1/phi^3 core's planes, and the 1/phi^3 Sunstar fits inside it with no room to grow (largest scale ${lo.toFixed(9)})`, starOnCore && Math.abs(lo - 1) < 1e-6);
+}
+
 console.log(failures === 0 ? '\nAll checks passed (0 failures).' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

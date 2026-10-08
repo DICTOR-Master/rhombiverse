@@ -24,6 +24,7 @@ const isEven = (s) => (((s[0] + s[1] + s[2]) % 2) + 2) % 2 === 0;
 /**
  * config: { storageKey, panelId, minimiser, strings (key prefix), modes [{ id, even, odd, grouped, nested }],
  * nestedFaces (drawn inside every even piece in a nested mode, the even piece then see-through),
+ * chainLayers [{ faces, opacity }] (drawn inside every even piece in a chain mode, innermost last),
  * group(evenSite) -> the odd sites that come with an even piece in a grouped mode,
  * evenFaces / oddFaces ([polygon, colour] in cell units), insideEven / insideOdd (p in cell units,
  * centred on the cell), overlay(s) -> { faint, bright } extra line segments per even piece (optional),
@@ -83,6 +84,11 @@ export function createPairLatticeWorld({ scene, fitView = () => {}, shear = () =
 
   // ---- drawing ----
   const pieceMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  const layerMaterials = new Map();
+  const layerMaterial = (op) => {
+    if (!layerMaterials.has(op)) layerMaterials.set(op, new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide }));
+    return layerMaterials.get(op);
+  };
   const seeThroughMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
   const ghostMaterial = new THREE.MeshStandardMaterial({ color: GHOST_COLOR, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
   const firstMaterial = new THREE.MeshStandardMaterial({ color: FIRST_COLOR, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
@@ -144,7 +150,7 @@ export function createPairLatticeWorld({ scene, fitView = () => {}, shear = () =
       pieceMaterial.depthWrite = opacity >= 1;
       // Nested (direct request, 2026-10-08: "Dogstars in every cell"): each even piece see-through,
       // the nested piece solid inside it.
-      const nested = modeOf().nested === true;
+      const nested = modeOf().nested === true || modeOf().chain === true;
       const solidSites = nested ? S.filter((s) => !isEven(s)) : S;
       const [m, l] = meshOf(solidSites, pieceMaterial, 'piece');
       m.visible = !skeleton;
@@ -158,9 +164,18 @@ export function createPairLatticeWorld({ scene, fitView = () => {}, shear = () =
         om.renderOrder = 2;
         group.add(om, ol);
         pickTargets.push(om);
-        const [nm, nl] = meshOf(evens, pieceMaterial, 'nested', undefined, EDGE_COLOR, () => config.nestedFaces);
-        nm.visible = !skeleton;
-        group.add(nm, nl);
+        // A chain (direct request, 2026-10-08: "add the nested Sunstar chain as a view"): layer
+        // inside layer, each see-through but the innermost, drawn outside in.
+        const layers = modeOf().chain ? config.chainLayers : [{ faces: config.nestedFaces, opacity: 1 }];
+        layers.forEach(({ faces, opacity: op }, i) => {
+          const mat = op >= 1 ? pieceMaterial : layerMaterial(op);
+          const [nm, nl] = meshOf(evens, mat, 'nested', undefined, EDGE_COLOR, () => faces);
+          nm.visible = !skeleton;
+          nm.renderOrder = layers.length - i;
+          nl.material.transparent = op < 1;
+          nl.material.opacity = Math.min(1, op + 0.35);
+          group.add(nm, nl);
+        });
       }
       if (latticeView) {
         const ghosts = emptyNeighbours();
