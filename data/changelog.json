@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-10-08",
+    "title": "Dogstars in every cell",
+    "items": [
+      "New in the Sunstar Lattice: Dogstars in every cell. A Dogstar fits wholly inside each dodecahedron as well as in the holes between them, so with the dodecahedra see-through, Dogstars fill every cell, eight tips meeting at each cube corner."
+    ]
+  },
+  {
+    "date": "2026-10-08",
     "title": "Whole Sunstars",
     "items": [
       "New in the Sunstar Lattice: a Whole Sunstars view, where each tap adds a dodecahedron together with the 6 Dogstars on its faces, and removing one takes its Dogstars too, except any another Sunstar still has."

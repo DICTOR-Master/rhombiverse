@@ -14,12 +14,16 @@ export function createSunstarWorld(opts) {
     panelId: 'worldsunstar-panel',
     minimiser: 'sunstar',
     strings: 'ss',
-    modes: [{ id: 'both', even: true, odd: true }, { id: 'sunstars', even: true, odd: true, grouped: true }, { id: 'dogstars', even: false, odd: true }, { id: 'dodecas', even: true, odd: false }],
+    modes: [{ id: 'both', even: true, odd: true }, { id: 'sunstars', even: true, odd: true, grouped: true }, { id: 'every', even: true, odd: true, nested: true }, { id: 'dogstars', even: false, odd: true }, { id: 'dodecas', even: true, odd: false }],
     // A Sunstar: the dodecahedron and the 6 Dogstars on its faces (direct decision, 2026-10-08:
     // the 8 at its corners only touch it at a point).
     group: (e) => [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].map((d) => e.map((c, i) => c + d[i])),
     evenFaces: roofFoldSolids().dodeca.faces.map((f) => [f, C.dodeca]),
     oddFaces: dogstarSolid().map((f) => [f, C.star]),
+    // Dogstars in every cell (direct request, 2026-10-08): a Dogstar fits wholly inside each
+    // dodecahedron too (Dogstar inside stella inside cube inside dodecahedron), so Dogstars fill
+    // every cell, eight tips meeting at each cube corner.
+    nestedFaces: dogstarSolid().map((f) => [f, C.star]),
     insideEven: insideDodecahedron,
     insideOdd: insideDogstar,
     // Across a face between the two; dodecahedron to dodecahedron across faces, Dogstar to Dogstar at corners.

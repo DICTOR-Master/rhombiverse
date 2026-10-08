@@ -589,5 +589,22 @@ check(`stars on even cells and icosahedra on odd cells share only corners: ${pai
   check(`Sunstar Lattice point tests: each point of an odd cube is in its Dogstar or exactly one dodecahedron (${N ** 3} points, ${bad} wrong)`, bad === 0);
 }
 
+// (j) Dogstars in every cell (DICTO, 2026-10-08): a Dogstar fits wholly inside the dodecahedron of its
+// own cell (Dogstar inside stella inside cube inside dodecahedron), and Dogstars in every cell never
+// overlap (each stays in its own cube).
+{
+  const N = 24;
+  let out = 0, dog = 0, overlap = 0;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) for (let k = 0; k < N; k++) {
+    const q = [i, j, k].map((t, ax) => -1 + (2 * (t + 0.5)) / N + 1e-7 * (ax + 1));
+    if (insideDogstar(q)) { dog++; if (!insideDodecahedron(q)) out++; }
+    const w = q.map((c) => c * 1.5);
+    let n = 0;
+    for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) if (insideDogstar([w[0] - 2 * x, w[1] - 2 * y, w[2] - 2 * z])) n++;
+    if (n > 1) overlap++;
+  }
+  check(`Dogstars in every cell: a Dogstar lies inside its cell's dodecahedron (${dog} points, ${out} outside), and Dogstars in neighbouring cells never overlap (${overlap} doubled)`, dog > 0 && out === 0 && overlap === 0);
+}
+
 console.log(failures === 0 ? '\nAll checks passed (0 failures).' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

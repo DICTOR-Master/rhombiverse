@@ -22,7 +22,8 @@ const key = (s) => s.join(',');
 const isEven = (s) => (((s[0] + s[1] + s[2]) % 2) + 2) % 2 === 0;
 
 /**
- * config: { storageKey, panelId, minimiser, strings (key prefix), modes [{ id, even, odd, grouped }],
+ * config: { storageKey, panelId, minimiser, strings (key prefix), modes [{ id, even, odd, grouped, nested }],
+ * nestedFaces (drawn inside every even piece in a nested mode, the even piece then see-through),
  * group(evenSite) -> the odd sites that come with an even piece in a grouped mode,
  * evenFaces / oddFaces ([polygon, colour] in cell units), insideEven / insideOdd (p in cell units,
  * centred on the cell), overlay(s) -> { faint, bright } extra line segments per even piece (optional),
@@ -82,6 +83,7 @@ export function createPairLatticeWorld({ scene, fitView = () => {}, shear = () =
 
   // ---- drawing ----
   const pieceMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  const seeThroughMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
   const ghostMaterial = new THREE.MeshStandardMaterial({ color: GHOST_COLOR, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
   const firstMaterial = new THREE.MeshStandardMaterial({ color: FIRST_COLOR, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
   const pickTargets = [];
@@ -94,9 +96,9 @@ export function createPairLatticeWorld({ scene, fitView = () => {}, shear = () =
     pickTargets.length = 0;
   }
   const facesOf = (s) => (isEven(s) ? config.evenFaces : config.oddFaces);
-  function meshOf(sitesList, material, tag, colourOverride, edgeColor = EDGE_COLOR) {
+  function meshOf(sitesList, material, tag, colourOverride, edgeColor = EDGE_COLOR, faces = facesOf) {
     const pos = [], col = [], line = [], records = [];
-    for (const s of sitesList) for (const [f, hex] of facesOf(s)) {
+    for (const s of sitesList) for (const [f, hex] of faces(s)) {
       const colour = new THREE.Color(colourOverride ?? hex);
       const P = f.map((p) => toWorld(s, p));
       for (let i = 1; i + 1 < P.length; i++) {
@@ -140,11 +142,26 @@ export function createPairLatticeWorld({ scene, fitView = () => {}, shear = () =
       pieceMaterial.transparent = opacity < 1;
       pieceMaterial.opacity = opacity;
       pieceMaterial.depthWrite = opacity >= 1;
-      const [m, l] = meshOf(S, pieceMaterial, 'piece');
+      // Nested (direct request, 2026-10-08: "Dogstars in every cell"): each even piece see-through,
+      // the nested piece solid inside it.
+      const nested = modeOf().nested === true;
+      const solidSites = nested ? S.filter((s) => !isEven(s)) : S;
+      const [m, l] = meshOf(solidSites, pieceMaterial, 'piece');
       m.visible = !skeleton;
       if (skeleton) l.material.color.setHex(GHOST_COLOR);
       group.add(m, l);
       pickTargets.push(m);
+      if (nested) {
+        const evens = S.filter(isEven);
+        const [om, ol] = meshOf(evens, seeThroughMaterial, 'piece');
+        om.visible = !skeleton;
+        om.renderOrder = 2;
+        group.add(om, ol);
+        pickTargets.push(om);
+        const [nm, nl] = meshOf(evens, pieceMaterial, 'nested', undefined, EDGE_COLOR, () => config.nestedFaces);
+        nm.visible = !skeleton;
+        group.add(nm, nl);
+      }
       if (latticeView) {
         const ghosts = emptyNeighbours();
         if (ghosts.length) {
