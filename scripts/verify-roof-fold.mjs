@@ -628,5 +628,27 @@ check(`stars on even cells and icosahedra on odd cells share only corners: ${pai
   check(`nested Sunstar chain: the great star's ${S.star.faces.length} faces all lie on the 1/phi^3 core's planes, and the 1/phi^3 Sunstar fits inside it with no room to grow (largest scale ${lo.toFixed(9)})`, starOnCore && Math.abs(lo - 1) < 1e-6);
 }
 
+// (l) The Dragon chain (study 12a, DICTO, 2026-10-08): Dragon Jewel > cube > stella octangula > Dogstar >
+// dodecahedron(1/phi^3) > Dragon Jewel(1/phi^3) > ..., every step touching: the largest scale at which
+// each fits inside the one before is exactly 1.
+{
+  const S = roofFoldSolids(), k = 1 / PHI ** 3, W = ekpWindowsSolid();
+  const sample = (faces, s = 1) => { const out = []; for (const f of faces) for (let m = 1; m + 1 < f.length; m++) for (let a = 0; a <= 6; a++) for (let b = 0; a + b <= 6; b++) out.push(f[0].map((c, i) => (c + (f[m][i] - f[0][i]) * a / 6 + (f[m + 1][i] - f[0][i]) * b / 6) * s)); return out; };
+  const cubeCorners = [...Array(8)].map((_, i) => [i & 1 ? 1 : -1, i & 2 ? 1 : -1, i & 4 ? 1 : -1]);
+  const steps = [
+    ['cube', cubeCorners, 'Dragon Jewel', (p) => insideDragonJewel(p)],
+    ['stella', sample(S.stella.faces), 'cube', (p) => p.every((c) => Math.abs(c) <= 1 + 1e-12)],
+    ['Dogstar', sample(dogstarSolid()), 'stella', (p) => insideStella(p)],
+    ['dodecahedron(1/phi^3)', sample(S.dodeca.faces, k), 'Dogstar', (p) => insideDogstar(p)],
+    ['Dragon Jewel(1/phi^3)', sample([...W.rhombi, ...W.walls], k), 'dodecahedron(1/phi^3)', (p) => insideDodecahedron(p.map((c) => c / k))],
+  ];
+  const results = steps.map(([a, pts, b, inside]) => {
+    let lo = 0, hi = 3;
+    for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (pts.every((p) => inside(p.map((c) => c * m * (1 - 1e-10))))) lo = m; else hi = m; }
+    return [a, b, lo];
+  });
+  check(`Dragon chain: every step touches (${results.map(([a, b, l]) => `${a} in ${b} ${l.toFixed(6)}`).join('; ')})`, results.every(([, , l]) => Math.abs(l - 1) < 1e-5));
+}
+
 console.log(failures === 0 ? '\nAll checks passed (0 failures).' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

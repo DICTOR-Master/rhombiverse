@@ -5,9 +5,21 @@
 // face, the cube's choice bright. The world itself is world-pair-lattice.js. Ported from
 // Kaleidohedra (direct request, 2026-10-08), beside the Sunstar Lattice.
 import {
-  ekpWindowsSolid, roofFoldSolids, ROOF_FOLD_COLOURS as C, insideDragonJewel, insideStella, fiveWindowPositions,
+  ekpWindowsSolid, roofFoldSolids, ROOF_FOLD_COLOURS as C, insideDragonJewel, insideStella, fiveWindowPositions, dogstarSolid, PHI,
 } from '../geometry-extensions/roof-fold.js';
 import { createPairLatticeWorld } from './world-pair-lattice.js';
+
+function dragonChain(DJ) {
+  const k = 1 / PHI ** 3, S = roofFoldSolids();
+  const at = (faces, s) => faces.map((f) => f.map((p) => p.map((c) => c * s)));
+  return [
+    { faces: S.cube.faces.map((f) => [f, C.cube]), opacity: 0.2 },
+    { faces: S.stella.faces.map((f) => [f, C.stella]), opacity: 0.3 },
+    { faces: dogstarSolid().map((f) => [f, C.star]), opacity: 0.45 },
+    { faces: at(S.dodeca.faces, k).map((f) => [f, C.dodeca]), opacity: 0.6 },
+    { faces: [...at(DJ.rhombi, k).map((f) => [f, C.dodeca]), ...at(DJ.walls, k).map((f) => [f, 0xb8892a])], opacity: 1 },
+  ];
+}
 
 export function createStellaJewelWorld(opts) {
   const DJ = ekpWindowsSolid();
@@ -17,7 +29,7 @@ export function createStellaJewelWorld(opts) {
     panelId: 'worldstellajewel-panel',
     minimiser: 'stella-jewel',
     strings: 'dj',
-    modes: [{ id: 'both', even: true, odd: true }, { id: 'jewels', even: true, odd: false }],
+    modes: [{ id: 'both', even: true, odd: true }, { id: 'jewels', even: true, odd: false }, { id: 'chain', even: true, odd: false, chain: true }],
     evenFaces: [...DJ.rhombi.map((f) => [f, C.dodeca]), ...DJ.walls.map((f) => [f, 0xb8892a])],
     oddFaces: roofFoldSolids().stella.faces.map((f) => [f, C.stella]),
     insideEven: insideDragonJewel,
@@ -27,5 +39,9 @@ export function createStellaJewelWorld(opts) {
     overlay: { faint: five.filter((x) => !x.chosen).map((x) => x.rhombus), bright: five.filter((x) => x.chosen).map((x) => x.rhombus) },
     brightColor: C.dodeca,
     holePrompt: true,
+    // The Dragon chain (study 12a, direct request 2026-10-08): inside each Dragon Jewel, every step
+    // touching, its cube, stella octangula, Dogstar, the Dogstar's 1/phi^3 core dodecahedron and the
+    // next Dragon Jewel 1/phi^3 the size.
+    chainLayers: dragonChain(DJ),
   });
 }

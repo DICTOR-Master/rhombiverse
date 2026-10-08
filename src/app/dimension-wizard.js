@@ -321,6 +321,16 @@ export const LATTICES_3D = [
   { key: 'roofFold', label: 'Euclid–Kepler–Pacioli Cell Network', pieces: [
     { label: 'Euclid–Kepler–Pacioli Cell Network', action: 'tool:roofFoldWorld' },
   ] },
+  // New work near the top (direct request, 2026-10-08: "put new originalish work close to top of
+  // App wizards"), right after the EKP cell they grow from (ported from Kaleidohedra).
+  // Sunstar Lattice: dodecahedra and the Dogstars in their holes.
+  { key: 'sunstar', label: 'Sunstar Lattice', pieces: [
+    { label: 'Sunstar Lattice', action: 'tool:sunstarWorld' },
+  ] },
+  // Stella–Jewel Lattice: Dragon Jewels and stella octangulas.
+  { key: 'stellaJewel', label: 'Stella–Jewel Lattice', pieces: [
+    { label: 'Stella–Jewel Lattice', action: 'tool:stellaJewelWorld' },
+  ] },
   { key: 'fcc', label: 'FCC', pieces: [
     { label: 'RD', action: 'tool:pieceType:rd' },
     { label: 'Hemi RD', action: 'tool:pieceType:halfrd' },
@@ -359,16 +369,6 @@ export const LATTICES_3D = [
   ] },
   { key: 'pyrochlore', label: 'Pyrochlore (3D Kagome)', pieces: [
     { label: 'Truncated Tetrahedron', action: 'tool:pieceType:pyrochlore' },
-  ] },
-  // Sunstar Lattice (direct request, 2026-10-08), beside Pyrochlore, the other corner-sharing
-  // lattice: dodecahedra and the Dogstars in their holes (ported from Kaleidohedra).
-  { key: 'sunstar', label: 'Sunstar Lattice', pieces: [
-    { label: 'Sunstar Lattice', action: 'tool:sunstarWorld' },
-  ] },
-  // Stella–Jewel Lattice (direct request, 2026-10-08), beside the Sunstar Lattice: Dragon Jewels
-  // and stella octangulas (ported from Kaleidohedra).
-  { key: 'stellaJewel', label: 'Stella–Jewel Lattice', pieces: [
-    { label: 'Stella–Jewel Lattice', action: 'tool:stellaJewelWorld' },
   ] },
   { key: 'shells', label: 'Shells', pieces: [
     { label: 'Shells', action: 'tool:shellsWorld' },
