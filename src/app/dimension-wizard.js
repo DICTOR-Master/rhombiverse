@@ -365,6 +365,11 @@ export const LATTICES_3D = [
   { key: 'sunstar', label: 'Sunstar Lattice', pieces: [
     { label: 'Sunstar Lattice', action: 'tool:sunstarWorld' },
   ] },
+  // Stella–Jewel Lattice (direct request, 2026-10-08), beside the Sunstar Lattice: Dragon Jewels
+  // and stella octangulas (ported from Kaleidohedra).
+  { key: 'stellaJewel', label: 'Stella–Jewel Lattice', pieces: [
+    { label: 'Stella–Jewel Lattice', action: 'tool:stellaJewelWorld' },
+  ] },
   { key: 'shells', label: 'Shells', pieces: [
     { label: 'Shells', action: 'tool:shellsWorld' },
   ] },

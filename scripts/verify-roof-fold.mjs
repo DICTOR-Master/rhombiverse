@@ -25,7 +25,7 @@
 //   - two extractions that don't overlap: even-cell dodecahedra (the optimal
 //     lattice packing, (5+sqrt5)/8) and even-cell stars with odd-cell
 //     icosahedra, sharing only corners.
-import { PHI, ROOF_FOLD_PERIOD as P, ROOF_FOLD_KINDS, roofFoldCell, roofFoldSolids, mergedDodecaSurface, mergedDodecaEdges, siteParity, ROOF_FOLD_PATTERNS, goldenRectangles, dogstarSolid, insideDogstar, insideDodecahedron } from '../src/geometry-extensions/roof-fold.js';
+import { PHI, ROOF_FOLD_PERIOD as P, ROOF_FOLD_KINDS, roofFoldCell, roofFoldSolids, mergedDodecaSurface, mergedDodecaEdges, siteParity, ROOF_FOLD_PATTERNS, goldenRectangles, dogstarSolid, insideDogstar, insideDodecahedron, ekpWindowsSolid, ekpWindowRhombi, insideDragonJewel, insideStella, PAIR_LATTICE_NEIGHBOURS, fiveWindowPositions, fiveFoldAxes } from '../src/geometry-extensions/roof-fold.js';
 
 let failures = 0;
 function check(label, condition) {
@@ -469,6 +469,78 @@ check(`stars on even cells and icosahedra on odd cells share only corners: ${pai
     chained && within('ico', 'star') && within('star', 'dodeca') && ['oct', 'stella', 'cube'].every(crosses)
     && ROOF_FOLD_KINDS.indexOf('star') === ROOF_FOLD_KINDS.indexOf('dodeca') - 1);
 }
+
+// Stella–Jewel Lattice (ported from Kaleidohedra, 2026-10-08).
+// The Dragon Jewel (the EKP windows solid): 12 rhombi and 48 walls enclosing exactly 12.
+{
+  const { rhombi, walls } = ekpWindowsSolid();
+  const vol = [...rhombi, ...walls].reduce((t, f) => { for (let m = 1; m + 1 < f.length; m++) t += dot(f[0], cross(f[m], f[m + 1])); return t; }, 0) / 6;
+  check(`Dragon Jewel: ${rhombi.length} rhombi and ${walls.length} walls, volume ${vol.toFixed(9)} = 12`, rhombi.length === 12 && walls.length === 48 && Math.abs(vol - 12) < 1e-9);
+}
+// (f) Windows and stellas, checkerboard (a study of #10; direct question, 2026-10-08: "a male
+// counterpart to window"): windows in the even cells, a stella octangula in the odd ones, fill
+// space. Each odd cube must be exactly its stella plus its six even neighbours' roofs with the
+// stella carved out, no gap or overlap: checked on a 40^3 grid of points in the cube, and by
+// volume (6 carved roofs = cube - stella = 4; windows 12 + stella 4 = two cubes).
+{
+  const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const halfSpaces = (V) => {
+    const H = [];
+    for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length; j++) for (let k = j + 1; k < V.length; k++) {
+      const n0 = cr(sub(V[j], V[i]), sub(V[k], V[i])), L = norm(n0);
+      if (L < 1e-9) continue;
+      const n = n0.map((x) => x / L), d = dot(n, V[i]), side = V.map((q) => dot(n, q) - d);
+      if (side.every((x) => x <= 1e-9)) H.push([n, d]); else if (side.every((x) => x >= -1e-9)) H.push([n.map((x) => -x), -d]);
+    }
+    return H;
+  };
+  const inside = (H, q) => H.every(([n, d]) => dot(n, q) <= d);
+  const tets = [[[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]], [[-1, -1, -1], [-1, 1, 1], [1, -1, 1], [1, 1, -1]]].map(halfSpaces);
+  const dv = [];
+  for (const f of roofFoldSolids().dodeca.faces) for (const q of f) if (!dv.some((r) => norm(sub(q, r)) < 1e-9)) dv.push(q);
+  const roofs = [];
+  for (let a = 0; a < 3; a++) for (const sg of [1, -1]) roofs.push(halfSpaces(dv.filter((q) => sg * q[a] >= 1 - 1e-9).map((q) => q.map((c, i) => (i === a ? c - 2 * sg : c)))));
+  const N = 40;
+  let bad = 0, inStella = 0;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) for (let k = 0; k < N; k++) {
+    const q = [i, j, k].map((t, ax) => -1 + (2 * (t + 0.5)) / N + 1e-7 * (ax + 1));
+    const st = tets.some((H) => inside(H, q));
+    const r = roofs.filter((H) => inside(H, q)).length;
+    if (st) inStella++;
+    if (!st && r !== 1) bad++;
+  }
+  const a = 2 / PHI, dodecaVol = ((15 + 7 * Math.sqrt(5)) / 4) * a ** 3, roof = (dodecaVol - 8) / 6, carved = (dodecaVol - 12) / 6;
+  check(`windows and stellas, checkerboard: each odd cube is its stella + six carved roofs (${N ** 3} points, ${bad} uncovered or doubled); 6 x ${(roof - carved).toFixed(4)} = cube - stella = 4`, bad === 0 && Math.abs(6 * (roof - carved) - 4) < 1e-12 && Math.abs(inStella / N ** 3 - 0.5) < 0.01);
+}
+
+// (g) The Dragon Jewel (DICTO's name for the windows solid on its own, 2026-10-08) and the
+// Stella–Jewel Lattice. Five-fold: each window lies in a dodecahedron face (its normal one of the
+// six five-fold axes); each face has five window positions (one per pentagon diagonal), and the
+// cube picks the one whose diagonal is a cube edge. Dragon Jewels alone on the even cells (FCC)
+// meet face to face on all 12 rhombi. The world's point tests agree with the checkerboard (10b).
+{
+  const W = ekpWindowRhombi(), P5 = fiveWindowPositions(), axes = fiveFoldAxes();
+  const sameSet = (A, B) => A.length === B.length && A.every((p) => B.some((q) => norm(sub(p, q)) < 1e-9));
+  const chosen = P5.filter((x) => x.chosen).map((x) => x.rhombus);
+  const picks = P5.length === 60 && chosen.length === 12 && chosen.every((r) => W.some((w) => sameSet(r, w)));
+  const nrm = (r) => { const n = cross(sub(r[1], r[0]), sub(r[2], r[0])); return n.map((c) => c / norm(n)); };
+  const onAxes = axes.length === 6 && W.every((r) => axes.some((a) => Math.abs(Math.abs(dot(a, nrm(r))) - 1) < 1e-9));
+  const thick = P5.every(({ rhombus: [A, V, B] }) => Math.abs(Math.acos(dot(sub(A, V), sub(B, V)) / (norm(sub(A, V)) * norm(sub(B, V)))) * 180 / Math.PI - 108) < 1e-9);
+  check('Dragon Jewel, five-fold: 6 five-fold axes; each face has 5 window positions (thick rhombi on its diagonals), and the cube picks exactly the 12 windows, each facing a five-fold axis', picks && onAxes && thick);
+  const FCC = PAIR_LATTICE_NEIGHBOURS.slice(6);
+  const faceToFace = W.every((r) => FCC.some((s) => W.some((w) => sameSet(r, w.map((p) => p.map((c, i) => c + 2 * s[i]))))));
+  check('Dragon Jewels alone on the even cells (FCC) meet face to face on all 12 rhombi', faceToFace);
+  const N = 24;
+  let bad = 0;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) for (let k = 0; k < N; k++) {
+    const q = [i, j, k].map((t, ax) => -1 + (2 * (t + 0.5)) / N + 1e-7 * (ax + 1));
+    const st = insideStella(q);
+    const dj = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].filter((d) => insideDragonJewel(q.map((c, a) => c - 2 * d[a]))).length;
+    if ((st ? 1 : 0) + dj !== 1) bad++;
+  }
+  check(`Stella–Jewel Lattice point tests: each point of an odd cube is in its stella octangula or exactly one neighbouring Dragon Jewel (${N ** 3} points, ${bad} wrong)`, bad === 0);
+}
+
 
 // Sunstar Lattice (ported from Kaleidohedra, 2026-10-08).
 // (h) The Dogstar (DICTO, 2026-10-08; DICTO's name, first called the gap star; a dodecahedron with its Dogstars round it is a Sunstar): the hole left in each odd cell by regular dodecahedra on the

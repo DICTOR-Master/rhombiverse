@@ -29,6 +29,7 @@ import { createShellsWorld } from './app/world-shells.js';
 import { createGoldenWorld } from './app/world-golden.js';
 import { createRoofFoldWorld } from './app/world-roof-fold.js';
 import { createSunstarWorld } from './app/world-sunstar.js';
+import { createStellaJewelWorld } from './app/world-stella-jewel.js';
 import { roofFoldSolids } from './geometry-extensions/roof-fold.js';
 import { createKaleidoWorld } from './app/world-kaleidoscope.js';
 import { createNetsWorld } from './app/world-nets.js';
@@ -156,13 +157,14 @@ let shellsWorld = null;
 let goldenWorld = null;
 let roofFoldWorld = null;
 let sunstarWorld = null;
+let stellaJewelWorld = null;
 let kaleidoWorld = null;
 let netsWorld = null;
 let signalWorld = null;
 let constructWorld = null;
 let own3D = null;
-const OWN_WORLD_DIMENSION = { shells: '3D', golden: '3D', roofFold: '3D', sunstar: '3D', kaleido: '2D', nets: '2D', signal: '1D', construct: '1D' };
-const own3DWorld = () => ({ shells: shellsWorld, golden: goldenWorld, roofFold: roofFoldWorld, sunstar: sunstarWorld, kaleido: kaleidoWorld, nets: netsWorld, signal: signalWorld, construct: constructWorld })[own3D] ?? null;
+const OWN_WORLD_DIMENSION = { shells: '3D', golden: '3D', roofFold: '3D', sunstar: '3D', stellaJewel: '3D', kaleido: '2D', nets: '2D', signal: '1D', construct: '1D' };
+const own3DWorld = () => ({ shells: shellsWorld, golden: goldenWorld, roofFold: roofFoldWorld, sunstar: sunstarWorld, stellaJewel: stellaJewelWorld, kaleido: kaleidoWorld, nets: netsWorld, signal: signalWorld, construct: constructWorld })[own3D] ?? null;
 const own3DActive = () => !!own3DWorld() && activeDimension === OWN_WORLD_DIMENSION[own3D];
 // 4D, 5D, 6D and the own 3D worlds each own their scene, taps, Lattice View and Skeleton.
 const isOwnWorldDimension = () => activeDimension === '4D' || qcWorlds.has(activeDimension) || own3DActive();
@@ -2073,7 +2075,7 @@ async function init() {
   // this bottom-row slot whenever no attach toggle needs it.
   let paintOn = false;
   // 1D has no colours to paint (Signal is cyan, Construct shows each axis).
-  const paintAvailable = () => !!activeDimension && activeDimension !== '1D' && !(own3DActive() && ['shells', 'golden', 'roofFold', 'sunstar', 'nets'].includes(own3D));
+  const paintAvailable = () => !!activeDimension && activeDimension !== '1D' && !(own3DActive() && ['shells', 'golden', 'roofFold', 'sunstar', 'stellaJewel', 'nets'].includes(own3D));
   const attachNeeded = () => (activeDimension === '4D' ? ['cell24', 'cell16', ...A4_CYCLE] : activeDimension !== '2D' && !isOwnWorldDimension() ? ['rhombohedra', 'pyrochlore'] : []).includes(attachPiece());
   const paintInSlot = () => paintAvailable() && !attachNeeded();
   function setPaint(on) {
@@ -2709,6 +2711,7 @@ async function init() {
     reg('worldgolden', '3D', () => goldenWorld.snapshot(), (j) => goldenWorld.restore(j));
     reg('worldrooffold', '3D', () => roofFoldWorld.snapshot(), (j) => roofFoldWorld.restore(j));
     reg('worldsunstar', '3D', () => sunstarWorld.snapshot(), (j) => sunstarWorld.restore(j));
+    reg('worldstellajewel', '3D', () => stellaJewelWorld.snapshot(), (j) => stellaJewelWorld.restore(j));
     reg('worldkaleido', '2D', () => kaleidoWorld.snapshot(), (j) => kaleidoWorld.restore(j));
     reg('worldnets', '2D', () => netsWorld.snapshot(), (j) => netsWorld.restore(j));
     reg('world1dsignal', '1D', () => signalWorld.snapshot(), (j) => signalWorld.restore(j));
@@ -2958,6 +2961,7 @@ async function init() {
     goldenWorld?.setActive(own3DActive() && own3D === 'golden');
     roofFoldWorld?.setActive(own3DActive() && own3D === 'roofFold');
     sunstarWorld?.setActive(own3DActive() && own3D === 'sunstar');
+    stellaJewelWorld?.setActive(own3DActive() && own3D === 'stellaJewel');
     kaleidoWorld?.setActive(own3DActive() && own3D === 'kaleido');
     netsWorld?.setActive(own3DActive() && own3D === 'nets');
     signalWorld?.setActive(own3DActive() && own3D === 'signal');
@@ -3179,6 +3183,7 @@ async function init() {
     goldenWorld?.setSkeleton(worldViewMode === 'skeleton');
     roofFoldWorld?.setSkeleton(worldViewMode === 'skeleton');
     sunstarWorld?.setSkeleton(worldViewMode === 'skeleton');
+    stellaJewelWorld?.setSkeleton(worldViewMode === 'skeleton');
     // Translucent too, at the same opacity as the 3D worlds.
     world4d?.setTranslucent(worldViewMode === 'translucent' ? TRANSLUCENT_OPACITY : 1);
     for (const w of qcWorlds.values()) w.setTranslucent(worldViewMode === 'translucent' ? TRANSLUCENT_OPACITY : 1);
@@ -3186,6 +3191,7 @@ async function init() {
     goldenWorld?.setTranslucent(worldViewMode === 'translucent' ? TRANSLUCENT_OPACITY : 1);
     roofFoldWorld?.setTranslucent(worldViewMode === 'translucent' ? TRANSLUCENT_OPACITY : 1);
     sunstarWorld?.setTranslucent(worldViewMode === 'translucent' ? TRANSLUCENT_OPACITY : 1);
+    stellaJewelWorld?.setTranslucent(worldViewMode === 'translucent' ? TRANSLUCENT_OPACITY : 1);
     document.getElementById('world-view-toggle')?.classList.toggle('active', worldViewMode !== 'color');
   }
   const worldViewSelect = document.getElementById('world-view-select');
@@ -3716,7 +3722,7 @@ async function init() {
         // 2026-08-29 -- X-Ray stays reachable via the corner HUD wheel's
         // own #xray-toggle face and the Lab panel, so no wheel face
         // routes to it here any more.)
-        const OWN_WORLD_ACTIONS = { 'tool:shellsWorld': 'shells', 'tool:goldenWorld': 'golden', 'tool:roofFoldWorld': 'roofFold', 'tool:sunstarWorld': 'sunstar', 'tool:kaleidoWorld': 'kaleido', 'tool:netsWorld': 'nets', 'tool:signalWorld': 'signal', 'tool:constructWorld': 'construct' };
+        const OWN_WORLD_ACTIONS = { 'tool:shellsWorld': 'shells', 'tool:goldenWorld': 'golden', 'tool:roofFoldWorld': 'roofFold', 'tool:sunstarWorld': 'sunstar', 'tool:stellaJewelWorld': 'stellaJewel', 'tool:kaleidoWorld': 'kaleido', 'tool:netsWorld': 'nets', 'tool:signalWorld': 'signal', 'tool:constructWorld': 'construct' };
         // Construct's families: tool:constructWorld:<family> (square, kagome, rd).
         if (action?.startsWith('tool:constructWorld:')) {
           constructWorld?.setFamily(action.slice('tool:constructWorld:'.length));
@@ -3727,7 +3733,7 @@ async function init() {
           wheel3D.close();
           applyDimensionVisibility();
           updateQuickSelect();
-          showHudPrompt({ shells: 'Shells', golden: 'Golden Rhombohedra', roofFold: 'EKP', sunstar: 'Sunstar Lattice', kaleido: 'Kaleidoscope', nets: 'Nets', signal: 'Signal', construct: 'Construct' }[own3D], 2500);
+          showHudPrompt({ shells: 'Shells', golden: 'Golden Rhombohedra', roofFold: 'EKP', sunstar: 'Sunstar Lattice', stellaJewel: 'Stella–Jewel Lattice', kaleido: 'Kaleidoscope', nets: 'Nets', signal: 'Signal', construct: 'Construct' }[own3D], 2500);
           return;
         }
         if (own3D && (action?.startsWith('tool:pieceType:') || action === 'tool:cuboctaBuild')) {
@@ -4054,6 +4060,7 @@ async function init() {
       if (action === 'tool:shellsWorld') return wizardPieceGeometry('tool:pieceType:rd');
       if (action === 'tool:roofFoldWorld') return convex(roofFoldSolids().dodeca.faces.flat());
       if (action === 'tool:sunstarWorld') return convex(roofFoldSolids().dodeca.faces.flat());
+      if (action === 'tool:stellaJewelWorld') return convex(roofFoldSolids().dodeca.faces.flat());
       if (action === 'tool:goldenWorld') {
         const e6 = qcEngines['6d'];
         return convex(e6.tileVertices([0, 0, 0, 0, 0, 0], [0, 1, 2]));
@@ -4731,6 +4738,7 @@ async function init() {
     goldenWorld?.setLatticeView(latticeQuickViewMode !== 'off');
     roofFoldWorld?.setLatticeView(latticeQuickViewMode !== 'off');
     sunstarWorld?.setLatticeView(latticeQuickViewMode !== 'off');
+    stellaJewelWorld?.setLatticeView(latticeQuickViewMode !== 'off');
     kaleidoWorld?.setLatticeView(latticeQuickViewMode !== 'off');
     showHudPrompt(isOwnWorldDimension() ? `Lattice View: ${latticeQuickViewMode === 'off' ? 'Off.' : `every open slot one step past your ${activeDimension} build.`}` : `Lattice View: ${LATTICE_QUICK_VIEW_LABELS[latticeQuickViewMode]}`, 4500);
     await rebuildLatticeQuickView(); // also syncs the toggle buttons' own 'active' state -- see syncLatticeQuickViewActiveState
@@ -4902,7 +4910,7 @@ async function init() {
       if (qcWorlds.has(activeDimension)) {
         quickShapeEl.innerHTML = iconFrame(MARKS.pieceRhombohedron, { title: t('cat.button', getSettings().language) });
       } else if (own3DActive()) {
-        quickShapeEl.innerHTML = iconFrame(({ shells: MARKS.pieceRD, roofFold: MARKS.pieceDodeca, sunstar: MARKS.pieceDodeca })[own3D] ?? MARKS.pieceRhombohedron, { title: ({ shells: 'Shells', roofFold: 'EKP', sunstar: 'Sunstar Lattice' })[own3D] ?? 'Golden Rhombohedra' });
+        quickShapeEl.innerHTML = iconFrame(({ shells: MARKS.pieceRD, roofFold: MARKS.pieceDodeca, sunstar: MARKS.pieceDodeca, stellaJewel: MARKS.pieceDodeca })[own3D] ?? MARKS.pieceRhombohedron, { title: ({ shells: 'Shells', roofFold: 'EKP', sunstar: 'Sunstar Lattice', stellaJewel: 'Stella–Jewel Lattice' })[own3D] ?? 'Golden Rhombohedra' });
       } else if (currentMode === 'cubocta') {
         quickShapeEl.innerHTML = iconFrame(MARKS.cuboctahedron, { title: 'Shape' });
       } else {
@@ -5305,6 +5313,12 @@ async function init() {
     showHudPrompt,
     fitView: fitCameraTo,
     onChange: () => { if (historyRestorers.has('worldsunstar')) recordHistory('worldsunstar', sunstarWorld.snapshot()); },
+  });
+  stellaJewelWorld = createStellaJewelWorld({
+    scene,
+    showHudPrompt,
+    fitView: fitCameraTo,
+    onChange: () => { if (historyRestorers.has('worldstellajewel')) recordHistory('worldstellajewel', stellaJewelWorld.snapshot()); },
   });
   signalWorld = createSignalWorld({
     scene,
@@ -6048,6 +6062,7 @@ async function init() {
     goldenWorld?.clear();
     roofFoldWorld?.clear();
     sunstarWorld?.clear();
+    stellaJewelWorld?.clear();
     kaleidoWorld?.clear();
     netsWorld?.clear();
     signalWorld?.clear();

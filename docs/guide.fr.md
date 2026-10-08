@@ -75,6 +75,7 @@ Puis le tesseract : quand le cube se ferme (**Ouvrir en 3D+** l'emmène vers la 
 | Rhombohedral | Rhombohedra (rhomboèdres) |
 | Pyrochlore (Kagome 3D) | Truncated Tetrahedron (tétraèdre tronqué ; les tétraèdres entre eux sont ajoutés pour vous) |
 | Sunstar Lattice | Un monde à part : des dodécaèdres réguliers dans leur empilement en réseau le plus dense et, dans chaque trou, un Dogstar (étoile à 8 pointes aux arêtes toutes dorées) ; un dodécaèdre entouré de ses Dogstars est un Sunstar (noms de DICTO). Touchez une face pour ajouter la pièce de l'autre côté ; **Vue** montre les deux, les Dogstars seuls (sommets partagés, quatre à chaque coin du cube, comme Pyrochlore) ou les dodécaèdres seuls ; **Axes d'ordre cinq** superpose les axes des dodécaèdres |
+| Stella–Jewel Lattice | Un monde à part : des Dragon Jewels (le nom donné par DICTO au solide des fenêtres de l'EKP : le dodécaèdre creusé des stellas octangulas de ses six voisins par une face, 12 losanges épais de Penrose) sur les cellules paires et des stellas octangulas sur les impaires, qui remplissent l'espace. Touchez une face pour ajouter la pièce de l'autre côté ; **Vue** montre les deux ou les Dragon Jewels seuls (accolés par leurs 12 losanges, laissant des trous en forme de stella) ; **Axes d'ordre cinq** montre les axes de chaque Dragon Jewel et les cinq places possibles de chaque fenêtre, celle que choisit le cube en clair |
 
 **4D :**
 

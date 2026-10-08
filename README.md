@@ -89,6 +89,9 @@ right-click) removes. The **User Guide** (in the app, or at
   - **Sunstar Lattice** (from Kaleidohedra): regular dodecahedra in their
     densest lattice packing and the Dogstars filling their holes, which
     share corners like Pyrochlore's tetrahedra
+  - **Stella–Jewel Lattice** (from Kaleidohedra): Dragon Jewels (the EKP
+    windows solid, named by DICTO) and stella octangulas filling space in a
+    checkerboard
 - **Shells** (a 3D world of its own) — build **hulls** from shells of
   rhombic dodecahedra, each shell its own colour band, counted out from
   your first piece as a **cuboctahedron** (the magic numbers 13, 55, 147 …),

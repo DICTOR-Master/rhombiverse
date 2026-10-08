@@ -73,6 +73,7 @@ Then the tesseract: when the cube closes (**Open in 3D+** takes it to 3D+'s Cube
 | Rhombohedral | Rhombohedra |
 | Pyrochlore (3D Kagome) | Truncated Tetrahedron (the tetrahedra between them are added for you) |
 | Sunstar Lattice | A world of its own: regular dodecahedra in their densest lattice packing and, in each hole, a Dogstar (an 8-pointed star with only golden edges); a dodecahedron with its Dogstars round it is a Sunstar (DICTO's names). Tap a face to add the piece across it; **View** shows both, the Dogstars alone (corner-sharing, four at each cube corner, like Pyrochlore) or the dodecahedra alone; **Five-fold axes** overlays the dodecahedra's axes |
+| Stella–Jewel Lattice | A world of its own: Dragon Jewels (DICTO's name for the EKP windows solid: the dodecahedron with its six face-neighbours' stella octangulas carved out, 12 Penrose thick rhombi) on the even cells and stella octangulas on the odd cells, filling space. Tap a face to add the piece across it; **View** shows both or the Dragon Jewels alone (they meet face to face on all 12 rhombi, leaving stella-shaped holes); **Five-fold axes** shows each Dragon Jewel's axes and the five places each window could sit, the cube's choice bright |
 
 **4D:**
 

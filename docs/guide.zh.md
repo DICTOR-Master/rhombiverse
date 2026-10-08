@@ -75,6 +75,7 @@ Rhombiverse 和它的孪生网站 [Polyhedraverse](https://polyhedraverse.vercel
 | Rhombohedral | Rhombohedra（菱面体） |
 | Pyrochlore（3D 笼目） | Truncated Tetrahedron（截角四面体；它们之间的四面体会自动添加） |
 | Sunstar Lattice | 独立的世界：处于最密格点堆积的正十二面体，每个空洞里一个犬星（Dogstar，棱长全为黄金比的八角星）；被犬星环绕的正十二面体是太阳星（Sunstar，DICTO 的命名）。轻点一个面即在另一侧添加部件；**视图**显示两者、只看犬星（像 Pyrochlore 一样在每个立方体顶角四个共享顶点）或只看正十二面体；**五次轴**叠加显示十二面体的轴 |
+| Stella–Jewel Lattice | 独立的世界：偶数晶胞放龙宝石（DICTO 给 EKP 窗立体起的名字：十二面体挖去六个面相邻晶胞的星形八面体，留下 12 个彭罗斯粗菱形），奇数晶胞放星形八面体，一起填满空间。轻点一个面即在另一侧添加部件；**视图**显示两者或只看龙宝石（以全部 12 个菱形面相贴，留下星形八面体形状的空洞）；**五次轴**显示每个龙宝石的轴和窗可能所在的五个位置，立方体选中的那个高亮 |
 
 **4D：**
 

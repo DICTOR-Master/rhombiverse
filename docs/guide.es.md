@@ -75,6 +75,7 @@ Después, el teseracto: al cerrarse el cubo (**Abrir en 3D+** lo lleva a la piez
 | Rhombohedral | Rhombohedra (romboedros) |
 | Pyrochlore (Kagome 3D) | Truncated Tetrahedron (tetraedro truncado; los tetraedros entre ellos se añaden solos) |
 | Sunstar Lattice | Un mundo propio: dodecaedros regulares en su empaquetado reticular más denso y, en cada hueco, un Dogstar (estrella de 8 puntas con aristas solo áureas); un dodecaedro rodeado de sus Dogstars es un Sunstar (nombres de DICTO). Toca una cara para añadir la pieza del otro lado; **Vista** muestra ambos, solo los Dogstars (comparten vértices, cuatro en cada esquina del cubo, como Pyrochlore) o solo los dodecaedros; **Ejes quíntuples** superpone los ejes de los dodecaedros |
+| Stella–Jewel Lattice | Un mundo propio: Dragon Jewels (el nombre que DICTO dio al sólido de las ventanas del EKP: el dodecaedro con las stellas octangulas de sus seis vecinos de cara talladas, 12 rombos gruesos de Penrose) en las celdas pares y stellas octangulas en las impares, llenando el espacio. Toca una cara para añadir la pieza del otro lado; **Vista** muestra ambos o solo los Dragon Jewels (unidos cara a cara por sus 12 rombos, con huecos en forma de stella); **Ejes quíntuples** muestra los ejes de cada Dragon Jewel y los cinco lugares posibles de cada ventana, resaltado el que elige el cubo |
 
 **4D:**
 

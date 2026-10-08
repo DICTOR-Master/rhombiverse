@@ -1,6 +1,13 @@
 [
   {
     "date": "2026-10-08",
+    "title": "The Stella–Jewel Lattice",
+    "items": [
+      "New in 3D+ (Wizard, beside the Sunstar Lattice): the Stella–Jewel Lattice, from Kaleidohedra. Dragon Jewels (DICTO's name for the EKP windows solid) on the even cells and stella octangulas on the odd cells fill space in a checkerboard. View both or the Dragon Jewels alone (they meet face to face on all 12 rhombi), and show each Dragon Jewel's five-fold axes with the five places each window could sit."
+    ]
+  },
+  {
+    "date": "2026-10-08",
     "title": "The Sunstar Lattice",
     "items": [
       "New in 3D+ (Wizard, beside Pyrochlore): the Sunstar Lattice, from Kaleidohedra. Regular dodecahedra in their densest lattice packing, and in every hole a Dogstar, an 8-pointed star with only golden edges; a dodecahedron with its Dogstars round it is a Sunstar. View both, the Dogstars alone (corner-sharing, four at each cube corner, like Pyrochlore) or the dodecahedra alone, with the five-fold axes on show."

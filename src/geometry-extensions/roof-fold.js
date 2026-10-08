@@ -352,3 +352,112 @@ export function dogstarSolid() {
   }
   return faces;
 }
+
+// ---- The Dragon Jewel and the Stella–Jewel Lattice (DICTO, 2026-10-08; ported from Kaleidohedra) ----
+// The Dragon Jewel (DJ) is DICTO's name for the EKP windows solid (Kaleidohedra DISCOVERIES #10): the
+// dodecahedron with its six face-neighbours' stella octangulas carved out. Dragon Jewels on the even
+// cells and stella octangulas on the odd cells fill space (study 10b).
+const FACE_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+
+export function neighbourStellas() {
+  const { stella } = roofFoldSolids();
+  return FACE_DIRS.flatMap((d) => [0, 4].map((k) => stella.faces.slice(k, k + 4).map((f) => f.map((p) => add(p, d.map((c) => 2 * c))))));
+}
+
+// The dodecahedron with its six face-neighbours' stellas carved out. Its outside is 12 rhombi,
+// one on each cube edge, at the dodecahedron's own face angles (72 and 108 degrees, edge 2/phi);
+// the cut-away is walled by the stellas' faces, in triangles meeting at the cube-face centres.
+// The 12 window rhombi (see ekpWindowsSolid), each wound outward.
+export function ekpWindowRhombi() {
+  const { dodeca } = roofFoldSolids();
+  const isCorner = (p) => p.every((c) => Math.abs(Math.abs(c) - 1) < 1e-9);
+  return dodeca.faces.map((f) => {
+    const [A, B] = f.filter(isCorner);
+    const Z = f.find((p) => !isCorner(p) && [A, B].every((c) => Math.abs(Math.hypot(...sub(p, c)) - 2 / PHI) < 1e-9));
+    const X = A.map((c, i) => c + B[i] - Z[i]);
+    const R = [A, X, B, Z];
+    return dot(cross(sub(R[1], R[0]), sub(R[2], R[0])), centroid(f)) < 0 ? R.reverse() : R;
+  });
+}
+
+export function ekpWindowsSolid() {
+  const { dodeca } = roofFoldSolids();
+  const rhombi = ekpWindowRhombi();
+  const planesOf = (faces) => faces.map((f) => { const n = unit(cross(sub(f[1], f[0]), sub(f[2], f[0]))); return { n, d: dot(n, f[0]) }; });
+  const D = planesOf(dodeca.faces);
+  const tets = neighbourStellas().map((faces) => ({ faces, planes: planesOf(faces) }));
+  // Walls: on every stella face plane, the part of the dodecahedron cut into cells by every other
+  // plane, kept where the carved solid lies on exactly one side, facing away from it.
+  const inside = (p) => D.every(({ n, d }) => dot(n, p) < d - 1e-12) && !tets.some((T) => T.planes.every(({ n, d }) => dot(n, p) < d + 1e-12));
+  const keyOf = ({ n, d }) => [...n, d].map((c) => (Math.round(c * 1e7) / 1e7 + 0).toFixed(7)).join();
+  const planes = new Map();
+  for (const T of tets) for (const pl of T.planes) {
+    const flip = pl.n.find((c) => Math.abs(c) > 1e-9) < 0;
+    const q = flip ? { n: pl.n.map((c) => -c), d: -pl.d } : pl;
+    planes.set(keyOf(q), q);
+  }
+  const splitters = [...planes.values()];
+  const boundary = [];
+  for (const pl of splitters) {
+    // A large square in the plane, cut down to the dodecahedron.
+    const u = unit(cross(pl.n, Math.abs(pl.n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0])), v = cross(pl.n, u);
+    const o = pl.n.map((c) => c * pl.d);
+    let Q = [[-9, -9], [9, -9], [9, 9], [-9, 9]].map(([a, b]) => o.map((c, i) => c + a * u[i] + b * v[i]));
+    for (const { n, d } of D) { Q = Q && clipBelow(Q, n, d); }
+    if (!Q) continue;
+    let cells = [Q];
+    for (const sp of splitters) {
+      if (Math.abs(Math.abs(dot(sp.n, pl.n)) - 1) < 1e-9) continue;
+      cells = cells.flatMap((C) => { const { above, below } = splitPolygon(C, sp.n, sp.d); return [above, below].filter(Boolean); });
+    }
+    for (const C of cells) {
+      if (polygonArea(C) < 1e-9) continue;
+      const c = centroid(C);
+      const back = inside(add(c, pl.n.map((x) => -x * 1e-6))), front = inside(add(c, pl.n.map((x) => x * 1e-6)));
+      if (back === front) continue;
+      // Outward: away from the side the solid is on.
+      const out = back ? pl.n : pl.n.map((x) => -x);
+      boundary.push(dot(cross(sub(C[1], C[0]), sub(C[2], C[0])), out) < 0 ? [...C].reverse() : C);
+    }
+  }
+  return { rhombi, walls: boundary };
+}
+
+let djParts = null;
+function dragonJewelParts() {
+  if (djParts) return djParts;
+  const { dodeca, stella } = roofFoldSolids();
+  const tetra = [stella.faces.slice(0, 4), stella.faces.slice(4, 8)].map(halfSpacesOf);
+  const neighbourTetra = FACE_DIRS.flatMap((d) => tetra.map((H) => H.map(([n, k]) => [n, k + 2 * dot(n, d)])));
+  djParts = { tetra, dodecaH: halfSpacesOf(dodeca.faces), neighbourTetra };
+  return djParts;
+}
+/** Is p (cell units, centred on the cell) inside the Dragon Jewel? */
+export function insideDragonJewel(p) {
+  const { dodecaH: H, neighbourTetra } = dragonJewelParts();
+  return insideAll(H, p) && !neighbourTetra.some((T) => insideAll(T, p, -1e-9));
+}
+/** Is p inside the cell's stella octangula? */
+export function insideStella(p) {
+  return dragonJewelParts().tetra.some((T) => insideAll(T, p));
+}
+/**
+ * The five window positions on each of the dodecahedron's 12 faces: for each of the
+ * pentagon's five diagonals AB (V the corner between A and B), the thick rhombus A V B V'
+ * (V' is V reflected across AB). The cube picks one per face, the diagonal that is a cube
+ * edge: `chosen`. Returned as { face, rhombus, chosen }.
+ */
+export function fiveWindowPositions() {
+  const { dodeca } = roofFoldSolids();
+  const out = [];
+  dodeca.faces.forEach((f, fi) => {
+    for (let k = 0; k < 5; k++) {
+      const A = f[k], V = f[(k + 1) % 5], B = f[(k + 2) % 5];
+      const m = add(A, B).map((c) => c / 2);
+      const Vr = sub(m.map((c) => 2 * c), V);
+      const isCubeEdge = A.every((c) => Math.abs(Math.abs(c) - 1) < 1e-9) && B.every((c) => Math.abs(Math.abs(c) - 1) < 1e-9);
+      out.push({ face: fi, rhombus: [A, V, B, Vr], chosen: isCubeEdge });
+    }
+  });
+  return out;
+}
