@@ -152,7 +152,9 @@ export function createPairLatticeWorld({ scene, fitView = () => {}, shear = () =
       // the nested piece solid inside it.
       const nested = modeOf().nested === true || modeOf().chain === true;
       const solidSites = nested ? S.filter((s) => !isEven(s)) : S;
-      const [m, l] = meshOf(solidSites, pieceMaterial, 'piece');
+      // In a chain view the odd pieces between the cells (DICTO, 2026-10-08: "the macro dogstars seem
+      // to be missing between the cells") are see-through, so the chains inside stay visible.
+      const [m, l] = meshOf(solidSites, modeOf().chain ? seeThroughMaterial : pieceMaterial, 'piece');
       m.visible = !skeleton;
       if (skeleton) l.material.color.setHex(GHOST_COLOR);
       group.add(m, l);
