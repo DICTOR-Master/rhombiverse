@@ -1,5 +1,12 @@
 # Rhombiverse
 
+> **Rhombiverse now lives in [DICTOR-Master/kaleidohedra](https://github.com/DICTOR-Master/kaleidohedra)** (since 2026-10-08).
+> Kaleidohedra and Rhombiverse became one app with two front doors (KRP, DICTO's plan for
+> Kaleidohedra, Rhombiverse and Polyhedraverse): [rhombiverse.vercel.app](https://rhombiverse.vercel.app)
+> is built from that repository (`SITE=rhombiverse`), and the shared geometry is
+> [krp-core](https://github.com/DICTOR-Master/krp-core). This repository keeps Rhombiverse's history
+> up to the join; new work happens there.
+
 Rhombiverse is a free, browser-based geometry builder **from 1D to 6D**.
 Everything is made of shapes that fill space perfectly on real lattices —
 starting from the rhombic dodecahedron, the natural cell of the
