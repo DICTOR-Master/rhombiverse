@@ -33,7 +33,7 @@ export const HEMISPHERE_STORAGE_KEY = 'rhombiverse-hemisphere-world';
 // Elongated Dodecahedron build ('elongdodeca' piece tier, core/build.js's
 // own handleElongDodecaClick): same reasoning again -- a seventh
 // independent store, own key. Same FCC integer coordinate grid as the
-// main World (see geometry-extensions/elongated-dodecahedron.js's own
+// main World (see krp-core/src/geometry-extensions/elongated-dodecahedron.js's own
 // header for why), just a different own key so its saves never mix
 // with the main world's.
 export const ELONGDODECA_STORAGE_KEY = 'rhombiverse-elongdodeca-world';
@@ -59,7 +59,7 @@ export function lattice2dStorageKey(comboId) {
 
 // Rhombohedra (free lattice): own store, own coordinate frame (3 real
 // edge vectors of one of RD Quarter's own 4 congruent orientations --
-// see geometry-extensions/rhombohedra-lattice.js's own header for why
+// see krp-core/src/geometry-extensions/rhombohedra-lattice.js's own header for why
 // RD Quarter itself can't be freely placed/removed in open space).
 export const RHOMBOHEDRA_STORAGE_KEY = 'rhombiverse-rhombohedra-world';
 

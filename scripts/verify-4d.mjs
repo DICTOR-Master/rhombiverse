@@ -7,8 +7,8 @@ import {
   toDoubled, fromDoubled, dot4, dedupeSections,
   a4To4, a4From4, a4Class, A4_CLASS_KIND, A4_REST_W, A4_FIRST, cellAcrossFacet, throughGap, cornerPartner,
 } from '../src/geometry-extensions/lattice-4d.js';
-import { pyrochloreSiteOrientation } from '../src/geometry-extensions/pyrochlore-lattice.js';
-import { rdRawVerts } from '../src/core/lattice.js';
+import { pyrochloreSiteOrientation } from '../src/krp-core/src/geometry-extensions/pyrochlore-lattice.js';
+import { rdRawVerts } from '../src/krp-core/src/core/lattice.js';
 
 let failures = 0;
 function check(label, condition) {

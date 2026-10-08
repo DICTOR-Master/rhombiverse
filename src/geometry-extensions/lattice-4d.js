@@ -3,7 +3,7 @@
 // scripts/verify-4d.mjs.
 //
 // Frame (direct decision): ONE integer (x, y, z, w) frame at the RD
-// world's own scale, extending core/lattice.js's FCC (even-sum integer
+// world's own scale, extending krp-core/src/core/lattice.js's FCC (even-sum integer
 // points, nearest-neighbor sqrt(2)) by a fourth coordinate. w = 0 is the
 // FCC floor: the D4 world's own w = 0 slice is EXACTLY the RD world (a
 // 24-cell centered on a w = 0 D4 point cuts w = 0 in rdRawVerts(1) --

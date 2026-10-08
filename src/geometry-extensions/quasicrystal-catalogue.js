@@ -21,7 +21,7 @@
 // the patch when its own window point is within `reach` of an image of w
 // under a symmetry and the rings computed there match the entry's up to
 // rotation or reflection.
-import { subsets } from './quasicrystal.js';
+import { subsets } from '../krp-core/src/geometry-extensions/quasicrystal.js';
 
 export const SERIAL_RANGES = {
   polytope: [1, 999],

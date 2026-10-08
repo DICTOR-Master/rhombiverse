@@ -10,11 +10,11 @@
 // separately) adapted from a square grid to this lattice.
 //
 // Pure math, no THREE/DOM -- same "core logic separate from rendering"
-// split puzzle-state.js already follows. core/lattice.js's own
+// split puzzle-state.js already follows. krp-core/src/core/lattice.js's own
 // NEIGHBOR_OFFSETS/isValidCell are the only inputs; this file adds
 // nothing to the lattice's own definition, only reasons about shapes
 // built from it.
-import { NEIGHBOR_OFFSETS, isValidCell } from '../core/lattice.js';
+import { NEIGHBOR_OFFSETS, isValidCell } from '../krp-core/src/core/lattice.js';
 
 // The FCC lattice's full symmetry group: every operation that maps the
 // 12 NEIGHBOR_OFFSETS onto themselves as a set is exactly the octahedral

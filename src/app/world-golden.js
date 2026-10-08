@@ -14,8 +14,8 @@
 // the most upright non-overlapping one); long-press
 // removes. Lattice View ghosts the true tiling one step out.
 import * as THREE from 'three';
-import { makeQuasicrystal, BASE_OFFSET, tileKey } from '../geometry-extensions/quasicrystal.js';
-import { solidFromPlanes } from '../geometry-extensions/rd-pieces.js';
+import { makeQuasicrystal, BASE_OFFSET, tileKey } from '../krp-core/src/geometry-extensions/quasicrystal.js';
+import { solidFromPlanes } from '../krp-core/src/geometry-extensions/rd-pieces.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 import { addPanelMinimiser } from './panel-minimiser.js';

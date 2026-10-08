@@ -13,7 +13,7 @@
 // (q, r) coordinates and neighbour table unchanged, in the same frame
 // (flat-top hexagon in x-y, stacking up z): world = hexagon centre + z d.
 // verify-dicto-hex.mjs proves the fill.
-import { HEX_NEIGHBOR_OFFSETS } from './hex-prism.js';
+import { HEX_NEIGHBOR_OFFSETS } from '../krp-core/src/geometry-extensions/hex-prism.js';
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];

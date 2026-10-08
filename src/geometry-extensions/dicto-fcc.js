@@ -15,14 +15,14 @@
 // one linear map M carries FCC's 12 nearest-neighbour vectors onto the
 // cell's 12 face-to-face translations (verify-dicto-fcc.mjs proves it).
 // So this lattice reuses FCC's own cell coordinates and neighbour table
-// (core/lattice.js: integer x, y, z with x + y + z even) unchanged, and
+// (krp-core/src/core/lattice.js: integer x, y, z with x + y + z even) unchanged, and
 // only M differs: world = M (x, y, z).
 //
 // Size: edge = the RD's own edge (sqrt 3 / 2 at scale 1), so the two
 // worlds sit side by side at the same scale. Orientation: the four edge
 // directions are turned to lie as close as possible to the RD's four
 // body-diagonal edge directions, so the world reads as a sheared RD world.
-import { NEIGHBOR_OFFSETS, isValidCell } from '../core/lattice.js';
+import { NEIGHBOR_OFFSETS, isValidCell } from '../krp-core/src/core/lattice.js';
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];

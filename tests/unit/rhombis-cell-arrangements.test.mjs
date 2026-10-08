@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SYMMETRY_OPERATIONS, applySymmetry, canonicalForm, enumerateShapes } from '../../src/rhombis/cell-arrangements.js';
-import { NEIGHBOR_OFFSETS, isValidCell } from '../../src/core/lattice.js';
+import { NEIGHBOR_OFFSETS, isValidCell } from '../../src/krp-core/src/core/lattice.js';
 
 test('symmetry group has exactly 48 operations (6 axis permutations x 8 sign combinations)', () => {
   assert.equal(SYMMETRY_OPERATIONS.length, 48);

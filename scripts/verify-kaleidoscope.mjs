@@ -9,7 +9,7 @@ import {
   KALEIDO_SHAPES, tileOnEdge, area, overlaps, contains, domain, groupMaps, applyMap, fold, clipPolygon,
   indicesFrom, firstIndices, indicesSafe, candidatesAcross, firstTile,
 } from '../src/geometry-extensions/kaleidoscope.js';
-import { makeQuasicrystal, BASE_OFFSET } from '../src/geometry-extensions/quasicrystal.js';
+import { makeQuasicrystal, BASE_OFFSET } from '../src/krp-core/src/geometry-extensions/quasicrystal.js';
 
 let failures = 0;
 function check(label, ok, extra = '') {

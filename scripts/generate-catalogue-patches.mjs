@@ -10,7 +10,7 @@
 // region is convex, so the centroid lies inside it); `reach` covers the
 // spread seen. verify:catalogue then checks every entry really lands.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { makeQuasicrystal, BASE_OFFSET } from '../src/geometry-extensions/quasicrystal.js';
+import { makeQuasicrystal, BASE_OFFSET } from '../src/krp-core/src/geometry-extensions/quasicrystal.js';
 import { localPatch, canonicalPatch } from '../src/geometry-extensions/quasicrystal-catalogue.js';
 
 const FILE = new URL('../data/catalogue-5d6d.json', import.meta.url);

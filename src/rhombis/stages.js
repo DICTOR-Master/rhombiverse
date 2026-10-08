@@ -10,12 +10,12 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { pyramidGeometry, facePyramidGeometry, hemisphereGeometry, diagonalOctahedronGeometry, flatStarPointGeometry, outwardQuaternion, inwardQuaternion, AXIS_NORMALS, rhombicDodecahedronGeometry, quaternionForOrientationKey, disphenoidGeometry, DISPHENOID_ORIENTATIONS, quaternionForDisphenoidOrientation, disphenoidApexAxisKey } from './geometry.js';
-import { PYRAMID_AXES, NEIGHBOR_OFFSETS, oppositeNeighborIndex, cellToWorld, cellsInShells } from '../core/lattice.js';
-import { BCC_NEIGHBOR_OFFSETS, truncatedOctahedronVertices, isBCC } from '../geometry-extensions/dual-lattice.js';
-import { bccShapeScaleFor } from '../geometry-extensions/bcc-detail-lattice.js';
-import { octahedronVerts } from '../geometry-extensions/interstitial-lattice.js';
-import { isCationSite, CATION_ANION_OFFSETS } from '../geometry-extensions/rock-salt-lattice.js';
-import { distortToRhombohedral, co3TriangleVerts, anionLayerIndex } from '../geometry-extensions/calcite-lattice.js';
+import { PYRAMID_AXES, NEIGHBOR_OFFSETS, oppositeNeighborIndex, cellToWorld, cellsInShells } from '../krp-core/src/core/lattice.js';
+import { BCC_NEIGHBOR_OFFSETS, truncatedOctahedronVertices, isBCC } from '../krp-core/src/geometry-extensions/dual-lattice.js';
+import { bccShapeScaleFor } from '../krp-core/src/geometry-extensions/bcc-detail-lattice.js';
+import { octahedronVerts } from '../krp-core/src/geometry-extensions/interstitial-lattice.js';
+import { isCationSite, CATION_ANION_OFFSETS } from '../krp-core/src/geometry-extensions/rock-salt-lattice.js';
+import { distortToRhombohedral, co3TriangleVerts, anionLayerIndex } from '../krp-core/src/geometry-extensions/calcite-lattice.js';
 import { enumerateShapes, SYMMETRY_OPERATIONS, applySymmetry } from './cell-arrangements.js';
 import { ANY_SINGLE_CELL_GROUP } from './puzzle-state.js';
 
@@ -25,7 +25,7 @@ const PIECE_COLOR = 0xffb35c;
 // BCC's own real Voronoi/space-filling cell -- a truncated octahedron,
 // NOT re-derived here: `truncatedOctahedronVertices` (real, 24-vertex,
 // generated not hand-listed) already lives in
-// `geometry-extensions/dual-lattice.js` and is already wired into real
+// `krp-core/src/geometry-extensions/dual-lattice.js` and is already wired into real
 // rendering elsewhere in this repo (render.js's own `new
 // ConvexGeometry(...)` calls) -- same pattern, reused rather than
 // reinvented, per the standing "if it isn't in rhombiverse and we need
@@ -540,7 +540,7 @@ function buildStage5(scale) {
 
 // Stage 6 -- multi-cell: two full rhombic dodecahedra (Stage 4's own
 // 12-void cell, repeated) at REAL adjacent FCC lattice positions --
-// core/lattice.js's own NEIGHBOR_OFFSETS/cellToWorld, the exact math
+// krp-core/src/core/lattice.js's own NEIGHBOR_OFFSETS/cellToWorld, the exact math
 // the main Rhombiverse app uses to place real RD cells, not a Rhombis-
 // only approximation ("the connection back to the original 'strings of
 // blocks' idea and the Rhombiverse lattice work", the spec's own
@@ -554,7 +554,7 @@ function buildStage5(scale) {
 // 2026-09-03 extended manual orientation to every stage that still had
 // auto-orienting loose pieces) OR one real, whole rhombic-
 // dodecahedron piece (geometry.js's rhombicDodecahedronGeometry,
-// reusing core/lattice.js's own rdRawVerts -- the exact same mesh the
+// reusing krp-core/src/core/lattice.js's own rdRawVerts -- the exact same mesh the
 // main app places for a real RD cell) that fills that cell's own 12
 // voids in a single placement. With 2 independent per-cell choices this
 // gives 4 real combinations overall (loose+loose, loose+fused,
@@ -566,7 +566,7 @@ function buildStage5(scale) {
 // their own always-visible slot, same as Stage 5's fused cube.
 
 // Shared by Stage 6 and Stage 7 -- the real adjacent-cell-pair position
-// math (`core/lattice.js`'s own NEIGHBOR_OFFSETS/cellToWorld, the exact
+// math (`krp-core/src/core/lattice.js`'s own NEIGHBOR_OFFSETS/cellToWorld, the exact
 // math the main app uses for real RD cells), centered on the pair's own
 // midpoint so dragging rotates the composite around its natural middle.
 // Factored out so both stages are PROVABLY the same underlying geometry,
@@ -781,7 +781,7 @@ function buildStage6(scale) {
 // at the VERTEX level, and exactly 2 of Multi-Cell's 12 real per-cell
 // faces sit exactly ON the dividing plane, so they don't fall cleanly
 // into either hemisphere). Reuses hemisphereSplit()/hemisphereGeometry()
-// (core/lattice.js / geometry.js) -- already verified flat and volume-
+// (krp-core/src/core/lattice.js / geometry.js) -- already verified flat and volume-
 // correct for the Disphenoid crossover's own fix the same day -- with
 // ZERO new geometry.
 //
@@ -2481,7 +2481,7 @@ const BRANCHING_MOLECULE_STAGES = BRANCHING_MOLECULE_STAGE_DEFS.map(({ hub, bran
 //
 // CUBOCTAHEDRON: 1 center cell + all 12 of its real nearest-neighbor
 // cells (`NEIGHBOR_OFFSETS` itself) -- this is the genuine FCC
-// "coordination shape" (already documented in `core/lattice.js`'s own
+// "coordination shape" (already documented in `krp-core/src/core/lattice.js`'s own
 // comments: "the convex hull of a lattice point's 12 nearest neighbors
 // ... is exactly a cuboctahedron"), so this needed no curation or
 // enumeration at all, just the lattice's own real structure. 13 cells.
@@ -2703,7 +2703,7 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChun
 // boundary cells between two different Big-Hull chunks, found via the
 // exact same NEIGHBOR_OFFSETS adjacency `partitionIntoIrregularChunks`
 // itself already grows through -- not an arbitrary fixed cell index)
-// split in two by `hemisphereSplit()` (core/lattice.js) between the
+// split in two by `hemisphereSplit()` (krp-core/src/core/lattice.js) between the
 // junction cell's own home chunk and the ONE real differently-chunked
 // neighbor that actually borders it there. Each half is folded DIRECTLY
 // into that chunk's own single fused piece geometry as a real
@@ -2747,7 +2747,7 @@ function buildBigHullStage(scale, allCells, chunkCount, decoyChunkCount, keyChun
 // apex point. The exact same class of bug as correction #1, just
 // relocated from the cell's outside to its inside.
 //
-// Real fix (`hemisphereSplit()`, core/lattice.js): capped at exactly
+// Real fix (`hemisphereSplit()`, krp-core/src/core/lattice.js): capped at exactly
 // ONE claiming neighbor per junction cell, splitting it clean in half
 // by a real plane instead of converging many pyramids on one point --
 // verified numerically for all 12 real directions (4 vertices strictly
@@ -2820,7 +2820,7 @@ function pickDiverseJunctionCells(cells, assignments, boundaryIndexes, count) {
 // owner on the same cell is exactly what let two different owners' own
 // pyramids meet at only their shared apex point instead of a real flat
 // face, whenever their own real directions weren't themselves edge-
-// adjacent -- see hemisphereSplit()'s own header in core/lattice.js for
+// adjacent -- see hemisphereSplit()'s own header in krp-core/src/core/lattice.js for
 // the full real fix. Returns null if this junction cell genuinely has
 // no real differently-chunked neighbor at all (shouldn't happen given
 // how junction cells are chosen, but stays honest rather than assumed).
@@ -3132,7 +3132,7 @@ const CRYSTAL_STAGES = [{
 // octahedron (`truncatedOctahedronGeometry` above), and its own real
 // coordination is 8 nearest (body-diagonal) + 6 second-nearest (axis)
 // neighbors -- `BCC_NEIGHBOR_OFFSETS`, already real and verified in
-// `geometry-extensions/dual-lattice.js`. Both lattices share the exact
+// `krp-core/src/geometry-extensions/dual-lattice.js`. Both lattices share the exact
 // same world coordinate frame and `cellToWorld` transform (confirmed in
 // `bcc-detail-lattice.js`'s own header), so BCC cell positions need no
 // new coordinate math, only BCC's own real neighbor offsets and its own
@@ -3595,7 +3595,7 @@ const FCC_ALLOY_STAGES = FCC_ALLOY_DEFS.map((def, i) => ({
 
 // Salt (NaCl, rock-salt/B1 structure) -- 2026-09-05, direct instruction
 // ("household materials like salt etc"), built on the new
-// `geometry-extensions/rock-salt-lattice.js` (scoped, created, and
+// `krp-core/src/geometry-extensions/rock-salt-lattice.js` (scoped, created, and
 // numerically self-verified this same session -- see that file's own
 // standalone sanity gate). A GENUINELY different real structure from
 // every Alloy stage above: those are all real coordination shells of
@@ -3671,7 +3671,7 @@ const SALT_STAGE = {
 
 // Calcite/Magnesite (CaCO3/MgCO3, real R-3c rhombohedral carbonate) --
 // 2026-09-05, direct instruction: scoped and built on
-// `geometry-extensions/calcite-lattice.js` (numerically self-verified
+// `krp-core/src/geometry-extensions/calcite-lattice.js` (numerically self-verified
 // this same session -- see that file's own standalone sanity gate).
 // Genuinely more than Salt: same real cation/anion topology (calcite
 // IS a real, documented rhombohedrally-distorted rock-salt structure),

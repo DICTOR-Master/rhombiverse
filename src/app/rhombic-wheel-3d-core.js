@@ -21,7 +21,7 @@
 // 4-valent/3-valent vertex counts.
 //
 // Note: this is a deliberately separate, self-contained face/vertex
-// representation from core/lattice.js's rdRawVerts() (which returns an
+// representation from krp-core/src/core/lattice.js's rdRawVerts() (which returns an
 // unordered 14-point list consumed by THREE's ConvexGeometry -- the
 // existing renderer has no per-face quad/winding structure at all, so
 // there is nothing to reconcile conventions with; see Phase 0 report).
@@ -351,7 +351,7 @@ export const WHEEL_PIECE = {
 // rather than more WHEEL_PIECE faces). Hemi RD/Hourglass/the two cluster
 // stamps below all ported from Rhombis 2026-09-06 (src/rhombis/stages.js's
 // Hourglass/Hourglass Chain stages and Multi-Cell's hubcap-cluster idea,
-// core/lattice.js's hemisphereSplit -- see core/hemisphere-build.js for
+// krp-core/src/core/lattice.js's hemisphereSplit -- see core/hemisphere-build.js for
 // the real store/key/cluster-group scheme).
 //
 // Real same-day bug, direct report: this wheel's first draft only
@@ -423,7 +423,7 @@ export const WHEEL_RD_FAMILY = {
     // this wheel's one remaining spare slot (direct decision). Not RD-
     // family either, but registered to the RD world's own FCC frame:
     // one up-tetrahedron inside every RD, truncated-tetrahedron voids in
-    // its real holes -- see geometry-extensions/pyrochlore-lattice.js.
+    // its real holes -- see krp-core/src/geometry-extensions/pyrochlore-lattice.js.
     "bottom|sx-1sz-1":  { kind: "dept", label: "Pyrochlore", action: "tool:pieceType:pyrochlore",
       desc: "Pyrochlore (3D Kagome) -- place truncated tetrahedra; the corner-sharing tetrahedra between them appear on their own." },
   }

@@ -13,7 +13,7 @@ import {
   PYRAMID_AXES,
   oppositeNeighborIndex,
   rdQuarterPieces,
-} from './lattice.js';
+} from '../krp-core/src/core/lattice.js';
 import {
   applyPyramidEdit,
   resolvePyramidAxisForHit,
@@ -27,14 +27,14 @@ import {
   pyramidAxisForNormal,
   axisKeyToOffset,
   nearestPyramidAxis,
-} from './pyramid.js';
-import { nearestBCCCell, matchBCCNeighborOffset } from '../geometry-extensions/dual-lattice.js';
-import { matchHexNeighborOffset } from '../geometry-extensions/hex-prism.js';
+} from '../krp-core/src/core/pyramid.js';
+import { nearestBCCCell, matchBCCNeighborOffset } from '../krp-core/src/geometry-extensions/dual-lattice.js';
+import { matchHexNeighborOffset } from '../krp-core/src/geometry-extensions/hex-prism.js';
 import { matchDictoNeighborOffset, matchDictoBlockNeighbour, dictoBlockFromKey, dictoBlockKey } from '../geometry-extensions/dicto-fcc.js';
 import { matchDictoHexNeighborOffset } from '../geometry-extensions/dicto-hex.js';
-import { rhombohedraAttachOptions, rhombohedraOverlap } from '../geometry-extensions/rhombohedra-lattice.js';
-import { pyrochloreSiteOrientation, pyrochloreNeighborForTTFace, pyrochloreNeighborForTetFace, pyrochloreCapForTTFace, pyrochloreTetCornerPartner, pyrochloreCapTetsOf, pyrochloreCellToWorld } from '../geometry-extensions/pyrochlore-lattice.js';
-import { elongDodecaCellToWorld } from '../geometry-extensions/elongated-dodecahedron.js';
+import { rhombohedraAttachOptions, rhombohedraOverlap } from '../krp-core/src/geometry-extensions/rhombohedra-lattice.js';
+import { pyrochloreSiteOrientation, pyrochloreNeighborForTTFace, pyrochloreNeighborForTetFace, pyrochloreCapForTTFace, pyrochloreTetCornerPartner, pyrochloreCapTetsOf, pyrochloreCellToWorld } from '../krp-core/src/geometry-extensions/pyrochlore-lattice.js';
+import { elongDodecaCellToWorld } from '../krp-core/src/geometry-extensions/elongated-dodecahedron.js';
 import {
   bootstrapDisphenoid,
   disphenoidKey,
@@ -42,7 +42,7 @@ import {
   resolveFaceForHit,
   axisEdgeOfFace,
   octahedronDisphenoids,
-} from '../geometry-extensions/interstitial-lattice.js';
+} from '../krp-core/src/geometry-extensions/interstitial-lattice.js';
 import {
   halfRdKey,
   hourglassKey,
@@ -174,7 +174,7 @@ export function createBuildController({
   elongDodecaCellAt = () => null,
   onElongDodecaChange = () => {},
   // Hex Prism ('hexprism' piece tier): a genuinely separate lattice
-  // (own axial-hex coordinate frame, geometry-extensions/hex-prism.js --
+  // (own axial-hex coordinate frame, krp-core/src/geometry-extensions/hex-prism.js --
   // NOT a sub-piece of RD's own lattice the way Elongated Dodecahedron
   // is, so there's no FCC-relative bootstrap here). Always seeded at
   // (0,0,0) by onHexPrismChange's own "never truly empty" invariant
@@ -1741,7 +1741,7 @@ export function createBuildController({
     // aware. 'pyramid' operates on the CLICKED cell itself (no new cell
     // placed); 'rd'/'cube' place a new adjacent cell, same as always,
     // just with or without pyramids: 0 explicitly set (absent means FULL
-    // per core/pyramid.js).
+    // per krp-core/src/core/pyramid.js).
     if (getPieceType() === 'pyramid') {
       // Direct instruction 2026-09-01 ("it just needed to be able to
       // attach flat to flat or point to point"), THEN a real regression

@@ -14,7 +14,7 @@
 //   - copies at the lattice cells fill space: random points lie in exactly
 //     one cell, and the cell's volume equals the volume per lattice cell;
 //   - a click on any face finds the neighbour across it.
-import { NEIGHBOR_OFFSETS, isValidCell } from '../src/core/lattice.js';
+import { NEIGHBOR_OFFSETS, isValidCell } from '../src/krp-core/src/core/lattice.js';
 import { blueLines, DICTO_DIRECTIONS, dictoCellVerts, dictoMatrix, dictoCellToWorld, matchDictoNeighborOffset, dictoBlocks, matchDictoBlockNeighbour, dictoBlockKey, dictoBlockFromKey } from '../src/geometry-extensions/dicto-fcc.js';
 
 let failures = 0;

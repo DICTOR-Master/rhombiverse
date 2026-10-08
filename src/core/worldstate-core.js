@@ -3,7 +3,7 @@
 // over it. Persistence to
 // storage lives in persistence.js -- this module only tracks state in
 // memory.
-import { cellKey, parseCellKey } from './lattice.js';
+import { cellKey, parseCellKey } from '../krp-core/src/core/lattice.js';
 
 export async function loadWorld(url) {
   const res = await fetch(url);

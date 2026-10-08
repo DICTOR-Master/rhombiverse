@@ -1,5 +1,5 @@
 // The 5D and 6D quasicrystal worlds, one factory for both, on the
-// cut-and-project engine in geometry-extensions/quasicrystal.js
+// cut-and-project engine in krp-core/src/geometry-extensions/quasicrystal.js
 // (verify:quasicrystal):
 //   6D: the icosahedral quasicrystal, prolate and oblate golden
 //       rhombohedra (Ammann-Kramer) from Z^6.
@@ -47,7 +47,7 @@
 //   removes one; they undo and export like pieces.
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { makeQuasicrystal, BASE_OFFSET, APPROXIMANT_STOPS, TIERS, PRISM_HEIGHT, tileKey } from '../geometry-extensions/quasicrystal.js';
+import { makeQuasicrystal, BASE_OFFSET, APPROXIMANT_STOPS, TIERS, PRISM_HEIGHT, tileKey } from '../krp-core/src/geometry-extensions/quasicrystal.js';
 import { createGearedSlider } from './geared-slider.js';
 import { t, tn } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';

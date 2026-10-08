@@ -222,6 +222,15 @@ real technical onboarding doc.
 
 ## Running locally
 
+The shared geometry (lattices, cells, quasicrystals, rhombic dodecahedron pieces) lives in
+[krp-core](https://github.com/DICTOR-Master/krp-core), shared with Kaleidohedra and pinned here as a git
+submodule at `src/krp-core`. Clone with it:
+
+```
+git clone --recurse-submodules https://github.com/DICTOR-Master/rhombiverse
+# or, in an existing clone: git submodule update --init
+```
+
 No build step — plain ES modules loaded via an import map in `index.html`.
 Serve the directory with any static file server, e.g.:
 

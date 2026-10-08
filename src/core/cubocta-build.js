@@ -9,7 +9,7 @@
 // point toward its 14 real neighbor directions by construction, so
 // clicking a face and matching its normal to the nearest neighbor offset
 // is unambiguous there. A cuboctahedron's VERTICES point toward its 12
-// real FCC neighbors instead (core/lattice.js's own NEIGHBOR_OFFSETS,
+// real FCC neighbors instead (krp-core/src/core/lattice.js's own NEIGHBOR_OFFSETS,
 // verified numerically before any of this was written -- see that
 // file's own header) -- its faces point in unrelated directions, so
 // face-normal matching doesn't carry over. Growth here instead matches
@@ -17,7 +17,7 @@
 // center against the 12 real neighbor directions, i.e. "click near
 // whichever vertex points toward the neighbor you want to grow into."
 import * as THREE from 'three';
-import { NEIGHBOR_OFFSETS } from './lattice.js';
+import { NEIGHBOR_OFFSETS } from '../krp-core/src/core/lattice.js';
 
 // Doubled-density growth (2026-08-31 session, real numeric verification
 // in the session's own scratch checks): axis-adjacent cuboctahedra

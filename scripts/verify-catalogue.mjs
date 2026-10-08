@@ -3,9 +3,9 @@
 // entry genuinely occurs in its tiling (at several phasons, near several
 // points), landing as the right number of pieces with no overlap.
 import { readFileSync } from 'node:fs';
-import { makeQuasicrystal, BASE_OFFSET, TIERS } from '../src/geometry-extensions/quasicrystal.js';
+import { makeQuasicrystal, BASE_OFFSET, TIERS } from '../src/krp-core/src/geometry-extensions/quasicrystal.js';
 import { SERIAL_RANGES, findOccurrence, pieceCount, congruentSets, localPatch, canonicalPatch, polytopeShape } from '../src/geometry-extensions/quasicrystal-catalogue.js';
-import { tilesOverlap } from '../src/geometry-extensions/growth.js';
+import { tilesOverlap } from '../src/krp-core/src/geometry-extensions/growth.js';
 
 let failures = 0;
 function check(label, condition) {

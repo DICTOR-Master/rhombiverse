@@ -8,7 +8,7 @@
 // same entry when their shadows are congruent (equal sorted corner-to-corner
 // distances), so every entry is a different shape.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { makeQuasicrystal, subsets } from '../src/geometry-extensions/quasicrystal.js';
+import { makeQuasicrystal, subsets } from '../src/krp-core/src/geometry-extensions/quasicrystal.js';
 import { polytopeShape } from '../src/geometry-extensions/quasicrystal-catalogue.js';
 
 const FILE = new URL('../data/catalogue-5d6d.json', import.meta.url);

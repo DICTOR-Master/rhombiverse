@@ -6,20 +6,20 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { rdRawVerts, cellToWorld, nearestValidCell, isValidCell, cellKey, pyramidPieces, rdQuarterPieces, cellsInShells, cuboctahedronVertices, octGapVertices, hemisphereSplit, NEIGHBOR_OFFSETS } from './core/lattice.js';
-import { FULL_PYRAMIDS, presentAxisKeys, hasCube, effectivePyramids } from './core/pyramid.js';
+import { rdRawVerts, cellToWorld, nearestValidCell, isValidCell, cellKey, pyramidPieces, rdQuarterPieces, cellsInShells, cuboctahedronVertices, octGapVertices, hemisphereSplit, NEIGHBOR_OFFSETS } from './krp-core/src/core/lattice.js';
+import { FULL_PYRAMIDS, presentAxisKeys, hasCube, effectivePyramids } from './krp-core/src/core/pyramid.js';
 import { createRhombicWheel3D } from './app/rhombic-wheel-3d.js';
 import { createAlmanac } from './app/almanac.js';
-import { getDual, DUAL_DIRS, snapToDual } from './core/dual.js';
-import { bccShapeScaleFor } from './geometry-extensions/bcc-detail-lattice.js';
-import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS } from './geometry-extensions/dual-lattice.js';
+import { getDual, DUAL_DIRS, snapToDual } from './krp-core/src/core/dual.js';
+import { bccShapeScaleFor } from './krp-core/src/geometry-extensions/bcc-detail-lattice.js';
+import { truncatedOctahedronVertices, nearestBCCPoints, nearestFCCPoints, BCC_NEIGHBOR_OFFSETS } from './krp-core/src/geometry-extensions/dual-lattice.js';
 import { createCuboctaBuildController, AXIS_OFFSETS as CUBOCTA_AXIS_OFFSETS } from './core/cubocta-build.js';
 import { createCuboctaGapBuildController, octGapCellToWorld, octGapCellForCOCell } from './core/cubocta-gap-build.js';
 import { createInterstitialStore } from './core/interstitial-build.js';
 import { createHemisphereStore } from './core/hemisphere-build.js';
-import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids, disphenoidKey } from './geometry-extensions/interstitial-lattice.js';
-import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './geometry-extensions/spherical-toggle.js';
-import { packing, voidSphereRadius, TANGENT_R, RADIUS_MAX } from './geometry-extensions/sphere-packing.js';
+import { bootstrapDisphenoid, disphenoidVertsToWorld, octahedronDisphenoids, disphenoidKey } from './krp-core/src/geometry-extensions/interstitial-lattice.js';
+import { sampleSuperellipsoidGrid, volumeMatchedRadius } from './krp-core/src/geometry-extensions/spherical-toggle.js';
+import { packing, voidSphereRadius, TANGENT_R, RADIUS_MAX } from './krp-core/src/geometry-extensions/sphere-packing.js';
 import { SKELETON_COLOR } from './app/rhombic-wheel-3d-core.js';
 import { createDimensionWizard } from './app/dimension-wizard.js';
 import { dimensionLabel } from './app/dimension-label.js';
@@ -35,15 +35,15 @@ import { createKaleidoWorld } from './app/world-kaleidoscope.js';
 import { createNetsWorld } from './app/world-nets.js';
 import { createSignalWorld } from './app/world-signal.js';
 import { createConstructWorld } from './app/world-construct.js';
-import { makeQuasicrystal, PRISM_HEIGHT } from './geometry-extensions/quasicrystal.js';
+import { makeQuasicrystal, PRISM_HEIGHT } from './krp-core/src/geometry-extensions/quasicrystal.js';
 import { loadCatalogue, findBySerial, zonotopeVertices, localPatch, polytopeShape } from './geometry-extensions/quasicrystal-catalogue.js';
-import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './geometry-extensions/elongated-dodecahedron.js';
-import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/hex-prism.js';
+import { elongatedDodecahedronVerts, elongDodecaCellToWorld } from './krp-core/src/geometry-extensions/elongated-dodecahedron.js';
+import { hexPrismVerts, hexCellToWorld, HEX_NEIGHBOR_OFFSETS } from './krp-core/src/geometry-extensions/hex-prism.js';
 import { dictoCellVerts, dictoCellToWorld, DICTO_NEIGHBOR_OFFSETS, dictoBlocks, dictoBlockFromKey, dictoBlockKey } from './geometry-extensions/dicto-fcc.js';
 import { dictoHexCellVerts, dictoHexCellToWorld, DICTO_HEX_NEIGHBOR_OFFSETS } from './geometry-extensions/dicto-hex.js';
 import { NAMED_LATTICE_ANGLES, START_LATTICE_ANGLE, LATTICE_PRIMITIVES, LATTICE_PRIMITIVE_IMPLS, latticeBasis, RHOMBILLE_ANGLE_ID, RHOMBILLE_ARRANGEMENT_IMPL } from './geometry-extensions/lattice-2d.js';
-import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWorld, rhombohedraMigrateLegacyCell, rhombohedraAttachOptions, rhombohedraOverlap } from './geometry-extensions/rhombohedra-lattice.js';
-import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats, pyrochloreNeighborOffsets, pyrochloreCapTetsOf, pyrochloreVisibleTets, pyrochloreTetCornerPartner } from './geometry-extensions/pyrochlore-lattice.js';
+import { rhombohedraTileVerts, rhombohedraOrientationMatrix, rhombohedraPieceWorld, rhombohedraMigrateLegacyCell, rhombohedraAttachOptions, rhombohedraOverlap } from './krp-core/src/geometry-extensions/rhombohedra-lattice.js';
+import { pyrochloreSiteOrientation, pyrochloreCellToWorld, truncatedTetrahedronVerts, tetrahedronVerts, pyrochloreCapTets, pyrochloreShapeStats, pyrochloreNeighborOffsets, pyrochloreCapTetsOf, pyrochloreVisibleTets, pyrochloreTetCornerPartner } from './krp-core/src/geometry-extensions/pyrochlore-lattice.js';
 import { loadWorld, createWorldStore } from './core/worldstate-core.js';
 import { createBuildController } from './core/build.js';
 import { getSettings, updateSettings, onSettingsChange, QUALITY_PIXEL_RATIO_FACTOR, QUALITY_LEVELS_ASCENDING } from './app/settings.js';
@@ -74,7 +74,7 @@ import {
   RHOMBOHEDRA_STORAGE_KEY,
   PYROCHLORE_STORAGE_KEY,
 } from './core/persistence.js';
-import { VALID_TRIPLES, unitTileVertices } from './geometry-extensions/growth.js';
+import { VALID_TRIPLES, unitTileVertices } from './krp-core/src/geometry-extensions/growth.js';
 
 const SCALE = 1;
 // Hex Prism: no special proportion is required for a plain hex-prism
@@ -120,7 +120,7 @@ const RHOMBOHEDRA_S = SCALE;
 const RHOMBOHEDRA_FIRST = [-1, -1, -1];
 const RHOMBOHEDRA_LEGACY_SEED = rhombohedraMigrateLegacyCell(5, 0, 0);
 // Pyrochlore (3D Kagome): registered to the main RD world's own units
-// (direct decision) -- see geometry-extensions/pyrochlore-lattice.js.
+// (direct decision) -- see krp-core/src/geometry-extensions/pyrochlore-lattice.js.
 const PYROCHLORE_S = SCALE;
 // Where the FIRST truncated tetrahedron goes when the Pyrochlore world is
 // empty (the cyan target, 2026-09-24): the O-site nearest the origin,
@@ -602,7 +602,7 @@ function buildCuboctaGeometry(scale) {
 }
 
 // Same recipe again, for the Cuboctahedron gap-octahedron piece (real
-// geometry verified numerically this session -- see core/lattice.js's
+// geometry verified numerically this session -- see krp-core/src/core/lattice.js's
 // own octGapVertices header).
 function buildOctGapGeometry(scale) {
   const points = octGapVertices(scale).map(([x, y, z]) => new THREE.Vector3(x, y, z));
@@ -934,7 +934,7 @@ function visibleCells(world) {
 }
 
 function isPartialCell(cell) {
-  // cube === false (see core/pyramid.js's hasCube()) always needs the
+  // cube === false (see krp-core/src/core/pyramid.js's hasCube()) always needs the
   // per-cell mesh path -- a cube-less cell can never be a plain
   // InstancedMesh instance regardless of its own pyramids bitmask.
   return cell.cube === false || (cell.pyramids !== undefined && cell.pyramids !== FULL_PYRAMIDS);
@@ -1002,7 +1002,7 @@ function buildPyramidOnlyMeshes(cell, color) {
     // Which of the 6 axes this specific sub-mesh is -- core/build.js's
     // pyramid click handler needs this to tell "clicked my own existing
     // pyramid's base/apex" apart from "clicked a bare cube's flat face",
-    // see classifyExistingPyramidHit in core/pyramid.js.
+    // see classifyExistingPyramidHit in krp-core/src/core/pyramid.js.
     pyramidMesh.userData.axisKey = axisKey;
     meshes.push(pyramidMesh);
   }
@@ -1659,7 +1659,7 @@ async function init() {
   const elongDodecaWorld = createWorldStore(elongDodecaSavedJSON ?? { worldName: 'Elongated Dodecahedron Lattice', version: 1, cells: {}, meta: {} });
 
   // Hex Prism Build: a genuinely separate lattice (own axial-hex
-  // coordinate frame, geometry-extensions/hex-prism.js), same "own
+  // coordinate frame, krp-core/src/geometry-extensions/hex-prism.js), same "own
   // independent store, own localStorage key" pattern as bccWorld/
   // cuboctaWorld. Unlike elongDodecaWorld, DOES need the "never truly
   // empty" invariant (onHexPrismChange, below) -- its own coordinate
@@ -1778,7 +1778,7 @@ async function init() {
   // material clone, same MATERIAL_COLORS palette, different base shape"
   // pattern as bccMesh above. elongatedDodecahedronVerts(SCALE) already
   // uses the verified equilateral-hexagon elongation ratio by default
-  // (elongationRatio=1, geometry-extensions/elongated-dodecahedron.js's
+  // (elongationRatio=1, krp-core/src/geometry-extensions/elongated-dodecahedron.js's
   // own header) -- no extra scale correction needed the way bccShapeScaleFor
   // provides for TO.
   const elongDodecaGeometry = new ConvexGeometry(elongatedDodecahedronVerts(SCALE).map(([x, y, z]) => new THREE.Vector3(x, y, z)));
@@ -2352,7 +2352,7 @@ async function init() {
   // Cuboctahedron Build: its own InstancedMesh (cuboctahedron geometry),
   // same "own material clone, same MATERIAL_COLORS palette" pattern as
   // bccMesh above -- cuboctahedronVertices(SCALE) already applies the
-  // real, verified half-scale internally (see core/lattice.js's own
+  // real, verified half-scale internally (see krp-core/src/core/lattice.js's own
   // header), so real placed cells touch their real neighbors without
   // overlapping, the same property Lattice Quick-View's own 'cubocta'
   // preview mode relies on.
@@ -2811,7 +2811,7 @@ async function init() {
     pyrochloreAllMeshes.forEach((m) => { m.material.clippingPlanes = planes; });
     cuboctaMesh.material.clippingPlanes = planes;
     octGapMesh.material.clippingPlanes = planes;
-    // Cube-less cells (see core/pyramid.js's hasCube()) render as a
+    // Cube-less cells (see krp-core/src/core/pyramid.js's hasCube()) render as a
     // Group of separate pyramid meshes rather than one Mesh -- see
     // disposePartialCellObject3D's own header for why -- so a Group's
     // own children each need the clippingPlanes update individually.
@@ -3553,7 +3553,7 @@ async function init() {
   }
 
   // ◯ Spherical (docs/RHOMBIVERSE_SPEC_SPHERICAL_VIEW_CYCLE.md; the
-  // packing maths is geometry-extensions/sphere-packing.js) cycles
+  // packing maths is krp-core/src/geometry-extensions/sphere-packing.js) cycles
   // off → spheres → voids. View only, like X-Ray: your cells are
   // untouched. Spheres: every piece as its sphere; whole RDs touch their
   // twelve neighbours. Voids: every sphere ghosted, over a faint RD
@@ -3676,7 +3676,7 @@ async function init() {
   // cohesive master lattice together with FCC," "mathematically
   // consistent and interchangeable," per direct instruction. Additive to
   // the real RD world (never touches worldstate); see
-  // geometry-extensions/bcc-detail-lattice.js for the full history of why
+  // krp-core/src/geometry-extensions/bcc-detail-lattice.js for the full history of why
   // this design replaced two earlier attempts (a same-scale overlay, then
   // a per-cell-contained nested cluster -- both real, reasoned dead ends,
   // not guesses).
@@ -4472,7 +4472,7 @@ async function init() {
     } else if (latticeQuickViewMode === 'cubocta') {
       // Cuboctahedron is native to the SAME FCC lattice as world.entries()
       // itself (its 12 vertices are exactly NEIGHBOR_OFFSETS -- see
-      // core/lattice.js's own cuboctahedronVertices) -- unlike the BCC-
+      // krp-core/src/core/lattice.js's own cuboctahedronVertices) -- unlike the BCC-
       // family modes below, no cross-lattice nearest-point conversion is
       // needed, one real shape per real cell, same as the FCC-family
       // modes above.
@@ -5640,7 +5640,7 @@ async function init() {
     // the universal Add/Remove actions ALSO target the separate BCC
     // dual-lattice world, via core/build.js's own handleToClick (which
     // owns the bootstrap-vs-extend logic directly, using
-    // geometry-extensions/dual-lattice.js's matchBCCNeighborOffset) --
+    // krp-core/src/geometry-extensions/dual-lattice.js's matchBCCNeighborOffset) --
     // not a pretense that a truncated octahedron is a piece of the same RD
     // decomposition RD/Cube/Pyramid are.
     bccWorld,

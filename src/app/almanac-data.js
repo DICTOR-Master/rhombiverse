@@ -12,18 +12,18 @@
 // -- every real piece action appears in Almanac exactly once, no silent
 // gaps.
 import { WHEEL_PIECE, WHEEL_RD_FAMILY, ACTION_TO_MARK } from './rhombic-wheel-3d-core.js';
-import { computeConvexStats } from '../core/polyhedron-stats.js';
-import { CUBE_VERTS, rdRawVerts, pyramidPieces, cuboctahedronVertices, octGapVertices, hemisphereSplit } from '../core/lattice.js';
-import { truncatedOctahedronVertices } from '../geometry-extensions/dual-lattice.js';
-import { bootstrapDisphenoid, octahedronVerts } from '../geometry-extensions/interstitial-lattice.js';
+import { computeConvexStats } from '../krp-core/src/core/polyhedron-stats.js';
+import { CUBE_VERTS, rdRawVerts, pyramidPieces, cuboctahedronVertices, octGapVertices, hemisphereSplit } from '../krp-core/src/core/lattice.js';
+import { truncatedOctahedronVertices } from '../krp-core/src/geometry-extensions/dual-lattice.js';
+import { bootstrapDisphenoid, octahedronVerts } from '../krp-core/src/geometry-extensions/interstitial-lattice.js';
 import { CORNER_GROUPS, BAND_GROUPS, TRIANGLE_GROUPS, triangleRingCells, canonicalHourglassCells } from '../core/hemisphere-build.js';
-import { rdQuarterPieces } from '../core/lattice.js';
-import { elongatedDodecahedronVerts } from '../geometry-extensions/elongated-dodecahedron.js';
+import { rdQuarterPieces } from '../krp-core/src/core/lattice.js';
+import { elongatedDodecahedronVerts } from '../krp-core/src/geometry-extensions/elongated-dodecahedron.js';
 import { dictoCellVerts } from '../geometry-extensions/dicto-fcc.js';
-import { hexPrismVerts } from '../geometry-extensions/hex-prism.js';
+import { hexPrismVerts } from '../krp-core/src/geometry-extensions/hex-prism.js';
 import { dictoHexCellVerts } from '../geometry-extensions/dicto-hex.js';
-import { rhombohedraTileVerts } from '../geometry-extensions/rhombohedra-lattice.js';
-import { truncatedTetrahedronVerts } from '../geometry-extensions/pyrochlore-lattice.js';
+import { rhombohedraTileVerts } from '../krp-core/src/geometry-extensions/rhombohedra-lattice.js';
+import { truncatedTetrahedronVerts } from '../krp-core/src/geometry-extensions/pyrochlore-lattice.js';
 
 // Only "kind: dept" faces with a real tool:pieceType:*/tool:cuboctaBuild
 // action are actual placeable pieces. Excludes two kinds of non-piece

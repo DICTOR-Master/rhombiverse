@@ -1,5 +1,5 @@
 // Interstitial-lattice store: disphenoid cells for the BCC interstitial-
-// site tessellation (geometry-extensions/interstitial-lattice.js). The
+// site tessellation (krp-core/src/geometry-extensions/interstitial-lattice.js). The
 // actual click-to-build logic lives in core/build.js's own
 // handleInterstitialClick, integrated the same way the TO piece tier is
 // (an early-routed branch inside the universal Add/Remove controller,
@@ -7,7 +7,7 @@
 // file's first draft, reverted once it became clear a second, parallel
 // set of click/contextmenu listeners would double-handle every click
 // alongside core/build.js's own.
-import { disphenoidKey } from '../geometry-extensions/interstitial-lattice.js';
+import { disphenoidKey } from '../krp-core/src/geometry-extensions/interstitial-lattice.js';
 
 // Deliberately NOT core/worldstate-core.js's createWorldStore: that
 // store's whole schema/API is keyed on cellKey(x,y,z), a single integer

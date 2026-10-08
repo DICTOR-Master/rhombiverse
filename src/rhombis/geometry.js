@@ -1,7 +1,7 @@
 // Rhombis' one parametrized pyramid mesh function (RHOMBIVERSE_SPEC_
 // RHOMBIS_GAME_BUILD_PLAN.md, "Core geometry"): every shape downstream
 // (octahedron, cube, RD) is this same mesh plus transforms, never a
-// redefinition. Reuses core/lattice.js's pyramidPieces() -- already the
+// redefinition. Reuses krp-core/src/core/lattice.js's pyramidPieces() -- already the
 // real RD cube+6-pyramid decomposition, unit tested in tests/unit/
 // pyramid.test.mjs and lattice.test.mjs -- instead of re-deriving pyramid
 // vertices. Same point-cloud -> THREE.ConvexGeometry recipe render.js's
@@ -21,7 +21,7 @@
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { pyramidPieces, facePieces, oppositeNeighborIndex, hemisphereSplit, rdRawVerts } from '../core/lattice.js';
+import { pyramidPieces, facePieces, oppositeNeighborIndex, hemisphereSplit, rdRawVerts } from '../krp-core/src/core/lattice.js';
 import { SYMMETRY_OPERATIONS } from './cell-arrangements.js';
 
 export function pyramidGeometry(scale = 1) {
@@ -34,7 +34,7 @@ export function pyramidGeometry(scale = 1) {
 }
 
 // A pyramid from a cell's own local center to ONE of its 12 REAL
-// rhombic faces (facePieces() in core/lattice.js -- the actual shared
+// rhombic faces (facePieces() in krp-core/src/core/lattice.js -- the actual shared
 // face two adjacent cells at NEIGHBOR_OFFSETS[offsetIndex] have, unlike
 // pyramidPieces()'s own 6-axis inscribed-cube frame, which only ever
 // reaches a single vertex of a real 12-neighbor-direction face, not the
@@ -50,7 +50,7 @@ export function facePyramidGeometry(scale, offsetIndex) {
   return geometry;
 }
 
-// One real half of a cell, split by hemisphereSplit() (core/lattice.js
+// One real half of a cell, split by hemisphereSplit() (krp-core/src/core/lattice.js
 // -- see its own header for why this replaced facePyramidGeometry() for
 // junction interlocking specifically). `side` is 'positive' (the half
 // touching the real neighbor at NEIGHBOR_OFFSETS[offsetIndex]) or
@@ -80,7 +80,7 @@ export function hemisphereGeometry(scale, offsetIndex, side) {
 // after: "the bridging point of any adjacent shapes in a structure is
 // a potential opportunity for a big odd connection"): built from the
 // SAME real facePieces() primitive verified earlier the same day (see
-// core/lattice.js's own header), not a new heuristic, so two adjacent
+// krp-core/src/core/lattice.js's own header), not a new heuristic, so two adjacent
 // cells' own diagonal octahedra -- each built along the SAME real
 // shared axis -- meet at that real shared face exactly, the identical
 // "share the exact same 4 real-world vertices" guarantee already
@@ -142,7 +142,7 @@ export function flatStarPointGeometry(scale, offsetIndex, depthFraction = 0.5) {
 // A real, whole rhombic dodecahedron mesh -- Stage 6's "fused twelve"
 // piece (a full RD standing in for a cell's own 12 loose pyramids at
 // once, RHOMBIVERSE_SPEC_RHOMBIS_GAME_BUILD_PLAN.md's "conjoined
-// pieces" extended to a whole cell). Reuses core/lattice.js's own
+// pieces" extended to a whole cell). Reuses krp-core/src/core/lattice.js's own
 // rdRawVerts() -- the SAME 14-point convex hull recipe render.js's own
 // buildRDGeometry() uses for every real placed RD in the main
 // Rhombiverse app -- rather than deriving RD geometry a second way, so
@@ -271,7 +271,7 @@ export function disphenoidPointsForOrientation(index, scale = 1) {
   return disphenoidLocalPoints(scale).map((p) => applySymmetryOp(op, p));
 }
 
-// General axis-keyed orientation system, reusing core/pyramid.js's own
+// General axis-keyed orientation system, reusing krp-core/src/core/pyramid.js's own
 // 'x+'/'x-'/'y+'/'y-'/'z+'/'z-' vocabulary (PYRAMID_AXES) rather than
 // inventing a second one. Stage 2's octahedron only ever needed a plain
 // up/down flip (a special case of this: outwardQuaternion('y+') is

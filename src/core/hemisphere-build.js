@@ -21,13 +21,13 @@
 // .position is left untouched at the scene origin forever) -- there is no
 // second "group position" applied on top, so that whole bug class can't
 // recur here by construction, not by discipline.
-import { NEIGHBOR_OFFSETS, CUBE_VERTS, cellKey } from './lattice.js';
+import { NEIGHBOR_OFFSETS, CUBE_VERTS, cellKey } from '../krp-core/src/core/lattice.js';
 
 export function halfRdKey(x, y, z, offsetIndex, side) {
   return `halfrd|${cellKey(x, y, z)}|${offsetIndex}|${side}`;
 }
 
-// RD Quarter (core/lattice.js's rdQuarterPieces): one of RD's own 4 real
+// RD Quarter (krp-core/src/core/lattice.js's rdQuarterPieces): one of RD's own 4 real
 // zonotope rhombohedra, indexed 0-3 matching rdQuarterPieces()'s own
 // anchor order. Unlike halfrd, no "side" -- each of the 4 is an
 // independent, self-contained solid (not one half of a shared cut), so
@@ -35,7 +35,7 @@ export function halfRdKey(x, y, z, offsetIndex, side) {
 export function rdQuarterKey(x, y, z, cornerIndex) {
   return `rdquarter|${cellKey(x, y, z)}|${cornerIndex}`;
 }
-// Must match core/lattice.js's rdQuarterPieces anchors exactly (see the
+// Must match krp-core/src/core/lattice.js's rdQuarterPieces anchors exactly (see the
 // 2026-09-24 fix there: [1,1,1] -> [-1,-1,-1]).
 export const RD_QUARTER_ANCHORS = [[-1, -1, -1], [1, 1, -1], [1, -1, 1], [-1, 1, 1]];
 
@@ -102,7 +102,7 @@ function lexLess(a, b) {
 
 // Canonical, click-direction-independent identity for a two-cell bridge --
 // same reasoning core/interstitial-build.js's disphenoidKey and
-// geometry-extensions/dual-lattice.js's own cell-order-independent keys
+// krp-core/src/geometry-extensions/dual-lattice.js's own cell-order-independent keys
 // already apply: clicking the shared boundary from either cell's own face
 // must resolve to the SAME stored piece, not create two.
 export function hourglassKey(ax, ay, az, bx, by, bz) {
@@ -148,7 +148,7 @@ export function canonicalHourglassCells(ax, ay, az, bx, by, bz) {
 // corner (1,1,1) is adjacent to (1,1,0), (1,0,1), (0,1,1), the RD's own 3
 // real edges meeting there in this 12-direction frame. Derived directly
 // from CUBE_VERTS (not hand-listed) so this stays correct for free if
-// that ever changes -- same reasoning core/pyramid.js's own PYRAMID_AXES
+// that ever changes -- same reasoning krp-core/src/core/pyramid.js's own PYRAMID_AXES
 // derivation from OCTA_VERTS already follows. Each of the 12 directions
 // belongs to exactly 2 of these 8 corner groups (it sits on the edge
 // between them), which is exactly why 'hemi3' bootstrap (core/build.js)
@@ -168,7 +168,7 @@ export const CORNER_GROUPS = CUBE_VERTS.map((sign) => ({ sign, indices: cornerGr
 // Nearest corner to a real click point, local to the anchor cell's own
 // center (core/build.js passes hit.point minus that cell's own
 // cellToWorld()) -- plain max-dot-product against each corner's own sign
-// vector, the same "nearest apex" style resolution core/pyramid.js's own
+// vector, the same "nearest apex" style resolution krp-core/src/core/pyramid.js's own
 // harder hit-testing already established for this codebase.
 export function nearestCornerGroup(localPoint) {
   let best = CORNER_GROUPS[0];

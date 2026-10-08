@@ -18,8 +18,8 @@
 // shell with whole RDs, − Shell removes the outermost.
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { rdRawVerts, facePieces, NEIGHBOR_OFFSETS } from '../core/lattice.js';
-import { HULL_IDS, hullShell, hullShellOf, SPLITS, SPLIT_BY_ID, pieceSolid, splitOrientations, pieceAt, piecesOverlap, TRIMMABLE, hullPlanes, trimGauge, trimPiece, scaleDecomposition, nearestFcc, canonicalG } from '../geometry-extensions/rd-pieces.js';
+import { rdRawVerts, facePieces, NEIGHBOR_OFFSETS } from '../krp-core/src/core/lattice.js';
+import { HULL_IDS, hullShell, hullShellOf, SPLITS, SPLIT_BY_ID, pieceSolid, splitOrientations, pieceAt, piecesOverlap, TRIMMABLE, hullPlanes, trimGauge, trimPiece, scaleDecomposition, nearestFcc, canonicalG } from '../krp-core/src/geometry-extensions/rd-pieces.js';
 import { t, tn } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 import { addPanelMinimiser } from './panel-minimiser.js';

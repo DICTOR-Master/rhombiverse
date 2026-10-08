@@ -17,14 +17,12 @@ jobs:
     timeout-minutes: 5 # normally ~1min -- a real hang should fail fast, not sit for GitHub's 360min default
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true # krp-core, the shared geometry (src/krp-core)
       - uses: actions/setup-node@v7
         with:
           node-version: 20
       - run: node --test tests/unit/
-      # 5D/6D cut-and-project engine against the known tiling facts.
-      - run: node scripts/verify-quasicrystal.mjs
-      # Shells scene: RD splits, the scale ladder and shell sizes.
-      - run: node scripts/verify-shells.mjs
       # Kaleidoscope: shapes, mirrors, clipping, Penrose Safe rule.
       - run: node scripts/verify-kaleidoscope.mjs
       # 1D Signal: Morse timing, one signal for every view, the embedding.
@@ -33,14 +31,8 @@ jobs:
       - run: node scripts/verify-construction.mjs
       # Nets: flat without overlaps, folding closed into the solid.
       - run: node scripts/verify-nets.mjs
-      # Packed spheres: tangency, enclosed voids, bulk FCC counts.
-      - run: node scripts/verify-packing.mjs
       # 2D lattices: edge lengths, angles, tile placement rules.
       - run: node scripts/verify-lattice-2d.mjs
-      # Pyrochlore (3D Kagome): the quarter-cubic geometry.
-      - run: node scripts/verify-pyrochlore.mjs
-      # Rhombohedra: copy/mirror attach on the rhombohedral lattice.
-      - run: node scripts/verify-rhombohedra.mjs
       # DICTO FCC: DICTO's blue-strut skewed RD tiles as a sheared FCC.
       - run: node scripts/verify-dicto-fcc.mjs
       - run: node scripts/verify-dicto-hex.mjs
@@ -64,6 +56,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true # krp-core, the shared geometry (src/krp-core)
       - uses: actions/setup-node@v7
         with:
           node-version: 20
@@ -85,6 +79,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true # krp-core, the shared geometry (src/krp-core)
       - uses: actions/setup-node@v7
         with:
           node-version: 20
@@ -120,6 +116,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true # krp-core, the shared geometry (src/krp-core)
       - uses: actions/setup-node@v7
         with:
           node-version: 20
