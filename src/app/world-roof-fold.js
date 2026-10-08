@@ -15,13 +15,13 @@ import { getSettings, onSettingsChange } from './settings.js';
 import { addPanelMinimiser } from './panel-minimiser.js';
 
 const STORAGE_KEY = 'rhombiverse-roof-fold-world';
-const VIEWS = ['built', 'starIco', 'dodecaStar', 'checker', 'merged'];
+const VIEWS = ['built', 'starIco', 'dodecaStar', 'dodecaDogstar', 'checker', 'merged'];
 const KIND_COLOR = ROOF_FOLD_COLOURS;
 const PARITY_COLOR = [0xffc857, 0x7cc4ff];
 const OCTANT_COLOR = [0xffc857, 0x7cc4ff, 0xff7a59, 0x5fd38a, 0xc792ea, 0x4dd0e1, 0xf06292, 0xe8eef7];
 const PATTERNS = Object.keys(ROOF_FOLD_PATTERNS);
 const VERTICES = ['off', 'cube', 'all'];
-const ALTERNATING = ['starIco', 'dodecaStar', 'checker'];
+const ALTERNATING = ['starIco', 'dodecaStar', 'dodecaDogstar', 'checker'];
 // X-ray: inside to outside, the same wrap order as the Piece list. The innermost kind in the
 // build stays solid; each one further out fades more.
 const NESTING = ROOF_FOLD_KINDS;
@@ -80,7 +80,9 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
 
   // ---- what to draw ----
   // Octants has 8 colours, so it's only offered in Checkerboard; the two-solid views fall back to x+y+z.
-  const patternName = () => (view.pattern === 'octants' && view.mode !== 'checker' ? 'xyz' : view.pattern);
+  // Dodecahedron / Dogstar (DICTO, 2026-10-08: "filling gaps in normal way between dodecahedrons in
+  // EKP") is the Sunstar Lattice's tiling, which only x+y+z parity gives, so it keeps that pattern.
+  const patternName = () => (view.mode === 'dodecaDogstar' || (view.pattern === 'octants' && view.mode !== 'checker') ? 'xyz' : view.pattern);
   const colourIndex = (site) => ROOF_FOLD_PATTERNS[patternName()].of(...site);
   const odd = (site) => colourIndex(site) % 2 === 1;
   const shade = (hex, site) => { const c = new THREE.Color(hex); return view.parity && odd(site) ? c.multiplyScalar(ODD_SHADE) : c; };
@@ -89,6 +91,7 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
     switch (view.mode) {
       case 'starIco': return sites().map((site) => ({ site, kind: odd(site) ? 'ico' : 'star' }));
       case 'dodecaStar': return sites().map((site) => ({ site, kind: odd(site) ? 'star' : 'dodeca' }));
+      case 'dodecaDogstar': return sites().map((site) => ({ site, kind: odd(site) ? 'dogstar' : 'dodeca' }));
       default: return built;
     }
   }
@@ -358,7 +361,7 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
     panel.querySelector('.rf-view-label').textContent = t('roofFold.view', L);
     pieceSelect.innerHTML = ROOF_FOLD_KINDS.map((k) => `<option value="${k}"${k === view.piece ? ' selected' : ''}>${t(`roofFold.${k}`, L)}</option>`).join('');
     modeSelect.innerHTML = VIEWS.map((v) => `<option value="${v}"${v === view.mode ? ' selected' : ''}>${t(`roofFold.view.${v}`, L)}</option>`).join('');
-    patternRow.style.display = ALTERNATING.includes(view.mode) ? '' : 'none';
+    patternRow.style.display = ALTERNATING.includes(view.mode) && view.mode !== 'dodecaDogstar' ? '' : 'none';
     panel.querySelector('.rf-pattern-label').textContent = t('roofFold.pattern', L);
     patternSelect.innerHTML = PATTERNS.filter((p) => p !== 'octants' || view.mode === 'checker')
       .map((p) => `<option value="${p}"${p === patternName() ? ' selected' : ''}>${t(`roofFold.pattern.${p}`, L)}</option>`).join('');

@@ -175,7 +175,7 @@ A 3D world on one exact cell. Put Euclid's roofs on a cube and you get a regular
 
 Three of those pieces complete a homage to Kepler: the **octahedron** on the cube's face centres, with the icosahedron's corners on its edges at the golden section; the **stella octangula**, two regular tetrahedra on alternate cube corners that overlap in that octahedron; and Pacioli's three interlocking **golden rectangles**, which are exactly where the neighbouring cells' roof ridges meet. Together all five Platonic solids nest in one cell: icosahedron, octahedron, tetrahedra, cube, dodecahedron.
 
-The **Dogstar** is a piece too, between the octahedron and the stella octangula in the wrap order: the hole regular dodecahedra leave in their densest packing (George W. Hart's stellation 8 of the dodecahedron, 1996), inside the stella and holding the next cell's dodecahedron, 1/φ³ the size. In 2D+ → Nets it unfolds into one 60-triangle net.
+The **Dogstar** is a piece too, between the octahedron and the stella octangula in the wrap order: the hole regular dodecahedra leave in their densest packing (George W. Hart's stellation 8 of the dodecahedron, 1996), inside the stella and holding the next cell's dodecahedron, 1/φ³ the size. In 2D+ → Nets it unfolds into one 60-triangle net. **Dodecahedron / Dogstar** fills the gaps the usual way: dodecahedra on the even cells and Dogstars in the gaps between them, the Sunstar Lattice's tiling.
 
 The cell behind this world is the **Euclid–Kepler–Pacioli cell**, and great stellated dodecahedra and icosahedra touching only at corners form the **Euclid–Kepler–Pacioli network**, both by DICTO. Cite them as [doi:10.5281/zenodo.23173809](https://doi.org/10.5281/zenodo.23173809).
 
