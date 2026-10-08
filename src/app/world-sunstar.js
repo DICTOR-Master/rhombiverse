@@ -14,7 +14,7 @@ function chain() {
   const dodeca = roofFoldSolids().dodeca.faces, star = roofFoldSolids().star.faces, dog = dogstarSolid();
   const at = (faces, s, off = [0, 0, 0]) => faces.map((f) => f.map((p) => p.map((c, i) => (c + off[i]) * s)));
   const axes = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
-  const sunstar = (s) => [...at(dodeca, s).map((f) => [f, C.dodeca]), ...axes.flatMap((d) => at(dog, s, d.map((c) => 2 * c)).map((f) => [f, C.star]))];
+  const sunstar = (s) => [...at(dodeca, s).map((f) => [f, C.dodeca]), ...axes.flatMap((d) => at(dog, s, d.map((c) => 2 * c)).map((f) => [f, C.dogstar]))];
   return [
     { faces: at(star, 1).map((f) => [f, GREAT_STAR]), opacity: 0.32 },
     { faces: sunstar(k), opacity: 0.5 },
@@ -34,11 +34,11 @@ export function createSunstarWorld(opts) {
     // the 8 at its corners only touch it at a point).
     group: (e) => [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].map((d) => e.map((c, i) => c + d[i])),
     evenFaces: roofFoldSolids().dodeca.faces.map((f) => [f, C.dodeca]),
-    oddFaces: dogstarSolid().map((f) => [f, C.star]),
+    oddFaces: dogstarSolid().map((f) => [f, C.dogstar]),
     // Dogstars in every cell (direct request, 2026-10-08): a Dogstar fits wholly inside each
     // dodecahedron too (Dogstar inside stella inside cube inside dodecahedron), so Dogstars fill
     // every cell, eight tips meeting at each cube corner.
-    nestedFaces: dogstarSolid().map((f) => [f, C.star]),
+    nestedFaces: dogstarSolid().map((f) => [f, C.dogstar]),
     // The Star Chain Reaction (DICTO's name, 2026-10-08: "like solar radiation"), each step touching: inside the
     // dodecahedron its great star (the great stellated dodecahedron of the Dogstar's 1/phi^3 core),
     // inside that a whole Sunstar 1/phi^3 the size, inside its dodecahedron the next great star, and

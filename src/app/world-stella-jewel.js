@@ -15,7 +15,7 @@ function dragonChain(DJ) {
   return [
     { faces: S.cube.faces.map((f) => [f, C.cube]), opacity: 0.2 },
     { faces: S.stella.faces.map((f) => [f, C.stella]), opacity: 0.3 },
-    { faces: dogstarSolid().map((f) => [f, C.star]), opacity: 0.45 },
+    { faces: dogstarSolid().map((f) => [f, C.dogstar]), opacity: 0.45 },
     { faces: at(S.dodeca.faces, k).map((f) => [f, C.dodeca]), opacity: 0.6 },
     { faces: [...at(DJ.rhombi, k).map((f) => [f, C.dodeca]), ...at(DJ.walls, k).map((f) => [f, 0xb8892a])], opacity: 1 },
   ];

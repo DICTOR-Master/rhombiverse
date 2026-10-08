@@ -35,7 +35,7 @@ export function roofFoldCell() {
 // octahedron, stella and cube, so it goes last before the dodecahedron (verify-roof-fold.mjs).
 export const ROOF_FOLD_KINDS = ['rects', 'ico', 'oct', 'dogstar', 'stella', 'cube', 'star', 'dodeca'];
 // One colour per piece, shared by every world that shows the cell.
-export const ROOF_FOLD_COLOURS = { cube: 0x9fb4c8, dodeca: 0xffc857, ico: 0x5fd38a, star: 0xff7a59, oct: 0x4dd0e1, stella: 0xc792ea, rects: 0xffe082, dogstar: 0xf0609e };
+export const ROOF_FOLD_COLOURS = { cube: 0x9fb4c8, dodeca: 0xffc857, ico: 0x5fd38a, star: 0xff7a59, oct: 0x4dd0e1, stella: 0xc792ea, rects: 0xffe082, dogstar: 0xff9a52 }; // the Dogstar in Kaleidohedra orange (DICTO, 2026-10-08)
 // World units: icosahedron edge 1, dodecahedron phi, cube phi^2.
 export const ROOF_FOLD_WORLD_SCALE = PHI ** 2 / 2;
 export const siteParity = (x, y, z) => (((x + y + z) % 2) + 2) % 2;
