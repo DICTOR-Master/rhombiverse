@@ -10,6 +10,8 @@
 // solids through outer ones) or as the exact merged surface of the dodecahedra.
 import * as THREE from 'three';
 import { ROOF_FOLD_KINDS, ROOF_FOLD_COLOURS, ROOF_FOLD_WORLD_SCALE as WS, roofFoldSolids, mergedDodecaSurface, mergedDodecaEdges, ROOF_FOLD_PATTERNS , siteParity, turnPoint } from '../krp-core/src/geometry-extensions/roof-fold.js';
+import { request } from '../krp-core/src/request.js';
+import { objectId } from '../krp-core/src/vocabulary.js';
 import { t } from './i18n.js';
 import { getSettings, onSettingsChange } from './settings.js';
 import { addPanelMinimiser } from './panel-minimiser.js';
@@ -25,6 +27,17 @@ const ALTERNATING = ['starIco', 'dodecaStar', 'dodecaDogstar', 'checker'];
 // X-ray: inside to outside, the same wrap order as the Piece list. The innermost kind in the
 // build stays solid; each one further out fades more.
 const NESTING = ROOF_FOLD_KINDS;
+// Each piece's record in krp-core (KRP stage 3, DICTO's decision 2026-10-08): requested by its ID,
+// shown as the Info panel's Record line.
+const RECORD_OF = { rects: 'ekp/pacioli-rectangles', ico: 'ekp/icosahedron', oct: 'ekp/octahedron', dogstar: 'ekp/dogstar', stella: 'ekp/stella-octangula', cube: 'ekp/cube', star: 'ekp/great-stellated-dodecahedron', dodeca: 'ekp/dodecahedron' };
+export function recordLine(kind, L) {
+  const d = request(objectId(RECORD_OF[kind])).description;
+  const n = d.novelty;
+  const novelty = n.kind === 'prior-art' ? t('krp.novelty.prior-art', L, { credit: n.short })
+    : n.kind === 'not-found' ? t('krp.novelty.not-found', L, { scope: t(`krp.scope.${n.scope}`, L), date: n.date })
+    : t(`krp.novelty.${n.kind}`, L);
+  return `${d.id} · ${t(`krp.status.${d.status}`, L)} · ${novelty}`;
+}
 const xrayOpacity = (rank) => (rank === 0 ? 1 : Math.max(0.14, 0.5 - 0.08 * (rank - 1)));
 const FIRST_COLOR = 0x00e5ff;
 const GHOST_COLOR = 0x9de0ff;
@@ -334,6 +347,7 @@ export function createRoofFoldWorld({ scene, onChange = () => {}, showHudPrompt 
       row(t('roofFold.info.solids', L), all.length ? ROOF_FOLD_KINDS.filter((k) => count(k)).map((k) => `${t(`roofFold.${k}`, L)} ${count(k)}`).join(', ') : t('hull.info.none', L)),
       all.length ? row(t('roofFold.info.sites', L), t('roofFold.info.siteCounts', L, { n: S.length, even, odd: S.length - even })) : '',
       row(t('roofFold.info.group', L), alternating ? ROOF_FOLD_PATTERNS[patternName()].group : 'Pm-3 (No. 200)'),
+      row(t('krp.record', L), `${t(`roofFold.${view.piece}`, L)}: ${recordLine(view.piece, L)}`),
     ].join('');
   }
 
