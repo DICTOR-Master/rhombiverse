@@ -13,7 +13,7 @@ export function createStellaJewelWorld(opts) {
   const DJ = ekpWindowsSolid();
   const five = fiveWindowPositions();
   return createPairLatticeWorld(opts, {
-    storageKey: 'kaleidohedra-stella-jewel',
+    storageKey: 'rhombiverse-stella-jewel',
     panelId: 'worldstellajewel-panel',
     minimiser: 'stella-jewel',
     strings: 'dj',

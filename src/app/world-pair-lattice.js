@@ -22,7 +22,8 @@ const key = (s) => s.join(',');
 const isEven = (s) => (((s[0] + s[1] + s[2]) % 2) + 2) % 2 === 0;
 
 /**
- * config: { storageKey, panelId, minimiser, strings (key prefix), modes [{ id, even, odd }],
+ * config: { storageKey, panelId, minimiser, strings (key prefix), modes [{ id, even, odd, grouped }],
+ * group(evenSite) -> the odd sites that come with an even piece in a grouped mode,
  * evenFaces / oddFaces ([polygon, colour] in cell units), insideEven / insideOdd (p in cell units,
  * centred on the cell), overlay(s) -> { faint, bright } extra line segments per even piece (optional),
  * brightColor, holePrompt (true: a tap toward a hidden piece explains; false: it adds the nearest
@@ -122,6 +123,7 @@ export function createPairLatticeWorld({ scene, fitView = () => {}, shear = () =
     for (const s of shown()) for (const d of DJ_NEIGHBOURS) {
       const n = s.map((c, i) => c + d[i]);
       if (!showsSite(n) || !config.touches(s, d)) continue;
+      if (grouped() && !isEven(n)) continue;
       if (!cells.has(key(n))) out.set(key(n), n);
     }
     return [...out.values()];
@@ -192,6 +194,39 @@ export function createPairLatticeWorld({ scene, fitView = () => {}, shear = () =
     fit();
     return true;
   }
+  // Grouped modes (direct request, 2026-10-08: "the dodecahedron has all stars attached"): an
+  // even piece comes with its group (a Sunstar: the dodecahedron with the 6 Dogstars on its faces).
+  const grouped = () => modeOf().grouped === true;
+  const AXIS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  function addGroup(e) {
+    const fresh = [e, ...config.group(e)].filter((x) => !cells.has(key(x)));
+    if (!fresh.length) return false;
+    for (const x of fresh) cells.set(key(x), [...x]);
+    commit();
+    fit();
+    return true;
+  }
+  // Remove an even piece's group: its own odd pieces go too, unless another even piece present still has them.
+  function removeGroup(e) {
+    if (!cells.delete(key(e))) return false;
+    for (const o of config.group(e)) {
+      const shared = AXIS.some((d) => { const e2 = o.map((c, i) => c + d[i]); return key(e2) !== key(e) && cells.has(key(e2)) && config.group(e2).some((x) => key(x) === key(o)); });
+      if (!shared) cells.delete(key(o));
+    }
+    commit();
+    return true;
+  }
+  // The even piece an odd site belongs with: the present one beside it nearest the tap, else none.
+  function evenFor(o, q) {
+    let best = null, bestD = Infinity;
+    for (const d of AXIS) {
+      const e = o.map((c, i) => c + d[i]);
+      if (!cells.has(key(e))) continue;
+      const dist = q ? Math.hypot(...q.map((v, a) => v - 2 * d[a])) : 0;
+      if (dist < bestD) { bestD = dist; best = e; }
+    }
+    return best;
+  }
   // The piece across the tapped face: the neighbour whose piece holds a point just outside it.
   function across(s, hit) {
     const n = hit.face.normal;
@@ -220,6 +255,22 @@ export function createPairLatticeWorld({ scene, fitView = () => {}, shear = () =
     const s = hit.object.userData.records?.[hit.faceIndex];
     if (!tag || !s || mode === 'paint') return false;
     const chisel = mode === 'chisel';
+    if (grouped()) {
+      if (tag === 'first' || tag === 'ghost') return chisel ? false : addGroup(isEven(s) ? s : evenFor(s) ?? s.map((c, i) => c + (i === 0 ? 1 : 0)));
+      if (chisel) {
+        const e = isEven(s) ? s : evenFor(s, toLocal(s, [hit.point.x, hit.point.y, hit.point.z]));
+        if (e) return removeGroup(e);
+        if (!cells.delete(key(s))) return false;
+        commit();
+        return true;
+      }
+      const nb = across(s, hit);
+      // Through a Dogstar, the Sunstar beyond it: straight on from the tapped dodecahedron.
+      const e = !nb ? null : isEven(nb) ? nb : isEven(s) ? nb.map((c, i) => 2 * c - s[i]) : null;
+      if (e && addGroup(e)) return true;
+      showHudPrompt(t(`${S_}.prompt.taken`, lang()), 2000);
+      return false;
+    }
     if (tag === 'first' || tag === 'ghost') return chisel ? false : add(s);
     if (chisel) {
       if (!cells.delete(key(s))) return false;
